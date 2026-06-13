@@ -2691,15 +2691,24 @@
 
     app.historyEl.innerHTML = ''
 
-    var historyBtnStyle = { flex: '1 1 0', maxWidth: '160px' }
-    app.historyEl.appendChild(createEl('div', {
-      style: {
-        display: 'flex',
-        gap: '6px',
-        flexWrap: 'wrap',
-        marginBottom: '6px'
-      }
-    }, [
+    var gridStyle = {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(3, 1fr)',
+      gap: '6px',
+      marginBottom: '6px'
+    }
+    var btnStyle = { width: '100%' }
+
+    app.historyEl.appendChild(createEl('div', { style: gridStyle }, [
+      button('Clear Downloads', function () {
+        app.settings.downloadRecords = []
+        app.settings.history = (app.settings.history || []).map(function (item) {
+          return Object.assign({}, item, { downloadedAt: '' })
+        })
+        saveState()
+        renderHistory()
+        setStatus('download records cleared')
+      }, btnStyle),
       button('Clear History', function () {
         app.settings.history = []
         app.selectedHistoryUrls = []
@@ -2707,22 +2716,7 @@
         app.historySelectionAnchorUrl = ''
         saveState()
         renderHistory()
-      }, historyBtnStyle),
-      button('Favorite Current', function () {
-        var current = ''
-        if (app.fullUrlEl) current = app.fullUrlEl.value
-        else if (app.model) current = rebuildUrl(app.model)
-        if (!current) {
-          setStatus('no current URL to favorite')
-          return
-        }
-        addFavorite(current)
-        renderFavorites()
-        setStatus('favorite added')
-      }, historyBtnStyle),
-      button('Save Favorites File', function () {
-        saveFavoritesFile()
-      }, historyBtnStyle),
+      }, btnStyle),
       button('Export History', function () {
         var json = JSON.stringify(app.settings.history || [], null, 2)
         var blob = new Blob([json], { type: 'application/json' })
@@ -2734,8 +2728,23 @@
         a.click()
         a.remove()
         setStatus('history exported')
-      }, historyBtnStyle),
-      button('Import History', function () {
+      }, btnStyle)
+    ]))
+
+    app.historyEl.appendChild(createEl('div', { style: gridStyle }, [
+      button('Favorite Current', function () {
+        var current = ''
+        if (app.fullUrlEl) current = app.fullUrlEl.value
+        else if (app.model) current = rebuildUrl(app.model)
+        if (!current) {
+          setStatus('no current URL to favorite')
+          return
+        }
+        addFavorite(current)
+        renderFavorites()
+        setStatus('favorite added')
+      }, btnStyle),
+      button('Import Favorites', function () {
         var input = document.createElement('input')
         input.type = 'file'
         input.accept = '.json,application/json'
@@ -2745,23 +2754,24 @@
           var reader = new FileReader()
           reader.onload = function (e) {
             try {
-              var imported = JSON.parse(e.target.result)
-              if (!Array.isArray(imported)) throw new Error('not an array')
+              var parsed = JSON.parse(e.target.result)
+              var imported = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.favorites) ? parsed.favorites : null)
+              if (!imported) throw new Error('not an array')
               var existingUrls = Object.create(null)
-              ;(app.settings.history || []).forEach(function (item) {
+              ;(app.settings.favorites || []).forEach(function (item) {
                 if (item && item.url) existingUrls[item.url] = true
               })
               var added = 0
               imported.forEach(function (item) {
                 if (!item || !item.url || existingUrls[item.url]) return
-                app.settings.history.push(item)
+                app.settings.favorites.push(item)
                 existingUrls[item.url] = true
                 added++
               })
-              app.settings.history = app.settings.history.slice()
+              app.settings.favorites = app.settings.favorites.slice()
               saveState()
-              renderHistory()
-              setStatus('imported ' + added + ' history item(s)')
+              renderFavorites()
+              setStatus('imported ' + added + ' favorite(s)')
             } catch (err) {
               setStatus('import failed: invalid JSON')
             }
@@ -2771,7 +2781,13 @@
         document.body.appendChild(input)
         input.click()
         input.remove()
-      }, historyBtnStyle),
+      }, btnStyle),
+      button('Export Favorites', function () {
+        saveFavoritesFile()
+      }, btnStyle)
+    ]))
+
+    app.historyEl.appendChild(createEl('div', { style: { marginBottom: '6px' } }, [
       button('Clear Storage', function () {
         if (!window.confirm('Clear all history, favorites, and settings from localStorage? This cannot be undone.')) return
         try {
@@ -2783,7 +2799,7 @@
         } catch (err) {
           setStatus('clear failed')
         }
-      }, historyBtnStyle)
+      }, { width: '100%' })
     ]))
 
     if (!app.settings.history.length) {
