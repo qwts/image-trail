@@ -64,7 +64,6 @@
       autoAdvanceOn404: false,
       auto404Count: '0',
       autoDownload: false,
-      llmDownloadNaming: true,
       llmEndpoint: LLM_DEFAULT_ENDPOINT,
       llmModel: LLM_DEFAULT_MODEL,
       llmMaxTokens: String(LLM_DEFAULT_MAX_TOKENS),
@@ -362,6 +361,14 @@
     }
 
     app.descriptionEl.textContent = metadata.description
+  }
+
+  function summarizeError (err) {
+    if (!err) return 'unknown error'
+    var message = (err && err.message) ? String(err.message) : String(err)
+    message = message.replace(/\s+/g, ' ').trim()
+    if (message.length > 160) message = message.slice(0, 157) + '...'
+    return message || 'unknown error'
   }
 
   function downloadBlob (blob, filename) {
@@ -1001,72 +1008,58 @@
     var url = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
     if (!url) return
 
-    var fallbackName = ensureFilenameExtension(deriveTitle(url) || 'image', url)
-    if (!app.settings.llmDownloadNaming) {
-      var directAnchor = document.createElement('a')
-      directAnchor.href = url
-      directAnchor.download = fallbackName
-      directAnchor.rel = 'noopener'
-      document.body.appendChild(directAnchor)
-      directAnchor.click()
-      directAnchor.remove()
-      setStatus('download requested (LLM naming off)')
-      return
-    }
+    var metadata = app.llmCache[url] || {}
+    var filename = ensureFilenameExtension(
+      metadata.filename || deriveTitle(url) || 'image',
+      url
+    )
 
+    var anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    anchor.rel = 'noopener'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+
+    if (metadata.filename) {
+      setStatus('download requested: ' + filename)
+    } else {
+      setStatus('download requested (fallback name; click Fetch Name+Desc first)')
+    }
+  }
+
+  function fetchNameAndDescriptionForCurrentImage () {
+    var url = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
+    if (!url) return
+
+    var llmEndpoint = app.settings.llmEndpoint || LLM_DEFAULT_ENDPOINT
     setStatus('asking LLM for filename + description...')
 
     fetchImageBlob(url).then(function (blob) {
       return toDataUrl(blob).then(function (dataUrl) {
-        return describeImageWithLlm(dataUrl, url).then(function (metadata) {
-          return {
-            blob: blob,
-            metadata: metadata
-          }
-        })
+        return describeImageWithLlm(dataUrl, url)
       })
-    }).catch(function () {
-      return describeImageWithLlm(url, url).then(function (metadata) {
-        return {
-          blob: null,
-          metadata: metadata
-        }
-      })
-    }).then(function (result) {
-      var metadata = result.metadata || {}
-      var filename = ensureFilenameExtension(metadata.filename || fallbackName, url)
-      var description = String(metadata.description || '').trim() || 'No description available.'
-
-      setDescriptionForUrl(url, {
-        filename: filename,
-        description: description
-      })
-      renderDescriptionForCurrentUrl()
-
-      if (result.blob) {
-        downloadBlob(result.blob, filename)
-      } else {
-        var anchor = document.createElement('a')
-        anchor.href = url
-        anchor.download = filename
-        anchor.rel = 'noopener'
-        document.body.appendChild(anchor)
-        anchor.click()
-        anchor.remove()
-      }
-
-      setStatus('download requested: ' + filename)
     })
+      .catch(function () {
+        return describeImageWithLlm(url, url)
+      })
+      .then(function (metadata) {
+        var filename = ensureFilenameExtension(metadata.filename || deriveTitle(url) || 'image', url)
+        var description = String(metadata.description || '').trim() || 'No description available.'
+
+        setDescriptionForUrl(url, {
+          filename: filename,
+          description: description
+        })
+        renderDescriptionForCurrentUrl()
+        setStatus('LLM metadata ready: ' + filename)
+      })
       .catch(function (err) {
         console.warn('[img-nav] llm naming failed', err)
-        var anchor = document.createElement('a')
-        anchor.href = url
-        anchor.download = fallbackName
-        anchor.rel = 'noopener'
-        document.body.appendChild(anchor)
-        anchor.click()
-        anchor.remove()
-        setStatus('download requested (fallback name)')
+        setStatus(
+          'LLM failed (' + summarizeError(err) + ') via ' + llmEndpoint
+        )
       })
   }
 
@@ -1231,7 +1224,7 @@
   }
 
   function onImageLoad () {
-    setStatus('loaded')
+    setStatus('loaded (click Fetch Name+Desc to run LLM)')
     app.auto404Remaining = null
 
     if (app.pendingHistoryUrl) {
@@ -1568,24 +1561,6 @@
       }, [
         createEl('input', {
           type: 'checkbox',
-          checked: app.settings.llmDownloadNaming !== false,
-          onchange: function (event) {
-            app.settings.llmDownloadNaming = event.target.checked
-            saveState()
-          }
-        }),
-        'use LLM naming on download'
-      ]),
-      createEl('label', {
-        style: {
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          marginTop: '8px'
-        }
-      }, [
-        createEl('input', {
-          type: 'checkbox',
           checked: app.settings.autoDownload,
           onchange: function (event) {
             app.settings.autoDownload = event.target.checked
@@ -1606,6 +1581,7 @@
         button('Forward', function () { moveActiveField('up') }),
         button('Slideshow', startSlideshow),
         button('Stop', function () { stopSlideshow() }),
+        button('Fetch Name+Desc', fetchNameAndDescriptionForCurrentImage),
         button('Download', downloadCurrentImage)
       ])
     ]
