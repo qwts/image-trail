@@ -14,6 +14,7 @@
 
   var app = {
     panel: null,
+    panelHidden: false,
     targetImg: null,
     model: null,
     fields: [],
@@ -1102,8 +1103,29 @@
     app.panel.appendChild(section('History', [app.historyEl]))
 
     document.body.appendChild(app.panel)
+    if (app.panelHidden) app.panel.style.display = 'none'
     renderFields()
     renderHistory()
+  }
+
+  function setPanelHidden (hidden) {
+    app.panelHidden = hidden
+    if (app.panel) app.panel.style.display = hidden ? 'none' : ''
+  }
+
+  function fieldShortcutKey (index) {
+    if (index < 0 || index > 24) return ''
+    if (index < 7) return String.fromCharCode(97 + index)
+    return String.fromCharCode(98 + index)
+  }
+
+  function fieldIndexForShortcutKey (key) {
+    if (key === 'h') return -1
+
+    var code = key.charCodeAt(0) - 97
+    if (code < 0 || code > 25) return -1
+    if (code > 7) return code - 1
+    return code
   }
 
   function renderControls () {
@@ -1242,7 +1264,8 @@
         }
       })
 
-      var keyLabel = index < 26 ? ' [' + String.fromCharCode(97 + index) + ']' : ''
+      var shortcutKey = fieldShortcutKey(index)
+      var keyLabel = shortcutKey ? ' [' + shortcutKey + ']' : ''
       row.appendChild(createEl('div', {
         text: field.label + keyLabel + ' · ' + field.kind,
         style: {
@@ -1452,9 +1475,15 @@
     }
 
     var lower = event.key.toLowerCase()
+    if (lower === 'h') {
+      event.preventDefault()
+      setPanelHidden(!app.panelHidden)
+      return
+    }
+
     if (/^[a-z]$/.test(lower)) {
-      var index = lower.charCodeAt(0) - 97
-      if (app.fields[index]) {
+      var index = fieldIndexForShortcutKey(lower)
+      if (index >= 0 && app.fields[index]) {
         event.preventDefault()
         setActiveField(app.fields[index].id)
       }
