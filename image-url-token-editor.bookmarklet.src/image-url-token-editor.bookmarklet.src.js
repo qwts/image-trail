@@ -93,7 +93,7 @@
       autoFetchTitleOnLoad: false,
       autoFetchDescriptionOnPreload: false,
       previewReplacesStyling: false,
-      showHistoryThumbnails: true,
+      showHistoryThumbnails: false,
       llmEndpoint: LLM_DEFAULT_ENDPOINT,
       llmModel: LLM_DEFAULT_MODEL,
       llmMaxTokens: String(LLM_DEFAULT_MAX_TOKENS),
