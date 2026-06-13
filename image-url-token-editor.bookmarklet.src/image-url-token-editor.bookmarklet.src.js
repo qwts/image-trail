@@ -1,4 +1,5 @@
-/* global window, document, location, history, localStorage, URL, setTimeout, clearTimeout, console */
+/* global window, document, location, history, localStorage, URL, setTimeout, clearTimeout */
+/* global console, fetch, FileReader */
 (function () {
   'use strict'
 
@@ -6,6 +7,9 @@
   var STORE_KEY = '__url_image_navigator_state_v1'
   var MAX_HISTORY = 100
   var MAX_Z_INDEX = 2147483647
+  var LLM_DEFAULT_ENDPOINT = 'http://127.0.0.1:1234/v1/chat/completions'
+  var LLM_DEFAULT_MODEL = 'gemma-4-e4b'
+  var LLM_DEFAULT_MAX_TOKENS = 220
 
   if (window[APP_ID] && typeof window[APP_ID].destroy === 'function') {
     window[APP_ID].destroy()
@@ -28,11 +32,13 @@
     preloadUp: null,
     preloadDown: null,
     titleEl: null,
+    descriptionEl: null,
     statusEl: null,
     fullUrlEl: null,
     domainEl: null,
     fieldsEl: null,
     historyEl: null,
+    llmCache: Object.create(null),
     settings: loadState(),
     original: {
       htmlCssText: '',
@@ -54,6 +60,10 @@
       autoCount: '50',
       autoDelay: '300',
       autoDownload: false,
+      llmDownloadNaming: true,
+      llmEndpoint: LLM_DEFAULT_ENDPOINT,
+      llmModel: LLM_DEFAULT_MODEL,
+      llmMaxTokens: String(LLM_DEFAULT_MAX_TOKENS),
       pageBackground: '#000000',
       imageObjectFit: 'contain',
       imageWidth: '100vw',
@@ -140,6 +150,226 @@
 
   function safeEncodeQueryPart (value) {
     return safeEncodeURIComponent(value).replace(/%20/g, '+')
+  }
+
+  function parseJsonObject (text) {
+    if (!text) return {}
+
+    try {
+      return JSON.parse(text)
+    } catch (err) {
+      var source = String(text)
+      var start = source.indexOf('{')
+      var end = source.lastIndexOf('}')
+      if (start === -1 || end === -1 || end < start) return {}
+      try {
+        return JSON.parse(source.slice(start, end + 1))
+      } catch (innerErr) {
+        return {}
+      }
+    }
+  }
+
+  function extractMessageText (message) {
+    if (!message) return ''
+    var content = message.content
+    if (typeof content === 'string') return content.trim()
+    if (!Array.isArray(content)) return ''
+
+    return content
+      .map(function (item) {
+        if (typeof item === 'string') return item
+        if (item && typeof item.text === 'string') return item.text
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim()
+  }
+
+  function extensionFromUrl (url) {
+    try {
+      var parsed = new URL(url, location.href)
+      var pathParts = splitPreservingSlashStyle(parsed.pathname).filter(function (part) {
+        return part.type === 'segment' && part.raw
+      })
+      var last = pathParts[pathParts.length - 1]
+      var filename = last ? safeDecodePathSegment(last.raw) : ''
+      var match = filename.match(/\.([A-Za-z0-9]{2,8})$/)
+      return match ? '.' + match[1].toLowerCase() : '.jpg'
+    } catch (err) {
+      return '.jpg'
+    }
+  }
+
+  function sanitizeFilename (text) {
+    return String(text || '')
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^[_\-.]+|[_\-.]+$/g, '')
+  }
+
+  function ensureFilenameExtension (baseName, sourceUrl) {
+    var cleaned = sanitizeFilename(baseName)
+    if (!cleaned) cleaned = 'image'
+    if (/\.[A-Za-z0-9]{2,8}$/.test(cleaned)) return cleaned
+    return cleaned + extensionFromUrl(sourceUrl)
+  }
+
+  function toDataUrl (blob) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader()
+      reader.onload = function () { resolve(String(reader.result || '')) }
+      reader.onerror = function () { reject(new Error('Failed to read image data')) }
+      reader.readAsDataURL(blob)
+    })
+  }
+
+  function fetchImageBlob (url) {
+    return window.fetch(url, {
+      method: 'GET',
+      mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-store'
+    }).then(function (response) {
+      if (!response.ok) throw new Error('image fetch failed: HTTP ' + response.status)
+      return response.blob()
+    })
+  }
+
+  function llmSchema () {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: ['filename', 'description'],
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Concise descriptive filename without extension.'
+        },
+        description: {
+          type: 'string',
+          description: 'One concise sentence describing visible image content.'
+        }
+      }
+    }
+  }
+
+  function describeImageWithLlm (imageInput, sourceUrl) {
+    var endpoint = app.settings.llmEndpoint || LLM_DEFAULT_ENDPOINT
+    var model = app.settings.llmModel || LLM_DEFAULT_MODEL
+    var maxTokens = parseInt(app.settings.llmMaxTokens, 10)
+    if (!Number.isFinite(maxTokens) || maxTokens <= 0) maxTokens = LLM_DEFAULT_MAX_TOKENS
+
+    var payload = {
+      model: model,
+      temperature: 0,
+      max_tokens: maxTokens,
+      stream: false,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'image_download_metadata',
+          strict: true,
+          schema: llmSchema()
+        }
+      },
+      messages: [
+        {
+          role: 'system',
+          content: 'Return only valid JSON matching the schema.'
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: [
+                'Create metadata for this image download.',
+                'Rules:',
+                '- filename: short snake_case filename without extension',
+                '- description: one concise sentence describing visible content',
+                '- avoid vague words like image, photo, pic',
+                '',
+                'Source URL: ' + sourceUrl
+              ].join('\n')
+            },
+            {
+              type: 'image_url',
+              image_url: { url: imageInput }
+            }
+          ]
+        }
+      ]
+    }
+
+    return window.fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    }).then(function (response) {
+      if (!response.ok) {
+        return response.text().then(function (body) {
+          throw new Error('LLM request failed: HTTP ' + response.status + ' ' + (body || ''))
+        })
+      }
+      return response.json()
+    }).then(function (data) {
+      var message = data && data.choices && data.choices[0] && data.choices[0].message
+      var parsed = parseJsonObject(extractMessageText(message))
+      var filename = sanitizeFilename(parsed.filename)
+      var description = String(parsed.description || '').trim()
+
+      if (!filename) filename = sanitizeFilename(deriveTitle(sourceUrl)) || 'image'
+      if (!description) description = 'No model description returned.'
+
+      return {
+        filename: filename,
+        description: description
+      }
+    })
+  }
+
+  function setDescriptionForUrl (url, metadata) {
+    if (!url || !metadata) return
+    app.llmCache[url] = {
+      filename: metadata.filename || '',
+      description: metadata.description || ''
+    }
+  }
+
+  function renderDescriptionForCurrentUrl () {
+    if (!app.descriptionEl) return
+
+    var currentUrl = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
+    if (!currentUrl) {
+      app.descriptionEl.textContent = 'No description yet.'
+      return
+    }
+
+    var metadata = app.llmCache[currentUrl]
+    if (!metadata || !metadata.description) {
+      app.descriptionEl.textContent = 'No description yet. Download to generate one.'
+      return
+    }
+
+    app.descriptionEl.textContent = metadata.description
+  }
+
+  function downloadBlob (blob, filename) {
+    var objectUrl = window.URL.createObjectURL(blob)
+    var anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = filename
+    anchor.rel = 'noopener'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.URL.revokeObjectURL(objectUrl)
   }
 
   function isProbablyVisible (img) {
@@ -652,6 +882,7 @@
     if (options.updateLocation !== false) updateLocationBarIfAllowed(url)
 
     setStatus('URL applied')
+    renderDescriptionForCurrentUrl()
     renderHistory()
     renderFields()
 
@@ -740,18 +971,73 @@
     var url = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
     if (!url) return
 
-    var filename = deriveTitle(url) || 'image'
-    filename = filename.replace(/[\\/:*?"<>|]+/g, '_')
+    var fallbackName = ensureFilenameExtension(deriveTitle(url) || 'image', url)
+    if (!app.settings.llmDownloadNaming) {
+      var directAnchor = document.createElement('a')
+      directAnchor.href = url
+      directAnchor.download = fallbackName
+      directAnchor.rel = 'noopener'
+      document.body.appendChild(directAnchor)
+      directAnchor.click()
+      directAnchor.remove()
+      setStatus('download requested (LLM naming off)')
+      return
+    }
 
-    var anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = filename
-    anchor.rel = 'noopener'
-    document.body.appendChild(anchor)
-    anchor.click()
-    anchor.remove()
+    setStatus('asking LLM for filename + description...')
 
-    setStatus('download requested')
+    fetchImageBlob(url).then(function (blob) {
+      return toDataUrl(blob).then(function (dataUrl) {
+        return describeImageWithLlm(dataUrl, url).then(function (metadata) {
+          return {
+            blob: blob,
+            metadata: metadata
+          }
+        })
+      })
+    }).catch(function () {
+      return describeImageWithLlm(url, url).then(function (metadata) {
+        return {
+          blob: null,
+          metadata: metadata
+        }
+      })
+    }).then(function (result) {
+      var metadata = result.metadata || {}
+      var filename = ensureFilenameExtension(metadata.filename || fallbackName, url)
+      var description = String(metadata.description || '').trim() || 'No description available.'
+
+      setDescriptionForUrl(url, {
+        filename: filename,
+        description: description
+      })
+      renderDescriptionForCurrentUrl()
+
+      if (result.blob) {
+        downloadBlob(result.blob, filename)
+      } else {
+        var anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = filename
+        anchor.rel = 'noopener'
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+      }
+
+      setStatus('download requested: ' + filename)
+    })
+      .catch(function (err) {
+        console.warn('[img-nav] llm naming failed', err)
+        var anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = fallbackName
+        anchor.rel = 'noopener'
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+        setStatus('download requested (fallback name)')
+      })
   }
 
   function downloadTextFile (filename, text) {
@@ -1067,6 +1353,16 @@
 
     app.fieldsEl = createEl('div')
     app.historyEl = createEl('div')
+    app.descriptionEl = createEl('div', {
+      text: 'No description yet.',
+      style: {
+        color: '#ddd',
+        font: '12px system-ui, sans-serif',
+        lineHeight: '1.4',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word'
+      }
+    })
 
     app.titleEl = createEl('div', {
       text: deriveLabel(app.model ? rebuildUrl(app.model) : location.href),
@@ -1078,6 +1374,7 @@
     })
 
     app.panel.appendChild(app.titleEl)
+    app.panel.appendChild(section('Image Description', [app.descriptionEl]))
 
     app.panel.appendChild(app.statusEl)
     app.panel.appendChild(section('Full URL', [
@@ -1106,6 +1403,7 @@
     if (app.panelHidden) app.panel.style.display = 'none'
     renderFields()
     renderHistory()
+    renderDescriptionForCurrentUrl()
   }
 
   function setPanelHidden (hidden) {
@@ -1156,6 +1454,39 @@
       input(app.settings.autoCount, function (value) { app.settings.autoCount = value; saveState() }),
       label('Auto delay ms'),
       input(app.settings.autoDelay, function (value) { app.settings.autoDelay = value; saveState() }),
+      label('LLM endpoint'),
+      input(app.settings.llmEndpoint || LLM_DEFAULT_ENDPOINT, function (value) {
+        app.settings.llmEndpoint = value.trim()
+        saveState()
+      }),
+      label('LLM model'),
+      input(app.settings.llmModel || LLM_DEFAULT_MODEL, function (value) {
+        app.settings.llmModel = value.trim()
+        saveState()
+      }),
+      label('LLM max tokens'),
+      input(String(app.settings.llmMaxTokens || LLM_DEFAULT_MAX_TOKENS), function (value) {
+        app.settings.llmMaxTokens = value
+        saveState()
+      }),
+      createEl('label', {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          marginTop: '8px'
+        }
+      }, [
+        createEl('input', {
+          type: 'checkbox',
+          checked: app.settings.llmDownloadNaming !== false,
+          onchange: function (event) {
+            app.settings.llmDownloadNaming = event.target.checked
+            saveState()
+          }
+        }),
+        'use LLM naming on download'
+      ]),
       createEl('label', {
         style: {
           display: 'flex',
@@ -1346,6 +1677,7 @@
     var url = rebuildUrl(app.model)
     if (app.fullUrlEl) app.fullUrlEl.value = url
     if (app.titleEl) app.titleEl.textContent = deriveLabel(url)
+    renderDescriptionForCurrentUrl()
   }
 
   function renderHistory () {
