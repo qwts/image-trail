@@ -617,6 +617,14 @@
         return value
       })
       .catch(function (err) {
+        if (options.strict) {
+          console.warn('[img-nav] llm ' + label + ' failed', err)
+          if (!options.silent) {
+            setStatus('LLM ' + label + ' failed (' + summarizeError(err) + ') via ' + llmEndpoint)
+          }
+          throw err
+        }
+
         var fallback = fallbackMetadataValue(url, mode)
         setMetadataFieldForUrl(url, mode, fallback)
         if (mode === 'title') {
@@ -763,28 +771,17 @@
     var inflightTitle = app.llmInflight[titleKey]
     if (inflightTitle) {
       setStatus('waiting for model title before download...')
-      return inflightTitle
-        .then(function (value) {
-          var latest = (app.llmCache[url] && app.llmCache[url].filename) || value
-          return ensureFilenameExtension(latest || deriveTitle(url) || 'image', url)
-        })
-        .catch(function () {
-          var fallbackTitle = (app.llmCache[url] && app.llmCache[url].filename) || deriveTitle(url) || 'image'
-          return ensureFilenameExtension(fallbackTitle, url)
-        })
-    }
-
-    var metadata = app.llmCache[url] || {}
-    if (metadata.filename) {
-      return Promise.resolve(ensureFilenameExtension(metadata.filename, url))
-    }
-    setStatus('fetching model filename before download...')
-    return runLlmMetadataFetch(url, 'title', { silent: true })
-      .then(function (value) {
+      return inflightTitle.then(function () {
+        return runLlmMetadataFetch(url, 'title', { silent: true, strict: true })
+      }).then(function (value) {
         return ensureFilenameExtension(value || deriveTitle(url) || 'image', url)
       })
-      .catch(function () {
-        return ensureFilenameExtension(deriveTitle(url) || 'image', url)
+    }
+
+    setStatus('fetching model filename before download...')
+    return runLlmMetadataFetch(url, 'title', { silent: true, strict: true })
+      .then(function (value) {
+        return ensureFilenameExtension(value || deriveTitle(url) || 'image', url)
       })
   }
 
