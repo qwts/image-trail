@@ -23,6 +23,7 @@
     autoTimer: null,
     autoRemaining: 0,
     lastAppliedUrl: '',
+    pendingHistoryUrl: '',
     statusEl: null,
     fullUrlEl: null,
     domainEl: null,
@@ -44,9 +45,6 @@
 
   function defaultState () {
     return {
-      lastUrl: '',
-      lastDomain: '',
-      activeFieldId: '',
       direction: 'up',
       step: '1',
       autoCount: '50',
@@ -56,7 +54,8 @@
       imageObjectFit: 'contain',
       imageWidth: '100vw',
       imageHeight: '100vh',
-      history: []
+      history: [],
+      favorites: []
     }
   }
 
@@ -75,6 +74,7 @@
       })
 
       if (!Array.isArray(state.history)) state.history = []
+      if (!Array.isArray(state.favorites)) state.favorites = []
     } catch (err) {
       console.warn('[img-nav] state load failed', err)
     }
@@ -626,15 +626,12 @@
 
     var url = rebuildUrl(app.model)
     app.lastAppliedUrl = url
-    app.settings.lastUrl = url
-    app.settings.lastDomain = app.model.host || ''
-    app.settings.activeFieldId = app.activeFieldId || ''
+    app.pendingHistoryUrl = url
 
     if (app.fullUrlEl) app.fullUrlEl.value = url
     if (app.domainEl) app.domainEl.value = app.model.host || ''
 
     saveState()
-    addHistory(url)
     styleTargetImage()
     removeResponsiveSourceAttrs(app.targetImg)
 
@@ -682,6 +679,23 @@
     saveState()
   }
 
+  function addFavorite (url) {
+    if (!url) return
+
+    var existing = app.settings.favorites.filter(function (item) {
+      return item.url !== url
+    })
+
+    existing.unshift({
+      url: url,
+      timestamp: new Date().toISOString(),
+      title: deriveTitle(url)
+    })
+
+    app.settings.favorites = existing.slice(0, MAX_HISTORY)
+    saveState()
+  }
+
   function deriveTitle (url) {
     try {
       var parsed = new URL(url, location.href)
@@ -713,6 +727,36 @@
     anchor.remove()
 
     setStatus('download requested')
+  }
+
+  function downloadTextFile (filename, text) {
+    var blob = new window.Blob([String(text == null ? '' : text)], { type: 'application/json;charset=utf-8' })
+    var objectUrl = window.URL.createObjectURL(blob)
+    var anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = filename
+    anchor.rel = 'noopener'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.URL.revokeObjectURL(objectUrl)
+  }
+
+  function saveFavoritesFile () {
+    var favorites = app.settings.favorites || []
+    if (!favorites.length) {
+      setStatus('no favorites to save')
+      return
+    }
+
+    var payload = JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      sourcePage: location.href,
+      favorites: favorites
+    }, null, 2)
+
+    downloadTextFile('image-url-favorites.json', payload)
+    setStatus('favorites file saved')
   }
 
   function moveActiveField (direction) {
@@ -764,12 +808,19 @@
   function onImageLoad () {
     setStatus('loaded')
 
+    if (app.pendingHistoryUrl) {
+      addHistory(app.pendingHistoryUrl)
+      app.pendingHistoryUrl = ''
+      renderHistory()
+    }
+
     if (app.settings.autoDownload) downloadCurrentImage()
     if (app.autoRunning) stopAuto('auto stopped: loaded')
   }
 
   function onImageError () {
-    setStatus('404 / image error')
+    app.pendingHistoryUrl = ''
+    setStatus('404 / image error (not saved in history)')
 
     if (!app.autoRunning) return
 
@@ -938,7 +989,6 @@
     app.domainEl = input(app.model ? app.model.host : '', function (value) {
       if (!app.model) return
       app.model.host = value.trim()
-      app.settings.lastDomain = app.model.host
       saveState()
     })
 
@@ -1112,7 +1162,8 @@
           marginBottom: '6px',
           cursor: 'pointer'
         },
-        onclick: function () {
+        onclick: function (event) {
+          if (isTypingTarget(event.target)) return
           setActiveField(field.id)
         }
       })
@@ -1131,7 +1182,6 @@
         setActiveField(field.id, false)
         setFieldValue(field, value)
         syncFullUrlOnly()
-        renderFields()
       }))
 
       var controlRow = createEl('div', {
@@ -1189,7 +1239,6 @@
     if (!app.fieldIndex[id]) return
 
     app.activeFieldId = id
-    app.settings.activeFieldId = id
     saveState()
 
     if (shouldRender !== false) renderFields()
@@ -1204,15 +1253,11 @@
 
     app.historyEl.innerHTML = ''
 
-    if (!app.settings.history.length) {
-      app.historyEl.appendChild(createEl('div', { text: 'No history yet.' }))
-      return
-    }
-
     app.historyEl.appendChild(createEl('div', {
       style: {
         display: 'flex',
         gap: '6px',
+        flexWrap: 'wrap',
         marginBottom: '6px'
       }
     }, [
@@ -1220,8 +1265,27 @@
         app.settings.history = []
         saveState()
         renderHistory()
+      }),
+      button('Favorite Current', function () {
+        var current = ''
+        if (app.fullUrlEl) current = app.fullUrlEl.value
+        else if (app.model) current = rebuildUrl(app.model)
+        if (!current) {
+          setStatus('no current URL to favorite')
+          return
+        }
+        addFavorite(current)
+        setStatus('favorite added')
+      }),
+      button('Save Favorites File', function () {
+        saveFavoritesFile()
       })
     ]))
+
+    if (!app.settings.history.length) {
+      app.historyEl.appendChild(createEl('div', { text: 'No history yet.' }))
+      return
+    }
 
     app.settings.history.slice(0, 30).forEach(function (item) {
       var row = createEl('div', {
@@ -1378,11 +1442,11 @@
       document.removeEventListener('keydown', onKeyDown, true)
     })
 
-    var initialUrl = app.settings.lastUrl || getImageUrl(app.targetImg) || getCandidateUrls()[0] || location.href
+    var initialUrl = location.href
 
     try {
       app.model = parseModel(initialUrl)
-      app.activeFieldId = app.settings.activeFieldId || ''
+      app.activeFieldId = ''
       collectFields(app.model)
       renderPanel()
       styleTargetImage()
