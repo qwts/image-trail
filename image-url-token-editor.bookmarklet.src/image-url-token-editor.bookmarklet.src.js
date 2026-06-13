@@ -2865,16 +2865,29 @@
                 if (item && item.url) existingUrls[item.url] = true
               })
               var added = 0
+              var newUrlsWithoutThumbnail = []
               imported.forEach(function (item) {
                 if (!item || !item.url || existingUrls[item.url]) return
                 app.settings.history.push(item)
                 existingUrls[item.url] = true
                 added++
+                if (!item.thumbnail) newUrlsWithoutThumbnail.push(item.url)
               })
               app.settings.history = app.settings.history.slice()
               saveState()
               renderHistory()
               setStatus('imported ' + added + ' history item' + (added === 1 ? '' : 's'))
+              if (app.settings.showHistoryThumbnails !== false && newUrlsWithoutThumbnail.length) {
+                var visibleUrls = Object.create(null)
+                getVisibleHistoryEntries().forEach(function (entry) { visibleUrls[entry.url] = true })
+                var visibleWithoutThumbnail = newUrlsWithoutThumbnail.filter(function (url) { return visibleUrls[url] })
+                var thumbnailChain = Promise.resolve()
+                visibleWithoutThumbnail.forEach(function (url) {
+                  thumbnailChain = thumbnailChain.then(function () {
+                    return ensureThumbnailForUrl(url).catch(function () {})
+                  })
+                })
+              }
             } catch (err) {
               setStatus('import failed: invalid JSON')
             }
