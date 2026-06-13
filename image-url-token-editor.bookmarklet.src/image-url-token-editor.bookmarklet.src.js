@@ -2648,6 +2648,33 @@
       target.isContentEditable
   }
 
+  function findImageFromTarget (target) {
+    var node = target
+    while (node && node !== document && node !== document.documentElement) {
+      if (node.tagName && node.tagName.toLowerCase() === 'img') return node
+      node = node.parentNode
+    }
+    return null
+  }
+
+  function onDocumentClick (event) {
+    if (!event || !event.target) return
+    if (app.panel && app.panel.contains(event.target)) return
+
+    var clickedImage = findImageFromTarget(event.target)
+    if (!clickedImage) return
+
+    var url = getImageUrl(clickedImage)
+    if (!url) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    addHistory(url)
+    renderHistory()
+    setStatus('selected image added to history')
+  }
+
   function onKeyDown (event) {
     if (isTypingTarget(event.target)) return
 
@@ -2748,6 +2775,11 @@
     document.addEventListener('keydown', onKeyDown, true)
     app.cleanupFns.push(function () {
       document.removeEventListener('keydown', onKeyDown, true)
+    })
+
+    document.addEventListener('click', onDocumentClick, true)
+    app.cleanupFns.push(function () {
+      document.removeEventListener('click', onDocumentClick, true)
     })
 
     var initialUrl = location.href
