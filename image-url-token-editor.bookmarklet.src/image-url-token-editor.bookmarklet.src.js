@@ -2869,6 +2869,10 @@
             setHistorySelectionByIndex(historyIndex, { toggle: true })
           } else {
             setHistorySelectionByIndex(historyIndex)
+            if (app.settings.previewReplacesStyling) {
+              parseAndApplyUrl(item.url)
+              return
+            }
           }
           renderHistory()
         },
