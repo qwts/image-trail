@@ -27,6 +27,7 @@
     autoRunning: false,
     autoTimer: null,
     autoRemaining: 0,
+    auto404Remaining: null,
     lastAppliedUrl: '',
     pendingHistoryUrl: '',
     preloadUp: null,
@@ -57,8 +58,11 @@
     return {
       direction: 'up',
       step: '1',
-      autoCount: '50',
+      autoCount: '0',
+      slideshowPause: '1200',
       autoDelay: '300',
+      autoAdvanceOn404: false,
+      auto404Count: '0',
       autoDownload: false,
       llmDownloadNaming: true,
       llmEndpoint: LLM_DEFAULT_ENDPOINT,
@@ -799,6 +803,32 @@
     return Number.isFinite(value) && value > 0 ? value : 1
   }
 
+  function getSlideshowPause () {
+    var value = parseInt(app.settings.slideshowPause, 10)
+    return Number.isFinite(value) && value >= 0 ? value : 1200
+  }
+
+  function get404Delay () {
+    var value = parseInt(app.settings.autoDelay, 10)
+    return Number.isFinite(value) && value >= 0 ? value : 300
+  }
+
+  function consumeRemainingStep () {
+    if (!Number.isFinite(app.autoRemaining)) return true
+    if (app.autoRemaining <= 0) return false
+    app.autoRemaining -= 1
+    return true
+  }
+
+  function start404AutoAdvanceCycle () {
+    var configuredCount = parseInt(app.settings.auto404Count, 10)
+    if (!Number.isFinite(configuredCount) || configuredCount <= 0) {
+      app.auto404Remaining = Number.POSITIVE_INFINITY
+      return
+    }
+    app.auto404Remaining = configuredCount
+  }
+
   function setStatus (message) {
     if (app.statusEl) app.statusEl.textContent = message
     console.log('[img-nav]', message)
@@ -1131,16 +1161,28 @@
     app.preloadDown = preloadWithRetry(-1, maxAttempts)
   }
 
-  function startAuto () {
+  function scheduleSlideshowStep (delayMs) {
+    if (!app.autoRunning) return
+    if (app.autoTimer) {
+      clearTimeout(app.autoTimer)
+      app.autoTimer = null
+    }
+    app.autoTimer = setTimeout(slideshowStep, delayMs)
+  }
+
+  function startSlideshow () {
     if (app.autoRunning) return
 
     app.autoRunning = true
-    app.autoRemaining = parseInt(app.settings.autoCount, 10) || 50
-    setStatus('auto started')
-    autoAttempt()
+    var count = parseInt(app.settings.autoCount, 10)
+    app.autoRemaining = Number.isFinite(count) && count > 0
+      ? count
+      : Number.POSITIVE_INFINITY
+    setStatus('slideshow started')
+    scheduleSlideshowStep(getSlideshowPause())
   }
 
-  function stopAuto (message) {
+  function stopSlideshow (message) {
     app.autoRunning = false
     app.autoRemaining = 0
 
@@ -1149,23 +1191,48 @@
       app.autoTimer = null
     }
 
-    setStatus(message || 'auto stopped')
+    setStatus(message || 'slideshow stopped')
   }
 
-  function autoAttempt () {
+  function slideshowStep () {
     if (!app.autoRunning) return
 
-    if (app.autoRemaining <= 0) {
-      stopAuto('auto stopped: max attempts reached')
+    if (!consumeRemainingStep()) {
+      stopSlideshow('slideshow stopped: max steps reached')
       return
     }
 
-    app.autoRemaining -= 1
-    moveActiveField(app.settings.direction || 'up')
+    if (!moveActiveField(app.settings.direction || 'up')) {
+      stopSlideshow('slideshow stopped: no numeric active field')
+    }
+  }
+
+  function schedule404Advance () {
+    if (!app.settings.autoAdvanceOn404) return
+    if (app.auto404Remaining == null) start404AutoAdvanceCycle()
+    if (app.auto404Remaining !== Number.POSITIVE_INFINITY && app.auto404Remaining <= 0) {
+      app.auto404Remaining = null
+      setStatus('404 auto-advance stopped: retry limit reached')
+      return
+    }
+    if (app.auto404Remaining !== Number.POSITIVE_INFINITY) app.auto404Remaining -= 1
+
+    var delay = get404Delay()
+    if (app.autoTimer) {
+      clearTimeout(app.autoTimer)
+      app.autoTimer = null
+    }
+    app.autoTimer = setTimeout(function () {
+      if (!moveActiveField(app.settings.direction || 'up')) {
+        app.auto404Remaining = null
+        setStatus('404 auto-advance stopped: no numeric active field')
+      }
+    }, delay)
   }
 
   function onImageLoad () {
     setStatus('loaded')
+    app.auto404Remaining = null
 
     if (app.pendingHistoryUrl) {
       addHistory(app.pendingHistoryUrl)
@@ -1174,17 +1241,16 @@
     }
 
     if (app.settings.autoDownload) downloadCurrentImage()
-    if (app.autoRunning) stopAuto('auto stopped: loaded')
+    if (app.autoRunning) scheduleSlideshowStep(getSlideshowPause())
   }
 
   function onImageError () {
     app.pendingHistoryUrl = ''
     setStatus('404 / image error (not saved in history)')
-
-    if (!app.autoRunning) return
-
-    var delay = parseInt(app.settings.autoDelay, 10) || 300
-    app.autoTimer = setTimeout(autoAttempt, delay)
+    schedule404Advance()
+    if (app.autoRunning && !app.settings.autoAdvanceOn404) {
+      scheduleSlideshowStep(getSlideshowPause())
+    }
   }
 
   function createEl (tagName, attrs, children) {
@@ -1450,10 +1516,33 @@
       direction,
       label('Step'),
       input(app.settings.step, function (value) { app.settings.step = value; saveState() }),
-      label('Auto count'),
+      label('Slideshow count (0 = infinite)'),
       input(app.settings.autoCount, function (value) { app.settings.autoCount = value; saveState() }),
-      label('Auto delay ms'),
+      label('Slideshow pause ms'),
+      input(app.settings.slideshowPause, function (value) { app.settings.slideshowPause = value; saveState() }),
+      label('404 retry delay ms'),
       input(app.settings.autoDelay, function (value) { app.settings.autoDelay = value; saveState() }),
+      createEl('label', {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          marginTop: '8px'
+        }
+      }, [
+        createEl('input', {
+          type: 'checkbox',
+          checked: app.settings.autoAdvanceOn404,
+          onchange: function (event) {
+            app.settings.autoAdvanceOn404 = event.target.checked
+            if (!event.target.checked) app.auto404Remaining = null
+            saveState()
+          }
+        }),
+        'auto advance/decrement on 404'
+      ]),
+      label('404 retry count (0 = until next load)'),
+      input(app.settings.auto404Count, function (value) { app.settings.auto404Count = value; saveState() }),
       label('LLM endpoint'),
       input(app.settings.llmEndpoint || LLM_DEFAULT_ENDPOINT, function (value) {
         app.settings.llmEndpoint = value.trim()
@@ -1515,8 +1604,8 @@
       }, [
         button('Back', function () { moveActiveField('down') }),
         button('Forward', function () { moveActiveField('up') }),
-        button('Auto', startAuto),
-        button('Stop', function () { stopAuto() }),
+        button('Slideshow', startSlideshow),
+        button('Stop', function () { stopSlideshow() }),
         button('Download', downloadCurrentImage)
       ])
     ]
@@ -1795,7 +1884,7 @@
 
     if (event.key === ' ') {
       event.preventDefault()
-      if (app.autoRunning) stopAuto()
+      if (app.autoRunning) stopSlideshow()
       else moveActiveField(app.settings.direction || 'up')
       return
     }
@@ -1847,7 +1936,7 @@
   }
 
   function destroy () {
-    stopAuto('closed')
+    stopSlideshow('closed')
 
     app.cleanupFns.forEach(function (fn) {
       try {
