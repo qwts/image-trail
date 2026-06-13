@@ -1195,6 +1195,85 @@
     return String(field && field.token && field.token.value != null ? field.token.value : '')
   }
 
+  function findMatchingFieldInModel (model, sourceField) {
+    if (!model || !sourceField || !sourceField.id) return null
+
+    var parts = sourceField.id.split(':')
+    var type = parts[0]
+    var tokenIndex = Number(parts[2])
+
+    if (type === 'p') {
+      var partIndex = Number(parts[1])
+      var part = (model.pathParts || [])[partIndex]
+      if (!part || part.type !== 'segment') return null
+      var token = (part.tokens || [])[tokenIndex]
+      if (!token) return null
+      return { token: token, kind: token.kind, width: token.width || String(token.value || '').length }
+    }
+
+    if (type === 'q') {
+      var keyMatch = (sourceField.label || '').match(/^query (.+)$/)
+      if (!keyMatch) return null
+      var key = keyMatch[1]
+      for (var i = 0; i < (model.queryFields || []).length; i++) {
+        var qf = model.queryFields[i]
+        if (qf.key === key) {
+          var qToken = (qf.valueTokens || [])[tokenIndex]
+          if (!qToken) return null
+          return { token: qToken, kind: qToken.kind, width: qToken.width || String(qToken.value || '').length }
+        }
+      }
+    }
+
+    return null
+  }
+
+  function applyFieldChangeToSelectedHistory (field) {
+    if (!field || app.selectedHistoryUrls.length <= 1) return
+
+    var newValue = getFieldValue(field)
+    var updatedCount = 0
+
+    var updatedSelectedUrls = app.selectedHistoryUrls.slice()
+
+    app.selectedHistoryUrls.forEach(function (url) {
+      if (url === app.lastAppliedUrl) return
+
+      var targetModel
+      try {
+        targetModel = parseModel(url)
+      } catch (e) {
+        return
+      }
+
+      var match = findMatchingFieldInModel(targetModel, field)
+      if (!match) return
+
+      setFieldValue(match, newValue)
+      var newUrl = rebuildUrl(targetModel)
+
+      var historyEntry = (app.settings.history || []).find(function (e) { return e && e.url === url })
+      if (historyEntry) {
+        historyEntry.url = newUrl
+        updatedCount++
+      }
+
+      var selIdx = updatedSelectedUrls.indexOf(url)
+      if (selIdx >= 0) updatedSelectedUrls[selIdx] = newUrl
+
+      if (app.historyFocusedUrl === url) app.historyFocusedUrl = newUrl
+      if (app.historySelectionAnchorUrl === url) app.historySelectionAnchorUrl = newUrl
+    })
+
+    app.selectedHistoryUrls = updatedSelectedUrls
+
+    if (updatedCount > 0) {
+      saveState()
+      renderHistory()
+      setStatus('Updated ' + updatedCount + ' selected history item' + (updatedCount === 1 ? '' : 's'))
+    }
+  }
+
   function setFieldValue (field, value) {
     if (!field || !field.token) return
 
@@ -1876,7 +1955,7 @@
     })
   }
 
-  function input (value, onInput, extraStyle) {
+  function input (value, onInput, extraStyle, onApply) {
     return createEl('input', {
       value: value == null ? '' : value,
       oninput: function (event) {
@@ -1886,6 +1965,7 @@
         if (event.key === 'Enter') {
           event.target.blur()
           applyCurrentUrl()
+          if (onApply) onApply()
         }
         if (event.key === 'Escape') event.target.blur()
       },
@@ -2405,6 +2485,22 @@
       return
     }
 
+    var multiSelectCount = app.selectedHistoryUrls.length
+    if (multiSelectCount > 1) {
+      app.fieldsEl.appendChild(createEl('div', {
+        text: multiSelectCount + ' history items selected — field edits will apply to all',
+        style: {
+          background: 'rgba(90,180,100,0.15)',
+          border: '1px solid rgba(90,180,100,0.4)',
+          borderRadius: '4px',
+          color: '#9d9',
+          font: '11px system-ui, sans-serif',
+          padding: '5px 7px',
+          marginBottom: '8px'
+        }
+      }))
+    }
+
     app.fields.forEach(function (field, index) {
       var row = createEl('div', {
         style: {
@@ -2436,6 +2532,8 @@
         setActiveField(field.id, false)
         setFieldValue(field, value)
         syncFullUrlOnly()
+      }, null, function () {
+        applyFieldChangeToSelectedHistory(field)
       }))
 
       var controlRow = createEl('div', {
@@ -2452,12 +2550,14 @@
           setActiveField(field.id, false)
           bumpField(field, -getStep())
           applyCurrentUrl()
+          applyFieldChangeToSelectedHistory(field)
         }))
 
         controlRow.appendChild(button('+', function () {
           setActiveField(field.id, false)
           bumpField(field, getStep())
           applyCurrentUrl()
+          applyFieldChangeToSelectedHistory(field)
         }))
 
         controlRow.appendChild(createEl('span', {
