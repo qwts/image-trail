@@ -1,0 +1,22 @@
+{
+  "name": "image-bookmarklet",
+  "version": "1.0.0",
+  "description": "URL token editor bookmarklet tooling",
+  "private": true,
+  "scripts": {
+    "lint": "eslint . --ext .js,.mjs --max-warnings=0",
+    "lint:fix": "npm run lint -- --fix",
+    "build": "node ./scripts/build-bookmarklet.mjs",
+    "minify": "npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.32.0",
+    "globals": "^17.6.0",
+    "terser": "^5.48.0"
+  }
+}
