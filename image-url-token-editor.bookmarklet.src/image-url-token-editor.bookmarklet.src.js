@@ -747,20 +747,26 @@
     return parts.join('')
   }
 
-  function computeImageFingerprint (url) {
-    if (!url || !window.crypto || !window.crypto.subtle || typeof window.crypto.subtle.digest !== 'function') {
+  function computeFingerprintFromBlob (blob) {
+    if (!blob || !window.crypto || !window.crypto.subtle || typeof window.crypto.subtle.digest !== 'function') {
       return Promise.resolve('')
     }
-    return fetchImageBlob(url)
-      .then(function (blob) {
-        return blob.arrayBuffer()
-      })
+    return blob.arrayBuffer()
       .then(function (buffer) {
         return window.crypto.subtle.digest('SHA-256', buffer)
       })
       .then(function (digestBuffer) {
         return arrayBufferToHex(digestBuffer)
       })
+      .catch(function () {
+        return ''
+      })
+  }
+
+  function computeImageFingerprint (url) {
+    if (!url) return Promise.resolve('')
+    return fetchImageBlob(url)
+      .then(computeFingerprintFromBlob)
       .catch(function () {
         return ''
       })
@@ -1481,19 +1487,37 @@
             return null
           }
 
-          var anchor = document.createElement('a')
-          anchor.href = url
-          anchor.download = filename
-          anchor.rel = 'noopener'
-          document.body.appendChild(anchor)
-          anchor.click()
-          anchor.remove()
+          return fetchImageBlob(url)
+            .then(function (blob) {
+              return computeFingerprintFromBlob(blob).then(function (blobFingerprint) {
+                var exact = findDownloadRecord(normalizedUrl, blobFingerprint || fingerprint)
+                if (exact) {
+                  setStatus('blocked: matching image already downloaded')
+                  return null
+                }
 
-          if (!(app.settings.history || []).some(function (entry) { return entry.url === url })) addHistory(url)
-          updateHistoryForUrl(url, { downloadedAt: new Date().toISOString(), title: filename })
-          addDownloadRecord(url, filename, fingerprint)
-          setStatus('download requested: ' + filename)
-          return null
+                downloadBlob(blob, filename)
+                if (!(app.settings.history || []).some(function (entry) { return entry.url === url })) addHistory(url)
+                updateHistoryForUrl(url, { downloadedAt: new Date().toISOString(), title: filename })
+                addDownloadRecord(url, filename, blobFingerprint || fingerprint)
+                setStatus('download requested: ' + filename)
+                return null
+              })
+            })
+            .catch(function () {
+              var anchor = document.createElement('a')
+              anchor.href = url
+              anchor.download = filename
+              anchor.rel = 'noopener'
+              document.body.appendChild(anchor)
+              anchor.click()
+              anchor.remove()
+              if (!(app.settings.history || []).some(function (entry) { return entry.url === url })) addHistory(url)
+              updateHistoryForUrl(url, { downloadedAt: new Date().toISOString(), title: filename })
+              addDownloadRecord(url, filename, fingerprint)
+              setStatus('download requested (direct link fallback): ' + filename)
+              return null
+            })
         })
       })
       .catch(function (err) {
