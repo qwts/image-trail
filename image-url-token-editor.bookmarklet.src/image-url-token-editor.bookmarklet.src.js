@@ -1149,7 +1149,9 @@
   }
 
   function triggerPreloads () {
-    var maxAttempts = Math.max(1, parseInt(app.settings.autoCount, 10) || 10)
+    var maxAttempts = app.settings.autoAdvanceOn404
+      ? Math.max(1, parseInt(app.settings.autoCount, 10) || 10)
+      : 1
     app.preloadUp = preloadWithRetry(1, maxAttempts)
     app.preloadDown = preloadWithRetry(-1, maxAttempts)
   }
