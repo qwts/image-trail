@@ -3258,13 +3258,26 @@
     setStatus('selected image added to history')
   }
 
+  function isButtonTarget (target) {
+    return !!(target && target.tagName && target.tagName.toLowerCase() === 'button')
+  }
+
   function onKeyDown (event) {
     if (event.key === 'Enter') {
       if (!isTypingTarget(event.target) && (app.selectedHistoryUrls || []).length) {
-        event.preventDefault()
-        event.stopPropagation()
-        if (event.shiftKey) downloadSelectedHistoryItems()
-        else loadSelectedHistoryItem()
+        if (event.shiftKey) {
+          // When focused on a button, let the button's own onkeydown handler run
+          // (it fires in the target phase after this capture-phase listener and also
+          // ensures the focused item is added to the selection before downloading).
+          if (isButtonTarget(event.target)) return
+          event.preventDefault()
+          event.stopPropagation()
+          downloadSelectedHistoryItems()
+        } else {
+          event.preventDefault()
+          event.stopPropagation()
+          loadSelectedHistoryItem()
+        }
         return
       }
     }
