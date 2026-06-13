@@ -9,6 +9,7 @@
   var MAX_Z_INDEX = 2147483647
   var THUMBNAIL_MAX_EDGE = 256
   var FAVORITE_THUMBNAIL_SIZE = 44
+  var HISTORY_THUMBNAIL_SIZE = 30
   var LLM_DEFAULT_ENDPOINT = 'http://127.0.0.1:1234/v1/chat/completions'
   var LLM_DEFAULT_MODEL = 'gemma-4-e4b'
   var LLM_DEFAULT_MAX_TOKENS = 220
@@ -73,6 +74,7 @@
       autoFetchOnQueryChange: false,
       autoFetchTitleOnLoad: false,
       autoFetchDescriptionOnPreload: false,
+      showHistoryThumbnails: true,
       llmEndpoint: LLM_DEFAULT_ENDPOINT,
       llmModel: LLM_DEFAULT_MODEL,
       llmMaxTokens: String(LLM_DEFAULT_MAX_TOKENS),
@@ -101,6 +103,19 @@
 
       if (!Array.isArray(state.history)) state.history = []
       if (!Array.isArray(state.favorites)) state.favorites = []
+      state.history = state.history
+        .map(function (entry) {
+          if (!entry || typeof entry !== 'object') return null
+          if (!entry.url) return null
+          return {
+            url: String(entry.url),
+            timestamp: String(entry.timestamp || ''),
+            title: String(entry.title || ''),
+            label: String(entry.label || ''),
+            thumbnail: String(entry.thumbnail || '')
+          }
+        })
+        .filter(Boolean)
       state.favorites = state.favorites
         .map(function (entry) {
           if (!entry || typeof entry !== 'object') return null
@@ -312,6 +327,21 @@
     if (!url || !thumbnail) return
     app.thumbnailCache[url] = thumbnail
     updateFavoriteForUrl(url, { thumbnail: thumbnail })
+    updateHistoryForUrl(url, { thumbnail: thumbnail })
+  }
+
+  function displayTitleForUrl (url) {
+    if (!url) return ''
+    var metadata = app.llmCache[url] || {}
+    var fetchedTitle = String(metadata.filename || '').trim()
+    if (fetchedTitle) return fetchedTitle
+    return deriveLabel(url)
+  }
+
+  function renderTitleForCurrentUrl () {
+    if (!app.titleEl) return
+    var currentUrl = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
+    app.titleEl.textContent = currentUrl ? displayTitleForUrl(currentUrl) : deriveLabel(location.href)
   }
 
   function ensureThumbnailForUrl (url, sourceImage) {
@@ -524,16 +554,28 @@
           ? ensureFilenameExtension(metadata.filename || deriveTitle(url) || 'image', url)
           : (String(metadata.description || '').trim() || 'No description available.')
         setMetadataFieldForUrl(url, mode, value)
-        if (mode === 'title') updateFavoriteForUrl(url, { title: value })
-        if (app.fullUrlEl && app.fullUrlEl.value === url) renderDescriptionForCurrentUrl()
+        if (mode === 'title') {
+          updateFavoriteForUrl(url, { title: value })
+          updateHistoryForUrl(url, { title: value })
+        }
+        if (app.fullUrlEl && app.fullUrlEl.value === url) {
+          renderTitleForCurrentUrl()
+          renderDescriptionForCurrentUrl()
+        }
         if (!options.silent) setStatus('LLM ' + label + ' ready')
         return value
       })
       .catch(function (err) {
         var fallback = fallbackMetadataValue(url, mode)
         setMetadataFieldForUrl(url, mode, fallback)
-        if (mode === 'title') updateFavoriteForUrl(url, { title: fallback })
-        if (app.fullUrlEl && app.fullUrlEl.value === url) renderDescriptionForCurrentUrl()
+        if (mode === 'title') {
+          updateFavoriteForUrl(url, { title: fallback })
+          updateHistoryForUrl(url, { title: fallback })
+        }
+        if (app.fullUrlEl && app.fullUrlEl.value === url) {
+          renderTitleForCurrentUrl()
+          renderDescriptionForCurrentUrl()
+        }
         console.warn('[img-nav] llm ' + label + ' failed', err)
         if (!options.silent) {
           setStatus('LLM ' + label + ' failed (' + summarizeError(err) + ') via ' + llmEndpoint)
@@ -1103,7 +1145,7 @@
 
     if (app.fullUrlEl) app.fullUrlEl.value = url
     if (app.domainEl) app.domainEl.value = app.model.host || ''
-    if (app.titleEl) app.titleEl.textContent = deriveLabel(url)
+    renderTitleForCurrentUrl()
 
     saveState()
     styleTargetImage()
@@ -1152,8 +1194,9 @@
     existing.unshift({
       url: url,
       timestamp: new Date().toISOString(),
-      title: deriveTitle(url),
-      label: deriveLabel(url)
+      title: String((app.llmCache[url] && app.llmCache[url].filename) || deriveTitle(url)),
+      label: deriveLabel(url),
+      thumbnail: String(app.thumbnailCache[url] || '')
     })
 
     app.settings.history = existing.slice(0, MAX_HISTORY)
@@ -1200,6 +1243,29 @@
     if (changed) {
       saveState()
       renderFavorites()
+    }
+  }
+
+  function updateHistoryForUrl (url, patch) {
+    if (!url || !patch) return
+    var changed = false
+
+    ;(app.settings.history || []).forEach(function (entry) {
+      if (entry.url !== url) return
+      Object.keys(patch).forEach(function (key) {
+        var nextValue = patch[key]
+        if (nextValue == null) return
+        var nextText = String(nextValue)
+        if (entry[key] !== nextText) {
+          entry[key] = nextText
+          changed = true
+        }
+      })
+    })
+
+    if (changed) {
+      saveState()
+      renderHistory()
     }
   }
 
@@ -1450,6 +1516,7 @@
       ensureThumbnailForUrl(currentUrl, app.targetImg)
         .then(function () {
           renderFavorites()
+          renderHistory()
         })
         .catch(function () {})
     }
@@ -1658,7 +1725,7 @@
     })
 
     app.titleEl = createEl('div', {
-      text: deriveLabel(app.model ? rebuildUrl(app.model) : location.href),
+      text: '',
       style: {
         font: '700 14px system-ui, sans-serif',
         marginBottom: '4px',
@@ -1698,6 +1765,7 @@
     renderFields()
     renderFavorites()
     renderHistory()
+    renderTitleForCurrentUrl()
     renderDescriptionForCurrentUrl()
   }
 
@@ -1858,6 +1926,25 @@
           }
         }),
         'auto-fetch description on preload/load'
+      ]),
+      createEl('label', {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          marginTop: '8px'
+        }
+      }, [
+        createEl('input', {
+          type: 'checkbox',
+          checked: app.settings.showHistoryThumbnails !== false,
+          onchange: function (event) {
+            app.settings.showHistoryThumbnails = event.target.checked
+            saveState()
+            renderHistory()
+          }
+        }),
+        'show history thumbnails'
       ]),
       createEl('div', {
         style: {
@@ -2032,7 +2119,7 @@
     if (!app.model) return
     var url = rebuildUrl(app.model)
     if (app.fullUrlEl) app.fullUrlEl.value = url
-    if (app.titleEl) app.titleEl.textContent = deriveLabel(url)
+    renderTitleForCurrentUrl()
     renderDescriptionForCurrentUrl()
   }
 
@@ -2076,11 +2163,14 @@
       return
     }
 
+    var showThumbnails = app.settings.showHistoryThumbnails !== false
     app.settings.history.slice(0, 30).forEach(function (item) {
       var row = createEl('div', {
         style: {
           display: 'grid',
-          gridTemplateColumns: '1fr auto',
+          gridTemplateColumns: showThumbnails
+            ? (HISTORY_THUMBNAIL_SIZE + 6) + 'px 1fr auto'
+            : '1fr auto',
           gap: '5px',
           alignItems: 'center',
           borderTop: '1px solid rgba(255,255,255,0.12)',
@@ -2088,9 +2178,36 @@
         }
       })
 
+      if (showThumbnails) {
+        if (item.thumbnail) {
+          row.appendChild(createEl('img', {
+            src: item.thumbnail,
+            alt: 'history thumbnail',
+            style: {
+              width: HISTORY_THUMBNAIL_SIZE + 'px',
+              height: HISTORY_THUMBNAIL_SIZE + 'px',
+              objectFit: 'cover',
+              borderRadius: '4px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: '#111'
+            }
+          }))
+        } else {
+          row.appendChild(createEl('div', {
+            style: {
+              width: HISTORY_THUMBNAIL_SIZE + 'px',
+              height: HISTORY_THUMBNAIL_SIZE + 'px',
+              borderRadius: '4px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: '#111'
+            }
+          }))
+        }
+      }
+
       row.appendChild(createEl('button', {
         type: 'button',
-        text: item.label || item.title || item.url,
+        text: item.title || item.label || item.url,
         title: item.url,
         onclick: function () { parseAndApplyUrl(item.url) },
         style: {
@@ -2198,6 +2315,8 @@
     if (!app.panel) renderPanel()
     if (app.fullUrlEl && app.model) app.fullUrlEl.value = rebuildUrl(app.model)
     if (app.domainEl && app.model) app.domainEl.value = app.model.host
+    renderTitleForCurrentUrl()
+    renderDescriptionForCurrentUrl()
     renderFields()
     renderFavorites()
     renderHistory()
