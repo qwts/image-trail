@@ -7,6 +7,8 @@
   var STORE_KEY = '__url_image_navigator_state_v1'
   var MAX_HISTORY = 100
   var MAX_Z_INDEX = 2147483647
+  var THUMBNAIL_MAX_EDGE = 256
+  var FAVORITE_THUMBNAIL_SIZE = 44
   var LLM_DEFAULT_ENDPOINT = 'http://127.0.0.1:1234/v1/chat/completions'
   var LLM_DEFAULT_MODEL = 'gemma-4-e4b'
   var LLM_DEFAULT_MAX_TOKENS = 220
@@ -39,8 +41,11 @@
     domainEl: null,
     fieldsEl: null,
     historyEl: null,
+    favoritesEl: null,
     llmCache: Object.create(null),
     llmInflight: Object.create(null),
+    thumbnailCache: Object.create(null),
+    thumbnailInflight: Object.create(null),
     settings: loadState(),
     original: {
       htmlCssText: '',
@@ -96,6 +101,19 @@
 
       if (!Array.isArray(state.history)) state.history = []
       if (!Array.isArray(state.favorites)) state.favorites = []
+      state.favorites = state.favorites
+        .map(function (entry) {
+          if (!entry || typeof entry !== 'object') return null
+          if (!entry.url) return null
+          return {
+            url: String(entry.url),
+            timestamp: String(entry.timestamp || ''),
+            title: String(entry.title || ''),
+            label: String(entry.label || ''),
+            thumbnail: String(entry.thumbnail || '')
+          }
+        })
+        .filter(Boolean)
     } catch (err) {
       console.warn('[img-nav] state load failed', err)
     }
@@ -246,6 +264,91 @@
     })
   }
 
+  function createThumbnailDataUrlFromImage (img, maxEdge) {
+    if (!img || !img.naturalWidth || !img.naturalHeight) return ''
+
+    var maxDimension = Math.max(1, maxEdge || THUMBNAIL_MAX_EDGE)
+    var scale = Math.min(1, maxDimension / Math.max(img.naturalWidth, img.naturalHeight))
+    var width = Math.max(1, Math.round(img.naturalWidth * scale))
+    var height = Math.max(1, Math.round(img.naturalHeight * scale))
+
+    var canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    var context = canvas.getContext('2d')
+    if (!context) return ''
+    context.drawImage(img, 0, 0, width, height)
+    return canvas.toDataURL('image/jpeg', 0.82)
+  }
+
+  function createThumbnailDataUrlFromBlob (blob) {
+    return new Promise(function (resolve) {
+      if (!blob) {
+        resolve('')
+        return
+      }
+
+      var objectUrl = window.URL.createObjectURL(blob)
+      var img = new window.Image()
+      img.onload = function () {
+        var dataUrl = ''
+        try {
+          dataUrl = createThumbnailDataUrlFromImage(img, THUMBNAIL_MAX_EDGE)
+        } catch (err) {
+          dataUrl = ''
+        }
+        window.URL.revokeObjectURL(objectUrl)
+        resolve(dataUrl)
+      }
+      img.onerror = function () {
+        window.URL.revokeObjectURL(objectUrl)
+        resolve('')
+      }
+      img.src = objectUrl
+    })
+  }
+
+  function cacheThumbnailForUrl (url, thumbnail) {
+    if (!url || !thumbnail) return
+    app.thumbnailCache[url] = thumbnail
+    updateFavoriteForUrl(url, { thumbnail: thumbnail })
+  }
+
+  function ensureThumbnailForUrl (url, sourceImage) {
+    if (!url) return Promise.resolve('')
+    if (app.thumbnailCache[url]) return Promise.resolve(app.thumbnailCache[url])
+    if (app.thumbnailInflight[url]) return app.thumbnailInflight[url]
+
+    app.thumbnailInflight[url] = Promise.resolve()
+      .then(function () {
+        if (sourceImage && sourceImage.naturalWidth && sourceImage.naturalHeight) {
+          try {
+            return createThumbnailDataUrlFromImage(sourceImage, THUMBNAIL_MAX_EDGE)
+          } catch (err) {
+            return ''
+          }
+        }
+        return ''
+      })
+      .then(function (thumbnail) {
+        if (thumbnail) return thumbnail
+        return fetchImageBlob(url)
+          .then(createThumbnailDataUrlFromBlob)
+          .catch(function () {
+            return ''
+          })
+      })
+      .then(function (thumbnail) {
+        if (thumbnail) cacheThumbnailForUrl(url, thumbnail)
+        return thumbnail
+      })
+      .finally(function () {
+        delete app.thumbnailInflight[url]
+      })
+
+    return app.thumbnailInflight[url]
+  }
+
   function llmTitleSchema () {
     return {
       type: 'object',
@@ -388,9 +491,12 @@
   }
 
   function getImageInputForLlm (url) {
-    return fetchImageBlob(url)
-      .then(function (blob) {
-        return toDataUrl(blob)
+    return ensureThumbnailForUrl(url, app.targetImg)
+      .then(function (thumbnail) {
+        if (thumbnail) return thumbnail
+        return fetchImageBlob(url).then(function (blob) {
+          return toDataUrl(blob)
+        })
       })
       .catch(function () {
         return url
@@ -418,6 +524,7 @@
           ? ensureFilenameExtension(metadata.filename || deriveTitle(url) || 'image', url)
           : (String(metadata.description || '').trim() || 'No description available.')
         setMetadataFieldForUrl(url, mode, value)
+        if (mode === 'title') updateFavoriteForUrl(url, { title: value })
         if (app.fullUrlEl && app.fullUrlEl.value === url) renderDescriptionForCurrentUrl()
         if (!options.silent) setStatus('LLM ' + label + ' ready')
         return value
@@ -425,6 +532,7 @@
       .catch(function (err) {
         var fallback = fallbackMetadataValue(url, mode)
         setMetadataFieldForUrl(url, mode, fallback)
+        if (mode === 'title') updateFavoriteForUrl(url, { title: fallback })
         if (app.fullUrlEl && app.fullUrlEl.value === url) renderDescriptionForCurrentUrl()
         console.warn('[img-nav] llm ' + label + ' failed', err)
         if (!options.silent) {
@@ -1055,6 +1163,7 @@
   function addFavorite (url) {
     if (!url) return
 
+    var metadata = app.llmCache[url] || {}
     var existing = app.settings.favorites.filter(function (item) {
       return item.url !== url
     })
@@ -1062,12 +1171,36 @@
     existing.unshift({
       url: url,
       timestamp: new Date().toISOString(),
-      title: deriveTitle(url),
-      label: deriveLabel(url)
+      title: String(metadata.filename || deriveTitle(url)),
+      label: deriveLabel(url),
+      thumbnail: String(app.thumbnailCache[url] || '')
     })
 
     app.settings.favorites = existing.slice(0, MAX_HISTORY)
     saveState()
+  }
+
+  function updateFavoriteForUrl (url, patch) {
+    if (!url || !patch) return
+    var changed = false
+
+    ;(app.settings.favorites || []).forEach(function (entry) {
+      if (entry.url !== url) return
+      Object.keys(patch).forEach(function (key) {
+        var nextValue = patch[key]
+        if (nextValue == null) return
+        var nextText = String(nextValue)
+        if (entry[key] !== nextText) {
+          entry[key] = nextText
+          changed = true
+        }
+      })
+    })
+
+    if (changed) {
+      saveState()
+      renderFavorites()
+    }
   }
 
   function deriveTitle (url) {
@@ -1313,6 +1446,14 @@
     app.auto404Remaining = null
     var currentUrl = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
 
+    if (currentUrl) {
+      ensureThumbnailForUrl(currentUrl, app.targetImg)
+        .then(function () {
+          renderFavorites()
+        })
+        .catch(function () {})
+    }
+
     if (app.pendingHistoryUrl) {
       addHistory(app.pendingHistoryUrl)
       app.pendingHistoryUrl = ''
@@ -1504,6 +1645,7 @@
 
     app.fieldsEl = createEl('div')
     app.historyEl = createEl('div')
+    app.favoritesEl = createEl('div')
     app.descriptionEl = createEl('div', {
       text: 'No description yet.',
       style: {
@@ -1548,11 +1690,13 @@
     app.panel.appendChild(section('Fields', [app.fieldsEl]))
     app.panel.appendChild(section('Controls', renderControls()))
     app.panel.appendChild(section('Styling', renderStyleControls()))
+    app.panel.appendChild(section('Favorites', [app.favoritesEl]))
     app.panel.appendChild(section('History', [app.historyEl]))
 
     document.body.appendChild(app.panel)
     if (app.panelHidden) app.panel.style.display = 'none'
     renderFields()
+    renderFavorites()
     renderHistory()
     renderDescriptionForCurrentUrl()
   }
@@ -1919,6 +2063,7 @@
           return
         }
         addFavorite(current)
+        renderFavorites()
         setStatus('favorite added')
       }),
       button('Save Favorites File', function () {
@@ -1972,11 +2117,89 @@
     })
   }
 
+  function renderFavorites () {
+    if (!app.favoritesEl) return
+
+    app.favoritesEl.innerHTML = ''
+    var favorites = app.settings.favorites || []
+
+    if (!favorites.length) {
+      app.favoritesEl.appendChild(createEl('div', { text: 'No favorites yet.' }))
+      return
+    }
+
+    favorites.slice(0, 30).forEach(function (item) {
+      var row = createEl('div', {
+        style: {
+          display: 'grid',
+          gridTemplateColumns: (FAVORITE_THUMBNAIL_SIZE + 6) + 'px 1fr auto',
+          gap: '6px',
+          alignItems: 'center',
+          borderTop: '1px solid rgba(255,255,255,0.12)',
+          padding: '6px 0'
+        }
+      })
+
+      if (item.thumbnail) {
+        row.appendChild(createEl('img', {
+          src: item.thumbnail,
+          alt: 'favorite thumbnail',
+          style: {
+            width: FAVORITE_THUMBNAIL_SIZE + 'px',
+            height: FAVORITE_THUMBNAIL_SIZE + 'px',
+            objectFit: 'cover',
+            borderRadius: '4px',
+            border: '1px solid rgba(255,255,255,0.2)',
+            background: '#111'
+          }
+        }))
+      } else {
+        row.appendChild(createEl('div', {
+          style: {
+            width: FAVORITE_THUMBNAIL_SIZE + 'px',
+            height: FAVORITE_THUMBNAIL_SIZE + 'px',
+            borderRadius: '4px',
+            border: '1px solid rgba(255,255,255,0.2)',
+            background: '#111'
+          }
+        }))
+      }
+
+      row.appendChild(createEl('button', {
+        type: 'button',
+        text: item.title || item.label || item.url,
+        title: item.url,
+        onclick: function () { parseAndApplyUrl(item.url) },
+        style: {
+          textAlign: 'left',
+          background: 'transparent',
+          color: '#ddd',
+          border: '0',
+          padding: '2px',
+          overflowWrap: 'anywhere',
+          cursor: 'pointer',
+          font: '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+        }
+      }))
+
+      row.appendChild(button('x', function () {
+        app.settings.favorites = app.settings.favorites.filter(function (entry) {
+          return entry.url !== item.url
+        })
+        saveState()
+        renderFavorites()
+      }))
+
+      app.favoritesEl.appendChild(row)
+    })
+  }
+
   function renderAll () {
     if (!app.panel) renderPanel()
     if (app.fullUrlEl && app.model) app.fullUrlEl.value = rebuildUrl(app.model)
     if (app.domainEl && app.model) app.domainEl.value = app.model.host
     renderFields()
+    renderFavorites()
     renderHistory()
   }
 
