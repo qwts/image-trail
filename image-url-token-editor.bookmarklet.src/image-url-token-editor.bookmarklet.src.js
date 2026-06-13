@@ -1229,49 +1229,77 @@
   }
 
   function applyFieldChangeToSelectedHistory (field) {
-    if (!field || app.selectedHistoryUrls.length <= 1) return
+    if (!field || app.selectedHistoryUrls.length === 0) return
 
     var newValue = getFieldValue(field)
+    var selectedSet = Object.create(null)
+    app.selectedHistoryUrls.forEach(function (url) { selectedSet[url] = true })
+
     var updatedCount = 0
+    var urlMap = Object.create(null)
 
-    var updatedSelectedUrls = app.selectedHistoryUrls.slice()
-
-    app.selectedHistoryUrls.forEach(function (url) {
-      if (url === app.lastAppliedUrl) return
-
+    app.settings.history = (app.settings.history || []).map(function (item) {
+      if (!item || !item.url || !selectedSet[item.url]) return item
       var targetModel
       try {
-        targetModel = parseModel(url)
+        targetModel = parseModel(item.url)
       } catch (e) {
-        return
+        return item
       }
-
       var match = findMatchingFieldInModel(targetModel, field)
-      if (!match) return
-
+      if (!match) return item
       setFieldValue(match, newValue)
       var newUrl = rebuildUrl(targetModel)
-
-      var historyEntry = (app.settings.history || []).find(function (e) { return e && e.url === url })
-      if (historyEntry) {
-        historyEntry.url = newUrl
-        updatedCount++
-      }
-
-      var selIdx = updatedSelectedUrls.indexOf(url)
-      if (selIdx >= 0) updatedSelectedUrls[selIdx] = newUrl
-
-      if (app.historyFocusedUrl === url) app.historyFocusedUrl = newUrl
-      if (app.historySelectionAnchorUrl === url) app.historySelectionAnchorUrl = newUrl
+      urlMap[item.url] = newUrl
+      updatedCount++
+      return Object.assign({}, item, { url: newUrl })
     })
 
-    app.selectedHistoryUrls = updatedSelectedUrls
+    if (updatedCount === 0) return
 
-    if (updatedCount > 0) {
-      saveState()
-      renderHistory()
-      setStatus('Updated ' + updatedCount + ' selected history item' + (updatedCount === 1 ? '' : 's'))
-    }
+    app.selectedHistoryUrls = app.selectedHistoryUrls.map(function (url) { return urlMap[url] || url })
+    if (app.historyFocusedUrl && urlMap[app.historyFocusedUrl]) app.historyFocusedUrl = urlMap[app.historyFocusedUrl]
+    if (app.historySelectionAnchorUrl && urlMap[app.historySelectionAnchorUrl]) app.historySelectionAnchorUrl = urlMap[app.historySelectionAnchorUrl]
+
+    saveState()
+    renderHistory()
+    setStatus('Updated ' + updatedCount + ' selected history item' + (updatedCount === 1 ? '' : 's'))
+  }
+
+  function applyDomainToSelectedHistory () {
+    if (!app.model || app.selectedHistoryUrls.length === 0) return
+
+    var newHost = app.model.host
+    var selectedSet = Object.create(null)
+    app.selectedHistoryUrls.forEach(function (url) { selectedSet[url] = true })
+
+    var updatedCount = 0
+    var urlMap = Object.create(null)
+
+    app.settings.history = (app.settings.history || []).map(function (item) {
+      if (!item || !item.url || !selectedSet[item.url]) return item
+      var targetModel
+      try {
+        targetModel = parseModel(item.url)
+      } catch (e) {
+        return item
+      }
+      targetModel.host = newHost
+      var newUrl = rebuildUrl(targetModel)
+      urlMap[item.url] = newUrl
+      updatedCount++
+      return Object.assign({}, item, { url: newUrl })
+    })
+
+    if (updatedCount === 0) return
+
+    app.selectedHistoryUrls = app.selectedHistoryUrls.map(function (url) { return urlMap[url] || url })
+    if (app.historyFocusedUrl && urlMap[app.historyFocusedUrl]) app.historyFocusedUrl = urlMap[app.historyFocusedUrl]
+    if (app.historySelectionAnchorUrl && urlMap[app.historySelectionAnchorUrl]) app.historySelectionAnchorUrl = urlMap[app.historySelectionAnchorUrl]
+
+    saveState()
+    renderHistory()
+    setStatus('Updated domain on ' + updatedCount + ' selected history item' + (updatedCount === 1 ? '' : 's'))
   }
 
   function setFieldValue (field, value) {
@@ -2144,6 +2172,8 @@
       if (!app.model) return
       app.model.host = value.trim()
       saveState()
+    }, null, function () {
+      applyDomainToSelectedHistory()
     })
 
     app.fieldsEl = createEl('div')
@@ -2799,7 +2829,7 @@
     }
     var btnStyle = { width: '100%' }
 
-    app.historyEl.appendChild(createEl('div', { style: gridStyle }, [
+    app.historyEl.appendChild(createEl('div', { style: Object.assign({}, gridStyle, { gridTemplateColumns: 'repeat(2, 1fr)' }) }, [
       button('Clear Downloads', function () {
         app.settings.downloadRecords = []
         app.settings.history = (app.settings.history || []).map(function (item) {
@@ -2816,6 +2846,44 @@
         app.historySelectionAnchorUrl = ''
         saveState()
         renderHistory()
+      }, btnStyle),
+      button('Import History', function () {
+        var fileInput = document.createElement('input')
+        fileInput.type = 'file'
+        fileInput.accept = '.json,application/json'
+        fileInput.onchange = function () {
+          var file = fileInput.files && fileInput.files[0]
+          if (!file) return
+          var reader = new FileReader()
+          reader.onload = function (e) {
+            try {
+              var parsed = JSON.parse(e.target.result)
+              var imported = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.history) ? parsed.history : null)
+              if (!imported) throw new Error('not an array')
+              var existingUrls = Object.create(null)
+              ;(app.settings.history || []).forEach(function (item) {
+                if (item && item.url) existingUrls[item.url] = true
+              })
+              var added = 0
+              imported.forEach(function (item) {
+                if (!item || !item.url || existingUrls[item.url]) return
+                app.settings.history.push(item)
+                existingUrls[item.url] = true
+                added++
+              })
+              app.settings.history = app.settings.history.slice()
+              saveState()
+              renderHistory()
+              setStatus('imported ' + added + ' history item' + (added === 1 ? '' : 's'))
+            } catch (err) {
+              setStatus('import failed: invalid JSON')
+            }
+          }
+          reader.readAsText(file)
+        }
+        document.body.appendChild(fileInput)
+        fileInput.click()
+        fileInput.remove()
       }, btnStyle),
       button('Export History', function () {
         var json = JSON.stringify(app.settings.history || [], null, 2)
@@ -3179,7 +3247,7 @@
 
   function onKeyDown (event) {
     if (event.key === 'Enter') {
-      if ((app.selectedHistoryUrls || []).length) {
+      if (!isTypingTarget(event.target) && (app.selectedHistoryUrls || []).length) {
         event.preventDefault()
         event.stopPropagation()
         if (event.shiftKey) downloadSelectedHistoryItems()
@@ -3189,7 +3257,7 @@
     }
 
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-      if ((app.selectedHistoryUrls || []).length) {
+      if (!isTypingTarget(event.target) && (app.selectedHistoryUrls || []).length) {
         event.preventDefault()
         event.stopPropagation()
         moveHistorySelection(event.key === 'ArrowDown' ? 1 : -1)
