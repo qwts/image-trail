@@ -5,7 +5,7 @@
 
   var APP_ID = '__image_url_token_editor_bookmarklet_v1'
   var STORE_KEY = '__url_image_navigator_state_v1'
-  var MAX_HISTORY = 100
+  var MAX_HISTORY = 100 // kept for favorites only
   var MAX_DOWNLOAD_RECORDS = 500
   var MAX_Z_INDEX = 2147483647
   var THUMBNAIL_MAX_EDGE = 256
@@ -53,6 +53,9 @@
     domainEl: null,
     fieldsEl: null,
     historyEl: null,
+    selectedHistoryUrls: [],
+    historyFocusedUrl: '',
+    historySelectionAnchorUrl: '',
     favoritesEl: null,
     llmCache: Object.create(null),
     llmInflight: Object.create(null),
@@ -687,6 +690,35 @@
     window.URL.revokeObjectURL(objectUrl)
   }
 
+  function downloadImageViaCanvas (url, filename) {
+    return new Promise(function (resolve) {
+      var img = new window.Image()
+      img.onload = function () {
+        if (!img.naturalWidth || !img.naturalHeight) { resolve(false); return }
+        try {
+          var canvas = document.createElement('canvas')
+          canvas.width = img.naturalWidth
+          canvas.height = img.naturalHeight
+          var ctx = canvas.getContext('2d')
+          if (!ctx) { resolve(false); return }
+          ctx.drawImage(img, 0, 0)
+          canvas.toBlob(function (blob) {
+            if (!blob) { resolve(false); return }
+            var a = document.createElement('a')
+            a.href = URL.createObjectURL(blob)
+            a.download = filename
+            a.click()
+            resolve(true)
+          })
+        } catch (e) {
+          resolve(false)
+        }
+      }
+      img.onerror = function () { resolve(false) }
+      img.src = url
+    })
+  }
+
   function normalizeAbsoluteUrl (url) {
     try {
       return new URL(url, location.href).href
@@ -1203,12 +1235,12 @@
       var upper = /[A-F]/.test(body)
       var value
       try {
-        value = body ? BigInt('0x' + body) : 0n
+        value = body ? BigInt('0x' + body) : BigInt(0)
       } catch (err) {
         return false
       }
       var bumped = value + deltaBigInt
-      if (bumped < 0n) bumped = 0n
+      if (bumped < BigInt(0)) bumped = BigInt(0)
       var nextBody = bumped.toString(16)
       if (upper) nextBody = nextBody.toUpperCase()
       nextBody = padNumberText(nextBody, width)
@@ -1221,7 +1253,7 @@
         return false
       }
       var nextInt = intValue + deltaBigInt
-      if (nextInt < 0n) nextInt = 0n
+      if (nextInt < BigInt(0)) nextInt = BigInt(0)
       next = padNumberText(nextInt.toString(10), width)
     }
 
@@ -1390,7 +1422,7 @@
       downloadedAt: String((existingEntry && existingEntry.downloadedAt) || '')
     })
 
-    app.settings.history = existing.slice(0, MAX_HISTORY)
+    app.settings.history = existing
     saveState()
   }
 
@@ -1489,25 +1521,47 @@
     }
   }
 
-  function downloadCurrentImage () {
-    var url = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
+  function downloadImageByUrl (url) {
     if (!url) return Promise.resolve()
 
     var normalizedUrl = normalizeAbsoluteUrl(url)
+    var fallbackFilename = ensureFilenameExtension(deriveTitle(url) || 'image', url)
+    var filenamePromise = ensureModelFilenameForUrl(url).catch(function (err) {
+      console.warn('[img-nav] model filename unavailable, using fallback', err)
+      return fallbackFilename
+    })
 
-    return ensureModelFilenameForUrl(url)
+    return filenamePromise
       .then(function (filename) {
         var fromHistory = findHistoryDownloadByUrl(normalizedUrl)
         if (fromHistory) {
           setStatus('blocked: this image URL was already downloaded')
-          return null
+          return false
         }
 
         return computeImageFingerprint(url).then(function (fingerprint) {
           var existing = findDownloadRecord(normalizedUrl, fingerprint)
           if (existing) {
             setStatus('blocked: matching image already downloaded')
-            return null
+            return false
+          }
+
+          var isCrossOrigin = false
+          try { isCrossOrigin = new URL(normalizedUrl).origin !== location.origin } catch (e) {}
+
+          if (isCrossOrigin) {
+            return downloadImageViaCanvas(url, filename).then(function (ok) {
+              if (!ok) {
+                window.location.href = url
+                setStatus('opening image in tab (cross-origin)')
+                return false
+              }
+              if (!(app.settings.history || []).some(function (entry) { return entry.url === url })) addHistory(url)
+              updateHistoryForUrl(url, { downloadedAt: new Date().toISOString(), title: filename })
+              addDownloadRecord(url, filename, '')
+              setStatus('download requested (canvas): ' + filename)
+              return true
+            })
           }
 
           return fetchImageBlob(url)
@@ -1516,7 +1570,7 @@
                 var exact = findDownloadRecord(normalizedUrl, blobFingerprint || fingerprint)
                 if (exact) {
                   setStatus('blocked: matching image already downloaded')
-                  return null
+                  return false
                 }
 
                 downloadBlob(blob, filename)
@@ -1524,29 +1578,33 @@
                 updateHistoryForUrl(url, { downloadedAt: new Date().toISOString(), title: filename })
                 addDownloadRecord(url, filename, blobFingerprint || fingerprint)
                 setStatus('download requested: ' + filename)
-                return null
+                return true
               })
             })
             .catch(function () {
-              var anchor = document.createElement('a')
-              anchor.href = url
-              anchor.download = filename
-              anchor.rel = 'noopener'
-              document.body.appendChild(anchor)
-              anchor.click()
-              anchor.remove()
-              if (!(app.settings.history || []).some(function (entry) { return entry.url === url })) addHistory(url)
-              updateHistoryForUrl(url, { downloadedAt: new Date().toISOString(), title: filename })
-              addDownloadRecord(url, filename, fingerprint)
-              setStatus('download requested (direct link fallback): ' + filename)
-              return null
+              return downloadImageViaCanvas(url, filename).then(function (ok) {
+                if (!ok) {
+                  setStatus('download blocked: cross-origin image')
+                  return false
+                }
+                if (!(app.settings.history || []).some(function (entry) { return entry.url === url })) addHistory(url)
+                updateHistoryForUrl(url, { downloadedAt: new Date().toISOString(), title: filename })
+                addDownloadRecord(url, filename, fingerprint)
+                setStatus('download requested (canvas fallback): ' + filename)
+                return true
+              })
             })
         })
       })
       .catch(function (err) {
         setStatus('download blocked: ' + summarizeError(err))
-        return null
+        return false
       })
+  }
+
+  function downloadCurrentImage () {
+    var url = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
+    return downloadImageByUrl(url)
   }
 
   function fetchTitleForCurrentImage () {
@@ -1801,12 +1859,12 @@
     return el
   }
 
-  function button (label, onClick) {
+  function button (label, onClick, extraStyle) {
     return createEl('button', {
       type: 'button',
       text: label,
       onclick: onClick,
-      style: {
+      style: Object.assign({
         background: '#222',
         color: '#fff',
         border: '1px solid #666',
@@ -1814,7 +1872,7 @@
         padding: '5px 8px',
         cursor: 'pointer',
         font: '12px system-ui, sans-serif'
-      }
+      }, extraStyle || {})
     })
   }
 
@@ -2440,6 +2498,186 @@
     if (shouldRender !== false) renderFields()
   }
 
+  function getVisibleHistoryEntries () {
+    return (app.settings.history || []).slice(0, 30)
+  }
+
+  function getHistoryIndexByUrl (url) {
+    if (!url) return -1
+    var entries = getVisibleHistoryEntries()
+    for (var i = 0; i < entries.length; i += 1) {
+      if (entries[i].url === url) return i
+    }
+    return -1
+  }
+
+  function normalizeHistorySelection () {
+    var entries = getVisibleHistoryEntries()
+    var allowed = Object.create(null)
+    entries.forEach(function (entry) {
+      allowed[entry.url] = true
+    })
+
+    app.selectedHistoryUrls = (app.selectedHistoryUrls || []).filter(function (url) {
+      return !!allowed[url]
+    })
+
+    if (app.historyFocusedUrl && !allowed[app.historyFocusedUrl]) {
+      app.historyFocusedUrl = ''
+    }
+
+    if (!app.historyFocusedUrl && app.selectedHistoryUrls.length) {
+      app.historyFocusedUrl = app.selectedHistoryUrls[app.selectedHistoryUrls.length - 1]
+    }
+
+    if (!app.historySelectionAnchorUrl || !allowed[app.historySelectionAnchorUrl]) {
+      app.historySelectionAnchorUrl = app.historyFocusedUrl || ''
+    }
+  }
+
+  function setHistorySelectionByIndex (index, options) {
+    var entries = getVisibleHistoryEntries()
+    if (!entries.length) {
+      app.selectedHistoryUrls = []
+      app.historyFocusedUrl = ''
+      app.historySelectionAnchorUrl = ''
+      return
+    }
+
+    options = options || {}
+    var clampedIndex = Math.max(0, Math.min(entries.length - 1, index))
+    var focusUrl = entries[clampedIndex].url
+    var nextSelection = []
+
+    if (options.range) {
+      var anchorIndex = getHistoryIndexByUrl(app.historySelectionAnchorUrl)
+      if (anchorIndex < 0) anchorIndex = clampedIndex
+      var start = Math.min(anchorIndex, clampedIndex)
+      var end = Math.max(anchorIndex, clampedIndex)
+      nextSelection = entries.slice(start, end + 1).map(function (entry) { return entry.url })
+    } else if (options.toggle) {
+      var selectedMap = Object.create(null)
+      ;(app.selectedHistoryUrls || []).forEach(function (url) {
+        selectedMap[url] = true
+      })
+
+      if (selectedMap[focusUrl]) delete selectedMap[focusUrl]
+      else selectedMap[focusUrl] = true
+
+      nextSelection = entries
+        .map(function (entry) { return entry.url })
+        .filter(function (url) { return !!selectedMap[url] })
+      app.historySelectionAnchorUrl = focusUrl
+    } else {
+      nextSelection = [focusUrl]
+      app.historySelectionAnchorUrl = focusUrl
+    }
+
+    app.selectedHistoryUrls = nextSelection
+    app.historyFocusedUrl = focusUrl
+  }
+
+  function moveHistorySelection (direction) {
+    var entries = getVisibleHistoryEntries()
+    if (!entries.length) return false
+
+    normalizeHistorySelection()
+    var currentIndex = getHistoryIndexByUrl(app.historyFocusedUrl)
+    if (currentIndex < 0) {
+      currentIndex = direction > 0 ? -1 : entries.length
+    }
+
+    var nextIndex = Math.max(0, Math.min(entries.length - 1, currentIndex + direction))
+    setHistorySelectionByIndex(nextIndex)
+    renderHistory()
+    return true
+  }
+
+  function loadSelectedHistoryItem () {
+    normalizeHistorySelection()
+    if (!app.selectedHistoryUrls.length) return false
+
+    var url = app.historyFocusedUrl && app.selectedHistoryUrls.indexOf(app.historyFocusedUrl) >= 0
+      ? app.historyFocusedUrl
+      : app.selectedHistoryUrls[0]
+    if (!url) return false
+
+    parseAndApplyUrl(url)
+    return true
+  }
+
+  function downloadHistoryItemViaCanvas (url) {
+    if (!url) return Promise.resolve(false)
+    var filename = ensureFilenameExtension(deriveTitle(url) || 'image', url)
+    return new Promise(function (resolve) {
+      var img = new window.Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = function () {
+        try {
+          var canvas = document.createElement('canvas')
+          canvas.width = img.naturalWidth
+          canvas.height = img.naturalHeight
+          canvas.getContext('2d').drawImage(img, 0, 0)
+          canvas.toBlob(function (blob) {
+            if (!blob) { resolve(false); return }
+            var a = document.createElement('a')
+            a.href = URL.createObjectURL(blob)
+            a.download = filename
+            a.click()
+            if (!(app.settings.history || []).some(function (entry) { return entry.url === url })) addHistory(url)
+            updateHistoryForUrl(url, { downloadedAt: new Date().toISOString(), title: filename })
+            setStatus('download requested: ' + filename)
+            resolve(true)
+          })
+        } catch (e) {
+          setStatus('download failed (cross-origin blocked): ' + filename)
+          resolve(false)
+        }
+      }
+      img.onerror = function () {
+        setStatus('download failed (image load error): ' + filename)
+        resolve(false)
+      }
+      img.src = url
+    })
+  }
+
+  function downloadSelectedHistoryItems () {
+    normalizeHistorySelection()
+    var urls = (app.selectedHistoryUrls || []).slice()
+    if (!urls.length) return false
+
+    if (urls.length === 1) {
+      downloadImageByUrl(urls[0])
+      return true
+    }
+
+    var requestedCount = 0
+    var blockedCount = 0
+    var run = Promise.resolve()
+    urls.forEach(function (url) {
+      run = run.then(function () {
+        return downloadImageByUrl(url).then(function (ok) {
+          if (ok) requestedCount += 1
+          else blockedCount += 1
+          return null
+        })
+      })
+    })
+
+    run.then(function () {
+      if (requestedCount > 0) {
+        setStatus(
+          'download requested for ' + requestedCount + ' selected history item(s)' +
+          (blockedCount ? ' (' + blockedCount + ' blocked/skipped)' : '')
+        )
+        return
+      }
+      setStatus('no selected history items downloaded (blocked/skipped)')
+    })
+    return true
+  }
+
   function syncFullUrlOnly () {
     if (!app.model) return
     var url = rebuildUrl(app.model)
@@ -2453,6 +2691,7 @@
 
     app.historyEl.innerHTML = ''
 
+    var historyBtnStyle = { flex: '1 1 0', maxWidth: '160px' }
     app.historyEl.appendChild(createEl('div', {
       style: {
         display: 'flex',
@@ -2463,9 +2702,12 @@
     }, [
       button('Clear History', function () {
         app.settings.history = []
+        app.selectedHistoryUrls = []
+        app.historyFocusedUrl = ''
+        app.historySelectionAnchorUrl = ''
         saveState()
         renderHistory()
-      }),
+      }, historyBtnStyle),
       button('Favorite Current', function () {
         var current = ''
         if (app.fullUrlEl) current = app.fullUrlEl.value
@@ -2477,10 +2719,71 @@
         addFavorite(current)
         renderFavorites()
         setStatus('favorite added')
-      }),
+      }, historyBtnStyle),
       button('Save Favorites File', function () {
         saveFavoritesFile()
-      })
+      }, historyBtnStyle),
+      button('Export History', function () {
+        var json = JSON.stringify(app.settings.history || [], null, 2)
+        var blob = new Blob([json], { type: 'application/json' })
+        var a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = 'history-' + new Date().toISOString().slice(0, 10) + '.json'
+        a.rel = 'noopener'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setStatus('history exported')
+      }, historyBtnStyle),
+      button('Import History', function () {
+        var input = document.createElement('input')
+        input.type = 'file'
+        input.accept = '.json,application/json'
+        input.onchange = function () {
+          var file = input.files && input.files[0]
+          if (!file) return
+          var reader = new FileReader()
+          reader.onload = function (e) {
+            try {
+              var imported = JSON.parse(e.target.result)
+              if (!Array.isArray(imported)) throw new Error('not an array')
+              var existingUrls = Object.create(null)
+              ;(app.settings.history || []).forEach(function (item) {
+                if (item && item.url) existingUrls[item.url] = true
+              })
+              var added = 0
+              imported.forEach(function (item) {
+                if (!item || !item.url || existingUrls[item.url]) return
+                app.settings.history.push(item)
+                existingUrls[item.url] = true
+                added++
+              })
+              app.settings.history = app.settings.history.slice()
+              saveState()
+              renderHistory()
+              setStatus('imported ' + added + ' history item(s)')
+            } catch (err) {
+              setStatus('import failed: invalid JSON')
+            }
+          }
+          reader.readAsText(file)
+        }
+        document.body.appendChild(input)
+        input.click()
+        input.remove()
+      }, historyBtnStyle),
+      button('Clear Storage', function () {
+        if (!window.confirm('Clear all history, favorites, and settings from localStorage? This cannot be undone.')) return
+        try {
+          window.localStorage.removeItem(STORE_KEY)
+          app.settings = defaultState()
+          saveState()
+          renderHistory()
+          setStatus('storage cleared')
+        } catch (err) {
+          setStatus('clear failed')
+        }
+      }, historyBtnStyle)
     ]))
 
     if (!app.settings.history.length) {
@@ -2488,8 +2791,16 @@
       return
     }
 
+    normalizeHistorySelection()
+    var selectedMap = Object.create(null)
+    ;(app.selectedHistoryUrls || []).forEach(function (url) {
+      selectedMap[url] = true
+    })
+
     var showThumbnails = app.settings.showHistoryThumbnails !== false
-    app.settings.history.slice(0, 30).forEach(function (item) {
+    getVisibleHistoryEntries().forEach(function (item, historyIndex) {
+      var isSelected = !!selectedMap[item.url]
+      var isFocused = app.historyFocusedUrl === item.url
       var row = createEl('div', {
         style: {
           display: 'grid',
@@ -2499,7 +2810,9 @@
           gap: '5px',
           alignItems: 'center',
           borderTop: '1px solid rgba(255,255,255,0.12)',
-          padding: '5px 0'
+          borderLeft: isSelected ? '2px solid #8fd' : '2px solid transparent',
+          padding: '5px 0 5px 4px',
+          background: isSelected ? 'rgba(143,255,221,0.12)' : 'transparent'
         }
       })
 
@@ -2534,16 +2847,49 @@
         type: 'button',
         text: item.title || item.label || item.url,
         title: item.url,
-        onclick: function () { parseAndApplyUrl(item.url) },
+        onkeydown: function (event) {
+          if (!event || event.key !== 'Enter' || !event.shiftKey) return
+          event.preventDefault()
+          event.stopPropagation()
+
+          if (app.selectedHistoryUrls.indexOf(item.url) < 0) {
+            setHistorySelectionByIndex(historyIndex)
+          }
+          downloadSelectedHistoryItems()
+        },
+        onclick: function (event) {
+          if (event) {
+            event.preventDefault()
+            event.stopPropagation()
+          }
+
+          if (event && event.shiftKey) {
+            setHistorySelectionByIndex(historyIndex, { range: true })
+          } else if (event && (event.metaKey || event.ctrlKey)) {
+            setHistorySelectionByIndex(historyIndex, { toggle: true })
+          } else {
+            setHistorySelectionByIndex(historyIndex)
+          }
+          renderHistory()
+        },
+        ondblclick: function (event) {
+          if (event) {
+            event.preventDefault()
+            event.stopPropagation()
+          }
+          setHistorySelectionByIndex(historyIndex)
+          parseAndApplyUrl(item.url)
+        },
         style: {
           textAlign: 'left',
           background: 'transparent',
-          color: '#ddd',
+          color: isSelected ? '#eafff6' : '#ddd',
           border: '0',
           padding: '2px',
           overflowWrap: 'anywhere',
           cursor: 'pointer',
-          font: '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+          font: '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+          outline: isFocused ? '1px dotted rgba(143,255,221,0.8)' : 'none'
         }
       }))
 
@@ -2712,6 +3058,25 @@
   }
 
   function onKeyDown (event) {
+    if (event.key === 'Enter') {
+      if ((app.selectedHistoryUrls || []).length) {
+        event.preventDefault()
+        event.stopPropagation()
+        if (event.shiftKey) downloadSelectedHistoryItems()
+        else loadSelectedHistoryItem()
+        return
+      }
+    }
+
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      if ((app.selectedHistoryUrls || []).length) {
+        event.preventDefault()
+        event.stopPropagation()
+        moveHistorySelection(event.key === 'ArrowDown' ? 1 : -1)
+        return
+      }
+    }
+
     if (isTypingTarget(event.target)) return
 
     if (event.key === 'ArrowLeft') {
