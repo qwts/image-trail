@@ -13,6 +13,16 @@
   var LLM_DEFAULT_ENDPOINT = 'http://127.0.0.1:1234/v1/chat/completions'
   var LLM_DEFAULT_MODEL = 'gemma-4-e4b'
   var LLM_DEFAULT_MAX_TOKENS = 220
+  var PANEL_SECTION_DEFAULTS = {
+    imageDescription: true,
+    fullUrl: false,
+    domain: false,
+    fields: true,
+    controls: false,
+    styling: false,
+    favorites: true,
+    history: true
+  }
 
   if (window[APP_ID] && typeof window[APP_ID].destroy === 'function') {
     window[APP_ID].destroy()
@@ -61,6 +71,10 @@
 
   window[APP_ID] = app
 
+  function clonePanelSectionDefaults () {
+    return Object.assign({}, PANEL_SECTION_DEFAULTS)
+  }
+
   function defaultState () {
     return {
       direction: 'up',
@@ -82,6 +96,7 @@
       imageObjectFit: 'contain',
       imageWidth: '100vw',
       imageHeight: '100vh',
+      panelSections: clonePanelSectionDefaults(),
       history: [],
       favorites: []
     }
@@ -103,6 +118,16 @@
 
       if (!Array.isArray(state.history)) state.history = []
       if (!Array.isArray(state.favorites)) state.favorites = []
+      if (!state.panelSections || typeof state.panelSections !== 'object' || Array.isArray(state.panelSections)) {
+        state.panelSections = clonePanelSectionDefaults()
+      } else {
+        state.panelSections = Object.keys(PANEL_SECTION_DEFAULTS).reduce(function (acc, key) {
+          acc[key] = typeof state.panelSections[key] === 'boolean'
+            ? state.panelSections[key]
+            : PANEL_SECTION_DEFAULTS[key]
+          return acc
+        }, {})
+      }
       state.history = state.history
         .map(function (entry) {
           if (!entry || typeof entry !== 'object') return null
@@ -1645,23 +1670,95 @@
     })
   }
 
-  function section (title, children) {
-    return createEl('div', {
+  function isSectionExpanded (sectionId) {
+    if (!sectionId) return true
+    var sections = app.settings && app.settings.panelSections
+    if (!sections || typeof sections !== 'object') return PANEL_SECTION_DEFAULTS[sectionId] !== false
+    if (typeof sections[sectionId] === 'boolean') return sections[sectionId]
+    return PANEL_SECTION_DEFAULTS[sectionId] !== false
+  }
+
+  function setSectionExpanded (sectionId, expanded) {
+    if (!sectionId) return
+    if (!app.settings.panelSections || typeof app.settings.panelSections !== 'object') {
+      app.settings.panelSections = clonePanelSectionDefaults()
+    }
+    app.settings.panelSections[sectionId] = !!expanded
+    saveState()
+  }
+
+  function section (title, children, options) {
+    var opts = options || {}
+    var sectionId = opts.id || ''
+    var collapsedByDefault = opts.collapsedByDefault === true
+    var expanded = sectionId ? isSectionExpanded(sectionId) : !collapsedByDefault
+
+    var container = createEl('div', {
       style: {
         borderTop: '1px solid rgba(255,255,255,0.16)',
         marginTop: '10px',
         paddingTop: '8px'
       }
-    }, [
-      createEl('div', {
-        text: title,
+    })
+
+    var indicator = createEl('span', {
+      text: expanded ? '[-]' : '[+]',
+      style: {
+        color: '#9ee',
+        marginRight: '6px',
+        font: '700 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+      }
+    })
+
+    var titleEl = createEl('span', {
+      text: title,
+      style: {
+        font: '700 12px system-ui, sans-serif',
+        color: '#fff'
+      }
+    })
+
+    var contentEl = createEl('div', {
+      style: {
+        display: expanded ? '' : 'none',
+        marginTop: '6px'
+      }
+    }, children || [])
+
+    function toggleSection () {
+      expanded = !expanded
+      indicator.textContent = expanded ? '[-]' : '[+]'
+      contentEl.style.display = expanded ? '' : 'none'
+      if (sectionId) setSectionExpanded(sectionId, expanded)
+    }
+
+    if (sectionId) {
+      container.appendChild(createEl('button', {
+        type: 'button',
+        onclick: toggleSection,
         style: {
-          font: '700 12px system-ui, sans-serif',
-          marginBottom: '6px',
-          color: '#fff'
+          display: 'flex',
+          alignItems: 'center',
+          width: '100%',
+          padding: '0',
+          border: '0',
+          background: 'transparent',
+          color: '#fff',
+          cursor: 'pointer',
+          textAlign: 'left'
         }
-      })
-    ].concat(children || []))
+      }, [indicator, titleEl]))
+    } else {
+      container.appendChild(createEl('div', {
+        style: {
+          display: 'flex',
+          alignItems: 'center'
+        }
+      }, [titleEl]))
+    }
+
+    container.appendChild(contentEl)
+    return container
   }
 
   function renderPanel () {
@@ -1750,7 +1847,7 @@
     })
 
     app.panel.appendChild(app.titleEl)
-    app.panel.appendChild(section('Image Description', [app.descriptionEl]))
+    app.panel.appendChild(section('Image Description', [app.descriptionEl], { id: 'imageDescription' }))
 
     app.panel.appendChild(app.statusEl)
     app.panel.appendChild(section('Full URL', [
@@ -1767,14 +1864,14 @@
         button('Save State', function () { saveState(); setStatus('state saved') }),
         button('Close Panel', destroy)
       ])
-    ]))
+    ], { id: 'fullUrl' }))
 
-    app.panel.appendChild(section('Domain', [app.domainEl]))
-    app.panel.appendChild(section('Fields', [app.fieldsEl]))
-    app.panel.appendChild(section('Controls', renderControls()))
-    app.panel.appendChild(section('Styling', renderStyleControls()))
-    app.panel.appendChild(section('Favorites', [app.favoritesEl]))
-    app.panel.appendChild(section('History', [app.historyEl]))
+    app.panel.appendChild(section('Domain', [app.domainEl], { id: 'domain' }))
+    app.panel.appendChild(section('Fields', [app.fieldsEl], { id: 'fields' }))
+    app.panel.appendChild(section('Controls', renderControls(), { id: 'controls' }))
+    app.panel.appendChild(section('Styling', renderStyleControls(), { id: 'styling' }))
+    app.panel.appendChild(section('Favorites', [app.favoritesEl], { id: 'favorites' }))
+    app.panel.appendChild(section('History', [app.historyEl], { id: 'history' }))
 
     document.body.appendChild(app.panel)
     if (app.panelHidden) app.panel.style.display = 'none'
