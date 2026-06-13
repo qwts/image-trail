@@ -89,6 +89,7 @@
       autoFetchOnQueryChange: false,
       autoFetchTitleOnLoad: false,
       autoFetchDescriptionOnPreload: false,
+      previewReplacesStyling: false,
       showHistoryThumbnails: true,
       llmEndpoint: LLM_DEFAULT_ENDPOINT,
       llmModel: LLM_DEFAULT_MODEL,
@@ -1267,6 +1268,13 @@
   function styleTargetImage () {
     if (!app.targetImg) return
 
+    if (app.settings.previewReplacesStyling === false) {
+      document.documentElement.style.cssText = app.original.htmlCssText
+      document.body.style.cssText = app.original.bodyCssText
+      app.targetImg.style.cssText = app.original.imgCssText
+      return
+    }
+
     document.documentElement.style.background = app.settings.pageBackground || '#000000'
     document.body.style.background = app.settings.pageBackground || '#000000'
     document.body.style.margin = '0'
@@ -2227,6 +2235,33 @@
       }, [
         createEl('input', {
           type: 'checkbox',
+          checked: app.settings.previewReplacesStyling === true,
+          onchange: function (event) {
+            app.settings.previewReplacesStyling = event.target.checked
+            saveState()
+            styleTargetImage()
+          }
+        }),
+        'replace page/image styling for preview'
+      ]),
+      createEl('div', {
+        text: 'Clicking page images only adds to history.',
+        style: {
+          color: '#999',
+          font: '11px system-ui, sans-serif',
+          marginTop: '4px'
+        }
+      }),
+      createEl('label', {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          marginTop: '8px'
+        }
+      }, [
+        createEl('input', {
+          type: 'checkbox',
           checked: app.settings.showHistoryThumbnails !== false,
           onchange: function (event) {
             app.settings.showHistoryThumbnails = event.target.checked
@@ -2672,6 +2707,7 @@
 
     addHistory(url)
     renderHistory()
+    app.pendingHistoryUrl = ''
     setStatus('selected image added to history')
   }
 
