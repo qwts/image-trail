@@ -1192,21 +1192,36 @@
 
     var current = getFieldValue(field)
     var width = Number(field.width || field.token.width || current.replace(/^0x/i, '').length || 1)
+    var normalizedDelta = Number.isFinite(delta) ? Math.trunc(delta) : 0
+    var deltaBigInt = BigInt(normalizedDelta)
     var next
 
     if (field.kind === 'hex') {
       var hasPrefix = /^0x/i.test(current)
       var body = current.replace(/^0x/i, '')
       var upper = /[A-F]/.test(body)
-      var value = parseInt(body || '0', 16)
-      var bumped = Math.max(0, value + delta)
+      var value
+      try {
+        value = body ? BigInt('0x' + body) : 0n
+      } catch (err) {
+        return false
+      }
+      var bumped = value + deltaBigInt
+      if (bumped < 0n) bumped = 0n
       var nextBody = bumped.toString(16)
       if (upper) nextBody = nextBody.toUpperCase()
       nextBody = padNumberText(nextBody, width)
       next = hasPrefix ? '0x' + nextBody : nextBody
     } else {
-      var intValue = parseInt(current || '0', 10)
-      next = padNumberText(String(Math.max(0, intValue + delta)), width)
+      var intValue
+      try {
+        intValue = BigInt(current || '0')
+      } catch (err) {
+        return false
+      }
+      var nextInt = intValue + deltaBigInt
+      if (nextInt < 0n) nextInt = 0n
+      next = padNumberText(nextInt.toString(10), width)
     }
 
     setFieldValue(field, next)
