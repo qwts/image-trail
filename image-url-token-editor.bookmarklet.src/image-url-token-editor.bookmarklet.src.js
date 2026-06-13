@@ -40,6 +40,7 @@
     fieldsEl: null,
     historyEl: null,
     llmCache: Object.create(null),
+    llmInflight: Object.create(null),
     settings: loadState(),
     original: {
       htmlCssText: '',
@@ -64,6 +65,9 @@
       autoAdvanceOn404: false,
       auto404Count: '0',
       autoDownload: false,
+      autoFetchOnQueryChange: false,
+      autoFetchTitleOnLoad: false,
+      autoFetchDescriptionOnPreload: false,
       llmEndpoint: LLM_DEFAULT_ENDPOINT,
       llmModel: LLM_DEFAULT_MODEL,
       llmMaxTokens: String(LLM_DEFAULT_MAX_TOKENS),
@@ -242,16 +246,26 @@
     })
   }
 
-  function llmSchema () {
+  function llmTitleSchema () {
     return {
       type: 'object',
       additionalProperties: false,
-      required: ['filename', 'description'],
+      required: ['filename'],
       properties: {
         filename: {
           type: 'string',
-          description: 'Concise descriptive filename without extension.'
-        },
+          description: 'Short snake_case filename without extension.'
+        }
+      }
+    }
+  }
+
+  function llmDescriptionSchema () {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: ['description'],
+      properties: {
         description: {
           type: 'string',
           description: 'One concise sentence describing visible image content.'
@@ -260,11 +274,12 @@
     }
   }
 
-  function describeImageWithLlm (imageInput, sourceUrl) {
+  function describeImageWithLlm (imageInput, sourceUrl, mode) {
     var endpoint = app.settings.llmEndpoint || LLM_DEFAULT_ENDPOINT
     var model = app.settings.llmModel || LLM_DEFAULT_MODEL
     var maxTokens = parseInt(app.settings.llmMaxTokens, 10)
     if (!Number.isFinite(maxTokens) || maxTokens <= 0) maxTokens = LLM_DEFAULT_MAX_TOKENS
+    var isTitle = mode === 'title'
 
     var payload = {
       model: model,
@@ -274,15 +289,19 @@
       response_format: {
         type: 'json_schema',
         json_schema: {
-          name: 'image_download_metadata',
+          name: isTitle ? 'image_title_metadata' : 'image_description_metadata',
           strict: true,
-          schema: llmSchema()
+          schema: isTitle ? llmTitleSchema() : llmDescriptionSchema()
         }
       },
       messages: [
         {
           role: 'system',
-          content: 'Return only valid JSON matching the schema.'
+          content: [
+            'Return only valid JSON matching the schema.',
+            'Do not wrap JSON in markdown or add extra keys.',
+            isTitle ? 'Return only filename.' : 'Return only description.'
+          ].join(' ')
         },
         {
           role: 'user',
@@ -290,11 +309,16 @@
             {
               type: 'text',
               text: [
-                'Create metadata for this image download.',
+                isTitle
+                  ? 'Create a descriptive download filename for this image and content.'
+                  : 'Create a concise description for this image.  Detailed no more than 2 or 3 sentences.',
                 'Rules:',
-                '- filename: short snake_case filename without extension',
-                '- description: one concise sentence describing visible content',
-                '- avoid vague words like image, photo, pic',
+                isTitle
+                  ? '- filename: short snake_case filename without extension'
+                  : '- description: one concise sentence describing visible content',
+                isTitle
+                  ? '- avoid generic words like image, photo, pic unless required by content'
+                  : '- include only visible content, no speculation',
                 '',
                 'Source URL: ' + sourceUrl
               ].join('\n')
@@ -324,25 +348,95 @@
     }).then(function (data) {
       var message = data && data.choices && data.choices[0] && data.choices[0].message
       var parsed = parseJsonObject(extractMessageText(message))
-      var filename = sanitizeFilename(parsed.filename)
-      var description = String(parsed.description || '').trim()
-
-      if (!filename) filename = sanitizeFilename(deriveTitle(sourceUrl)) || 'image'
-      if (!description) description = 'No model description returned.'
-
+      if (isTitle) {
+        return {
+          filename: sanitizeFilename(parsed.filename)
+        }
+      }
       return {
-        filename: filename,
-        description: description
+        description: String(parsed.description || '').trim()
       }
     })
   }
 
-  function setDescriptionForUrl (url, metadata) {
-    if (!url || !metadata) return
-    app.llmCache[url] = {
-      filename: metadata.filename || '',
-      description: metadata.description || ''
+  function metadataCacheKey (url, mode) {
+    return mode + '::' + String(url || '')
+  }
+
+  function setMetadataFieldForUrl (url, mode, value) {
+    if (!url) return
+    var existing = app.llmCache[url] || {}
+    if (mode === 'title') {
+      app.llmCache[url] = {
+        filename: String(value || ''),
+        description: String(existing.description || '')
+      }
+      return
     }
+    app.llmCache[url] = {
+      filename: String(existing.filename || ''),
+      description: String(value || '')
+    }
+  }
+
+  function fallbackMetadataValue (url, mode) {
+    var existing = app.llmCache[url] || {}
+    if (mode === 'title') {
+      return existing.filename || ensureFilenameExtension(deriveTitle(url) || 'image', url)
+    }
+    return existing.description || 'No description available.'
+  }
+
+  function getImageInputForLlm (url) {
+    return fetchImageBlob(url)
+      .then(function (blob) {
+        return toDataUrl(blob)
+      })
+      .catch(function () {
+        return url
+      })
+  }
+
+  function runLlmMetadataFetch (url, mode, options) {
+    options = options || {}
+    if (!url) return Promise.reject(new Error('No URL to fetch metadata for'))
+
+    var key = metadataCacheKey(url, mode)
+    if (app.llmInflight[key]) return app.llmInflight[key]
+
+    var llmEndpoint = app.settings.llmEndpoint || LLM_DEFAULT_ENDPOINT
+    var label = mode === 'title' ? 'title' : 'description'
+
+    if (!options.silent) setStatus('asking LLM for ' + label + '...')
+
+    app.llmInflight[key] = getImageInputForLlm(url)
+      .then(function (imageInput) {
+        return describeImageWithLlm(imageInput, url, mode)
+      })
+      .then(function (metadata) {
+        var value = mode === 'title'
+          ? ensureFilenameExtension(metadata.filename || deriveTitle(url) || 'image', url)
+          : (String(metadata.description || '').trim() || 'No description available.')
+        setMetadataFieldForUrl(url, mode, value)
+        if (app.fullUrlEl && app.fullUrlEl.value === url) renderDescriptionForCurrentUrl()
+        if (!options.silent) setStatus('LLM ' + label + ' ready')
+        return value
+      })
+      .catch(function (err) {
+        var fallback = fallbackMetadataValue(url, mode)
+        setMetadataFieldForUrl(url, mode, fallback)
+        if (app.fullUrlEl && app.fullUrlEl.value === url) renderDescriptionForCurrentUrl()
+        console.warn('[img-nav] llm ' + label + ' failed', err)
+        if (!options.silent) {
+          setStatus('LLM ' + label + ' failed (' + summarizeError(err) + ') via ' + llmEndpoint)
+        }
+        return fallback
+      })
+      .finally(function () {
+        delete app.llmInflight[key]
+      })
+
+    return app.llmInflight[key]
   }
 
   function renderDescriptionForCurrentUrl () {
@@ -356,7 +450,7 @@
 
     var metadata = app.llmCache[currentUrl]
     if (!metadata || !metadata.description) {
-      app.descriptionEl.textContent = 'No description yet. Download to generate one.'
+      app.descriptionEl.textContent = 'No description yet. Click Fetch Description to generate one.'
       return
     }
 
@@ -915,6 +1009,7 @@
     }
 
     triggerPreloads()
+    maybeAutoFetchForQueryChange(url)
 
     if (options.updateLocation !== false) updateLocationBarIfAllowed(url)
 
@@ -1025,42 +1120,26 @@
     if (metadata.filename) {
       setStatus('download requested: ' + filename)
     } else {
-      setStatus('download requested (fallback name; click Fetch Name+Desc first)')
+      setStatus('download requested (fallback name; click Fetch Title first)')
     }
   }
 
-  function fetchNameAndDescriptionForCurrentImage () {
+  function fetchTitleForCurrentImage () {
     var url = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
     if (!url) return
+    runLlmMetadataFetch(url, 'title')
+  }
 
-    var llmEndpoint = app.settings.llmEndpoint || LLM_DEFAULT_ENDPOINT
-    setStatus('asking LLM for filename + description...')
+  function fetchDescriptionForCurrentImage () {
+    var url = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
+    if (!url) return
+    runLlmMetadataFetch(url, 'description')
+  }
 
-    fetchImageBlob(url).then(function (blob) {
-      return toDataUrl(blob).then(function (dataUrl) {
-        return describeImageWithLlm(dataUrl, url)
-      })
-    })
-      .catch(function () {
-        return describeImageWithLlm(url, url)
-      })
-      .then(function (metadata) {
-        var filename = ensureFilenameExtension(metadata.filename || deriveTitle(url) || 'image', url)
-        var description = String(metadata.description || '').trim() || 'No description available.'
-
-        setDescriptionForUrl(url, {
-          filename: filename,
-          description: description
-        })
-        renderDescriptionForCurrentUrl()
-        setStatus('LLM metadata ready: ' + filename)
-      })
-      .catch(function (err) {
-        console.warn('[img-nav] llm naming failed', err)
-        setStatus(
-          'LLM failed (' + summarizeError(err) + ') via ' + llmEndpoint
-        )
-      })
+  function maybeAutoFetchForQueryChange (url) {
+    if (!app.settings.autoFetchOnQueryChange || !url) return
+    runLlmMetadataFetch(url, 'title', { silent: true })
+    runLlmMetadataFetch(url, 'description', { silent: true })
   }
 
   function downloadTextFile (filename, text) {
@@ -1140,7 +1219,11 @@
       var url = computeUrlAtDelta(directionSign * step * attempt)
       if (!url) return
       img.onerror = tryNext
-      img.onload = null
+      img.onload = function () {
+        if (app.settings.autoFetchDescriptionOnPreload) {
+          runLlmMetadataFetch(url, 'description', { silent: true })
+        }
+      }
       img.src = url
     }
 
@@ -1226,8 +1309,9 @@
   }
 
   function onImageLoad () {
-    setStatus('loaded (click Fetch Name+Desc to run LLM)')
+    setStatus('loaded (click Fetch Title/Fetch Description to run LLM)')
     app.auto404Remaining = null
+    var currentUrl = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
 
     if (app.pendingHistoryUrl) {
       addHistory(app.pendingHistoryUrl)
@@ -1236,6 +1320,12 @@
     }
 
     if (app.settings.autoDownload) downloadCurrentImage()
+    if (app.settings.autoFetchTitleOnLoad && currentUrl) {
+      runLlmMetadataFetch(currentUrl, 'title', { silent: true })
+    }
+    if (app.settings.autoFetchDescriptionOnPreload && currentUrl) {
+      runLlmMetadataFetch(currentUrl, 'description', { silent: true })
+    }
     if (app.autoRunning) scheduleSlideshowStep(getSlideshowPause())
   }
 
@@ -1571,6 +1661,60 @@
         }),
         'auto-download successful load'
       ]),
+      createEl('label', {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          marginTop: '8px'
+        }
+      }, [
+        createEl('input', {
+          type: 'checkbox',
+          checked: app.settings.autoFetchOnQueryChange,
+          onchange: function (event) {
+            app.settings.autoFetchOnQueryChange = event.target.checked
+            saveState()
+          }
+        }),
+        'auto-fetch title+description on query change'
+      ]),
+      createEl('label', {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          marginTop: '8px'
+        }
+      }, [
+        createEl('input', {
+          type: 'checkbox',
+          checked: app.settings.autoFetchTitleOnLoad,
+          onchange: function (event) {
+            app.settings.autoFetchTitleOnLoad = event.target.checked
+            saveState()
+          }
+        }),
+        'auto-fetch title on load'
+      ]),
+      createEl('label', {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          marginTop: '8px'
+        }
+      }, [
+        createEl('input', {
+          type: 'checkbox',
+          checked: app.settings.autoFetchDescriptionOnPreload,
+          onchange: function (event) {
+            app.settings.autoFetchDescriptionOnPreload = event.target.checked
+            saveState()
+          }
+        }),
+        'auto-fetch description on preload/load'
+      ]),
       createEl('div', {
         style: {
           display: 'flex',
@@ -1583,7 +1727,8 @@
         button('Forward', function () { moveActiveField('up') }),
         button('Slideshow', startSlideshow),
         button('Stop', function () { stopSlideshow() }),
-        button('Fetch Name+Desc', fetchNameAndDescriptionForCurrentImage),
+        button('Fetch Title', fetchTitleForCurrentImage),
+        button('Fetch Description', fetchDescriptionForCurrentImage),
         button('Download', downloadCurrentImage)
       ])
     ]
