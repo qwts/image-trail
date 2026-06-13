@@ -24,6 +24,9 @@
     autoRemaining: 0,
     lastAppliedUrl: '',
     pendingHistoryUrl: '',
+    preloadUp: null,
+    preloadDown: null,
+    titleEl: null,
     statusEl: null,
     fullUrlEl: null,
     domainEl: null,
@@ -630,15 +633,20 @@
 
     if (app.fullUrlEl) app.fullUrlEl.value = url
     if (app.domainEl) app.domainEl.value = app.model.host || ''
+    if (app.titleEl) app.titleEl.textContent = deriveLabel(url)
 
     saveState()
     styleTargetImage()
     removeResponsiveSourceAttrs(app.targetImg)
 
     if (app.targetImg) {
+      app.targetImg.removeAttribute('src')
+      app.targetImg.src = ''
       app.targetImg.setAttribute('src', url)
       app.targetImg.src = url
     }
+
+    triggerPreloads()
 
     if (options.updateLocation !== false) updateLocationBarIfAllowed(url)
 
@@ -672,7 +680,8 @@
     existing.unshift({
       url: url,
       timestamp: new Date().toISOString(),
-      title: deriveTitle(url)
+      title: deriveTitle(url),
+      label: deriveLabel(url)
     })
 
     app.settings.history = existing.slice(0, MAX_HISTORY)
@@ -689,7 +698,8 @@
     existing.unshift({
       url: url,
       timestamp: new Date().toISOString(),
-      title: deriveTitle(url)
+      title: deriveTitle(url),
+      label: deriveLabel(url)
     })
 
     app.settings.favorites = existing.slice(0, MAX_HISTORY)
@@ -708,6 +718,20 @@
       return parsed.host
     } catch (err) {
       return document.title || 'image'
+    }
+  }
+
+  function deriveLabel (url) {
+    try {
+      var parsed = new URL(url, location.href)
+      var pathParts = splitPreservingSlashStyle(parsed.pathname).filter(function (part) {
+        return part.type === 'segment' && part.raw
+      })
+      var last = pathParts[pathParts.length - 1]
+      var filename = last ? safeDecodePathSegment(last.raw) : parsed.host
+      return filename + ' \u2013 ' + parsed.host
+    } catch (err) {
+      return url
     }
   }
 
@@ -770,6 +794,54 @@
 
     applyCurrentUrl()
     return true
+  }
+
+  function computeUrlAtDelta (delta) {
+    var field = app.fieldIndex[app.activeFieldId]
+    if (!field || !field.token) return null
+
+    var savedValue = field.token.value
+    var savedKind = field.kind
+    var savedWidth = field.width
+    var savedTokenKind = field.token.kind
+    var savedTokenWidth = field.token.width
+
+    if (!bumpField(field, delta)) return null
+
+    var url = rebuildUrl(app.model)
+
+    field.token.value = savedValue
+    field.kind = savedKind
+    field.width = savedWidth
+    field.token.kind = savedTokenKind
+    field.token.width = savedTokenWidth
+
+    return url
+  }
+
+  function preloadWithRetry (directionSign, maxAttempts) {
+    var step = getStep()
+    var attempt = 0
+    var img = new window.Image()
+
+    function tryNext () {
+      attempt += 1
+      if (attempt > maxAttempts) return
+      var url = computeUrlAtDelta(directionSign * step * attempt)
+      if (!url) return
+      img.onerror = tryNext
+      img.onload = null
+      img.src = url
+    }
+
+    tryNext()
+    return img
+  }
+
+  function triggerPreloads () {
+    var maxAttempts = Math.max(1, parseInt(app.settings.autoCount, 10) || 10)
+    app.preloadUp = preloadWithRetry(1, maxAttempts)
+    app.preloadDown = preloadWithRetry(-1, maxAttempts)
   }
 
   function startAuto () {
@@ -995,14 +1067,16 @@
     app.fieldsEl = createEl('div')
     app.historyEl = createEl('div')
 
-    app.panel.appendChild(createEl('div', {
-      text: deriveTitle(app.model ? rebuildUrl(app.model) : location.href),
+    app.titleEl = createEl('div', {
+      text: deriveLabel(app.model ? rebuildUrl(app.model) : location.href),
       style: {
         font: '700 14px system-ui, sans-serif',
         marginBottom: '4px',
         wordBreak: 'break-word'
       }
-    }))
+    })
+
+    app.panel.appendChild(app.titleEl)
 
     app.panel.appendChild(app.statusEl)
     app.panel.appendChild(section('Full URL', [
@@ -1245,7 +1319,10 @@
   }
 
   function syncFullUrlOnly () {
-    if (app.fullUrlEl && app.model) app.fullUrlEl.value = rebuildUrl(app.model)
+    if (!app.model) return
+    var url = rebuildUrl(app.model)
+    if (app.fullUrlEl) app.fullUrlEl.value = url
+    if (app.titleEl) app.titleEl.textContent = deriveLabel(url)
   }
 
   function renderHistory () {
@@ -1301,7 +1378,7 @@
 
       row.appendChild(createEl('button', {
         type: 'button',
-        text: item.title || item.url,
+        text: item.label || item.title || item.url,
         title: item.url,
         onclick: function () { parseAndApplyUrl(item.url) },
         style: {
