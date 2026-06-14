@@ -576,7 +576,8 @@
   }
 
   function getImageInputForLlm (url) {
-    return ensureThumbnailForUrl(url, app.targetImg)
+    var currentUrl = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
+    return ensureThumbnailForUrl(url, url === currentUrl ? app.targetImg : null)
       .then(function (thumbnail) {
         if (thumbnail) return thumbnail
         return fetchImageBlob(url).then(function (blob) {

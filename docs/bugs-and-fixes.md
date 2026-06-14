@@ -69,6 +69,35 @@ Plain Enter (load selected item) is still handled by the global handler for butt
 
 ---
 
+### Bug: Batch Shift+Enter download overwrites thumbnails (and LLM titles) of non-current history items
+
+**Symptom:** With multiple history items selected via ctrl/cmd-click, pressing Shift+Enter to batch-download causes the history thumbnails (and, when LLM is configured, the titles) of all selected items that lack a cached thumbnail to be overwritten with the data of the first (currently-displayed) image. Items that already have a thumbnail stored in `app.thumbnailCache` are unaffected.
+
+**Root cause:** `getImageInputForLlm(url)` unconditionally passes `app.targetImg` as the `sourceImage` parameter to `ensureThumbnailForUrl`:
+
+```js
+function getImageInputForLlm (url) {
+  return ensureThumbnailForUrl(url, app.targetImg)   // ← always uses page image
+  ...
+}
+```
+
+`ensureThumbnailForUrl` short-circuits and returns the cached value when `app.thumbnailCache[url]` already exists. But when the cache is cold (which is always true for non-current URLs that haven't been individually loaded in this session), it falls through to the `sourceImage` branch and creates a thumbnail snapshot of `app.targetImg` — the currently-displayed page image. That snapshot is then persisted back to the history entry via `cacheThumbnailForUrl → updateHistoryForUrl(url, { thumbnail })`. Because the page is showing the first selected item's image, all other selected items get that image's thumbnail written into their history entries. When LLM is configured, `getImageInputForLlm` also returns this wrong thumbnail as the image input, so the LLM returns a title based on the wrong image.
+
+**Fix:** Only pass `app.targetImg` when `url` matches the currently-displayed URL. For any other URL, pass `null` so `ensureThumbnailForUrl` skips the `sourceImage` branch and fetches the correct image directly from `url`.
+
+```js
+function getImageInputForLlm (url) {
+  var currentUrl = app.fullUrlEl ? app.fullUrlEl.value : app.lastAppliedUrl
+  return ensureThumbnailForUrl(url, url === currentUrl ? app.targetImg : null)
+  ...
+}
+```
+
+**Affected code:** `getImageInputForLlm()` (~line 578).
+
+---
+
 ## General notes for future debugging
 
 - **Double render / layout thrashing:** If `renderHistory()` is being called in a loop or async chain, check whether `updateHistoryForUrl` or `cacheThumbnailForUrl` is also in the call path — they each trigger their own `renderHistory()` call. Avoid adding explicit `renderHistory()` calls after `ensureThumbnailForUrl` for this reason.
