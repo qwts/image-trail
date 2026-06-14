@@ -51,6 +51,7 @@
     statusEl: null,
     fullUrlEl: null,
     domainEl: null,
+    directionEl: null,
     fieldsEl: null,
     historyEl: null,
     selectedHistoryUrls: [],
@@ -1857,6 +1858,7 @@
   }
 
   function moveActiveField (direction) {
+    var autoWasActive = app.autoRunning || app.auto404Remaining != null || app.settings.autoAdvanceOn404
     stopAutoIfOppositeDirection(direction)
     var field = app.fieldIndex[app.activeFieldId]
     var signedStep = direction === 'down' ? -getStep() : getStep()
@@ -1867,6 +1869,13 @@
     }
 
     applyCurrentUrl()
+
+    if (!autoWasActive && app.settings.direction !== direction) {
+      app.settings.direction = direction
+      saveState()
+      if (app.directionEl) app.directionEl.value = direction
+    }
+
     return true
   }
 
@@ -2387,6 +2396,8 @@
       createEl('option', { value: 'up', text: 'up / + step', selected: app.settings.direction === 'up' }),
       createEl('option', { value: 'down', text: 'down / - step', selected: app.settings.direction === 'down' })
     ])
+
+    app.directionEl = direction
 
     return [
       label('Direction'),
