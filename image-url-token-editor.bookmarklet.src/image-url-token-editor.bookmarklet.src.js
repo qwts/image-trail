@@ -34,6 +34,16 @@
     panel: null,
     panelHidden: false,
     targetImg: null,
+    boundTargetImg: null,
+    isTargetPickMode: false,
+    pickModeListenersAttached: false,
+    pickModeImageBindings: [],
+    pickModeMutationObserver: null,
+    pickModeRefreshRaf: 0,
+    pickHoverImg: null,
+    targetIndicatorStyleEl: null,
+    targetImgSelector: '',
+    suppressClickUntilTs: 0,
     model: null,
     fields: [],
     fieldIndex: Object.create(null),
@@ -46,10 +56,10 @@
     pendingHistoryUrl: '',
     preloadUp: null,
     preloadDown: null,
-    pendingProbe: null,
     titleEl: null,
     descriptionEl: null,
     statusEl: null,
+    targetPickerEl: null,
     fullUrlEl: null,
     domainEl: null,
     directionEl: null,
@@ -894,8 +904,8 @@
     return candidates.filter(Boolean)
   }
 
-  function findTargetImage () {
-    var images = Array.prototype.slice.call(document.images || [])
+  function getTargetImageCandidates () {
+    return Array.prototype.slice.call(document.images || [])
       .filter(function (img) {
         return getImageUrl(img)
       })
@@ -904,13 +914,18 @@
         if (visibleDiff) return visibleDiff
         return imageScore(b) - imageScore(a)
       })
+  }
+
+  function findSingleTargetImage () {
+    var images = getTargetImageCandidates()
+    return images.length === 1 ? images[0] : null
+  }
+
+  function findTargetImage () {
+    var images = getTargetImageCandidates()
 
     if (images[0]) return images[0]
-
-    var img = document.createElement('img')
-    img.alt = 'image navigator target'
-    document.body.appendChild(img)
-    return img
+    return null
   }
 
   function resolveUrl (input) {
@@ -1269,7 +1284,7 @@
 
     if (!replacementTokens.length) return false
 
-    tokens.splice(tokenIndex, 1, ...replacementTokens)
+    Array.prototype.splice.apply(tokens, [tokenIndex, 1].concat(replacementTokens))
 
     collectFields(app.model)
     var selectedTokenIndex = tokenIndex + (prefix ? 1 : 0)
@@ -1500,6 +1515,316 @@
     console.log('[img-nav]', message)
   }
 
+  function refreshTargetPickerButton () {
+    if (!app.targetPickerEl) return
+    app.targetPickerEl.style.background = app.isTargetPickMode ? '#0f5d4a' : '#222'
+    app.targetPickerEl.style.borderColor = app.isTargetPickMode ? '#67e8c3' : '#666'
+    app.targetPickerEl.style.color = app.isTargetPickMode ? '#d7fff5' : '#fff'
+    app.targetPickerEl.textContent = app.isTargetPickMode ? 'Cancel Target' : 'Pick Target'
+  }
+
+  function setTargetPickMode (enabled) {
+    app.isTargetPickMode = !!enabled
+    document.body.style.cursor = app.isTargetPickMode ? 'crosshair' : ''
+    if (app.isTargetPickMode) attachPickModeListeners()
+    else detachPickModeListeners()
+    refreshTargetPickerButton()
+    if (app.isTargetPickMode) {
+      setStatus('click an image on the page to set host')
+    }
+  }
+
+  function clearPickHoverImage () {
+    if (!app.pickHoverImg) return
+    app.pickHoverImg.removeAttribute('data-img-nav-pick-hover')
+    app.pickHoverImg = null
+  }
+
+  function setPickHoverImage (img) {
+    if (!img || !img.tagName || img.tagName.toLowerCase() !== 'img') return
+    if (app.pickHoverImg === img) return
+    clearPickHoverImage()
+    app.pickHoverImg = img
+    app.pickHoverImg.setAttribute('data-img-nav-pick-hover', '1')
+    var hoverUrl = getImageUrl(img)
+    setStatus(hoverUrl ? 'hover image: ' + hoverUrl : 'hover image has no URL')
+  }
+
+  function isInViewport (el) {
+    if (!el || !el.getBoundingClientRect) return false
+    var rect = el.getBoundingClientRect()
+    var width = window.innerWidth || document.documentElement.clientWidth || 0
+    var height = window.innerHeight || document.documentElement.clientHeight || 0
+    return rect.bottom > 0 && rect.right > 0 && rect.top < height && rect.left < width
+  }
+
+  function unbindPickImageBinding (binding) {
+    if (!binding || !binding.img) return
+    binding.img.removeEventListener('mouseover', binding.onEnter, true)
+    binding.img.removeEventListener('click', binding.onClick, true)
+  }
+
+  function pickTargetImage (img, event) {
+    if (!app.isTargetPickMode) return false
+    if (!img || !img.tagName || img.tagName.toLowerCase() !== 'img') return false
+
+    if (event) {
+      event.preventDefault()
+      event.stopPropagation()
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation()
+    }
+
+    var wrappedLink = img.closest && img.closest('a')
+    if (wrappedLink) {
+      wrappedLink.onclick = null
+      try {
+        wrappedLink.href = 'javascript:void(0)'
+      } catch (err) {}
+      wrappedLink.removeAttribute('target')
+    }
+
+    if (!setTargetImage(img)) return false
+
+    var pickedUrl = getImageUrl(img)
+    if (pickedUrl) {
+      parseAndApplyUrl(pickedUrl, { updateLocation: false })
+      addHistory(pickedUrl)
+      renderHistory()
+      app.pendingHistoryUrl = ''
+    }
+    app.suppressClickUntilTs = Date.now() + 1000
+    setTargetPickMode(false)
+    setStatus(pickedUrl ? 'host image selected and URL loaded' : 'host image selected')
+    return true
+  }
+
+  function bindPickImageListener (img) {
+    if (!img || !img.tagName || img.tagName.toLowerCase() !== 'img') return
+    for (var i = 0; i < app.pickModeImageBindings.length; i += 1) {
+      if (app.pickModeImageBindings[i].img === img) return
+    }
+
+    var onEnter = function () {
+      if (!app.isTargetPickMode) return
+      setPickHoverImage(img)
+    }
+
+    var onClick = function (event) {
+      if (!app.isTargetPickMode) return
+      setPickHoverImage(img)
+      pickTargetImage(img, event)
+    }
+
+    img.addEventListener('mouseover', onEnter, true)
+    img.addEventListener('click', onClick, true)
+    app.pickModeImageBindings.push({
+      img: img,
+      onEnter: onEnter,
+      onClick: onClick
+    })
+  }
+
+  function refreshPickModeImageListeners () {
+    if (!app.isTargetPickMode) return
+
+    var kept = []
+    app.pickModeImageBindings.forEach(function (binding) {
+      if (!binding.img || binding.img.isConnected === false || !isInViewport(binding.img)) {
+        if (app.pickHoverImg === binding.img) clearPickHoverImage()
+        unbindPickImageBinding(binding)
+      } else {
+        kept.push(binding)
+      }
+    })
+    app.pickModeImageBindings = kept
+
+    Array.prototype.slice.call(document.images || []).forEach(function (img) {
+      if (!isProbablyVisible(img) || !isInViewport(img)) return
+      bindPickImageListener(img)
+    })
+  }
+
+  function schedulePickModeRefresh () {
+    if (!app.isTargetPickMode) return
+    if (app.pickModeRefreshRaf) return
+    app.pickModeRefreshRaf = window.requestAnimationFrame(function () {
+      app.pickModeRefreshRaf = 0
+      refreshPickModeImageListeners()
+    })
+  }
+
+  function onPickModeViewportChanged () {
+    schedulePickModeRefresh()
+  }
+
+  function getImageFromPoint (x, y) {
+    if (typeof document.elementsFromPoint !== 'function') return null
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+    var elements = document.elementsFromPoint(x, y) || []
+    for (var i = 0; i < elements.length; i += 1) {
+      var node = elements[i]
+      if (!node || !node.tagName) continue
+      if (node.tagName.toLowerCase() === 'img') return node
+      if (typeof node.querySelector === 'function') {
+        var nested = node.querySelector('img')
+        if (nested) return nested
+      }
+    }
+    return null
+  }
+
+  function attachPickModeListeners () {
+    if (app.pickModeListenersAttached) return
+    ;['pointerdown', 'mousedown', 'mouseup', 'click', 'mousemove'].forEach(function (type) {
+      document.addEventListener(type, onPickModeCaptureEvent, true)
+    })
+    document.addEventListener('scroll', onPickModeViewportChanged, true)
+    window.addEventListener('resize', onPickModeViewportChanged, true)
+    if (!app.pickModeMutationObserver) {
+      app.pickModeMutationObserver = new window.MutationObserver(function () {
+        schedulePickModeRefresh()
+      })
+    }
+    app.pickModeMutationObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true
+    })
+    ensureTargetIndicatorStyles()
+    refreshPickModeImageListeners()
+    app.pickModeListenersAttached = true
+  }
+
+  function detachPickModeListeners () {
+    if (!app.pickModeListenersAttached) return
+    ;['pointerdown', 'mousedown', 'mouseup', 'click', 'mousemove'].forEach(function (type) {
+      document.removeEventListener(type, onPickModeCaptureEvent, true)
+    })
+    document.removeEventListener('scroll', onPickModeViewportChanged, true)
+    window.removeEventListener('resize', onPickModeViewportChanged, true)
+    if (app.pickModeMutationObserver) app.pickModeMutationObserver.disconnect()
+    if (app.pickModeRefreshRaf) {
+      window.cancelAnimationFrame(app.pickModeRefreshRaf)
+      app.pickModeRefreshRaf = 0
+    }
+    app.pickModeImageBindings.forEach(unbindPickImageBinding)
+    app.pickModeImageBindings = []
+    clearPickHoverImage()
+    app.pickModeListenersAttached = false
+  }
+
+  function onPickModeCaptureEvent (event) {
+    if (!app.isTargetPickMode) return
+    if (!event || !event.target) return
+    if (app.panel && app.panel.contains(event.target)) return
+    if (app.targetPickerEl && app.targetPickerEl.contains(event.target)) return
+
+    if (event.type === 'mousemove') {
+      var hoverImage = findImageFromEvent(event) || getImageFromPoint(event.clientX, event.clientY)
+      if (hoverImage) setPickHoverImage(hoverImage)
+      return
+    }
+
+    var pickedImage = findImageFromEvent(event)
+    if (!pickedImage && event.type !== 'click') return
+    tryPickTargetFromEvent(event, pickedImage)
+  }
+
+  function removeTargetImageListeners () {
+    if (!app.boundTargetImg) return
+    app.boundTargetImg.removeEventListener('load', onImageLoad, true)
+    app.boundTargetImg.removeEventListener('error', onImageError, true)
+    app.boundTargetImg = null
+  }
+
+  function ensureTargetIndicatorStyles () {
+    if (app.targetIndicatorStyleEl) return
+    app.targetIndicatorStyleEl = createEl('style', {
+      text: 'img[data-img-nav-host-selected="1"]{' +
+        'outline:3px solid #67e8c3 !important;' +
+        'outline-offset:2px !important;' +
+        'box-shadow:0 0 0 2px rgba(0,0,0,0.55),0 0 0 5px rgba(103,232,195,0.35) !important;' +
+        '}' +
+        'img[data-img-nav-pick-hover="1"]{' +
+        'outline:3px dashed #ffd166 !important;' +
+        'outline-offset:2px !important;' +
+        'box-shadow:0 0 0 2px rgba(0,0,0,0.5) !important;' +
+        '}'
+    })
+    document.head.appendChild(app.targetIndicatorStyleEl)
+  }
+
+  function clearTargetIndicator () {
+    Array.prototype.slice.call(document.querySelectorAll('img[data-img-nav-host-selected="1"]'))
+      .forEach(function (img) {
+        img.removeAttribute('data-img-nav-host-selected')
+      })
+  }
+
+  function escapeCssIdentifier (value) {
+    return String(value || '').replace(/[^a-zA-Z0-9_-]/g, function (char) {
+      return '\\' + char
+    })
+  }
+
+  function buildImageSelector (img) {
+    if (!img || !img.tagName || img.tagName.toLowerCase() !== 'img') return ''
+    if (img.id) return 'img#' + escapeCssIdentifier(img.id)
+
+    var parts = []
+    var node = img
+    while (node && node.nodeType === 1 && node !== document.documentElement) {
+      var tag = node.tagName.toLowerCase()
+      var index = 1
+      var sibling = node.previousElementSibling
+      while (sibling) {
+        if (sibling.tagName && sibling.tagName.toLowerCase() === tag) index += 1
+        sibling = sibling.previousElementSibling
+      }
+      parts.unshift(tag + ':nth-of-type(' + index + ')')
+      node = node.parentElement
+    }
+    return parts.join(' > ')
+  }
+
+  function recoverTargetImageFromSelector () {
+    if (!app.targetImgSelector) return null
+    try {
+      var recovered = document.querySelector(app.targetImgSelector)
+      if (recovered && recovered.tagName && recovered.tagName.toLowerCase() === 'img') return recovered
+      return null
+    } catch (err) {
+      return null
+    }
+  }
+
+  function attachTargetImageListeners (img) {
+    removeTargetImageListeners()
+    if (!img) return
+    img.addEventListener('load', onImageLoad, true)
+    img.addEventListener('error', onImageError, true)
+    app.boundTargetImg = img
+  }
+
+  function setTargetImage (img, options) {
+    options = options || {}
+    if (!img) return false
+
+    if (app.targetImg) restoreOriginalState()
+    clearTargetIndicator()
+    ensureTargetIndicatorStyles()
+    img.setAttribute('data-img-nav-host-selected', '1')
+
+    if (app.targetImg === img) return true
+
+    app.targetImg = img
+    app.targetImgSelector = buildImageSelector(img)
+    rememberOriginalState()
+    attachTargetImageListeners(img)
+    styleTargetImage()
+
+    return true
+  }
+
   function styleTargetImage () {
     if (!app.targetImg) return
 
@@ -1507,6 +1832,7 @@
       document.documentElement.style.cssText = app.original.htmlCssText
       document.body.style.cssText = app.original.bodyCssText
       app.targetImg.style.cssText = app.original.imgCssText
+      app.targetImg.style.opacity = '1'
     } else {
       document.documentElement.style.background = app.settings.pageBackground || '#000000'
       document.body.style.background = app.settings.pageBackground || '#000000'
@@ -1520,6 +1846,7 @@
       app.targetImg.style.maxHeight = 'none'
       app.targetImg.style.objectFit = app.settings.imageObjectFit || 'contain'
       app.targetImg.style.background = app.settings.pageBackground || '#000000'
+      app.targetImg.style.opacity = '1'
     }
 
     if (app.panelHidden) {
@@ -1573,36 +1900,24 @@
     renderTitleForCurrentUrl()
 
     saveState()
+    if (!app.targetImg || app.targetImg.isConnected === false) {
+      var recoveredTarget = recoverTargetImageFromSelector()
+      if (recoveredTarget) setTargetImage(recoveredTarget)
+    }
+    if (app.targetImg && app.targetImg.isConnected === false) {
+      removeTargetImageListeners()
+      app.targetImg = null
+    }
     styleTargetImage()
-    removeResponsiveSourceAttrs(app.targetImg)
-
-    if (app.targetImg) {
-      if (app.pendingProbe) {
-        app.pendingProbe.onload = null
-        app.pendingProbe.onerror = null
-        app.pendingProbe = null
-      }
-
-      var probe = new window.Image()
-      app.pendingProbe = probe
-      var probeUrl = url
-
-      probe.onload = function () {
-        if (app.pendingProbe !== probe) return
-        app.pendingProbe = null
-        app.targetImg.removeAttribute('src')
-        app.targetImg.src = ''
-        app.targetImg.setAttribute('src', probeUrl)
-        app.targetImg.src = probeUrl
-      }
-
-      probe.onerror = function () {
-        if (app.pendingProbe !== probe) return
-        app.pendingProbe = null
-        onImageError()
-      }
-
-      probe.src = probeUrl
+    if (!app.targetImg) {
+      setStatus('no host image selected; click Pick Target in panel')
+    } else {
+      removeResponsiveSourceAttrs(app.targetImg)
+      // Apply directly to the selected host <img> element.
+      app.targetImg.removeAttribute('src')
+      app.targetImg.src = ''
+      app.targetImg.setAttribute('src', url)
+      app.targetImg.src = url
     }
 
     triggerPreloads()
@@ -1610,7 +1925,7 @@
 
     if (options.updateLocation !== false) updateLocationBarIfAllowed(url)
 
-    setStatus('URL applied')
+    if (app.targetImg) setStatus('URL applied')
     renderDescriptionForCurrentUrl()
     renderHistory()
     renderFields()
@@ -2342,13 +2657,23 @@
     app.titleEl = createEl('div', {
       text: '',
       style: {
+        flex: '1',
+        minWidth: '0',
         font: '700 14px system-ui, sans-serif',
-        marginBottom: '4px',
+        marginBottom: '0',
         wordBreak: 'break-word'
       }
     })
 
-    app.panel.appendChild(app.titleEl)
+    app.panel.appendChild(createEl('div', {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '8px',
+        marginBottom: '4px'
+      }
+    }, [app.titleEl]))
     app.panel.appendChild(section('Image Description', [app.descriptionEl], { id: 'imageDescription' }))
 
     app.panel.appendChild(app.statusEl)
@@ -2382,6 +2707,22 @@
     renderHistory()
     renderTitleForCurrentUrl()
     renderDescriptionForCurrentUrl()
+  }
+
+  function renderTargetPickerButton () {
+    if (app.targetPickerEl) app.targetPickerEl.remove()
+    app.targetPickerEl = button('Pick Target', function () {
+      setTargetPickMode(!app.isTargetPickMode)
+    }, {
+      flexShrink: '0',
+      font: '12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+      whiteSpace: 'nowrap'
+    })
+    app.targetPickerEl.title = 'Pick host image'
+    if (app.titleEl && app.titleEl.parentNode) {
+      app.titleEl.parentNode.appendChild(app.targetPickerEl)
+    }
+    refreshTargetPickerButton()
   }
 
   function setPanelHidden (hidden) {
@@ -3406,25 +3747,92 @@
     return null
   }
 
+  function findImageFromEvent (event) {
+    if (!event) return null
+    var direct = findImageFromTarget(event.target)
+    if (direct) return direct
+    if (typeof event.composedPath !== 'function') return null
+    var path = event.composedPath() || []
+    for (var i = 0; i < path.length; i += 1) {
+      var node = path[i]
+      if (node && node.tagName && node.tagName.toLowerCase() === 'img') return node
+    }
+
+    if (typeof document.elementsFromPoint === 'function' &&
+      Number.isFinite(event.clientX) &&
+      Number.isFinite(event.clientY)) {
+      var pointed = document.elementsFromPoint(event.clientX, event.clientY) || []
+      for (var j = 0; j < pointed.length; j += 1) {
+        var candidate = pointed[j]
+        if (!candidate || !candidate.tagName) continue
+        if (candidate.tagName.toLowerCase() === 'img') return candidate
+        if (typeof candidate.querySelector === 'function') {
+          var nestedImage = candidate.querySelector('img')
+          if (nestedImage) return nestedImage
+        }
+      }
+    }
+
+    return null
+  }
+
   function onDocumentClick (event) {
     if (!event || !event.target) return
-    if (app.panel && app.panel.contains(event.target)) return
 
-    var clickedImage = findImageFromTarget(event.target)
+    if (Date.now() < app.suppressClickUntilTs) {
+      event.preventDefault()
+      event.stopPropagation()
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation()
+      app.suppressClickUntilTs = 0
+      return
+    }
+
+    if (app.panel && app.panel.contains(event.target)) return
+    if (app.targetPickerEl && app.targetPickerEl.contains(event.target)) return
+
+    if (!app.isTargetPickMode && !event.shiftKey) return
+
+    if (app.isTargetPickMode) {
+      if (tryPickTargetFromEvent(event)) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation()
+      setStatus('no image element found; click directly on an image')
+      return
+    }
+
+    var clickedImage = findImageFromEvent(event)
     if (!clickedImage) return
 
     var url = getImageUrl(clickedImage)
     if (!url) return
 
-    event.preventDefault()
-    event.stopPropagation()
-
     if (!event.shiftKey) return
 
+    event.preventDefault()
+    event.stopPropagation()
     addHistory(url)
     renderHistory()
     app.pendingHistoryUrl = ''
     setStatus('selected image added to history')
+  }
+
+  function tryPickTargetFromEvent (event, preResolvedImage) {
+    if (!app.isTargetPickMode) return false
+    if (!event) return false
+    if (event.target) {
+      if (app.panel && app.panel.contains(event.target)) return false
+      if (app.targetPickerEl && app.targetPickerEl.contains(event.target)) return false
+    }
+
+    var pickedImage = preResolvedImage || findImageFromEvent(event)
+    if (!pickedImage && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+      pickedImage = getImageFromPoint(event.clientX, event.clientY)
+    }
+    if (!pickedImage && app.pickHoverImg) pickedImage = app.pickHoverImg
+    if (!pickedImage) return false
+    return pickTargetImage(pickedImage, event)
   }
 
   function isButtonTarget (target) {
@@ -3529,6 +3937,8 @@
 
   function destroy () {
     stopSlideshow('closed')
+    setTargetPickMode(false)
+    detachPickModeListeners()
 
     app.cleanupFns.forEach(function (fn) {
       try {
@@ -3538,6 +3948,11 @@
       }
     })
 
+    clearTargetIndicator()
+    if (app.targetIndicatorStyleEl) app.targetIndicatorStyleEl.remove()
+    removeTargetImageListeners()
+    app.targetImgSelector = ''
+    if (app.targetPickerEl) app.targetPickerEl.remove()
     if (app.panel) app.panel.remove()
     restoreOriginalState()
     delete window[APP_ID]
@@ -3546,15 +3961,9 @@
   app.destroy = destroy
 
   function init () {
-    app.targetImg = findTargetImage()
-    rememberOriginalState()
-
-    app.targetImg.addEventListener('load', onImageLoad, true)
-    app.targetImg.addEventListener('error', onImageError, true)
-    app.cleanupFns.push(function () {
-      app.targetImg.removeEventListener('load', onImageLoad, true)
-      app.targetImg.removeEventListener('error', onImageError, true)
-    })
+    var singleImage = findSingleTargetImage()
+    if (singleImage) setTargetImage(singleImage)
+    else app.targetImg = null
 
     document.addEventListener('keydown', onKeyDown, true)
     app.cleanupFns.push(function () {
@@ -3573,11 +3982,14 @@
       app.activeFieldId = ''
       collectFields(app.model)
       renderPanel()
+      renderTargetPickerButton()
       styleTargetImage()
       syncFullUrlOnly()
-      setStatus('ready')
+      if (app.targetImg) setStatus('ready')
+      else setStatus('no single image found; click Pick Target in panel')
     } catch (err) {
       renderPanel()
+      renderTargetPickerButton()
       setStatus(err.message || 'invalid URL')
     }
   }
