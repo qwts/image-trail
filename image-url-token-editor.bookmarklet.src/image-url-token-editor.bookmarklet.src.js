@@ -1963,13 +1963,16 @@
     if (app.autoRunning) {
       stopSlideshow('slideshow stopped: manual override')
     }
-    if (app.auto404Remaining != null) {
+    if (app.auto404Remaining != null || app.settings.autoAdvanceOn404) {
       if (app.autoTimer) {
         clearTimeout(app.autoTimer)
         app.autoTimer = null
       }
       app.auto404Remaining = null
-      setStatus('404 auto-advance stopped: manual override')
+      app.settings.autoAdvanceOn404 = false
+      if (app.auto404Checkbox) app.auto404Checkbox.checked = false
+      saveState()
+      setStatus('404 auto-advance disabled: manual override')
     }
   }
 
@@ -2404,15 +2407,18 @@
           marginTop: '8px'
         }
       }, [
-        createEl('input', {
-          type: 'checkbox',
-          checked: app.settings.autoAdvanceOn404,
-          onchange: function (event) {
-            app.settings.autoAdvanceOn404 = event.target.checked
-            if (!event.target.checked) app.auto404Remaining = null
-            saveState()
-          }
-        }),
+        (function () {
+          app.auto404Checkbox = createEl('input', {
+            type: 'checkbox',
+            checked: app.settings.autoAdvanceOn404,
+            onchange: function (event) {
+              app.settings.autoAdvanceOn404 = event.target.checked
+              if (!event.target.checked) app.auto404Remaining = null
+              saveState()
+            }
+          })
+          return app.auto404Checkbox
+        }()),
         'auto advance/decrement on 404'
       ]),
       label('404 retry count (0 = until next load)'),
@@ -2524,7 +2530,7 @@
         'replace page/image styling for preview'
       ]),
       createEl('div', {
-        text: 'Clicking page images only adds to history.',
+        text: 'Shift-clicking page images adds to history.',
         style: {
           color: '#999',
           font: '11px system-ui, sans-serif',
@@ -3372,6 +3378,8 @@
 
     event.preventDefault()
     event.stopPropagation()
+
+    if (!event.shiftKey) return
 
     addHistory(url)
     renderHistory()
