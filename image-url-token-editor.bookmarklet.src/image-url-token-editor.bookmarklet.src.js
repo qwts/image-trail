@@ -1857,6 +1857,7 @@
   }
 
   function moveActiveField (direction) {
+    stopAutoIfOppositeDirection(direction)
     var field = app.fieldIndex[app.activeFieldId]
     var signedStep = direction === 'down' ? -getStep() : getStep()
 
@@ -1954,6 +1955,22 @@
     }
 
     setStatus(message || 'slideshow stopped')
+  }
+
+  function stopAutoIfOppositeDirection (direction) {
+    var autoDirection = app.settings.direction || 'up'
+    if (direction === autoDirection) return
+    if (app.autoRunning) {
+      stopSlideshow('slideshow stopped: manual override')
+    }
+    if (app.auto404Remaining != null) {
+      if (app.autoTimer) {
+        clearTimeout(app.autoTimer)
+        app.autoTimer = null
+      }
+      app.auto404Remaining = null
+      setStatus('404 auto-advance stopped: manual override')
+    }
   }
 
   function slideshowStep () {
@@ -2679,6 +2696,7 @@
 
       if (field.kind === 'int' || field.kind === 'hex') {
         controlRow.appendChild(button('-', function () {
+          stopAutoIfOppositeDirection('down')
           setActiveField(field.id, false)
           bumpField(field, -getStep())
           applyCurrentUrl()
@@ -2686,6 +2704,7 @@
         }))
 
         controlRow.appendChild(button('+', function () {
+          stopAutoIfOppositeDirection('up')
           setActiveField(field.id, false)
           bumpField(field, getStep())
           applyCurrentUrl()
