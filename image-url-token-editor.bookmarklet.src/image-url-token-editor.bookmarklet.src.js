@@ -1196,6 +1196,99 @@
     return String(field && field.token && field.token.value != null ? field.token.value : '')
   }
 
+  function getFieldTokenContainer (field) {
+    if (!app.model || !field || !field.token) return null
+
+    if (field.location === 'path') {
+      var part = (app.model.pathParts || [])[field.token.partIndex]
+      if (!part || part.type !== 'segment' || !Array.isArray(part.tokens)) return null
+      return part.tokens
+    }
+
+    if (field.location === 'query') {
+      var queryField = (app.model.queryFields || [])[field.token.queryIndex]
+      if (!queryField || !Array.isArray(queryField.valueTokens)) return null
+      return queryField.valueTokens
+    }
+
+    return null
+  }
+
+  function createMetafieldToken (value, context) {
+    var text = String(value == null ? '' : value)
+    var kind = detectNumericType(text)
+    var token = {
+      kind: kind,
+      value: text,
+      context: context
+    }
+
+    if (kind === 'int' || kind === 'hex') {
+      token.width = text.replace(/^0x/i, '').length
+    }
+
+    return token
+  }
+
+  function splitFieldBySelection (field, inputEl) {
+    if (!field || !inputEl) return false
+
+    var sourceValue = String(inputEl.value == null ? '' : inputEl.value)
+    var start = Number(inputEl.selectionStart)
+    var end = Number(inputEl.selectionEnd)
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return false
+
+    start = Math.max(0, Math.min(sourceValue.length, start))
+    end = Math.max(0, Math.min(sourceValue.length, end))
+    if (end <= start) {
+      setStatus('Select text in a field before splitting')
+      return false
+    }
+
+    setFieldValue(field, sourceValue)
+    var tokens = getFieldTokenContainer(field)
+    if (!tokens) return false
+
+    var tokenIndex = Number(field.token.tokenIndex)
+    if (!Number.isFinite(tokenIndex) || tokenIndex < 0 || tokenIndex >= tokens.length) {
+      tokenIndex = tokens.indexOf(field.token)
+      if (tokenIndex < 0) return false
+    }
+
+    var prefix = sourceValue.slice(0, start)
+    var selected = sourceValue.slice(start, end)
+    var suffix = sourceValue.slice(end)
+    var context = field.location === 'query' ? 'query' : 'path'
+    var replacementTokens = []
+
+    if (prefix) replacementTokens.push(createMetafieldToken(prefix, context))
+    replacementTokens.push(createMetafieldToken(selected, context))
+    if (suffix) replacementTokens.push(createMetafieldToken(suffix, context))
+
+    if (!replacementTokens.length) return false
+
+    tokens.splice(tokenIndex, 1, ...replacementTokens)
+
+    collectFields(app.model)
+    var selectedTokenIndex = tokenIndex + (prefix ? 1 : 0)
+    var activeFieldId
+    if (field.location === 'path') {
+      activeFieldId = 'p:' + field.token.partIndex + ':' + selectedTokenIndex
+    } else {
+      activeFieldId = 'q:' + field.token.queryIndex + ':' + selectedTokenIndex
+    }
+
+    if (app.fieldIndex[activeFieldId]) {
+      app.activeFieldId = activeFieldId
+    }
+
+    saveState()
+    renderFields()
+    syncFullUrlOnly()
+    setStatus('Created metafield from selected text')
+    return true
+  }
+
   function findMatchingFieldInModel (model, sourceField) {
     if (!model || !sourceField || !sourceField.id) return null
 
@@ -2559,13 +2652,15 @@
         }
       }))
 
-      row.appendChild(input(getFieldValue(field), function (value) {
+      var fieldInput = input(getFieldValue(field), function (value) {
         setActiveField(field.id, false)
         setFieldValue(field, value)
         syncFullUrlOnly()
       }, null, function () {
         applyFieldChangeToSelectedHistory(field)
-      }))
+      })
+      fieldInput.setAttribute('data-field-input-id', field.id)
+      row.appendChild(fieldInput)
 
       var controlRow = createEl('div', {
         style: {
@@ -2575,6 +2670,12 @@
           marginTop: '5px'
         }
       })
+
+      controlRow.appendChild(button('+ split', function (event) {
+        if (event && typeof event.stopPropagation === 'function') event.stopPropagation()
+        setActiveField(field.id, false)
+        splitFieldBySelection(field, fieldInput)
+      }))
 
       if (field.kind === 'int' || field.kind === 'hex') {
         controlRow.appendChild(button('-', function () {

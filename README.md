@@ -110,3 +110,19 @@ Controls include:
 ```text
 http://127.0.0.1:1234/v1/chat/completions
 ```
+
+## Selection-Based Metafield Split
+
+In the **Fields** panel, each field row now includes a `+ split` button.
+
+How it works:
+
+- highlight part of a field value inside its input (for example `3612b6b86` from `349485459563612b6b86.jpg`)
+- click `+ split`
+- the selected text becomes its own editable field token (metafield), while staying part of the same original URL segment/query value
+
+Behavior notes:
+
+- full URL text syncs immediately after split
+- image reload behavior stays unchanged (reload on Enter, or when using increment/decrement controls)
+- numeric `-` / `+` controls continue to work on the currently active numeric/hex token
