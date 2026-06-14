@@ -46,6 +46,7 @@
     pendingHistoryUrl: '',
     preloadUp: null,
     preloadDown: null,
+    pendingProbe: null,
     titleEl: null,
     descriptionEl: null,
     statusEl: null,
@@ -1506,21 +1507,24 @@
       document.documentElement.style.cssText = app.original.htmlCssText
       document.body.style.cssText = app.original.bodyCssText
       app.targetImg.style.cssText = app.original.imgCssText
-      return
+    } else {
+      document.documentElement.style.background = app.settings.pageBackground || '#000000'
+      document.body.style.background = app.settings.pageBackground || '#000000'
+      document.body.style.margin = '0'
+      document.body.style.overflow = 'hidden'
+
+      app.targetImg.style.display = 'block'
+      app.targetImg.style.width = app.settings.imageWidth || '100vw'
+      app.targetImg.style.height = app.settings.imageHeight || '100vh'
+      app.targetImg.style.maxWidth = 'none'
+      app.targetImg.style.maxHeight = 'none'
+      app.targetImg.style.objectFit = app.settings.imageObjectFit || 'contain'
+      app.targetImg.style.background = app.settings.pageBackground || '#000000'
     }
 
-    document.documentElement.style.background = app.settings.pageBackground || '#000000'
-    document.body.style.background = app.settings.pageBackground || '#000000'
-    document.body.style.margin = '0'
-    document.body.style.overflow = 'hidden'
-
-    app.targetImg.style.display = 'block'
-    app.targetImg.style.width = app.settings.imageWidth || '100vw'
-    app.targetImg.style.height = app.settings.imageHeight || '100vh'
-    app.targetImg.style.maxWidth = 'none'
-    app.targetImg.style.maxHeight = 'none'
-    app.targetImg.style.objectFit = app.settings.imageObjectFit || 'contain'
-    app.targetImg.style.background = app.settings.pageBackground || '#000000'
+    if (app.panelHidden) {
+      app.targetImg.style.filter = 'grayscale(1)'
+    }
   }
 
   function removeResponsiveSourceAttrs (img) {
@@ -1573,10 +1577,32 @@
     removeResponsiveSourceAttrs(app.targetImg)
 
     if (app.targetImg) {
-      app.targetImg.removeAttribute('src')
-      app.targetImg.src = ''
-      app.targetImg.setAttribute('src', url)
-      app.targetImg.src = url
+      if (app.pendingProbe) {
+        app.pendingProbe.onload = null
+        app.pendingProbe.onerror = null
+        app.pendingProbe = null
+      }
+
+      var probe = new window.Image()
+      app.pendingProbe = probe
+      var probeUrl = url
+
+      probe.onload = function () {
+        if (app.pendingProbe !== probe) return
+        app.pendingProbe = null
+        app.targetImg.removeAttribute('src')
+        app.targetImg.src = ''
+        app.targetImg.setAttribute('src', probeUrl)
+        app.targetImg.src = probeUrl
+      }
+
+      probe.onerror = function () {
+        if (app.pendingProbe !== probe) return
+        app.pendingProbe = null
+        onImageError()
+      }
+
+      probe.src = probeUrl
     }
 
     triggerPreloads()
@@ -2361,6 +2387,9 @@
   function setPanelHidden (hidden) {
     app.panelHidden = hidden
     if (app.panel) app.panel.style.display = hidden ? 'none' : ''
+    if (app.targetImg) {
+      app.targetImg.style.filter = hidden ? 'grayscale(1)' : ''
+    }
   }
 
   function fieldShortcutKey (index) {
