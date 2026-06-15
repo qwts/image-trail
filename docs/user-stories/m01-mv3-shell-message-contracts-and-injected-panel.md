@@ -54,6 +54,13 @@ This milestone creates the minimal Manifest V3 shell, service worker, content sc
 
 ---
 
+## Documentation Review Complete
+
+- **Reviewed source context:** MV3 shell assumptions, first vertical slice acceptance baseline, proposed extension file structure.
+- **Most important build guardrails:** idempotent injection, typed message contracts, lifecycle cleanup, unsupported-page handling.
+- **Acceptance criteria added from review:** panel lifecycle, message validation, serializable state/action dispatch.
+- **Still intentionally out of scope:** parser, storage, keyboard, capture, automation, and LLM behavior.
+
 ## Acceptance Scenarios
 
 - Unpacked MV3 extension loads in Brave/Chromium with no manifest or service-worker startup errors.
@@ -91,23 +98,24 @@ This milestone creates the minimal Manifest V3 shell, service worker, content sc
 
 ### Missing Before This Planning Pass
 
-- The original story had placeholder acceptance scenarios, implementation notes, test notes, and open questions.
-- Shift-left validation expectations were not stated at the story level.
-- DRY/modularity, single-responsibility, secure-by-default, testability, observability/status, and React-ready boundaries were implicit rather than traceable.
-- The story did not explicitly identify which acceptance criteria close parity or planning gaps for later implementation.
+- Placeholder sections made the story impossible to execute or verify without rediscovering requirements from the broader docs.
+- The story did not explicitly state the reviewed source documents, the module boundaries that must not be crossed, or the framework-adoption constraints.
+- The story did not call out the concrete pass/fail acceptance criteria needed to prove panel lifecycle, message validation, serializable state/action dispatch.
+- The story did not explicitly separate parser, storage, keyboard, capture, automation, and LLM behavior from the work that should be implemented in this milestone.
 
 ### Added In This Planning Pass
 
-- Filled acceptance scenarios with concrete pass/fail criteria grounded in the docs, bookmarklet behavior map, and extension acceptance baseline.
-- Added planning discipline notes that must be reviewed before implementation begins.
-- Added implementation notes naming the software patterns, adapters, contracts, and module boundaries to preserve.
-- Added test notes so manual or automated checks can be prepared before code is integrated.
-- Added open questions for decisions that should be resolved before or during implementation rather than discovered late.
+- Added a documentation-review completion block tying this story to: MV3 shell assumptions, first vertical slice acceptance baseline, proposed extension file structure.
+- Added concrete acceptance scenarios for panel lifecycle, message validation, serializable state/action dispatch.
+- Added implementation notes that preserve idempotent injection, typed message contracts, lifecycle cleanup, unsupported-page handling.
+- Added test notes that can be converted into manual regression checks or automated fixtures before integration.
+- Added open questions for decisions that remain unresolved but should not block documenting the intended architecture.
 
 ### Coverage Status
 
-- All previously missing placeholder sections in this story are now filled.
-- Any remaining uncertainty is captured under **Open Questions** instead of hidden in the implementation plan.
+- All placeholder planning sections for this story are filled.
+- The milestone is now traceable from docs to acceptance criteria to implementation patterns and test notes.
+- Remaining uncertainty is isolated under **Open Questions** rather than hidden as missing acceptance criteria.
 
 ## Open Questions
 

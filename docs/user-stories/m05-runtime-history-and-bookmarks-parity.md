@@ -55,6 +55,13 @@ This milestone ports runtime history and favorites/bookmarks into the extension 
 
 ---
 
+## Documentation Review Complete
+
+- **Reviewed source context:** Bookmarklet behavior map history/favorites sections, deprecated architecture notes, bugs-and-fixes notes, acceptance baseline M05 parity.
+- **Most important build guardrails:** newest-first runtime history, durable encrypted records, bookmark compatibility, thumbnail reference safety, session undo.
+- **Acceptance criteria added from review:** history commit rules, bookmark CRUD/dedupe, bounded visible history, storage boundary.
+- **Still intentionally out of scope:** stored originals, permission flows, full import/export, LLM metadata, advanced batch selection.
+
 ## Acceptance Scenarios
 
 - Successful image loads add newest-first runtime history entries; failed/pending loads do not.
@@ -93,23 +100,24 @@ This milestone ports runtime history and favorites/bookmarks into the extension 
 
 ### Missing Before This Planning Pass
 
-- The original story had placeholder acceptance scenarios, implementation notes, test notes, and open questions.
-- Shift-left validation expectations were not stated at the story level.
-- DRY/modularity, single-responsibility, secure-by-default, testability, observability/status, and React-ready boundaries were implicit rather than traceable.
-- The story did not explicitly identify which acceptance criteria close parity or planning gaps for later implementation.
+- Placeholder sections made the story impossible to execute or verify without rediscovering requirements from the broader docs.
+- The story did not explicitly state the reviewed source documents, the module boundaries that must not be crossed, or the framework-adoption constraints.
+- The story did not call out the concrete pass/fail acceptance criteria needed to prove history commit rules, bookmark CRUD/dedupe, bounded visible history, storage boundary.
+- The story did not explicitly separate stored originals, permission flows, full import/export, LLM metadata, advanced batch selection from the work that should be implemented in this milestone.
 
 ### Added In This Planning Pass
 
-- Filled acceptance scenarios with concrete pass/fail criteria grounded in the docs, bookmarklet behavior map, and extension acceptance baseline.
-- Added planning discipline notes that must be reviewed before implementation begins.
-- Added implementation notes naming the software patterns, adapters, contracts, and module boundaries to preserve.
-- Added test notes so manual or automated checks can be prepared before code is integrated.
-- Added open questions for decisions that should be resolved before or during implementation rather than discovered late.
+- Added a documentation-review completion block tying this story to: Bookmarklet behavior map history/favorites sections, deprecated architecture notes, bugs-and-fixes notes, acceptance baseline M05 parity.
+- Added concrete acceptance scenarios for history commit rules, bookmark CRUD/dedupe, bounded visible history, storage boundary.
+- Added implementation notes that preserve newest-first runtime history, durable encrypted records, bookmark compatibility, thumbnail reference safety, session undo.
+- Added test notes that can be converted into manual regression checks or automated fixtures before integration.
+- Added open questions for decisions that remain unresolved but should not block documenting the intended architecture.
 
 ### Coverage Status
 
-- All previously missing placeholder sections in this story are now filled.
-- Any remaining uncertainty is captured under **Open Questions** instead of hidden in the implementation plan.
+- All placeholder planning sections for this story are filled.
+- The milestone is now traceable from docs to acceptance criteria to implementation patterns and test notes.
+- Remaining uncertainty is isolated under **Open Questions** rather than hidden as missing acceptance criteria.
 
 ## Open Questions
 

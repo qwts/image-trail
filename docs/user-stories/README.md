@@ -64,3 +64,17 @@ These should be scheduled before or inside the earliest affected milestone.
 - Feature behavior has at least one manual happy-path and one failure-path check.
 - New permissions are justified by a specific feature and documented.
 - Any deferred behavior is explicitly listed rather than silently omitted.
+
+## Per-Story Completion Template
+
+Every milestone story should now include these sections before implementation begins:
+
+1. **Documentation Review Complete** — names the docs reviewed, the story-specific guardrails, added acceptance criteria, and intentional out-of-scope work.
+2. **Acceptance Scenarios** — concrete pass/fail criteria rather than broad intent.
+3. **Planning Discipline To Apply Before Build** — shift-left, DRY, single-responsibility, secure-by-default, testability-first, explicit-interface, observability/status, and React-ready constraints.
+4. **Implementation Notes** — patterns and module boundaries to preserve during coding.
+5. **Test Notes** — manual or automated checks that can be prepared before integration.
+6. **Acceptance Criteria Coverage Review** — what was missing, what was added, and whether uncertainty remains.
+7. **Open Questions** — decisions that should be resolved explicitly instead of discovered late in implementation.
+
+This keeps the stories reviewable as planning artifacts and prevents future implementation work from using undocumented assumptions.

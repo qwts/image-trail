@@ -45,6 +45,13 @@ This milestone evaluates UI complexity and, if adopted, limits React to panel re
 
 ---
 
+## Documentation Review Complete
+
+- **Reviewed source context:** Proposed extension file structure, React/Vite deferral, first-slice UI boundary rules.
+- **Most important build guardrails:** decision record, UI-only migration boundary, component inventory, rollback/build reviewability.
+- **Acceptance criteria added from review:** plain DOM vs React/Vite rationale and mapping of existing views to future components.
+- **Still intentionally out of scope:** moving parser/storage/crypto/content/background behavior into React or adding aesthetic dependencies.
+
 ## Acceptance Scenarios
 
 - Decision record states keep plain DOM or adopt React/Vite with rationale tied to observed complexity.
@@ -79,23 +86,24 @@ This milestone evaluates UI complexity and, if adopted, limits React to panel re
 
 ### Missing Before This Planning Pass
 
-- The original story had placeholder acceptance scenarios, implementation notes, test notes, and open questions.
-- Shift-left validation expectations were not stated at the story level.
-- DRY/modularity, single-responsibility, secure-by-default, testability, observability/status, and React-ready boundaries were implicit rather than traceable.
-- The story did not explicitly identify which acceptance criteria close parity or planning gaps for later implementation.
+- Placeholder sections made the story impossible to execute or verify without rediscovering requirements from the broader docs.
+- The story did not explicitly state the reviewed source documents, the module boundaries that must not be crossed, or the framework-adoption constraints.
+- The story did not call out the concrete pass/fail acceptance criteria needed to prove plain DOM vs React/Vite rationale and mapping of existing views to future components.
+- The story did not explicitly separate moving parser/storage/crypto/content/background behavior into React or adding aesthetic dependencies from the work that should be implemented in this milestone.
 
 ### Added In This Planning Pass
 
-- Filled acceptance scenarios with concrete pass/fail criteria grounded in the docs, bookmarklet behavior map, and extension acceptance baseline.
-- Added planning discipline notes that must be reviewed before implementation begins.
-- Added implementation notes naming the software patterns, adapters, contracts, and module boundaries to preserve.
-- Added test notes so manual or automated checks can be prepared before code is integrated.
-- Added open questions for decisions that should be resolved before or during implementation rather than discovered late.
+- Added a documentation-review completion block tying this story to: Proposed extension file structure, React/Vite deferral, first-slice UI boundary rules.
+- Added concrete acceptance scenarios for plain DOM vs React/Vite rationale and mapping of existing views to future components.
+- Added implementation notes that preserve decision record, UI-only migration boundary, component inventory, rollback/build reviewability.
+- Added test notes that can be converted into manual regression checks or automated fixtures before integration.
+- Added open questions for decisions that remain unresolved but should not block documenting the intended architecture.
 
 ### Coverage Status
 
-- All previously missing placeholder sections in this story are now filled.
-- Any remaining uncertainty is captured under **Open Questions** instead of hidden in the implementation plan.
+- All placeholder planning sections for this story are filled.
+- The milestone is now traceable from docs to acceptance criteria to implementation patterns and test notes.
+- Remaining uncertainty is isolated under **Open Questions** rather than hidden as missing acceptance criteria.
 
 ## Open Questions
 
