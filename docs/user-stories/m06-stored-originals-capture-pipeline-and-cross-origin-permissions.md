@@ -72,16 +72,61 @@ These can be added if the existing repository names become too ambiguous:
 
 ## Acceptance Scenarios
 
-TBD
+- Capture occurs only from explicit user action on current target, history item, or bookmark.
+- Same-origin or already-permitted image bytes are fetched, type-validated as image data, size-bounded, hashed, stored, and linked to the source record.
+- Cross-origin failures produce actionable states and may request origin-specific optional permission only when needed.
+- Oversized originals are rejected or downshifted according to 25 MB default and 100 MB hard maximum policy.
+- Stored original recall displays local bytes without remote network dependency.
+- Delete removes or cleanly detaches blob records and updates storage usage.
+- Remote-only fallback records preserve the attempted capture state when bytes cannot be stored.
+
+## Planning Discipline To Apply Before Build
+
+- **Shift-left validation:** confirm contracts, threat model notes, edge cases, and regression checks before implementation begins. Add fixtures or manual checks before wiring broad UI behavior.
+- **DRY and explicit interfaces:** centralize repeated schemas, actions, repository calls, status codes, and DOM cleanup primitives rather than copying logic into views.
+- **Single responsibility:** keep parser, storage, crypto, target DOM integration, background permissions, and UI rendering in their own bounded modules.
+- **React-ready modularity:** views should render from serializable state and dispatch named actions; no view should own parser, crypto, persistence, network governance, or target-image business rules.
+- **Change isolation:** volatile browser APIs, storage formats, permission prompts, LLM endpoints, and future React/Vite rendering must sit behind adapters.
+- **Secure/testable defaults:** default to least privilege, bounded storage/request behavior, typed validation, and pure core functions that can be tested without DOM, network, or extension APIs.
 
 ## Implementation Notes
 
-TBD
+- Use Background Fetch Adapter for extension-context image retrieval; content scripts request capture but do not bypass CORS themselves.
+- Use Blob Repository and Fingerprint service behind interfaces so future dedupe/vector work does not rewrite UI.
+- Use explicit CaptureResult status codes, not exception strings, across background/content/UI.
+- Keep permission prompts narrowly scoped to image origin and document why the prompt appears.
+- Make storage accounting a first-class service called after writes/deletes.
 
 ## Test Notes
 
-TBD
+- Capture current same-origin image and recall after blocking/changing remote URL.
+- Attempt third-party CDN capture, grant permission, and verify success.
+- Attempt oversized image and verify bounded rejection/status.
+- Delete captured original and verify blob/reference cleanup and storage usage update.
+
+## Acceptance Criteria Coverage Review
+
+### Missing Before This Planning Pass
+
+- The original story had placeholder acceptance scenarios, implementation notes, test notes, and open questions.
+- Shift-left validation expectations were not stated at the story level.
+- DRY/modularity, single-responsibility, secure-by-default, testability, observability/status, and React-ready boundaries were implicit rather than traceable.
+- The story did not explicitly identify which acceptance criteria close parity or planning gaps for later implementation.
+
+### Added In This Planning Pass
+
+- Filled acceptance scenarios with concrete pass/fail criteria grounded in the docs, bookmarklet behavior map, and extension acceptance baseline.
+- Added planning discipline notes that must be reviewed before implementation begins.
+- Added implementation notes naming the software patterns, adapters, contracts, and module boundaries to preserve.
+- Added test notes so manual or automated checks can be prepared before code is integrated.
+- Added open questions for decisions that should be resolved before or during implementation rather than discovered late.
+
+### Coverage Status
+
+- All previously missing placeholder sections in this story are now filled.
+- Any remaining uncertainty is captured under **Open Questions** instead of hidden in the implementation plan.
 
 ## Open Questions
 
-TBD
+- Should thumbnails be stored in the same blob store as originals or as separate bounded records?
+- What is the exact UX wording for optional origin permission prompts?
