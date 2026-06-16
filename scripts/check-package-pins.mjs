@@ -4,9 +4,19 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
-const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+const DEPENDENCY_FIELDS = [
+  'dependencies',
+  'devDependencies',
+  'peerDependencies',
+  'optionalDependencies',
+];
 
-const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', '.test-dist']);
+const SKIPPED_DIRECTORIES = new Set([
+  '.git',
+  'node_modules',
+  'dist',
+  '.test-dist',
+]);
 
 async function findPackageManifests(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -17,7 +27,7 @@ async function findPackageManifests(directory) {
 
     if (entry.isDirectory()) {
       if (!SKIPPED_DIRECTORIES.has(entry.name)) {
-        manifests.push(...(await findPackageManifests(entryPath)));
+        manifests.push(...await findPackageManifests(entryPath));
       }
       continue;
     }

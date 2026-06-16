@@ -3,7 +3,6 @@
 ## Key Data Structures
 
 ### `app` object (global state)
-
 - `app.settings.history` — array of history entries, NEWEST FIRST (index 0). Entries have: `url`, `title`, `label`, `thumbnail`, `timestamp`, `downloadedAt`.
 - `app.settings.favorites` — array of favorite entries, same shape as history.
 - `app.settings.panelSections` — map of section IDs to booleans (expanded/collapsed). Persisted in localStorage.
@@ -15,7 +14,6 @@
 - `app.historySelectionAnchorUrl` — anchor for shift-click range selection.
 
 ### History ordering
-
 `addHistory(url)` uses `unshift` to prepend the new item — newest items are at index 0. `getVisibleHistoryEntries()` returns `app.settings.history.slice(0, 30)`, so the **first 30 entries** are the 30 most recent.
 
 **Important:** The import handler uses `push` (not `unshift`), so imported items land at the **end** of the array and may not be visible in the first-30 window if there is already a large history.
@@ -23,7 +21,6 @@
 ## Rendering Model
 
 The panel is built once by `renderPanel()` at init. It creates stable container elements:
-
 - `app.historyEl` — container for the History section content
 - `app.favoritesEl` — container for the Favorites section content
 - `app.fieldsEl` — container for the Fields section content
@@ -33,7 +30,6 @@ The panel is built once by `renderPanel()` at init. It creates stable container 
 `renderAll()` calls all three plus syncs the URL/domain inputs.
 
 ### Re-render triggers
-
 - `updateHistoryForUrl(url, patch)` — mutates a history entry in place, calls `saveState()` + `renderHistory()` if anything changed.
 - `updateFavoriteForUrl(url, patch)` — same pattern for favorites.
 - `cacheThumbnailForUrl(url, thumbnail)` — calls both `updateFavoriteForUrl` and `updateHistoryForUrl`, potentially triggering two re-renders.
@@ -43,7 +39,7 @@ The panel is built once by `renderPanel()` at init. It creates stable container 
 The global keyboard handler is registered in **capture phase**:
 
 ```js
-document.addEventListener('keydown', onKeyDown, true); // true = capture
+document.addEventListener('keydown', onKeyDown, true)  // true = capture
 ```
 
 This means `onKeyDown` runs **before** any element's own `onkeydown` handler (target/bubble phase). Crucially, `stopPropagation()` called inside `onKeyDown` stops further capture-phase propagation but does **not** prevent the target element's own handlers from running. This is a subtle but important distinction.
@@ -57,7 +53,6 @@ Section expanded state is stored in `app.settings.panelSections[sectionId]`. Tog
 ## Thumbnail Fetching
 
 `ensureThumbnailForUrl(url, sourceImage)`:
-
 1. Returns cached result if available.
 2. Returns in-flight promise if already fetching.
 3. Otherwise: tries to generate a thumbnail from `sourceImage` (the currently loaded `<img>`), then falls back to fetching the image blob from `url` and resizing via canvas.
