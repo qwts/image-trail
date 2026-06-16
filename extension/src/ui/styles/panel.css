@@ -41,3 +41,24 @@
   cursor: pointer;
   padding: 8px 10px;
 }
+
+#image-trail-panel-root .image-trail-panel__section {
+  border-top: 1px solid #d9e2ec;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+#image-trail-panel-root h3 {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+#image-trail-panel-root .image-trail-panel__target-url {
+  background: #f5f7fa;
+  border-radius: 6px;
+  color: #334e68;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  padding: 8px;
+}

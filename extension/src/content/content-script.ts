@@ -1,25 +1,52 @@
-import { createStatusMessage, createUnknownMessageResponse, isExtensionMessage, MessageType } from '../background/messages.js';
+import { createStatusMessage, createUnknownMessageResponse, isExtensionRequest, MessageType } from '../background/messages.js';
+import { PageAdapter } from './page-adapter.js';
 import { ImageTrailPanel } from '../ui/panel.js';
 
-const panel = new ImageTrailPanel();
+interface ImageTrailContentController {
+  readonly panel: ImageTrailPanel;
+  readonly destroy: () => void;
+}
 
-chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse: (response: unknown) => void) => {
-  if (!isExtensionMessage(message)) {
-    sendResponse(createUnknownMessageResponse('Unsupported Image Trail message.'));
-    return false;
+declare global {
+  interface Window {
+    __imageTrailContentController?: ImageTrailContentController;
   }
+}
 
-  switch (message.type) {
-    case MessageType.TogglePanel: {
-      const state = panel.toggle();
-      sendResponse(createStatusMessage(state.visible, state.message));
+function createController(): ImageTrailContentController {
+  const pageAdapter = new PageAdapter();
+  const panel = new ImageTrailPanel(pageAdapter);
+
+  const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
+    if (!isExtensionRequest(message)) {
+      sendResponse(createUnknownMessageResponse('Unsupported Image Trail message.'));
       return false;
     }
-    case MessageType.Ping:
-    case MessageType.Status:
-      sendResponse(createStatusMessage(panel.visible, panel.statusMessage));
-      return false;
-  }
-});
 
-window.addEventListener('pagehide', () => panel.destroy(), { once: true });
+    switch (message.type) {
+      case MessageType.TogglePanel: {
+        const state = panel.toggle();
+        sendResponse(createStatusMessage(state.visible, state.message));
+        return false;
+      }
+      case MessageType.Ping:
+        sendResponse(createStatusMessage(panel.visible, panel.statusMessage));
+        return false;
+    }
+  };
+
+  const destroy = (): void => {
+    chrome.runtime.onMessage.removeListener(handleMessage);
+    panel.disconnect();
+    delete window.__imageTrailContentController;
+  };
+
+  chrome.runtime.onMessage.addListener(handleMessage);
+  window.addEventListener('pagehide', destroy, { once: true });
+
+  return { panel, destroy };
+}
+
+if (!window.__imageTrailContentController) {
+  window.__imageTrailContentController = createController();
+}
