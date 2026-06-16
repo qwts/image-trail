@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": ".test-dist",
+    "types": ["chrome", "node"],
+    "noEmit": false
+  },
+  "include": ["extension/src/**/*.ts", "tests/**/*.test.ts"],
+  "exclude": ["extension/src/test-fixtures/**/*.ts"]
+}

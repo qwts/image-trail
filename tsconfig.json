@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "strict": true,
+    "noEmitOnError": true,
+    "rootDir": "extension/src",
+    "outDir": "extension/dist/src",
+    "types": [
+      "chrome"
+    ],
+    "skipLibCheck": true
+  },
+  "include": [
+    "extension/src/**/*.ts"
+  ],
+  "exclude": [
+    "extension/src/test-fixtures/**/*.ts"
+  ]
+}

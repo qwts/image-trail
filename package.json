@@ -1,0 +1,18 @@
+{
+  "name": "image-trail",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "clean": "rm -rf dist extension/dist",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run clean && tsc -p tsconfig.json && node scripts/copy-extension-assets.mjs",
+    "test:unit": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests",
+    "test": "npm run typecheck && npm run test:unit"
+  },
+  "devDependencies": {
+    "@types/chrome": "latest",
+    "@types/node": "^25.9.3",
+    "typescript": "latest"
+  }
+}
