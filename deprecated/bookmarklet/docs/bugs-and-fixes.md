@@ -14,19 +14,24 @@
 
 ```js
 if (app.settings.showHistoryThumbnails !== false && newUrlsWithoutThumbnail.length) {
-  var visibleUrls = Object.create(null)
-  getVisibleHistoryEntries().forEach(function (entry) { visibleUrls[entry.url] = true })
-  var visibleWithoutThumbnail = newUrlsWithoutThumbnail.filter(function (url) { return visibleUrls[url] })
-  var thumbnailChain = Promise.resolve()
+  var visibleUrls = Object.create(null);
+  getVisibleHistoryEntries().forEach(function (entry) {
+    visibleUrls[entry.url] = true;
+  });
+  var visibleWithoutThumbnail = newUrlsWithoutThumbnail.filter(function (url) {
+    return visibleUrls[url];
+  });
+  var thumbnailChain = Promise.resolve();
   visibleWithoutThumbnail.forEach(function (url) {
     thumbnailChain = thumbnailChain.then(function () {
-      return ensureThumbnailForUrl(url).catch(function () {})
-    })
-  })
+      return ensureThumbnailForUrl(url).catch(function () {});
+    });
+  });
 }
 ```
 
 **Key design decisions:**
+
 - Only fetch thumbnails for **visible** items (first 30). Fetching for all imported items (potentially hundreds) caused the history panel to rebuild constantly via `updateHistoryForUrl → renderHistory()` for items the user couldn't see, resulting in layout thrashing.
 - No explicit `renderHistory()` call needed in the chain. `ensureThumbnailForUrl` → `cacheThumbnailForUrl` → `updateHistoryForUrl` already calls `renderHistory()` when it saves a thumbnail. Adding another call caused double renders per item.
 
@@ -41,12 +46,13 @@ if (app.settings.showHistoryThumbnails !== false && newUrlsWithoutThumbnail.leng
 **Root cause:** The global keyboard handler is registered in **capture phase**:
 
 ```js
-document.addEventListener('keydown', onKeyDown, true)
+document.addEventListener('keydown', onKeyDown, true);
 ```
 
 Capture-phase listeners fire **before** target-element handlers. `stopPropagation()` called in a capture listener prevents further capture propagation but does **not** prevent the target element's own `onkeydown` from running in the target phase.
 
 So for Shift+Enter on a history `<button>`:
+
 1. **Capture phase** — global `onKeyDown` fires, calls `downloadSelectedHistoryItems()` (potentially without the focused button's item in the selection).
 2. **Target phase** — the button's own `onkeydown` fires, ensures the item is in the selection via `setHistorySelectionByIndex`, then calls `downloadSelectedHistoryItems()` again.
 
@@ -56,10 +62,10 @@ Both chains run concurrently with different selection snapshots.
 
 ```js
 if (event.shiftKey) {
-  if (isButtonTarget(event.target)) return  // let the button's own handler run
-  event.preventDefault()
-  event.stopPropagation()
-  downloadSelectedHistoryItems()
+  if (isButtonTarget(event.target)) return; // let the button's own handler run
+  event.preventDefault();
+  event.stopPropagation();
+  downloadSelectedHistoryItems();
 }
 ```
 

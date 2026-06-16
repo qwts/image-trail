@@ -157,8 +157,7 @@ export const urlFixtures: UrlFixture[] = [
         expectedUrl: 'https://example.com/img/9007199254740994.jpg',
       },
     ],
-    notes:
-      'Exceeds Number.MAX_SAFE_INTEGER; BigInt arithmetic is required to avoid rounding.',
+    notes: 'Exceeds Number.MAX_SAFE_INTEGER; BigInt arithmetic is required to avoid rounding.',
   },
 
   {
@@ -193,8 +192,7 @@ export const urlFixtures: UrlFixture[] = [
         expectedUrl: 'https://example.com/assets/3F9A2C.jpg',
       },
     ],
-    notes:
-      'Hex token without 0x prefix; case must be preserved (uppercase in → uppercase out).',
+    notes: 'Hex token without 0x prefix; case must be preserved (uppercase in → uppercase out).',
   },
 
   {
@@ -298,8 +296,7 @@ export const urlFixtures: UrlFixture[] = [
     category: 'query-field',
     input: 'https://example.com/image?raw',
     expectedRebuild: 'https://example.com/image?raw',
-    notes:
-      'hasEquals is false for bare query keys; rebuild must not append = sign.',
+    notes: 'hasEquals is false for bare query keys; rebuild must not append = sign.',
   },
 
   {
@@ -337,8 +334,7 @@ export const urlFixtures: UrlFixture[] = [
         expectedUrl: 'https://example.com/photos%2Farchive%2F0043.jpg',
       },
     ],
-    notes:
-      'Encoded slashes (%2f / %2F) must not be decoded to / on rebuild; case may be normalized to uppercase.',
+    notes: 'Encoded slashes (%2f / %2F) must not be decoded to / on rebuild; case may be normalized to uppercase.',
   },
 
   {
@@ -352,8 +348,7 @@ export const urlFixtures: UrlFixture[] = [
         expectedUrl: 'https://example.com/data%252fimages%252f002.jpg',
       },
     ],
-    notes:
-      'Double-encoded slashes must be preserved as separators without further encoding.',
+    notes: 'Double-encoded slashes must be preserved as separators without further encoding.',
   },
 
   {
@@ -367,8 +362,7 @@ export const urlFixtures: UrlFixture[] = [
         expectedUrl: 'https://example.com/archive/photos%2F2024/img_002.jpg',
       },
     ],
-    notes:
-      'Literal and encoded slashes in the same pathname each serve as separators; both styles preserved.',
+    notes: 'Literal and encoded slashes in the same pathname each serve as separators; both styles preserved.',
   },
 
   // ─── HTML entity handling ──────────────────────────────────────────────────
@@ -378,8 +372,7 @@ export const urlFixtures: UrlFixture[] = [
     category: 'html-entity',
     input: 'https://example.com/img?page=002&amp;size=large',
     expectedRebuild: 'https://example.com/img?page=002&size=large',
-    notes:
-      '&amp; is decoded to & before URL parsing; rebuild produces the canonical unescaped form.',
+    notes: '&amp; is decoded to & before URL parsing; rebuild produces the canonical unescaped form.',
   },
 
   {
@@ -387,8 +380,7 @@ export const urlFixtures: UrlFixture[] = [
     category: 'html-entity',
     input: 'https://example.com/img?q=hello&amp;id=003&amp;format=jpg',
     expectedRebuild: 'https://example.com/img?q=hello&id=003&format=jpg',
-    notes:
-      'All &amp; occurrences are decoded before parsing; result is a standard query string.',
+    notes: 'All &amp; occurrences are decoded before parsing; result is a standard query string.',
   },
 
   // ─── Query-like path (no ? in URL) ────────────────────────────────────────
@@ -397,8 +389,7 @@ export const urlFixtures: UrlFixture[] = [
     label: 'Query parameters embedded in path with ?',
     category: 'query-like-path',
     input: 'https://example.com/photo?id=0003&size=full',
-    notes:
-      'Standard ? separator; maybeSplitQueryLikePath should treat it as a normal query string.',
+    notes: 'Standard ? separator; maybeSplitQueryLikePath should treat it as a normal query string.',
   },
 
   {
@@ -477,8 +468,7 @@ export const urlFixtures: UrlFixture[] = [
     label: 'URL with no numeric tokens',
     category: 'no-numeric',
     input: 'https://example.com/images/photo.jpg',
-    notes:
-      'Parser produces all text tokens; no active field is set; increment/decrement has no effect.',
+    notes: 'Parser produces all text tokens; no active field is set; increment/decrement has no effect.',
   },
 
   {
@@ -522,8 +512,7 @@ export const urlFixtures: UrlFixture[] = [
         expectedUrl: 'https://example.com/img/hello%20world/003.jpg',
       },
     ],
-    notes:
-      'Space encoded as %20 in a path segment; decode for token display, re-encode on rebuild.',
+    notes: 'Space encoded as %20 in a path segment; decode for token display, re-encode on rebuild.',
   },
 
   {
@@ -559,7 +548,6 @@ export const urlFixtures: UrlFixture[] = [
     category: 'rebuild-round-trip',
     input: 'https://example.com/gallery/001/',
     expectedRebuild: 'https://example.com/gallery/001/',
-    notes:
-      'A trailing / segment is a separator with an empty segment following it; rebuild must not collapse it.',
+    notes: 'A trailing / segment is a separator with an empty segment following it; rebuild must not collapse it.',
   },
 ];

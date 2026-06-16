@@ -10,11 +10,13 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run clean && tsc -p tsconfig.json && node scripts/copy-extension-assets.mjs",
     "test:unit": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests",
-    "test": "npm run typecheck && npm run test:unit"
+    "test": "npm run typecheck && npm run test:unit",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@types/chrome": "^0.1.43",
     "@types/node": "^25.9.3",
+    "prettier": "^3.8.4",
     "typescript": "^6.0.3"
   }
 }

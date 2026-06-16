@@ -11,6 +11,10 @@ export function migrateImageTrailDb(db: IDBDatabase, oldVersion: number): void {
     const history = db.createObjectStore(DataStore.History, { keyPath: 'uuid' });
     history.createIndex(SchemaIndex.HistoryByUpdatedAt, 'envelope.updatedAt', { unique: false });
     history.createIndex(SchemaIndex.HistoryByKeyReference, 'envelope.key.reference', { unique: false });
-    metadata.put({ key: 'schema', databaseVersion: IMAGE_TRAIL_DB_VERSION, migratedAt: new Date().toISOString() } satisfies VersionMetadataRecord);
+    metadata.put({
+      key: 'schema',
+      databaseVersion: IMAGE_TRAIL_DB_VERSION,
+      migratedAt: new Date().toISOString(),
+    } satisfies VersionMetadataRecord);
   }
 }

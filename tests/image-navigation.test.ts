@@ -1,16 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyImageUrl, clearResponsiveImageAttributes, pushVisibleUrlWhenSameOrigin } from '../extension/src/core/image/image-navigation.js';
+import {
+  applyImageUrl,
+  clearResponsiveImageAttributes,
+  pushVisibleUrlWhenSameOrigin,
+} from '../extension/src/core/image/image-navigation.js';
 
 function fakeImage(): HTMLImageElement {
   const removed: string[] = [];
   const sourceRemoved: string[] = [];
-  const source = { removeAttribute(name: string) { sourceRemoved.push(name); } };
+  const source = {
+    removeAttribute(name: string) {
+      sourceRemoved.push(name);
+    },
+  };
   return {
     src: 'https://example.test/old.jpg',
     removed,
     sourceRemoved,
-    removeAttribute(name: string) { removed.push(name); },
+    removeAttribute(name: string) {
+      removed.push(name);
+    },
     closest(selector: string) {
       assert.equal(selector, 'picture');
       return { querySelectorAll: () => [source] };
@@ -30,7 +40,11 @@ test('clears responsive attributes before applying a target image URL', () => {
 test('pushes visible URL only for same-origin updates', () => {
   const pushed: string[] = [];
   const location = { href: 'https://example.test/current', origin: 'https://example.test' } as Location;
-  const history = { pushState(_state: unknown, _title: string, url?: string | URL | null) { pushed.push(String(url)); } } as History;
+  const history = {
+    pushState(_state: unknown, _title: string, url?: string | URL | null) {
+      pushed.push(String(url));
+    },
+  } as History;
 
   assert.equal(pushVisibleUrlWhenSameOrigin('https://example.test/next.jpg', location, history), true);
   assert.equal(pushVisibleUrlWhenSameOrigin('https://other.test/next.jpg', location, history), false);

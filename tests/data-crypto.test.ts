@@ -51,7 +51,6 @@ test('rejects envelopes when authenticated metadata is tampered with', async () 
   );
 });
 
-
 test('derives and validates key reference strings from kind and uuid', async () => {
   const session = await createSessionKey('history', 'derived-key', '2026-06-16T00:00:00.000Z');
   assert.deepEqual(session.reference, createKeyReference('history', 'derived-key'));
@@ -90,7 +89,6 @@ test('falls back to plaintext local setting defaults when storage is corrupt', (
 
   assert.deepEqual(repository.load(), DEFAULT_LOCAL_SETTINGS);
 });
-
 
 test('rejects out-of-range request throttle setting migrations', () => {
   const high = new LocalSettingsRepository({

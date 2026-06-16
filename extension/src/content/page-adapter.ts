@@ -38,7 +38,11 @@ export class PageAdapter {
     }
 
     this.mode = 'none';
-    return this.emit(matches.length === 0 ? 'No qualifying images found. Use pick mode after images load.' : `${matches.length} qualifying images found. Pick one target image.`);
+    return this.emit(
+      matches.length === 0
+        ? 'No qualifying images found. Use pick mode after images load.'
+        : `${matches.length} qualifying images found. Pick one target image.`,
+    );
   }
 
   startPickMode(): TargetSelectionSnapshot {

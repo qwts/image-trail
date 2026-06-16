@@ -20,7 +20,11 @@ export function applyImageUrl(image: HTMLImageElement, url: string): ImageNaviga
   return { status: 'applied', url, message: `Applied ${url}` };
 }
 
-export function pushVisibleUrlWhenSameOrigin(nextUrl: string, location: Location = window.location, history: History = window.history): boolean {
+export function pushVisibleUrlWhenSameOrigin(
+  nextUrl: string,
+  location: Location = window.location,
+  history: History = window.history,
+): boolean {
   const next = new URL(nextUrl, location.href);
   if (next.origin !== location.origin) return false;
   history.pushState(null, '', next.href);

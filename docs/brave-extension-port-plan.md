@@ -9,7 +9,7 @@
 - The existing bookmarklet remains in the repository as a preserved fallback/debug artifact. The port should share behavior with it, not erase or replace it.
 - The initial extension UI is injected by a content script into the active page. It should use isolated extension code where possible and only bridge into the page when page-context access is unavoidable.
 - URL parsing, URL rebuilding, token navigation, image application, same-origin `history.pushState()` behavior, target image picking, 404 handling, and keyboard behavior should preserve the bookmarklet's observable behavior.
-- Long-term state moves away from one large `localStorage` JSON blob. IndexedDB is the long-term store.  Local storage can be added for temporary store of data not pertain to url history for example algorithms, themes, sorting and other customizations.
+- Long-term state moves away from one large `localStorage` JSON blob. IndexedDB is the long-term store. Local storage can be added for temporary store of data not pertain to url history for example algorithms, themes, sorting and other customizations.
 - IndexedDB includes a key table/object store keyed by `kind`, `uuid`, and `reference`.
 - History items are individually encrypted with aes-256 and each history item gets its own content key.
 - Bookmark/favorite items are encrypted at rest. They may also use per-item keys when stored as independent durable records.
@@ -21,21 +21,21 @@
 - Downloads written to disk are encrypted and get their own key.
 - Key export wraps keys with a user-provided password. Key import requires the password to unwrap.
 - Manual symmetric password protection is supported as an additional option for selected exports, imports, downloads, or item groups.
-- WebCrypto should be the crypto baseline: random per-record IVs, AES-GCM content encryption, PBKDF2-derived password wrapping unless a stronger browser-native option becomes available without adding dependencies.  WebAuthn is also plausiable for Yubikey.
+- WebCrypto should be the crypto baseline: random per-record IVs, AES-GCM content encryption, PBKDF2-derived password wrapping unless a stronger browser-native option becomes available without adding dependencies. WebAuthn is also plausiable for Yubikey.
 - WebAuthn/YubiKey support is a later optional key wrapping/unlock method, but the key table should keep enough metadata to support it later.
-- Service workers are treated as event-driven and semi-disposable.  They will be used for requests to avoid CORS error issues where possible. Durable state lives in IndexedDB; live page state lives in the content script/panel and is rehydrated as needed.
+- Service workers are treated as event-driven and semi-disposable. They will be used for requests to avoid CORS error issues where possible. Durable state lives in IndexedDB; live page state lives in the content script/panel and is rehydrated as needed.
 
 ## Known Constraints
 
 - Manifest V3 service workers cannot observe or mutate the DOM directly. DOM reactivity belongs in content scripts using `MutationObserver`, image load/error listeners, and explicit messages to/from the service worker.
 - MV3 service workers can stop between events, so they cannot hold unlocked keys, automation state, or DOM target state as the only source of truth.
 - Content scripts run in an isolated world. They can manipulate DOM nodes, but direct access to page JavaScript state is limited.
-- Page CSP and cross-origin restrictions may affect image fetching, canvas thumbnail generation, LLM image input generation, and downloads.  Where feasable, think ahead of time pre plan for working out cors issues like loading cross site images  while on other pages consider using service workers and when necdssary recommend using new elements if reusing existing elements would cause cors issues.  The extension will not always modify every page beyond it's scope of created elements. IE wil laim to be self contained and access only the element it owns.
+- Page CSP and cross-origin restrictions may affect image fetching, canvas thumbnail generation, LLM image input generation, and downloads. Where feasable, think ahead of time pre plan for working out cors issues like loading cross site images while on other pages consider using service workers and when necdssary recommend using new elements if reusing existing elements would cause cors issues. The extension will not always modify every page beyond it's scope of created elements. IE wil laim to be self contained and access only the element it owns.
 - Canvas-based thumbnails and fingerprints can fail or become tainted for cross-origin images.
 - `history.pushState()` can only update the visible URL safely for same-origin destinations.
 - Brave privacy protections may block or alter network/image behavior on some sites.
 - `chrome.storage.local`, extension IndexedDB, and extension local storage are not OS keychain storage. Encryption-at-rest depends on key handling and unlock choices.
-- If raw key material is stored unwrapped in extension storage, encryption protects against casual disk inspection but not against extension compromise.  RAW should not live in the indexdb for long lifetimes hence the import/export.  Ideally, there would be one mater key and the other items would be able to have keys rotated periodiically.
+- If raw key material is stored unwrapped in extension storage, encryption protects against casual disk inspection but not against extension compromise. RAW should not live in the indexdb for long lifetimes hence the import/export. Ideally, there would be one mater key and the other items would be able to have keys rotated periodiically.
 - Downloading encrypted files requires a clear file format/header so imports can locate the key reference, algorithm, salt, IV, and wrapping mode.
 - The existing bookmarklet stores history, favorites, thumbnails, settings, download records, and LLM settings together; migration must separate settings from encrypted durable records.
 - With or without a framework build system, shared core code should stay framework-independent and browser-compatible after TypeScript compilation. If React/Vite is adopted later, it should wrap the panel UI rather than absorb parser, crypto, storage, messaging, or image-navigation logic.
@@ -97,7 +97,7 @@ Failed/remote-only: 37 records
 ### Image History
 
 - Stores a sortable history entries with URL, title, label, thumbnail, timestamp, and downloaded timestamp.
-- Sortable by domain, image kind, title, prefixes in folders.  Apply to items in the history with common field structure.
+- Sortable by domain, image kind, title, prefixes in folders. Apply to items in the history with common field structure.
 - Shows a visible history window, a configurable max limit, no limit by default.
 - The active view should be bounded for usability, with a practical visible/runtime cap around 200 items even if encrypted IndexedDB stores more.
 - Recent runtime history covers the last 30 minutes without requiring decrypt/unlock during the active browser session.
@@ -123,9 +123,9 @@ Failed/remote-only: 37 records
 ### Loading Images Into DOMs
 
 - Startup auto-selects a target image only when exactly one qualifying image exists.
-- Manual target picking lets the user choose an image in the page.  Uses a visible indication as the user is finding the element to target.
+- Manual target picking lets the user choose an image in the page. Uses a visible indication as the user is finding the element to target.
 - Applying a URL removes `srcset`/`sizes`, updates `img.src`, and binds load/error handling to drive status, history, 404 traversal, thumbnails, and downloads.
-- Optional preview styling can make the selected image the primary visible page item while preserving original DOM state for cleanup.  Default is on when one image element is on page.
+- Optional preview styling can make the selected image the primary visible page item while preserving original DOM state for cleanup. Default is on when one image element is on page.
 - When exactly one image is present on injection, preview styling should be applied immediately.
 - When an image is loaded into existing image element it preserves the previous in history for restore if target changes.
 
@@ -134,10 +134,10 @@ Failed/remote-only: 37 records
 - Generic URL tokenizer parses protocol, host/domain, path segments, filename tokens, query fields, hash, encoded slash paths, HTML entity `&amp;`, decimal fields, hex fields, and width/zero padding.
 - Rebuilds URLs by position rather than global string replacement.
 - Supports editable fields, active field selection, numeric `+`/`-`, step, direction, width override, selected-history field edits, domain edits across selected history, and selection-based metafield splitting.
-- Advanced pattern setting for fields to allow the user to split a particular field into 2 or more.  For example if the field was the number 01011990 and the user wanted to split into 3 fields they might do ..|..|.... or use a regex to specify then each one of those fields cold be increment/decrement/modified independently and have a direct effect on the url and image loaded as well.
+- Advanced pattern setting for fields to allow the user to split a particular field into 2 or more. For example if the field was the number 01011990 and the user wanted to split into 3 fields they might do ..|..|.... or use a regex to specify then each one of those fields cold be increment/decrement/modified independently and have a direct effect on the url and image loaded as well.
 - Field can be selected and aliased specific to a domain and it's folder structure. IE field q might be aliased to question but when changeed would update q= in the title bar.
 - The fields should have a text that starts the section showing something like /<field1>/<fiedl2>/... based on the naming that is currently chosen.
-- Fields should detect if it is a hex number or integer or date/time on first load.  Hex includes a non int in hex format.  int is all inters.  Time/Date when matching the length of epoche time or format like 01011990.  These should be udpatable for example if I wanted to add phone number later or specific directions.  For example, if the field is a date I may break into 3 fields ..|.|.... for a specific domain.  This could be extended other buckets/containers/groupings etc.
+- Fields should detect if it is a hex number or integer or date/time on first load. Hex includes a non int in hex format. int is all inters. Time/Date when matching the length of epoche time or format like 01011990. These should be udpatable for example if I wanted to add phone number later or specific directions. For example, if the field is a date I may break into 3 fields ..|.|.... for a specific domain. This could be extended other buckets/containers/groupings etc.
 - Eager date/time detection is acceptable, but every split/inferred field should be reversible or hideable so clutter can be reduced when fields do not add value.
 - Hidden fields should remain available for advanced editing, including edits across multiple selected history items.
 - Domain/folder-specific aliases and field patterns should be user configuration, and can be locked/offloaded from local settings into encrypted IndexedDB with a symmetric PIN-style unlock when stepping away.
@@ -150,8 +150,8 @@ Failed/remote-only: 37 records
 
 ### 404 Automation
 
-- Optional preloading images above and below a url - if the user has enabled and the furrent url has identified key path structure attempt to preload n images above and below.  The n is 1 by default but can be modified by the user.
-- Special attention should be paid to how interactions occur so that infiniite `get` requests aren't submitted.  Also, automatoin should stop or when user interrupts.  Automation should continue in the direction of the last user interaction unless they click on a specific direction button.
+- Optional preloading images above and below a url - if the user has enabled and the furrent url has identified key path structure attempt to preload n images above and below. The n is 1 by default but can be modified by the user.
+- Special attention should be paid to how interactions occur so that infiniite `get` requests aren't submitted. Also, automatoin should stop or when user interrupts. Automation should continue in the direction of the last user interaction unless they click on a specific direction button.
 - Automation must enforce a hard global request cap and a minimum delay between requests so thousands of requests cannot be made in a short span.
 - If too many requests are detected, the extension should throttle, pause, or stop automation and surface the status clearly.
 

@@ -5,33 +5,37 @@ module.exports = {
   env: {
     browser: true,
     es2021: true,
-    node: true
+    node: true,
   },
   parserOptions: {
     ecmaVersion: 2021,
-    sourceType: 'script'
+    sourceType: 'script',
   },
   rules: {
     'no-console': 'off',
-    'import/extensions': ['error', 'ignorePackages', {
-      js: 'never',
-      mjs: 'never'
-    }],
+    'import/extensions': [
+      'error',
+      'ignorePackages',
+      {
+        js: 'never',
+        mjs: 'never',
+      },
+    ],
     // Bookmarklets often run in constrained environments and use direct loops.
     'no-plusplus': 'off',
     'no-continue': 'off',
-    'prefer-destructuring': 'off'
+    'prefer-destructuring': 'off',
   },
   overrides: [
     {
       files: ['image-url-token-editor.bookmarklet.src/**/*.js'],
       env: {
         browser: true,
-        node: false
+        node: false,
       },
       parserOptions: {
         ecmaVersion: 5,
-        sourceType: 'script'
+        sourceType: 'script',
       },
       rules: {
         strict: ['error', 'function'],
@@ -56,35 +60,44 @@ module.exports = {
         'no-extra-semi': 'off',
         'prefer-object-spread': 'off',
         semi: ['error', 'never'],
-        'space-before-function-paren': ['error', {
-          anonymous: 'always',
-          named: 'always',
-          asyncArrow: 'always'
-        }],
-        'max-len': ['error', {
-          code: 120,
-          ignoreUrls: true,
-          ignoreStrings: true,
-          ignoreTemplateLiterals: true,
-          ignoreRegExpLiterals: true
-        }]
-      }
+        'space-before-function-paren': [
+          'error',
+          {
+            anonymous: 'always',
+            named: 'always',
+            asyncArrow: 'always',
+          },
+        ],
+        'max-len': [
+          'error',
+          {
+            code: 120,
+            ignoreUrls: true,
+            ignoreStrings: true,
+            ignoreTemplateLiterals: true,
+            ignoreRegExpLiterals: true,
+          },
+        ],
+      },
     },
     {
       files: ['scripts/**/*.mjs'],
       env: {
         browser: false,
-        node: true
+        node: true,
       },
       parserOptions: {
         ecmaVersion: 2022,
-        sourceType: 'module'
+        sourceType: 'module',
       },
       rules: {
-        'import/no-extraneous-dependencies': ['error', {
-          devDependencies: true
-        }]
-      }
-    }
-  ]
-}
+        'import/no-extraneous-dependencies': [
+          'error',
+          {
+            devDependencies: true,
+          },
+        ],
+      },
+    },
+  ],
+};

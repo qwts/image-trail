@@ -15,21 +15,29 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
   if (field.location === 'path' && field.segmentIndex !== undefined) {
     return {
       ...model,
-      pathSegments: model.pathSegments.map((segment, segmentIndex) => segmentIndex === field.segmentIndex ? {
-        ...segment,
-        edited: true,
-        tokens: segment.tokens.map((token, tokenIndex) => tokenIndex === field.tokenIndex ? update(token) : token),
-      } : segment),
+      pathSegments: model.pathSegments.map((segment, segmentIndex) =>
+        segmentIndex === field.segmentIndex
+          ? {
+              ...segment,
+              edited: true,
+              tokens: segment.tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token)),
+            }
+          : segment,
+      ),
     };
   }
 
   if (field.location === 'query' && field.queryIndex !== undefined) {
     return {
       ...model,
-      queryFields: model.queryFields.map((queryField) => queryField.index === field.queryIndex ? {
-        ...queryField,
-        valueTokens: queryField.valueTokens.map((token, tokenIndex) => tokenIndex === field.tokenIndex ? update(token) : token),
-      } : queryField),
+      queryFields: model.queryFields.map((queryField) =>
+        queryField.index === field.queryIndex
+          ? {
+              ...queryField,
+              valueTokens: queryField.valueTokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token)),
+            }
+          : queryField,
+      ),
     };
   }
 
