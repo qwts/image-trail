@@ -8,6 +8,10 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
     case 'close-panel':
       return closePanel(state);
     case 'ping-status':
-      return { ...state, message: state.visible ? 'Panel is visible.' : 'Panel is hidden.', lastUpdatedAt: Date.now() };
+      return { ...state, message: state.visible ? state.target.message : 'Panel is hidden.', lastUpdatedAt: Date.now() };
+    case 'start-target-picker':
+      return { ...state, status: 'picking', message: 'Pick mode is active. Click the intended image.', lastUpdatedAt: Date.now() };
+    case 'stop-target-picker':
+      return { ...state, status: 'ready', message: state.target.message, lastUpdatedAt: Date.now() };
   }
 }
