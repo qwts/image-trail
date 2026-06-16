@@ -1,2 +1,21 @@
 import type { KeyReference } from '../crypto/types.js';
-export class SessionUnlockState { private active: { keyReference: KeyReference; unlockedAt: string } | null = null; unlock(keyReference: KeyReference, now = new Date().toISOString()): void { this.active = { keyReference, unlockedAt: now }; } lock(): void { this.active = null; } get snapshot() { return this.active ? { status: 'unlocked' as const, ...this.active } : { status: 'locked' as const }; } }
+
+export type SessionUnlockSnapshot =
+  | { readonly status: 'locked' }
+  | { readonly status: 'unlocked'; readonly keyReference: KeyReference; readonly unlockedAt: string };
+
+export class SessionUnlockState {
+  private active: Extract<SessionUnlockSnapshot, { status: 'unlocked' }> | null = null;
+
+  unlock(keyReference: KeyReference, now = new Date().toISOString()): void {
+    this.active = { status: 'unlocked', keyReference, unlockedAt: now };
+  }
+
+  lock(): void {
+    this.active = null;
+  }
+
+  get snapshot(): SessionUnlockSnapshot {
+    return this.active ?? { status: 'locked' };
+  }
+}
