@@ -4,6 +4,7 @@ These scenarios define the first browser-level acceptance coverage for the Brave
 
 ## Tests
 
+- [M00 Planning Baseline Review](m00-planning-baseline-review.md)
 - [Local Original Capture Survives Remote Loss](local-original-capture-survives-remote-loss.md)
 - [Target Picker Captures Only The Selected Image](target-picker-captures-only-selected-image.md)
 - [Third-Party CDN Permission Flow](third-party-cdn-permission-flow.md)

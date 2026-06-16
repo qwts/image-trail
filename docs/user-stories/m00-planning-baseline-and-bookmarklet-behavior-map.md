@@ -107,5 +107,5 @@ This milestone defines implementation boundaries, regression fixtures, and the f
 
 ## Open Questions
 
-- Which exact URL fixtures will be checked in first once extension test fixtures are created?
-- Should acceptance tests remain manual markdown initially or be mirrored into browser automation when the shell exists?
+- Resolved for M00: the initial URL fixture set is checked in at `extension/src/test-fixtures/urls.ts`; later milestones may add cases as parser defects are found.
+- Resolved for M00: acceptance tests remain manual markdown until the MV3 shell and browser automation harness exist.

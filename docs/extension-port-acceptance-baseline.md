@@ -66,6 +66,7 @@ These tests are release gates for specific later milestones. They are not M00 ex
 
 | Test | File | Gates milestone |
 |---|---|---|
+| M00 Planning Baseline Review | `m00-planning-baseline-review.md` | M00 |
 | Target Picker Captures Only The Selected Image | `target-picker-captures-only-selected-image.md` | M02, M06 |
 | Local Original Capture Survives Remote Loss | `local-original-capture-survives-remote-loss.md` | M05, M06 |
 | Third-Party CDN Permission Flow | `third-party-cdn-permission-flow.md` | M06 |
