@@ -31,8 +31,10 @@ caught after the fact.
 - One PR = one user story / one milestone slice. Don't bundle unrelated modules.
 - Don't force-push a stale branch with unrelated content over an open PR. If the
   scope changes substantially, close the PR and open a new one with a clean diff.
-- Rebase onto the latest base branch (`codex/dev`) before requesting review. A PR in
-  `dirty` or `blocked` mergeable state will not be reviewed until it's rebased.
+- Rebase onto the latest commit of the PR's base branch before requesting review (check
+  the PR's own "base" field — it is not always the same branch for every PR in this
+  repo). A PR in `dirty` or `blocked` mergeable state will not be reviewed until it's
+  rebased.
 - PR descriptions must include, at minimum:
   - **Motivation** — why this change exists, tied to a milestone/user story.
   - **Description** — what changed, file by file or module by module.
@@ -66,8 +68,10 @@ round-trip:
 - **No `"latest"` in `package.json` dependencies.** Pin an exact version or a `^`
   range; rely on `package-lock.json` for reproducibility, not the manifest.
 - **`tsconfig.json` `moduleResolution` must match the actual build pipeline.** This
-  project builds with plain `tsc` and no bundler — use `"NodeNext"`, not
-  `"Bundler"`. If a bundler is introduced (see Milestone 10), update this
+  project builds with plain `tsc` and no bundler. `"moduleResolution": "NodeNext"`
+  requires `"module": "NodeNext"` as well (TypeScript rejects `NodeNext` resolution
+  paired with `"module": "ES2022"` — TS5110) — change both settings together, not
+  just one. If a bundler is introduced (see Milestone 10), update this
   intentionally, not by copy-paste.
 - **Permissions stay least-privilege.** Don't add `host_permissions` or new
   `permissions` entries beyond what the current milestone's exit criteria require
