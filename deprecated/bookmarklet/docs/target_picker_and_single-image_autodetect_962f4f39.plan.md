@@ -26,13 +26,16 @@ isProject: false
 # Add Target Picker + Single Image Auto-Detect
 
 ## Goal
+
 Implement a manual host-image picker (top-right target button) and update bookmarklet startup behavior so it only auto-selects when the page has exactly one qualifying image.
 
 ## Files to update
+
 - [`/Users/chris/Code/image-bookmarklet/image-url-token-editor.bookmarklet.src/image-url-token-editor.bookmarklet.src.js`](/Users/chris/Code/image-bookmarklet/image-url-token-editor.bookmarklet.src/image-url-token-editor.bookmarklet.src.js)
 - (After implementation) rebuild generated dist output via existing build script so minified bundle matches source.
 
 ## Implementation plan
+
 1. **Add explicit target-pick state and UI handle**
    - Extend `app` state with fields like `isTargetPickMode`, `targetPickerButton`, and optional overlay container ref.
    - Render a fixed-position top-right button (crosshair/target style) that toggles pick mode.
@@ -64,6 +67,7 @@ Implement a manual host-image picker (top-right target button) and update bookma
    - Validate flows: one image auto-picks; zero/multi images require target button; click selects host; existing history interactions still work.
 
 ## Behavior checks to run
+
 - Page with **exactly 1 image**: bookmarklet auto-selects that image as host.
 - Page with **0 images**: no host auto-selected; target button required.
 - Page with **2+ images**: no host auto-selected; target button required.

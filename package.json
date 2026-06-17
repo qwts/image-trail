@@ -1,22 +1,29 @@
 {
-  "name": "image-bookmarklet",
-  "version": "1.0.0",
-  "description": "URL token editor bookmarklet tooling",
+  "name": "image-trail",
+  "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "lint": "eslint . --ext .js,.mjs --max-warnings=0",
-    "lint:fix": "npm run lint -- --fix",
-    "build": "node ./scripts/build-bookmarklet.mjs",
-    "minify": "npm run build"
+    "clean": "rm -rf dist extension/dist",
+    "lint:package": "node scripts/check-package-pins.mjs",
+    "lint": "npm run lint:package && eslint .",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run clean && tsc -p tsconfig.json && node scripts/copy-extension-assets.mjs",
+    "test:unit": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js",
+    "test": "npm run typecheck && npm run test:unit",
+    "format:check": "prettier --check \"**/*.{ts,json,md,css,yml,yaml}\" \".prettierrc.json\"",
+    "format": "prettier --write \"**/*.{ts,json,md,css,yml,yaml}\" \".prettierrc.json\""
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
-    "eslint": "^8.57.1",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-plugin-import": "^2.32.0",
-    "globals": "^17.6.0",
-    "terser": "^5.48.0"
+    "@eslint/js": "^10.0.1",
+    "@types/chrome": "^0.1.43",
+    "@types/node": "^25.9.3",
+    "@typescript-eslint/eslint-plugin": "^8.61.1",
+    "@typescript-eslint/parser": "^8.61.1",
+    "eslint": "^10.5.0",
+    "fake-indexeddb": "^6.2.5",
+    "prettier": "^3.8.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1"
   }
 }

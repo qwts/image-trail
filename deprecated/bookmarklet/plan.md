@@ -486,16 +486,18 @@ Behavior:
 2. Wait for `img.onload` or `img.onerror`.
 3. If load succeeds:
 
-   * stop auto traversal
-   * update status
+   - stop auto traversal
+   - update status
+
 4. If 404/error:
 
-   * decrement remaining count
-   * continue in selected direction
+   - decrement remaining count
+   - continue in selected direction
+
 5. If count reaches zero:
 
-   * stop
-   * show status
+   - stop
+   - show status
 
 Space should stop or toggle auto mode depending on current state.
 
@@ -807,4 +809,3 @@ URL → parser → editable token model → rebuild URL
 ```
 
 Regex remains useful for token detection, but not as the primary architecture.
-

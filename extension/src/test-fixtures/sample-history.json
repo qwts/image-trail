@@ -1,0 +1,369 @@
+{
+  "_comment": [
+    "Sample history and bookmark fixtures for M05 tests.",
+    "",
+    "These records reflect the extension-era field names rather than the",
+    "bookmarklet's localStorage shape, but the logical content is equivalent.",
+    "Key differences from the bookmarklet shape:",
+    "  - 'favorites' renamed to 'bookmarks' in all new code",
+    "  - 'downloadedAt' replaced by the 'captureStatus' field",
+    "  - 'label' retained as a display hint",
+    "  - 'thumbnail' remains a data URL or empty string (session cache only;",
+    "    durable thumbnails live in the IndexedDB 'thumbnails' object store)",
+    "",
+    "The records below cover the cases needed for M05 repository tests:",
+    "  - remote-only entry (no local capture)",
+    "  - entry with a thumbnail data URL",
+    "  - entry that has been downloaded",
+    "  - entry with LLM-fetched metadata (title + description)",
+    "  - entry that failed to load (404)",
+    "  - entry from a cross-origin CDN",
+    "  - entry with a hex token in the URL",
+    "  - entry with a query-only URL",
+    "  - entry at the 30-item visible window boundary",
+    "  - a set of 5 bookmark records mirroring history shape (no captureStatus)"
+  ],
+
+  "history": [
+    {
+      "url": "https://cdn.example.com/images/gallery/00042/photo.jpg",
+      "timestamp": "2026-06-14T20:00:00.000Z",
+      "title": "coastal_cliffs_at_sunset_overlooking_the_ocean",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Remote-only entry; LLM title set; no local bytes."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00043/photo.jpg",
+      "timestamp": "2026-06-14T19:58:00.000Z",
+      "title": "coastal_cliffs_at_sunset_detail_wave_spray",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA==",
+      "captureStatus": "remote-only",
+      "_notes": "Entry with a thumbnail data URL (placeholder base64; not a real image)."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00044/photo.jpg",
+      "timestamp": "2026-06-14T19:55:00.000Z",
+      "title": "coastal_cliffs_at_sunset_panoramic_view",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA==",
+      "captureStatus": "downloaded",
+      "downloadedAt": "2026-06-14T19:56:00.000Z",
+      "_notes": "Entry that has been downloaded; both captureStatus and downloadedAt are set."
+    },
+    {
+      "url": "https://media.example.org/photos/autumn_forest/img_0001.jpg",
+      "timestamp": "2026-06-14T19:50:00.000Z",
+      "title": "tall_oak_trees_in_autumn_fog_morning_light",
+      "label": "img_0001.jpg – media.example.org",
+      "thumbnail": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA==",
+      "captureStatus": "remote-only",
+      "_notes": "Entry with LLM-fetched title and a thumbnail."
+    },
+    {
+      "url": "https://media.example.org/photos/autumn_forest/img_0002.jpg",
+      "timestamp": "2026-06-14T19:49:00.000Z",
+      "title": "img_0002.jpg",
+      "label": "img_0002.jpg – media.example.org",
+      "thumbnail": "",
+      "captureStatus": "failed",
+      "_notes": "Entry that failed to load (404); title is URL-derived fallback; no thumbnail."
+    },
+    {
+      "url": "https://images.external-cdn.net/user/u_00039/profile.jpg",
+      "timestamp": "2026-06-14T19:45:00.000Z",
+      "title": "profile.jpg",
+      "label": "profile.jpg – images.external-cdn.net",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Cross-origin CDN entry; no local capture; URL contains a numeric user ID."
+    },
+    {
+      "url": "https://example.com/assets/3f9a2b.jpg",
+      "timestamp": "2026-06-14T19:40:00.000Z",
+      "title": "3f9a2b.jpg",
+      "label": "3f9a2b.jpg – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Entry with a hex token in the filename; title is URL-derived (no LLM fetch)."
+    },
+    {
+      "url": "https://example.com/viewer?page=003&chapter=02",
+      "timestamp": "2026-06-14T19:35:00.000Z",
+      "title": "example.com",
+      "label": "example.com – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Query-only URL with no meaningful path segment; title and label fall back to host."
+    },
+    {
+      "url": "https://images.example.co.uk/gallery/001/photo.jpg",
+      "timestamp": "2026-06-14T19:30:00.000Z",
+      "title": "sunlit_field_of_lavender_in_rural_france",
+      "label": "photo.jpg – images.example.co.uk",
+      "thumbnail": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA==",
+      "captureStatus": "remote-only",
+      "_notes": "Subdomain and ccTLD host; thumbnail present."
+    },
+    {
+      "url": "https://example.com/photos%2Farchive%2F0042.jpg",
+      "timestamp": "2026-06-14T19:25:00.000Z",
+      "title": "0042.jpg",
+      "label": "0042.jpg – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Encoded-slash path; title is URL-derived from the last path segment."
+    },
+    {
+      "url": "https://example.com/img/caf%C3%A9/001.jpg",
+      "timestamp": "2026-06-14T19:20:00.000Z",
+      "title": "001.jpg",
+      "label": "001.jpg – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Non-ASCII characters in path; URL stored as-is (percent-encoded form)."
+    },
+    {
+      "url": "https://example.com/gallery/002.jpg#fullscreen",
+      "timestamp": "2026-06-14T19:15:00.000Z",
+      "title": "002.jpg",
+      "label": "002.jpg – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "URL with hash fragment; hash is preserved in stored URL."
+    },
+    {
+      "url": "https://example.com/img/9007199254740993.jpg",
+      "timestamp": "2026-06-14T19:10:00.000Z",
+      "title": "9007199254740993.jpg",
+      "label": "9007199254740993.jpg – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Large numeric value exceeding Number.MAX_SAFE_INTEGER in the URL."
+    },
+    {
+      "url": "https://example.com/img?q=mountains&id=003",
+      "timestamp": "2026-06-14T19:05:00.000Z",
+      "title": "example.com",
+      "label": "example.com – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Query-only URL with a text parameter and a numeric ID."
+    },
+    {
+      "url": "https://example.com/images/0x00FF00/thumb.jpg",
+      "timestamp": "2026-06-14T19:00:00.000Z",
+      "title": "thumb.jpg",
+      "label": "thumb.jpg – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "0x-prefixed hex color value in path."
+    },
+    {
+      "url": "http://localhost:8080/images/003.jpg",
+      "timestamp": "2026-06-14T18:55:00.000Z",
+      "title": "003.jpg",
+      "label": "003.jpg – localhost:8080",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Localhost URL with port; tests that port is preserved in host."
+    },
+    {
+      "url": "https://example.com/img/hello%20world/002.jpg",
+      "timestamp": "2026-06-14T18:50:00.000Z",
+      "title": "002.jpg",
+      "label": "002.jpg – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Space encoded as %20 in path segment."
+    },
+    {
+      "url": "https://example.com/img/99.jpg",
+      "timestamp": "2026-06-14T18:45:00.000Z",
+      "title": "99.jpg",
+      "label": "99.jpg – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Two-digit unpadded numeric; width grows on bump past 99."
+    },
+    {
+      "url": "https://example.com/img/100.jpg",
+      "timestamp": "2026-06-14T18:40:00.000Z",
+      "title": "100.jpg",
+      "label": "100.jpg – example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Three-digit; decrement to 99 must zero-pad to preserve width."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00030/photo.jpg",
+      "timestamp": "2026-06-14T18:35:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Visible window boundary item (index 19 of 30 max visible)."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00029/photo.jpg",
+      "timestamp": "2026-06-14T18:30:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 20."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00028/photo.jpg",
+      "timestamp": "2026-06-14T18:25:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 21."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00027/photo.jpg",
+      "timestamp": "2026-06-14T18:20:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 22."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00026/photo.jpg",
+      "timestamp": "2026-06-14T18:15:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 23."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00025/photo.jpg",
+      "timestamp": "2026-06-14T18:10:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 24."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00024/photo.jpg",
+      "timestamp": "2026-06-14T18:05:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 25."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00023/photo.jpg",
+      "timestamp": "2026-06-14T18:00:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 26."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00022/photo.jpg",
+      "timestamp": "2026-06-14T17:55:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 27."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00021/photo.jpg",
+      "timestamp": "2026-06-14T17:50:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 28."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00020/photo.jpg",
+      "timestamp": "2026-06-14T17:45:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 29 — last item visible in the 30-item window."
+    },
+    {
+      "url": "https://cdn.example.com/images/gallery/00019/photo.jpg",
+      "timestamp": "2026-06-14T17:40:00.000Z",
+      "title": "photo.jpg",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "",
+      "captureStatus": "remote-only",
+      "_notes": "Index 30 — beyond the 30-item visible window; still persisted in IndexedDB."
+    }
+  ],
+
+  "bookmarks": [
+    {
+      "url": "https://cdn.example.com/images/gallery/00042/photo.jpg",
+      "timestamp": "2026-06-14T20:01:00.000Z",
+      "title": "coastal_cliffs_at_sunset_overlooking_the_ocean",
+      "label": "photo.jpg – cdn.example.com",
+      "thumbnail": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA==",
+      "_notes": "Bookmark for the same URL as history item 0; thumbnail may be shared."
+    },
+    {
+      "url": "https://media.example.org/photos/autumn_forest/img_0001.jpg",
+      "timestamp": "2026-06-14T19:51:00.000Z",
+      "title": "tall_oak_trees_in_autumn_fog_morning_light",
+      "label": "img_0001.jpg – media.example.org",
+      "thumbnail": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA==",
+      "_notes": "Bookmark with LLM title and thumbnail."
+    },
+    {
+      "url": "https://images.example.co.uk/gallery/001/photo.jpg",
+      "timestamp": "2026-06-14T19:31:00.000Z",
+      "title": "sunlit_field_of_lavender_in_rural_france",
+      "label": "photo.jpg – images.example.co.uk",
+      "thumbnail": "",
+      "_notes": "Bookmark without a thumbnail (never generated or evicted)."
+    },
+    {
+      "url": "https://example.com/assets/3f9a2b.jpg",
+      "timestamp": "2026-06-14T19:41:00.000Z",
+      "title": "3f9a2b.jpg",
+      "label": "3f9a2b.jpg – example.com",
+      "thumbnail": "",
+      "_notes": "Bookmarked hex-token URL with URL-derived title."
+    },
+    {
+      "url": "https://example.com/viewer?page=003&chapter=02",
+      "timestamp": "2026-06-14T19:36:00.000Z",
+      "title": "example.com",
+      "label": "example.com – example.com",
+      "thumbnail": "",
+      "_notes": "Bookmarked query-only URL; title falls back to host."
+    }
+  ],
+
+  "downloadRecords": [
+    {
+      "url": "https://cdn.example.com/images/gallery/00044/photo.jpg",
+      "filename": "coastal_cliffs_at_sunset_panoramic_view.jpg",
+      "timestamp": "2026-06-14T19:56:00.000Z",
+      "fingerprint": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+      "_notes": "Completed download record; matches history entry with captureStatus 'downloaded'."
+    },
+    {
+      "url": "https://media.example.org/photos/autumn_forest/img_0001.jpg",
+      "filename": "tall_oak_trees_in_autumn_fog_morning_light.jpg",
+      "timestamp": "2026-06-14T19:52:00.000Z",
+      "fingerprint": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+      "_notes": "Download record with a valid SHA-256 fingerprint (placeholder hex)."
+    }
+  ]
+}
