@@ -1,4 +1,4 @@
-export type DataStoreName = 'metadata' | 'keys' | 'history';
+export type DataStoreName = 'metadata' | 'keys' | 'history' | 'bookmarks';
 export type DataStatusCode =
   | 'ok'
   | 'db-open-failed'
@@ -28,4 +28,15 @@ export interface DurableHistoryPayloadV1 {
   readonly thumbnail?: string;
   readonly capturedAt: string;
   readonly captureStatus: 'remote-only' | 'downloaded' | 'failed';
+}
+
+export interface DurableBookmarkPayloadV1 {
+  readonly url: string;
+  readonly title?: string;
+  readonly label?: string;
+  readonly thumbnail?: string;
+  readonly bookmarkedAt: string;
+  readonly downloadedAt?: string;
+  readonly capturedAt?: string;
+  readonly sourceCompatibility?: 'favorites';
 }

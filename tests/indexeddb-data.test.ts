@@ -4,6 +4,7 @@ import 'fake-indexeddb/auto';
 import { openImageTrailDb } from '../extension/src/data/db.js';
 import { DataStore, IMAGE_TRAIL_DB_NAME, SchemaIndex } from '../extension/src/data/schema.js';
 import { HistoryRepository, type EncryptedHistoryRecord } from '../extension/src/data/repositories/history-repository.js';
+import { BookmarksRepository, type EncryptedBookmarkRecord } from '../extension/src/data/repositories/bookmarks-repository.js';
 import { KeysRepository } from '../extension/src/data/repositories/keys-repository.js';
 import type { StoredKeyRecord } from '../extension/src/data/crypto/types.js';
 
@@ -43,6 +44,28 @@ function storedKeyRecord(reference: `history:${string}` = 'history:key-001', uui
   };
 }
 
+function bookmarkRecord(uuid = 'bookmark-001'): EncryptedBookmarkRecord {
+  return {
+    uuid,
+    url: 'https://example.test/bookmark.jpg',
+    envelope: {
+      schemaVersion: 1,
+      payloadVersion: 1,
+      algorithm: 'AES-GCM',
+      iv: 'test-iv',
+      ciphertext: 'test-ciphertext',
+      key: {
+        kind: 'bookmark',
+        uuid: 'key-001',
+        reference: 'bookmark:key-001',
+      },
+      createdAt: '2026-06-17T00:00:00.000Z',
+      updatedAt: '2026-06-17T00:00:01.000Z',
+      authenticatedMetadata: { recordType: 'bookmark' },
+    },
+  };
+}
+
 function historyRecord(uuid = 'history-001'): EncryptedHistoryRecord {
   return {
     uuid,
@@ -68,14 +91,19 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   const db = await openFreshImageTrailDb();
   t.after(() => db.close());
 
-  assert.deepEqual(asArray(db.objectStoreNames), [DataStore.History, DataStore.Keys, DataStore.Metadata].sort());
+  assert.deepEqual(asArray(db.objectStoreNames), [DataStore.Bookmarks, DataStore.History, DataStore.Keys, DataStore.Metadata].sort());
 
-  const transaction = db.transaction([DataStore.Metadata, DataStore.Keys, DataStore.History], 'readonly');
+  const transaction = db.transaction([DataStore.Metadata, DataStore.Keys, DataStore.History, DataStore.Bookmarks], 'readonly');
   const keys = transaction.objectStore(DataStore.Keys);
   const history = transaction.objectStore(DataStore.History);
+  const bookmarks = transaction.objectStore(DataStore.Bookmarks);
 
   assert.deepEqual(asArray(keys.indexNames), [SchemaIndex.KeysByKind, SchemaIndex.KeysByReference, SchemaIndex.KeysByUuid].sort());
   assert.deepEqual(asArray(history.indexNames), [SchemaIndex.HistoryByKeyReference, SchemaIndex.HistoryByUpdatedAt].sort());
+  assert.deepEqual(
+    asArray(bookmarks.indexNames),
+    [SchemaIndex.BookmarksByKeyReference, SchemaIndex.BookmarksByUpdatedAt, SchemaIndex.BookmarksByUrl].sort(),
+  );
 
   const metadata = await new Promise((resolve, reject) => {
     const request = transaction.objectStore(DataStore.Metadata).get('schema');
@@ -108,6 +136,19 @@ test('HistoryRepository writes complete transactions and reads encrypted records
 
   assert.deepEqual(await repository.getEncrypted(record.uuid), record);
   assert.equal(await repository.getEncrypted('missing-history'), undefined);
+});
+
+test('BookmarksRepository writes encrypted records and dedupes by URL index', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const repository = new BookmarksRepository(db);
+  const record = bookmarkRecord();
+
+  await repository.putEncrypted(record);
+
+  assert.deepEqual(await repository.getEncrypted(record.uuid), record);
+  assert.deepEqual(await repository.getEncryptedByUrl(record.url), record);
+  assert.equal(await repository.getEncryptedByUrl('https://example.test/missing.jpg'), undefined);
 });
 
 test('repository transaction failures are surfaced to callers', async (t) => {

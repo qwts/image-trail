@@ -9,8 +9,8 @@ import { DATA_STORE_NAMES, IMAGE_TRAIL_DB_NAME, IMAGE_TRAIL_DB_VERSION } from '.
 
 test('defines a versioned IndexedDB schema with durable M04 stores', () => {
   assert.equal(IMAGE_TRAIL_DB_NAME, 'image-trail');
-  assert.equal(IMAGE_TRAIL_DB_VERSION, 1);
-  assert.deepEqual(DATA_STORE_NAMES, ['metadata', 'keys', 'history']);
+  assert.equal(IMAGE_TRAIL_DB_VERSION, 2);
+  assert.deepEqual(DATA_STORE_NAMES, ['metadata', 'keys', 'history', 'bookmarks']);
 });
 
 test('seals and opens a versioned AES-GCM JSON envelope with authenticated metadata', async () => {
