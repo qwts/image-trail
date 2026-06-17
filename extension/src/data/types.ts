@@ -1,5 +1,12 @@
 export type DataStoreName = 'metadata' | 'keys' | 'history';
-export type DataStatusCode = 'ok' | 'db-open-failed' | 'migration-failed' | 'encryption-failed' | 'decryption-failed' | 'not-found' | 'locked';
+export type DataStatusCode =
+  | 'ok'
+  | 'db-open-failed'
+  | 'migration-failed'
+  | 'encryption-failed'
+  | 'decryption-failed'
+  | 'not-found'
+  | 'locked';
 
 export interface RecoverableDataStatus {
   readonly ok: boolean;

@@ -4,10 +4,13 @@ import type { ParsedUrlModel, QueryField } from './types.js';
 export function parseUrl(input: string): ParsedUrlModel {
   const normalizedInput = input.replaceAll('&amp;', '&');
   const url = new URL(normalizedInput);
-  const pathSegments = url.pathname.split('/').slice(1).map((raw) => {
-    const decoded = safeDecode(raw, 'path');
-    return { type: 'segment' as const, raw: decoded, rawEncoded: raw, tokens: tokenizeValue(decoded) };
-  });
+  const pathSegments = url.pathname
+    .split('/')
+    .slice(1)
+    .map((raw) => {
+      const decoded = safeDecode(raw, 'path');
+      return { type: 'segment' as const, raw: decoded, rawEncoded: raw, tokens: tokenizeValue(decoded) };
+    });
 
   return {
     protocol: url.protocol,

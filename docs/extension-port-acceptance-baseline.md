@@ -14,20 +14,20 @@ The first vertical slice spans M01 through M05. It covers the minimum set of beh
 
 ### Slice scope
 
-| Area | Minimum required |
-|---|---|
-| Extension shell | MV3 manifest, service worker, basic permissions (`activeTab`, `scripting`, `storage`) |
-| Panel injection | Browser action toggles an in-page panel reliably; repeated toggles do not duplicate DOM |
-| Messaging | Typed ping/status message round-trip between service worker and content script |
-| Target selection | Auto-select one image or prompt user to pick; visual selection indicator |
-| Image apply | Clear `srcset`/`sizes`, set `img.src`, handle load/error, surface status |
-| URL navigation | Parse URL into model, increment/decrement numeric field, rebuild URL, apply |
-| Request throttle | Rapid manual navigation is coalesced or rate-limited |
-| Style restore | Closing the panel restores all extension-owned styles |
-| Runtime history | Successful loads appear in session history; 404 loads do not |
-| Encrypted storage | IndexedDB schema open, versioned, migrateable; no raw key material in storage |
-| Bookmarks | User can bookmark the current URL; bookmarks survive restart |
-| Local settings | Settings load from `chrome.storage.local` with typed defaults; writes persist |
+| Area              | Minimum required                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| Extension shell   | MV3 manifest, service worker, basic permissions (`activeTab`, `scripting`, `storage`)   |
+| Panel injection   | Browser action toggles an in-page panel reliably; repeated toggles do not duplicate DOM |
+| Messaging         | Typed ping/status message round-trip between service worker and content script          |
+| Target selection  | Auto-select one image or prompt user to pick; visual selection indicator                |
+| Image apply       | Clear `srcset`/`sizes`, set `img.src`, handle load/error, surface status                |
+| URL navigation    | Parse URL into model, increment/decrement numeric field, rebuild URL, apply             |
+| Request throttle  | Rapid manual navigation is coalesced or rate-limited                                    |
+| Style restore     | Closing the panel restores all extension-owned styles                                   |
+| Runtime history   | Successful loads appear in session history; 404 loads do not                            |
+| Encrypted storage | IndexedDB schema open, versioned, migrateable; no raw key material in storage           |
+| Bookmarks         | User can bookmark the current URL; bookmarks survive restart                            |
+| Local settings    | Settings load from `chrome.storage.local` with typed defaults; writes persist           |
 
 ### Slice exclusions (not required for first slice)
 
@@ -64,34 +64,34 @@ The first vertical slice is complete when:
 
 These tests are release gates for specific later milestones. They are not M00 exit criteria.
 
-| Test | File | Gates milestone |
-|---|---|---|
-| M00 Planning Baseline Review | `m00-planning-baseline-review.md` | M00 |
-| Target Picker Captures Only The Selected Image | `target-picker-captures-only-selected-image.md` | M02, M06 |
-| Local Original Capture Survives Remote Loss | `local-original-capture-survives-remote-loss.md` | M05, M06 |
-| Third-Party CDN Permission Flow | `third-party-cdn-permission-flow.md` | M06 |
-| Oversized Original Is Bounded | `oversized-original-is-bounded.md` | M05, M06 |
+| Test                                           | File                                             | Gates milestone |
+| ---------------------------------------------- | ------------------------------------------------ | --------------- |
+| M00 Planning Baseline Review                   | `m00-planning-baseline-review.md`                | M00             |
+| Target Picker Captures Only The Selected Image | `target-picker-captures-only-selected-image.md`  | M02, M06        |
+| Local Original Capture Survives Remote Loss    | `local-original-capture-survives-remote-loss.md` | M05, M06        |
+| Third-Party CDN Permission Flow                | `third-party-cdn-permission-flow.md`             | M06             |
+| Oversized Original Is Bounded                  | `oversized-original-is-bounded.md`               | M05, M06        |
 
 ### Additional tests to write when their milestones begin
 
-| Test (to be created) | Gates milestone |
-|---|---|
-| Panel toggles without DOM leaks | M01 |
-| Service worker ping round-trip | M01 |
-| Single-image auto-select on injection | M02 |
-| Multi-image manual pick with visual indicator | M02 |
-| Panel close restores page styles | M02 |
-| URL parse, increment, and rebuild round-trip | M03 |
-| Failed image load clears pending history | M03 |
-| Same-origin location bar update | M03 |
-| Request throttle prevents rapid uncontrolled requests | M03 |
-| IndexedDB opens and migrates | M04 |
-| Encrypted record can be written and read back | M04 |
-| Settings load with correct defaults and persist on change | M04 |
-| Successful load adds history entry | M05 |
-| 404 load does not add history entry | M05 |
-| Bookmark persists across panel close and browser restart | M05 |
-| Download is blocked for already-downloaded URL | M05 |
+| Test (to be created)                                      | Gates milestone |
+| --------------------------------------------------------- | --------------- |
+| Panel toggles without DOM leaks                           | M01             |
+| Service worker ping round-trip                            | M01             |
+| Single-image auto-select on injection                     | M02             |
+| Multi-image manual pick with visual indicator             | M02             |
+| Panel close restores page styles                          | M02             |
+| URL parse, increment, and rebuild round-trip              | M03             |
+| Failed image load clears pending history                  | M03             |
+| Same-origin location bar update                           | M03             |
+| Request throttle prevents rapid uncontrolled requests     | M03             |
+| IndexedDB opens and migrates                              | M04             |
+| Encrypted record can be written and read back             | M04             |
+| Settings load with correct defaults and persist on change | M04             |
+| Successful load adds history entry                        | M05             |
+| 404 load does not add history entry                       | M05             |
+| Bookmark persists across panel close and browser restart  | M05             |
+| Download is blocked for already-downloaded URL            | M05             |
 
 ---
 
@@ -166,13 +166,13 @@ This checklist is derived from `docs/bookmarklet-behavior-map.md`. Items are gro
 
 The following boundaries must be established before any milestone beyond M01 adds feature code. Violation of these boundaries is a regression regardless of whether the feature works.
 
-| Boundary | Rule |
-|---|---|
-| `core/` | No direct DOM access; no `document`, `window`, `chrome` APIs; no storage I/O |
-| `data/` | No UI rendering; no DOM manipulation |
-| `content/` | No IndexedDB access directly; no business logic other than DOM integration and dispatching named actions |
-| `background/` | No owned DOM state; no unlocked key material; no long-running automation as the sole source of truth |
-| `ui/` | No parser logic; no crypto; no IndexedDB; renders from explicit state and calls named actions only |
+| Boundary      | Rule                                                                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| `core/`       | No direct DOM access; no `document`, `window`, `chrome` APIs; no storage I/O                             |
+| `data/`       | No UI rendering; no DOM manipulation                                                                     |
+| `content/`    | No IndexedDB access directly; no business logic other than DOM integration and dispatching named actions |
+| `background/` | No owned DOM state; no unlocked key material; no long-running automation as the sole source of truth     |
+| `ui/`         | No parser logic; no crypto; no IndexedDB; renders from explicit state and calls named actions only       |
 
 ---
 
@@ -180,20 +180,20 @@ The following boundaries must be established before any milestone beyond M01 add
 
 These are acknowledged areas that the first vertical slice does not cover. Each must be named before implementation begins to avoid accidental scope creep.
 
-| Deferred item | First eligible milestone |
-|---|---|
-| Stored original image bytes | M06 |
-| Cross-origin host permission requests | M06 |
-| Import bookmarklet localStorage data | M07 (import UI) |
-| Export encrypted archive | M07 |
-| History recall / search | M07 |
-| Slideshow and 404 auto-advance | M08 |
-| Full keyboard routing | M08 |
-| LLM metadata fetch | M09 |
-| Encrypted metadata cache | M09 |
-| React/Vite decision | M10 |
-| Automatic bookmarklet data migration | Not in scope; import-only |
-| WebAuthn key wrapping | Placeholder; post-M11 |
+| Deferred item                         | First eligible milestone  |
+| ------------------------------------- | ------------------------- |
+| Stored original image bytes           | M06                       |
+| Cross-origin host permission requests | M06                       |
+| Import bookmarklet localStorage data  | M07 (import UI)           |
+| Export encrypted archive              | M07                       |
+| History recall / search               | M07                       |
+| Slideshow and 404 auto-advance        | M08                       |
+| Full keyboard routing                 | M08                       |
+| LLM metadata fetch                    | M09                       |
+| Encrypted metadata cache              | M09                       |
+| React/Vite decision                   | M10                       |
+| Automatic bookmarklet data migration  | Not in scope; import-only |
+| WebAuthn key wrapping                 | Placeholder; post-M11     |
 
 ---
 

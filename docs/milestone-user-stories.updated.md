@@ -20,20 +20,20 @@ The main revision is to separate bookmarklet-behavior parity from extension-only
 
 ## Milestone Summary
 
-| Order | Milestone | Type | Primary Outcome |
-|---:|---|---|---|
-| 0 | M00: Planning Baseline And Bookmarklet Behavior Map | Planning / parity map | Known behavior surface, fixtures, acceptance baseline |
-| 1 | M01: MV3 Shell, Message Contracts, And Injected Panel | Extension foundation | Browser action toggles injected panel reliably |
-| 2 | M02: Target Image Selection And Page Integration | Port / adapt | Correct image targeting, preview styling, cleanup |
-| 3 | M03: URL Parser, Field Model, And Navigation Core | Port / refactor | URL navigation parity in framework-independent core |
-| 4 | M04: IndexedDB, Keys, Local Settings, And Envelope Foundation | Data/security foundation | Versioned durable storage and crypto interfaces |
-| 5 | M05: Runtime History And Bookmarks Parity | Port / replace storage | Existing history/favorite workflows mapped to extension storage |
-| 6 | M06: Stored Originals, Capture Pipeline, And Cross-Origin Permissions | New extension capability | Explicit local image-byte capture and recoverable failures |
-| 7 | M07: Recall, Migration, Import/Export, And Encrypted Downloads | Data portability | Recover, migrate, export, import, and encrypted download flows |
-| 8 | M08: Automation, Keybindings, And Request Governance | Port / harden | Fast workflows restored with request caps and stop behavior |
-| 9 | M09: LLM Metadata And Encrypted Metadata Cache | Port / deferable | Optional metadata generation with encrypted persistence |
-| 10 | M10: UI Scale-Up And React/Vite Decision | Decision gate | Determine whether plain DOM remains sufficient |
-| 11 | M11: Hardening, Regression Validation, And Release Readiness | Hardening | Brave/Chromium validation, privacy review, recovery paths |
+| Order | Milestone                                                             | Type                     | Primary Outcome                                                 |
+| ----: | --------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------- |
+|     0 | M00: Planning Baseline And Bookmarklet Behavior Map                   | Planning / parity map    | Known behavior surface, fixtures, acceptance baseline           |
+|     1 | M01: MV3 Shell, Message Contracts, And Injected Panel                 | Extension foundation     | Browser action toggles injected panel reliably                  |
+|     2 | M02: Target Image Selection And Page Integration                      | Port / adapt             | Correct image targeting, preview styling, cleanup               |
+|     3 | M03: URL Parser, Field Model, And Navigation Core                     | Port / refactor          | URL navigation parity in framework-independent core             |
+|     4 | M04: IndexedDB, Keys, Local Settings, And Envelope Foundation         | Data/security foundation | Versioned durable storage and crypto interfaces                 |
+|     5 | M05: Runtime History And Bookmarks Parity                             | Port / replace storage   | Existing history/favorite workflows mapped to extension storage |
+|     6 | M06: Stored Originals, Capture Pipeline, And Cross-Origin Permissions | New extension capability | Explicit local image-byte capture and recoverable failures      |
+|     7 | M07: Recall, Migration, Import/Export, And Encrypted Downloads        | Data portability         | Recover, migrate, export, import, and encrypted download flows  |
+|     8 | M08: Automation, Keybindings, And Request Governance                  | Port / harden            | Fast workflows restored with request caps and stop behavior     |
+|     9 | M09: LLM Metadata And Encrypted Metadata Cache                        | Port / deferable         | Optional metadata generation with encrypted persistence         |
+|    10 | M10: UI Scale-Up And React/Vite Decision                              | Decision gate            | Determine whether plain DOM remains sufficient                  |
+|    11 | M11: Hardening, Regression Validation, And Release Readiness          | Hardening                | Brave/Chromium validation, privacy review, recovery paths       |
 
 ---
 
@@ -600,19 +600,19 @@ As a developer, I want the extension to be reliable, recoverable, and privacy-co
 
 These should be scheduled before or inside the earliest affected milestone.
 
-| Spike | Earliest Milestone | Pass Condition |
-|---|---:|---|
-| MV3 ES module loading without bundler | M01 | Unpacked extension loads compiled TypeScript output cleanly |
-| Content-script panel isolation | M01 | Page CSS does not materially break core panel controls |
-| Target image mutation behavior | M02 | Late images and target changes are handled without stale references |
-| URL parser parity | M03 | Fixture URLs round-trip and mutate by token position |
-| IndexedDB migration safety | M04 | Failed migration leaves prior readable state when possible |
-| WebCrypto envelope shape | M04 | Minimal encrypted record can be written/read with versioned metadata |
-| Extension-context image fetch | M06 | Same-origin and selected cross-origin outcomes are understood and surfaced |
-| Optional host permission request flow | M06 | Specific image origin can be requested without broad upfront permissions |
-| Encrypted export/import restore | M07 | Clean profile can import selected exported records |
-| Automation request governance | M08 | Rapid manual and automated actions are throttled by the same cap model |
-| LLM image input fallback | M09 | Data URL and URL fallback paths behave predictably |
+| Spike                                 | Earliest Milestone | Pass Condition                                                             |
+| ------------------------------------- | -----------------: | -------------------------------------------------------------------------- |
+| MV3 ES module loading without bundler |                M01 | Unpacked extension loads compiled TypeScript output cleanly                |
+| Content-script panel isolation        |                M01 | Page CSS does not materially break core panel controls                     |
+| Target image mutation behavior        |                M02 | Late images and target changes are handled without stale references        |
+| URL parser parity                     |                M03 | Fixture URLs round-trip and mutate by token position                       |
+| IndexedDB migration safety            |                M04 | Failed migration leaves prior readable state when possible                 |
+| WebCrypto envelope shape              |                M04 | Minimal encrypted record can be written/read with versioned metadata       |
+| Extension-context image fetch         |                M06 | Same-origin and selected cross-origin outcomes are understood and surfaced |
+| Optional host permission request flow |                M06 | Specific image origin can be requested without broad upfront permissions   |
+| Encrypted export/import restore       |                M07 | Clean profile can import selected exported records                         |
+| Automation request governance         |                M08 | Rapid manual and automated actions are throttled by the same cap model     |
+| LLM image input fallback              |                M09 | Data URL and URL fallback paths behave predictably                         |
 
 ## Definition Of Done For Any Milestone
 
@@ -623,4 +623,3 @@ These should be scheduled before or inside the earliest affected milestone.
 - Feature behavior has at least one manual happy-path and one failure-path check.
 - New permissions are justified by a specific feature and documented.
 - Any deferred behavior is explicitly listed rather than silently omitted.
-

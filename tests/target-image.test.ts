@@ -52,18 +52,24 @@ globalThis.window = {
 } as Window & typeof globalThis;
 
 test('uses bookmarklet-compatible URL precedence for target images', () => {
-  assert.deepEqual(getImageUrl(fakeImage({ currentSrc: 'https://example.test/current.jpg', srcAttribute: 'https://example.test/attr.jpg' })), {
-    source: 'currentSrc',
-    url: 'https://example.test/current.jpg',
-  });
+  assert.deepEqual(
+    getImageUrl(fakeImage({ currentSrc: 'https://example.test/current.jpg', srcAttribute: 'https://example.test/attr.jpg' })),
+    {
+      source: 'currentSrc',
+      url: 'https://example.test/current.jpg',
+    },
+  );
   assert.deepEqual(getImageUrl(fakeImage({ srcAttribute: 'https://example.test/attr.jpg', src: 'https://example.test/property.jpg' })), {
     source: 'srcAttribute',
     url: 'https://example.test/attr.jpg',
   });
-  assert.deepEqual(getImageUrl(fakeImage({ dataSrc: 'https://example.test/data.jpg', dataOriginal: 'https://example.test/original.jpg' })), {
-    source: 'data-src',
-    url: 'https://example.test/data.jpg',
-  });
+  assert.deepEqual(
+    getImageUrl(fakeImage({ dataSrc: 'https://example.test/data.jpg', dataOriginal: 'https://example.test/original.jpg' })),
+    {
+      source: 'data-src',
+      url: 'https://example.test/data.jpg',
+    },
+  );
 });
 
 test('qualifies only connected visible images with usable dimensions and URLs', () => {

@@ -19,7 +19,14 @@ export function showPanel(state: PanelState, now = Date.now()): PanelState {
 }
 
 export function closePanel(state: PanelState, now = Date.now()): PanelState {
-  return { ...state, visible: false, status: 'closed', message: 'Panel closed.', lastUpdatedAt: now, target: { ...state.target, picking: false } };
+  return {
+    ...state,
+    visible: false,
+    status: 'closed',
+    message: 'Panel closed.',
+    lastUpdatedAt: now,
+    target: { ...state.target, picking: false },
+  };
 }
 
 export function setTargetState(state: PanelState, target: TargetState, now = Date.now()): PanelState {

@@ -19,7 +19,11 @@ test('bumps fixture fields with BigInt, width preservation, and clamping', () =>
       const fields = collectUrlFields(model);
       const field = selectField(fields, incrementCase.fieldHint);
       assert.ok(field, `${fixture.label}: ${incrementCase.fieldHint}`);
-      assert.equal(rebuildUrl(bumpUrlField(model, field, incrementCase.delta)), incrementCase.expectedUrl, `${fixture.label}: ${incrementCase.fieldHint}`);
+      assert.equal(
+        rebuildUrl(bumpUrlField(model, field, incrementCase.delta)),
+        incrementCase.expectedUrl,
+        `${fixture.label}: ${incrementCase.fieldHint}`,
+      );
     }
   }
 });
@@ -37,7 +41,9 @@ function selectField(fields: UrlField[], hint: string): UrlField {
   const lowerHint = hint.toLowerCase();
   const queryKey = lowerHint.match(/query\s+([\w.-]+)/u)?.[1];
   if (queryKey) {
-    const field = fields.find((candidate) => candidate.location === 'query' && candidate.label.toLowerCase().includes(`query ${queryKey} `));
+    const field = fields.find(
+      (candidate) => candidate.location === 'query' && candidate.label.toLowerCase().includes(`query ${queryKey} `),
+    );
     if (field) return field;
   }
 

@@ -1,9 +1,9 @@
 ---
 name: User Story
 about: Capture an ImageTrail user story with scope, acceptance scenarios, implementation notes, and test coverage.
-title: "[Story]: "
-labels: ["user story"]
-assignees: ""
+title: '[Story]: '
+labels: ['user story']
+assignees: ''
 ---
 
 # User Story

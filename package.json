@@ -11,7 +11,8 @@
     "build": "npm run clean && tsc -p tsconfig.json && node scripts/copy-extension-assets.mjs",
     "test:unit": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js",
     "test": "npm run typecheck && npm run test:unit",
-    "format:check": "prettier --check package.json package-lock.json .prettierrc.json .github/workflows/*.yml"
+    "format:check": "prettier --check \"**/*.{ts,json,md,css,yml,yaml}\" \".prettierrc.json\"",
+    "format": "prettier --write \"**/*.{ts,json,md,css,yml,yaml}\" \".prettierrc.json\""
   },
   "devDependencies": {
     "@types/chrome": "^0.1.43",

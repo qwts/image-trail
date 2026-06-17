@@ -3,23 +3,14 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": [
-      "ES2022",
-      "DOM"
-    ],
+    "lib": ["ES2022", "DOM"],
     "strict": true,
     "noEmitOnError": true,
     "rootDir": "extension/src",
     "outDir": "extension/dist/src",
-    "types": [
-      "chrome"
-    ],
+    "types": ["chrome"],
     "skipLibCheck": true
   },
-  "include": [
-    "extension/src/**/*.ts"
-  ],
-  "exclude": [
-    "extension/src/test-fixtures/**/*.ts"
-  ]
+  "include": ["extension/src/**/*.ts"],
+  "exclude": ["extension/src/test-fixtures/**/*.ts"]
 }

@@ -2,7 +2,7 @@
 
 Image Trail is built in small, milestone-scoped slices (see `docs/milestones.md` and
 `docs/user-stories/`). This document codifies the rules that recent PRs (#15–#19) have
-repeatedly needed in review, so they're enforced *before* a PR is opened instead of
+repeatedly needed in review, so they're enforced _before_ a PR is opened instead of
 caught after the fact.
 
 ## Before you open a PR
@@ -48,6 +48,7 @@ against this list before requesting review — it is the fastest way to avoid a
 round-trip:
 
 ### Correctness
+
 - **DOM mount targets:** UI elements must be appended to `document.body` (or
   `document.head` for stylesheets), never to `document.documentElement` directly.
 - **Idempotent injection:** content-script/listener registration must guard against
@@ -65,6 +66,7 @@ round-trip:
   middle-click aren't silently suppressed.
 
 ### Configuration
+
 - **No `"latest"` in `package.json` dependencies.** Pin an exact version or a `^`
   range; rely on `package-lock.json` for reproducibility, not the manifest.
 - **`tsconfig.json` `moduleResolution` must match the actual build pipeline.** This
@@ -78,6 +80,7 @@ round-trip:
   (see "Avoid broad host permissions up front" in `docs/milestones.md`).
 
 ### Architecture (see `.github/ISSUE_TEMPLATE/user-story.md` for the full list)
+
 - Keep `core/`, `data/`, `content/`, `background/`, and `ui/` boundaries intact.
   Parser, storage, crypto, and navigation logic must not be absorbed into UI
   rendering code.
@@ -87,6 +90,7 @@ round-trip:
   copy-pasting a helper function into a second file, extract it instead.
 
 ### Testing
+
 - Any new pure function (reducers, parsers, crypto envelope helpers, schema
   constants) must ship with unit tests in the same PR — these have no DOM or
   extension-API dependency and are always testable in `node --test`.
@@ -99,6 +103,7 @@ round-trip:
   unused" - either use the parameter or remove it.
 
 ### Security (data/crypto code specifically)
+
 - Long-lived raw key material must not be persisted in plaintext (see Milestone 4
   exit criteria). Session-only keys must actually be retained for reuse, not just
   represented as a reference with no backing `CryptoKey`.
@@ -115,7 +120,7 @@ round-trip:
   introducing a new convention, and prefer readable multi-line code over dense
   single-line classes/functions — reviewers need to be able to diff individual
   statements.
-- Comments should explain *why*, not *what*. Don't restate what a well-named
+- Comments should explain _why_, not _what_. Don't restate what a well-named
   function already says.
 
 ## Documentation

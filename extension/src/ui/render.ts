@@ -28,10 +28,5 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     makeButton('Close', { name: 'close-panel' }, target.dispatch),
   );
 
-  target.root.append(
-    heading,
-    createStatusView(state),
-    createTargetPickerView(state.target, target.dispatch),
-    actions,
-  );
+  target.root.append(heading, createStatusView(state), createTargetPickerView(state.target, target.dispatch), actions);
 }
