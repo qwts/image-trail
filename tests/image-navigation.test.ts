@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   applyImageUrl,
-  clearResponsiveImageAttributes,
   pushVisibleUrlWhenSameOrigin,
 } from '../extension/src/core/image/image-navigation.js';
 
