@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyImageUrl, clearResponsiveImageAttributes, pushVisibleUrlWhenSameOrigin } from '../extension/src/core/image/image-navigation.js';
+import { applyImageUrl, pushVisibleUrlWhenSameOrigin } from '../extension/src/core/image/image-navigation.js';
 
 function fakeImage(): HTMLImageElement {
   const removed: string[] = [];
@@ -17,15 +17,6 @@ function fakeImage(): HTMLImageElement {
     },
   } as unknown as HTMLImageElement;
 }
-
-
-test('clears responsive image attributes without changing src', () => {
-  const image = fakeImage();
-  clearResponsiveImageAttributes(image);
-  assert.deepEqual((image as unknown as { removed: string[] }).removed, ['srcset', 'sizes']);
-  assert.deepEqual((image as unknown as { sourceRemoved: string[] }).sourceRemoved, ['srcset', 'sizes']);
-  assert.equal(image.src, 'https://example.test/old.jpg');
-});
 
 test('clears responsive attributes before applying a target image URL', () => {
   const image = fakeImage();
