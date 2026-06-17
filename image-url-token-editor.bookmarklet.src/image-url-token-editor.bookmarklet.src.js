@@ -2095,7 +2095,18 @@
           if (isCrossOrigin) {
             return downloadImageViaCanvas(url, filename).then(function (ok) {
               if (!ok) {
-                window.location.href = url
+                var fallbackTarget
+                try {
+                  fallbackTarget = new URL(normalizedUrl, location.href)
+                } catch (e) {
+                  setStatus('download blocked: invalid image URL')
+                  return false
+                }
+                if (fallbackTarget.protocol !== 'http:' && fallbackTarget.protocol !== 'https:') {
+                  setStatus('download blocked: unsupported URL protocol')
+                  return false
+                }
+                window.location.href = fallbackTarget.href
                 setStatus('opening image in tab (cross-origin)')
                 return false
               }
