@@ -1,5 +1,0 @@
-# npm lockfiles are generated from package.json. Use Git's built-in union
-# merge driver to avoid blocking PR merges when independent dependency
-# changes touch adjacent package-lock entries; regenerate with npm install if
-# a semantic dependency conflict remains after merging.
-package-lock.json merge=union
