@@ -1,3 +1,4 @@
+import type { AutomationPhase } from './automation/types.js';
 import type { CaptureResult, StorageUsageSummary } from './image/capture-result.js';
 import type { ImageDisplayRecord } from './display-records.js';
 
@@ -13,6 +14,16 @@ export interface TargetState {
   readonly message: string;
 }
 
+export interface AutomationState {
+  readonly slideshowPhase: AutomationPhase;
+  readonly slideshowCount: number;
+  readonly retryPhase: AutomationPhase;
+  readonly retriesUsed: number;
+  readonly retriesMax: number;
+  readonly governorStatus: 'ready' | 'throttled' | 'capped';
+  readonly requestsInLastMinute: number;
+}
+
 export interface PanelState {
   readonly visible: boolean;
   readonly status: PanelStatus;
@@ -24,6 +35,7 @@ export interface PanelState {
   readonly captureInProgress: boolean;
   readonly captureResult: CaptureResult | null;
   readonly storageUsage: StorageUsageSummary | null;
+  readonly automation: AutomationState;
 }
 
 export type CaptureSourceType = 'target' | 'history' | 'bookmark';
@@ -45,7 +57,16 @@ export type PanelActionName =
   | 'capture/clear'
   | 'capture/delete'
   | 'storage/update'
-  | 'undo-last';
+  | 'undo-last'
+  | 'slideshow-start'
+  | 'slideshow-stop'
+  | 'slideshow-pause'
+  | 'slideshow-resume'
+  | 'retry-start'
+  | 'retry-stop'
+  | 'navigate-next'
+  | 'navigate-previous'
+  | 'stop-all';
 
 export type PanelAction =
   | {

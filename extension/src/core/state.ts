@@ -1,4 +1,4 @@
-import type { PanelState, TargetState } from './types.js';
+import type { AutomationState, PanelState, TargetState } from './types.js';
 
 export const EMPTY_TARGET_STATE: TargetState = {
   mode: 'none',
@@ -8,6 +8,16 @@ export const EMPTY_TARGET_STATE: TargetState = {
   selectedHandleId: null,
   selectedDimensions: null,
   message: 'No target selected.',
+};
+
+export const EMPTY_AUTOMATION_STATE: AutomationState = {
+  slideshowPhase: 'idle',
+  slideshowCount: 0,
+  retryPhase: 'idle',
+  retriesUsed: 0,
+  retriesMax: 3,
+  governorStatus: 'ready',
+  requestsInLastMinute: 0,
 };
 
 export function createInitialPanelState(now = Date.now()): PanelState {
@@ -22,6 +32,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     captureInProgress: false,
     captureResult: null,
     storageUsage: null,
+    automation: EMPTY_AUTOMATION_STATE,
   };
 }
 
@@ -46,6 +57,14 @@ export function setTargetState(state: PanelState, target: TargetState, now = Dat
     status: target.picking ? 'picking' : 'ready',
     message: target.message,
     target,
+    lastUpdatedAt: now,
+  };
+}
+
+export function setAutomationState(state: PanelState, automation: Partial<AutomationState>, now = Date.now()): PanelState {
+  return {
+    ...state,
+    automation: { ...state.automation, ...automation },
     lastUpdatedAt: now,
   };
 }

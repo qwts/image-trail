@@ -37,6 +37,41 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     captureSection.append(captureBtn);
   }
 
+  const navSection = document.createElement('div');
+  navSection.className = 'image-trail-panel__nav-actions';
+  const hasTarget = !!state.target.selectedUrl;
+  navSection.append(
+    makeButton('◀ Prev', { name: 'navigate-previous' }, target.dispatch, !hasTarget),
+    makeButton('Next ▶', { name: 'navigate-next' }, target.dispatch, !hasTarget),
+  );
+
+  const autoSection = document.createElement('div');
+  autoSection.className = 'image-trail-panel__automation-actions';
+  const auto = state.automation;
+  if (auto.slideshowPhase === 'running') {
+    autoSection.append(
+      makeButton('Pause slideshow', { name: 'slideshow-pause' }, target.dispatch),
+      makeButton('Stop slideshow', { name: 'slideshow-stop' }, target.dispatch),
+    );
+  } else if (auto.slideshowPhase === 'paused') {
+    autoSection.append(
+      makeButton('Resume slideshow', { name: 'slideshow-resume' }, target.dispatch),
+      makeButton('Stop slideshow', { name: 'slideshow-stop' }, target.dispatch),
+    );
+  } else {
+    autoSection.append(makeButton('Start slideshow', { name: 'slideshow-start' }, target.dispatch, !hasTarget));
+  }
+
+  if (auto.retryPhase === 'running') {
+    autoSection.append(makeButton('Stop retry', { name: 'retry-stop' }, target.dispatch));
+  } else {
+    autoSection.append(makeButton('Retry 404', { name: 'retry-start' }, target.dispatch, !hasTarget));
+  }
+
+  if (auto.slideshowPhase !== 'idle' || auto.retryPhase !== 'idle') {
+    autoSection.append(makeButton('Stop all', { name: 'stop-all' }, target.dispatch));
+  }
+
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__actions';
   actions.append(
@@ -49,6 +84,8 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     createStatusView(state, target.dispatch),
     createTargetPickerView(state.target, target.dispatch),
     captureSection,
+    navSection,
+    autoSection,
     createHistoryView(state.history, state.captureInProgress, target.dispatch),
     createBookmarksView(state.target.selectedUrl, state.bookmarks, state.captureInProgress, target.dispatch),
     actions,

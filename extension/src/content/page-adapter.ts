@@ -153,12 +153,17 @@ export class PageAdapter {
     this.restoreSelectedTarget();
     this.selected = image;
     this.mode = mode;
+    const handleId = createTargetImageInfo(image)?.handleId;
+    if (handleId) image.setAttribute('data-image-trail-handle', handleId);
     markSelectedTarget(image);
     this.watchSelectedLoad(image);
   }
 
   private restoreSelectedTarget(): void {
-    if (this.selected) restoreElementStyles(this.selected);
+    if (this.selected) {
+      this.selected.removeAttribute('data-image-trail-handle');
+      restoreElementStyles(this.selected);
+    }
     this.clearPendingLoadTarget();
     this.selected = null;
   }

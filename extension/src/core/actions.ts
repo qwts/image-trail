@@ -1,7 +1,7 @@
 import { createDisplayRecord } from './display-records.js';
 import type { ImageDisplayRecord } from './display-records.js';
 import { isCapturedResult } from './image/capture-result.js';
-import { closePanel, showPanel } from './state.js';
+import { closePanel, EMPTY_AUTOMATION_STATE, showPanel } from './state.js';
 import type { PanelAction, PanelState } from './types.js';
 
 function updateRecordCapture(
@@ -94,5 +94,22 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return { ...state, storageUsage: action.usage, lastUpdatedAt: Date.now() };
     case 'undo-last':
       return state;
+    case 'slideshow-start':
+      return { ...state, automation: { ...state.automation, slideshowPhase: 'running', slideshowCount: 0 }, lastUpdatedAt: Date.now() };
+    case 'slideshow-stop':
+      return { ...state, automation: { ...state.automation, slideshowPhase: 'stopped' }, lastUpdatedAt: Date.now() };
+    case 'slideshow-pause':
+      return { ...state, automation: { ...state.automation, slideshowPhase: 'paused' }, lastUpdatedAt: Date.now() };
+    case 'slideshow-resume':
+      return { ...state, automation: { ...state.automation, slideshowPhase: 'running' }, lastUpdatedAt: Date.now() };
+    case 'retry-start':
+      return { ...state, automation: { ...state.automation, retryPhase: 'running', retriesUsed: 0 }, lastUpdatedAt: Date.now() };
+    case 'retry-stop':
+      return { ...state, automation: { ...state.automation, retryPhase: 'stopped' }, lastUpdatedAt: Date.now() };
+    case 'navigate-next':
+    case 'navigate-previous':
+      return state;
+    case 'stop-all':
+      return { ...state, automation: { ...EMPTY_AUTOMATION_STATE }, lastUpdatedAt: Date.now() };
   }
 }

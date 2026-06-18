@@ -49,5 +49,27 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
     wrapper.append(usage);
   }
 
+  const auto = state.automation;
+  if (auto.slideshowPhase !== 'idle') {
+    const slideshow = document.createElement('p');
+    slideshow.className = 'image-trail-panel__automation-status';
+    slideshow.textContent = `Slideshow: ${auto.slideshowPhase} (${auto.slideshowCount} shown)`;
+    wrapper.append(slideshow);
+  }
+
+  if (auto.retryPhase !== 'idle') {
+    const retry = document.createElement('p');
+    retry.className = 'image-trail-panel__automation-status';
+    retry.textContent = `Retry: ${auto.retryPhase} (${auto.retriesUsed}/${auto.retriesMax})`;
+    wrapper.append(retry);
+  }
+
+  if (auto.governorStatus !== 'ready') {
+    const governor = document.createElement('p');
+    governor.className = 'image-trail-panel__automation-status';
+    governor.textContent = `Rate limit: ${auto.governorStatus} (${auto.requestsInLastMinute} req/min)`;
+    wrapper.append(governor);
+  }
+
   return wrapper;
 }
