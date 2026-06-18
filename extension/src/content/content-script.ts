@@ -2,9 +2,31 @@ import { createStatusMessage, createUnknownMessageResponse, isExtensionRequest, 
 import { PageAdapter } from './page-adapter.js';
 import { ImageTrailPanel } from '../ui/panel.js';
 
+interface ContentPanel {
+  readonly visible: boolean;
+  readonly statusMessage: string;
+  readonly toggle: () => { readonly visible: boolean; readonly message: string };
+  readonly disconnect: () => void;
+}
+
 interface ImageTrailContentController {
-  readonly panel: ImageTrailPanel;
+  readonly panel: ContentPanel;
   readonly destroy: () => void;
+}
+
+type ContentMessageHandler = (message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void) => boolean;
+
+type ContentControllerFactory = () => ContentPanel;
+
+interface ContentMessagePort {
+  readonly addListener: (handler: ContentMessageHandler) => void;
+  readonly removeListener: (handler: ContentMessageHandler) => void;
+}
+
+interface ContentScriptRuntime {
+  readonly window: Window;
+  readonly onMessage: ContentMessagePort;
+  readonly createPanel: ContentControllerFactory;
 }
 
 declare global {
@@ -13,11 +35,15 @@ declare global {
   }
 }
 
-function createController(): ImageTrailContentController {
+function defaultCreatePanel(): ContentPanel {
   const pageAdapter = new PageAdapter();
-  const panel = new ImageTrailPanel(pageAdapter);
+  return new ImageTrailPanel(pageAdapter);
+}
 
-  const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
+function createController(runtime: ContentScriptRuntime): ImageTrailContentController {
+  const panel = runtime.createPanel();
+
+  const handleMessage: ContentMessageHandler = (message, _sender, sendResponse) => {
     if (!isExtensionRequest(message)) {
       sendResponse(createUnknownMessageResponse('Unsupported Image Trail message.'));
       return false;
@@ -36,17 +62,35 @@ function createController(): ImageTrailContentController {
   };
 
   const destroy = (): void => {
-    chrome.runtime.onMessage.removeListener(handleMessage);
+    runtime.onMessage.removeListener(handleMessage);
+    runtime.window.removeEventListener('pagehide', destroy);
     panel.disconnect();
-    delete window.__imageTrailContentController;
+    delete runtime.window.__imageTrailContentController;
   };
 
-  chrome.runtime.onMessage.addListener(handleMessage);
-  window.addEventListener('pagehide', destroy, { once: true });
+  runtime.onMessage.addListener(handleMessage);
+  runtime.window.addEventListener('pagehide', destroy, { once: true });
 
   return { panel, destroy };
 }
 
-if (!window.__imageTrailContentController) {
-  window.__imageTrailContentController = createController();
+export function initContentScript(runtime: Partial<ContentScriptRuntime> = {}): ImageTrailContentController | undefined {
+  const targetWindow = runtime.window ?? (typeof window === 'undefined' ? undefined : window);
+  const onMessage = runtime.onMessage ?? (typeof chrome === 'undefined' ? undefined : chrome.runtime?.onMessage);
+
+  if (!targetWindow || !onMessage) {
+    return undefined;
+  }
+
+  if (!targetWindow.__imageTrailContentController) {
+    targetWindow.__imageTrailContentController = createController({
+      window: targetWindow,
+      onMessage,
+      createPanel: runtime.createPanel ?? defaultCreatePanel,
+    });
+  }
+
+  return targetWindow.__imageTrailContentController;
 }
+
+initContentScript();
