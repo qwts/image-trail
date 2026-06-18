@@ -6,6 +6,7 @@ import type { StoredBlobRecord } from '../data/types.js';
 import { fetchImageBytes } from './fetch-image.js';
 import {
   MessageType,
+  createCaptureImageMessage,
   createCaptureResultMessage,
   createDeleteBlobResultMessage,
   createPingMessage,
@@ -14,8 +15,8 @@ import {
   isExtensionRequest,
   isStatusMessage,
 } from './messages.js';
-import type { CaptureImageMessage, DeleteBlobMessage } from './messages.js';
-import { extractOrigin, hasOriginPermission } from './permissions.js';
+import type { CaptureImageMessage, DeleteBlobMessage, GrantPermissionAndCaptureMessage } from './messages.js';
+import { extractOrigin, hasOriginPermission, requestOriginPermission } from './permissions.js';
 
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
@@ -115,6 +116,24 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
   return new BlobsRepository(db).getStorageUsage();
 }
 
+async function handleGrantPermissionAndCapture(
+  message: GrantPermissionAndCaptureMessage,
+): Promise<import('../core/image/capture-result.js').CaptureResult> {
+  const { url, sourceType, sourceRecordId } = message.payload;
+  const origin = extractOrigin(url);
+
+  if (!origin) {
+    return { status: 'failed', reason: 'unknown', message: 'Could not extract origin from URL.' };
+  }
+
+  const granted = await requestOriginPermission(origin);
+  if (!granted) {
+    return { status: 'failed', reason: 'permission-needed', message: 'Permission was not granted.' };
+  }
+
+  return handleCaptureImage(createCaptureImageMessage(url, sourceType, sourceRecordId));
+}
+
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   if (!isExtensionRequest(message)) return false;
 
@@ -135,6 +154,14 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleDeleteBlob(message)
         .then(({ deleted, usage }) => sendResponse(createDeleteBlobResultMessage(deleted, usage)))
         .catch(() => sendResponse(createDeleteBlobResultMessage(false, { totalBytes: 0, blobCount: 0 })));
+      return true;
+
+    case MessageType.GrantPermissionAndCapture:
+      handleGrantPermissionAndCapture(message)
+        .then((result) => sendResponse(createCaptureResultMessage(result)))
+        .catch(() =>
+          sendResponse(createCaptureResultMessage({ status: 'failed', reason: 'unknown', message: 'Internal permission/capture error.' })),
+        );
       return true;
 
     default:

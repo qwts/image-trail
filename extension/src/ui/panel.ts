@@ -4,6 +4,7 @@ import { createDisplayRecord } from '../core/display-records.js';
 import { reducePanelAction } from '../core/actions.js';
 import { createInitialPanelState, setTargetState } from '../core/state.js';
 import type { BookmarkStore, PanelAction, PanelState, TargetState } from '../core/types.js';
+import { isCapturedResult } from '../core/image/capture-result.js';
 import { renderPanel } from './render.js';
 
 const ROOT_ID = 'image-trail-panel-root';
@@ -168,6 +169,12 @@ export class ImageTrailPanel {
     this.render();
     const result = await this.captureStore.requestCapture(url, sourceType, sourceRecordId);
     this.state = reducePanelAction(this.state, { name: 'capture/complete', result, sourceRecordId });
+    if (isCapturedResult(result) && sourceType === 'bookmark' && sourceRecordId && this.bookmarkStore) {
+      const updatedBookmark = this.state.bookmarks.find((b) => b.id === sourceRecordId);
+      if (updatedBookmark) {
+        await this.bookmarkStore.save(updatedBookmark);
+      }
+    }
     await this.refreshStorageUsage();
     this.render();
   }

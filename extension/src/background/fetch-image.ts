@@ -58,7 +58,35 @@ export async function fetchImageBytes(url: string, maxBytes: number = DEFAULT_MA
 
   let bytes: ArrayBuffer;
   try {
-    bytes = await response.arrayBuffer();
+    if (!response.body) {
+      // Fallback for environments where ReadableStream is unavailable.
+      bytes = await response.arrayBuffer();
+    } else {
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let totalBytes = 0;
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        totalBytes += value.byteLength;
+        if (totalBytes > maxBytes) {
+          await reader.cancel();
+          return { ok: false, reason: 'too-large', message: `Actual size exceeds limit of ${maxBytes} bytes.` };
+        }
+        chunks.push(value);
+      }
+
+      // Concatenate chunks into a single ArrayBuffer.
+      const merged = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      bytes = merged.buffer;
+    }
   } catch {
     return { ok: false, reason: 'network-error', message: 'Failed to read response body.' };
   }

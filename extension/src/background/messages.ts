@@ -11,6 +11,7 @@ export const MessageType = {
   StorageUsageResponse: 'imageTrail.storageUsageResponse',
   DeleteBlob: 'imageTrail.deleteBlob',
   DeleteBlobResult: 'imageTrail.deleteBlobResult',
+  GrantPermissionAndCapture: 'imageTrail.grantPermissionAndCapture',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -81,7 +82,23 @@ export interface DeleteBlobResultMessage {
   readonly payload: { readonly deleted: boolean; readonly usage: import('../core/image/capture-result.js').StorageUsageSummary };
 }
 
-export type ExtensionRequest = TogglePanelMessage | PingMessage | CaptureImageMessage | StorageUsageRequestMessage | DeleteBlobMessage;
+export interface GrantPermissionAndCaptureMessage {
+  readonly type: typeof MessageType.GrantPermissionAndCapture;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: {
+    readonly url: string;
+    readonly sourceType: CaptureSourceType;
+    readonly sourceRecordId?: string;
+  };
+}
+
+export type ExtensionRequest =
+  | TogglePanelMessage
+  | PingMessage
+  | CaptureImageMessage
+  | StorageUsageRequestMessage
+  | DeleteBlobMessage
+  | GrantPermissionAndCaptureMessage;
 export type ExtensionResponse =
   | StatusMessage
   | UnknownMessageResponse
@@ -128,6 +145,14 @@ export function createDeleteBlobMessage(blobId: string): DeleteBlobMessage {
   return { type: MessageType.DeleteBlob, version: MESSAGE_PROTOCOL_VERSION, payload: { blobId } };
 }
 
+export function createGrantPermissionAndCaptureMessage(
+  url: string,
+  sourceType: CaptureSourceType,
+  sourceRecordId?: string,
+): GrantPermissionAndCaptureMessage {
+  return { type: MessageType.GrantPermissionAndCapture, version: MESSAGE_PROTOCOL_VERSION, payload: { url, sourceType, sourceRecordId } };
+}
+
 export function createDeleteBlobResultMessage(
   deleted: boolean,
   usage: import('../core/image/capture-result.js').StorageUsageSummary,
@@ -148,7 +173,8 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.Ping ||
     value.type === MessageType.CaptureImage ||
     value.type === MessageType.StorageUsageRequest ||
-    value.type === MessageType.DeleteBlob
+    value.type === MessageType.DeleteBlob ||
+    value.type === MessageType.GrantPermissionAndCapture
   );
 }
 
