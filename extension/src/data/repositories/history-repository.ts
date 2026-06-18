@@ -25,6 +25,13 @@ export class HistoryRepository {
     return result;
   }
 
+  async listEncrypted(): Promise<readonly EncryptedHistoryRecord[]> {
+    const transaction = this.db.transaction(DataStore.History, 'readonly');
+    const result = await requestToPromise<EncryptedHistoryRecord[]>(transaction.objectStore(DataStore.History).getAll());
+    await transactionDone(transaction);
+    return result;
+  }
+
   async sealAndPut(
     uuid: string,
     payload: DurableHistoryPayloadV1,
