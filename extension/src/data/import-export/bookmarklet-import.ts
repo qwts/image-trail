@@ -30,10 +30,7 @@ export function parseBookmarkletJson(raw: string): BookmarkletJsonPayload {
   };
 }
 
-export function importBookmarkletJson(
-  raw: string,
-  now: string = new Date().toISOString(),
-): BookmarkletImportResult {
+export function importBookmarkletJson(raw: string, now: string = new Date().toISOString()): BookmarkletImportResult {
   let data: BookmarkletJsonPayload;
   try {
     data = parseBookmarkletJson(raw);

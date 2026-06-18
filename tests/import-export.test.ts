@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createPasswordSalt, deriveWrappingKey, wrapKeyWithPassword, unwrapKeyWithPassword, PBKDF2_ITERATIONS } from '../extension/src/data/crypto/password-wrap.js';
+import {
+  createPasswordSalt,
+  deriveWrappingKey,
+  wrapKeyWithPassword,
+  unwrapKeyWithPassword,
+  PBKDF2_ITERATIONS,
+} from '../extension/src/data/crypto/password-wrap.js';
 import { generateAesGcmKey, getCrypto } from '../extension/src/data/crypto/webcrypto.js';
 import {
   buildExportFileHeader,
@@ -35,9 +41,7 @@ test('password-wrap: wraps and unwraps an AES-GCM key with password', async () =
   assert.equal(wrapped.salt.byteLength, 16);
   assert.equal(wrapped.iv.byteLength, 12);
 
-  const unwrapped = await unwrapKeyWithPassword(
-    wrapped.wrappedKey, wrapped.iv, 'my-password', wrapped.salt, wrapped.iterations,
-  );
+  const unwrapped = await unwrapKeyWithPassword(wrapped.wrappedKey, wrapped.iv, 'my-password', wrapped.salt, wrapped.iterations);
   const rawUnwrapped = new Uint8Array(await getCrypto().subtle.exportKey('raw', unwrapped));
   assert.deepEqual(rawUnwrapped, rawOriginal);
 });
@@ -46,9 +50,7 @@ test('password-wrap: rejects unwrap with wrong password', async () => {
   const original = await generateAesGcmKey(true);
   const wrapped = await wrapKeyWithPassword(original, 'correct-password');
 
-  await assert.rejects(
-    unwrapKeyWithPassword(wrapped.wrappedKey, wrapped.iv, 'wrong-password', wrapped.salt, wrapped.iterations),
-  );
+  await assert.rejects(unwrapKeyWithPassword(wrapped.wrappedKey, wrapped.iv, 'wrong-password', wrapped.salt, wrapped.iterations));
 });
 
 test('encrypted-file-format: builds and validates header with magic and version', () => {
@@ -142,10 +144,12 @@ test('history-export: exports and history-import decrypts with correct password'
 
 test('history-import: rejects wrong password', async () => {
   const exportResult = await exportEncryptedHistory({
-    entries: [{
-      uuid: 'entry-1',
-      payload: { url: 'https://example.test/001.jpg', capturedAt: '2026-06-18T00:00:00.000Z', captureStatus: 'remote-only' as const },
-    }],
+    entries: [
+      {
+        uuid: 'entry-1',
+        payload: { url: 'https://example.test/001.jpg', capturedAt: '2026-06-18T00:00:00.000Z', captureStatus: 'remote-only' as const },
+      },
+    ],
     password: 'correct-password',
   });
 
@@ -168,9 +172,7 @@ test('bookmarklet-import: imports favorites and deduplicates URLs', () => {
       { url: 'https://example.test/b.jpg' },
       { url: 'https://example.test/a.jpg', title: 'Duplicate A' },
     ],
-    history: [
-      { url: 'https://example.test/c.jpg', title: 'History C' },
-    ],
+    history: [{ url: 'https://example.test/c.jpg', title: 'History C' }],
   });
 
   const result = importBookmarkletJson(json, '2026-06-18T00:00:00.000Z');
@@ -183,11 +185,7 @@ test('bookmarklet-import: imports favorites and deduplicates URLs', () => {
 
 test('bookmarklet-import: skips invalid URLs', () => {
   const json = JSON.stringify({
-    favorites: [
-      { url: 'https://example.test/valid.jpg' },
-      { url: 'not-a-url' },
-      { url: '' },
-    ],
+    favorites: [{ url: 'https://example.test/valid.jpg' }, { url: 'not-a-url' }, { url: '' }],
   });
 
   const result = importBookmarkletJson(json);

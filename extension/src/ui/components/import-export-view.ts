@@ -12,10 +12,7 @@ export interface ImportExportViewState {
   readonly lastMessageIsError?: boolean;
 }
 
-export function createImportExportView(
-  state: ImportExportViewState,
-  dispatch: (action: ImportExportAction) => void,
-): HTMLElement {
+export function createImportExportView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
   const section = document.createElement('section');
   section.className = 'image-trail-panel__section';
 
@@ -25,25 +22,17 @@ export function createImportExportView(
 
   if (state.lastMessage) {
     const msg = document.createElement('p');
-    msg.className = state.lastMessageIsError
-      ? 'image-trail-panel__meta image-trail-panel__error'
-      : 'image-trail-panel__meta';
+    msg.className = state.lastMessageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
     msg.textContent = state.lastMessage;
     section.append(msg);
   }
 
-  section.append(
-    createExportGroup(state, dispatch),
-    createImportGroup(state, dispatch),
-  );
+  section.append(createExportGroup(state, dispatch), createImportGroup(state, dispatch));
 
   return section;
 }
 
-function createExportGroup(
-  state: ImportExportViewState,
-  dispatch: (action: ImportExportAction) => void,
-): HTMLElement {
+function createExportGroup(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
   const group = document.createElement('div');
   group.className = 'image-trail-panel__subsection';
 
@@ -81,10 +70,7 @@ function createExportGroup(
   return group;
 }
 
-function createImportGroup(
-  state: ImportExportViewState,
-  dispatch: (action: ImportExportAction) => void,
-): HTMLElement {
+function createImportGroup(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
   const group = document.createElement('div');
   group.className = 'image-trail-panel__subsection';
 

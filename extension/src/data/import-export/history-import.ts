@@ -14,10 +14,7 @@ export interface HistoryImportResult {
   readonly skipped: readonly string[];
 }
 
-export async function importEncryptedHistory(
-  fileContent: string,
-  password: string,
-): Promise<HistoryImportResult> {
+export async function importEncryptedHistory(fileContent: string, password: string): Promise<HistoryImportResult> {
   const fail = (message: string): HistoryImportResult => ({
     status: { ok: false, code: 'decryption-failed', message },
     entries: [],
@@ -87,8 +84,6 @@ function isValidHistoryEntry(value: unknown): value is HistoryImportEntry {
   if (typeof obj.payload !== 'object' || obj.payload === null) return false;
   const payload = obj.payload as Record<string, unknown>;
   return (
-    typeof payload.url === 'string' &&
-    typeof payload.capturedAt === 'string' &&
-    VALID_CAPTURE_STATUSES.has(payload.captureStatus as string)
+    typeof payload.url === 'string' && typeof payload.capturedAt === 'string' && VALID_CAPTURE_STATUSES.has(payload.captureStatus as string)
   );
 }

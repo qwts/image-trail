@@ -1,12 +1,7 @@
 import { createAesGcmIv, encryptAesGcm, getCrypto } from '../crypto/webcrypto.js';
 import { createPasswordSalt, deriveEncryptionKey } from '../crypto/password-wrap.js';
 import type { RecoverableDataStatus } from '../types.js';
-import {
-  buildExportFileHeader,
-  serializeExportFile,
-  toBase64,
-  type ExportFileEnvelope,
-} from './encrypted-file-format.js';
+import { buildExportFileHeader, serializeExportFile, toBase64, type ExportFileEnvelope } from './encrypted-file-format.js';
 
 export interface KeyExportInput {
   readonly key: CryptoKey;

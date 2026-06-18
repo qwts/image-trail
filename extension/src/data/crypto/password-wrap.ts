@@ -20,10 +20,7 @@ async function importPasswordKey(password: string): Promise<CryptoKey> {
   return getCrypto().subtle.importKey('raw', encoded, 'PBKDF2', false, ['deriveKey']);
 }
 
-export async function deriveWrappingKey(
-  password: string,
-  params: PasswordDeriveParams,
-): Promise<CryptoKey> {
+export async function deriveWrappingKey(password: string, params: PasswordDeriveParams): Promise<CryptoKey> {
   const baseKey = await importPasswordKey(password);
   return getCrypto().subtle.deriveKey(
     { name: 'PBKDF2', salt: params.salt as BufferSource, iterations: params.iterations, hash: 'SHA-256' },
@@ -34,10 +31,7 @@ export async function deriveWrappingKey(
   );
 }
 
-export async function deriveEncryptionKey(
-  password: string,
-  params: PasswordDeriveParams,
-): Promise<CryptoKey> {
+export async function deriveEncryptionKey(password: string, params: PasswordDeriveParams): Promise<CryptoKey> {
   const baseKey = await importPasswordKey(password);
   return getCrypto().subtle.deriveKey(
     { name: 'PBKDF2', salt: params.salt as BufferSource, iterations: params.iterations, hash: 'SHA-256' },

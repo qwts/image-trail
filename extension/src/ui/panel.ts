@@ -295,9 +295,18 @@ export class ImageTrailPanel {
     const image = this.findSelectedImage(snapshot.selected.handleId);
     if (!image) return false;
     return new Promise<boolean>((resolve) => {
-      const onLoad = () => { cleanup(); resolve(true); };
-      const onError = () => { cleanup(); resolve(false); };
-      const cleanup = () => { image.removeEventListener('load', onLoad); image.removeEventListener('error', onError); };
+      const onLoad = () => {
+        cleanup();
+        resolve(true);
+      };
+      const onError = () => {
+        cleanup();
+        resolve(false);
+      };
+      const cleanup = () => {
+        image.removeEventListener('load', onLoad);
+        image.removeEventListener('error', onError);
+      };
       image.addEventListener('load', onLoad, { once: true });
       image.addEventListener('error', onError, { once: true });
       const currentSrc = image.src;

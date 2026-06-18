@@ -30,9 +30,7 @@ export interface RecallResult {
   readonly entry?: RecalledEntry;
 }
 
-export async function recallEncryptedRecord<T extends RecallRecordType>(
-  input: RecallInput<T>,
-): Promise<RecallResult> {
+export async function recallEncryptedRecord<T extends RecallRecordType>(input: RecallInput<T>): Promise<RecallResult> {
   try {
     if (input.recordType === 'history') {
       const payload = await openJsonEnvelope<DurableHistoryPayloadV1>(input.envelope, input.key);
@@ -60,9 +58,7 @@ export interface BatchRecallResult {
   readonly failed: readonly string[];
 }
 
-export async function recallSelectedRecords(
-  inputs: readonly RecallInput<RecallRecordType>[],
-): Promise<BatchRecallResult> {
+export async function recallSelectedRecords(inputs: readonly RecallInput<RecallRecordType>[]): Promise<BatchRecallResult> {
   const entries: RecalledEntry[] = [];
   const failed: string[] = [];
 

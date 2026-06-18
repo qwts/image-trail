@@ -66,10 +66,7 @@ export interface DecryptedDownloadResult {
   readonly sourceUrl: string;
 }
 
-export async function openEncryptedDownload(
-  fileContent: string,
-  password: string,
-): Promise<DecryptedDownloadResult> {
+export async function openEncryptedDownload(fileContent: string, password: string): Promise<DecryptedDownloadResult> {
   const envelope = parseExportFile(fileContent);
   const salt = fromBase64(envelope.header.salt);
   const iv = fromBase64(envelope.header.iv);

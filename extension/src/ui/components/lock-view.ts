@@ -11,10 +11,7 @@ export interface LockViewState {
   readonly recallableCount: number;
 }
 
-export function createLockView(
-  state: LockViewState,
-  dispatch: (action: LockAction) => void,
-): HTMLElement {
+export function createLockView(state: LockViewState, dispatch: (action: LockAction) => void): HTMLElement {
   const section = document.createElement('section');
   section.className = 'image-trail-panel__section';
 

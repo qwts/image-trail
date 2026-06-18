@@ -11,10 +11,7 @@ export interface KeyImportResult {
   readonly keyKind?: KeyKind;
 }
 
-export async function importKeyWithPassword(
-  fileContent: string,
-  password: string,
-): Promise<KeyImportResult> {
+export async function importKeyWithPassword(fileContent: string, password: string): Promise<KeyImportResult> {
   let envelope;
   try {
     envelope = parseExportFile(fileContent);
@@ -38,13 +35,10 @@ export async function importKeyWithPassword(
 
     const rawKeyBytes = await decryptAesGcm(encryptionKey, ciphertext, iv);
 
-    const key = await getCrypto().subtle.importKey(
-      'raw',
-      rawKeyBytes as BufferSource,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt'],
-    );
+    const key = await getCrypto().subtle.importKey('raw', rawKeyBytes as BufferSource, { name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ]);
 
     return {
       status: { ok: true, code: 'ok', message: 'Key imported successfully.' },

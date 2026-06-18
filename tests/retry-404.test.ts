@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { Retry404 } from '../extension/src/core/automation/retry-404.js';
 
 test('retry starts in idle phase', () => {
-  const retry = new Retry404(async () => true, () => {}, () => {});
+  const retry = new Retry404(
+    async () => true,
+    () => {},
+    () => {},
+  );
   assert.equal(retry.currentPhase, 'idle');
   assert.equal(retry.retriesUsed, 0);
 });
@@ -11,9 +15,14 @@ test('retry starts in idle phase', () => {
 test('retry transitions to running on start', () => {
   const phases: string[] = [];
   const retry = new Retry404(
-    async () => { await new Promise((r) => setTimeout(r, 500)); return true; },
+    async () => {
+      await new Promise((r) => setTimeout(r, 500));
+      return true;
+    },
     () => {},
-    (phase) => { phases.push(phase); },
+    (phase) => {
+      phases.push(phase);
+    },
   );
   retry.start();
   assert.equal(retry.currentPhase, 'running');
@@ -23,9 +32,14 @@ test('retry transitions to running on start', () => {
 test('retry stops and transitions to stopped', () => {
   const phases: string[] = [];
   const retry = new Retry404(
-    async () => { await new Promise((r) => setTimeout(r, 500)); return false; },
+    async () => {
+      await new Promise((r) => setTimeout(r, 500));
+      return false;
+    },
     () => {},
-    (phase) => { phases.push(phase); },
+    (phase) => {
+      phases.push(phase);
+    },
   );
   retry.start();
   retry.stop();
@@ -38,7 +52,9 @@ test('retry resolves to idle on successful load', async () => {
   const retry = new Retry404(
     async () => true,
     () => {},
-    (phase) => { phases.push(phase); },
+    (phase) => {
+      phases.push(phase);
+    },
     { maxRetries: 3, retryDelayMs: 10, advanceOnExhaust: false },
   );
   retry.start();
@@ -52,8 +68,12 @@ test('retry exhausts after maxRetries failures', async () => {
   let advanceCalled = false;
   const retry = new Retry404(
     async () => false,
-    () => { advanceCalled = true; },
-    (phase) => { phases.push(phase); },
+    () => {
+      advanceCalled = true;
+    },
+    (phase) => {
+      phases.push(phase);
+    },
     { maxRetries: 2, retryDelayMs: 10, advanceOnExhaust: true },
   );
   retry.start();
@@ -66,7 +86,10 @@ test('retry exhausts after maxRetries failures', async () => {
 test('stop prevents stale completion from overwriting phase', async () => {
   let resolveLoad: (v: boolean) => void = () => {};
   const retry = new Retry404(
-    () => new Promise<boolean>((r) => { resolveLoad = r; }),
+    () =>
+      new Promise<boolean>((r) => {
+        resolveLoad = r;
+      }),
     () => {},
     () => {},
     { maxRetries: 3, retryDelayMs: 10, advanceOnExhaust: false },
@@ -81,7 +104,11 @@ test('stop prevents stale completion from overwriting phase', async () => {
 });
 
 test('destroy resets to idle', () => {
-  const retry = new Retry404(async () => true, () => {}, () => {});
+  const retry = new Retry404(
+    async () => true,
+    () => {},
+    () => {},
+  );
   retry.start();
   retry.destroy();
   assert.equal(retry.currentPhase, 'idle');
