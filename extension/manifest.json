@@ -10,6 +10,14 @@
     "service_worker": "src/background/service-worker.js",
     "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["src/content/content-script.js"],
+      "type": "module",
+      "run_at": "document_idle"
+    }
+  ],
   "permissions": ["activeTab", "scripting"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "web_accessible_resources": [
