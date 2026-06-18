@@ -28,6 +28,7 @@ export type PanelActionName =
   | 'ping-status'
   | 'start-target-picker'
   | 'stop-target-picker'
+  | 'history/add-loaded'
   | 'history/remove'
   | 'bookmark/current'
   | 'bookmark/load'
@@ -35,5 +36,12 @@ export type PanelActionName =
   | 'undo-last';
 
 export type PanelAction =
-  | { readonly name: Exclude<PanelActionName, 'history/remove' | 'bookmark/load' | 'bookmark/remove'> }
+  | { readonly name: Exclude<PanelActionName, 'history/add-loaded' | 'history/remove' | 'bookmark/load' | 'bookmark/remove'> }
+  | { readonly name: 'history/add-loaded'; readonly url: string; readonly title?: string; readonly timestamp?: string }
   | { readonly name: 'history/remove' | 'bookmark/load' | 'bookmark/remove'; readonly id: string };
+
+export interface BookmarkStore {
+  readonly load: () => Promise<readonly ImageDisplayRecord[]>;
+  readonly save: (record: ImageDisplayRecord) => Promise<ImageDisplayRecord>;
+  readonly remove: (record: ImageDisplayRecord) => Promise<void>;
+}

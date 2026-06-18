@@ -44,3 +44,23 @@ test('undo stack returns session restore actions in last-action-first order', ()
   assert.equal(undo.pop()?.action.id, 'second');
   assert.equal(undo.pop(), undefined);
 });
+
+test('target selection alone does not commit runtime history before load success', async () => {
+  const { createInitialPanelState, setTargetState } = await import('../extension/src/core/state.js');
+  const state = createInitialPanelState(0);
+  const selected = setTargetState(
+    state,
+    {
+      mode: 'manual',
+      picking: false,
+      candidateCount: 1,
+      selectedUrl: 'https://example.test/pending.jpg',
+      selectedHandleId: 'target-1',
+      selectedDimensions: '640×480',
+      message: 'Selected pending image.',
+    },
+    1,
+  );
+
+  assert.deepEqual(selected.history, []);
+});

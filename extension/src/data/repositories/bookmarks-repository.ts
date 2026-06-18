@@ -26,6 +26,13 @@ export class BookmarksRepository {
     return result;
   }
 
+  async listEncrypted(): Promise<readonly EncryptedBookmarkRecord[]> {
+    const transaction = this.db.transaction(DataStore.Bookmarks, 'readonly');
+    const result = await requestToPromise<EncryptedBookmarkRecord[]>(transaction.objectStore(DataStore.Bookmarks).getAll());
+    await transactionDone(transaction);
+    return result;
+  }
+
   async getEncryptedByUrl(url: string): Promise<EncryptedBookmarkRecord | undefined> {
     const transaction = this.db.transaction(DataStore.Bookmarks, 'readonly');
     const result = await requestToPromise<EncryptedBookmarkRecord | undefined>(

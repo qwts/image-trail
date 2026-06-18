@@ -1,7 +1,8 @@
 import type { PageAdapter, TargetSelectionSnapshot } from '../content/page-adapter.js';
+import { createDisplayRecord } from '../core/display-records.js';
 import { reducePanelAction } from '../core/actions.js';
 import { createInitialPanelState, setTargetState } from '../core/state.js';
-import type { PanelAction, PanelState, TargetState } from '../core/types.js';
+import type { BookmarkStore, PanelAction, PanelState, TargetState } from '../core/types.js';
 import { renderPanel } from './render.js';
 
 const ROOT_ID = 'image-trail-panel-root';
@@ -24,12 +25,21 @@ export class ImageTrailPanel {
   private root: HTMLElement | null = null;
   private state: PanelState = createInitialPanelState();
   private unsubscribeFromTarget: (() => void) | null = null;
+  private unsubscribeFromLoads: (() => void) | null = null;
 
-  constructor(private readonly pageAdapter: PageAdapter) {
+  constructor(
+    private readonly pageAdapter: PageAdapter,
+    private readonly bookmarkStore: BookmarkStore | null = null,
+  ) {
     this.unsubscribeFromTarget = this.pageAdapter.subscribe((snapshot) => {
       this.state = setTargetState(this.state, toTargetState(snapshot));
       this.render();
     });
+    this.unsubscribeFromLoads = this.pageAdapter.subscribeToSuccessfulLoads((target) => {
+      this.state = reducePanelAction(this.state, { name: 'history/add-loaded', url: target.url });
+      this.render();
+    });
+    void this.loadBookmarks();
   }
 
   get visible(): boolean {
@@ -61,7 +71,16 @@ export class ImageTrailPanel {
     this.destroy();
     this.unsubscribeFromTarget?.();
     this.unsubscribeFromTarget = null;
+    this.unsubscribeFromLoads?.();
+    this.unsubscribeFromLoads = null;
   }
+
+  private loadBookmarks = async (): Promise<void> => {
+    if (!this.bookmarkStore) return;
+    const bookmarks = await this.bookmarkStore.load();
+    this.state = { ...this.state, bookmarks: bookmarks.slice(0, 200) };
+    this.render();
+  };
 
   private dispatch = (action: PanelAction): void => {
     if (action.name === 'start-target-picker') {
@@ -76,6 +95,21 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'bookmark/current') {
+      void this.bookmarkCurrentImage();
+      return;
+    }
+
+    if (action.name === 'bookmark/load') {
+      this.loadBookmark(action.id);
+      return;
+    }
+
+    if (action.name === 'bookmark/remove') {
+      void this.removeBookmark(action.id);
+      return;
+    }
+
     this.state = reducePanelAction(this.state, action);
     if (!this.state.visible) {
       this.cleanupMountedElements();
@@ -85,6 +119,35 @@ export class ImageTrailPanel {
     this.pageAdapter.autoSelectSingleImage();
     this.render();
   };
+
+  private async bookmarkCurrentImage(): Promise<void> {
+    const url = this.state.target.selectedUrl;
+    if (!url) return;
+    const draft = createDisplayRecord({ id: url, url, source: 'bookmark' });
+    const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
+    this.state = {
+      ...this.state,
+      bookmarks: [bookmark, ...this.state.bookmarks.filter((item) => item.url !== bookmark.url)],
+      lastUpdatedAt: Date.now(),
+    };
+    this.render();
+  }
+
+  private loadBookmark(id: string): void {
+    const bookmark = this.state.bookmarks.find((item) => item.id === id);
+    if (!bookmark) return;
+    const snapshot = this.pageAdapter.applyUrlToSelected(bookmark.url);
+    this.state = setTargetState(this.state, toTargetState(snapshot));
+    this.render();
+  }
+
+  private async removeBookmark(id: string): Promise<void> {
+    const bookmark = this.state.bookmarks.find((item) => item.id === id);
+    if (!bookmark) return;
+    await this.bookmarkStore?.remove(bookmark);
+    this.state = reducePanelAction(this.state, { name: 'bookmark/remove', id });
+    this.render();
+  }
 
   private mount(): void {
     if (!this.root) {

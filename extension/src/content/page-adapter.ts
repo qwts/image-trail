@@ -1,3 +1,4 @@
+import { applyImageUrl } from '../core/image/image-navigation.js';
 import { DomObserver } from './dom-observer.js';
 import { createTargetImageInfo, findQualifyingImages, type TargetImageInfo } from './target-image.js';
 import { markHoveredTarget, markPickModeCandidate, markSelectedTarget, restoreElementStyles } from './page-style.js';
@@ -13,6 +14,7 @@ export interface TargetSelectionSnapshot {
 }
 
 export type TargetSelectionListener = (snapshot: TargetSelectionSnapshot) => void;
+export type TargetLoadListener = (target: TargetImageInfo) => void;
 
 export class PageAdapter {
   private selected: HTMLImageElement | null = null;
@@ -23,11 +25,18 @@ export class PageAdapter {
   private lastSnapshot: TargetSelectionSnapshot = this.createSnapshot('No target selected.');
   private readonly observer = new DomObserver(() => this.refreshPickCandidates());
   private readonly listeners = new Set<TargetSelectionListener>();
+  private readonly loadListeners = new Set<TargetLoadListener>();
+  private pendingLoadTarget: HTMLImageElement | null = null;
 
   subscribe(listener: TargetSelectionListener): () => void {
     this.listeners.add(listener);
     listener(this.lastSnapshot);
     return () => this.listeners.delete(listener);
+  }
+
+  subscribeToSuccessfulLoads(listener: TargetLoadListener): () => void {
+    this.loadListeners.add(listener);
+    return () => this.loadListeners.delete(listener);
   }
 
   autoSelectSingleImage(): TargetSelectionSnapshot {
@@ -72,6 +81,16 @@ export class PageAdapter {
 
   getSnapshot(): TargetSelectionSnapshot {
     return this.lastSnapshot;
+  }
+
+  applyUrlToSelected(url: string): TargetSelectionSnapshot {
+    if (!this.selected?.isConnected) {
+      return this.emit('Select a target image before loading a bookmark.');
+    }
+
+    const result = applyImageUrl(this.selected, url);
+    this.watchSelectedLoad(this.selected);
+    return this.emit(result.message);
   }
 
   private refreshPickCandidates(): TargetSelectionSnapshot {
@@ -135,11 +154,50 @@ export class PageAdapter {
     this.selected = image;
     this.mode = mode;
     markSelectedTarget(image);
+    this.watchSelectedLoad(image);
   }
 
   private restoreSelectedTarget(): void {
     if (this.selected) restoreElementStyles(this.selected);
+    this.clearPendingLoadTarget();
     this.selected = null;
+  }
+
+  private watchSelectedLoad(image: HTMLImageElement): void {
+    this.clearPendingLoadTarget();
+    if (isSuccessfulImageLoad(image)) {
+      this.emitSuccessfulLoad(image);
+      return;
+    }
+
+    this.pendingLoadTarget = image;
+    image.addEventListener('load', this.onSelectedLoad, { once: true });
+    image.addEventListener('error', this.onSelectedError, { once: true });
+  }
+
+  private clearPendingLoadTarget(): void {
+    if (!this.pendingLoadTarget) return;
+    this.pendingLoadTarget.removeEventListener('load', this.onSelectedLoad);
+    this.pendingLoadTarget.removeEventListener('error', this.onSelectedError);
+    this.pendingLoadTarget = null;
+  }
+
+  private onSelectedLoad = (event: Event): void => {
+    const image = event.currentTarget;
+    if (image instanceof HTMLImageElement && image === this.selected && isSuccessfulImageLoad(image)) {
+      this.emitSuccessfulLoad(image);
+    }
+    this.clearPendingLoadTarget();
+  };
+
+  private onSelectedError = (event: Event): void => {
+    if (event.currentTarget === this.pendingLoadTarget) this.clearPendingLoadTarget();
+  };
+
+  private emitSuccessfulLoad(image: HTMLImageElement): void {
+    const target = createTargetImageInfo(image);
+    if (!target) return;
+    for (const listener of this.loadListeners) listener(target);
   }
 
   private clearHover(): void {
@@ -166,4 +224,8 @@ export class PageAdapter {
     for (const listener of this.listeners) listener(this.lastSnapshot);
     return this.lastSnapshot;
   }
+}
+
+function isSuccessfulImageLoad(image: HTMLImageElement): boolean {
+  return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
 }

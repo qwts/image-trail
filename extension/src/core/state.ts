@@ -1,4 +1,3 @@
-import { createDisplayRecord } from './display-records.js';
 import type { PanelState, TargetState } from './types.js';
 
 export const EMPTY_TARGET_STATE: TargetState = {
@@ -39,24 +38,11 @@ export function closePanel(state: PanelState, now = Date.now()): PanelState {
 }
 
 export function setTargetState(state: PanelState, target: TargetState, now = Date.now()): PanelState {
-  const selectedUrlChanged = target.selectedUrl !== null && target.selectedUrl !== state.target.selectedUrl;
-  const history = selectedUrlChanged
-    ? [
-        createDisplayRecord({
-          url: target.selectedUrl,
-          timestamp: new Date(now).toISOString(),
-          source: 'history',
-        }),
-        ...state.history.filter((item) => item.url !== target.selectedUrl),
-      ].slice(0, 30)
-    : state.history;
-
   return {
     ...state,
     status: target.picking ? 'picking' : 'ready',
     message: target.message,
     target,
-    history,
     lastUpdatedAt: now,
   };
 }

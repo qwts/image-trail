@@ -147,6 +147,7 @@ test('BookmarksRepository writes encrypted records and dedupes by URL index', as
   await repository.putEncrypted(record);
 
   assert.deepEqual(await repository.getEncrypted(record.uuid), record);
+  assert.deepEqual(await repository.listEncrypted(), [record]);
   assert.deepEqual(await repository.getEncryptedByUrl(record.url), record);
   assert.equal(await repository.getEncryptedByUrl('https://example.test/missing.jpg'), undefined);
 });

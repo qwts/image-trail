@@ -1,5 +1,6 @@
 import { createStatusMessage, createUnknownMessageResponse, isExtensionRequest, MessageType } from '../background/messages.js';
 import { PageAdapter } from './page-adapter.js';
+import { IndexedDbBookmarkStore } from './bookmarks-controller.js';
 import { ImageTrailPanel } from '../ui/panel.js';
 
 interface ImageTrailContentController {
@@ -15,7 +16,7 @@ declare global {
 
 function createController(): ImageTrailContentController {
   const pageAdapter = new PageAdapter();
-  const panel = new ImageTrailPanel(pageAdapter);
+  const panel = new ImageTrailPanel(pageAdapter, new IndexedDbBookmarkStore());
 
   const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
     if (!isExtensionRequest(message)) {
