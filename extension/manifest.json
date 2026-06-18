@@ -11,11 +11,11 @@
     "type": "module"
   },
   "permissions": ["activeTab", "scripting"],
-  "host_permissions": ["http://*/*", "https://*/*"],
   "web_accessible_resources": [
     {
       "resources": ["src/ui/styles/panel.css"],
       "matches": ["http://*/*", "https://*/*"]
     }
-  ]
+  ],
+  "optional_host_permissions": ["http://*/*", "https://*/*"]
 }

@@ -1,3 +1,6 @@
+import type { ImageDisplayRecord } from './display-records.js';
+import type { CaptureResult, StorageUsageSnapshot } from './image/image-metadata.js';
+
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 
 export interface TargetState {
@@ -16,10 +19,51 @@ export interface PanelState {
   readonly message: string;
   readonly lastUpdatedAt: number;
   readonly target: TargetState;
+  readonly history: readonly ImageDisplayRecord[];
+  readonly bookmarks: readonly ImageDisplayRecord[];
+  readonly storageUsage: StorageUsageSnapshot | null;
 }
 
-export type PanelActionName = 'toggle-panel' | 'close-panel' | 'ping-status' | 'start-target-picker' | 'stop-target-picker';
+export type PanelActionName =
+  | 'toggle-panel'
+  | 'close-panel'
+  | 'ping-status'
+  | 'start-target-picker'
+  | 'stop-target-picker'
+  | 'history/add-loaded'
+  | 'history/remove'
+  | 'bookmark/current'
+  | 'bookmark/load'
+  | 'bookmark/remove'
+  | 'capture/current'
+  | 'capture/history'
+  | 'capture/bookmark'
+  | 'capture/result'
+  | 'undo-last';
 
-export interface PanelAction {
-  readonly name: PanelActionName;
+export type PanelAction =
+  | {
+      readonly name: Exclude<
+        PanelActionName,
+        | 'history/add-loaded'
+        | 'history/remove'
+        | 'bookmark/load'
+        | 'bookmark/remove'
+        | 'capture/history'
+        | 'capture/bookmark'
+        | 'capture/result'
+      >;
+    }
+  | { readonly name: 'history/add-loaded'; readonly url: string; readonly title?: string; readonly timestamp?: string }
+  | { readonly name: 'history/remove' | 'bookmark/load' | 'bookmark/remove' | 'capture/history' | 'capture/bookmark'; readonly id: string }
+  | { readonly name: 'capture/result'; readonly result: CaptureResult };
+
+export interface BookmarkStore {
+  readonly load: () => Promise<readonly ImageDisplayRecord[]>;
+  readonly save: (record: ImageDisplayRecord) => Promise<ImageDisplayRecord>;
+  readonly remove: (record: ImageDisplayRecord) => Promise<void>;
+}
+
+export interface CaptureStore {
+  readonly capture: (url: string) => Promise<CaptureResult>;
 }

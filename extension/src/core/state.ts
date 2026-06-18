@@ -11,7 +11,16 @@ export const EMPTY_TARGET_STATE: TargetState = {
 };
 
 export function createInitialPanelState(now = Date.now()): PanelState {
-  return { visible: false, status: 'idle', message: 'Image Trail is ready.', lastUpdatedAt: now, target: EMPTY_TARGET_STATE };
+  return {
+    visible: false,
+    status: 'idle',
+    message: 'Image Trail is ready.',
+    lastUpdatedAt: now,
+    target: EMPTY_TARGET_STATE,
+    history: [],
+    bookmarks: [],
+    storageUsage: null,
+  };
 }
 
 export function showPanel(state: PanelState, now = Date.now()): PanelState {

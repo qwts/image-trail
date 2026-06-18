@@ -12,7 +12,7 @@ export function openImageTrailDb(indexedDb: IDBFactory = globalThis.indexedDB): 
     const request = indexedDb.open(IMAGE_TRAIL_DB_NAME, IMAGE_TRAIL_DB_VERSION);
     request.onupgradeneeded = (event) => {
       try {
-        migrateImageTrailDb(request.result, event.oldVersion);
+        migrateImageTrailDb(request.result, event.oldVersion, request.transaction ?? undefined);
       } catch (cause) {
         request.transaction?.abort();
         resolve({

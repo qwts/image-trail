@@ -1,4 +1,6 @@
 import type { PanelAction, PanelState } from '../core/types.js';
+import { createBookmarksView } from './components/bookmarks-view.js';
+import { createHistoryView } from './components/history-view.js';
 import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
 
@@ -25,8 +27,16 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
   actions.className = 'image-trail-panel__actions';
   actions.append(
     makeButton('Ping status', { name: 'ping-status' }, target.dispatch),
+    makeButton('Capture original', { name: 'capture/current' }, target.dispatch),
     makeButton('Close', { name: 'close-panel' }, target.dispatch),
   );
 
-  target.root.append(heading, createStatusView(state), createTargetPickerView(state.target, target.dispatch), actions);
+  target.root.append(
+    heading,
+    createStatusView(state),
+    createTargetPickerView(state.target, target.dispatch),
+    createHistoryView(state.history, target.dispatch),
+    createBookmarksView(state.target.selectedUrl, state.bookmarks, target.dispatch),
+    actions,
+  );
 }
