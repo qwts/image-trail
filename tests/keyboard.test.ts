@@ -14,6 +14,15 @@ test('classifyTarget returns typing for INPUT element', () => {
   assert.equal(classifyTarget(fakeEvent({ target: { tagName: 'INPUT' } })), 'typing');
 });
 
+test('classifyTarget uses composed path for shadow DOM inputs', () => {
+  const host = {
+    tagName: 'DIV',
+    closest: (selector: string) => (selector === '#image-trail-panel-root' ? {} : null),
+  };
+  const input = { tagName: 'INPUT' };
+  assert.equal(classifyTarget(fakeEvent({ target: host, composedPath: () => [input, host] })), 'typing');
+});
+
 test('classifyTarget returns typing for TEXTAREA element', () => {
   assert.equal(classifyTarget(fakeEvent({ target: { tagName: 'TEXTAREA' } })), 'typing');
 });

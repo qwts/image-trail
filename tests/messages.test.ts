@@ -8,6 +8,8 @@ import {
   createDeleteBlobMessage,
   createDeleteBlobResultMessage,
   createPingMessage,
+  createRetrieveBlobMessage,
+  createRetrieveBlobResultMessage,
   createStatusMessage,
   createStorageUsageRequestMessage,
   createStorageUsageResponseMessage,
@@ -16,6 +18,7 @@ import {
   isCaptureResultMessage,
   isExtensionRequest,
   isExtensionResponse,
+  isRetrieveBlobResultMessage,
   isStatusMessage,
 } from '../extension/src/background/messages.js';
 
@@ -56,13 +59,13 @@ test('recognizes capture-related messages as extension requests', () => {
   assert.equal(isExtensionRequest(createCaptureImageMessage('https://example.com/a.jpg', 'target')), true);
   assert.equal(isExtensionRequest(createStorageUsageRequestMessage()), true);
   assert.equal(isExtensionRequest(createDeleteBlobMessage('blob-1')), true);
+  assert.equal(isExtensionRequest(createRetrieveBlobMessage('blob-1')), true);
 });
 
 test('creates capture result response messages for success and failure', () => {
   const success = createCaptureResultMessage({
     status: 'captured',
     blobId: 'b-1',
-    sha256: 'abc',
     mimeType: 'image/png',
     byteLength: 1024,
   });
@@ -86,7 +89,7 @@ test('creates capture result response messages for success and failure', () => {
 });
 
 test('recognizes capture result messages as extension responses', () => {
-  const result = createCaptureResultMessage({ status: 'captured', blobId: 'b-1', sha256: 'abc', mimeType: 'image/png', byteLength: 100 });
+  const result = createCaptureResultMessage({ status: 'captured', blobId: 'b-1', mimeType: 'image/png', byteLength: 100 });
   assert.equal(isExtensionResponse(result), true);
   assert.equal(isCaptureResultMessage(result), true);
   assert.equal(isCaptureResultMessage(createStatusMessage(true, 'ok')), false);
@@ -113,4 +116,28 @@ test('creates delete blob request and result messages', () => {
   assert.equal(result.payload.deleted, true);
   assert.equal(result.payload.usage.totalBytes, 200);
   assert.equal(isExtensionResponse(result), true);
+});
+
+test('creates retrieve blob request and result messages', () => {
+  const request = createRetrieveBlobMessage('blob-99');
+  assert.equal(request.type, MessageType.RetrieveBlob);
+  assert.equal(request.payload.blobId, 'blob-99');
+  assert.equal(isExtensionRequest(request), true);
+
+  const success = createRetrieveBlobResultMessage({
+    ok: true,
+    blobId: 'blob-99',
+    dataUrl: 'data:image/jpeg;base64,/9j/',
+    mimeType: 'image/jpeg',
+    byteLength: 4,
+    capturedAt: '2026-06-19T00:00:00.000Z',
+  });
+  assert.equal(success.type, MessageType.RetrieveBlobResult);
+  assert.equal(success.payload.ok, true);
+  assert.equal(isExtensionResponse(success), true);
+  assert.equal(isRetrieveBlobResultMessage(success), true);
+
+  const failure = createRetrieveBlobResultMessage({ ok: false, reason: 'encryption-locked', message: 'Unlock first.' });
+  assert.equal(failure.payload.ok, false);
+  assert.equal(isRetrieveBlobResultMessage(failure), true);
 });

@@ -1,3 +1,5 @@
+import type { EncryptionAlgorithm, KeyReference } from './crypto/types.js';
+
 export type DataStoreName = 'metadata' | 'keys' | 'history' | 'bookmarks' | 'blobs';
 export type DataStatusCode =
   | 'ok'
@@ -26,18 +28,18 @@ export type BlobKind = 'original' | 'thumbnail';
 export interface StoredBlobRecord {
   readonly id: string;
   readonly kind: BlobKind;
-  readonly sha256: string;
-  readonly mimeType: string;
-  readonly byteLength: number;
-  readonly bytes: ArrayBuffer;
+  readonly schemaVersion: 1;
+  readonly algorithm: EncryptionAlgorithm;
+  readonly iv: string;
+  readonly ciphertext: ArrayBuffer;
+  readonly encryptedByteLength: number;
   readonly createdAt: string;
-  readonly sourceUrl: string;
+  readonly key: KeyReference<'blob'>;
   readonly referenceCount: number;
 }
 
 export interface StoredOriginalReference {
   readonly blobId: string;
-  readonly sha256: string;
   readonly mimeType: string;
   readonly byteLength: number;
   readonly capturedAt: string;

@@ -1,6 +1,7 @@
 import type { PanelAction, PanelState } from '../core/types.js';
 import { createBookmarksView } from './components/bookmarks-view.js';
 import { createControlsView } from './components/controls-view.js';
+import { createEncryptionView } from './components/encryption-view.js';
 import { createFieldsView, type EditableField } from './components/fields-view.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHistoryView } from './components/history-view.js';
@@ -15,6 +16,13 @@ export interface PanelRenderTarget {
   readonly dispatch: (action: PanelAction) => void;
 }
 
+interface FocusedTextControlSnapshot {
+  readonly selector: string;
+  readonly value: string;
+  readonly selectionStart: number | null;
+  readonly selectionEnd: number | null;
+}
+
 function makeButton(label: string, action: PanelAction, dispatch: (action: PanelAction) => void, disabled = false): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
@@ -24,7 +32,46 @@ function makeButton(label: string, action: PanelAction, dispatch: (action: Panel
   return button;
 }
 
+function focusedTextControlSnapshot(root: HTMLElement): FocusedTextControlSnapshot | null {
+  const rootNode = root.getRootNode();
+  const activeElement = rootNode instanceof ShadowRoot ? rootNode.activeElement : document.activeElement;
+  if (!(activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement)) return null;
+
+  let selector: string | null = null;
+  if (activeElement.classList.contains('image-trail-panel__password-input')) {
+    selector = '.image-trail-panel__password-input';
+  } else if (activeElement.classList.contains('image-trail-panel__full-url-input')) {
+    selector = '.image-trail-panel__full-url-input';
+  } else if (activeElement.classList.contains('image-trail-panel__field-input') && activeElement.dataset.fieldId) {
+    selector = `.image-trail-panel__field-input[data-field-id="${CSS.escape(activeElement.dataset.fieldId)}"]`;
+  }
+
+  return selector
+    ? {
+        selector,
+        value: activeElement.value,
+        selectionStart: activeElement.selectionStart,
+        selectionEnd: activeElement.selectionEnd,
+      }
+    : null;
+}
+
+function restoreFocusedTextControl(root: HTMLElement, snapshot: FocusedTextControlSnapshot | null): void {
+  if (!snapshot) return;
+  const next = root.querySelector<HTMLInputElement | HTMLTextAreaElement>(snapshot.selector);
+  if (!next) return;
+  next.value = snapshot.value;
+  queueMicrotask(() => {
+    next.focus();
+    if (snapshot.selectionStart !== null && snapshot.selectionEnd !== null) {
+      next.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+    }
+  });
+}
+
 export function renderPanel(target: PanelRenderTarget, state: PanelState): void {
+  const focusedTextControl = focusedTextControlSnapshot(target.root);
+
   target.root.replaceChildren();
 
   const fieldValueFor = (model: ParsedUrlModel, field: UrlField): string => {
@@ -150,6 +197,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
       },
     ),
     createTargetPickerView(state.target, target.dispatch),
+    createEncryptionView(target.dispatch),
     createFieldsView(
       editableFields,
       state.activeFieldId,
@@ -173,4 +221,5 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     createBookmarksView(state.target.selectedUrl, state.bookmarks, state.captureInProgress, target.dispatch),
     actions,
   );
+  restoreFocusedTextControl(target.root, focusedTextControl);
 }

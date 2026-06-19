@@ -81,10 +81,12 @@ function toPayload(record: ImageDisplayRecord): DurableBookmarkPayloadV1 {
     downloadedAt: record.downloadedAt,
     capturedAt: record.capturedAt,
     sourceCompatibility: 'favorites',
+    storedOriginal: record.storedOriginal,
   };
 }
 
 function toDisplayRecord(id: string, payload: DurableBookmarkPayloadV1): ImageDisplayRecord {
+  const storedOriginal = payload.storedOriginal;
   return createDisplayRecord({
     id,
     url: payload.url,
@@ -93,7 +95,10 @@ function toDisplayRecord(id: string, payload: DurableBookmarkPayloadV1): ImageDi
     thumbnail: payload.thumbnail,
     timestamp: payload.bookmarkedAt,
     downloadedAt: payload.downloadedAt,
-    capturedAt: payload.capturedAt,
+    capturedAt: payload.capturedAt ?? storedOriginal?.capturedAt,
+    captureStatus: storedOriginal ? 'captured' : undefined,
+    blobId: storedOriginal?.blobId,
+    storedOriginal,
     source: payload.sourceCompatibility ?? 'bookmark',
   });
 }

@@ -64,6 +64,9 @@ export type PanelActionName =
   | 'capture/complete'
   | 'capture/clear'
   | 'capture/delete'
+  | 'capture/preview'
+  | 'blob-key/setup'
+  | 'blob-key/unlock'
   | 'storage/update'
   | 'undo-last'
   | 'slideshow-start'
@@ -93,6 +96,9 @@ export type PanelAction =
         | 'capture/complete'
         | 'capture/clear'
         | 'capture/delete'
+        | 'capture/preview'
+        | 'blob-key/setup'
+        | 'blob-key/unlock'
         | 'storage/update'
       >;
     }
@@ -107,6 +113,8 @@ export type PanelAction =
   | { readonly name: 'capture/complete'; readonly result: CaptureResult; readonly sourceRecordId?: string }
   | { readonly name: 'capture/clear' }
   | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string }
+  | { readonly name: 'capture/preview'; readonly blobId: string }
+  | { readonly name: 'blob-key/setup' | 'blob-key/unlock'; readonly password: string }
   | { readonly name: 'storage/update'; readonly usage: StorageUsageSummary };
 
 export interface BookmarkStore {

@@ -41,7 +41,7 @@ test('password-wrap: wraps and unwraps an AES-GCM key with password', async () =
   assert.equal(wrapped.salt.byteLength, 16);
   assert.equal(wrapped.iv.byteLength, 12);
 
-  const unwrapped = await unwrapKeyWithPassword(wrapped.wrappedKey, wrapped.iv, 'my-password', wrapped.salt, wrapped.iterations);
+  const unwrapped = await unwrapKeyWithPassword(wrapped.wrappedKey, wrapped.iv, 'my-password', wrapped.salt, wrapped.iterations, true);
   const rawUnwrapped = new Uint8Array(await getCrypto().subtle.exportKey('raw', unwrapped));
   assert.deepEqual(rawUnwrapped, rawOriginal);
 });

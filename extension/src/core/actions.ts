@@ -1,5 +1,6 @@
 import { createDisplayRecord } from './display-records.js';
 import type { ImageDisplayRecord } from './display-records.js';
+import type { CaptureResult } from './image/capture-result.js';
 import { isCapturedResult } from './image/capture-result.js';
 import { closePanel, EMPTY_AUTOMATION_STATE, showPanel } from './state.js';
 import type { PanelAction, PanelState } from './types.js';
@@ -7,15 +8,30 @@ import type { PanelAction, PanelState } from './types.js';
 function updateRecordCapture(
   records: readonly ImageDisplayRecord[],
   sourceRecordId: string | undefined,
-  blobId: string,
+  result: CaptureResult & { status: 'captured' },
   capturedAt: string,
 ): readonly ImageDisplayRecord[] {
   if (!sourceRecordId) return records;
-  return records.map((r) => (r.id === sourceRecordId ? { ...r, captureStatus: 'captured' as const, blobId, capturedAt } : r));
+  return records.map((r) =>
+    r.id === sourceRecordId
+      ? {
+          ...r,
+          captureStatus: 'captured' as const,
+          blobId: result.blobId,
+          capturedAt,
+          storedOriginal: {
+            blobId: result.blobId,
+            mimeType: result.mimeType,
+            byteLength: result.byteLength,
+            capturedAt,
+          },
+        }
+      : r,
+  );
 }
 
 function clearRecordCapture(records: readonly ImageDisplayRecord[], id: string): readonly ImageDisplayRecord[] {
-  return records.map((r) => (r.id === id ? { ...r, captureStatus: undefined, blobId: undefined } : r));
+  return records.map((r) => (r.id === id ? { ...r, captureStatus: undefined, blobId: undefined, storedOriginal: undefined } : r));
 }
 
 export function reducePanelAction(state: PanelState, action: PanelAction): PanelState {
@@ -74,8 +90,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         const capturedAt = now.toISOString();
         return {
           ...updated,
-          history: updateRecordCapture(updated.history, action.sourceRecordId, action.result.blobId, capturedAt),
-          bookmarks: updateRecordCapture(updated.bookmarks, action.sourceRecordId, action.result.blobId, capturedAt),
+          history: updateRecordCapture(updated.history, action.sourceRecordId, action.result, capturedAt),
+          bookmarks: updateRecordCapture(updated.bookmarks, action.sourceRecordId, action.result, capturedAt),
           message: `Captured ${(action.result.byteLength / 1024).toFixed(1)} KB image.`,
         };
       }

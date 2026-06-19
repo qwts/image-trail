@@ -3,6 +3,7 @@ import type { ImageDisplayRecord } from '../../core/display-records.js';
 type HistoryAction =
   | { readonly name: 'history/remove'; readonly id: string }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'history'; readonly sourceRecordId: string }
+  | { readonly name: 'capture/preview'; readonly blobId: string }
   | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string };
 
 export function createHistoryView(
@@ -31,11 +32,15 @@ export function createHistoryView(
       const badge = document.createElement('span');
       badge.className = 'image-trail-panel__capture-badge';
       badge.textContent = 'Stored';
+      const preview = document.createElement('button');
+      preview.type = 'button';
+      preview.textContent = 'Preview original';
+      preview.addEventListener('click', () => dispatch({ name: 'capture/preview', blobId: item.blobId! }));
       const deleteCapture = document.createElement('button');
       deleteCapture.type = 'button';
       deleteCapture.textContent = 'Delete original';
       deleteCapture.addEventListener('click', () => dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! }));
-      actions.append(badge, deleteCapture);
+      actions.append(badge, preview, deleteCapture);
     } else {
       const capture = document.createElement('button');
       capture.type = 'button';

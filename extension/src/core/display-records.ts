@@ -1,4 +1,5 @@
 import type { CaptureStatus } from './image/capture-result.js';
+import type { StoredOriginalReference } from '../data/types.js';
 
 export interface ImageDisplayRecord {
   readonly id: string;
@@ -12,6 +13,7 @@ export interface ImageDisplayRecord {
   readonly source?: 'history' | 'bookmark' | 'favorites';
   readonly captureStatus?: CaptureStatus;
   readonly blobId?: string;
+  readonly storedOriginal?: StoredOriginalReference;
 }
 
 export function normalizeDisplayLabel(record: Pick<ImageDisplayRecord, 'url' | 'title' | 'label'>): string {
@@ -43,6 +45,15 @@ export function sourceImageUrlFrom(url: string): URL {
     }
   }
   return parsed;
+}
+
+export function isDurableImageSourceUrl(url: string): boolean {
+  try {
+    const sourceUrl = sourceImageUrlFrom(url);
+    return sourceUrl.protocol === 'http:' || sourceUrl.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 export function createDisplayRecord(

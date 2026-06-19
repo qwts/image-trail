@@ -79,7 +79,7 @@ test('capture/start sets captureInProgress and clears previous result', () => {
 test('capture/complete stores result and clears in-progress flag', () => {
   let state: PanelState = reducePanelAction(createInitialPanelState(0), { name: 'capture/start' });
 
-  const result = { status: 'captured' as const, blobId: 'b-1', sha256: 'abc', mimeType: 'image/png', byteLength: 2048 };
+  const result = { status: 'captured' as const, blobId: 'b-1', mimeType: 'image/png', byteLength: 2048 };
   state = reducePanelAction(state, { name: 'capture/complete', result });
 
   assert.equal(state.captureInProgress, false);
@@ -98,12 +98,18 @@ test('capture/complete with sourceRecordId updates matching history record', () 
   state = reducePanelAction(state, { name: 'capture/start' });
   state = reducePanelAction(state, {
     name: 'capture/complete',
-    result: { status: 'captured', blobId: 'blob-42', sha256: 'def', mimeType: 'image/jpeg', byteLength: 4096 },
+    result: { status: 'captured', blobId: 'blob-42', mimeType: 'image/jpeg', byteLength: 4096 },
     sourceRecordId: recordId,
   });
 
   assert.equal(state.history[0].captureStatus, 'captured');
   assert.equal(state.history[0].blobId, 'blob-42');
+  assert.deepEqual(state.history[0].storedOriginal, {
+    blobId: 'blob-42',
+    mimeType: 'image/jpeg',
+    byteLength: 4096,
+    capturedAt: state.history[0].capturedAt,
+  });
 });
 
 test('capture/complete with failed result does not modify records', () => {
@@ -143,7 +149,7 @@ test('capture/delete clears capture status and blobId from matching records', ()
   state = reducePanelAction(state, { name: 'capture/start' });
   state = reducePanelAction(state, {
     name: 'capture/complete',
-    result: { status: 'captured', blobId: 'blob-99', sha256: 'xyz', mimeType: 'image/png', byteLength: 512 },
+    result: { status: 'captured', blobId: 'blob-99', mimeType: 'image/png', byteLength: 512 },
     sourceRecordId: recordId,
   });
   assert.equal(state.history[0].captureStatus, 'captured');

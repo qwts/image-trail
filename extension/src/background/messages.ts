@@ -11,7 +11,14 @@ export const MessageType = {
   StorageUsageResponse: 'imageTrail.storageUsageResponse',
   DeleteBlob: 'imageTrail.deleteBlob',
   DeleteBlobResult: 'imageTrail.deleteBlobResult',
+  RetrieveBlob: 'imageTrail.retrieveBlob',
+  RetrieveBlobResult: 'imageTrail.retrieveBlobResult',
+  CreateBlobPreview: 'imageTrail.createBlobPreview',
+  CreateBlobPreviewResult: 'imageTrail.createBlobPreviewResult',
   GrantPermissionAndCapture: 'imageTrail.grantPermissionAndCapture',
+  SetupBlobKey: 'imageTrail.setupBlobKey',
+  UnlockBlobKey: 'imageTrail.unlockBlobKey',
+  BlobKeyResult: 'imageTrail.blobKeyResult',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -82,6 +89,41 @@ export interface DeleteBlobResultMessage {
   readonly payload: { readonly deleted: boolean; readonly usage: import('../core/image/capture-result.js').StorageUsageSummary };
 }
 
+export interface RetrieveBlobMessage {
+  readonly type: typeof MessageType.RetrieveBlob;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly blobId: string };
+}
+
+export interface RetrieveBlobResultMessage {
+  readonly type: typeof MessageType.RetrieveBlobResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | {
+        readonly ok: true;
+        readonly blobId: string;
+        readonly dataUrl: string;
+        readonly mimeType: string;
+        readonly byteLength: number;
+        readonly capturedAt: string;
+      }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
+export interface CreateBlobPreviewMessage {
+  readonly type: typeof MessageType.CreateBlobPreview;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly blobId: string };
+}
+
+export interface CreateBlobPreviewResultMessage {
+  readonly type: typeof MessageType.CreateBlobPreviewResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly previewUrl: string; readonly byteLength: number }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
 export interface GrantPermissionAndCaptureMessage {
   readonly type: typeof MessageType.GrantPermissionAndCapture;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -92,19 +134,46 @@ export interface GrantPermissionAndCaptureMessage {
   };
 }
 
+export interface SetupBlobKeyMessage {
+  readonly type: typeof MessageType.SetupBlobKey;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly password: string };
+}
+
+export interface UnlockBlobKeyMessage {
+  readonly type: typeof MessageType.UnlockBlobKey;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly password: string; readonly keyReference?: string };
+}
+
+export interface BlobKeyResultMessage {
+  readonly type: typeof MessageType.BlobKeyResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly keyReference: string; readonly message: string }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
 export type ExtensionRequest =
   | TogglePanelMessage
   | PingMessage
   | CaptureImageMessage
   | StorageUsageRequestMessage
   | DeleteBlobMessage
-  | GrantPermissionAndCaptureMessage;
+  | RetrieveBlobMessage
+  | CreateBlobPreviewMessage
+  | GrantPermissionAndCaptureMessage
+  | SetupBlobKeyMessage
+  | UnlockBlobKeyMessage;
 export type ExtensionResponse =
   | StatusMessage
   | UnknownMessageResponse
   | CaptureResultMessage
   | StorageUsageResponseMessage
-  | DeleteBlobResultMessage;
+  | DeleteBlobResultMessage
+  | RetrieveBlobResultMessage
+  | CreateBlobPreviewResultMessage
+  | BlobKeyResultMessage;
 export type ExtensionMessage = ExtensionRequest | ExtensionResponse;
 
 export function createTogglePanelMessage(): TogglePanelMessage {
@@ -145,6 +214,22 @@ export function createDeleteBlobMessage(blobId: string): DeleteBlobMessage {
   return { type: MessageType.DeleteBlob, version: MESSAGE_PROTOCOL_VERSION, payload: { blobId } };
 }
 
+export function createRetrieveBlobMessage(blobId: string): RetrieveBlobMessage {
+  return { type: MessageType.RetrieveBlob, version: MESSAGE_PROTOCOL_VERSION, payload: { blobId } };
+}
+
+export function createCreateBlobPreviewMessage(blobId: string): CreateBlobPreviewMessage {
+  return { type: MessageType.CreateBlobPreview, version: MESSAGE_PROTOCOL_VERSION, payload: { blobId } };
+}
+
+export function createRetrieveBlobResultMessage(payload: RetrieveBlobResultMessage['payload']): RetrieveBlobResultMessage {
+  return { type: MessageType.RetrieveBlobResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createCreateBlobPreviewResultMessage(payload: CreateBlobPreviewResultMessage['payload']): CreateBlobPreviewResultMessage {
+  return { type: MessageType.CreateBlobPreviewResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 export function createGrantPermissionAndCaptureMessage(
   url: string,
   sourceType: CaptureSourceType,
@@ -158,6 +243,18 @@ export function createDeleteBlobResultMessage(
   usage: import('../core/image/capture-result.js').StorageUsageSummary,
 ): DeleteBlobResultMessage {
   return { type: MessageType.DeleteBlobResult, version: MESSAGE_PROTOCOL_VERSION, payload: { deleted, usage } };
+}
+
+export function createSetupBlobKeyMessage(password: string): SetupBlobKeyMessage {
+  return { type: MessageType.SetupBlobKey, version: MESSAGE_PROTOCOL_VERSION, payload: { password } };
+}
+
+export function createUnlockBlobKeyMessage(password: string, keyReference?: string): UnlockBlobKeyMessage {
+  return { type: MessageType.UnlockBlobKey, version: MESSAGE_PROTOCOL_VERSION, payload: { password, keyReference } };
+}
+
+export function createBlobKeyResultMessage(payload: BlobKeyResultMessage['payload']): BlobKeyResultMessage {
+  return { type: MessageType.BlobKeyResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 function hasVersionedObjectShape(value: unknown): value is { type?: unknown; version?: unknown; payload?: unknown } {
@@ -174,7 +271,11 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.CaptureImage ||
     value.type === MessageType.StorageUsageRequest ||
     value.type === MessageType.DeleteBlob ||
-    value.type === MessageType.GrantPermissionAndCapture
+    value.type === MessageType.RetrieveBlob ||
+    value.type === MessageType.CreateBlobPreview ||
+    value.type === MessageType.GrantPermissionAndCapture ||
+    value.type === MessageType.SetupBlobKey ||
+    value.type === MessageType.UnlockBlobKey
   );
 }
 
@@ -185,8 +286,26 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.Unknown ||
     value.type === MessageType.CaptureResult ||
     value.type === MessageType.StorageUsageResponse ||
-    value.type === MessageType.DeleteBlobResult
+    value.type === MessageType.DeleteBlobResult ||
+    value.type === MessageType.RetrieveBlobResult ||
+    value.type === MessageType.CreateBlobPreviewResult ||
+    value.type === MessageType.BlobKeyResult
   );
+}
+
+export function isBlobKeyResultMessage(value: unknown): value is BlobKeyResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.BlobKeyResult;
+}
+
+export function isRetrieveBlobResultMessage(value: unknown): value is RetrieveBlobResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.RetrieveBlobResult;
+}
+
+export function isCreateBlobPreviewResultMessage(value: unknown): value is CreateBlobPreviewResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.CreateBlobPreviewResult;
 }
 
 export function isCaptureResultMessage(value: unknown): value is CaptureResultMessage {

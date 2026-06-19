@@ -9,7 +9,7 @@ import { DATA_STORE_NAMES, IMAGE_TRAIL_DB_NAME, IMAGE_TRAIL_DB_VERSION } from '.
 
 test('defines a versioned IndexedDB schema with durable M04 stores', () => {
   assert.equal(IMAGE_TRAIL_DB_NAME, 'image-trail');
-  assert.equal(IMAGE_TRAIL_DB_VERSION, 3);
+  assert.equal(IMAGE_TRAIL_DB_VERSION, 4);
   assert.deepEqual(DATA_STORE_NAMES, ['metadata', 'keys', 'history', 'bookmarks', 'blobs']);
 });
 
@@ -64,6 +64,14 @@ test('derives and validates key reference strings from kind and uuid', async () 
     }),
     /Key reference must be derived/,
   );
+});
+
+test('supports blob key references for encrypted original storage', () => {
+  assert.deepEqual(createKeyReference('blob', 'blob-key-001'), {
+    kind: 'blob',
+    uuid: 'blob-key-001',
+    reference: 'blob:blob-key-001',
+  });
 });
 
 test('loads typed plaintext local settings through defaults and migrations', () => {

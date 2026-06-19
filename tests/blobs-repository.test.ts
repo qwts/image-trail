@@ -5,6 +5,7 @@ import { openImageTrailDb } from '../extension/src/data/db.js';
 import { IMAGE_TRAIL_DB_NAME } from '../extension/src/data/schema.js';
 import { BlobsRepository } from '../extension/src/data/repositories/blobs-repository.js';
 import type { StoredBlobRecord } from '../extension/src/data/types.js';
+import { createKeyReference } from '../extension/src/data/crypto/key-reference.js';
 
 async function deleteDb(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
@@ -26,12 +27,13 @@ function makeBlobRecord(overrides: Partial<StoredBlobRecord> = {}): StoredBlobRe
   return {
     id: overrides.id ?? crypto.randomUUID(),
     kind: overrides.kind ?? 'original',
-    sha256: overrides.sha256 ?? 'abc123',
-    mimeType: overrides.mimeType ?? 'image/png',
-    byteLength: overrides.byteLength ?? 100,
-    bytes: overrides.bytes ?? new ArrayBuffer(100),
+    schemaVersion: overrides.schemaVersion ?? 1,
+    algorithm: overrides.algorithm ?? 'AES-GCM',
+    iv: overrides.iv ?? 'AAAAAAAAAAAAAAAA',
+    ciphertext: overrides.ciphertext ?? new ArrayBuffer(100),
+    encryptedByteLength: overrides.encryptedByteLength ?? 100,
     createdAt: overrides.createdAt ?? new Date().toISOString(),
-    sourceUrl: overrides.sourceUrl ?? 'https://example.com/image.png',
+    key: overrides.key ?? createKeyReference('blob', 'blob-key-1'),
     referenceCount: overrides.referenceCount ?? 1,
   };
 }
@@ -47,42 +49,26 @@ test('BlobsRepository stores and retrieves blob records by id', async (t) => {
   const retrieved = await repo.get('blob-1');
   assert.ok(retrieved);
   assert.equal(retrieved.id, 'blob-1');
-  assert.equal(retrieved.sha256, record.sha256);
-  assert.equal(retrieved.byteLength, 100);
+  assert.equal(retrieved.encryptedByteLength, 100);
+  assert.equal(retrieved.key.reference, 'blob:blob-key-1');
 });
 
-test('BlobsRepository deduplicates by SHA-256 and increments reference count', async (t) => {
+test('BlobsRepository stores duplicate encrypted captures separately', async (t) => {
   const db = await openFreshDb();
   t.after(() => db.close());
   const repo = new BlobsRepository(db);
 
-  const first = makeBlobRecord({ id: 'blob-a', sha256: 'dedup-hash', referenceCount: 1 });
+  const first = makeBlobRecord({ id: 'blob-a', referenceCount: 1 });
   await repo.put(first);
 
-  const second = makeBlobRecord({ id: 'blob-b', sha256: 'dedup-hash', referenceCount: 1 });
+  const second = makeBlobRecord({ id: 'blob-b', referenceCount: 1 });
   const result = await repo.put(second);
 
-  assert.equal(result.id, 'blob-a');
-  assert.equal(result.referenceCount, 2);
+  assert.equal(result.id, 'blob-b');
+  assert.equal(result.referenceCount, 1);
 
-  const notFound = await repo.get('blob-b');
-  assert.equal(notFound, undefined);
-});
-
-test('BlobsRepository looks up blob by SHA-256 hash', async (t) => {
-  const db = await openFreshDb();
-  t.after(() => db.close());
-  const repo = new BlobsRepository(db);
-
-  const record = makeBlobRecord({ sha256: 'find-me-hash' });
-  await repo.put(record);
-
-  const found = await repo.getBySha256('find-me-hash');
-  assert.ok(found);
-  assert.equal(found.sha256, 'find-me-hash');
-
-  const notFound = await repo.getBySha256('nonexistent');
-  assert.equal(notFound, undefined);
+  assert.ok(await repo.get('blob-a'));
+  assert.ok(await repo.get('blob-b'));
 });
 
 test('BlobsRepository decrements reference count and deletes at zero', async (t) => {
@@ -120,8 +106,8 @@ test('BlobsRepository reports storage usage across all records', async (t) => {
   assert.equal(emptyUsage.blobCount, 0);
   assert.equal(emptyUsage.totalBytes, 0);
 
-  await repo.put(makeBlobRecord({ id: 'b1', sha256: 'h1', byteLength: 500 }));
-  await repo.put(makeBlobRecord({ id: 'b2', sha256: 'h2', byteLength: 300 }));
+  await repo.put(makeBlobRecord({ id: 'b1', encryptedByteLength: 500 }));
+  await repo.put(makeBlobRecord({ id: 'b2', encryptedByteLength: 300 }));
 
   const usage = await repo.getStorageUsage();
   assert.equal(usage.blobCount, 2);

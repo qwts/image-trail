@@ -2,7 +2,7 @@ import type { CaptureStore } from '../content/capture-controller.js';
 import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
 import type { PageAdapter, TargetSelectionSnapshot } from '../content/page-adapter.js';
-import { createDisplayRecord, sourceImageUrlFrom } from '../core/display-records.js';
+import { createDisplayRecord, isDurableImageSourceUrl, sourceImageUrlFrom } from '../core/display-records.js';
 import { reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
@@ -60,6 +60,7 @@ export class ImageTrailPanel {
       this.render();
     });
     this.unsubscribeFromLoads = this.pageAdapter.subscribeToSuccessfulLoads((target) => {
+      if (!isDurableImageSourceUrl(target.url)) return;
       this.state = reducePanelAction(this.state, { name: 'history/add-loaded', url: target.url });
       this.render();
     });
@@ -178,6 +179,21 @@ export class ImageTrailPanel {
 
     if (action.name === 'capture/delete') {
       void this.deleteCapturedBlob(action.id, action.blobId);
+      return;
+    }
+
+    if (action.name === 'capture/preview') {
+      void this.previewCapturedBlob(action.blobId);
+      return;
+    }
+
+    if (action.name === 'blob-key/setup') {
+      void this.setupBlobKey(action.password);
+      return;
+    }
+
+    if (action.name === 'blob-key/unlock') {
+      void this.unlockBlobKey(action.password);
       return;
     }
 
@@ -377,6 +393,16 @@ export class ImageTrailPanel {
   }
 
   private async bookmarkUrl(url: string): Promise<void> {
+    if (!isDurableImageSourceUrl(url)) {
+      this.state = {
+        ...this.state,
+        message: 'Only http(s) image URLs can be saved to Image Trail.',
+        status: 'error',
+        lastUpdatedAt: Date.now(),
+      };
+      this.render();
+      return;
+    }
     const sourceUrl = sourceUrlForBookmark(url);
     const draft = createDisplayRecord({ id: sourceUrl, url: sourceUrl, source: 'bookmark' });
     const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
@@ -407,6 +433,16 @@ export class ImageTrailPanel {
 
   private async captureImage(url: string, sourceType: 'target' | 'history' | 'bookmark', sourceRecordId?: string): Promise<void> {
     if (!this.captureStore) return;
+    if (!isDurableImageSourceUrl(url)) {
+      this.state = {
+        ...this.state,
+        message: 'Only http(s) image URLs can be captured as encrypted originals.',
+        status: 'error',
+        lastUpdatedAt: Date.now(),
+      };
+      this.render();
+      return;
+    }
     this.state = reducePanelAction(this.state, { name: 'capture/start' });
     this.render();
     const result = await this.captureStore.requestCapture(sourceUrlForBookmark(url), sourceType, sourceRecordId);
@@ -426,6 +462,32 @@ export class ImageTrailPanel {
     this.state = reducePanelAction(this.state, { name: 'capture/delete', id: recordId, blobId });
     const { usage } = await this.captureStore.requestDeleteBlob(blobId);
     this.state = reducePanelAction(this.state, { name: 'storage/update', usage });
+    this.render();
+  }
+
+  private async previewCapturedBlob(blobId: string): Promise<void> {
+    if (!this.captureStore) return;
+    const result = await this.captureStore.requestBlobPreview(blobId);
+    if (!result.ok) {
+      this.state = { ...this.state, message: result.message, status: 'error', lastUpdatedAt: Date.now() };
+      this.render();
+      return;
+    }
+    this.state = { ...this.state, message: `Previewed encrypted original (${(result.byteLength / 1024).toFixed(1)} KB).`, lastUpdatedAt: Date.now() };
+    this.render();
+  }
+
+  private async setupBlobKey(password: string): Promise<void> {
+    if (!this.captureStore) return;
+    const result = await this.captureStore.setupBlobKey(password);
+    this.state = { ...this.state, message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() };
+    this.render();
+  }
+
+  private async unlockBlobKey(password: string): Promise<void> {
+    if (!this.captureStore) return;
+    const result = await this.captureStore.unlockBlobKey(password);
+    this.state = { ...this.state, message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() };
     this.render();
   }
 

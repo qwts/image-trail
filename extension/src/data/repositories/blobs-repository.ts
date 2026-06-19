@@ -1,20 +1,12 @@
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
-import { DataStore, SchemaIndex } from '../schema.js';
+import { DataStore } from '../schema.js';
 import type { StoredBlobRecord } from '../types.js';
 
 export class BlobsRepository {
   constructor(private readonly db: IDBDatabase) {}
 
   async put(record: StoredBlobRecord): Promise<StoredBlobRecord> {
-    const existing = await this.getBySha256(record.sha256);
-    if (existing) {
-      const updated: StoredBlobRecord = { ...existing, referenceCount: existing.referenceCount + 1 };
-      const transaction = this.db.transaction(DataStore.Blobs, 'readwrite');
-      transaction.objectStore(DataStore.Blobs).put(updated);
-      await transactionDone(transaction);
-      return updated;
-    }
     const transaction = this.db.transaction(DataStore.Blobs, 'readwrite');
     transaction.objectStore(DataStore.Blobs).put(record);
     await transactionDone(transaction);
@@ -24,14 +16,6 @@ export class BlobsRepository {
   async get(id: string): Promise<StoredBlobRecord | undefined> {
     const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
     const result = await requestToPromise<StoredBlobRecord | undefined>(transaction.objectStore(DataStore.Blobs).get(id));
-    await transactionDone(transaction);
-    return result;
-  }
-
-  async getBySha256(sha256: string): Promise<StoredBlobRecord | undefined> {
-    const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
-    const index = transaction.objectStore(DataStore.Blobs).index(SchemaIndex.BlobsBySha256);
-    const result = await requestToPromise<StoredBlobRecord | undefined>(index.get(sha256));
     await transactionDone(transaction);
     return result;
   }
@@ -64,7 +48,7 @@ export class BlobsRepository {
         const cursor = request.result;
         if (cursor) {
           const record = cursor.value as StoredBlobRecord;
-          totalBytes += record.byteLength;
+          totalBytes += record.encryptedByteLength;
           blobCount += 1;
           cursor.continue();
         } else {

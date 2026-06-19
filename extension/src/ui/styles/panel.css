@@ -137,6 +137,7 @@
 
 .image-trail-panel-root .image-trail-panel__target-url,
 .image-trail-panel-root .image-trail-panel__full-url-input,
+.image-trail-panel-root .image-trail-panel__password-input,
 .image-trail-panel-root .image-trail-panel__field-input {
   width: 100%;
   min-width: 0;
@@ -177,6 +178,11 @@
 }
 
 .image-trail-panel-root .image-trail-panel__field-input:focus {
+  outline: 1px solid #8fd;
+  border-color: #8fd;
+}
+
+.image-trail-panel-root .image-trail-panel__password-input:focus {
   outline: 1px solid #8fd;
   border-color: #8fd;
 }

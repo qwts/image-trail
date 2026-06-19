@@ -111,7 +111,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
     asArray(bookmarks.indexNames),
     [SchemaIndex.BookmarksByKeyReference, SchemaIndex.BookmarksByUpdatedAt, SchemaIndex.BookmarksByUrl].sort(),
   );
-  assert.deepEqual(asArray(blobs.indexNames), [SchemaIndex.BlobsByCreatedAt, SchemaIndex.BlobsBySha256].sort());
+  assert.deepEqual(asArray(blobs.indexNames), [SchemaIndex.BlobsByCreatedAt, SchemaIndex.BlobsByKeyReference].sort());
 
   const metadata = await new Promise((resolve, reject) => {
     const request = transaction.objectStore(DataStore.Metadata).get('schema');

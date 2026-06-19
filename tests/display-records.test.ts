@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeDisplayLabel, sourceImageUrlFrom } from '../extension/src/core/display-records.js';
+import { isDurableImageSourceUrl, normalizeDisplayLabel, sourceImageUrlFrom } from '../extension/src/core/display-records.js';
 
 test('uses source image filename from DuckDuckGo image proxy URLs', () => {
   const source = 'https://cdn.example.test/images/korn-live-1999.jpg';
@@ -18,4 +18,11 @@ test('unwraps source image URLs from proxy query parameters', () => {
   const proxy = `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(source)}&f=1&nofb=1`;
 
   assert.equal(sourceImageUrlFrom(proxy).href, source);
+});
+
+test('durable image source URLs reject blob preview URLs', () => {
+  assert.equal(isDurableImageSourceUrl('https://example.test/photo.jpg'), true);
+  assert.equal(isDurableImageSourceUrl('http://example.test/photo.jpg'), true);
+  assert.equal(isDurableImageSourceUrl('blob:https://example.test/preview-id'), false);
+  assert.equal(isDurableImageSourceUrl('data:image/png;base64,abc'), false);
 });
