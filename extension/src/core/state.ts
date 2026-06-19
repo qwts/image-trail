@@ -33,6 +33,8 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     captureResult: null,
     storageUsage: null,
     automation: EMPTY_AUTOMATION_STATE,
+    selectedHistoryId: null,
+    activeFieldId: null,
   };
 }
 

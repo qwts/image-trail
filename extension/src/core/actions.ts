@@ -111,5 +111,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return state;
     case 'stop-all':
       return { ...state, automation: { ...EMPTY_AUTOMATION_STATE }, lastUpdatedAt: Date.now() };
+    default:
+      return state;
   }
 }

@@ -125,7 +125,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     captureSection,
     navSection,
     autoSection,
-    createHistoryView(state.history, state.selectedHistoryId, state.captureInProgress, target.dispatch),
+    createHistoryView(state.history, state.captureInProgress, target.dispatch),
     createBookmarksView(state.target.selectedUrl, state.bookmarks, state.captureInProgress, target.dispatch),
     actions,
   );
