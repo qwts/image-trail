@@ -1,4 +1,5 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
+import { sourceImageUrlFrom } from '../core/display-records.js';
 import { computeSha256 } from '../core/image/fingerprints.js';
 import { openImageTrailDb } from '../data/db.js';
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
@@ -57,8 +58,16 @@ function getDb(): Promise<IDBDatabase | null> {
   return dbPromise;
 }
 
+function canonicalCaptureUrl(url: string): string {
+  try {
+    return sourceImageUrlFrom(url).href;
+  } catch {
+    return url;
+  }
+}
+
 async function handleCaptureImage(message: CaptureImageMessage): Promise<import('../core/image/capture-result.js').CaptureResult> {
-  const { url } = message.payload;
+  const url = canonicalCaptureUrl(message.payload.url);
 
   const origin = extractOrigin(url);
   if (origin && !(await hasOriginPermission(origin))) {
@@ -119,7 +128,8 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
 async function handleGrantPermissionAndCapture(
   message: GrantPermissionAndCaptureMessage,
 ): Promise<import('../core/image/capture-result.js').CaptureResult> {
-  const { url, sourceType, sourceRecordId } = message.payload;
+  const { sourceType, sourceRecordId } = message.payload;
+  const url = canonicalCaptureUrl(message.payload.url);
   const origin = extractOrigin(url);
 
   if (!origin) {

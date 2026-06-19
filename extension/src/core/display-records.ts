@@ -23,12 +23,26 @@ export function normalizeDisplayLabel(record: Pick<ImageDisplayRecord, 'url' | '
   }
 
   try {
-    const parsed = new URL(record.url);
+    const parsed = sourceImageUrlFrom(record.url);
     const filename = parsed.pathname.split('/').filter(Boolean).at(-1);
     return filename ? decodeURIComponent(filename) : parsed.hostname;
   } catch {
     return record.url;
   }
+}
+
+export function sourceImageUrlFrom(url: string): URL {
+  const parsed = new URL(url);
+  for (const key of ['u', 'url', 'imgurl', 'mediaurl']) {
+    const sourceUrl = parsed.searchParams.get(key)?.trim();
+    if (!sourceUrl) continue;
+    try {
+      return new URL(sourceUrl);
+    } catch {
+      // Fall back to the visible URL if the parameter is not itself a URL.
+    }
+  }
+  return parsed;
 }
 
 export function createDisplayRecord(

@@ -44,16 +44,15 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     return '';
   };
 
-  const parseSelectedUrl = (): ParsedUrlModel | null => {
-    if (!state.target.selectedUrl) return null;
+  const parsePageUrl = (): ParsedUrlModel | null => {
     try {
-      return parseUrl(state.target.selectedUrl);
+      return parseUrl(window.location.href);
     } catch {
       return null;
     }
   };
 
-  const targetModel = parseSelectedUrl();
+  const targetModel = parsePageUrl();
   const fields = targetModel ? collectUrlFields(targetModel) : [];
   const editableFields: EditableField[] = targetModel
     ? fields.map((field) => ({
@@ -143,7 +142,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     heading,
     createStatusView(state, target.dispatch),
     createUrlEditorView(
-      { url: state.target.selectedUrl },
+      { url: window.location.href },
       {
         onApply: (url) => {
           target.dispatch({ name: 'selected-url/apply', url });

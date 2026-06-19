@@ -2,7 +2,7 @@ import type { CaptureStore } from '../content/capture-controller.js';
 import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
 import type { PageAdapter, TargetSelectionSnapshot } from '../content/page-adapter.js';
-import { createDisplayRecord } from '../core/display-records.js';
+import { createDisplayRecord, sourceImageUrlFrom } from '../core/display-records.js';
 import { reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
@@ -17,6 +17,14 @@ import { renderPanel } from './render.js';
 
 const ROOT_ID = 'image-trail-panel-root';
 const STYLE_PATH = 'src/ui/styles/panel.css';
+
+function sourceUrlForBookmark(url: string): string {
+  try {
+    return sourceImageUrlFrom(url).href;
+  } catch {
+    return url;
+  }
+}
 
 function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
   return {
@@ -35,6 +43,7 @@ export class ImageTrailPanel {
   private state: PanelState = createInitialPanelState();
   private unsubscribeFromTarget: (() => void) | null = null;
   private unsubscribeFromLoads: (() => void) | null = null;
+  private unsubscribeFromBookmarkRequests: (() => void) | null = null;
 
   private readonly governor = new RequestGovernor();
   private readonly keyboard: KeyboardRouter;
@@ -53,6 +62,9 @@ export class ImageTrailPanel {
     this.unsubscribeFromLoads = this.pageAdapter.subscribeToSuccessfulLoads((target) => {
       this.state = reducePanelAction(this.state, { name: 'history/add-loaded', url: target.url });
       this.render();
+    });
+    this.unsubscribeFromBookmarkRequests = this.pageAdapter.subscribeToBookmarkRequests((target) => {
+      void this.bookmarkUrl(target.url);
     });
     void this.loadBookmarks();
     void this.refreshStorageUsage();
@@ -110,6 +122,8 @@ export class ImageTrailPanel {
     this.unsubscribeFromTarget = null;
     this.unsubscribeFromLoads?.();
     this.unsubscribeFromLoads = null;
+    this.unsubscribeFromBookmarkRequests?.();
+    this.unsubscribeFromBookmarkRequests = null;
   }
 
   private loadBookmarks = async (): Promise<void> => {
@@ -237,6 +251,7 @@ export class ImageTrailPanel {
     }
     this.mount();
     this.keyboard.enable();
+    this.pageAdapter.enableBookmarkShortcut();
     this.pageAdapter.autoSelectSingleImage();
     this.render();
   };
@@ -278,7 +293,7 @@ export class ImageTrailPanel {
       if (!snapshot.selected) return false;
       const image = this.findSelectedImage(snapshot.selected.handleId);
       if (!image) return false;
-      const currentUrl = image.src;
+      const currentUrl = window.location.href;
       if (!currentUrl) return false;
       const model = parseUrl(currentUrl);
       const fields = collectUrlFields(model);
@@ -302,9 +317,9 @@ export class ImageTrailPanel {
     if (!snapshot.selected) return;
 
     const image = this.findSelectedImage(snapshot.selected.handleId);
-    if (!image || !image.src) return;
+    if (!image) return;
 
-    const model = parseUrl(image.src);
+    const model = parseUrl(window.location.href);
     const fields = collectUrlFields(model);
     const field = fields.find((item) => item.id === fieldId);
     if (!field) return;
@@ -312,8 +327,6 @@ export class ImageTrailPanel {
     const nextModel = setUrlFieldValue(model, field, nextValue);
     const nextUrl = rebuildUrl(nextModel);
     applyImageUrl(image, nextUrl);
-
-    this.state = setTargetState(this.state, { ...this.state.target, selectedUrl: nextUrl });
     this.render();
   }
 
@@ -325,7 +338,6 @@ export class ImageTrailPanel {
     if (!image) return;
 
     applyImageUrl(image, nextUrl);
-    this.state = setTargetState(this.state, { ...this.state.target, selectedUrl: nextUrl });
     this.render();
   }
 
@@ -361,11 +373,17 @@ export class ImageTrailPanel {
   private async bookmarkCurrentImage(): Promise<void> {
     const url = this.state.target.selectedUrl;
     if (!url) return;
-    const draft = createDisplayRecord({ id: url, url, source: 'bookmark' });
+    await this.bookmarkUrl(url);
+  }
+
+  private async bookmarkUrl(url: string): Promise<void> {
+    const sourceUrl = sourceUrlForBookmark(url);
+    const draft = createDisplayRecord({ id: sourceUrl, url: sourceUrl, source: 'bookmark' });
     const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
     this.state = {
       ...this.state,
       bookmarks: [bookmark, ...this.state.bookmarks.filter((item) => item.url !== bookmark.url)],
+      message: `Added to Image Trail: ${bookmark.url}`,
       lastUpdatedAt: Date.now(),
     };
     this.render();
@@ -391,7 +409,7 @@ export class ImageTrailPanel {
     if (!this.captureStore) return;
     this.state = reducePanelAction(this.state, { name: 'capture/start' });
     this.render();
-    const result = await this.captureStore.requestCapture(url, sourceType, sourceRecordId);
+    const result = await this.captureStore.requestCapture(sourceUrlForBookmark(url), sourceType, sourceRecordId);
     this.state = reducePanelAction(this.state, { name: 'capture/complete', result, sourceRecordId });
     if (isCapturedResult(result) && sourceType === 'bookmark' && sourceRecordId && this.bookmarkStore) {
       const updatedBookmark = this.state.bookmarks.find((b) => b.id === sourceRecordId);

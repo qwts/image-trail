@@ -1,6 +1,6 @@
 import { applyImageUrl } from '../core/image/image-navigation.js';
 import { DomObserver } from './dom-observer.js';
-import { createTargetImageInfo, findQualifyingImages, type TargetImageInfo } from './target-image.js';
+import { createTargetImageInfo, findQualifyingImages, isQualifyingImage, type TargetImageInfo } from './target-image.js';
 import { markHoveredTarget, markPickModeCandidate, markSelectedTarget, restoreElementStyles } from './page-style.js';
 
 export type TargetSelectionMode = 'auto' | 'manual' | 'none';
@@ -15,6 +15,7 @@ export interface TargetSelectionSnapshot {
 
 export type TargetSelectionListener = (snapshot: TargetSelectionSnapshot) => void;
 export type TargetLoadListener = (target: TargetImageInfo) => void;
+export type TargetBookmarkRequestListener = (target: TargetImageInfo) => void;
 
 export class PageAdapter {
   private selected: HTMLImageElement | null = null;
@@ -26,7 +27,9 @@ export class PageAdapter {
   private readonly observer = new DomObserver(() => this.refreshPickCandidates());
   private readonly listeners = new Set<TargetSelectionListener>();
   private readonly loadListeners = new Set<TargetLoadListener>();
+  private readonly bookmarkRequestListeners = new Set<TargetBookmarkRequestListener>();
   private pendingLoadTarget: HTMLImageElement | null = null;
+  private bookmarkShortcutActive = false;
 
   subscribe(listener: TargetSelectionListener): () => void {
     this.listeners.add(listener);
@@ -37,6 +40,23 @@ export class PageAdapter {
   subscribeToSuccessfulLoads(listener: TargetLoadListener): () => void {
     this.loadListeners.add(listener);
     return () => this.loadListeners.delete(listener);
+  }
+
+  subscribeToBookmarkRequests(listener: TargetBookmarkRequestListener): () => void {
+    this.bookmarkRequestListeners.add(listener);
+    return () => this.bookmarkRequestListeners.delete(listener);
+  }
+
+  enableBookmarkShortcut(): void {
+    if (this.bookmarkShortcutActive) return;
+    this.bookmarkShortcutActive = true;
+    document.addEventListener('click', this.onBookmarkShortcutClick, true);
+  }
+
+  disableBookmarkShortcut(): void {
+    if (!this.bookmarkShortcutActive) return;
+    this.bookmarkShortcutActive = false;
+    document.removeEventListener('click', this.onBookmarkShortcutClick, true);
   }
 
   autoSelectSingleImage(): TargetSelectionSnapshot {
@@ -73,6 +93,7 @@ export class PageAdapter {
   }
 
   cleanup(): void {
+    this.disableBookmarkShortcut();
     this.stopPickMode();
     this.restoreSelectedTarget();
     this.mode = 'none';
@@ -147,6 +168,21 @@ export class PageAdapter {
     this.selectTarget(image, 'manual');
     this.stopPickMode();
     this.emit(`Selected ${this.lastSnapshot.selected?.url ?? 'image target'}.`);
+  };
+
+  private onBookmarkShortcutClick = (event: MouseEvent): void => {
+    if (!event.shiftKey || event.button !== 0) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const image = target.closest('img');
+    if (!(image instanceof HTMLImageElement) || !isQualifyingImage(image)) return;
+    const info = createTargetImageInfo(image);
+    if (!info) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    for (const listener of this.bookmarkRequestListeners) listener(info);
   };
 
   private selectTarget(image: HTMLImageElement, mode: TargetSelectionMode): void {

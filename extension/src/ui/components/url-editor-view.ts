@@ -21,7 +21,8 @@ export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEdi
   value.wrap = 'soft';
   value.spellcheck = false;
   value.disabled = state.url === null;
-  value.value = state.url ?? EMPTY_URL_MESSAGE;
+  value.value = state.url ?? '';
+  value.placeholder = EMPTY_URL_MESSAGE;
 
   const applyUrl = (): void => {
     callbacks.onApply(value.value);

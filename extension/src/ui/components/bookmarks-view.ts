@@ -1,4 +1,4 @@
-import type { ImageDisplayRecord } from '../../core/display-records.js';
+import { sourceImageUrlFrom, type ImageDisplayRecord } from '../../core/display-records.js';
 
 type BookmarkAction =
   | { readonly name: 'bookmark/current' }
@@ -29,10 +29,15 @@ export function createBookmarksView(
   list.className = 'image-trail-panel__record-list';
   for (const item of items) {
     const entry = document.createElement('li');
-    const load = document.createElement('button');
-    load.type = 'button';
-    load.textContent = item.label ?? item.url;
-    load.addEventListener('click', () => dispatch({ name: 'bookmark/load', id: item.id }));
+    const bookmarkLabel = document.createElement('div');
+    bookmarkLabel.className = 'image-trail-panel__bookmark-label';
+    const source = document.createElement('span');
+    source.className = 'image-trail-panel__bookmark-source';
+    source.textContent = extensionLabelFor(item);
+    const label = document.createElement('span');
+    label.className = 'image-trail-panel__bookmark-name';
+    label.textContent = item.label ?? item.url;
+    bookmarkLabel.append(source, label);
 
     const actions = document.createElement('span');
     actions.className = 'image-trail-panel__item-actions';
@@ -62,7 +67,7 @@ export function createBookmarksView(
     remove.textContent = 'Remove';
     remove.addEventListener('click', () => dispatch({ name: 'bookmark/remove', id: item.id }));
     actions.append(remove);
-    entry.append(load, actions);
+    entry.append(bookmarkLabel, actions);
     list.append(entry);
   }
 
@@ -71,4 +76,26 @@ export function createBookmarksView(
   empty.textContent = 'Saved image URLs persist through the encrypted bookmarks repository.';
   section.append(heading, add, items.length ? list : empty);
   return section;
+}
+
+function extensionLabelFor(item: ImageDisplayRecord): string {
+  const extension = extensionFrom(item.label) ?? extensionFromUrl(item.url);
+  return extension ? extension.toUpperCase() : 'IMAGE';
+}
+
+function extensionFrom(value: string | undefined): string | null {
+  if (!value) return null;
+  const cleanName = value.split(/[?#]/u)[0];
+  const extension = cleanName.match(/\.([a-z0-9]+)$/iu)?.[1]?.toUpperCase();
+  if (extension && ['PNG', 'JPG', 'JPEG', 'GIF', 'WEBP'].includes(extension)) return extension;
+  return /(?:^|[/.-])OIP[.-]/iu.test(cleanName) ? 'JPG' : null;
+}
+
+function extensionFromUrl(url: string): string | null {
+  try {
+    const sourceUrl = sourceImageUrlFrom(url);
+    return extensionFrom(sourceUrl.pathname);
+  } catch {
+    return extensionFrom(url);
+  }
 }

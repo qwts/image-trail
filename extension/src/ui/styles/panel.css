@@ -12,7 +12,6 @@
   inline-size: min(420px, calc(100vw - 24px));
   max-inline-size: calc(100vw - 24px);
   max-height: calc(100vh - 24px);
-  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -272,6 +271,37 @@
   overflow-wrap: anywhere;
   word-break: break-word;
   text-align: left;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-label {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 0;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-source {
+  max-width: 72px;
+  overflow: hidden;
+  color: rgb(255 255 255 / 86%);
+  font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-shadow:
+    0 0 4px rgb(255 255 255 / 70%),
+    0 0 12px rgb(143 255 221 / 45%);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .image-trail-panel-root .image-trail-panel__item-actions {
