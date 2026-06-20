@@ -1,6 +1,17 @@
-import { applyImageUrl } from '../core/image/image-navigation.js';
+import {
+  applyImageUrl,
+  captureImageNavigationSnapshot,
+  restoreImageNavigationSnapshot,
+  type ImageNavigationSnapshot,
+} from '../core/image/image-navigation.js';
 import { DomObserver } from './dom-observer.js';
-import { createTargetImageInfo, findQualifyingImages, getImageRejectionReason, isQualifyingImage, type TargetImageInfo } from './target-image.js';
+import {
+  createTargetImageInfo,
+  findQualifyingImages,
+  getImageRejectionReason,
+  isQualifyingImage,
+  type TargetImageInfo,
+} from './target-image.js';
 import { markHoveredTarget, markPickModeCandidate, markSelectedTarget, restoreElementStyles } from './page-style.js';
 import { createThumbnailDataUrlFromImage } from './thumbnail-generator.js';
 
@@ -32,7 +43,9 @@ export class PageAdapter {
   private readonly bookmarkRequestListeners = new Set<TargetBookmarkRequestListener>();
   private pendingLoadTarget: HTMLImageElement | null = null;
   private pendingLoadRestoreUrl: string | null = null;
+  private pendingLoadRestoreSnapshot: ImageNavigationSnapshot | null = null;
   private selectedOriginalUrl: string | null = null;
+  private selectedOriginalSnapshot: ImageNavigationSnapshot | null = null;
   private selectedActiveUrl: string | null = null;
   private bookmarkShortcutActive = false;
 
@@ -117,9 +130,10 @@ export class PageAdapter {
     }
 
     const previousUrl = this.selectedActiveUrl ?? createTargetImageInfo(this.selected)?.url ?? null;
+    const previousSnapshot = captureImageNavigationSnapshot(this.selected);
     const result = applyImageUrl(this.selected, url);
     this.selectedActiveUrl = result.url;
-    this.watchSelectedLoad(this.selected, previousUrl);
+    this.watchSelectedLoad(this.selected, previousUrl, previousSnapshot);
     return this.emit(result.message);
   }
 
@@ -221,9 +235,11 @@ export class PageAdapter {
 
   private selectTarget(image: HTMLImageElement, mode: TargetSelectionMode): void {
     const originalUrl = createTargetImageInfo(image)?.url ?? null;
+    const originalSnapshot = captureImageNavigationSnapshot(image);
     this.restoreSelectedTarget();
     this.selected = image;
     this.selectedOriginalUrl = originalUrl;
+    this.selectedOriginalSnapshot = originalSnapshot;
     this.selectedActiveUrl = originalUrl;
     this.mode = mode;
     const handleId = createTargetImageInfo(image)?.handleId;
@@ -234,7 +250,9 @@ export class PageAdapter {
 
   private restoreSelectedTarget(): void {
     if (this.selected) {
-      if (this.selectedOriginalUrl && createTargetImageInfo(this.selected)?.url !== this.selectedOriginalUrl) {
+      if (this.selectedOriginalSnapshot) {
+        restoreImageNavigationSnapshot(this.selectedOriginalSnapshot);
+      } else if (this.selectedOriginalUrl && createTargetImageInfo(this.selected)?.url !== this.selectedOriginalUrl) {
         applyImageUrl(this.selected, this.selectedOriginalUrl);
       }
       this.selected.removeAttribute('data-image-trail-handle');
@@ -243,10 +261,15 @@ export class PageAdapter {
     this.clearPendingLoadTarget();
     this.selected = null;
     this.selectedOriginalUrl = null;
+    this.selectedOriginalSnapshot = null;
     this.selectedActiveUrl = null;
   }
 
-  private watchSelectedLoad(image: HTMLImageElement, restoreUrl: string | null = null): void {
+  private watchSelectedLoad(
+    image: HTMLImageElement,
+    restoreUrl: string | null = null,
+    restoreSnapshot: ImageNavigationSnapshot | null = null,
+  ): void {
     this.clearPendingLoadTarget();
     if (isSuccessfulImageLoad(image)) {
       void this.emitSuccessfulLoad(image);
@@ -255,6 +278,7 @@ export class PageAdapter {
 
     this.pendingLoadTarget = image;
     this.pendingLoadRestoreUrl = restoreUrl;
+    this.pendingLoadRestoreSnapshot = restoreSnapshot;
     image.addEventListener('load', this.onSelectedLoad, { once: true });
     image.addEventListener('error', this.onSelectedError, { once: true });
   }
@@ -265,6 +289,7 @@ export class PageAdapter {
     this.pendingLoadTarget.removeEventListener('error', this.onSelectedError);
     this.pendingLoadTarget = null;
     this.pendingLoadRestoreUrl = null;
+    this.pendingLoadRestoreSnapshot = null;
   }
 
   private onSelectedLoad = (event: Event): void => {
@@ -279,9 +304,14 @@ export class PageAdapter {
     const image = event.currentTarget;
     if (!(image instanceof HTMLImageElement) || image !== this.pendingLoadTarget) return;
     const restoreUrl = this.pendingLoadRestoreUrl;
+    const restoreSnapshot = this.pendingLoadRestoreSnapshot;
     this.clearPendingLoadTarget();
     if (image === this.selected && restoreUrl) {
-      applyImageUrl(image, restoreUrl);
+      if (restoreSnapshot) {
+        restoreImageNavigationSnapshot(restoreSnapshot);
+      } else {
+        applyImageUrl(image, restoreUrl);
+      }
       this.selectedActiveUrl = restoreUrl;
       this.emit(`Failed to load image; restored ${restoreUrl}.`);
     }

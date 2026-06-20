@@ -4,6 +4,50 @@ export interface ImageNavigationResult {
   readonly message: string;
 }
 
+export interface ImageNavigationSnapshot {
+  readonly image: HTMLImageElement;
+  readonly src: string;
+  readonly srcAttribute: string | null;
+  readonly srcset: string | null;
+  readonly sizes: string | null;
+  readonly sources: readonly SourceNavigationSnapshot[];
+}
+
+interface SourceNavigationSnapshot {
+  readonly source: HTMLSourceElement;
+  readonly srcset: string | null;
+  readonly sizes: string | null;
+}
+
+export function captureImageNavigationSnapshot(image: HTMLImageElement): ImageNavigationSnapshot {
+  const picture = image.closest('picture');
+  return {
+    image,
+    src: image.src,
+    srcAttribute: image.getAttribute('src'),
+    srcset: image.getAttribute('srcset'),
+    sizes: image.getAttribute('sizes'),
+    sources: picture
+      ? Array.from(picture.querySelectorAll('source')).map((source) => ({
+          source,
+          srcset: source.getAttribute('srcset'),
+          sizes: source.getAttribute('sizes'),
+        }))
+      : [],
+  };
+}
+
+export function restoreImageNavigationSnapshot(snapshot: ImageNavigationSnapshot): void {
+  for (const source of snapshot.sources) {
+    setOptionalAttribute(source.source, 'srcset', source.srcset);
+    setOptionalAttribute(source.source, 'sizes', source.sizes);
+  }
+  setOptionalAttribute(snapshot.image, 'srcset', snapshot.srcset);
+  setOptionalAttribute(snapshot.image, 'sizes', snapshot.sizes);
+  setOptionalAttribute(snapshot.image, 'src', snapshot.srcAttribute);
+  snapshot.image.src = snapshot.src;
+}
+
 export function clearResponsiveImageAttributes(image: HTMLImageElement): void {
   image.removeAttribute('srcset');
   image.removeAttribute('sizes');
@@ -18,6 +62,14 @@ export function applyImageUrl(image: HTMLImageElement, url: string): ImageNaviga
   clearResponsiveImageAttributes(image);
   image.src = url;
   return { status: 'applied', url, message: `Applied ${url}` };
+}
+
+function setOptionalAttribute(element: Element, name: string, value: string | null): void {
+  if (value === null) {
+    element.removeAttribute(name);
+  } else {
+    element.setAttribute(name, value);
+  }
 }
 
 export function pushVisibleUrlWhenSameOrigin(

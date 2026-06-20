@@ -1,21 +1,51 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyImageUrl, pushVisibleUrlWhenSameOrigin } from '../extension/src/core/image/image-navigation.js';
+import {
+  applyImageUrl,
+  captureImageNavigationSnapshot,
+  pushVisibleUrlWhenSameOrigin,
+  restoreImageNavigationSnapshot,
+} from '../extension/src/core/image/image-navigation.js';
 
 function fakeImage(): HTMLImageElement {
   const removed: string[] = [];
   const sourceRemoved: string[] = [];
+  const imageAttrs = new Map<string, string>([
+    ['src', 'old.jpg'],
+    ['srcset', 'old-1x.jpg 1x, old-2x.jpg 2x'],
+    ['sizes', '100vw'],
+  ]);
+  const sourceAttrs = new Map<string, string>([
+    ['srcset', 'source-old.webp 1x'],
+    ['sizes', '80vw'],
+  ]);
   const source = {
+    getAttribute(name: string) {
+      return sourceAttrs.get(name) ?? null;
+    },
+    setAttribute(name: string, value: string) {
+      sourceAttrs.set(name, value);
+    },
     removeAttribute(name: string) {
       sourceRemoved.push(name);
+      sourceAttrs.delete(name);
     },
   };
   return {
     src: 'https://example.test/old.jpg',
     removed,
     sourceRemoved,
+    imageAttrs,
+    sourceAttrs,
+    getAttribute(name: string) {
+      return imageAttrs.get(name) ?? null;
+    },
+    setAttribute(name: string, value: string) {
+      imageAttrs.set(name, value);
+    },
     removeAttribute(name: string) {
       removed.push(name);
+      imageAttrs.delete(name);
     },
     closest(selector: string) {
       assert.equal(selector, 'picture');
@@ -31,6 +61,21 @@ test('clears responsive attributes before applying a target image URL', () => {
   assert.deepEqual((image as unknown as { sourceRemoved: string[] }).sourceRemoved, ['srcset', 'sizes']);
   assert.equal(image.src, 'https://example.test/new.jpg');
   assert.equal(result.status, 'applied');
+});
+
+test('restores responsive image attributes after a failed target image URL', () => {
+  const image = fakeImage();
+  const snapshot = captureImageNavigationSnapshot(image);
+
+  applyImageUrl(image, 'https://example.test/missing.jpg');
+  restoreImageNavigationSnapshot(snapshot);
+
+  assert.equal(image.src, 'https://example.test/old.jpg');
+  assert.equal(image.getAttribute('src'), 'old.jpg');
+  assert.equal(image.getAttribute('srcset'), 'old-1x.jpg 1x, old-2x.jpg 2x');
+  assert.equal(image.getAttribute('sizes'), '100vw');
+  assert.equal((image as unknown as { sourceAttrs: Map<string, string> }).sourceAttrs.get('srcset'), 'source-old.webp 1x');
+  assert.equal((image as unknown as { sourceAttrs: Map<string, string> }).sourceAttrs.get('sizes'), '80vw');
 });
 
 test('pushes visible URL only for same-origin updates', () => {
