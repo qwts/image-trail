@@ -1,5 +1,4 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
-import { sourceImageUrlFrom } from '../core/display-records.js';
 import { IndexedDbBookmarkStore } from '../content/bookmarks-controller.js';
 import { getActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
@@ -93,14 +92,6 @@ function getDb(): Promise<IDBDatabase | null> {
   return dbPromise;
 }
 
-function canonicalCaptureUrl(url: string): string {
-  try {
-    return sourceImageUrlFrom(url).href;
-  } catch {
-    return url;
-  }
-}
-
 function recentHistoryKey(pageUrl: string): string {
   try {
     return new URL(pageUrl).hostname;
@@ -164,7 +155,7 @@ function createPreviewForDataUrl(dataUrl: string): Promise<import('./messages.js
 }
 
 async function handleCaptureImage(message: CaptureImageMessage): Promise<import('../core/image/capture-result.js').CaptureResult> {
-  const url = canonicalCaptureUrl(message.payload.url);
+  const url = message.payload.url;
   const activeBlobKey = getActiveBlobKey();
   if (!activeBlobKey) {
     return {
@@ -325,7 +316,7 @@ async function handleCreateBlobPreview(message: CreateBlobPreviewMessage): Promi
 async function handleFetchThumbnailSource(
   message: FetchThumbnailSourceMessage,
 ): Promise<import('./messages.js').FetchThumbnailSourceResultMessage['payload']> {
-  const fetchResult = await fetchImageBytes(canonicalCaptureUrl(message.payload.url), MAX_THUMBNAIL_SOURCE_BYTES, {
+  const fetchResult = await fetchImageBytes(message.payload.url, MAX_THUMBNAIL_SOURCE_BYTES, {
     referrer: message.payload.referrer,
   });
   if (!fetchResult.ok) {
@@ -415,7 +406,7 @@ async function handleGrantPermissionAndCapture(
   message: GrantPermissionAndCaptureMessage,
 ): Promise<import('../core/image/capture-result.js').CaptureResult> {
   const { sourceType, sourceRecordId } = message.payload;
-  const url = canonicalCaptureUrl(message.payload.url);
+  const url = message.payload.url;
   const origin = extractOrigin(url);
 
   if (!origin) {

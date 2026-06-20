@@ -1,5 +1,5 @@
 import type { ImageDisplayRecord } from '../core/display-records.js';
-import { createDisplayRecord, sourceImageUrlFrom } from '../core/display-records.js';
+import { createDisplayRecord } from '../core/display-records.js';
 import { createKeyReference } from '../data/crypto/key-reference.js';
 import type { KeyReference, StoredKeyRecord } from '../data/crypto/types.js';
 import { generateAesGcmKey } from '../data/crypto/webcrypto.js';
@@ -141,7 +141,7 @@ function filterByVisibilityScope(
 
 function hostnameFromUrl(url: string): string | null {
   try {
-    return sourceImageUrlFrom(url).hostname;
+    return new URL(url).hostname;
   } catch {
     return null;
   }

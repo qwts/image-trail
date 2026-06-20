@@ -55,6 +55,11 @@ test('image record URL validation rejects invalid transport before load probing'
     ok: true,
     sourceUrl: 'https://example.test/gallery/page',
   });
+  const wrapped = 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fcdn.example.test%2Fphoto.jpg&f=1';
+  assert.deepEqual(validateImageRecordUrl(wrapped), {
+    ok: true,
+    sourceUrl: wrapped,
+  });
 
   const invalid = validateImageRecordUrl('not a url');
   assert.equal(invalid.ok, false);

@@ -565,14 +565,20 @@ test('IndexedDbBookmarkStore can scope visible bookmarks to the current site', a
     );
 
     const globalPage = await store.loadPage({ offset: 0, limit: 30, scope: 'global', currentPageUrl: 'https://duckduckgo.com/' });
-    const sitePage = await store.loadPage({ offset: 0, limit: 30, scope: 'site', currentPageUrl: 'https://cdn.example.test/page' });
+    const sourceSitePage = await store.loadPage({ offset: 0, limit: 30, scope: 'site', currentPageUrl: 'https://cdn.example.test/page' });
+    const proxySitePage = await store.loadPage({ offset: 0, limit: 30, scope: 'site', currentPageUrl: 'https://duckduckgo.com/' });
 
     assert.equal(globalPage.total, 2);
     assert.deepEqual(
-      sitePage.items.map((item) => item.url),
+      sourceSitePage.items.map((item) => item.url),
+      [],
+    );
+    assert.deepEqual(
+      proxySitePage.items.map((item) => item.url),
       ['https://duckduckgo.com/image-proxy?u=https%3A%2F%2Fcdn.example.test%2Fduck.jpg'],
     );
-    assert.equal(sitePage.total, 1);
+    assert.equal(sourceSitePage.total, 0);
+    assert.equal(proxySitePage.total, 1);
   } finally {
     await store.close();
   }

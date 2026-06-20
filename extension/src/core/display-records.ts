@@ -57,7 +57,7 @@ export function sourceImageUrlFrom(url: string): URL {
 
 export function isDurableImageSourceUrl(url: string): boolean {
   try {
-    const sourceUrl = sourceImageUrlFrom(url);
+    const sourceUrl = new URL(url);
     return sourceUrl.protocol === 'http:' || sourceUrl.protocol === 'https:';
   } catch {
     return false;
@@ -71,7 +71,7 @@ export function encryptedBlobIdForRecord(record: Pick<ImageDisplayRecord, 'captu
 export function validateImageRecordUrl(url: string): ImageRecordUrlValidation {
   let sourceUrl: URL;
   try {
-    sourceUrl = sourceImageUrlFrom(url);
+    sourceUrl = new URL(url);
   } catch {
     return { ok: false, message: 'Image Trail could not save this URL because it is not a valid URL.' };
   }

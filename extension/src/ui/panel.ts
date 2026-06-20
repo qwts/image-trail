@@ -6,7 +6,6 @@ import type { PageAdapter, TargetSelectionSnapshot } from '../content/page-adapt
 import {
   createDisplayRecord,
   isDurableImageSourceUrl,
-  sourceImageUrlFrom,
   validateImageRecordUrl,
   type ImageRecordUrlValidation,
 } from '../core/display-records.js';
@@ -46,14 +45,6 @@ interface ValidatedRecordUrl extends ImageRecordUrlValidation {
 
 interface RecordAddOptions {
   readonly trustLoadedImage?: boolean;
-}
-
-function sourceUrlForBookmark(url: string): string {
-  try {
-    return sourceImageUrlFrom(url).href;
-  } catch {
-    return url;
-  }
 }
 
 function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
@@ -104,8 +95,7 @@ export class ImageTrailPanel {
         const options = { trustLoadedImage: target.trustedLoadedImage };
         const bookmarked = await this.bookmarkUrl(target.url, target.thumbnail, options);
         if (bookmarked) {
-          const historyUrl = options.trustLoadedImage ? target.url : sourceUrlForBookmark(target.url);
-          await this.addRecentHistory(historyUrl, target.thumbnail, options);
+          await this.addRecentHistory(target.url, target.thumbnail, options);
         }
       });
     });
@@ -788,7 +778,7 @@ export class ImageTrailPanel {
     }
     this.state = reducePanelAction(this.state, { name: 'capture/start' });
     this.render();
-    const result = await this.captureStore.requestCapture(isImportedImage ? url : sourceUrlForBookmark(url), sourceType, sourceRecordId);
+    const result = await this.captureStore.requestCapture(url, sourceType, sourceRecordId);
     this.state = reducePanelAction(this.state, { name: 'capture/complete', result, sourceRecordId });
     if (isCapturedResult(result) && sourceType === 'history' && sourceRecordId && this.recentHistoryStore) {
       const updatedHistory = this.state.history.find((item) => item.id === sourceRecordId);
