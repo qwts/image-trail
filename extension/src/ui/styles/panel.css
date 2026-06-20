@@ -623,6 +623,19 @@
   background: rgb(90 180 200 / 18%);
 }
 
+.image-trail-panel-root .image-trail-panel__field-row.is-success {
+  border-color: rgb(116 214 158 / 76%);
+  background: rgb(42 126 76 / 18%);
+  box-shadow:
+    0 0 0 1px rgb(116 214 158 / 15%),
+    0 0 14px rgb(80 210 130 / 18%);
+}
+
+.image-trail-panel-root .image-trail-panel__field-row.is-unchanged {
+  border-color: rgb(255 255 255 / 24%);
+  background: rgb(255 255 255 / 7%);
+}
+
 .image-trail-panel-root .image-trail-panel__field-row.is-error {
   border-color: rgb(255 126 126 / 78%);
   background: rgb(170 38 38 / 20%);
@@ -641,6 +654,10 @@
 
 .image-trail-panel-root .image-trail-panel__field-control.has-step-controls {
   grid-template-columns: minmax(0, 1fr) 26px 26px;
+}
+
+.image-trail-panel-root .image-trail-panel__field-control.has-step-controls.has-unlock-control {
+  grid-template-columns: minmax(0, 1fr) 26px 26px minmax(58px, max-content);
 }
 
 .image-trail-panel-root .image-trail-panel__field-step-button {
@@ -666,6 +683,28 @@
 .image-trail-panel-root .image-trail-panel__field-step-button:hover {
   border-color: #8fd;
   background: #333;
+}
+
+.image-trail-panel-root .image-trail-panel__field-lock-button {
+  min-height: 26px;
+  padding: 0 7px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 4px;
+  background: #2a2a2a;
+  color: #ddd;
+  cursor: pointer;
+  font:
+    700 10px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__field-lock-button.is-unlocked {
+  border-color: rgb(116 214 158 / 62%);
+  background: rgb(42 126 76 / 28%);
+  color: rgb(230 255 240);
 }
 
 .image-trail-panel-root .image-trail-panel__field-step-button:focus {

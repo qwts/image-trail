@@ -13,7 +13,14 @@ test('switching active fields clears a previous failed field marker', () => {
 });
 
 test('target changes clear failed field markers', () => {
-  const failed = { ...createInitialPanelState(), failedFieldId: 'query-src-0' };
+  const failed = {
+    ...createInitialPanelState(),
+    failedFieldId: 'query-src-0',
+    successfulFieldIds: ['query-src-0'],
+    unchangedFieldIds: ['query-page-0'],
+    unlockedFieldIds: ['query-src-0'],
+    currentImageFingerprint: 'a'.repeat(64),
+  };
 
   const next = setTargetState(failed, {
     mode: 'manual',
@@ -26,4 +33,21 @@ test('target changes clear failed field markers', () => {
   });
 
   assert.equal(next.failedFieldId, null);
+  assert.deepEqual(next.successfulFieldIds, []);
+  assert.deepEqual(next.unchangedFieldIds, []);
+  assert.deepEqual(next.unlockedFieldIds, []);
+  assert.equal(next.currentImageFingerprint, null);
+});
+
+test('unlock toggle only changes successful fields', () => {
+  const state = { ...createInitialPanelState(), successfulFieldIds: ['q:0:0'] };
+
+  const unlocked = reducePanelAction(state, { name: 'field-unlock/toggle', id: 'q:0:0' });
+  assert.deepEqual(unlocked.unlockedFieldIds, ['q:0:0']);
+
+  const locked = reducePanelAction(unlocked, { name: 'field-unlock/toggle', id: 'q:0:0' });
+  assert.deepEqual(locked.unlockedFieldIds, []);
+
+  const ignored = reducePanelAction(state, { name: 'field-unlock/toggle', id: 'q:1:0' });
+  assert.deepEqual(ignored.unlockedFieldIds, []);
 });

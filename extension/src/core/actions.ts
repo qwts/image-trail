@@ -34,6 +34,10 @@ function clearRecordCapture(records: readonly ImageDisplayRecord[], id: string):
   return records.map((r) => (r.id === id ? { ...r, captureStatus: undefined, blobId: undefined, storedOriginal: undefined } : r));
 }
 
+function toggleItem(items: readonly string[], item: string): readonly string[] {
+  return items.includes(item) ? items.filter((value) => value !== item) : [...items, item];
+}
+
 export function reducePanelAction(state: PanelState, action: PanelAction): PanelState {
   switch (action.name) {
     case 'toggle-panel':
@@ -69,6 +73,14 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         ...state,
         activeFieldId: action.id,
         failedFieldId: action.id === state.failedFieldId ? state.failedFieldId : null,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'field-unlock/toggle':
+      return {
+        ...state,
+        unlockedFieldIds: state.successfulFieldIds.includes(action.id)
+          ? toggleItem(state.unlockedFieldIds, action.id)
+          : state.unlockedFieldIds,
         lastUpdatedAt: Date.now(),
       };
     case 'bookmark/current':

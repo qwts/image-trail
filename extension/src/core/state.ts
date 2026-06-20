@@ -47,6 +47,10 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     selectedHistoryId: null,
     activeFieldId: null,
     failedFieldId: null,
+    successfulFieldIds: [],
+    unchangedFieldIds: [],
+    unlockedFieldIds: [],
+    currentImageFingerprint: null,
   };
 }
 
@@ -73,6 +77,10 @@ export function setTargetState(state: PanelState, target: TargetState, now = Dat
     target,
     draftUrl: null,
     failedFieldId: null,
+    successfulFieldIds: [],
+    unchangedFieldIds: [],
+    unlockedFieldIds: [],
+    currentImageFingerprint: null,
     lastUpdatedAt: now,
   };
 }

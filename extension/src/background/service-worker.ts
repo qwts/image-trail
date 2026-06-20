@@ -1,4 +1,5 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
+import { computeSha256 } from '../core/image/fingerprints.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { getActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
@@ -337,6 +338,7 @@ async function handleFetchThumbnailSource(
     dataUrl: `data:${fetchResult.mimeType};base64,${arrayBufferToBase64(fetchResult.bytes)}`,
     mimeType: fetchResult.mimeType,
     byteLength: fetchResult.byteLength,
+    sha256: await computeSha256(fetchResult.bytes),
   };
 }
 

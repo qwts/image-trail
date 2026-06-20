@@ -171,7 +171,7 @@ export interface FetchThumbnailSourceResultMessage {
   readonly type: typeof MessageType.FetchThumbnailSourceResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload:
-    | { readonly ok: true; readonly dataUrl: string; readonly mimeType: string; readonly byteLength: number }
+    | { readonly ok: true; readonly dataUrl: string; readonly mimeType: string; readonly byteLength: number; readonly sha256?: string }
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 

@@ -9,12 +9,16 @@ export interface FieldsViewCallbacks {
   readonly onValueChange: (fieldId: string, value: string) => void;
   readonly onStep: (fieldId: string, delta: 1 | -1) => void;
   readonly onActivate: (fieldId: string) => void;
+  readonly onToggleUnlock: (fieldId: string) => void;
 }
 
 export function createFieldsView(
   fields: EditableField[],
   activeFieldId: string | null,
   failedFieldId: string | null,
+  successfulFieldIds: readonly string[],
+  unchangedFieldIds: readonly string[],
+  unlockedFieldIds: readonly string[],
   callbacks: FieldsViewCallbacks,
 ): HTMLElement {
   const wrapper = document.createElement('section');
@@ -32,7 +36,13 @@ export function createFieldsView(
     const item = document.createElement('li');
     item.className = 'image-trail-panel__field-item';
     const container = document.createElement('div');
-    container.className = `image-trail-panel__field-row${field.field.id === activeFieldId ? ' is-active' : ''}${field.field.id === failedFieldId ? ' is-error' : ''}`;
+    const isFailed = field.field.id === failedFieldId;
+    const isSuccessful = successfulFieldIds.includes(field.field.id);
+    const isUnchanged = unchangedFieldIds.includes(field.field.id);
+    const isUnlocked = unlockedFieldIds.includes(field.field.id);
+    const canUnlock =
+      isSuccessful && field.field.location === 'query' && (field.field.tokenKind === 'int' || field.field.tokenKind === 'hex');
+    container.className = `image-trail-panel__field-row${field.field.id === activeFieldId ? ' is-active' : ''}${isSuccessful ? ' is-success' : ''}${isUnchanged ? ' is-unchanged' : ''}${isFailed ? ' is-error' : ''}`;
 
     const value = document.createElement('input');
     value.type = 'text';
@@ -51,11 +61,18 @@ export function createFieldsView(
 
     const meta = document.createElement('span');
     meta.className = 'image-trail-panel__field-meta';
-    meta.textContent = `${field.field.location} · ${field.field.tokenKind} · ${field.field.value || '(empty)'}${field.field.id === activeFieldId ? ' · active' : ''}${field.field.id === failedFieldId ? ' · failed load' : ''}`;
+    const statuses = [
+      field.field.id === activeFieldId ? 'active' : '',
+      isSuccessful ? 'loads' : '',
+      isUnlocked ? 'unlocked' : '',
+      isUnchanged ? 'unchanged' : '',
+      isFailed ? 'failed load' : '',
+    ].filter(Boolean);
+    meta.textContent = `${field.field.location} · ${field.field.tokenKind} · ${field.field.value || '(empty)'}${statuses.length ? ` · ${statuses.join(' · ')}` : ''}`;
 
-    const controls = document.createElement('span');
     const hasStepControls = field.field.tokenKind === 'int' || field.field.tokenKind === 'hex';
-    controls.className = `image-trail-panel__field-control${hasStepControls ? ' has-step-controls' : ''}`;
+    const controls = document.createElement('span');
+    controls.className = `image-trail-panel__field-control${hasStepControls ? ' has-step-controls' : ''}${canUnlock ? ' has-unlock-control' : ''}`;
     controls.append(value);
 
     if (hasStepControls) {
@@ -76,6 +93,17 @@ export function createFieldsView(
       increment.addEventListener('click', () => callbacks.onStep(field.field.id, 1));
 
       controls.append(decrement, increment);
+    }
+
+    if (canUnlock) {
+      const unlock = document.createElement('button');
+      unlock.type = 'button';
+      unlock.className = `image-trail-panel__field-lock-button${isUnlocked ? ' is-unlocked' : ''}`;
+      unlock.textContent = isUnlocked ? 'Lock' : 'Unlock';
+      unlock.title = isUnlocked ? `Remove ${field.field.label} from Previous/Next` : `Include ${field.field.label} in Previous/Next`;
+      unlock.setAttribute('aria-label', unlock.title);
+      unlock.addEventListener('click', () => callbacks.onToggleUnlock(field.field.id));
+      controls.append(unlock);
     }
 
     value.addEventListener('change', () => {
