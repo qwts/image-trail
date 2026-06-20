@@ -180,8 +180,8 @@ test('storage/update sets storage usage summary on panel state', () => {
   let state = createInitialPanelState(0);
   assert.equal(state.storageUsage, null);
 
-  state = reducePanelAction(state, { name: 'storage/update', usage: { totalBytes: 10240, blobCount: 2 } });
-  assert.deepEqual(state.storageUsage, { totalBytes: 10240, blobCount: 2 });
+  state = reducePanelAction(state, { name: 'storage/update', usage: { totalBytes: 10240, blobCount: 2, orphanedBlobCount: 1 } });
+  assert.deepEqual(state.storageUsage, { totalBytes: 10240, blobCount: 2, orphanedBlobCount: 1 });
 
   state = reducePanelAction(state, { name: 'storage/update', usage: { totalBytes: 0, blobCount: 0 } });
   assert.deepEqual(state.storageUsage, { totalBytes: 0, blobCount: 0 });

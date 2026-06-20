@@ -109,6 +109,19 @@ function recentHistoryKey(pageUrl: string): string {
   }
 }
 
+async function referencedBlobIds(): Promise<Set<string>> {
+  const referenced = new Set<string>();
+  for (const bookmark of await bookmarkStore.load()) {
+    if (bookmark.blobId) referenced.add(bookmark.blobId);
+  }
+  for (const history of recentHistoryBySite.values()) {
+    for (const item of history) {
+      if (item.blobId) referenced.add(item.blobId);
+    }
+  }
+  return referenced;
+}
+
 function isStoredBlobKey(record: StoredKeyRecord | undefined): record is StoredKeyRecord<'blob'> {
   return record?.kind === 'blob';
 }
@@ -232,20 +245,12 @@ async function handleCleanupOrphanedBlobs(): Promise<import('./messages.js').Cle
   const db = await getDb();
   if (!db) return { deletedCount: 0, usage: { totalBytes: 0, blobCount: 0 } };
 
-  const referencedBlobIds = new Set<string>();
-  for (const bookmark of await bookmarkStore.load()) {
-    if (bookmark.blobId) referencedBlobIds.add(bookmark.blobId);
-  }
-  for (const history of recentHistoryBySite.values()) {
-    for (const item of history) {
-      if (item.blobId) referencedBlobIds.add(item.blobId);
-    }
-  }
+  const referenced = await referencedBlobIds();
 
   const blobs = new BlobsRepository(db);
   let deletedCount = 0;
   for (const blob of await blobs.list()) {
-    if (referencedBlobIds.has(blob.id)) continue;
+    if (referenced.has(blob.id)) continue;
     await blobs.remove(blob.id);
     deletedCount += 1;
   }
@@ -335,7 +340,10 @@ async function handleFetchThumbnailSource(
 async function handleStorageUsage(): Promise<StorageUsageSummary> {
   const db = await getDb();
   if (!db) return { totalBytes: 0, blobCount: 0 };
-  return new BlobsRepository(db).getStorageUsage();
+  const blobs = new BlobsRepository(db);
+  const [usage, referenced] = await Promise.all([blobs.getStorageUsage(), referencedBlobIds()]);
+  const all = await blobs.list();
+  return { ...usage, orphanedBlobCount: all.filter((blob) => !referenced.has(blob.id)).length };
 }
 
 async function handleLoadBookmarks(message: LoadBookmarksMessage): Promise<import('./messages.js').LoadBookmarksResultMessage['payload']> {

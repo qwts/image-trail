@@ -31,6 +31,7 @@ export interface StoredOriginalReference {
 export interface StorageUsageSummary {
   readonly blobCount: number;
   readonly totalBytes: number;
+  readonly orphanedBlobCount?: number;
 }
 
 export const DEFAULT_MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;

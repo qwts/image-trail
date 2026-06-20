@@ -208,7 +208,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
         unlocked: state.blobKeyUnlocked,
         keyReference: state.blobKeyReference,
         hasKey: state.blobKeyAvailable,
-        storedOriginalCount: state.storageUsage?.blobCount ?? 0,
+        abandonedOriginalCount: state.storageUsage?.orphanedBlobCount ?? 0,
       },
       target.dispatch,
     ),
