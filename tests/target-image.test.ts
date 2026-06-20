@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTargetImageInfo, findQualifyingImages, getImageUrl, isQualifyingImage } from '../extension/src/content/target-image.js';
+import {
+  createTargetImageInfo,
+  findQualifyingImages,
+  getImageRejectionReason,
+  getImageUrl,
+  isQualifyingImage,
+} from '../extension/src/content/target-image.js';
 
 interface FakeImageOptions {
   currentSrc?: string;
@@ -119,6 +125,12 @@ test('qualifies only connected visible images with usable dimensions and URLs', 
   assert.equal(isQualifyingImage(fakeImage({ srcAttribute: 'https://example.test/image.jpg', naturalWidth: 20 })), false);
   assert.equal(isQualifyingImage(fakeImage({ srcAttribute: 'https://example.test/image.jpg', display: 'none' })), false);
   assert.equal(isQualifyingImage(fakeImage({})), false);
+});
+
+test('explains why a target image cannot be bookmarked', () => {
+  assert.equal(getImageRejectionReason(fakeImage({})), 'Image does not expose a usable source URL.');
+  assert.equal(getImageRejectionReason(fakeImage({ srcAttribute: 'https://example.test/image.jpg', naturalWidth: 20 })), 'Image is too small (20x100).');
+  assert.equal(getImageRejectionReason(fakeImage({ srcAttribute: 'https://example.test/image.jpg', display: 'none' })), 'Image is not displayed.');
 });
 
 test('creates serializable target info and filters qualifying roots', () => {

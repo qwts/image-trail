@@ -112,16 +112,25 @@ function isLikelyImageUrl(value: string): boolean {
 }
 
 export function isQualifyingImage(image: HTMLImageElement): boolean {
-  if (!image.isConnected || image.closest('#image-trail-panel-root')) return false;
-  if (!getImageUrl(image)) return false;
+  if (getImageRejectionReason(image)) return false;
+  return true;
+}
+
+export function getImageRejectionReason(image: HTMLImageElement): string | null {
+  if (!image.isConnected) return 'Image is no longer connected to the page.';
+  if (image.closest('#image-trail-panel-root')) return 'Image is inside the Image Trail panel.';
+  if (!getImageUrl(image)) return 'Image does not expose a usable source URL.';
 
   const rect = image.getBoundingClientRect();
   const width = image.naturalWidth || rect.width;
   const height = image.naturalHeight || rect.height;
-  if (width < MIN_VISIBLE_DIMENSION || height < MIN_VISIBLE_DIMENSION) return false;
+  if (width < MIN_VISIBLE_DIMENSION || height < MIN_VISIBLE_DIMENSION) return `Image is too small (${Math.round(width)}x${Math.round(height)}).`;
 
   const style = window.getComputedStyle(image);
-  return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0;
+  if (style.display === 'none') return 'Image is not displayed.';
+  if (style.visibility === 'hidden') return 'Image is hidden.';
+  if (Number(style.opacity) === 0) return 'Image is fully transparent.';
+  return null;
 }
 
 export function createTargetImageInfo(image: HTMLImageElement): TargetImageInfo | null {

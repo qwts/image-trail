@@ -1,6 +1,6 @@
 import { applyImageUrl } from '../core/image/image-navigation.js';
 import { DomObserver } from './dom-observer.js';
-import { createTargetImageInfo, findQualifyingImages, isQualifyingImage, type TargetImageInfo } from './target-image.js';
+import { createTargetImageInfo, findQualifyingImages, getImageRejectionReason, isQualifyingImage, type TargetImageInfo } from './target-image.js';
 import { markHoveredTarget, markPickModeCandidate, markSelectedTarget, restoreElementStyles } from './page-style.js';
 import { createThumbnailDataUrlFromImage } from './thumbnail-generator.js';
 
@@ -188,15 +188,21 @@ export class PageAdapter {
     if (!event.shiftKey || event.button !== 0) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
-    const image = target.closest('img') ?? target.closest('a')?.querySelector('img');
+    const image = findImageFromShortcutTarget(target);
     if (!(image instanceof HTMLImageElement)) return;
 
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
-    if (!isQualifyingImage(image)) return;
+    if (!isQualifyingImage(image)) {
+      this.emit(`Could not bookmark image: ${getImageRejectionReason(image) ?? 'Image is not usable.'}`);
+      return;
+    }
     const info = createTargetImageInfo(image);
-    if (!info) return;
+    if (!info) {
+      this.emit('Could not bookmark image: Image source could not be resolved.');
+      return;
+    }
 
     void this.emitBookmarkRequest(image, info);
   };
@@ -304,4 +310,19 @@ export class PageAdapter {
 
 function isSuccessfulImageLoad(image: HTMLImageElement): boolean {
   return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+}
+
+function findImageFromShortcutTarget(target: Element): HTMLImageElement | null {
+  const direct = target.closest('img');
+  if (direct instanceof HTMLImageElement) return direct;
+
+  const linked = target.closest('a,[role="link"]')?.querySelector('img');
+  if (linked instanceof HTMLImageElement) return linked;
+
+  const nested = target.querySelector('img');
+  if (nested instanceof HTMLImageElement) return nested;
+
+  const interactive = target.closest('[role="button"],article,[data-testid]');
+  const nestedInteractive = interactive?.querySelector('img');
+  return nestedInteractive instanceof HTMLImageElement ? nestedInteractive : null;
 }
