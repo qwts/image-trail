@@ -1,112 +1,865 @@
-#image-trail-panel-root.image-trail-panel {
+.image-trail-panel-root.image-trail-panel {
+  all: initial;
   position: fixed;
-  top: 24px;
-  right: 24px;
+  top: 12px;
+  left: 12px;
   z-index: 2147483647;
   box-sizing: border-box;
-  width: min(360px, calc(100vw - 48px));
-  padding: 16px;
-  border: 1px solid #335c67;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #1f2933;
-  box-shadow: 0 18px 45px rgb(15 23 42 / 28%);
+  display: grid;
+  gap: 8px;
+  width: min(420px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  inline-size: min(420px, calc(100vw - 24px));
+  max-inline-size: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  contain: layout inline-size style paint;
+  isolation: isolate;
+  padding: 10px;
+  border: 1px solid #666;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 88%);
+  color: #fff;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
   font:
-    14px/1.45 system-ui,
+    12px/1.4 system-ui,
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
 }
 
-#image-trail-panel-root h2 {
-  margin: 0 0 8px;
-  font-size: 18px;
+.image-trail-panel-root.image-trail-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
 }
 
-#image-trail-panel-root p {
-  margin: 0 0 12px;
+.image-trail-panel-root,
+.image-trail-panel-root * {
+  box-sizing: border-box;
+  max-inline-size: 100%;
 }
 
-#image-trail-panel-root .image-trail-panel__meta {
-  color: #52606d;
-  font-size: 12px;
+.image-trail-panel-root > * {
+  min-width: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
 }
 
-#image-trail-panel-root .image-trail-panel__actions {
+.image-trail-panel-root h2 {
+  margin: 0;
+  color: #fff;
+  font:
+    700 14px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root h3 {
+  margin: 0;
+  color: #ddd;
+  font:
+    700 12px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root summary {
+  cursor: pointer;
+}
+
+.image-trail-panel-root p {
+  margin: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__meta,
+.image-trail-panel-root .image-trail-panel__storage-usage,
+.image-trail-panel-root .image-trail-panel__automation-status,
+.image-trail-panel-root .image-trail-panel__capture-status {
+  color: #999;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__status {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.image-trail-panel-root .image-trail-panel__full-url-input,
+.image-trail-panel-root .image-trail-panel__target-url {
+  min-width: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
+  max-height: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.image-trail-panel-root .image-trail-panel__full-url-input {
+  resize: none;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__target-url {
+  color: #aaa;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__capture-error {
+  color: #f88;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__section {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 0;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+}
+
+.image-trail-panel-root .image-trail-panel__target-summary {
   display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  list-style: none;
+}
+
+.image-trail-panel-root .image-trail-panel__target-utility {
+  gap: 10px;
+}
+
+.image-trail-panel-root .image-trail-panel__target-utility:not([open]) {
+  padding-bottom: 1px;
+}
+
+.image-trail-panel-root .image-trail-panel__target-utility > :not(summary) {
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+@supports selector(::details-content) {
+  .image-trail-panel-root .image-trail-panel__target-utility {
+    interpolate-size: allow-keywords;
+  }
+
+  .image-trail-panel-root .image-trail-panel__target-utility::details-content {
+    block-size: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition:
+      block-size 190ms ease,
+      opacity 160ms ease,
+      transform 190ms ease,
+      content-visibility 190ms ease allow-discrete;
+  }
+
+  .image-trail-panel-root .image-trail-panel__target-utility[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.image-trail-panel-root .image-trail-panel__target-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-block-start: 2px;
+  padding: 9px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 7px;
+  background: rgb(255 255 255 / 3%);
+}
+
+.image-trail-panel-root .image-trail-panel__target-body .image-trail-panel__actions {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: center;
+}
+
+.image-trail-panel-root .image-trail-panel__target-utility:not([open]) > :not(summary) {
+  opacity: 0;
+  transform: translateY(-3px);
+}
+
+.image-trail-panel-root .image-trail-panel__target-count,
+.image-trail-panel-root .image-trail-panel__target-badge {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  max-inline-size: 120px;
+  min-block-size: 24px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 5px;
+  background: rgb(255 255 255 / 6%);
+  color: #aaa;
+  padding: 3px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font:
+    700 10px/1.2 system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__target-count {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: #999;
+  padding-inline: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__target-badge {
+  justify-self: center;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.image-trail-panel-root .image-trail-panel__target-badge.is-selected {
+  border-color: rgb(89 255 178 / 76%);
+  background: rgb(89 255 178 / 20%);
+  color: rgb(232 255 244);
+  box-shadow:
+    0 0 0 1px rgb(89 255 178 / 22%),
+    0 0 16px rgb(89 255 178 / 34%);
+}
+
+.image-trail-panel-root .image-trail-panel__target-summary::-webkit-details-marker {
+  display: none;
+}
+
+.image-trail-panel-root .image-trail-panel__target-summary::after {
+  content: 'Show';
+  margin-left: auto;
+  flex: none;
+  color: #999;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__target-utility[open] .image-trail-panel__target-summary::after {
+  content: 'Hide';
+}
+
+.image-trail-panel-root .image-trail-panel__encryption {
   gap: 8px;
 }
 
-#image-trail-panel-root button {
-  border: 0;
-  border-radius: 8px;
-  background: #335c67;
-  color: #ffffff;
-  cursor: pointer;
-  padding: 8px 10px;
+.image-trail-panel-root .image-trail-panel__encryption-summary {
+  list-style: none;
 }
 
-#image-trail-panel-root .image-trail-panel__section {
-  border-top: 1px solid #d9e2ec;
-  margin-top: 12px;
-  padding-top: 12px;
+.image-trail-panel-root .image-trail-panel__encryption-summary::-webkit-details-marker {
+  display: none;
 }
 
-#image-trail-panel-root h3 {
-  font-size: 14px;
-  margin: 0 0 8px;
+.image-trail-panel-root .image-trail-panel__encryption-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
-#image-trail-panel-root .image-trail-panel__target-url {
-  background: #f5f7fa;
-  border-radius: 6px;
-  color: #334e68;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-  padding: 8px;
+.image-trail-panel-root .image-trail-panel__encryption-badge {
+  display: inline-grid;
+  place-items: center;
+  min-block-size: 22px;
+  margin-left: auto;
+  border: 1px solid rgb(89 255 178 / 34%);
+  border-radius: 5px;
+  background: rgb(89 255 178 / 10%);
+  color: rgb(216 255 236 / 90%);
+  padding: 3px 7px;
+  box-shadow: 0 0 10px rgb(89 255 178 / 12%);
+  font:
+    700 9px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  letter-spacing: 0.03em;
 }
 
-#image-trail-panel-root .image-trail-panel__item-actions {
-  display: inline-flex;
-  gap: 4px;
-  margin-left: 8px;
+.image-trail-panel-root .image-trail-panel__encryption-badge.is-unlocked {
+  border-color: rgb(89 255 178 / 48%);
+  background: rgb(89 255 178 / 14%);
+  box-shadow: 0 0 12px rgb(89 255 178 / 18%);
 }
 
-#image-trail-panel-root .image-trail-panel__capture-badge {
-  display: inline-block;
-  padding: 2px 6px;
+.image-trail-panel-root .image-trail-panel__encryption-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgb(89 255 178 / 7%), transparent 48%), rgb(255 255 255 / 3%);
+}
+
+.image-trail-panel-root .image-trail-panel__encryption-body .image-trail-panel__actions {
+  justify-content: space-between;
+}
+
+.image-trail-panel-root .image-trail-panel__primary-action {
+  border-color: rgb(89 255 178 / 42%);
+  background: rgb(18 49 34 / 72%);
+  box-shadow: 0 0 10px rgb(89 255 178 / 14%);
+}
+
+.image-trail-panel-root .image-trail-panel__primary-action:hover:not(:disabled) {
+  background: rgb(24 64 45 / 84%);
+}
+
+.image-trail-panel-root .image-trail-panel__secondary-action {
+  color: #ccc;
+}
+
+.image-trail-panel-root .image-trail-panel__url-editor {
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__actions,
+.image-trail-panel-root .image-trail-panel__item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.image-trail-panel-root button {
+  appearance: none;
+  max-width: 100%;
+  border: 1px solid #555;
   border-radius: 4px;
-  background: #57a773;
-  color: #ffffff;
-  font-size: 11px;
+  background: #222;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px 8px;
+  font:
+    12px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
 }
 
-#image-trail-panel-root .image-trail-panel__capture-btn {
-  background: #2b6cb0;
+.image-trail-panel-root button:hover:not(:disabled) {
+  background: #2b2b2b;
 }
 
-#image-trail-panel-root .image-trail-panel__capture-actions {
-  margin: 8px 0;
-}
-
-#image-trail-panel-root .image-trail-panel__capture-status {
-  color: #52606d;
-  font-style: italic;
-}
-
-#image-trail-panel-root .image-trail-panel__capture-error {
-  color: #c53030;
-  font-size: 13px;
-}
-
-#image-trail-panel-root .image-trail-panel__storage-usage {
-  color: #52606d;
-  font-size: 12px;
-}
-
-#image-trail-panel-root button:disabled {
+.image-trail-panel-root button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.image-trail-panel-root .image-trail-panel__image-transfer,
+.image-trail-panel-root .image-trail-panel__import-export {
+  display: grid;
+  gap: 8px;
+}
+
+.image-trail-panel-root .image-trail-panel__subsection {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__subsection h4 {
+  margin: 0;
+  color: #ddd;
+  font:
+    600 12px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__control-stack {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  color: #ddd;
+  font:
+    12px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__toggle input {
+  margin: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__file-picker {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__file-picker-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 26px;
+  max-width: 100%;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #222;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px 8px;
+  font:
+    12px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__file-picker-button:hover {
+  background: #2b2b2b;
+}
+
+.image-trail-panel-root .image-trail-panel__file-input:disabled + .image-trail-panel__file-picker-button {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.image-trail-panel-root .image-trail-panel__file-picker-name {
+  min-width: 0;
+  overflow: hidden;
+  color: #aaa;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__target-url,
+.image-trail-panel-root .image-trail-panel__full-url-input,
+.image-trail-panel-root .image-trail-panel__password-input,
+.image-trail-panel-root .image-trail-panel__field-input {
+  width: 100%;
+  min-width: 0;
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  max-inline-size: 100%;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #111;
+  color: #fff;
+  padding: 5px 6px;
+  font:
+    12px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+.image-trail-panel-root .image-trail-panel__file-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__target-url {
+  inline-size: 100%;
+  max-width: 100%;
+  max-inline-size: 100%;
+  max-height: 72px;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  text-overflow: ellipsis;
+}
+
+.image-trail-panel-root .image-trail-panel__full-url-input {
+  inline-size: 100%;
+  max-width: 100%;
+  max-inline-size: 100%;
+  min-height: calc(1.4em * 4 + 10px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  resize: vertical;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.image-trail-panel-root .image-trail-panel__full-url-input:focus {
+  outline: 1px solid #8fd;
+  border-color: #8fd;
+}
+
+.image-trail-panel-root .image-trail-panel__field-input:focus {
+  outline: 1px solid #8fd;
+  border-color: #8fd;
+}
+
+.image-trail-panel-root .image-trail-panel__field-input {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__password-input:focus {
+  outline: 1px solid #8fd;
+  border-color: #8fd;
+}
+
+.image-trail-panel-root .image-trail-panel__file-input:focus + .image-trail-panel__file-picker-button {
+  outline: 1px solid #8fd;
+  border-color: #8fd;
+}
+
+.image-trail-panel-root .image-trail-panel__field-list,
+.image-trail-panel-root .image-trail-panel__record-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  list-style: none;
+}
+
+.image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list {
+  max-block-size: 168px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-inline-end: 3px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.image-trail-panel-root .image-trail-panel__field-item,
+.image-trail-panel-root .image-trail-panel__record-list li {
+  min-width: 0;
+  max-width: 100%;
+  list-style: none;
+}
+
+.image-trail-panel-root .image-trail-panel__field-row {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 5px;
+  background: rgb(255 255 255 / 4%);
+}
+
+.image-trail-panel-root .image-trail-panel__field-row.is-active {
+  border-color: #9ee;
+  background: rgb(90 180 200 / 18%);
+}
+
+.image-trail-panel-root .image-trail-panel__field-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.image-trail-panel-root .image-trail-panel__field-control.has-step-controls {
+  grid-template-columns: minmax(0, 1fr) 26px 26px;
+}
+
+.image-trail-panel-root .image-trail-panel__field-step-button {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 4px;
+  background: #2a2a2a;
+  color: #f2f2f2;
+  cursor: pointer;
+  font:
+    700 15px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  line-height: 1;
+}
+
+.image-trail-panel-root .image-trail-panel__field-step-button:hover {
+  border-color: #8fd;
+  background: #333;
+}
+
+.image-trail-panel-root .image-trail-panel__field-step-button:focus {
+  outline: 1px solid #8fd;
+  outline-offset: 1px;
+}
+
+.image-trail-panel-root .image-trail-panel__field-label {
+  min-width: 0;
+  max-width: 100%;
+  color: #ccc;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__field-meta {
+  min-width: 0;
+  max-width: 100%;
+  color: #aaa;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__field-empty {
+  color: #999;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__record-list li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: start;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid transparent;
+  border-top-color: rgb(255 255 255 / 12%);
+  border-radius: 7px;
+}
+
+.image-trail-panel-root .image-trail-panel__record-list li.is-captured {
+  border-color: rgb(89 255 178 / 28%);
+  background: linear-gradient(135deg, rgb(89 255 178 / 5%), transparent 45%), rgb(8 28 18 / 24%);
+  box-shadow:
+    0 0 0 1px rgb(89 255 178 / 8%),
+    0 0 10px rgb(89 255 178 / 10%);
+}
+
+.image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted {
+  border-color: rgb(255 96 112 / 34%);
+  background: linear-gradient(135deg, rgb(255 96 112 / 7%), transparent 45%), rgb(38 10 16 / 34%);
+  box-shadow:
+    0 0 0 1px rgb(255 96 112 / 10%),
+    0 0 12px rgb(255 96 112 / 14%);
+  opacity: 0.72;
+}
+
+.image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__record-thumbnail,
+.image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__record-link,
+.image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__bookmark-label {
+  filter: saturate(0.55);
+  opacity: 0.72;
+}
+
+.image-trail-panel-root .image-trail-panel__record-list li[role='button'] {
+  cursor: pointer;
+}
+
+.image-trail-panel-root .image-trail-panel__record-list li[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.image-trail-panel-root .image-trail-panel__record-list li[role='button']:hover {
+  border-color: rgb(255 255 255 / 28%);
+  background: rgb(255 255 255 / 6%);
+}
+
+.image-trail-panel-root .image-trail-panel__record-list li[role='button']:focus-visible {
+  outline: 1px solid #8fd;
+  outline-offset: 2px;
+}
+
+.image-trail-panel-root .image-trail-panel__history-item {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.image-trail-panel-root .image-trail-panel__history-item .image-trail-panel__item-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+
+.image-trail-panel-root .image-trail-panel__record-thumbnail {
+  display: block;
+  inline-size: 44px;
+  block-size: 44px;
+  max-inline-size: 44px;
+  object-fit: cover;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 5px;
+  background: #111;
+}
+
+.image-trail-panel-root .image-trail-panel__record-thumbnail--empty {
+  display: grid;
+  place-items: center;
+  color: rgb(255 255 255 / 72%);
+  font:
+    700 9px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  text-shadow:
+    0 0 4px rgb(255 255 255 / 55%),
+    0 0 10px rgb(143 255 221 / 35%);
+}
+
+.image-trail-panel-root .image-trail-panel__record-link {
+  min-width: 0;
+  max-width: 100%;
+  color: #ddd;
+  display: block;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font:
+    11px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+.image-trail-panel-root .image-trail-panel__record-list li[role='button']:hover .image-trail-panel__record-link {
+  color: #fff;
+}
+
+.image-trail-panel-root .image-trail-panel__record-list button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: left;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-label {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 0;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-source {
+  max-width: 72px;
+  overflow: hidden;
+  color: rgb(255 255 255 / 86%);
+  font:
+    700 10px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-shadow:
+    0 0 4px rgb(255 255 255 / 70%),
+    0 0 12px rgb(143 255 221 / 45%);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__item-actions {
+  justify-content: flex-end;
+  align-self: start;
 }

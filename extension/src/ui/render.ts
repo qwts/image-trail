@@ -1,12 +1,27 @@
 import type { PanelAction, PanelState } from '../core/types.js';
 import { createBookmarksView } from './components/bookmarks-view.js';
+import { createControlsView } from './components/controls-view.js';
+import { createEncryptionView } from './components/encryption-view.js';
+import { createFieldsView, type EditableField } from './components/fields-view.js';
+import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHistoryView } from './components/history-view.js';
+import { createImageTransferView, createImportExportView } from './components/import-export-view.js';
 import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
+import { parseUrl } from '../core/url/parse-url.js';
+import { collectUrlFields, tokenValue } from '../core/url/tokenize-fields.js';
+import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
 
 export interface PanelRenderTarget {
   readonly root: HTMLElement;
   readonly dispatch: (action: PanelAction) => void;
+}
+
+interface FocusedTextControlSnapshot {
+  readonly selector: string;
+  readonly value: string;
+  readonly selectionStart: number | null;
+  readonly selectionEnd: number | null;
 }
 
 function makeButton(label: string, action: PanelAction, dispatch: (action: PanelAction) => void, disabled = false): HTMLButtonElement {
@@ -18,31 +33,129 @@ function makeButton(label: string, action: PanelAction, dispatch: (action: Panel
   return button;
 }
 
+function focusedTextControlSnapshot(root: HTMLElement): FocusedTextControlSnapshot | null {
+  const rootNode = root.getRootNode();
+  const activeElement = rootNode instanceof ShadowRoot ? rootNode.activeElement : document.activeElement;
+  if (!(activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement)) return null;
+
+  let selector: string | null = null;
+  if (activeElement.classList.contains('image-trail-panel__password-input')) {
+    selector = '.image-trail-panel__password-input';
+  } else if (activeElement.classList.contains('image-trail-panel__full-url-input')) {
+    selector = '.image-trail-panel__full-url-input';
+  } else if (activeElement.classList.contains('image-trail-panel__field-input') && activeElement.dataset.fieldId) {
+    selector = `.image-trail-panel__field-input[data-field-id="${CSS.escape(activeElement.dataset.fieldId)}"]`;
+  }
+
+  return selector
+    ? {
+        selector,
+        value: activeElement.value,
+        selectionStart: activeElement.selectionStart,
+        selectionEnd: activeElement.selectionEnd,
+      }
+    : null;
+}
+
+function restoreFocusedTextControl(root: HTMLElement, snapshot: FocusedTextControlSnapshot | null): void {
+  if (!snapshot) return;
+  if (snapshot.selector === '.image-trail-panel__full-url-input' && snapshot.value.startsWith('data:')) return;
+  const next = root.querySelector<HTMLInputElement | HTMLTextAreaElement>(snapshot.selector);
+  if (!next) return;
+  next.value = snapshot.value;
+  queueMicrotask(() => {
+    next.focus();
+    if (snapshot.selectionStart !== null && snapshot.selectionEnd !== null) {
+      next.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+    }
+  });
+}
+
 export function renderPanel(target: PanelRenderTarget, state: PanelState): void {
+  const focusedTextControl = focusedTextControlSnapshot(target.root);
+
   target.root.replaceChildren();
+
+  const fieldValueFor = (model: ParsedUrlModel, field: UrlField): string => {
+    if (field.location === 'path' && field.partIndex !== undefined) {
+      const part = model.pathParts[field.partIndex];
+      if (!part || part.type !== 'segment') return '';
+      const token = part.tokens[field.tokenIndex];
+      return token ? tokenValue(token) : '';
+    }
+
+    if (field.location === 'query' && field.queryIndex !== undefined) {
+      const queryField = model.queryFields[field.queryIndex];
+      const token = queryField?.valueTokens[field.tokenIndex];
+      return token ? tokenValue(token) : '';
+    }
+
+    return '';
+  };
+
+  const selectedUrl = state.target.selectedUrl;
+  const editableUrl = state.draftUrl ?? selectedUrl;
+  const selectedIsDataUrl = editableUrl?.startsWith('data:') === true;
+  const activeUrl = selectedIsDataUrl ? window.location.href : (editableUrl ?? window.location.href);
+
+  const parseActiveUrl = (): ParsedUrlModel | null => {
+    try {
+      return parseUrl(activeUrl);
+    } catch {
+      return null;
+    }
+  };
+
+  const targetModel = parseActiveUrl();
+  const fields = targetModel ? collectUrlFields(targetModel) : [];
+  const editableFields: EditableField[] = targetModel
+    ? fields.map((field) => ({
+        field,
+        value: fieldValueFor(targetModel, field),
+      }))
+    : [];
+
+  const dispatchActiveField = (delta: -1 | 1): void => {
+    if (fields.length === 0) return;
+    const currentIndex = fields.findIndex((field) => field.id === state.activeFieldId);
+    let nextIndex: number;
+    if (currentIndex === -1) {
+      nextIndex = delta > 0 ? 0 : fields.length - 1;
+    } else {
+      nextIndex = Math.max(0, Math.min(fields.length - 1, currentIndex + delta));
+    }
+    const nextField = fields[nextIndex];
+    if (nextField) {
+      target.dispatch({ name: 'active-field/set', id: nextField.id });
+    }
+  };
+
+  const isNoTarget = !state.target.selectedUrl;
 
   const heading = document.createElement('h2');
   heading.textContent = 'Image Trail';
 
   const captureSection = document.createElement('div');
   captureSection.className = 'image-trail-panel__capture-actions';
-  if (state.target.selectedUrl) {
-    const captureBtn = makeButton(
-      'Capture original',
-      { name: 'capture/request', url: state.target.selectedUrl, sourceType: 'target' },
-      target.dispatch,
-      state.captureInProgress || !state.target.selectedUrl,
-    );
-    captureBtn.className = 'image-trail-panel__capture-btn';
-    captureSection.append(captureBtn);
+  if (!isNoTarget) {
+    const selectedUrl = state.target.selectedUrl;
+    if (selectedUrl) {
+      const captureBtn = makeButton(
+        'Capture original',
+        { name: 'capture/request', url: selectedUrl, sourceType: 'target' },
+        target.dispatch,
+        state.captureInProgress,
+      );
+      captureBtn.className = 'image-trail-panel__capture-btn';
+      captureSection.append(captureBtn);
+    }
   }
 
   const navSection = document.createElement('div');
   navSection.className = 'image-trail-panel__nav-actions';
-  const hasTarget = !!state.target.selectedUrl;
   navSection.append(
-    makeButton('◀ Prev', { name: 'navigate-previous' }, target.dispatch, !hasTarget),
-    makeButton('Next ▶', { name: 'navigate-next' }, target.dispatch, !hasTarget),
+    makeButton('◀ Prev', { name: 'navigate-previous' }, target.dispatch, isNoTarget),
+    makeButton('Next ▶', { name: 'navigate-next' }, target.dispatch, isNoTarget),
   );
 
   const autoSection = document.createElement('div');
@@ -59,13 +172,13 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
       makeButton('Stop slideshow', { name: 'slideshow-stop' }, target.dispatch),
     );
   } else {
-    autoSection.append(makeButton('Start slideshow', { name: 'slideshow-start' }, target.dispatch, !hasTarget));
+    autoSection.append(makeButton('Start slideshow', { name: 'slideshow-start' }, target.dispatch, isNoTarget));
   }
 
   if (auto.retryPhase === 'running') {
     autoSection.append(makeButton('Stop retry', { name: 'retry-stop' }, target.dispatch));
   } else {
-    autoSection.append(makeButton('Retry 404', { name: 'retry-start' }, target.dispatch, !hasTarget));
+    autoSection.append(makeButton('Retry 404', { name: 'retry-start' }, target.dispatch, isNoTarget));
   }
 
   if (auto.slideshowPhase !== 'idle' || auto.retryPhase !== 'idle') {
@@ -82,12 +195,77 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
   target.root.append(
     heading,
     createStatusView(state, target.dispatch),
+    createUrlEditorView(
+      { url: activeUrl },
+      {
+        onApply: (url) => {
+          target.dispatch({ name: 'selected-url/apply', url });
+        },
+      },
+    ),
     createTargetPickerView(state.target, target.dispatch),
+    createEncryptionView(
+      {
+        unlocked: state.blobKeyUnlocked,
+        keyReference: state.blobKeyReference,
+        hasKey: state.blobKeyAvailable,
+        abandonedOriginalCount: state.storageUsage?.orphanedBlobCount ?? 0,
+      },
+      target.dispatch,
+    ),
+    createImageTransferView(
+      {
+        busy: state.importExportBusy,
+        currentImageUrl: state.target.selectedUrl,
+        lastMessage: state.importExportMessage,
+        lastMessageIsError: state.importExportMessageIsError,
+      },
+      target.dispatch,
+    ),
+    createImportExportView(
+      {
+        busy: state.importExportBusy,
+        currentImageUrl: state.target.selectedUrl,
+        lastMessage: state.importExportMessage,
+        lastMessageIsError: state.importExportMessageIsError,
+      },
+      target.dispatch,
+    ),
+    createFieldsView(editableFields, state.activeFieldId, {
+      onActivate: (fieldId) => {
+        target.dispatch({ name: 'active-field/set', id: fieldId });
+      },
+      onValueChange: (fieldId, value) => {
+        target.dispatch({ name: 'field-value-change', id: fieldId, value });
+      },
+      onStep: (fieldId, delta) => {
+        target.dispatch({ name: 'field-value-bump', id: fieldId, delta });
+      },
+    }),
+    createControlsView({
+      onPrevious: () => dispatchActiveField(-1),
+      onNext: () => dispatchActiveField(1),
+    }),
     captureSection,
     navSection,
     autoSection,
-    createHistoryView(state.history, state.captureInProgress, target.dispatch),
-    createBookmarksView(state.target.selectedUrl, state.bookmarks, state.captureInProgress, target.dispatch),
+    createHistoryView(state.history, state.captureInProgress, state.blobKeyUnlocked, target.dispatch),
+    createBookmarksView(
+      state.target.selectedUrl,
+      state.bookmarks,
+      state.captureInProgress,
+      state.blobKeyUnlocked,
+      state.bookmarkVisibilityScope,
+      {
+        offset: state.bookmarkOffset,
+        limit: state.bookmarkLimit,
+        total: state.bookmarkTotal,
+        hasOlder: state.hasOlderBookmarks,
+        hasNewer: state.hasNewerBookmarks,
+      },
+      target.dispatch,
+    ),
     actions,
   );
+  restoreFocusedTextControl(target.root, focusedTextControl);
 }

@@ -24,7 +24,8 @@ const DEFAULT_BINDINGS: KeyBinding[] = [
 ];
 
 export function classifyTarget(event: KeyboardEvent): KeyTarget {
-  const el = event.target as unknown as Record<string, unknown> | null;
+  const composedTarget = event.composedPath?.()[0];
+  const el = (composedTarget ?? event.target) as unknown as Record<string, unknown> | null;
   if (!el || typeof el['tagName'] !== 'string') return 'page';
   const tag = el['tagName'] as string;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return 'typing';

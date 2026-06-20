@@ -61,6 +61,7 @@ export async function unwrapKeyWithPassword(
   password: string,
   salt: Uint8Array,
   iterations: number = PBKDF2_ITERATIONS,
+  extractable = false,
 ): Promise<CryptoKey> {
   const wrappingKey = await deriveWrappingKey(password, { salt, iterations });
   return getCrypto().subtle.unwrapKey(
@@ -69,7 +70,7 @@ export async function unwrapKeyWithPassword(
     wrappingKey,
     { name: 'AES-GCM', iv: iv as BufferSource },
     { name: 'AES-GCM', length: DERIVED_KEY_BITS },
-    true,
+    extractable,
     ['encrypt', 'decrypt'],
   );
 }

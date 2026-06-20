@@ -2,6 +2,7 @@ import { decryptAesGcm } from '../crypto/webcrypto.js';
 import { deriveEncryptionKey } from '../crypto/password-wrap.js';
 import type { DurableHistoryPayloadV1, RecoverableDataStatus } from '../types.js';
 import { fromBase64, parseExportFile } from './encrypted-file-format.js';
+import { parsePlainRecordsExport } from './plain-records-format.js';
 
 export interface HistoryImportEntry {
   readonly uuid: string;
@@ -12,13 +13,18 @@ export interface HistoryImportResult {
   readonly status: RecoverableDataStatus;
   readonly entries: readonly HistoryImportEntry[];
   readonly skipped: readonly string[];
+  readonly plaintext: boolean;
 }
 
 export async function importEncryptedHistory(fileContent: string, password: string): Promise<HistoryImportResult> {
+  const plain = tryImportPlainHistory(fileContent);
+  if (plain) return { ...plain, plaintext: true };
+
   const fail = (message: string): HistoryImportResult => ({
     status: { ok: false, code: 'decryption-failed', message },
     entries: [],
     skipped: [],
+    plaintext: false,
   });
 
   let envelope;
@@ -46,33 +52,53 @@ export async function importEncryptedHistory(fileContent: string, password: stri
     const decoded = new TextDecoder().decode(plaintext);
     const parsed: unknown = JSON.parse(decoded);
 
-    if (!Array.isArray(parsed)) {
-      return fail('Decrypted payload is not an array.');
-    }
-
-    const entries: HistoryImportEntry[] = [];
-    const skipped: string[] = [];
-
-    for (const item of parsed) {
-      if (isValidHistoryEntry(item)) {
-        entries.push(item);
-      } else {
-        skipped.push(typeof item === 'object' && item !== null && 'uuid' in item ? String(item.uuid) : 'unknown');
-      }
-    }
-
-    return {
-      status: {
-        ok: true,
-        code: 'ok',
-        message: `Imported ${entries.length} record(s)${skipped.length ? `, skipped ${skipped.length}` : ''}.`,
-      },
-      entries,
-      skipped,
-    };
+    return { ...parseHistoryEntries(parsed), plaintext: false };
   } catch {
     return fail('Decryption failed. Wrong password or corrupted file.');
   }
+}
+
+function tryImportPlainHistory(fileContent: string): Omit<HistoryImportResult, 'plaintext'> | null {
+  try {
+    const envelope = parsePlainRecordsExport(fileContent);
+    if (envelope.payloadType !== 'history') return null;
+    return parseHistoryEntries(envelope.entries);
+  } catch {
+    return null;
+  }
+}
+
+function parseHistoryEntries(parsed: unknown): Omit<HistoryImportResult, 'plaintext'> {
+  const fail = (message: string): Omit<HistoryImportResult, 'plaintext'> => ({
+    status: { ok: false, code: 'decryption-failed', message },
+    entries: [],
+    skipped: [],
+  });
+
+  if (!Array.isArray(parsed)) {
+    return fail('History payload is not an array.');
+  }
+
+  const entries: HistoryImportEntry[] = [];
+  const skipped: string[] = [];
+
+  for (const item of parsed) {
+    if (isValidHistoryEntry(item)) {
+      entries.push(item);
+    } else {
+      skipped.push(typeof item === 'object' && item !== null && 'uuid' in item ? String(item.uuid) : 'unknown');
+    }
+  }
+
+  return {
+    status: {
+      ok: true,
+      code: 'ok',
+      message: `Imported ${entries.length} record(s)${skipped.length ? `, skipped ${skipped.length}` : ''}.`,
+    },
+    entries,
+    skipped,
+  };
 }
 
 const VALID_CAPTURE_STATUSES = new Set(['remote-only', 'downloaded', 'failed']);

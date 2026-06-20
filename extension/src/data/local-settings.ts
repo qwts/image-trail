@@ -3,6 +3,8 @@ export interface PlaintextLocalSettings {
   readonly showHistoryThumbnails: boolean;
   readonly requestThrottleMs: number;
   readonly panelDock: 'right' | 'left';
+  readonly visibleBookmarkSoftMax: number;
+  readonly bookmarkVisibilityScope: 'global' | 'site';
 }
 
 export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
@@ -10,11 +12,15 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   showHistoryThumbnails: false,
   requestThrottleMs: 250,
   panelDock: 'right',
+  visibleBookmarkSoftMax: 30,
+  bookmarkVisibilityScope: 'global',
 };
 
 const LOCAL_SETTINGS_KEY = 'imageTrail.localSettings';
 const MIN_REQUEST_THROTTLE_MS = 0;
 const MAX_REQUEST_THROTTLE_MS = 60_000;
+const MIN_VISIBLE_BOOKMARK_SOFT_MAX = 1;
+const MAX_VISIBLE_BOOKMARK_SOFT_MAX = 200;
 
 export interface StringStorage {
   getItem(key: string): string | null;
@@ -46,9 +52,19 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
     showHistoryThumbnails: input.showHistoryThumbnails === true,
     requestThrottleMs: isSafeThrottle(input.requestThrottleMs) ? input.requestThrottleMs : DEFAULT_LOCAL_SETTINGS.requestThrottleMs,
     panelDock: input.panelDock === 'left' ? 'left' : 'right',
+    visibleBookmarkSoftMax: isSafeVisibleBookmarkSoftMax(input.visibleBookmarkSoftMax)
+      ? input.visibleBookmarkSoftMax
+      : DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
+    bookmarkVisibilityScope: input.bookmarkVisibilityScope === 'site' ? 'site' : 'global',
   };
 }
 
 function isSafeThrottle(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= MIN_REQUEST_THROTTLE_MS && value <= MAX_REQUEST_THROTTLE_MS;
+}
+
+function isSafeVisibleBookmarkSoftMax(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isInteger(value) && value >= MIN_VISIBLE_BOOKMARK_SOFT_MAX && value <= MAX_VISIBLE_BOOKMARK_SOFT_MAX
+  );
 }

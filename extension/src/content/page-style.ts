@@ -1,4 +1,4 @@
-type StyleSnapshot = Pick<CSSStyleDeclaration, 'cursor' | 'outline' | 'outlineOffset'>;
+type StyleSnapshot = Pick<CSSStyleDeclaration, 'cursor' | 'opacity' | 'outline' | 'outlineOffset'>;
 
 const snapshots = new WeakMap<HTMLElement, StyleSnapshot>();
 
@@ -6,6 +6,7 @@ function snapshot(element: HTMLElement): void {
   if (snapshots.has(element)) return;
   snapshots.set(element, {
     cursor: element.style.cursor,
+    opacity: element.style.opacity,
     outline: element.style.outline,
     outlineOffset: element.style.outlineOffset,
   });
@@ -27,6 +28,7 @@ export function markHoveredTarget(element: HTMLElement): void {
 export function markSelectedTarget(element: HTMLElement): void {
   snapshot(element);
   element.dataset.imageTrailSelected = 'true';
+  element.style.opacity = '1';
   element.style.outline = '4px solid #10b981';
   element.style.outlineOffset = '4px';
 }
@@ -35,6 +37,7 @@ export function restoreElementStyles(element: HTMLElement): void {
   const original = snapshots.get(element);
   if (original) {
     element.style.cursor = original.cursor;
+    element.style.opacity = original.opacity;
     element.style.outline = original.outline;
     element.style.outlineOffset = original.outlineOffset;
     snapshots.delete(element);

@@ -36,6 +36,23 @@ test('runtime history keeps loaded images newest-first, deduped, and visibly bou
   );
 });
 
+test('history/add-loaded preserves session thumbnail for matching visible record', () => {
+  let state = createInitialPanelState(0);
+  state = reducePanelAction(state, {
+    name: 'history/add-loaded',
+    url: 'https://example.test/thumb.jpg',
+    thumbnail: 'data:image/jpeg;base64,abc',
+    timestamp: '2026-06-19T00:00:00.000Z',
+  });
+
+  assert.equal(state.history[0]?.thumbnail, 'data:image/jpeg;base64,abc');
+});
+
+test('bookmark thumbnail refresh action is a reducer no-op', () => {
+  const state = createInitialPanelState(0);
+  assert.equal(reducePanelAction(state, { name: 'bookmarks/refresh-thumbnails' }), state);
+});
+
 test('undo stack returns session restore actions in last-action-first order', () => {
   const undo = new UndoStack<{ readonly name: 'bookmark/restore'; readonly id: string }>(2);
   undo.push({ label: 'Restore first', action: { name: 'bookmark/restore', id: 'first' } });
@@ -79,7 +96,7 @@ test('capture/start sets captureInProgress and clears previous result', () => {
 test('capture/complete stores result and clears in-progress flag', () => {
   let state: PanelState = reducePanelAction(createInitialPanelState(0), { name: 'capture/start' });
 
-  const result = { status: 'captured' as const, blobId: 'b-1', sha256: 'abc', mimeType: 'image/png', byteLength: 2048 };
+  const result = { status: 'captured' as const, blobId: 'b-1', mimeType: 'image/png', byteLength: 2048 };
   state = reducePanelAction(state, { name: 'capture/complete', result });
 
   assert.equal(state.captureInProgress, false);
@@ -98,12 +115,18 @@ test('capture/complete with sourceRecordId updates matching history record', () 
   state = reducePanelAction(state, { name: 'capture/start' });
   state = reducePanelAction(state, {
     name: 'capture/complete',
-    result: { status: 'captured', blobId: 'blob-42', sha256: 'def', mimeType: 'image/jpeg', byteLength: 4096 },
+    result: { status: 'captured', blobId: 'blob-42', mimeType: 'image/jpeg', byteLength: 4096 },
     sourceRecordId: recordId,
   });
 
   assert.equal(state.history[0].captureStatus, 'captured');
   assert.equal(state.history[0].blobId, 'blob-42');
+  assert.deepEqual(state.history[0].storedOriginal, {
+    blobId: 'blob-42',
+    mimeType: 'image/jpeg',
+    byteLength: 4096,
+    capturedAt: state.history[0].capturedAt,
+  });
 });
 
 test('capture/complete with failed result does not modify records', () => {
@@ -143,7 +166,7 @@ test('capture/delete clears capture status and blobId from matching records', ()
   state = reducePanelAction(state, { name: 'capture/start' });
   state = reducePanelAction(state, {
     name: 'capture/complete',
-    result: { status: 'captured', blobId: 'blob-99', sha256: 'xyz', mimeType: 'image/png', byteLength: 512 },
+    result: { status: 'captured', blobId: 'blob-99', mimeType: 'image/png', byteLength: 512 },
     sourceRecordId: recordId,
   });
   assert.equal(state.history[0].captureStatus, 'captured');
@@ -157,8 +180,8 @@ test('storage/update sets storage usage summary on panel state', () => {
   let state = createInitialPanelState(0);
   assert.equal(state.storageUsage, null);
 
-  state = reducePanelAction(state, { name: 'storage/update', usage: { totalBytes: 10240, blobCount: 2 } });
-  assert.deepEqual(state.storageUsage, { totalBytes: 10240, blobCount: 2 });
+  state = reducePanelAction(state, { name: 'storage/update', usage: { totalBytes: 10240, blobCount: 2, orphanedBlobCount: 1 } });
+  assert.deepEqual(state.storageUsage, { totalBytes: 10240, blobCount: 2, orphanedBlobCount: 1 });
 
   state = reducePanelAction(state, { name: 'storage/update', usage: { totalBytes: 0, blobCount: 0 } });
   assert.deepEqual(state.storageUsage, { totalBytes: 0, blobCount: 0 });

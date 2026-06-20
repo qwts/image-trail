@@ -16,8 +16,10 @@ import {
   EXPORT_FORMAT_MAGIC,
   EXPORT_FORMAT_VERSION,
 } from '../extension/src/data/import-export/encrypted-file-format.js';
-import { exportEncryptedHistory } from '../extension/src/data/import-export/history-export.js';
+import { exportEncryptedHistory, exportPlainHistory } from '../extension/src/data/import-export/history-export.js';
 import { importEncryptedHistory } from '../extension/src/data/import-export/history-import.js';
+import { exportEncryptedBookmarks, exportPlainBookmarks } from '../extension/src/data/import-export/bookmarks-export.js';
+import { importBookmarks } from '../extension/src/data/import-export/bookmarks-import.js';
 import { importBookmarkletJson } from '../extension/src/data/import-export/bookmarklet-import.js';
 import { recallEncryptedRecord, recallSelectedRecords } from '../extension/src/data/import-export/recall.js';
 import { exportKeyWithPassword } from '../extension/src/data/import-export/key-export.js';
@@ -41,7 +43,7 @@ test('password-wrap: wraps and unwraps an AES-GCM key with password', async () =
   assert.equal(wrapped.salt.byteLength, 16);
   assert.equal(wrapped.iv.byteLength, 12);
 
-  const unwrapped = await unwrapKeyWithPassword(wrapped.wrappedKey, wrapped.iv, 'my-password', wrapped.salt, wrapped.iterations);
+  const unwrapped = await unwrapKeyWithPassword(wrapped.wrappedKey, wrapped.iv, 'my-password', wrapped.salt, wrapped.iterations, true);
   const rawUnwrapped = new Uint8Array(await getCrypto().subtle.exportKey('raw', unwrapped));
   assert.deepEqual(rawUnwrapped, rawOriginal);
 });
@@ -163,6 +165,154 @@ test('history-export: rejects empty record set', async () => {
   const result = await exportEncryptedHistory({ entries: [], password: 'pass' });
   assert.equal(result.status.ok, false);
   assert.equal(result.status.code, 'not-found');
+});
+
+test('history-export: shift/plain export imports without password', async () => {
+  const entries = [
+    {
+      uuid: 'plain-history-1',
+      payload: {
+        url: 'https://example.test/plain.jpg',
+        capturedAt: '2026-06-18T00:00:00.000Z',
+        captureStatus: 'remote-only' as const,
+      },
+    },
+  ];
+
+  const exportResult = exportPlainHistory({ entries, now: '2026-06-18T12:00:00.000Z' });
+  assert.ok(exportResult.status.ok);
+  assert.equal(exportResult.fileName, 'image-trail-history-2026-06-18.plain.json');
+  assert.match(exportResult.fileContent!, /https:\/\/example\.test\/plain\.jpg/);
+
+  const importResult = await importEncryptedHistory(exportResult.fileContent!, '');
+  assert.ok(importResult.status.ok, importResult.status.message);
+  assert.equal(importResult.plaintext, true);
+  assert.equal(importResult.entries[0].payload.url, 'https://example.test/plain.jpg');
+});
+
+test('bookmarks-export: exports encrypted and imports with password', async () => {
+  const entries = [
+    {
+      uuid: 'bookmark-1',
+      payload: {
+        url: 'https://example.test/bookmark.jpg',
+        bookmarkedAt: '2026-06-18T00:00:00.000Z',
+        label: 'Bookmark',
+      },
+    },
+  ];
+
+  const exportResult = await exportEncryptedBookmarks({ entries, password: 'bookmark-pass', now: '2026-06-18T12:00:00.000Z' });
+  assert.ok(exportResult.status.ok);
+  assert.equal(exportResult.fileName, 'image-trail-bookmarks-2026-06-18.json');
+  assert.doesNotMatch(exportResult.fileContent!, /bookmark\.jpg/);
+
+  const importResult = await importBookmarks(exportResult.fileContent!, 'bookmark-pass');
+  assert.ok(importResult.status.ok, importResult.status.message);
+  assert.equal(importResult.plaintext, false);
+  assert.equal(importResult.entries[0].payload.label, 'Bookmark');
+});
+
+test('bookmarks-export: encrypted export does not pass undefined AES-GCM additionalData', async () => {
+  const originalEncrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+  const calls: AesGcmParams[] = [];
+  crypto.subtle.encrypt = ((algorithm: AlgorithmIdentifier, key: CryptoKey, data: BufferSource) => {
+    const params = algorithm as AesGcmParams;
+    if (typeof params === 'object' && params.name === 'AES-GCM') calls.push(params);
+    return originalEncrypt(algorithm, key, data);
+  }) as SubtleCrypto['encrypt'];
+
+  try {
+    const exportResult = await exportEncryptedBookmarks({
+      entries: [
+        {
+          uuid: 'bookmark-1',
+          payload: {
+            url: 'https://example.test/bookmark.jpg',
+            bookmarkedAt: '2026-06-18T00:00:00.000Z',
+          },
+        },
+      ],
+      password: 'bookmark-pass',
+      now: '2026-06-18T12:00:00.000Z',
+    });
+
+    assert.ok(exportResult.status.ok, exportResult.status.message);
+    assert.ok(calls.some((params) => !Object.hasOwn(params, 'additionalData')));
+  } finally {
+    crypto.subtle.encrypt = originalEncrypt as SubtleCrypto['encrypt'];
+  }
+});
+
+test('bookmarks-import: strips external blob references from imported bookmark payloads', async () => {
+  const exportResult = exportPlainBookmarks({
+    entries: [
+      {
+        uuid: 'imported-captured-bookmark',
+        payload: {
+          url: 'https://example.test/captured.jpg',
+          bookmarkedAt: '2026-06-20T00:00:00.000Z',
+          capturedAt: '2026-06-20T00:00:01.000Z',
+          storedOriginal: {
+            blobId: 'external-blob-id',
+            mimeType: 'image/jpeg',
+            byteLength: 10,
+            capturedAt: '2026-06-20T00:00:01.000Z',
+          },
+        },
+      },
+    ],
+    now: '2026-06-20T00:00:00.000Z',
+  });
+  assert.ok(exportResult.status.ok, exportResult.status.message);
+
+  const result = await importBookmarks(exportResult.fileContent!, '');
+  assert.equal(result.status.ok, true);
+  assert.equal(result.entries[0]?.payload.storedOriginal, undefined);
+  assert.equal(result.entries[0]?.payload.capturedAt, undefined);
+});
+
+test('bookmarks-export: shift/plain export imports without password', async () => {
+  const entries = [
+    {
+      uuid: 'plain-bookmark-1',
+      payload: {
+        url: 'https://example.test/plain-bookmark.webp',
+        bookmarkedAt: '2026-06-18T00:00:00.000Z',
+      },
+    },
+  ];
+
+  const exportResult = exportPlainBookmarks({ entries, now: '2026-06-18T12:00:00.000Z' });
+  assert.ok(exportResult.status.ok);
+  assert.equal(exportResult.fileName, 'image-trail-bookmarks-2026-06-18.plain.json');
+  assert.match(exportResult.fileContent!, /plain-bookmark\.webp/);
+
+  const importResult = await importBookmarks(exportResult.fileContent!, '');
+  assert.ok(importResult.status.ok, importResult.status.message);
+  assert.equal(importResult.plaintext, true);
+  assert.equal(importResult.entries[0].payload.url, 'https://example.test/plain-bookmark.webp');
+});
+
+test('bookmarks-export: encrypts large thumbnail payloads', async () => {
+  const largeThumbnail = `data:image/jpeg;base64,${'a'.repeat(180_000)}`;
+  const entries = [
+    {
+      uuid: 'large-bookmark-1',
+      payload: {
+        url: 'https://example.test/large.jpg',
+        bookmarkedAt: '2026-06-18T00:00:00.000Z',
+        thumbnail: largeThumbnail,
+      },
+    },
+  ];
+
+  const exportResult = await exportEncryptedBookmarks({ entries, password: 'bookmark-pass', now: '2026-06-18T12:00:00.000Z' });
+  assert.ok(exportResult.status.ok, exportResult.status.message);
+
+  const importResult = await importBookmarks(exportResult.fileContent!, 'bookmark-pass');
+  assert.ok(importResult.status.ok, importResult.status.message);
+  assert.equal(importResult.entries[0].payload.thumbnail, largeThumbnail);
 });
 
 test('bookmarklet-import: imports favorites and deduplicates URLs', () => {

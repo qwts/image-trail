@@ -1,5 +1,6 @@
 import { createDisplayRecord } from './display-records.js';
 import type { ImageDisplayRecord } from './display-records.js';
+import type { CaptureResult } from './image/capture-result.js';
 import { isCapturedResult } from './image/capture-result.js';
 import { closePanel, EMPTY_AUTOMATION_STATE, showPanel } from './state.js';
 import type { PanelAction, PanelState } from './types.js';
@@ -7,15 +8,30 @@ import type { PanelAction, PanelState } from './types.js';
 function updateRecordCapture(
   records: readonly ImageDisplayRecord[],
   sourceRecordId: string | undefined,
-  blobId: string,
+  result: CaptureResult & { status: 'captured' },
   capturedAt: string,
 ): readonly ImageDisplayRecord[] {
   if (!sourceRecordId) return records;
-  return records.map((r) => (r.id === sourceRecordId ? { ...r, captureStatus: 'captured' as const, blobId, capturedAt } : r));
+  return records.map((r) =>
+    r.id === sourceRecordId
+      ? {
+          ...r,
+          captureStatus: 'captured' as const,
+          blobId: result.blobId,
+          capturedAt,
+          storedOriginal: {
+            blobId: result.blobId,
+            mimeType: result.mimeType,
+            byteLength: result.byteLength,
+            capturedAt,
+          },
+        }
+      : r,
+  );
 }
 
 function clearRecordCapture(records: readonly ImageDisplayRecord[], id: string): readonly ImageDisplayRecord[] {
-  return records.map((r) => (r.id === id ? { ...r, captureStatus: undefined, blobId: undefined } : r));
+  return records.map((r) => (r.id === id ? { ...r, captureStatus: undefined, blobId: undefined, storedOriginal: undefined } : r));
 }
 
 export function reducePanelAction(state: PanelState, action: PanelAction): PanelState {
@@ -30,8 +46,16 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return { ...state, status: 'picking', message: 'Pick mode is active. Click the intended image.', lastUpdatedAt: Date.now() };
     case 'stop-target-picker':
       return { ...state, status: 'ready', message: state.target.message, lastUpdatedAt: Date.now() };
+    case 'target/release':
+      return state;
     case 'history/add-loaded': {
-      const item = createDisplayRecord({ url: action.url, title: action.title, timestamp: action.timestamp, source: 'history' });
+      const item = createDisplayRecord({
+        url: action.url,
+        title: action.title,
+        timestamp: action.timestamp,
+        thumbnail: action.thumbnail,
+        source: 'history',
+      });
       return {
         ...state,
         history: [item, ...state.history.filter((entry) => entry.url !== item.url && entry.id !== item.id)].slice(0, 30),
@@ -40,6 +64,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
     }
     case 'history/remove':
       return { ...state, history: state.history.filter((item) => item.id !== action.id), lastUpdatedAt: Date.now() };
+    case 'active-field/set':
+      return { ...state, activeFieldId: action.id, lastUpdatedAt: Date.now() };
     case 'bookmark/current':
       return state.target.selectedUrl
         ? {
@@ -63,6 +89,24 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
     }
     case 'bookmark/remove':
       return { ...state, bookmarks: state.bookmarks.filter((item) => item.id !== action.id), lastUpdatedAt: Date.now() };
+    case 'bookmarks/page-loaded':
+      return {
+        ...state,
+        bookmarks: action.bookmarks,
+        bookmarkOffset: action.offset,
+        bookmarkLimit: action.limit,
+        bookmarkTotal: action.total,
+        hasOlderBookmarks: action.hasOlder,
+        hasNewerBookmarks: action.hasNewer,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'bookmarks/toggle-scope':
+      return {
+        ...state,
+        bookmarkVisibilityScope: state.bookmarkVisibilityScope === 'global' ? 'site' : 'global',
+        bookmarkOffset: 0,
+        lastUpdatedAt: Date.now(),
+      };
     case 'capture/request':
       return state;
     case 'capture/start':
@@ -74,8 +118,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         const capturedAt = now.toISOString();
         return {
           ...updated,
-          history: updateRecordCapture(updated.history, action.sourceRecordId, action.result.blobId, capturedAt),
-          bookmarks: updateRecordCapture(updated.bookmarks, action.sourceRecordId, action.result.blobId, capturedAt),
+          history: updateRecordCapture(updated.history, action.sourceRecordId, action.result, capturedAt),
+          bookmarks: updateRecordCapture(updated.bookmarks, action.sourceRecordId, action.result, capturedAt),
           message: `Captured ${(action.result.byteLength / 1024).toFixed(1)} KB image.`,
         };
       }
@@ -88,6 +132,42 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         ...state,
         history: clearRecordCapture(state.history, action.id),
         bookmarks: clearRecordCapture(state.bookmarks, action.id),
+        lastUpdatedAt: Date.now(),
+      };
+    case 'blob-key/status':
+      return {
+        ...state,
+        blobKeyUnlocked: action.unlocked,
+        blobKeyAvailable: action.unlocked || action.hasKey === true,
+        blobKeyReference: action.unlocked ? (action.keyReference ?? state.blobKeyReference) : null,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'import-export/start':
+      return {
+        ...state,
+        importExportBusy: true,
+        importExportMessage: 'Import/export is running...',
+        importExportMessageIsError: false,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'import-export/complete':
+      return {
+        ...state,
+        importExportBusy: false,
+        importExportMessage: action.message,
+        importExportMessageIsError: false,
+        message: action.message,
+        status: 'ready',
+        lastUpdatedAt: Date.now(),
+      };
+    case 'import-export/error':
+      return {
+        ...state,
+        importExportBusy: false,
+        importExportMessage: action.message,
+        importExportMessageIsError: true,
+        message: action.message,
+        status: 'error',
         lastUpdatedAt: Date.now(),
       };
     case 'storage/update':
@@ -111,5 +191,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return state;
     case 'stop-all':
       return { ...state, automation: { ...EMPTY_AUTOMATION_STATE }, lastUpdatedAt: Date.now() };
+    default:
+      return state;
   }
 }

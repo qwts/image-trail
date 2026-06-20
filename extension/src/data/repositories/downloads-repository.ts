@@ -7,6 +7,109 @@ import {
   toBase64,
   fromBase64,
 } from '../import-export/encrypted-file-format.js';
+import { openJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
+import type { EncryptedEnvelope } from '../crypto/types.js';
+import { findDownloadDuplicate } from '../../core/image/downloads.js';
+import { requestToPromise, transactionDone } from '../idb-helpers.js';
+import { DataStore, SchemaIndex } from '../schema.js';
+import type { DurableDownloadPayloadV1 } from '../types.js';
+
+export interface EncryptedDownloadRecord {
+  readonly uuid: string;
+  readonly envelope: EncryptedEnvelope<{ readonly recordType: 'download' }>;
+}
+
+export interface DownloadDuplicateResult {
+  readonly record: EncryptedDownloadRecord;
+  readonly payload: DurableDownloadPayloadV1;
+  readonly matchedBy: 'fingerprint' | 'url';
+}
+
+export class DownloadsRepository {
+  constructor(private readonly db: IDBDatabase) {}
+
+  async putEncrypted(record: EncryptedDownloadRecord): Promise<void> {
+    const transaction = this.db.transaction(DataStore.Downloads, 'readwrite');
+    transaction.objectStore(DataStore.Downloads).put(record);
+    await transactionDone(transaction);
+  }
+
+  async getEncrypted(uuid: string): Promise<EncryptedDownloadRecord | undefined> {
+    const transaction = this.db.transaction(DataStore.Downloads, 'readonly');
+    const result = await requestToPromise<EncryptedDownloadRecord | undefined>(transaction.objectStore(DataStore.Downloads).get(uuid));
+    await transactionDone(transaction);
+    return result;
+  }
+
+  async listEncryptedNewestFirst(): Promise<readonly EncryptedDownloadRecord[]> {
+    const transaction = this.db.transaction(DataStore.Downloads, 'readonly');
+    const index = transaction.objectStore(DataStore.Downloads).index(SchemaIndex.DownloadsByDownloadedAt);
+    const request = index.openCursor(null, 'prev');
+    const result: EncryptedDownloadRecord[] = [];
+
+    await new Promise<void>((resolve, reject) => {
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) {
+          resolve();
+          return;
+        }
+        result.push(cursor.value as EncryptedDownloadRecord);
+        cursor.continue();
+      };
+      request.onerror = () => reject(request.error);
+    });
+
+    await transactionDone(transaction);
+    return result;
+  }
+
+  async sealAndPut(
+    uuid: string,
+    payload: DurableDownloadPayloadV1,
+    key: CryptoKey,
+    keyReference: EncryptedDownloadRecord['envelope']['key'],
+    now = payload.downloadedAt,
+  ): Promise<EncryptedDownloadRecord> {
+    const envelope = await sealJsonEnvelope({
+      payload,
+      payloadVersion: 1,
+      key,
+      keyReference,
+      authenticatedMetadata: { recordType: 'download' as const },
+      now,
+    });
+    const record = { uuid, envelope };
+    await this.putEncrypted(record);
+    return record;
+  }
+
+  async openRecord(record: EncryptedDownloadRecord, key: CryptoKey): Promise<DurableDownloadPayloadV1> {
+    return openJsonEnvelope<DurableDownloadPayloadV1>(record.envelope, key);
+  }
+
+  async findDuplicate(
+    candidate: { readonly sourceUrl: string; readonly fingerprint?: string },
+    key: CryptoKey,
+  ): Promise<DownloadDuplicateResult | null> {
+    const opened: Array<{ readonly record: EncryptedDownloadRecord; readonly payload: DurableDownloadPayloadV1 }> = [];
+    for (const record of await this.listEncryptedNewestFirst()) {
+      try {
+        opened.push({ record, payload: await this.openRecord(record, key) });
+      } catch {
+        // Records encrypted with unavailable keys cannot participate in this dedupe check.
+      }
+    }
+
+    const duplicate = findDownloadDuplicate(
+      opened.map(({ payload }) => payload),
+      candidate,
+    );
+    if (!duplicate) return null;
+    const match = opened.find(({ payload }) => payload === duplicate.record);
+    return match ? { ...match, matchedBy: duplicate.matchedBy } : null;
+  }
+}
 
 export interface EncryptedDownloadInput {
   readonly data: Uint8Array;

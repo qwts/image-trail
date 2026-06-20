@@ -34,6 +34,37 @@ export function migrateImageTrailDb(db: IDBDatabase, oldVersion: number, transac
     blobs.createIndex(SchemaIndex.BlobsByCreatedAt, 'createdAt', { unique: false });
   }
 
+  if (oldVersion < 4) {
+    if (db.objectStoreNames.contains(DataStore.Blobs)) {
+      const blobs = requireUpgradeTransaction(transaction).objectStore(DataStore.Blobs);
+      if (blobs.indexNames.contains(SchemaIndex.BlobsBySha256)) {
+        blobs.deleteIndex(SchemaIndex.BlobsBySha256);
+      }
+      if (!blobs.indexNames.contains(SchemaIndex.BlobsByCreatedAt)) {
+        blobs.createIndex(SchemaIndex.BlobsByCreatedAt, 'createdAt', { unique: false });
+      }
+      if (!blobs.indexNames.contains(SchemaIndex.BlobsByKeyReference)) {
+        blobs.createIndex(SchemaIndex.BlobsByKeyReference, 'key.reference', { unique: false });
+      }
+    } else {
+      const blobs = db.createObjectStore(DataStore.Blobs, { keyPath: 'id' });
+      blobs.createIndex(SchemaIndex.BlobsByCreatedAt, 'createdAt', { unique: false });
+      blobs.createIndex(SchemaIndex.BlobsByKeyReference, 'key.reference', { unique: false });
+    }
+  }
+
+  if (oldVersion < 5) {
+    const downloads = db.objectStoreNames.contains(DataStore.Downloads)
+      ? requireUpgradeTransaction(transaction).objectStore(DataStore.Downloads)
+      : db.createObjectStore(DataStore.Downloads, { keyPath: 'uuid' });
+    if (!downloads.indexNames.contains(SchemaIndex.DownloadsByDownloadedAt)) {
+      downloads.createIndex(SchemaIndex.DownloadsByDownloadedAt, 'envelope.updatedAt', { unique: false });
+    }
+    if (!downloads.indexNames.contains(SchemaIndex.DownloadsByKeyReference)) {
+      downloads.createIndex(SchemaIndex.DownloadsByKeyReference, 'envelope.key.reference', { unique: false });
+    }
+  }
+
   const metadata = transaction?.objectStore(DataStore.Metadata);
   metadata?.put({
     key: 'schema',

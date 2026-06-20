@@ -6,6 +6,7 @@ export type CaptureFailureReason =
   | 'network-error'
   | 'auth-required'
   | 'canvas-tainted'
+  | 'encryption-locked'
   | 'unknown';
 
 export type CaptureStatus = 'captured' | 'remote-only' | 'failed';
@@ -14,7 +15,6 @@ export type CaptureResult =
   | {
       readonly status: 'captured';
       readonly blobId: string;
-      readonly sha256: string;
       readonly mimeType: string;
       readonly byteLength: number;
     }
@@ -23,7 +23,6 @@ export type CaptureResult =
 
 export interface StoredOriginalReference {
   readonly blobId: string;
-  readonly sha256: string;
   readonly mimeType: string;
   readonly byteLength: number;
   readonly capturedAt: string;
@@ -32,6 +31,7 @@ export interface StoredOriginalReference {
 export interface StorageUsageSummary {
   readonly blobCount: number;
   readonly totalBytes: number;
+  readonly orphanedBlobCount?: number;
 }
 
 export const DEFAULT_MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;
@@ -61,6 +61,8 @@ export function captureFailureMessage(reason: CaptureFailureReason, origin?: str
       return 'Authentication is required to access this image.';
     case 'canvas-tainted':
       return 'The image is tainted by cross-origin restrictions.';
+    case 'encryption-locked':
+      return 'Image capture is locked until encrypted blob storage is unlocked.';
     case 'unknown':
       return 'An unknown error occurred during capture.';
   }

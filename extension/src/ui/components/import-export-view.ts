@@ -1,20 +1,46 @@
+import type { ImportedImageFile } from '../../core/types.js';
+
 export type ImportExportAction =
-  | { readonly name: 'export/history'; readonly password: string }
-  | { readonly name: 'export/bookmarks'; readonly password: string }
+  | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
+  | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
+  | { readonly name: 'export/image' }
   | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string }
+  | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
-  | { readonly name: 'import/key'; readonly fileContent: string; readonly password: string }
-  | { readonly name: 'export/download'; readonly password: string };
+  | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] };
 
 export interface ImportExportViewState {
   readonly busy: boolean;
+  readonly currentImageUrl: string | null;
   readonly lastMessage?: string;
   readonly lastMessageIsError?: boolean;
 }
 
+let filePickerId = 0;
+
+export function createImageTransferView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'image-trail-panel__section image-trail-panel__image-transfer';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Image';
+  section.append(heading);
+
+  if (state.lastMessage) {
+    const msg = document.createElement('p');
+    msg.className = state.lastMessageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
+    msg.textContent = state.lastMessage;
+    section.append(msg);
+  }
+
+  section.append(createImageGroup(state, dispatch));
+
+  return section;
+}
+
 export function createImportExportView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
   const section = document.createElement('section');
-  section.className = 'image-trail-panel__section';
+  section.className = 'image-trail-panel__section image-trail-panel__import-export';
 
   const heading = document.createElement('h3');
   heading.textContent = 'Import / Export';
@@ -44,16 +70,22 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   passwordInput.type = 'password';
   passwordInput.placeholder = 'Export password';
   passwordInput.autocomplete = 'new-password';
-  group.append(passwordInput);
+  passwordInput.className = 'image-trail-panel__password-input';
+
+  const plaintext = createToggle('Plaintext');
+
+  const controls = document.createElement('div');
+  controls.className = 'image-trail-panel__control-stack';
+  controls.append(passwordInput, plaintext.label);
 
   const historyBtn = document.createElement('button');
   historyBtn.type = 'button';
   historyBtn.textContent = 'Export history';
   historyBtn.disabled = state.busy;
   historyBtn.addEventListener('click', () => {
-    if (passwordInput.value.length < 4) return;
-    dispatch({ name: 'export/history', password: passwordInput.value });
+    dispatch({ name: 'export/history', password: passwordInput.value, plaintext: plaintext.input.checked });
     passwordInput.value = '';
+    updateExportControls();
   });
 
   const bookmarksBtn = document.createElement('button');
@@ -61,12 +93,70 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   bookmarksBtn.textContent = 'Export bookmarks';
   bookmarksBtn.disabled = state.busy;
   bookmarksBtn.addEventListener('click', () => {
-    if (passwordInput.value.length < 4) return;
-    dispatch({ name: 'export/bookmarks', password: passwordInput.value });
+    dispatch({ name: 'export/bookmarks', password: passwordInput.value, plaintext: plaintext.input.checked });
     passwordInput.value = '';
+    updateExportControls();
   });
 
-  group.append(historyBtn, bookmarksBtn);
+  const actions = document.createElement('div');
+  actions.className = 'image-trail-panel__actions';
+  actions.append(historyBtn, bookmarksBtn);
+
+  const updateExportControls = (): void => {
+    const locked = state.busy || (!plaintext.input.checked && passwordInput.value.length < 4);
+    historyBtn.disabled = locked;
+    bookmarksBtn.disabled = locked;
+    passwordInput.disabled = plaintext.input.checked || state.busy;
+  };
+  passwordInput.addEventListener('input', updateExportControls);
+  plaintext.input.addEventListener('change', updateExportControls);
+  updateExportControls();
+
+  group.append(controls, actions);
+  return group;
+}
+
+function createImageGroup(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
+  const group = document.createElement('div');
+  group.className = 'image-trail-panel__subsection';
+
+  const label = document.createElement('h4');
+  label.textContent = 'Image';
+  group.append(label);
+
+  const imageInput = document.createElement('input');
+  imageInput.type = 'file';
+  imageInput.accept = 'image/*';
+  imageInput.multiple = true;
+  imageInput.className = 'image-trail-panel__file-input';
+  imageInput.disabled = state.busy;
+  const imagePicker = createFilePicker(imageInput, 'Choose images');
+
+  const controls = document.createElement('div');
+  controls.className = 'image-trail-panel__control-stack';
+  controls.append(imagePicker);
+
+  const importBtn = document.createElement('button');
+  importBtn.type = 'button';
+  importBtn.textContent = 'Import selected';
+  importBtn.disabled = state.busy;
+  importBtn.addEventListener('click', () => {
+    readImageFiles(imageInput, (files) => dispatch({ name: 'import/image', files }));
+  });
+
+  const exportBtn = document.createElement('button');
+  exportBtn.type = 'button';
+  exportBtn.textContent = 'Export image';
+  exportBtn.disabled = state.busy || !state.currentImageUrl;
+  exportBtn.addEventListener('click', () => {
+    dispatch({ name: 'export/image' });
+  });
+
+  const actions = document.createElement('div');
+  actions.className = 'image-trail-panel__actions';
+  actions.append(importBtn, exportBtn);
+
+  group.append(controls, actions);
   return group;
 }
 
@@ -82,26 +172,39 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   passwordInput.type = 'password';
   passwordInput.placeholder = 'Import password';
   passwordInput.autocomplete = 'current-password';
+  passwordInput.className = 'image-trail-panel__password-input';
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = '.json';
+  fileInput.className = 'image-trail-panel__file-input';
+  const filePicker = createFilePicker(fileInput, 'Choose JSON');
 
   const historyBtn = document.createElement('button');
   historyBtn.type = 'button';
-  historyBtn.textContent = 'Import encrypted history';
+  historyBtn.textContent = 'Import history';
   historyBtn.disabled = state.busy;
   historyBtn.addEventListener('click', () => {
     readFileInput(fileInput, (content) => {
-      if (passwordInput.value.length < 4) return;
       dispatch({ name: 'import/history', fileContent: content, password: passwordInput.value });
+      passwordInput.value = '';
+    });
+  });
+
+  const bookmarksBtn = document.createElement('button');
+  bookmarksBtn.type = 'button';
+  bookmarksBtn.textContent = 'Import bookmarks';
+  bookmarksBtn.disabled = state.busy;
+  bookmarksBtn.addEventListener('click', () => {
+    readFileInput(fileInput, (content) => {
+      dispatch({ name: 'import/bookmarks', fileContent: content, password: passwordInput.value });
       passwordInput.value = '';
     });
   });
 
   const bookmarkletBtn = document.createElement('button');
   bookmarkletBtn.type = 'button';
-  bookmarkletBtn.textContent = 'Import bookmarklet JSON';
+  bookmarkletBtn.textContent = 'Import old bookmarklet data';
   bookmarkletBtn.disabled = state.busy;
   bookmarkletBtn.addEventListener('click', () => {
     readFileInput(fileInput, (content) => {
@@ -109,28 +212,86 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
     });
   });
 
-  const keyBtn = document.createElement('button');
-  keyBtn.type = 'button';
-  keyBtn.textContent = 'Import key';
-  keyBtn.disabled = state.busy;
-  keyBtn.addEventListener('click', () => {
-    readFileInput(fileInput, (content) => {
-      if (passwordInput.value.length < 4) return;
-      dispatch({ name: 'import/key', fileContent: content, password: passwordInput.value });
-      passwordInput.value = '';
-    });
-  });
+  const controls = document.createElement('div');
+  controls.className = 'image-trail-panel__control-stack';
+  controls.append(filePicker, passwordInput);
 
-  group.append(fileInput, passwordInput, historyBtn, bookmarkletBtn, keyBtn);
+  const actions = document.createElement('div');
+  actions.className = 'image-trail-panel__actions';
+  actions.append(historyBtn, bookmarksBtn, bookmarkletBtn);
+
+  group.append(controls, actions);
   return group;
 }
 
-function readFileInput(input: HTMLInputElement, onRead: (content: string) => void): void {
+function createToggle(text: string): { readonly label: HTMLLabelElement; readonly input: HTMLInputElement } {
+  const label = document.createElement('label');
+  label.className = 'image-trail-panel__toggle';
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  const copy = document.createElement('span');
+  copy.textContent = text;
+  label.append(input, copy);
+  return { label, input };
+}
+
+function createFilePicker(input: HTMLInputElement, text: string): HTMLElement {
+  const id = `image-trail-file-${(filePickerId += 1)}`;
+  input.id = id;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__file-picker';
+
+  const label = document.createElement('label');
+  label.className = 'image-trail-panel__file-picker-button';
+  label.htmlFor = id;
+  label.textContent = text;
+
+  const name = document.createElement('span');
+  name.className = 'image-trail-panel__file-picker-name';
+  name.textContent = 'No file selected';
+
+  input.addEventListener('change', () => {
+    const files = Array.from(input.files ?? []);
+    name.textContent = files.length > 1 ? `${files.length} files selected` : (files[0]?.name ?? 'No file selected');
+  });
+
+  wrapper.append(input, label, name);
+  return wrapper;
+}
+
+function readImageFiles(input: HTMLInputElement, onRead: (files: readonly ImportedImageFile[]) => void): void {
+  const files = Array.from(input.files ?? []).filter((file) => file.type.startsWith('image/'));
+  if (files.length === 0) return;
+  let remaining = files.length;
+  const results: ImportedImageFile[] = [];
+  for (const file of files) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string' && reader.result.startsWith('data:image/')) {
+        results.push({ name: file.name, dataUrl: reader.result });
+      }
+      remaining -= 1;
+      if (remaining === 0) onRead(results);
+    };
+    reader.onerror = () => {
+      remaining -= 1;
+      if (remaining === 0) onRead(results);
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function readFileInput(input: HTMLInputElement, onRead: (content: string) => void, mode: 'text' | 'data-url' = 'text'): void {
   const file = input.files?.[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
     if (typeof reader.result === 'string') onRead(reader.result);
   };
-  reader.readAsText(file);
+  if (mode === 'data-url') {
+    reader.readAsDataURL(file);
+  } else {
+    reader.readAsText(file);
+  }
 }

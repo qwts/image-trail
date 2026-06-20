@@ -8,13 +8,19 @@ export interface UrlToken {
   readonly uppercase?: boolean;
 }
 
+export interface PathSeparator {
+  readonly type: 'sep';
+  readonly raw: string;
+}
+
 export interface PathSegment {
   readonly type: 'segment';
   readonly raw: string;
-  readonly rawEncoded: string;
   readonly edited?: boolean;
   readonly tokens: UrlToken[];
 }
+
+export type PathPart = PathSeparator | PathSegment;
 
 export interface QueryField {
   readonly type: 'query';
@@ -30,7 +36,8 @@ export interface ParsedUrlModel {
   readonly protocol: string;
   readonly host: string;
   readonly hash: string;
-  readonly pathSegments: PathSegment[];
+  readonly pathParts: PathPart[];
+  readonly queryPrefix: string;
   readonly queryFields: QueryField[];
 }
 
@@ -40,8 +47,9 @@ export interface UrlField {
   readonly id: string;
   readonly location: UrlFieldLocation;
   readonly label: string;
+  readonly value: string;
   readonly tokenKind: UrlTokenKind;
-  readonly segmentIndex?: number;
+  readonly partIndex?: number;
   readonly queryIndex?: number;
   readonly tokenIndex: number;
 }

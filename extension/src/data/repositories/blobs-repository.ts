@@ -1,20 +1,12 @@
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
-import { DataStore, SchemaIndex } from '../schema.js';
+import { DataStore } from '../schema.js';
 import type { StoredBlobRecord } from '../types.js';
 
 export class BlobsRepository {
   constructor(private readonly db: IDBDatabase) {}
 
   async put(record: StoredBlobRecord): Promise<StoredBlobRecord> {
-    const existing = await this.getBySha256(record.sha256);
-    if (existing) {
-      const updated: StoredBlobRecord = { ...existing, referenceCount: existing.referenceCount + 1 };
-      const transaction = this.db.transaction(DataStore.Blobs, 'readwrite');
-      transaction.objectStore(DataStore.Blobs).put(updated);
-      await transactionDone(transaction);
-      return updated;
-    }
     const transaction = this.db.transaction(DataStore.Blobs, 'readwrite');
     transaction.objectStore(DataStore.Blobs).put(record);
     await transactionDone(transaction);
@@ -28,10 +20,9 @@ export class BlobsRepository {
     return result;
   }
 
-  async getBySha256(sha256: string): Promise<StoredBlobRecord | undefined> {
+  async list(): Promise<readonly StoredBlobRecord[]> {
     const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
-    const index = transaction.objectStore(DataStore.Blobs).index(SchemaIndex.BlobsBySha256);
-    const result = await requestToPromise<StoredBlobRecord | undefined>(index.get(sha256));
+    const result = await requestToPromise<StoredBlobRecord[]>(transaction.objectStore(DataStore.Blobs).getAll());
     await transactionDone(transaction);
     return result;
   }
@@ -51,6 +42,17 @@ export class BlobsRepository {
     await transactionDone(transaction);
   }
 
+  async deleteMany(ids: readonly string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+
+    const transaction = this.db.transaction(DataStore.Blobs, 'readwrite');
+    const store = transaction.objectStore(DataStore.Blobs);
+    const uniqueIds = [...new Set(ids)];
+    for (const id of uniqueIds) store.delete(id);
+    await transactionDone(transaction);
+    return uniqueIds.length;
+  }
+
   async getStorageUsage(): Promise<StorageUsageSummary> {
     const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
     const store = transaction.objectStore(DataStore.Blobs);
@@ -64,7 +66,7 @@ export class BlobsRepository {
         const cursor = request.result;
         if (cursor) {
           const record = cursor.value as StoredBlobRecord;
-          totalBytes += record.byteLength;
+          totalBytes += record.encryptedByteLength;
           blobCount += 1;
           cursor.continue();
         } else {

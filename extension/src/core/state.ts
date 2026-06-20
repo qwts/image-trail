@@ -27,12 +27,25 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     message: 'Image Trail is ready.',
     lastUpdatedAt: now,
     target: EMPTY_TARGET_STATE,
+    draftUrl: null,
     history: [],
     bookmarks: [],
+    bookmarkOffset: 0,
+    bookmarkLimit: 30,
+    bookmarkTotal: 0,
+    bookmarkVisibilityScope: 'global',
+    hasOlderBookmarks: false,
+    hasNewerBookmarks: false,
     captureInProgress: false,
     captureResult: null,
     storageUsage: null,
+    blobKeyUnlocked: false,
+    blobKeyAvailable: false,
+    blobKeyReference: null,
+    importExportBusy: false,
     automation: EMPTY_AUTOMATION_STATE,
+    selectedHistoryId: null,
+    activeFieldId: null,
   };
 }
 
@@ -57,6 +70,7 @@ export function setTargetState(state: PanelState, target: TargetState, now = Dat
     status: target.picking ? 'picking' : 'ready',
     message: target.message,
     target,
+    draftUrl: null,
     lastUpdatedAt: now,
   };
 }

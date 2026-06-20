@@ -152,7 +152,7 @@ export const urlFixtures: UrlFixture[] = [
     input: 'https://example.com/img/9007199254740993.jpg',
     incrementCases: [
       {
-        fieldHint: 'file numeric large',
+        fieldHint: '9007199254740993',
         delta: 1,
         expectedUrl: 'https://example.com/img/9007199254740994.jpg',
       },

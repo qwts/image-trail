@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTargetImageInfo, findQualifyingImages, getImageUrl, isQualifyingImage } from '../extension/src/content/target-image.js';
+import {
+  createLoadedTargetImageInfo,
+  createTargetImageInfo,
+  findQualifyingImages,
+  getImageRejectionReason,
+  getImageUrl,
+  getLoadedImageUrl,
+  isQualifyingImage,
+} from '../extension/src/content/target-image.js';
 
 interface FakeImageOptions {
   currentSrc?: string;
@@ -8,6 +16,11 @@ interface FakeImageOptions {
   src?: string;
   dataSrc?: string | null;
   dataOriginal?: string | null;
+  dataFullSrc?: string | null;
+  dataImageUrl?: string | null;
+  dataMediaUrl?: string | null;
+  dataZoomSrc?: string | null;
+  parentHref?: string | null;
   connected?: boolean;
   rectWidth?: number;
   rectHeight?: number;
@@ -29,9 +42,15 @@ function fakeImage(options: FakeImageOptions): HTMLImageElement {
       if (name === 'src') return options.srcAttribute ?? null;
       if (name === 'data-src') return options.dataSrc ?? null;
       if (name === 'data-original') return options.dataOriginal ?? null;
+      if (name === 'data-full-src') return options.dataFullSrc ?? null;
+      if (name === 'data-image-url') return options.dataImageUrl ?? null;
+      if (name === 'data-media-url') return options.dataMediaUrl ?? null;
+      if (name === 'data-zoom-src') return options.dataZoomSrc ?? null;
+      if (name === 'href') return options.parentHref ?? null;
       return null;
     },
-    closest(): Element | null {
+    closest(selector: string): Element | null {
+      if (selector === 'a[href]' && options.parentHref) return this as unknown as Element;
       return null;
     },
     getBoundingClientRect() {
@@ -50,6 +69,10 @@ globalThis.window = {
     return (element as unknown as { __style: CSSStyleDeclaration }).__style;
   },
 } as Window & typeof globalThis;
+
+globalThis.document = {
+  baseURI: 'https://example.test/page',
+} as Document;
 
 test('uses bookmarklet-compatible URL precedence for target images', () => {
   assert.deepEqual(
@@ -72,12 +95,88 @@ test('uses bookmarklet-compatible URL precedence for target images', () => {
   );
 });
 
+test('uses linked source URL when visible image is a Bing thumbnail', () => {
+  const source = 'https://cdn.example.test/images/source.jpg';
+  const thumbnail = 'https://thf.bing.com/th/id/OIP.ybpkfTltBcXM_pn_a8r2zAHaE3?cb=thfc1falcon2&pid=Api';
+  const link = `https://www.bing.com/images/search?view=detailV2&mediaurl=${encodeURIComponent(source)}`;
+
+  assert.deepEqual(getImageUrl(fakeImage({ currentSrc: thumbnail, parentHref: link })), {
+    source: 'linkSource',
+    url: source,
+  });
+});
+
+test('ignores wrapper source parameters on untrusted hosts', () => {
+  const source = 'https://evil.example.test/fake.jpg';
+  const thumbnail = 'https://thf.bing.com/th/id/OIP.ybpkfTltBcXM_pn_a8r2zAHaE3?cb=thfc1falcon2&pid=Api';
+  const link = `https://attacker.example.test/gallery?url=${encodeURIComponent(source)}`;
+
+  assert.deepEqual(getImageUrl(fakeImage({ currentSrc: thumbnail, parentHref: link })), {
+    source: 'currentSrc',
+    url: thumbnail,
+  });
+});
+
+test('loaded target info keeps the actual img src instead of unwrapping link source URLs', () => {
+  const source = 'https://cdn.example.test/images/source.jpg';
+  const thumbnail = 'https://thf.bing.com/th/id/OIP.ybpkfTltBcXM_pn_a8r2zAHaE3?cb=thfc1falcon2&pid=Api';
+  const link = `https://www.bing.com/images/search?view=detailV2&mediaurl=${encodeURIComponent(source)}`;
+  const image = fakeImage({ currentSrc: thumbnail, parentHref: link, naturalWidth: 320, naturalHeight: 240 });
+
+  assert.deepEqual(getLoadedImageUrl(image), {
+    source: 'currentSrc',
+    url: thumbnail,
+  });
+  assert.deepEqual(createLoadedTargetImageInfo(image), {
+    handleId: 'image-trail-target-1',
+    url: thumbnail,
+    width: 320,
+    height: 240,
+    source: 'currentSrc',
+  });
+});
+
+test('loaded target info resolves relative src attributes against the page URL', () => {
+  assert.deepEqual(getLoadedImageUrl(fakeImage({ srcAttribute: '/images/photo.jpg' })), {
+    source: 'srcAttribute',
+    url: 'https://example.test/images/photo.jpg',
+  });
+});
+
+test('uses richer image attributes before falling back to visible source', () => {
+  assert.deepEqual(
+    getImageUrl(
+      fakeImage({
+        currentSrc: 'https://pbs.twimg.com/media/example?format=jpg&name=small',
+        dataFullSrc: 'https://pbs.twimg.com/media/example?format=jpg&name=orig',
+      }),
+    ),
+    {
+      source: 'data-full-src',
+      url: 'https://pbs.twimg.com/media/example?format=jpg&name=orig',
+    },
+  );
+});
+
 test('qualifies only connected visible images with usable dimensions and URLs', () => {
   assert.equal(isQualifyingImage(fakeImage({ srcAttribute: 'https://example.test/image.jpg' })), true);
   assert.equal(isQualifyingImage(fakeImage({ srcAttribute: 'https://example.test/image.jpg', connected: false })), false);
   assert.equal(isQualifyingImage(fakeImage({ srcAttribute: 'https://example.test/image.jpg', naturalWidth: 20 })), false);
   assert.equal(isQualifyingImage(fakeImage({ srcAttribute: 'https://example.test/image.jpg', display: 'none' })), false);
+  assert.equal(isQualifyingImage(fakeImage({ srcAttribute: 'https://example.test/image.jpg', opacity: '0' })), true);
   assert.equal(isQualifyingImage(fakeImage({})), false);
+});
+
+test('explains why a target image cannot be bookmarked', () => {
+  assert.equal(getImageRejectionReason(fakeImage({})), 'Image does not expose a usable source URL.');
+  assert.equal(
+    getImageRejectionReason(fakeImage({ srcAttribute: 'https://example.test/image.jpg', naturalWidth: 20 })),
+    'Image is too small (20x100).',
+  );
+  assert.equal(
+    getImageRejectionReason(fakeImage({ srcAttribute: 'https://example.test/image.jpg', display: 'none' })),
+    'Image is not displayed.',
+  );
 });
 
 test('creates serializable target info and filters qualifying roots', () => {
@@ -92,7 +191,7 @@ test('creates serializable target info and filters qualifying roots', () => {
 
   assert.equal(findQualifyingImages(root).length, 1);
   assert.deepEqual(createTargetImageInfo(first), {
-    handleId: 'image-trail-target-1',
+    handleId: 'image-trail-target-2',
     url: 'https://example.test/one.jpg',
     width: 640,
     height: 480,

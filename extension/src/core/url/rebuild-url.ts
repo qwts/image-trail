@@ -1,9 +1,9 @@
-import { tokenValue } from './tokenize-fields.js';
+import { detectNumericType, tokenValue } from './tokenize-fields.js';
 import type { ParsedUrlModel, UrlField, UrlToken } from './types.js';
 
 export function rebuildUrl(model: ParsedUrlModel): string {
-  const path = `/${model.pathSegments.map(rebuildPathSegment).join('/')}`;
-  const query = model.queryFields.length > 0 ? `?${model.queryFields.map(rebuildQueryField).join('&')}` : '';
+  const path = rebuildPath(model);
+  const query = model.queryFields.length > 0 ? `${model.queryPrefix || '?'}${model.queryFields.map(rebuildQueryField).join('&')}` : '';
   return `${model.protocol}//${model.host}${path}${query}${model.hash}`;
 }
 
@@ -11,18 +11,23 @@ export function bumpUrlField(model: ParsedUrlModel, field: UrlField, delta: numb
   return setUrlFieldToken(model, field, (token) => bumpToken(token, delta));
 }
 
+export function setUrlFieldValue(model: ParsedUrlModel, field: UrlField, nextValue: string): ParsedUrlModel {
+  const normalized = normalizeTokenValue(nextValue);
+  return setUrlFieldToken(model, field, (token) => setTokenValue(token, normalized));
+}
+
 function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token: UrlToken) => UrlToken): ParsedUrlModel {
-  if (field.location === 'path' && field.segmentIndex !== undefined) {
+  if (field.location === 'path' && field.partIndex !== undefined) {
     return {
       ...model,
-      pathSegments: model.pathSegments.map((segment, segmentIndex) =>
-        segmentIndex === field.segmentIndex
+      pathParts: model.pathParts.map((part, partIndex) =>
+        partIndex === field.partIndex && part.type === 'segment'
           ? {
-              ...segment,
+              ...part,
               edited: true,
-              tokens: segment.tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token)),
+              tokens: part.tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token)),
             }
-          : segment,
+          : part,
       ),
     };
   }
@@ -55,15 +60,57 @@ function bumpToken(token: UrlToken, delta: number): UrlToken {
   return { ...token, value: cased.padStart(token.width ?? cased.length, '0') };
 }
 
+function normalizeTokenValue(raw: string): string {
+  return raw.trim();
+}
+
+function setTokenValue(token: UrlToken, raw: string): UrlToken {
+  const normalized = raw.trim();
+  const kind = detectNumericType(normalized);
+
+  if (kind === 'text') return { kind, value: normalized };
+
+  const hasPrefix = /^0[xX]/u.test(normalized);
+  const digits = hasPrefix ? normalized.slice(2) : normalized;
+  const width = Math.max(token.width ?? 0, digits.length);
+  const uppercase = kind === 'hex' ? /[A-F]/u.test(digits) || token.uppercase === true : undefined;
+  const value = kind === 'hex' && uppercase ? digits.toUpperCase() : kind === 'hex' ? digits.toLowerCase() : digits;
+
+  if (kind === 'hex' && hasPrefix) {
+    return {
+      kind,
+      value: value.padStart(width, '0'),
+      width,
+      prefix: normalized.slice(0, 2) as '0x' | '0X',
+      uppercase,
+    };
+  }
+
+  return {
+    kind,
+    value: value.padStart(width, '0'),
+    width,
+    uppercase,
+  };
+}
+
 function rebuildQueryField(field: ParsedUrlModel['queryFields'][number]): string {
   const key = encodeQueryKey(field.key);
   if (!field.hasEquals) return key;
   return `${key}=${encodeQueryComponent(field.valueTokens.map(tokenValue).join(''))}`;
 }
 
-function rebuildPathSegment(segment: ParsedUrlModel['pathSegments'][number]): string {
+function rebuildPath(model: ParsedUrlModel): string {
+  const parts = model.pathParts.map((part) => {
+    if (part.type === 'sep') return part.raw;
+    return rebuildPathSegment(part);
+  });
+  return parts.join('') || '/';
+}
+
+function rebuildPathSegment(segment: Extract<ParsedUrlModel['pathParts'][number], { type: 'segment' }>): string {
   const value = segment.tokens.map(tokenValue).join('');
-  return !segment.edited && value === segment.raw ? segment.rawEncoded.replace(/%2f/giu, '%2F') : encodePathSegment(value);
+  return !segment.edited ? segment.raw : encodePathSegment(value);
 }
 
 function encodePathSegment(value: string): string {
@@ -73,10 +120,12 @@ function encodePathSegment(value: string): string {
     .replace(/[!'()*]/gu, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
-function encodeQueryKey(value: string): string {
-  return encodeURIComponent(value);
+function encodeQueryComponent(value: string): string {
+  return encodeURIComponent(value)
+    .replace(/[!'()*]/gu, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replaceAll('%20', '+');
 }
 
-function encodeQueryComponent(value: string): string {
-  return encodeURIComponent(value).replaceAll('%20', '+');
+function encodeQueryKey(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/gu, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
 }
