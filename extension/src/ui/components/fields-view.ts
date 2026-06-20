@@ -52,7 +52,7 @@ export function createFieldsView(
     const isFailed = field.field.id === failedFieldId;
     const isSuccessful = successfulFieldIds.includes(field.field.id);
     const isUnchanged = unchangedFieldIds.includes(field.field.id);
-    const isUnlocked = unlockedFieldIds.includes(field.field.id);
+    const isIncludedInTrail = unlockedFieldIds.includes(field.field.id);
     const isSplitField = field.field.splitBaseId !== undefined;
     const canUnlock =
       isSuccessful && field.field.location === 'query' && (field.field.tokenKind === 'int' || field.field.tokenKind === 'hex');
@@ -79,7 +79,7 @@ export function createFieldsView(
     const statuses = [
       field.field.id === activeFieldId ? 'active' : '',
       isSuccessful ? 'loads' : '',
-      isUnlocked ? 'unlocked' : '',
+      isIncludedInTrail ? 'included' : '',
       isSplitField && field.field.splitPartIndex !== undefined && field.field.splitPartCount !== undefined
         ? `split ${field.field.splitPartIndex + 1}/${field.field.splitPartCount}`
         : '',
@@ -90,7 +90,7 @@ export function createFieldsView(
 
     const hasStepControls = field.field.tokenKind === 'int' || field.field.tokenKind === 'hex';
     const controls = document.createElement('span');
-    controls.className = `image-trail-panel__field-control${hasStepControls ? ' has-step-controls' : ''}${canUnlock ? ' has-unlock-control' : ''}`;
+    controls.className = `image-trail-panel__field-control${hasStepControls ? ' has-step-controls' : ''}${canUnlock ? ' has-trail-control' : ''}`;
     controls.append(value);
     let splitControls: HTMLSpanElement | null = null;
 
@@ -115,14 +115,14 @@ export function createFieldsView(
     }
 
     if (canUnlock) {
-      const unlock = document.createElement('button');
-      unlock.type = 'button';
-      unlock.className = `image-trail-panel__field-lock-button${isUnlocked ? ' is-unlocked' : ''}`;
-      unlock.textContent = isUnlocked ? 'Lock' : 'Unlock';
-      unlock.title = isUnlocked ? `Remove ${field.field.label} from Previous/Next` : `Include ${field.field.label} in Previous/Next`;
-      unlock.setAttribute('aria-label', unlock.title);
-      unlock.addEventListener('click', () => callbacks.onToggleUnlock(field.field.id));
-      controls.append(unlock);
+      const trail = document.createElement('button');
+      trail.type = 'button';
+      trail.className = `image-trail-panel__field-trail-button${isIncludedInTrail ? ' is-included' : ''}`;
+      trail.textContent = isIncludedInTrail ? 'Exclude' : 'Include';
+      trail.title = isIncludedInTrail ? `Exclude ${field.field.label} from Previous/Next` : `Include ${field.field.label} in Previous/Next`;
+      trail.setAttribute('aria-label', trail.title);
+      trail.addEventListener('click', () => callbacks.onToggleUnlock(field.field.id));
+      controls.append(trail);
     }
 
     if (canSplit || isSplitField) {

@@ -85,14 +85,14 @@ test('same target load snapshots preserve learned field markers', () => {
   assert.equal(next.currentImageFingerprint, 'a'.repeat(64));
 });
 
-test('unlock toggle only changes successful fields', () => {
+test('Previous/Next inclusion toggle only changes successful fields', () => {
   const state = { ...createInitialPanelState(), successfulFieldIds: ['q:0:0'] };
 
-  const unlocked = reducePanelAction(state, { name: 'field-unlock/toggle', id: 'q:0:0' });
-  assert.deepEqual(unlocked.unlockedFieldIds, ['q:0:0']);
+  const included = reducePanelAction(state, { name: 'field-unlock/toggle', id: 'q:0:0' });
+  assert.deepEqual(included.unlockedFieldIds, ['q:0:0']);
 
-  const locked = reducePanelAction(unlocked, { name: 'field-unlock/toggle', id: 'q:0:0' });
-  assert.deepEqual(locked.unlockedFieldIds, []);
+  const excluded = reducePanelAction(included, { name: 'field-unlock/toggle', id: 'q:0:0' });
+  assert.deepEqual(excluded.unlockedFieldIds, []);
 
   const ignored = reducePanelAction(state, { name: 'field-unlock/toggle', id: 'q:1:0' });
   assert.deepEqual(ignored.unlockedFieldIds, []);

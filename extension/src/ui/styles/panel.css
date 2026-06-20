@@ -661,7 +661,7 @@
   grid-template-columns: minmax(0, 1fr) 26px 26px;
 }
 
-.image-trail-panel-root .image-trail-panel__field-control.has-step-controls.has-unlock-control {
+.image-trail-panel-root .image-trail-panel__field-control.has-step-controls.has-trail-control {
   grid-template-columns: minmax(0, 1fr) 26px 26px minmax(58px, max-content);
 }
 
@@ -697,7 +697,7 @@
   background: #333;
 }
 
-.image-trail-panel-root .image-trail-panel__field-lock-button {
+.image-trail-panel-root .image-trail-panel__field-trail-button {
   min-height: 26px;
   padding: 0 7px;
   border: 1px solid rgb(255 255 255 / 22%);
@@ -734,7 +734,7 @@
   background: #303030;
 }
 
-.image-trail-panel-root .image-trail-panel__field-lock-button.is-unlocked {
+.image-trail-panel-root .image-trail-panel__field-trail-button.is-included {
   border-color: rgb(116 214 158 / 62%);
   background: rgb(42 126 76 / 28%);
   color: rgb(230 255 240);
