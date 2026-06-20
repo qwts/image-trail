@@ -304,6 +304,12 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'field-unlock/toggle') {
+      this.state = reducePanelAction(this.state, action);
+      this.render();
+      return;
+    }
+
     if (action.name === 'selected-url/apply') {
       void this.applySelectedUrl(action.url);
       return;
