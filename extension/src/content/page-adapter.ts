@@ -267,7 +267,7 @@ export class PageAdapter {
     if (!target) return;
     if (image === this.selected) {
       this.selectedActiveUrl = target.url;
-      this.emit(`Loaded ${target.url}`);
+      this.emit(target.url.startsWith('data:') ? 'Loaded data URL' : `Loaded ${target.url}`);
     }
     const thumbnail = (await createThumbnailDataUrlFromImage(image)) ?? undefined;
     for (const listener of this.loadListeners) listener({ ...target, thumbnail });

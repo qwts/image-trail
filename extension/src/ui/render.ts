@@ -58,6 +58,7 @@ function focusedTextControlSnapshot(root: HTMLElement): FocusedTextControlSnapsh
 
 function restoreFocusedTextControl(root: HTMLElement, snapshot: FocusedTextControlSnapshot | null): void {
   if (!snapshot) return;
+  if (snapshot.selector === '.image-trail-panel__full-url-input' && snapshot.value.startsWith('data:')) return;
   const next = root.querySelector<HTMLInputElement | HTMLTextAreaElement>(snapshot.selector);
   if (!next) return;
   next.value = snapshot.value;

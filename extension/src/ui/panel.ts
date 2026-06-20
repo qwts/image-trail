@@ -30,11 +30,12 @@ function sourceUrlForBookmark(url: string): string {
 }
 
 function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
+  const selectedUrl = snapshot.selected?.url ?? null;
   return {
     mode: snapshot.mode,
     picking: snapshot.picking,
     candidateCount: snapshot.candidateCount,
-    selectedUrl: snapshot.selected?.url ?? null,
+    selectedUrl: selectedUrl?.startsWith('data:') ? 'data:' : selectedUrl,
     selectedHandleId: snapshot.selected?.handleId ?? null,
     selectedDimensions: snapshot.selected ? `${snapshot.selected.width}×${snapshot.selected.height}` : null,
     message: snapshot.message,

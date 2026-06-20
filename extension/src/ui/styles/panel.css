@@ -378,10 +378,12 @@
   inline-size: 100%;
   max-width: 100%;
   max-inline-size: 100%;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  max-height: 72px;
+  white-space: nowrap;
+  overflow-wrap: normal;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
+  text-overflow: ellipsis;
 }
 
 .image-trail-panel-root .image-trail-panel__full-url-input {
