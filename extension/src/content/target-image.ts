@@ -151,7 +151,8 @@ export function getImageRejectionReason(image: HTMLImageElement): string | null 
   const rect = image.getBoundingClientRect();
   const width = image.naturalWidth || rect.width;
   const height = image.naturalHeight || rect.height;
-  if (width < MIN_VISIBLE_DIMENSION || height < MIN_VISIBLE_DIMENSION) return `Image is too small (${Math.round(width)}x${Math.round(height)}).`;
+  if (width < MIN_VISIBLE_DIMENSION || height < MIN_VISIBLE_DIMENSION)
+    return `Image is too small (${Math.round(width)}x${Math.round(height)}).`;
 
   const style = window.getComputedStyle(image);
   if (style.display === 'none') return 'Image is not displayed.';

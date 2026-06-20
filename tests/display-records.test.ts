@@ -17,7 +17,10 @@ test('uses source image filename from DuckDuckGo image proxy URLs', () => {
 });
 
 test('keeps explicit display labels before deriving a filename', () => {
-  assert.equal(normalizeDisplayLabel({ url: 'https://example.test/iu/?u=https%3A%2F%2Fcdn.test%2Fimage.jpg', label: 'Favorite' }), 'Favorite');
+  assert.equal(
+    normalizeDisplayLabel({ url: 'https://example.test/iu/?u=https%3A%2F%2Fcdn.test%2Fimage.jpg', label: 'Favorite' }),
+    'Favorite',
+  );
 });
 
 test('unwraps source image URLs from proxy query parameters', () => {

@@ -158,8 +158,14 @@ test('qualifies only connected visible images with usable dimensions and URLs', 
 
 test('explains why a target image cannot be bookmarked', () => {
   assert.equal(getImageRejectionReason(fakeImage({})), 'Image does not expose a usable source URL.');
-  assert.equal(getImageRejectionReason(fakeImage({ srcAttribute: 'https://example.test/image.jpg', naturalWidth: 20 })), 'Image is too small (20x100).');
-  assert.equal(getImageRejectionReason(fakeImage({ srcAttribute: 'https://example.test/image.jpg', display: 'none' })), 'Image is not displayed.');
+  assert.equal(
+    getImageRejectionReason(fakeImage({ srcAttribute: 'https://example.test/image.jpg', naturalWidth: 20 })),
+    'Image is too small (20x100).',
+  );
+  assert.equal(
+    getImageRejectionReason(fakeImage({ srcAttribute: 'https://example.test/image.jpg', display: 'none' })),
+    'Image is not displayed.',
+  );
 });
 
 test('creates serializable target info and filters qualifying roots', () => {

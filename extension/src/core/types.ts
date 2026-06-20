@@ -153,7 +153,13 @@ export type PanelAction =
         | 'storage/update'
       >;
     }
-  | { readonly name: 'history/add-loaded'; readonly url: string; readonly title?: string; readonly timestamp?: string; readonly thumbnail?: string }
+  | {
+      readonly name: 'history/add-loaded';
+      readonly url: string;
+      readonly title?: string;
+      readonly timestamp?: string;
+      readonly thumbnail?: string;
+    }
   | { readonly name: 'history/remove' | 'bookmark/load' | 'bookmark/remove' | 'history/select'; readonly id: string }
   | {
       readonly name: 'bookmarks/page-loaded';

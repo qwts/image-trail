@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAndActivateWrappedBlobKey, lockBlobKey, activateWrappedBlobKey, getActiveBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
+import {
+  createAndActivateWrappedBlobKey,
+  lockBlobKey,
+  activateWrappedBlobKey,
+  getActiveBlobKey,
+} from '../extension/src/data/crypto/blob-keyring.js';
 import { sealBlobPayload, openBlobPayload } from '../extension/src/data/crypto/binary-envelope.js';
 import { createKeyReference } from '../extension/src/data/crypto/key-reference.js';
 
@@ -118,4 +123,3 @@ test('encrypted blob payload rejects authenticated metadata tampering', async ()
     }),
   );
 });
-

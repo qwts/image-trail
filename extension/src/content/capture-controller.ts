@@ -19,7 +19,12 @@ import {
   isRetrieveBlobResultMessage,
 } from '../background/messages.js';
 import type { CaptureSourceType } from '../background/messages.js';
-import type { BlobKeyResultMessage, BlobKeyStatusResultMessage, CreateBlobPreviewResultMessage, RetrieveBlobResultMessage } from '../background/messages.js';
+import type {
+  BlobKeyResultMessage,
+  BlobKeyStatusResultMessage,
+  CreateBlobPreviewResultMessage,
+  RetrieveBlobResultMessage,
+} from '../background/messages.js';
 
 export interface CaptureStore {
   readonly requestCapture: (url: string, sourceType: CaptureSourceType, sourceRecordId?: string) => Promise<CaptureResult>;

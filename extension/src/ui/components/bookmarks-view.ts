@@ -1,4 +1,9 @@
-import { encryptedBlobIdForRecord, imageExtensionFromUrl, imageExtensionFromValue, type ImageDisplayRecord } from '../../core/display-records.js';
+import {
+  encryptedBlobIdForRecord,
+  imageExtensionFromUrl,
+  imageExtensionFromValue,
+  type ImageDisplayRecord,
+} from '../../core/display-records.js';
 
 type BookmarkAction =
   | { readonly name: 'bookmark/current' }

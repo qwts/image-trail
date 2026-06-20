@@ -3,7 +3,12 @@ import type { PanelAction } from '../../core/types.js';
 type EncryptionAction = Extract<PanelAction, { readonly name: 'blob-key/setup' | 'blob-key/unlock' | 'capture/cleanup-orphans' }>;
 
 export function createEncryptionView(
-  state: { readonly unlocked: boolean; readonly keyReference: string | null; readonly hasKey: boolean; readonly abandonedOriginalCount: number },
+  state: {
+    readonly unlocked: boolean;
+    readonly keyReference: string | null;
+    readonly hasKey: boolean;
+    readonly abandonedOriginalCount: number;
+  },
   dispatch: (action: EncryptionAction) => void,
 ): HTMLElement {
   const section = document.createElement('details');

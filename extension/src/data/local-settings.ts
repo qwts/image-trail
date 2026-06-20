@@ -65,9 +65,6 @@ function isSafeThrottle(value: unknown): value is number {
 
 function isSafeVisibleBookmarkSoftMax(value: unknown): value is number {
   return (
-    typeof value === 'number' &&
-    Number.isInteger(value) &&
-    value >= MIN_VISIBLE_BOOKMARK_SOFT_MAX &&
-    value <= MAX_VISIBLE_BOOKMARK_SOFT_MAX
+    typeof value === 'number' && Number.isInteger(value) && value >= MIN_VISIBLE_BOOKMARK_SOFT_MAX && value <= MAX_VISIBLE_BOOKMARK_SOFT_MAX
   );
 }

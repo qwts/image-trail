@@ -487,7 +487,9 @@ export function createLoadRecentHistoryMessage(pageUrl: string): LoadRecentHisto
   return { type: MessageType.LoadRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl } };
 }
 
-export function createLoadRecentHistoryResultMessage(items: readonly import('../core/display-records.js').ImageDisplayRecord[]): LoadRecentHistoryResultMessage {
+export function createLoadRecentHistoryResultMessage(
+  items: readonly import('../core/display-records.js').ImageDisplayRecord[],
+): LoadRecentHistoryResultMessage {
   return { type: MessageType.LoadRecentHistoryResult, version: MESSAGE_PROTOCOL_VERSION, payload: { items } };
 }
 
