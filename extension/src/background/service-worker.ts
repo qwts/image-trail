@@ -251,12 +251,8 @@ async function handleCleanupOrphanedBlobs(): Promise<import('./messages.js').Cle
   const referenced = await referencedBlobIds();
 
   const blobs = new BlobsRepository(db);
-  let deletedCount = 0;
-  for (const blob of await blobs.list()) {
-    if (referenced.has(blob.id)) continue;
-    await blobs.remove(blob.id);
-    deletedCount += 1;
-  }
+  const orphanedBlobIds = (await blobs.list()).filter((blob) => !referenced.has(blob.id)).map((blob) => blob.id);
+  const deletedCount = await blobs.deleteMany(orphanedBlobIds);
 
   return { deletedCount, usage: await blobs.getStorageUsage() };
 }

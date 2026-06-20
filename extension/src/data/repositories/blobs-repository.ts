@@ -42,6 +42,17 @@ export class BlobsRepository {
     await transactionDone(transaction);
   }
 
+  async deleteMany(ids: readonly string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+
+    const transaction = this.db.transaction(DataStore.Blobs, 'readwrite');
+    const store = transaction.objectStore(DataStore.Blobs);
+    const uniqueIds = [...new Set(ids)];
+    for (const id of uniqueIds) store.delete(id);
+    await transactionDone(transaction);
+    return uniqueIds.length;
+  }
+
   async getStorageUsage(): Promise<StorageUsageSummary> {
     const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
     const store = transaction.objectStore(DataStore.Blobs);

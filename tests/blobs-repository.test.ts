@@ -97,6 +97,22 @@ test('BlobsRepository remove is a no-op for nonexistent blobs', async (t) => {
   await repo.remove('does-not-exist');
 });
 
+test('BlobsRepository deleteMany removes unique ids in one operation', async (t) => {
+  const db = await openFreshDb();
+  t.after(() => db.close());
+  const repo = new BlobsRepository(db);
+
+  await repo.put(makeBlobRecord({ id: 'delete-a', referenceCount: 3 }));
+  await repo.put(makeBlobRecord({ id: 'delete-b', referenceCount: 1 }));
+  await repo.put(makeBlobRecord({ id: 'keep-c', referenceCount: 1 }));
+
+  const deletedCount = await repo.deleteMany(['delete-a', 'delete-b', 'delete-a']);
+  assert.equal(deletedCount, 2);
+  assert.equal(await repo.get('delete-a'), undefined);
+  assert.equal(await repo.get('delete-b'), undefined);
+  assert.ok(await repo.get('keep-c'));
+});
+
 test('BlobsRepository reports storage usage across all records', async (t) => {
   const db = await openFreshDb();
   t.after(() => db.close());
