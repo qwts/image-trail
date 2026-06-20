@@ -1,10 +1,9 @@
 export type ImportExportAction =
-  | { readonly name: 'export/history'; readonly password: string }
-  | { readonly name: 'export/bookmarks'; readonly password: string }
+  | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
+  | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string }
-  | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
-  | { readonly name: 'import/key'; readonly fileContent: string; readonly password: string }
-  | { readonly name: 'export/download'; readonly password: string };
+  | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string }
+  | { readonly name: 'import/bookmarklet'; readonly fileContent: string };
 
 export interface ImportExportViewState {
   readonly busy: boolean;
@@ -46,23 +45,32 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   passwordInput.autocomplete = 'new-password';
   group.append(passwordInput);
 
+  const hint = document.createElement('p');
+  hint.className = 'image-trail-panel__meta';
+  hint.textContent = 'Click exports encrypted. Shift-click exports plaintext to disk.';
+  group.append(hint);
+
   const historyBtn = document.createElement('button');
   historyBtn.type = 'button';
   historyBtn.textContent = 'Export history';
+  historyBtn.title = 'Shift-click to export plaintext history.';
   historyBtn.disabled = state.busy;
-  historyBtn.addEventListener('click', () => {
-    if (passwordInput.value.length < 4) return;
-    dispatch({ name: 'export/history', password: passwordInput.value });
+  historyBtn.addEventListener('click', (event) => {
+    const plaintext = event.shiftKey;
+    if (!plaintext && passwordInput.value.length < 4) return;
+    dispatch({ name: 'export/history', password: passwordInput.value, plaintext });
     passwordInput.value = '';
   });
 
   const bookmarksBtn = document.createElement('button');
   bookmarksBtn.type = 'button';
   bookmarksBtn.textContent = 'Export bookmarks';
+  bookmarksBtn.title = 'Shift-click to export plaintext bookmarks.';
   bookmarksBtn.disabled = state.busy;
-  bookmarksBtn.addEventListener('click', () => {
-    if (passwordInput.value.length < 4) return;
-    dispatch({ name: 'export/bookmarks', password: passwordInput.value });
+  bookmarksBtn.addEventListener('click', (event) => {
+    const plaintext = event.shiftKey;
+    if (!plaintext && passwordInput.value.length < 4) return;
+    dispatch({ name: 'export/bookmarks', password: passwordInput.value, plaintext });
     passwordInput.value = '';
   });
 
@@ -89,12 +97,22 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
 
   const historyBtn = document.createElement('button');
   historyBtn.type = 'button';
-  historyBtn.textContent = 'Import encrypted history';
+  historyBtn.textContent = 'Import history';
   historyBtn.disabled = state.busy;
   historyBtn.addEventListener('click', () => {
     readFileInput(fileInput, (content) => {
-      if (passwordInput.value.length < 4) return;
       dispatch({ name: 'import/history', fileContent: content, password: passwordInput.value });
+      passwordInput.value = '';
+    });
+  });
+
+  const bookmarksBtn = document.createElement('button');
+  bookmarksBtn.type = 'button';
+  bookmarksBtn.textContent = 'Import bookmarks';
+  bookmarksBtn.disabled = state.busy;
+  bookmarksBtn.addEventListener('click', () => {
+    readFileInput(fileInput, (content) => {
+      dispatch({ name: 'import/bookmarks', fileContent: content, password: passwordInput.value });
       passwordInput.value = '';
     });
   });
@@ -109,19 +127,7 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
     });
   });
 
-  const keyBtn = document.createElement('button');
-  keyBtn.type = 'button';
-  keyBtn.textContent = 'Import key';
-  keyBtn.disabled = state.busy;
-  keyBtn.addEventListener('click', () => {
-    readFileInput(fileInput, (content) => {
-      if (passwordInput.value.length < 4) return;
-      dispatch({ name: 'import/key', fileContent: content, password: passwordInput.value });
-      passwordInput.value = '';
-    });
-  });
-
-  group.append(fileInput, passwordInput, historyBtn, bookmarkletBtn, keyBtn);
+  group.append(fileInput, passwordInput, historyBtn, bookmarksBtn, bookmarkletBtn);
   return group;
 }
 

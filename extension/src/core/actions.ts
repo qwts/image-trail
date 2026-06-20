@@ -142,6 +142,34 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         blobKeyReference: action.unlocked ? (action.keyReference ?? state.blobKeyReference) : null,
         lastUpdatedAt: Date.now(),
       };
+    case 'import-export/start':
+      return {
+        ...state,
+        importExportBusy: true,
+        importExportMessage: 'Import/export is running...',
+        importExportMessageIsError: false,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'import-export/complete':
+      return {
+        ...state,
+        importExportBusy: false,
+        importExportMessage: action.message,
+        importExportMessageIsError: false,
+        message: action.message,
+        status: 'ready',
+        lastUpdatedAt: Date.now(),
+      };
+    case 'import-export/error':
+      return {
+        ...state,
+        importExportBusy: false,
+        importExportMessage: action.message,
+        importExportMessageIsError: true,
+        message: action.message,
+        status: 'error',
+        lastUpdatedAt: Date.now(),
+      };
     case 'storage/update':
       return { ...state, storageUsage: action.usage, lastUpdatedAt: Date.now() };
     case 'undo-last':

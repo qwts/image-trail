@@ -41,6 +41,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     blobKeyUnlocked: false,
     blobKeyAvailable: false,
     blobKeyReference: null,
+    importExportBusy: false,
     automation: EMPTY_AUTOMATION_STATE,
     selectedHistoryId: null,
     activeFieldId: null,

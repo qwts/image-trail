@@ -16,8 +16,10 @@ import {
   EXPORT_FORMAT_MAGIC,
   EXPORT_FORMAT_VERSION,
 } from '../extension/src/data/import-export/encrypted-file-format.js';
-import { exportEncryptedHistory } from '../extension/src/data/import-export/history-export.js';
+import { exportEncryptedHistory, exportPlainHistory } from '../extension/src/data/import-export/history-export.js';
 import { importEncryptedHistory } from '../extension/src/data/import-export/history-import.js';
+import { exportEncryptedBookmarks, exportPlainBookmarks } from '../extension/src/data/import-export/bookmarks-export.js';
+import { importBookmarks } from '../extension/src/data/import-export/bookmarks-import.js';
 import { importBookmarkletJson } from '../extension/src/data/import-export/bookmarklet-import.js';
 import { recallEncryptedRecord, recallSelectedRecords } from '../extension/src/data/import-export/recall.js';
 import { exportKeyWithPassword } from '../extension/src/data/import-export/key-export.js';
@@ -163,6 +165,74 @@ test('history-export: rejects empty record set', async () => {
   const result = await exportEncryptedHistory({ entries: [], password: 'pass' });
   assert.equal(result.status.ok, false);
   assert.equal(result.status.code, 'not-found');
+});
+
+test('history-export: shift/plain export imports without password', async () => {
+  const entries = [
+    {
+      uuid: 'plain-history-1',
+      payload: {
+        url: 'https://example.test/plain.jpg',
+        capturedAt: '2026-06-18T00:00:00.000Z',
+        captureStatus: 'remote-only' as const,
+      },
+    },
+  ];
+
+  const exportResult = exportPlainHistory({ entries, now: '2026-06-18T12:00:00.000Z' });
+  assert.ok(exportResult.status.ok);
+  assert.equal(exportResult.fileName, 'image-trail-history-2026-06-18.plain.json');
+  assert.match(exportResult.fileContent!, /https:\/\/example\.test\/plain\.jpg/);
+
+  const importResult = await importEncryptedHistory(exportResult.fileContent!, '');
+  assert.ok(importResult.status.ok, importResult.status.message);
+  assert.equal(importResult.plaintext, true);
+  assert.equal(importResult.entries[0].payload.url, 'https://example.test/plain.jpg');
+});
+
+test('bookmarks-export: exports encrypted and imports with password', async () => {
+  const entries = [
+    {
+      uuid: 'bookmark-1',
+      payload: {
+        url: 'https://example.test/bookmark.jpg',
+        bookmarkedAt: '2026-06-18T00:00:00.000Z',
+        label: 'Bookmark',
+      },
+    },
+  ];
+
+  const exportResult = await exportEncryptedBookmarks({ entries, password: 'bookmark-pass', now: '2026-06-18T12:00:00.000Z' });
+  assert.ok(exportResult.status.ok);
+  assert.equal(exportResult.fileName, 'image-trail-bookmarks-2026-06-18.json');
+  assert.doesNotMatch(exportResult.fileContent!, /bookmark\.jpg/);
+
+  const importResult = await importBookmarks(exportResult.fileContent!, 'bookmark-pass');
+  assert.ok(importResult.status.ok, importResult.status.message);
+  assert.equal(importResult.plaintext, false);
+  assert.equal(importResult.entries[0].payload.label, 'Bookmark');
+});
+
+test('bookmarks-export: shift/plain export imports without password', async () => {
+  const entries = [
+    {
+      uuid: 'plain-bookmark-1',
+      payload: {
+        url: 'https://example.test/plain-bookmark.webp',
+        bookmarkedAt: '2026-06-18T00:00:00.000Z',
+      },
+    },
+  ];
+
+  const exportResult = exportPlainBookmarks({ entries, now: '2026-06-18T12:00:00.000Z' });
+  assert.ok(exportResult.status.ok);
+  assert.equal(exportResult.fileName, 'image-trail-bookmarks-2026-06-18.plain.json');
+  assert.match(exportResult.fileContent!, /plain-bookmark\.webp/);
+
+  const importResult = await importBookmarks(exportResult.fileContent!, '');
+  assert.ok(importResult.status.ok, importResult.status.message);
+  assert.equal(importResult.plaintext, true);
+  assert.equal(importResult.entries[0].payload.url, 'https://example.test/plain-bookmark.webp');
 });
 
 test('bookmarklet-import: imports favorites and deduplicates URLs', () => {

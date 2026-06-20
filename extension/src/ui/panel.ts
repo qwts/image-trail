@@ -4,6 +4,7 @@ import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
 import type { PageAdapter, TargetSelectionSnapshot } from '../content/page-adapter.js';
 import { createDisplayRecord, isDurableImageSourceUrl, sourceImageUrlFrom } from '../core/display-records.js';
+import type { ImageDisplayRecord } from '../core/display-records.js';
 import { reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
@@ -16,6 +17,12 @@ import { parseUrl } from '../core/url/parse-url.js';
 import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../core/url/rebuild-url.js';
 import { collectUrlFields, selectDefaultField } from '../core/url/tokenize-fields.js';
 import { createThumbnailDataUrlFromImage, createThumbnailDataUrlFromUrl } from '../content/thumbnail-generator.js';
+import { importBookmarkletJson } from '../data/import-export/bookmarklet-import.js';
+import { exportEncryptedBookmarks, exportPlainBookmarks } from '../data/import-export/bookmarks-export.js';
+import { importBookmarks as importBookmarkRecords } from '../data/import-export/bookmarks-import.js';
+import { exportEncryptedHistory, exportPlainHistory } from '../data/import-export/history-export.js';
+import { importEncryptedHistory } from '../data/import-export/history-import.js';
+import type { DurableBookmarkPayloadV1, DurableHistoryPayloadV1 } from '../data/types.js';
 import { renderPanel } from './render.js';
 
 const ROOT_ID = 'image-trail-panel-root';
@@ -279,6 +286,31 @@ export class ImageTrailPanel {
 
     if (action.name === 'blob-key/unlock') {
       void this.unlockBlobKey(action.password);
+      return;
+    }
+
+    if (action.name === 'export/history') {
+      void this.exportHistory(action.password, action.plaintext);
+      return;
+    }
+
+    if (action.name === 'export/bookmarks') {
+      void this.exportBookmarks(action.password, action.plaintext);
+      return;
+    }
+
+    if (action.name === 'import/history') {
+      void this.importHistory(action.fileContent, action.password);
+      return;
+    }
+
+    if (action.name === 'import/bookmarks') {
+      void this.importBookmarks(action.fileContent, action.password);
+      return;
+    }
+
+    if (action.name === 'import/bookmarklet') {
+      void this.importBookmarklet(action.fileContent);
       return;
     }
 
@@ -765,6 +797,105 @@ export class ImageTrailPanel {
     this.render();
   }
 
+  private async exportHistory(password: string, plaintext: boolean): Promise<void> {
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const entries = this.state.history.map(historyRecordToExportEntry);
+    const result = plaintext ? exportPlainHistory({ entries }) : await exportEncryptedHistory({ entries, password });
+    this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
+  }
+
+  private async exportBookmarks(password: string, plaintext: boolean): Promise<void> {
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const bookmarks = await this.loadAllBookmarksForExport();
+    const entries = bookmarks.map(bookmarkRecordToExportEntry);
+    const result = plaintext ? exportPlainBookmarks({ entries }) : await exportEncryptedBookmarks({ entries, password });
+    this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
+  }
+
+  private finishExport(fileContent: string | undefined, fileName: string | undefined, message: string, ok: boolean): void {
+    if (!ok || !fileContent || !fileName) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message });
+      this.render();
+      return;
+    }
+    downloadTextFile(fileContent, fileName);
+    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message });
+    this.render();
+  }
+
+  private async importHistory(fileContent: string, password: string): Promise<void> {
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const result = await importEncryptedHistory(fileContent, password);
+    if (!result.status.ok) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.status.message });
+      this.render();
+      return;
+    }
+    for (const entry of result.entries) {
+      const record = historyPayloadToDisplayRecord(entry.uuid, entry.payload);
+      await this.recentHistoryStore?.add(record, window.location.href);
+    }
+    await this.loadRecentHistory();
+    this.state = reducePanelAction(this.state, {
+      name: 'import-export/complete',
+      message: `${result.status.message}${result.plaintext ? ' Plaintext import was reloaded into extension state.' : ''}`,
+    });
+    this.render();
+  }
+
+  private async importBookmarks(fileContent: string, password: string): Promise<void> {
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const result = await importBookmarkRecords(fileContent, password);
+    if (!result.status.ok) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.status.message });
+      this.render();
+      return;
+    }
+    for (const entry of result.entries) {
+      await this.bookmarkStore?.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
+    }
+    await this.loadBookmarkPage(0);
+    this.state = reducePanelAction(this.state, {
+      name: 'import-export/complete',
+      message: `${result.status.message}${result.plaintext ? ' Plaintext import was encrypted into bookmark storage.' : ''}`,
+    });
+    this.render();
+  }
+
+  private async importBookmarklet(fileContent: string): Promise<void> {
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const result = importBookmarkletJson(fileContent);
+    if (!result.status.ok) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.status.message });
+      this.render();
+      return;
+    }
+    for (const entry of result.bookmarks) {
+      await this.bookmarkStore?.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
+    }
+    await this.loadBookmarkPage(0);
+    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message: result.status.message });
+    this.render();
+  }
+
+  private async loadAllBookmarksForExport(): Promise<readonly ImageDisplayRecord[]> {
+    if (!this.bookmarkStore) return this.state.bookmarks;
+    const all: ImageDisplayRecord[] = [];
+    let offset = 0;
+    const limit = 100;
+    for (;;) {
+      const page = await this.bookmarkStore.loadPage({ offset, limit, scope: 'global', currentPageUrl: window.location.href });
+      all.push(...page.items);
+      if (!page.hasOlder) return all;
+      offset = page.offset + page.limit;
+    }
+  }
+
   private async refreshStorageUsage(): Promise<void> {
     if (!this.captureStore) return;
     const usage = await this.captureStore.requestStorageUsage();
@@ -793,4 +924,80 @@ export class ImageTrailPanel {
       renderPanel({ root: this.root, dispatch: this.dispatch }, this.state);
     }
   }
+}
+
+function historyRecordToExportEntry(record: ImageDisplayRecord): { readonly uuid: string; readonly payload: DurableHistoryPayloadV1 } {
+  return {
+    uuid: record.id,
+    payload: {
+      url: record.url,
+      title: record.title,
+      label: record.label,
+      thumbnail: record.thumbnail,
+      capturedAt: record.timestamp,
+      captureStatus: record.storedOriginal ? 'downloaded' : 'remote-only',
+      storedOriginal: record.storedOriginal,
+    },
+  };
+}
+
+function bookmarkRecordToExportEntry(record: ImageDisplayRecord): { readonly uuid: string; readonly payload: DurableBookmarkPayloadV1 } {
+  return {
+    uuid: record.id,
+    payload: {
+      url: record.url,
+      title: record.title,
+      label: record.label,
+      thumbnail: record.thumbnail,
+      bookmarkedAt: record.timestamp,
+      downloadedAt: record.downloadedAt,
+      capturedAt: record.capturedAt,
+      sourceCompatibility: record.source === 'favorites' ? 'favorites' : undefined,
+      storedOriginal: record.storedOriginal,
+    },
+  };
+}
+
+function historyPayloadToDisplayRecord(uuid: string, payload: DurableHistoryPayloadV1): ImageDisplayRecord {
+  return createDisplayRecord({
+    id: uuid,
+    url: payload.url,
+    title: payload.title,
+    label: payload.label,
+    thumbnail: payload.thumbnail,
+    timestamp: payload.capturedAt,
+    captureStatus: payload.storedOriginal ? 'captured' : undefined,
+    blobId: payload.storedOriginal?.blobId,
+    storedOriginal: payload.storedOriginal,
+    source: 'history',
+  });
+}
+
+function bookmarkPayloadToDisplayRecord(uuid: string, payload: DurableBookmarkPayloadV1): ImageDisplayRecord {
+  return createDisplayRecord({
+    id: uuid,
+    url: payload.url,
+    title: payload.title,
+    label: payload.label,
+    thumbnail: payload.thumbnail,
+    timestamp: payload.bookmarkedAt,
+    downloadedAt: payload.downloadedAt,
+    capturedAt: payload.capturedAt ?? payload.storedOriginal?.capturedAt,
+    captureStatus: payload.storedOriginal ? 'captured' : undefined,
+    blobId: payload.storedOriginal?.blobId,
+    storedOriginal: payload.storedOriginal,
+    source: payload.sourceCompatibility ?? 'bookmark',
+  });
+}
+
+function downloadTextFile(fileContent: string, fileName: string): void {
+  const url = URL.createObjectURL(new Blob([fileContent], { type: 'application/json' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.rel = 'noopener';
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }

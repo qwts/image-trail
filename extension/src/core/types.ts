@@ -44,6 +44,9 @@ export interface PanelState {
   readonly blobKeyUnlocked: boolean;
   readonly blobKeyAvailable: boolean;
   readonly blobKeyReference: string | null;
+  readonly importExportBusy: boolean;
+  readonly importExportMessage?: string;
+  readonly importExportMessageIsError?: boolean;
   readonly automation: AutomationState;
   readonly selectedHistoryId: string | null;
   readonly activeFieldId: string | null;
@@ -85,6 +88,14 @@ export type PanelActionName =
   | 'blob-key/setup'
   | 'blob-key/unlock'
   | 'blob-key/status'
+  | 'import-export/start'
+  | 'import-export/complete'
+  | 'import-export/error'
+  | 'export/history'
+  | 'export/bookmarks'
+  | 'import/history'
+  | 'import/bookmarks'
+  | 'import/bookmarklet'
   | 'storage/update'
   | 'undo-last'
   | 'slideshow-start'
@@ -120,6 +131,13 @@ export type PanelAction =
         | 'blob-key/setup'
         | 'blob-key/unlock'
         | 'blob-key/status'
+        | 'import-export/complete'
+        | 'import-export/error'
+        | 'export/history'
+        | 'export/bookmarks'
+        | 'import/history'
+        | 'import/bookmarks'
+        | 'import/bookmarklet'
         | 'storage/update'
       >;
     }
@@ -147,6 +165,11 @@ export type PanelAction =
   | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string }
   | { readonly name: 'blob-key/setup' | 'blob-key/unlock'; readonly password: string }
   | { readonly name: 'blob-key/status'; readonly unlocked: boolean; readonly keyReference?: string | null; readonly hasKey?: boolean }
+  | { readonly name: 'import-export/complete'; readonly message: string }
+  | { readonly name: 'import-export/error'; readonly message: string }
+  | { readonly name: 'export/history' | 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
+  | { readonly name: 'import/history' | 'import/bookmarks'; readonly fileContent: string; readonly password: string }
+  | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
   | { readonly name: 'storage/update'; readonly usage: StorageUsageSummary };
 
 export interface BookmarkStore {
