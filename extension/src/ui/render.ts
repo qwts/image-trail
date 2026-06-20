@@ -215,6 +215,8 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
       {
         busy: state.importExportBusy,
         currentImageUrl: state.target.selectedUrl,
+        selectedHistoryCount: state.selectedHistoryIds.length,
+        selectedBookmarkCount: state.selectedBookmarkIds.length,
         lastMessage: state.importExportMessage,
         lastMessageIsError: state.importExportMessageIsError,
       },
@@ -224,6 +226,8 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
       {
         busy: state.importExportBusy,
         currentImageUrl: state.target.selectedUrl,
+        selectedHistoryCount: state.selectedHistoryIds.length,
+        selectedBookmarkCount: state.selectedBookmarkIds.length,
         lastMessage: state.importExportMessage,
         lastMessageIsError: state.importExportMessageIsError,
       },
@@ -264,10 +268,11 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     captureSection,
     navSection,
     autoSection,
-    createHistoryView(state.history, state.captureInProgress, state.blobKeyUnlocked, target.dispatch),
+    createHistoryView(state.history, state.selectedHistoryIds, state.captureInProgress, state.blobKeyUnlocked, target.dispatch),
     createBookmarksView(
       state.target.selectedUrl,
       state.bookmarks,
+      state.selectedBookmarkIds,
       state.captureInProgress,
       state.blobKeyUnlocked,
       state.bookmarkVisibilityScope,

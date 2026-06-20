@@ -811,6 +811,14 @@
     0 0 10px rgb(89 255 178 / 10%);
 }
 
+.image-trail-panel-root .image-trail-panel__record-list li.is-selected {
+  border-color: rgb(124 255 168 / 45%);
+  background: linear-gradient(135deg, rgb(124 255 168 / 8%), transparent 50%), rgb(10 35 20 / 28%);
+  box-shadow:
+    0 0 0 1px rgb(124 255 168 / 14%),
+    0 0 12px rgb(124 255 168 / 16%);
+}
+
 .image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted {
   border-color: rgb(255 96 112 / 34%);
   background: linear-gradient(135deg, rgb(255 96 112 / 7%), transparent 45%), rgb(38 10 16 / 34%);

@@ -55,7 +55,8 @@ export interface PanelState {
   readonly importExportMessage?: string;
   readonly importExportMessageIsError?: boolean;
   readonly automation: AutomationState;
-  readonly selectedHistoryId: string | null;
+  readonly selectedHistoryIds: readonly string[];
+  readonly selectedBookmarkIds: readonly string[];
   readonly activeFieldId: string | null;
   readonly failedFieldId: string | null;
   readonly successfulFieldIds: readonly string[];
@@ -79,6 +80,7 @@ export type PanelActionName =
   | 'history/load'
   | 'history/download'
   | 'history/select'
+  | 'history-selection/toggle'
   | 'active-field/set'
   | 'field-unlock/toggle'
   | 'field-split/apply'
@@ -89,6 +91,7 @@ export type PanelActionName =
   | 'bookmark/current'
   | 'bookmark/load'
   | 'bookmark/remove'
+  | 'bookmark-selection/toggle'
   | 'bookmarks/page-loaded'
   | 'bookmarks/older'
   | 'bookmarks/newer'
@@ -134,6 +137,7 @@ export type PanelAction =
         | 'history/add-loaded'
         | 'history/remove'
         | 'history/select'
+        | 'history-selection/toggle'
         | 'field-value-change'
         | 'field-value-bump'
         | 'selected-url/apply'
@@ -143,6 +147,7 @@ export type PanelAction =
         | 'field-split/clear'
         | 'bookmark/load'
         | 'bookmark/remove'
+        | 'bookmark-selection/toggle'
         | 'bookmarks/page-loaded'
         | 'capture/request'
         | 'capture/start'
@@ -174,6 +179,7 @@ export type PanelAction =
       readonly thumbnail?: string;
     }
   | { readonly name: 'history/remove' | 'bookmark/load' | 'bookmark/remove' | 'history/select'; readonly id: string }
+  | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle'; readonly id: string }
   | {
       readonly name: 'bookmarks/page-loaded';
       readonly bookmarks: readonly ImageDisplayRecord[];

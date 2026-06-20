@@ -9,6 +9,7 @@ type BookmarkAction =
   | { readonly name: 'bookmark/current' }
   | { readonly name: 'bookmark/load'; readonly id: string }
   | { readonly name: 'bookmark/remove'; readonly id: string }
+  | { readonly name: 'bookmark-selection/toggle'; readonly id: string }
   | { readonly name: 'bookmarks/older' }
   | { readonly name: 'bookmarks/newer' }
   | { readonly name: 'bookmarks/toggle-scope' }
@@ -21,6 +22,7 @@ type BookmarkAction =
 export function createBookmarksView(
   currentUrl: string | null,
   items: readonly ImageDisplayRecord[],
+  selectedIds: readonly string[],
   captureInProgress: boolean,
   blobKeyUnlocked: boolean,
   visibilityScope: 'global' | 'site',
@@ -89,17 +91,29 @@ export function createBookmarksView(
     const capturedBlobId = encryptedBlobIdForRecord(item);
     const lockedEncrypted = isLockedEncryptedRecord(item, blobKeyUnlocked);
     const previewableEncrypted = isPreviewableEncryptedRecord(item, blobKeyUnlocked);
+    const selected = selectedIds.includes(item.id);
     const entry = document.createElement('li');
     if (previewableEncrypted) entry.classList.add('is-captured');
+    if (selected) entry.classList.add('is-selected');
+    entry.setAttribute('aria-selected', String(selected));
+    entry.addEventListener('click', (event) => {
+      if (!isMultiSelectClick(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      dispatch({ name: 'bookmark-selection/toggle', id: item.id });
+    });
     if (lockedEncrypted) {
       entry.classList.add('is-locked-encrypted');
       entry.setAttribute('aria-disabled', 'true');
-      entry.title = 'Unlock encrypted originals before previewing this row.';
+      entry.title = 'Unlock encrypted originals before previewing this row. Cmd/Ctrl-click to select for export.';
     } else {
       entry.tabIndex = 0;
       entry.setAttribute('role', 'button');
-      entry.title = 'Preview this image in the selected host image.';
-      entry.addEventListener('click', () => dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId }));
+      entry.title = 'Preview this image in the selected host image. Cmd/Ctrl-click to select for export.';
+      entry.addEventListener('click', (event) => {
+        if (isMultiSelectClick(event)) return;
+        dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
+      });
       entry.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
@@ -154,7 +168,14 @@ export function createBookmarksView(
     visibilityScope === 'global'
       ? 'No saved bookmarks loaded from encrypted storage.'
       : 'No saved bookmarks match this site. Switch to All sites to show every saved bookmark.';
-  section.append(heading, add, refreshThumbnails, scope, reload, pageMeta, pager, items.length ? list : empty);
+  const selectionMeta = document.createElement('p');
+  selectionMeta.className = 'image-trail-panel__meta';
+  selectionMeta.textContent =
+    selectedIds.length > 0
+      ? `${selectedIds.length} bookmark(s) selected for export.`
+      : 'Cmd/Ctrl-click rows to select bookmarks for export.';
+  section.append(heading, add, refreshThumbnails, scope, reload, pageMeta, pager, items.length ? selectionMeta : empty);
+  if (items.length) section.append(list);
   return section;
 }
 
@@ -185,4 +206,8 @@ function isLockedEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked: bool
 
 function isPreviewableEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked: boolean): boolean {
   return !!encryptedBlobIdForRecord(item) && blobKeyUnlocked;
+}
+
+function isMultiSelectClick(event: MouseEvent): boolean {
+  return event.metaKey || event.ctrlKey;
 }

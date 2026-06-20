@@ -2,12 +2,14 @@ import { encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/di
 
 type HistoryAction =
   | { readonly name: 'history/remove'; readonly id: string }
+  | { readonly name: 'history-selection/toggle'; readonly id: string }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'history'; readonly sourceRecordId: string }
   | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string }
   | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string };
 
 export function createHistoryView(
   items: readonly ImageDisplayRecord[],
+  selectedIds: readonly string[],
   captureInProgress: boolean,
   blobKeyUnlocked: boolean,
   dispatch: (action: HistoryAction) => void,
@@ -24,18 +26,30 @@ export function createHistoryView(
     const capturedBlobId = encryptedBlobIdForRecord(item);
     const lockedEncrypted = isLockedEncryptedRecord(item, blobKeyUnlocked);
     const previewableEncrypted = isPreviewableEncryptedRecord(item, blobKeyUnlocked);
+    const selected = selectedIds.includes(item.id);
     const entry = document.createElement('li');
     entry.className = 'image-trail-panel__history-item';
     if (previewableEncrypted) entry.classList.add('is-captured');
+    if (selected) entry.classList.add('is-selected');
+    entry.setAttribute('aria-selected', String(selected));
+    entry.addEventListener('click', (event) => {
+      if (!isMultiSelectClick(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      dispatch({ name: 'history-selection/toggle', id: item.id });
+    });
     if (lockedEncrypted) {
       entry.classList.add('is-locked-encrypted');
       entry.setAttribute('aria-disabled', 'true');
-      entry.title = 'Unlock encrypted originals before previewing this row.';
+      entry.title = 'Unlock encrypted originals before previewing this row. Cmd/Ctrl-click to select for export.';
     } else {
       entry.tabIndex = 0;
       entry.setAttribute('role', 'button');
-      entry.title = 'Preview this image in the selected host image.';
-      entry.addEventListener('click', () => dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId }));
+      entry.title = 'Preview this image in the selected host image. Cmd/Ctrl-click to select for export.';
+      entry.addEventListener('click', (event) => {
+        if (isMultiSelectClick(event)) return;
+        dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
+      });
       entry.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
@@ -81,7 +95,14 @@ export function createHistoryView(
   const empty = document.createElement('p');
   empty.className = 'image-trail-panel__meta';
   empty.textContent = 'Loaded images will appear here newest-first.';
-  section.append(heading, items.length ? list : empty);
+  const selectionMeta = document.createElement('p');
+  selectionMeta.className = 'image-trail-panel__meta';
+  selectionMeta.textContent =
+    selectedIds.length > 0
+      ? `${selectedIds.length} recent item(s) selected for export.`
+      : 'Cmd/Ctrl-click rows to select recent items for export.';
+  section.append(heading, items.length ? selectionMeta : empty);
+  if (items.length) section.append(list);
   return section;
 }
 
@@ -107,4 +128,8 @@ function createRecordVisual(item: ImageDisplayRecord): HTMLElement {
   fallback.className = 'image-trail-panel__record-thumbnail image-trail-panel__record-thumbnail--empty';
   fallback.textContent = 'IMG';
   return fallback;
+}
+
+function isMultiSelectClick(event: MouseEvent): boolean {
+  return event.metaKey || event.ctrlKey;
 }

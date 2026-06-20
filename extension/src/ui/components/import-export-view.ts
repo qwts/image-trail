@@ -12,6 +12,8 @@ export type ImportExportAction =
 export interface ImportExportViewState {
   readonly busy: boolean;
   readonly currentImageUrl: string | null;
+  readonly selectedHistoryCount: number;
+  readonly selectedBookmarkCount: number;
   readonly lastMessage?: string;
   readonly lastMessageIsError?: boolean;
 }
@@ -80,7 +82,7 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
 
   const historyBtn = document.createElement('button');
   historyBtn.type = 'button';
-  historyBtn.textContent = 'Export history';
+  historyBtn.textContent = state.selectedHistoryCount > 0 ? `Export selected history (${state.selectedHistoryCount})` : 'Export history';
   historyBtn.disabled = state.busy;
   historyBtn.addEventListener('click', () => {
     dispatch({ name: 'export/history', password: passwordInput.value, plaintext: plaintext.input.checked });
@@ -90,7 +92,8 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
 
   const bookmarksBtn = document.createElement('button');
   bookmarksBtn.type = 'button';
-  bookmarksBtn.textContent = 'Export bookmarks';
+  bookmarksBtn.textContent =
+    state.selectedBookmarkCount > 0 ? `Export selected bookmarks (${state.selectedBookmarkCount})` : 'Export bookmarks';
   bookmarksBtn.disabled = state.busy;
   bookmarksBtn.addEventListener('click', () => {
     dispatch({ name: 'export/bookmarks', password: passwordInput.value, plaintext: plaintext.input.checked });

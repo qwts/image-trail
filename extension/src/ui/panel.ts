@@ -1102,7 +1102,8 @@ export class ImageTrailPanel {
   private async exportHistory(password: string, plaintext: boolean): Promise<void> {
     this.state = reducePanelAction(this.state, { name: 'import-export/start' });
     this.render();
-    const entries = this.state.history.map(historyRecordToExportEntry);
+    const history = selectedRecords(this.state.history, this.state.selectedHistoryIds);
+    const entries = history.map(historyRecordToExportEntry);
     const result = plaintext ? exportPlainHistory({ entries }) : await exportEncryptedHistory({ entries, password });
     this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
   }
@@ -1110,7 +1111,10 @@ export class ImageTrailPanel {
   private async exportBookmarks(password: string, plaintext: boolean): Promise<void> {
     this.state = reducePanelAction(this.state, { name: 'import-export/start' });
     this.render();
-    const bookmarks = await this.loadAllBookmarksForExport();
+    const bookmarks =
+      this.state.selectedBookmarkIds.length > 0
+        ? selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds)
+        : await this.loadAllBookmarksForExport();
     const entries = bookmarks.map(bookmarkRecordToExportEntry);
     const result = plaintext ? exportPlainBookmarks({ entries }) : await exportEncryptedBookmarks({ entries, password });
     this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
@@ -1302,6 +1306,12 @@ function bookmarkRecordToExportEntry(record: ImageDisplayRecord): { readonly uui
       storedOriginal: record.storedOriginal,
     },
   };
+}
+
+function selectedRecords(records: readonly ImageDisplayRecord[], selectedIds: readonly string[]): readonly ImageDisplayRecord[] {
+  if (selectedIds.length === 0) return records;
+  const selected = new Set(selectedIds);
+  return records.filter((record) => selected.has(record.id));
 }
 
 function historyPayloadToDisplayRecord(uuid: string, payload: DurableHistoryPayloadV1): ImageDisplayRecord {

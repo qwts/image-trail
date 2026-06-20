@@ -53,6 +53,12 @@ function removeItems(items: readonly string[], removals: readonly string[]): rea
   return items.filter((item) => !removalSet.has(item));
 }
 
+function keepItems(items: readonly string[], allowedItems: readonly string[]): readonly string[] {
+  if (items.length === 0) return items;
+  const allowed = new Set(allowedItems);
+  return items.filter((item) => allowed.has(item));
+}
+
 function splitFieldIds(spec: UrlFieldSplitSpec): readonly string[] {
   const prefix = spec.location === 'path' ? `p:${spec.partIndex}` : `q:${spec.queryIndex}`;
   return spec.lengths.map((_, index) => `${prefix}:${spec.tokenIndex + index}`);
@@ -134,14 +140,31 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         thumbnail: action.thumbnail,
         source: 'history',
       });
+      const history = [item, ...state.history.filter((entry) => entry.url !== item.url && entry.id !== item.id)].slice(0, 30);
       return {
         ...state,
-        history: [item, ...state.history.filter((entry) => entry.url !== item.url && entry.id !== item.id)].slice(0, 30),
+        history,
+        selectedHistoryIds: keepItems(
+          state.selectedHistoryIds,
+          history.map((entry) => entry.id),
+        ),
         lastUpdatedAt: Date.now(),
       };
     }
     case 'history/remove':
-      return { ...state, history: state.history.filter((item) => item.id !== action.id), lastUpdatedAt: Date.now() };
+      return {
+        ...state,
+        history: state.history.filter((item) => item.id !== action.id),
+        selectedHistoryIds: removeItem(state.selectedHistoryIds, action.id),
+        lastUpdatedAt: Date.now(),
+      };
+    case 'history-selection/toggle':
+      return {
+        ...state,
+        selectedHistoryIds: toggleItem(state.selectedHistoryIds, action.id),
+        selectedBookmarkIds: [],
+        lastUpdatedAt: Date.now(),
+      };
     case 'active-field/set':
       return {
         ...state,
@@ -166,32 +189,54 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
     case 'field-split/clear':
       return clearFieldSplitSpecFromState(state, action.baseFieldId);
     case 'bookmark/current':
-      return state.target.selectedUrl
-        ? {
-            ...state,
-            bookmarks: [
-              {
-                id: state.target.selectedUrl,
-                url: state.target.selectedUrl,
-                label: state.target.selectedUrl,
-                timestamp: new Date().toISOString(),
-                source: 'bookmark',
-              },
-              ...state.bookmarks.filter((item) => item.url !== state.target.selectedUrl),
-            ],
-            lastUpdatedAt: Date.now(),
-          }
-        : state;
+      if (!state.target.selectedUrl) return state;
+      {
+        const bookmarks = [
+          {
+            id: state.target.selectedUrl,
+            url: state.target.selectedUrl,
+            label: state.target.selectedUrl,
+            timestamp: new Date().toISOString(),
+            source: 'bookmark' as const,
+          },
+          ...state.bookmarks.filter((item) => item.url !== state.target.selectedUrl),
+        ];
+        return {
+          ...state,
+          bookmarks,
+          selectedBookmarkIds: keepItems(
+            state.selectedBookmarkIds,
+            bookmarks.map((bookmark) => bookmark.id),
+          ),
+          lastUpdatedAt: Date.now(),
+        };
+      }
     case 'bookmark/load': {
       const bookmark = state.bookmarks.find((item) => item.id === action.id);
       return bookmark ? { ...state, message: `Loaded bookmark: ${bookmark.url}`, lastUpdatedAt: Date.now() } : state;
     }
     case 'bookmark/remove':
-      return { ...state, bookmarks: state.bookmarks.filter((item) => item.id !== action.id), lastUpdatedAt: Date.now() };
+      return {
+        ...state,
+        bookmarks: state.bookmarks.filter((item) => item.id !== action.id),
+        selectedBookmarkIds: removeItem(state.selectedBookmarkIds, action.id),
+        lastUpdatedAt: Date.now(),
+      };
+    case 'bookmark-selection/toggle':
+      return {
+        ...state,
+        selectedBookmarkIds: toggleItem(state.selectedBookmarkIds, action.id),
+        selectedHistoryIds: [],
+        lastUpdatedAt: Date.now(),
+      };
     case 'bookmarks/page-loaded':
       return {
         ...state,
         bookmarks: action.bookmarks,
+        selectedBookmarkIds: keepItems(
+          state.selectedBookmarkIds,
+          action.bookmarks.map((bookmark) => bookmark.id),
+        ),
         bookmarkOffset: action.offset,
         bookmarkLimit: action.limit,
         bookmarkTotal: action.total,

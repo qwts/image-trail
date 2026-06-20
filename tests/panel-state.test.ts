@@ -130,6 +130,65 @@ test('failed field load preserves Previous/Next inclusion choices', () => {
   assert.deepEqual(next.manuallyExcludedFieldIds, ['q:2:0']);
 });
 
+test('record selection toggles one list at a time', () => {
+  const state = {
+    ...createInitialPanelState(),
+    selectedBookmarkIds: ['bookmark-1'],
+  };
+
+  const historySelected = reducePanelAction(state, { name: 'history-selection/toggle', id: 'history-1' });
+  assert.deepEqual(historySelected.selectedHistoryIds, ['history-1']);
+  assert.deepEqual(historySelected.selectedBookmarkIds, []);
+
+  const historyUnselected = reducePanelAction(historySelected, { name: 'history-selection/toggle', id: 'history-1' });
+  assert.deepEqual(historyUnselected.selectedHistoryIds, []);
+
+  const bookmarkSelected = reducePanelAction(
+    {
+      ...historySelected,
+      selectedBookmarkIds: [],
+    },
+    { name: 'bookmark-selection/toggle', id: 'bookmark-2' },
+  );
+  assert.deepEqual(bookmarkSelected.selectedBookmarkIds, ['bookmark-2']);
+  assert.deepEqual(bookmarkSelected.selectedHistoryIds, []);
+});
+
+test('record selection prunes removed and unloaded rows', () => {
+  const state = {
+    ...createInitialPanelState(),
+    bookmarks: [
+      { id: 'bookmark-1', url: 'https://example.test/1.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'bookmark' as const },
+      { id: 'bookmark-2', url: 'https://example.test/2.jpg', timestamp: '2026-06-20T00:00:01.000Z', source: 'bookmark' as const },
+    ],
+    history: [
+      { id: 'history-1', url: 'https://example.test/1.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'history' as const },
+      { id: 'history-2', url: 'https://example.test/2.jpg', timestamp: '2026-06-20T00:00:01.000Z', source: 'history' as const },
+    ],
+    selectedBookmarkIds: ['bookmark-1', 'bookmark-2'],
+    selectedHistoryIds: ['history-1', 'history-2'],
+  };
+
+  const removedHistory = reducePanelAction(state, { name: 'history/remove', id: 'history-1' });
+  assert.deepEqual(removedHistory.selectedHistoryIds, ['history-2']);
+
+  const removedBookmark = reducePanelAction(state, { name: 'bookmark/remove', id: 'bookmark-1' });
+  assert.deepEqual(removedBookmark.selectedBookmarkIds, ['bookmark-2']);
+
+  const reloadedBookmarks = reducePanelAction(state, {
+    name: 'bookmarks/page-loaded',
+    bookmarks: [
+      { id: 'bookmark-2', url: 'https://example.test/2.jpg', timestamp: '2026-06-20T00:00:01.000Z', source: 'bookmark' as const },
+    ],
+    offset: 0,
+    limit: 30,
+    total: 1,
+    hasOlder: false,
+    hasNewer: false,
+  });
+  assert.deepEqual(reloadedBookmarks.selectedBookmarkIds, ['bookmark-2']);
+});
+
 test('clearing split specs collapses fields and clears related markers', () => {
   const splitSpec: UrlFieldSplitSpec = {
     baseFieldId: 'q:0:0',
