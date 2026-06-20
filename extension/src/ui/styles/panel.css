@@ -139,25 +139,22 @@
   display: grid;
   gap: 6px;
   min-width: 0;
+  padding: 6px 0;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+}
+
+.image-trail-panel-root .image-trail-panel__status-section,
+.image-trail-panel-root .image-trail-panel__target-utility,
+.image-trail-panel-root .image-trail-panel__encryption,
+.image-trail-panel-root .image-trail-panel__url-editor,
+.image-trail-panel-root .image-trail-panel__image-transfer,
+.image-trail-panel-root .image-trail-panel__import-export,
+.image-trail-panel-root .image-trail-panel__fields {
   max-block-size: 180px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 6px 0;
-  border-top: 1px solid rgb(255 255 255 / 12%);
   scrollbar-width: thin;
-}
-
-.image-trail-panel-root .image-trail-panel__bookmarks-section {
-  max-block-size: none;
-  overflow: visible;
-  overscroll-behavior: auto;
-}
-
-.image-trail-panel-root .image-trail-panel__history-section {
-  max-block-size: none;
-  overflow: visible;
-  overscroll-behavior: auto;
 }
 
 .image-trail-panel-root .image-trail-panel__target-summary {
