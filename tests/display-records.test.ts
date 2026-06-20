@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  encryptedBlobIdForRecord,
   imageExtensionFromUrl,
   isDurableImageSourceUrl,
   normalizeDisplayLabel,
@@ -31,6 +32,12 @@ test('durable image source URLs reject blob preview URLs', () => {
   assert.equal(isDurableImageSourceUrl('http://example.test/photo.jpg'), true);
   assert.equal(isDurableImageSourceUrl('blob:https://example.test/preview-id'), false);
   assert.equal(isDurableImageSourceUrl('data:image/png;base64,abc'), false);
+});
+
+test('encrypted blob id is only active for captured records', () => {
+  assert.equal(encryptedBlobIdForRecord({ captureStatus: 'captured', blobId: 'blob-1' }), 'blob-1');
+  assert.equal(encryptedBlobIdForRecord({ blobId: 'stale-blob' }), undefined);
+  assert.equal(encryptedBlobIdForRecord({ captureStatus: 'remote-only', blobId: 'remote-blob' }), undefined);
 });
 
 test('image extension detection supports image service format hints', () => {

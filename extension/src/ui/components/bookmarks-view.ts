@@ -1,4 +1,4 @@
-import { imageExtensionFromUrl, imageExtensionFromValue, type ImageDisplayRecord } from '../../core/display-records.js';
+import { encryptedBlobIdForRecord, imageExtensionFromUrl, imageExtensionFromValue, type ImageDisplayRecord } from '../../core/display-records.js';
 
 type BookmarkAction =
   | { readonly name: 'bookmark/current' }
@@ -81,6 +81,7 @@ export function createBookmarksView(
   const list = document.createElement('ol');
   list.className = 'image-trail-panel__record-list';
   for (const item of items) {
+    const capturedBlobId = encryptedBlobIdForRecord(item);
     const lockedEncrypted = isLockedEncryptedRecord(item, blobKeyUnlocked);
     const previewableEncrypted = isPreviewableEncryptedRecord(item, blobKeyUnlocked);
     const entry = document.createElement('li');
@@ -92,12 +93,12 @@ export function createBookmarksView(
     } else {
       entry.tabIndex = 0;
       entry.setAttribute('role', 'button');
-      entry.title = 'Preview this image in the selected host image, or open it in a new tab.';
-      entry.addEventListener('click', () => dispatch({ name: 'capture/preview', url: item.url, blobId: item.blobId }));
+      entry.title = 'Preview this image in the selected host image.';
+      entry.addEventListener('click', () => dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId }));
       entry.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
-        dispatch({ name: 'capture/preview', url: item.url, blobId: item.blobId });
+        dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
       });
     }
     const visual = createRecordVisual(item);
@@ -174,9 +175,9 @@ export function extensionLabelFor(item: ImageDisplayRecord): string {
 }
 
 function isLockedEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked: boolean): boolean {
-  return item.captureStatus === 'captured' && !!item.blobId && !blobKeyUnlocked;
+  return !!encryptedBlobIdForRecord(item) && !blobKeyUnlocked;
 }
 
 function isPreviewableEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked: boolean): boolean {
-  return item.captureStatus === 'captured' && !!item.blobId && blobKeyUnlocked && !!item.thumbnail;
+  return !!encryptedBlobIdForRecord(item) && blobKeyUnlocked;
 }

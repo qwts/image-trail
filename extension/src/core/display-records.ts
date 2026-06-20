@@ -64,6 +64,10 @@ export function isDurableImageSourceUrl(url: string): boolean {
   }
 }
 
+export function encryptedBlobIdForRecord(record: Pick<ImageDisplayRecord, 'captureStatus' | 'blobId'>): string | undefined {
+  return record.captureStatus === 'captured' ? record.blobId : undefined;
+}
+
 export function validateImageRecordUrl(url: string): ImageRecordUrlValidation {
   let sourceUrl: URL;
   try {
