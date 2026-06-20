@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  createLoadedTargetImageInfo,
   createTargetImageInfo,
   findQualifyingImages,
   getImageRejectionReason,
   getImageUrl,
+  getLoadedImageUrl,
   isQualifyingImage,
 } from '../extension/src/content/target-image.js';
 
@@ -104,6 +106,32 @@ test('uses linked source URL when visible image is a Bing thumbnail', () => {
   });
 });
 
+test('loaded target info keeps the actual img src instead of unwrapping link source URLs', () => {
+  const source = 'https://cdn.example.test/images/source.jpg';
+  const thumbnail = 'https://thf.bing.com/th/id/OIP.ybpkfTltBcXM_pn_a8r2zAHaE3?cb=thfc1falcon2&pid=Api';
+  const link = `https://www.bing.com/images/search?view=detailV2&mediaurl=${encodeURIComponent(source)}`;
+  const image = fakeImage({ currentSrc: thumbnail, parentHref: link, naturalWidth: 320, naturalHeight: 240 });
+
+  assert.deepEqual(getLoadedImageUrl(image), {
+    source: 'currentSrc',
+    url: thumbnail,
+  });
+  assert.deepEqual(createLoadedTargetImageInfo(image), {
+    handleId: 'image-trail-target-1',
+    url: thumbnail,
+    width: 320,
+    height: 240,
+    source: 'currentSrc',
+  });
+});
+
+test('loaded target info resolves relative src attributes against the page URL', () => {
+  assert.deepEqual(getLoadedImageUrl(fakeImage({ srcAttribute: '/images/photo.jpg' })), {
+    source: 'srcAttribute',
+    url: 'https://example.test/images/photo.jpg',
+  });
+});
+
 test('uses richer image attributes before falling back to visible source', () => {
   assert.deepEqual(
     getImageUrl(
@@ -146,7 +174,7 @@ test('creates serializable target info and filters qualifying roots', () => {
 
   assert.equal(findQualifyingImages(root).length, 1);
   assert.deepEqual(createTargetImageInfo(first), {
-    handleId: 'image-trail-target-1',
+    handleId: 'image-trail-target-2',
     url: 'https://example.test/one.jpg',
     width: 640,
     height: 480,

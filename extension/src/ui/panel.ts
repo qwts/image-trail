@@ -44,6 +44,10 @@ interface ValidatedRecordUrl extends ImageRecordUrlValidation {
   readonly preloadDataUrl?: string;
 }
 
+interface RecordAddOptions {
+  readonly trustLoadedImage?: boolean;
+}
+
 function sourceUrlForBookmark(url: string): string {
   try {
     return sourceImageUrlFrom(url).href;
@@ -93,12 +97,16 @@ export class ImageTrailPanel {
       this.render();
     });
     this.unsubscribeFromLoads = this.pageAdapter.subscribeToSuccessfulLoads((target) => {
-      void this.addRecentHistory(target.url, target.thumbnail);
+      void this.addRecentHistory(target.url, target.thumbnail, { trustLoadedImage: target.trustedLoadedImage });
     });
     this.unsubscribeFromBookmarkRequests = this.pageAdapter.subscribeToBookmarkRequests((target) => {
       this.enqueueBookmarkMutation(async () => {
-        const bookmarked = await this.bookmarkUrl(target.url, target.thumbnail);
-        if (bookmarked) await this.addRecentHistory(sourceUrlForBookmark(target.url), target.thumbnail);
+        const options = { trustLoadedImage: target.trustedLoadedImage };
+        const bookmarked = await this.bookmarkUrl(target.url, target.thumbnail, options);
+        if (bookmarked) {
+          const historyUrl = options.trustLoadedImage ? target.url : sourceUrlForBookmark(target.url);
+          await this.addRecentHistory(historyUrl, target.thumbnail, options);
+        }
       });
     });
     void this.loadBookmarks();
@@ -562,7 +570,8 @@ export class ImageTrailPanel {
     const url = this.state.target.selectedUrl;
     if (!url) return;
     const image = this.state.target.selectedHandleId ? this.findSelectedImage(this.state.target.selectedHandleId) : null;
-    await this.bookmarkUrl(url, image ? ((await createThumbnailDataUrlFromImage(image)) ?? undefined) : undefined);
+    const trustLoadedImage = image ? image.complete && image.naturalWidth > 0 && image.naturalHeight > 0 : false;
+    await this.bookmarkUrl(url, image ? ((await createThumbnailDataUrlFromImage(image)) ?? undefined) : undefined, { trustLoadedImage });
   }
 
   private enqueueBookmarkMutation(work: () => Promise<void>): void {
@@ -570,8 +579,8 @@ export class ImageTrailPanel {
     void this.bookmarkMutationQueue;
   }
 
-  private async bookmarkUrl(url: string, thumbnail?: string): Promise<boolean> {
-    const validation = await this.validateRecordUrlForAdd(url);
+  private async bookmarkUrl(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<boolean> {
+    const validation = await this.validateRecordUrlForAdd(url, options);
     if (!validation.ok || !validation.sourceUrl) {
       return false;
     }
@@ -615,8 +624,8 @@ export class ImageTrailPanel {
     return true;
   }
 
-  private async addRecentHistory(url: string, thumbnail?: string): Promise<void> {
-    const validation = await this.validateRecordUrlForAdd(url);
+  private async addRecentHistory(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<void> {
+    const validation = await this.validateRecordUrlForAdd(url, options);
     if (!validation.ok || !validation.sourceUrl) return;
     const resolvedThumbnail =
       thumbnail ??
@@ -633,10 +642,11 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private async validateRecordUrlForAdd(url: string): Promise<ValidatedRecordUrl> {
-    const validation = this.validateRecordUrl(url);
+  private async validateRecordUrlForAdd(url: string, options: RecordAddOptions = {}): Promise<ValidatedRecordUrl> {
+    const validation = options.trustLoadedImage ? this.validateLoadedImageUrl(url) : this.validateRecordUrl(url);
     if (!validation.ok || !validation.sourceUrl) return validation;
     if (validation.sourceUrl.startsWith('data:image/')) return validation;
+    if (options.trustLoadedImage) return validation;
     const fetchResult = await fetchThumbnailSource(validation.sourceUrl);
     if (fetchResult.ok) return { ...validation, preloadDataUrl: fetchResult.dataUrl };
 
@@ -662,6 +672,21 @@ export class ImageTrailPanel {
       this.render();
     }
     return validation;
+  }
+
+  private validateLoadedImageUrl(url: string): ImageRecordUrlValidation {
+    let sourceUrl: URL;
+    try {
+      sourceUrl = new URL(url, document.baseURI);
+    } catch {
+      return { ok: false, message: 'Image Trail could not save this URL because it is not a valid URL.' };
+    }
+
+    if (sourceUrl.protocol !== 'http:' && sourceUrl.protocol !== 'https:') {
+      return { ok: false, message: 'Only http(s) image URLs can be saved to Image Trail.' };
+    }
+
+    return { ok: true, sourceUrl: sourceUrl.href };
   }
 
   private async removeRecentHistory(id: string): Promise<void> {

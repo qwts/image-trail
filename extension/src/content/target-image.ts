@@ -63,6 +63,33 @@ export function getImageUrl(image: HTMLImageElement): Pick<TargetImageInfo, 'url
   return null;
 }
 
+export function getLoadedImageUrl(image: HTMLImageElement): Pick<TargetImageInfo, 'url' | 'source'> | null {
+  const candidates: Array<[TargetImageInfo['source'], string | null | undefined]> = [
+    ['currentSrc', image.currentSrc],
+    ['srcProperty', image.src],
+    ['srcAttribute', image.getAttribute('src')],
+    ['data-src', image.getAttribute('data-src')],
+    ['data-original', image.getAttribute('data-original')],
+  ];
+
+  for (const [source, value] of candidates) {
+    const url = normalizeImageUrl(value);
+    if (url) return { source, url };
+  }
+
+  return null;
+}
+
+function normalizeImageUrl(value: string | null | undefined): string | null {
+  const candidate = value?.trim();
+  if (!candidate) return null;
+  try {
+    return new URL(candidate, document.baseURI).href;
+  } catch {
+    return candidate;
+  }
+}
+
 function sourceUrlFromLink(image: HTMLImageElement): string | null {
   const href = image.closest('a[href]')?.getAttribute('href')?.trim();
   if (!href) return null;
@@ -134,6 +161,19 @@ export function getImageRejectionReason(image: HTMLImageElement): string | null 
 
 export function createTargetImageInfo(image: HTMLImageElement): TargetImageInfo | null {
   const urlInfo = getImageUrl(image);
+  if (!urlInfo) return null;
+  const rect = image.getBoundingClientRect();
+  return {
+    handleId: getHandleId(image),
+    url: urlInfo.url,
+    width: Math.round(image.naturalWidth || rect.width),
+    height: Math.round(image.naturalHeight || rect.height),
+    source: urlInfo.source,
+  };
+}
+
+export function createLoadedTargetImageInfo(image: HTMLImageElement): TargetImageInfo | null {
+  const urlInfo = getLoadedImageUrl(image);
   if (!urlInfo) return null;
   const rect = image.getBoundingClientRect();
   return {

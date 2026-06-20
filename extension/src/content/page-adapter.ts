@@ -6,6 +6,7 @@ import {
 } from '../core/image/image-navigation.js';
 import { DomObserver } from './dom-observer.js';
 import {
+  createLoadedTargetImageInfo,
   createTargetImageInfo,
   findQualifyingImages,
   getImageRejectionReason,
@@ -26,8 +27,10 @@ export interface TargetSelectionSnapshot {
 }
 
 export type TargetSelectionListener = (snapshot: TargetSelectionSnapshot) => void;
-export type TargetLoadListener = (target: TargetImageInfo & { readonly thumbnail?: string }) => void;
-export type TargetBookmarkRequestListener = (target: TargetImageInfo & { readonly thumbnail?: string }) => void;
+export type TargetLoadListener = (target: TargetImageInfo & { readonly thumbnail?: string; readonly trustedLoadedImage?: boolean }) => void;
+export type TargetBookmarkRequestListener = (
+  target: TargetImageInfo & { readonly thumbnail?: string; readonly trustedLoadedImage?: boolean },
+) => void;
 
 export class PageAdapter {
   private selected: HTMLImageElement | null = null;
@@ -215,7 +218,7 @@ export class PageAdapter {
       this.emit(`Could not bookmark image: ${getImageRejectionReason(image) ?? 'Image is not usable.'}`);
       return;
     }
-    const info = createTargetImageInfo(image);
+    const info = createLoadedTargetImageInfo(image) ?? createTargetImageInfo(image);
     if (!info) {
       this.emit('Could not bookmark image: Image source could not be resolved.');
       return;
@@ -226,7 +229,7 @@ export class PageAdapter {
 
   private async emitBookmarkRequest(image: HTMLImageElement, info: TargetImageInfo): Promise<void> {
     const thumbnail = (await createThumbnailDataUrlFromImage(image)) ?? undefined;
-    for (const listener of this.bookmarkRequestListeners) listener({ ...info, thumbnail });
+    for (const listener of this.bookmarkRequestListeners) listener({ ...info, thumbnail, trustedLoadedImage: true });
   }
 
   private selectTarget(image: HTMLImageElement, mode: TargetSelectionMode): void {
@@ -301,7 +304,7 @@ export class PageAdapter {
       this.emit(reportedTarget.url.startsWith('data:') ? 'Loaded data URL' : `Loaded ${reportedTarget.url}`);
     }
     const thumbnail = (await createThumbnailDataUrlFromImage(image)) ?? undefined;
-    for (const listener of this.loadListeners) listener({ ...reportedTarget, thumbnail });
+    for (const listener of this.loadListeners) listener({ ...reportedTarget, thumbnail, trustedLoadedImage: true });
   }
 
   private clearHover(): void {
