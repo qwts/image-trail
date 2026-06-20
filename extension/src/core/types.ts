@@ -56,6 +56,11 @@ export interface PanelState {
   readonly automation: AutomationState;
   readonly selectedHistoryId: string | null;
   readonly activeFieldId: string | null;
+  readonly failedFieldId: string | null;
+  readonly successfulFieldIds: readonly string[];
+  readonly unchangedFieldIds: readonly string[];
+  readonly unlockedFieldIds: readonly string[];
+  readonly currentImageFingerprint: string | null;
 }
 
 export type CaptureSourceType = 'target' | 'history' | 'bookmark';
@@ -73,6 +78,7 @@ export type PanelActionName =
   | 'history/download'
   | 'history/select'
   | 'active-field/set'
+  | 'field-unlock/toggle'
   | 'field-value-change'
   | 'field-value-bump'
   | 'selected-url/apply'
@@ -128,6 +134,7 @@ export type PanelAction =
         | 'field-value-bump'
         | 'selected-url/apply'
         | 'active-field/set'
+        | 'field-unlock/toggle'
         | 'bookmark/load'
         | 'bookmark/remove'
         | 'bookmarks/page-loaded'
@@ -172,6 +179,7 @@ export type PanelAction =
     }
   | { readonly name: 'history/load' | 'history/download' }
   | { readonly name: 'active-field/set'; readonly id: string | null }
+  | { readonly name: 'field-unlock/toggle'; readonly id: string }
   | { readonly name: 'field-value-change'; readonly id: string; readonly value: string }
   | { readonly name: 'field-value-bump'; readonly id: string; readonly delta: 1 | -1 }
   | { readonly name: 'selected-url/apply'; readonly url: string }

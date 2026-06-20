@@ -21,6 +21,7 @@ import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js'
 import { parseUrl } from '../core/url/parse-url.js';
 import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../core/url/rebuild-url.js';
 import { collectUrlFields, selectDefaultField } from '../core/url/tokenize-fields.js';
+import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
 import {
   createThumbnailDataUrlFromDataUrl,
   createThumbnailDataUrlFromImage,
@@ -51,6 +52,16 @@ interface ValidatedRecordUrl extends ImageRecordUrlValidation {
 
 interface RecordAddOptions {
   readonly trustLoadedImage?: boolean;
+}
+
+function addItems(items: readonly string[], nextItems: readonly string[]): readonly string[] {
+  return [...items, ...nextItems.filter((item) => !items.includes(item))];
+}
+
+function removeItems(items: readonly string[], removedItems: readonly string[]): readonly string[] {
+  if (removedItems.length === 0) return items;
+  const removed = new Set(removedItems);
+  return items.filter((item) => !removed.has(item));
 }
 
 function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
@@ -463,13 +474,18 @@ export class ImageTrailPanel {
       if (!snapshot.selected) return false;
       const currentUrl = snapshot.selected.url;
       if (!currentUrl) return false;
-      const model = parseUrl(currentUrl);
+      const model = parseUrl(this.state.draftUrl ?? currentUrl);
       const fields = collectUrlFields(model);
-      const field = selectDefaultField(fields);
-      if (!field) return false;
-      const bumped = bumpUrlField(model, field, delta);
+      const unlockedFields = fields.filter((field) => this.isUnlockedNavigableField(field));
+      const fallback = selectDefaultField(fields);
+      const navigableFields = unlockedFields.length ? unlockedFields : fallback ? [fallback] : [];
+      if (navigableFields.length === 0) return false;
+      const bumped = navigableFields.reduce<ParsedUrlModel>((nextModel, field) => bumpUrlField(nextModel, field, delta), model);
       const nextUrl = rebuildUrl(bumped);
-      void this.applySelectedUrl(nextUrl);
+      void this.applySelectedUrl(
+        nextUrl,
+        navigableFields.filter((field) => field.location === 'query').map((field) => field.id),
+      );
       return true;
     });
 
@@ -490,7 +506,7 @@ export class ImageTrailPanel {
 
     const nextModel = setUrlFieldValue(model, field, nextValue);
     const nextUrl = rebuildUrl(nextModel);
-    await this.applySelectedUrl(nextUrl);
+    await this.applySelectedUrl(nextUrl, field.location === 'query' ? [fieldId] : []);
   }
 
   private async bumpFieldValue(fieldId: string, delta: 1 | -1): Promise<void> {
@@ -504,13 +520,35 @@ export class ImageTrailPanel {
     const nextModel = bumpUrlField(model, field, delta);
     const nextUrl = rebuildUrl(nextModel);
     this.state = reducePanelAction(this.state, { name: 'active-field/set', id: fieldId });
-    await this.applySelectedUrl(nextUrl);
+    await this.applySelectedUrl(nextUrl, field.location === 'query' ? [fieldId] : []);
   }
 
-  private async applySelectedUrl(nextUrl: string): Promise<boolean> {
+  private async applySelectedUrl(nextUrl: string, attemptedFieldIds: readonly string[] = []): Promise<boolean> {
+    const baselineFingerprint = await this.currentImageFingerprint();
     const preload = await this.preloadImageUrl(nextUrl);
     if (!preload.ok) {
-      this.state = { ...this.state, draftUrl: nextUrl, message: preload.message, status: 'error', lastUpdatedAt: Date.now() };
+      this.state = {
+        ...this.state,
+        draftUrl: nextUrl,
+        failedFieldId: attemptedFieldIds[0] ?? null,
+        successfulFieldIds: removeItems(this.state.successfulFieldIds, attemptedFieldIds),
+        unchangedFieldIds: removeItems(this.state.unchangedFieldIds, attemptedFieldIds),
+        unlockedFieldIds: removeItems(this.state.unlockedFieldIds, attemptedFieldIds),
+        message: preload.message,
+        status: 'error',
+        lastUpdatedAt: Date.now(),
+      };
+      this.render();
+      return false;
+    }
+
+    if (attemptedFieldIds.length > 0 && baselineFingerprint && preload.sha256 === baselineFingerprint) {
+      this.state = this.applyFieldLoadResult(
+        { ...this.state, draftUrl: nextUrl, message: 'Image loaded but did not change.', status: 'ready', lastUpdatedAt: Date.now() },
+        attemptedFieldIds,
+        preload.sha256,
+        baselineFingerprint,
+      );
       this.render();
       return false;
     }
@@ -520,6 +558,7 @@ export class ImageTrailPanel {
       const nextSnapshot = this.pageAdapter.applyUrlToSelected(nextUrl, preload.displayUrl);
       this.state = setTargetState(this.state, toTargetState(nextSnapshot));
     }
+    this.state = this.applyFieldLoadResult(this.state, attemptedFieldIds, preload.sha256, baselineFingerprint);
     pushVisibleUrlWhenSameOrigin(nextUrl);
     this.render();
     return true;
@@ -527,10 +566,65 @@ export class ImageTrailPanel {
 
   private async preloadImageUrl(
     url: string,
-  ): Promise<{ readonly ok: true; readonly displayUrl: string } | { readonly ok: false; readonly message: string }> {
-    if (url.startsWith('data:image/')) return { ok: true, displayUrl: url };
+  ): Promise<
+    { readonly ok: true; readonly displayUrl: string; readonly sha256: string | null } | { readonly ok: false; readonly message: string }
+  > {
+    if (url.startsWith('data:image/')) return { ok: true, displayUrl: url, sha256: null };
     const result = await fetchThumbnailSource(url);
-    return result.ok ? { ok: true, displayUrl: result.dataUrl } : { ok: false, message: `Image failed to load: ${result.message}` };
+    return result.ok
+      ? { ok: true, displayUrl: result.dataUrl, sha256: result.sha256 ?? null }
+      : { ok: false, message: `Image failed to load: ${result.message}` };
+  }
+
+  private async currentImageFingerprint(): Promise<string | null> {
+    if (this.state.currentImageFingerprint) return this.state.currentImageFingerprint;
+    const currentUrl = this.state.target.selectedUrl;
+    if (!currentUrl || currentUrl.startsWith('data:image/')) return null;
+    const preload = await this.preloadImageUrl(currentUrl);
+    if (!preload.ok || !preload.sha256) return null;
+    this.state = { ...this.state, currentImageFingerprint: preload.sha256 };
+    return preload.sha256;
+  }
+
+  private applyFieldLoadResult(
+    state: PanelState,
+    attemptedFieldIds: readonly string[],
+    nextFingerprint: string | null,
+    previousFingerprint: string | null,
+  ): PanelState {
+    const changed = Boolean(nextFingerprint && previousFingerprint && nextFingerprint !== previousFingerprint);
+    const unchanged = Boolean(nextFingerprint && previousFingerprint && nextFingerprint === previousFingerprint);
+    const autoUnlocked = changed ? attemptedFieldIds.filter((fieldId) => this.isAutoUnlockableField(fieldId)) : [];
+
+    return {
+      ...state,
+      failedFieldId: null,
+      successfulFieldIds: changed
+        ? addItems(removeItems(state.successfulFieldIds, attemptedFieldIds), attemptedFieldIds)
+        : removeItems(state.successfulFieldIds, attemptedFieldIds),
+      unchangedFieldIds: unchanged
+        ? addItems(removeItems(state.unchangedFieldIds, attemptedFieldIds), attemptedFieldIds)
+        : removeItems(state.unchangedFieldIds, attemptedFieldIds),
+      unlockedFieldIds: changed
+        ? addItems(removeItems(state.unlockedFieldIds, attemptedFieldIds), autoUnlocked)
+        : removeItems(state.unlockedFieldIds, attemptedFieldIds),
+      currentImageFingerprint: nextFingerprint ?? state.currentImageFingerprint,
+    };
+  }
+
+  private isUnlockedNavigableField(field: UrlField): boolean {
+    return this.state.unlockedFieldIds.includes(field.id) && this.isNavigableQueryField(field);
+  }
+
+  private isAutoUnlockableField(fieldId: string): boolean {
+    const snapshot = this.pageAdapter.getSnapshot();
+    const model = parseUrl(this.state.draftUrl ?? snapshot.selected?.url ?? window.location.href);
+    const field = collectUrlFields(model).find((candidate) => candidate.id === fieldId);
+    return field ? this.isNavigableQueryField(field) : false;
+  }
+
+  private isNavigableQueryField(field: UrlField): boolean {
+    return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
   }
 
   private async tryReloadCurrent(): Promise<boolean> {

@@ -122,9 +122,11 @@ test('creates thumbnail source fetch messages', () => {
     dataUrl: 'data:image/jpeg;base64,abc',
     mimeType: 'image/jpeg',
     byteLength: 3,
+    sha256: 'a'.repeat(64),
   });
   assert.equal(success.type, MessageType.FetchThumbnailSourceResult);
   assert.equal(success.payload.ok, true);
+  assert.equal(success.payload.ok ? success.payload.sha256 : undefined, 'a'.repeat(64));
   assert.equal(isExtensionResponse(success), true);
   assert.equal(isFetchThumbnailSourceResultMessage(success), true);
 

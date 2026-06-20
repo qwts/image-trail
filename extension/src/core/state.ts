@@ -46,6 +46,11 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     automation: EMPTY_AUTOMATION_STATE,
     selectedHistoryId: null,
     activeFieldId: null,
+    failedFieldId: null,
+    successfulFieldIds: [],
+    unchangedFieldIds: [],
+    unlockedFieldIds: [],
+    currentImageFingerprint: null,
   };
 }
 
@@ -65,12 +70,18 @@ export function closePanel(state: PanelState, now = Date.now()): PanelState {
 }
 
 export function setTargetState(state: PanelState, target: TargetState, now = Date.now()): PanelState {
+  const targetChanged = state.target.selectedHandleId !== target.selectedHandleId || target.selectedUrl === null;
   return {
     ...state,
     status: target.picking ? 'picking' : 'ready',
     message: target.message,
     target,
     draftUrl: null,
+    failedFieldId: targetChanged ? null : state.failedFieldId,
+    successfulFieldIds: targetChanged ? [] : state.successfulFieldIds,
+    unchangedFieldIds: targetChanged ? [] : state.unchangedFieldIds,
+    unlockedFieldIds: targetChanged ? [] : state.unlockedFieldIds,
+    currentImageFingerprint: targetChanged ? null : state.currentImageFingerprint,
     lastUpdatedAt: now,
   };
 }

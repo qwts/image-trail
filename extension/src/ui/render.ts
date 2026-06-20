@@ -231,17 +231,28 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
       },
       target.dispatch,
     ),
-    createFieldsView(editableFields, state.activeFieldId, {
-      onActivate: (fieldId) => {
-        target.dispatch({ name: 'active-field/set', id: fieldId });
+    createFieldsView(
+      editableFields,
+      state.activeFieldId,
+      state.failedFieldId,
+      state.successfulFieldIds,
+      state.unchangedFieldIds,
+      state.unlockedFieldIds,
+      {
+        onActivate: (fieldId) => {
+          target.dispatch({ name: 'active-field/set', id: fieldId });
+        },
+        onValueChange: (fieldId, value) => {
+          target.dispatch({ name: 'field-value-change', id: fieldId, value });
+        },
+        onStep: (fieldId, delta) => {
+          target.dispatch({ name: 'field-value-bump', id: fieldId, delta });
+        },
+        onToggleUnlock: (fieldId) => {
+          target.dispatch({ name: 'field-unlock/toggle', id: fieldId });
+        },
       },
-      onValueChange: (fieldId, value) => {
-        target.dispatch({ name: 'field-value-change', id: fieldId, value });
-      },
-      onStep: (fieldId, delta) => {
-        target.dispatch({ name: 'field-value-bump', id: fieldId, delta });
-      },
-    }),
+    ),
     createControlsView({
       onPrevious: () => dispatchActiveField(-1),
       onNext: () => dispatchActiveField(1),

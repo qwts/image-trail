@@ -40,6 +40,8 @@ This milestone extracts and ports URL parsing, URL rebuilding, token field movem
 - Failed image loads surface status without corrupting the previous usable state.
 - Same-origin visible URL updates happen only when allowed.
 - Request throttling prevents uncontrolled rapid manual requests.
+- Parsed query field feedback distinguishes failed, useful, and unchanged image
+  loads before fields participate in global navigation.
 
 ## Primary Modules
 
@@ -72,6 +74,16 @@ This milestone extracts and ports URL parsing, URL rebuilding, token field movem
 - Successful image load commits pending history; failed load clears pending state and does not corrupt last successful URL.
 - Same-origin `history.pushState` is attempted only when safe; cross-origin updates are skipped with status.
 - Request throttle governs rapid manual controls before automation is introduced.
+- Failed query-field edits turn that field red, keep the previous image applied,
+  and leave the draft URL editable for another attempt.
+- Query-field edits that load the same image stay neutral/unchanged and do not
+  unlock Previous/Next navigation.
+- Query-field edits that load a different image turn green; successful numeric
+  or hex query fields auto-unlock for Previous/Next navigation.
+- Global Previous/Next changes all unlocked numeric/hex query fields together
+  and falls back to the default numeric/hex field when nothing is unlocked.
+- Hex fields show their decimal value nearby so users can reason about both
+  representations while editing.
 
 ## Planning Discipline To Apply Before Build
 
@@ -88,6 +100,10 @@ This milestone extracts and ports URL parsing, URL rebuilding, token field movem
 - Use Strategy-like encoding helpers for path/query contexts rather than conditionals spread across callers.
 - Use Command objects/actions for `setField`, `bumpField`, and `applyUrl` so UI can dispatch the same action from DOM or React later.
 - Keep image application in `core/image` plus `content/page-adapter`; core computes intent, content mutates DOM.
+- Treat image identity as a first-class part of query-field feedback. A URL that
+  fetches successfully but has the same image bytes is not a useful green field.
+- Keep unlock state session-only and target-scoped. Changing the host target
+  clears failed/successful/unchanged/unlocked field state.
 - Create regression fixtures before broad UI wiring.
 
 ## Test Notes
@@ -96,6 +112,9 @@ This milestone extracts and ports URL parsing, URL rebuilding, token field movem
 - Test bump behavior for decimal, zero-padded decimal, hex with prefix, hex without prefix, and underflow.
 - Manual apply to picture/srcset page and confirm responsive attributes are cleared only for target.
 - Manual 404 load confirms no history commit.
+- Test query field feedback for failed load, different-image success, same-image
+  unchanged, auto-unlock, manual lock/unlock, and global Previous/Next over all
+  unlocked fields.
 
 ## Acceptance Criteria Coverage Review
 
