@@ -404,6 +404,46 @@ test('IndexedDbBookmarkStore keeps bookmark order stable when refreshing an exis
   }
 });
 
+test('IndexedDbBookmarkStore updates imported image bookmarks without duplicating rows', async () => {
+  await deleteImageTrailDb();
+  const store = new IndexedDbBookmarkStore();
+  try {
+    const saved = await store.save(
+      createDisplayRecord({
+        id: '2026-06-20T00:00:00.000Z:imported.png',
+        url: 'data:image/png;base64,imported',
+        label: 'imported.png',
+        thumbnail: 'data:image/png;base64,imported',
+        timestamp: '2026-06-20T00:00:00.000Z',
+        source: 'bookmark',
+      }),
+    );
+    const refreshed = await store.save({ ...saved, thumbnail: 'data:image/png;base64,refreshed' });
+    await store.save({
+      ...refreshed,
+      captureStatus: 'captured',
+      blobId: 'blob-001',
+      capturedAt: '2026-06-20T00:00:01.000Z',
+      storedOriginal: {
+        blobId: 'blob-001',
+        mimeType: 'image/png',
+        byteLength: 8,
+        capturedAt: '2026-06-20T00:00:01.000Z',
+      },
+    });
+
+    const page = await store.loadPage({ offset: 0, limit: 30 });
+
+    assert.equal(page.total, 1);
+    assert.equal(page.items.length, 1);
+    assert.equal(page.items[0]?.url, 'data:image/png;base64,imported');
+    assert.equal(page.items[0]?.captureStatus, 'captured');
+    assert.equal(page.items[0]?.blobId, 'blob-001');
+  } finally {
+    await store.close();
+  }
+});
+
 test('IndexedDbBookmarkStore paginates visible bookmarks without counting undecryptable legacy rows', async () => {
   await deleteImageTrailDb();
   const firstStore = new IndexedDbBookmarkStore();

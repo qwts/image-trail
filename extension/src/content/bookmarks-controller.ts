@@ -81,7 +81,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     if (!context) return bookmark;
 
     const indexUrl = importedDataUrl ? `image-trail-import:${bookmark.id}` : bookmark.url;
-    const existing = importedDataUrl ? undefined : await context.repository.getEncryptedByUrl(bookmark.url);
+    const existing = importedDataUrl ? await context.repository.getEncrypted(bookmark.id) : await context.repository.getEncryptedByUrl(bookmark.url);
     const uuid = existing?.uuid ?? crypto.randomUUID();
     await context.repository.sealAndPut(
       uuid,
