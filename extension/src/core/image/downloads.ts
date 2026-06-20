@@ -13,8 +13,9 @@ export interface DownloadDuplicateRecord {
 export type DownloadDuplicateMatch = 'fingerprint' | 'url';
 
 export function sanitizeFilename(input: string, fallback = 'image'): string {
-  const sanitized = input
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '_')
+  const withoutControlCharacters = Array.from(input, (character) => ((character.codePointAt(0) ?? 0) < 32 ? '_' : character)).join('');
+  const sanitized = withoutControlCharacters
+    .replace(/[<>:"/\\|?*]/gu, '_')
     .replace(/\s+/gu, ' ')
     .replace(/[._ -]+$/gu, '')
     .replace(/^[._ -]+/gu, '')

@@ -1,3 +1,5 @@
+/* global chrome, document, location */
+
 const status = document.getElementById('status');
 const token = decodeURIComponent(location.hash.slice(1));
 

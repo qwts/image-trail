@@ -1,5 +1,5 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
-import { IndexedDbBookmarkStore } from '../content/bookmarks-controller.js';
+import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { getActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
@@ -123,7 +123,11 @@ function arrayBufferToBase64(bytes: ArrayBuffer): string {
   return btoa(binary);
 }
 
-function dataUrlToImageBytes(dataUrl: string): { readonly ok: true; readonly bytes: ArrayBuffer; readonly mimeType: string; readonly byteLength: number } | { readonly ok: false; readonly message: string } {
+function dataUrlToImageBytes(
+  dataUrl: string,
+):
+  | { readonly ok: true; readonly bytes: ArrayBuffer; readonly mimeType: string; readonly byteLength: number }
+  | { readonly ok: false; readonly message: string } {
   const match = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/iu.exec(dataUrl);
   if (!match) return { ok: false, message: 'Imported image data could not be decoded.' };
   const mimeType = match[1]!.toLowerCase();
@@ -175,7 +179,10 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
         return fetchImageBytes(url);
       })();
   if (!bytesResult.ok) {
-    return 'reason' in bytesResult && bytesResult.reason === 'permission-needed' && 'origin' in bytesResult && typeof bytesResult.origin === 'string'
+    return 'reason' in bytesResult &&
+      bytesResult.reason === 'permission-needed' &&
+      'origin' in bytesResult &&
+      typeof bytesResult.origin === 'string'
       ? { status: 'remote-only', reason: 'permission-needed', message: bytesResult.message, origin: bytesResult.origin }
       : { status: 'failed', reason: 'unknown', message: bytesResult.message };
   }
@@ -293,7 +300,9 @@ async function handleRetrieveBlob(message: RetrieveBlobMessage): Promise<import(
   };
 }
 
-async function handleCreateBlobPreview(message: CreateBlobPreviewMessage): Promise<import('./messages.js').CreateBlobPreviewResultMessage['payload']> {
+async function handleCreateBlobPreview(
+  message: CreateBlobPreviewMessage,
+): Promise<import('./messages.js').CreateBlobPreviewResultMessage['payload']> {
   const retrieved = await handleRetrieveBlob({ type: MessageType.RetrieveBlob, version: 1, payload: { blobId: message.payload.blobId } });
   if (!retrieved.ok) return retrieved;
   const token = crypto.randomUUID();
@@ -348,7 +357,9 @@ async function handleSaveBookmark(message: SaveBookmarkMessage): Promise<import(
   return { ok: true, record };
 }
 
-async function handleRemoveBookmark(message: RemoveBookmarkMessage): Promise<import('./messages.js').RemoveBookmarkResultMessage['payload']> {
+async function handleRemoveBookmark(
+  message: RemoveBookmarkMessage,
+): Promise<import('./messages.js').RemoveBookmarkResultMessage['payload']> {
   await bookmarkStore.remove(message.payload.record);
   return { ok: true };
 }
@@ -368,7 +379,9 @@ function handleAddRecentHistory(message: AddRecentHistoryMessage): import('./mes
   return { items: next };
 }
 
-function handleRemoveRecentHistory(message: RemoveRecentHistoryMessage): import('./messages.js').RemoveRecentHistoryResultMessage['payload'] {
+function handleRemoveRecentHistory(
+  message: RemoveRecentHistoryMessage,
+): import('./messages.js').RemoveRecentHistoryResultMessage['payload'] {
   const key = recentHistoryKey(message.payload.pageUrl);
   const next = (recentHistoryBySite.get(key) ?? []).filter((entry) => entry.id !== message.payload.id);
   recentHistoryBySite.set(key, next);
@@ -382,7 +395,11 @@ async function handleSetupBlobKey(message: SetupBlobKeyMessage): Promise<BlobKey
   if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
   const wrapped = await createAndActivateWrappedBlobKey({ password });
   await new KeysRepository(db).put(wrapped.metadata);
-  return { ok: true, keyReference: wrapped.metadata.reference, message: `Encrypted blob storage unlocked with ${wrapped.metadata.reference}.` };
+  return {
+    ok: true,
+    keyReference: wrapped.metadata.reference,
+    message: `Encrypted blob storage unlocked with ${wrapped.metadata.reference}.`,
+  };
 }
 
 async function handleUnlockBlobKey(message: UnlockBlobKeyMessage): Promise<BlobKeyResultMessage['payload']> {
@@ -393,8 +410,7 @@ async function handleUnlockBlobKey(message: UnlockBlobKeyMessage): Promise<BlobK
   const keys = new KeysRepository(db);
   const requested = message.payload.keyReference ? await keys.get(message.payload.keyReference) : undefined;
   const latest = [...(await keys.listByKind('blob'))].sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
-  const blobKey =
-    requested ?? latest;
+  const blobKey = requested ?? latest;
   if (!isStoredBlobKey(blobKey)) {
     return { ok: false, reason: 'missing-key', message: 'No encrypted blob key exists. Set up encrypted storage first.' };
   }
@@ -499,20 +515,26 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     case MessageType.CreateBlobPreview:
       handleCreateBlobPreview(message)
         .then((result) => sendResponse(createCreateBlobPreviewResultMessage(result)))
-        .catch(() => sendResponse(createCreateBlobPreviewResultMessage({ ok: false, reason: 'unknown', message: 'Preview creation failed.' })));
+        .catch(() =>
+          sendResponse(createCreateBlobPreviewResultMessage({ ok: false, reason: 'unknown', message: 'Preview creation failed.' })),
+        );
       return true;
 
     case MessageType.CreateDataUrlPreview:
       createPreviewForDataUrl(message.payload.dataUrl)
         .then((result) => sendResponse(createCreateBlobPreviewResultMessage(result)))
-        .catch(() => sendResponse(createCreateBlobPreviewResultMessage({ ok: false, reason: 'unknown', message: 'Preview creation failed.' })));
+        .catch(() =>
+          sendResponse(createCreateBlobPreviewResultMessage({ ok: false, reason: 'unknown', message: 'Preview creation failed.' })),
+        );
       return true;
 
     case MessageType.FetchThumbnailSource:
       handleFetchThumbnailSource(message)
         .then((result) => sendResponse(createFetchThumbnailSourceResultMessage(result)))
         .catch(() =>
-          sendResponse(createFetchThumbnailSourceResultMessage({ ok: false, reason: 'unknown', message: 'Thumbnail source fetch failed.' })),
+          sendResponse(
+            createFetchThumbnailSourceResultMessage({ ok: false, reason: 'unknown', message: 'Thumbnail source fetch failed.' }),
+          ),
         );
       return true;
 

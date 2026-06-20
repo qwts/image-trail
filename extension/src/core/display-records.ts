@@ -1,5 +1,4 @@
-import type { CaptureStatus } from './image/capture-result.js';
-import type { StoredOriginalReference } from '../data/types.js';
+import type { CaptureStatus, StoredOriginalReference } from './image/capture-result.js';
 
 export interface ImageDisplayRecord {
   readonly id: string;
@@ -113,7 +112,10 @@ function imageExtensionFromImageQuery(url: URL): string | null {
 
 function imageExtensionFromImageType(value: string | null | undefined): string | null {
   if (!value) return null;
-  const normalized = value.toUpperCase().replace(/^IMAGE\//u, '').replace(/^JPE?G$/u, (match) => (match === 'JPG' ? 'JPG' : 'JPEG'));
+  const normalized = value
+    .toUpperCase()
+    .replace(/^IMAGE\//u, '')
+    .replace(/^JPE?G$/u, (match) => (match === 'JPG' ? 'JPG' : 'JPEG'));
   return isImageRecordExtension(normalized) ? normalized : null;
 }
 

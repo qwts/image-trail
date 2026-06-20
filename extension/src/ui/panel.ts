@@ -17,7 +17,6 @@ import { createInitialPanelState, setAutomationState, setTargetState } from '../
 import type { BookmarkStore, ImportedImageFile, PanelAction, PanelState, TargetState } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl } from '../core/image/downloads.js';
-import { DEFAULT_LOCAL_SETTINGS, LocalSettingsRepository } from '../data/local-settings.js';
 import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
 import { parseUrl } from '../core/url/parse-url.js';
 import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../core/url/rebuild-url.js';
@@ -28,12 +27,19 @@ import {
   createThumbnailDataUrlFromUrl,
   fetchThumbnailSource,
 } from '../content/thumbnail-generator.js';
-import { importBookmarkletJson } from '../data/import-export/bookmarklet-import.js';
-import { exportEncryptedBookmarks, exportPlainBookmarks } from '../data/import-export/bookmarks-export.js';
-import { importBookmarks as importBookmarkRecords } from '../data/import-export/bookmarks-import.js';
-import { exportEncryptedHistory, exportPlainHistory } from '../data/import-export/history-export.js';
-import { importEncryptedHistory } from '../data/import-export/history-import.js';
-import type { DurableBookmarkPayloadV1, DurableHistoryPayloadV1 } from '../data/types.js';
+import {
+  DEFAULT_LOCAL_SETTINGS,
+  LocalSettingsRepository,
+  exportEncryptedBookmarks,
+  exportEncryptedHistory,
+  exportPlainBookmarks,
+  exportPlainHistory,
+  importBookmarkletJson,
+  importBookmarks as importBookmarkRecords,
+  importEncryptedHistory,
+  type DurableBookmarkPayloadV1,
+  type DurableHistoryPayloadV1,
+} from '../content/panel-services.js';
 import { renderPanel } from './render.js';
 
 const ROOT_ID = 'image-trail-panel-root';
@@ -854,7 +860,12 @@ export class ImageTrailPanel {
 
   private async previewUrl(url: string): Promise<void> {
     if (!this.canProjectToSelectedImage()) {
-      this.state = { ...this.state, message: 'Select a host image before previewing an image.', status: 'error', lastUpdatedAt: Date.now() };
+      this.state = {
+        ...this.state,
+        message: 'Select a host image before previewing an image.',
+        status: 'error',
+        lastUpdatedAt: Date.now(),
+      };
       this.render();
       return;
     }

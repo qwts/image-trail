@@ -94,12 +94,6 @@ function setTokenValue(token: UrlToken, raw: string): UrlToken {
   };
 }
 
-function stripHexPrefix(value: string, kind: 'int' | 'hex'): string {
-  if (kind !== 'hex') return value;
-  if (/^0[xX]/u.test(value)) return value.slice(2);
-  return value;
-}
-
 function rebuildQueryField(field: ParsedUrlModel['queryFields'][number]): string {
   const key = encodeQueryKey(field.key);
   if (!field.hasEquals) return key;

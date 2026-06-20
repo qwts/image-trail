@@ -9,7 +9,7 @@ import { DownloadsRepository } from '../extension/src/data/repositories/download
 import { KeysRepository } from '../extension/src/data/repositories/keys-repository.js';
 import type { StoredKeyRecord } from '../extension/src/data/crypto/types.js';
 import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
-import { IndexedDbBookmarkStore } from '../extension/src/content/bookmarks-controller.js';
+import { IndexedDbBookmarkStore } from '../extension/src/data/bookmarks-controller.js';
 import { createDisplayRecord } from '../extension/src/core/display-records.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
 
