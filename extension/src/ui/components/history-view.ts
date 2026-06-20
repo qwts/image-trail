@@ -6,7 +6,7 @@ type HistoryAction =
   | { readonly name: 'history-selection/toggle'; readonly id: string }
   | { readonly name: 'history-selection/clear' }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'history'; readonly sourceRecordId: string }
-  | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string; readonly scrollAnchorId?: string }
+  | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string }
   | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string };
 
 export function createHistoryView(
@@ -31,7 +31,6 @@ export function createHistoryView(
     const selected = selectedIds.includes(item.id);
     const entry = document.createElement('li');
     entry.className = 'image-trail-panel__history-item';
-    entry.dataset.imageTrailScrollAnchor = `history:${item.id}`;
     if (previewableEncrypted) entry.classList.add('is-captured');
     if (selected) entry.classList.add('is-selected');
     entry.setAttribute('aria-selected', String(selected));
