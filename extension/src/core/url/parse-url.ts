@@ -36,7 +36,8 @@ function resolveUrl(input: string): URL {
 }
 
 function decodeHtmlEntities(value: string): string {
-  return value.replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&#39;', "'");
+  const withQuerySeparators = value.replace(/&amp;(?=[A-Za-z0-9_.~-]+=)/gu, '&');
+  return withQuerySeparators.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&#39;', "'");
 }
 
 function encodedSlashAt(value: string, index: number): string {

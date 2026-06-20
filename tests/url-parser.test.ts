@@ -37,6 +37,16 @@ test('selects the first numeric field by default before hex fields', () => {
   assert.equal(hexOnly?.tokenKind, 'hex');
 });
 
+test('decodes ampersand entities only for query-shaped separators', () => {
+  const model = parseUrl('https://example.test/fish&ampchips?src=a&amp;b=2');
+  assert.deepEqual(
+    model.queryFields.map((field) => field.key),
+    ['src', 'b'],
+  );
+  const pathSegment = model.pathParts.find((part) => part.type === 'segment');
+  assert.equal(pathSegment?.raw, 'fish&ampchips');
+});
+
 function selectField(fields: UrlField[], hint: string): UrlField {
   const lowerHint = hint.toLowerCase();
   const queryKey = lowerHint.match(/query\s+([\w.-]+)/u)?.[1];
