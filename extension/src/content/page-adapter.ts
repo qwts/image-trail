@@ -188,14 +188,16 @@ export class PageAdapter {
     if (!event.shiftKey || event.button !== 0) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
-    const image = target.closest('img');
-    if (!(image instanceof HTMLImageElement) || !isQualifyingImage(image)) return;
-    const info = createTargetImageInfo(image);
-    if (!info) return;
+    const image = target.closest('img') ?? target.closest('a')?.querySelector('img');
+    if (!(image instanceof HTMLImageElement)) return;
 
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
+    if (!isQualifyingImage(image)) return;
+    const info = createTargetImageInfo(image);
+    if (!info) return;
+
     void this.emitBookmarkRequest(image, info);
   };
 
