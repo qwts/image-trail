@@ -139,8 +139,19 @@
   display: grid;
   gap: 6px;
   min-width: 0;
+  max-block-size: 180px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 6px 0;
   border-top: 1px solid rgb(255 255 255 / 12%);
+  scrollbar-width: thin;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmarks-section {
+  max-block-size: none;
+  overflow: visible;
+  overscroll-behavior: auto;
 }
 
 .image-trail-panel-root .image-trail-panel__target-summary {
@@ -356,6 +367,7 @@
 
 .image-trail-panel-root .image-trail-panel__url-editor {
   min-width: 0;
+  max-block-size: 132px;
 }
 
 .image-trail-panel-root .image-trail-panel__section:first-of-type {
@@ -402,6 +414,14 @@
 .image-trail-panel-root .image-trail-panel__import-export {
   display: grid;
   gap: 8px;
+}
+
+.image-trail-panel-root .image-trail-panel__image-transfer {
+  max-block-size: 116px;
+}
+
+.image-trail-panel-root .image-trail-panel__import-export {
+  max-block-size: 220px;
 }
 
 .image-trail-panel-root .image-trail-panel__subsection {
@@ -599,8 +619,12 @@
   list-style: none;
 }
 
+.image-trail-panel-root .image-trail-panel__fields {
+  max-block-size: 260px;
+}
+
 .image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list {
-  max-block-size: 168px;
+  max-block-size: 150px;
   overflow-x: hidden;
   overflow-y: auto;
   padding-inline-end: 3px;
