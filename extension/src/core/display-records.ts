@@ -76,13 +76,6 @@ export function validateImageRecordUrl(url: string): ImageRecordUrlValidation {
     return { ok: false, message: 'Only http(s) image URLs can be saved to Image Trail.' };
   }
 
-  if (!imageExtensionFromParsedUrl(sourceUrl)) {
-    return {
-      ok: false,
-      message: 'Image Trail could not save this URL because it does not look like a JPG, JPEG, PNG, GIF, or WEBP image URL.',
-    };
-  }
-
   return { ok: true, sourceUrl: sourceUrl.href };
 }
 

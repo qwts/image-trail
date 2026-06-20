@@ -36,6 +36,25 @@ function sourceUrlForBookmark(url: string): string {
   }
 }
 
+function imageUrlLoads(url: string, timeoutMs = 8_000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    let settled = false;
+    const finish = (ok: boolean): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      image.onload = null;
+      image.onerror = null;
+      resolve(ok);
+    };
+    const timeout = window.setTimeout(() => finish(false), timeoutMs);
+    image.onload = () => finish(image.naturalWidth > 0 && image.naturalHeight > 0);
+    image.onerror = () => finish(false);
+    image.src = url;
+  });
+}
+
 function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
   const selectedUrl = snapshot.selected?.url ?? null;
   return {
@@ -517,7 +536,7 @@ export class ImageTrailPanel {
   }
 
   private async bookmarkUrl(url: string, thumbnail?: string): Promise<boolean> {
-    const validation = this.validateRecordUrl(url);
+    const validation = await this.validateRecordUrlForAdd(url);
     if (!validation.ok || !validation.sourceUrl) {
       return false;
     }
@@ -531,7 +550,7 @@ export class ImageTrailPanel {
   }
 
   private async addRecentHistory(url: string, thumbnail?: string): Promise<void> {
-    const validation = this.validateRecordUrl(url);
+    const validation = await this.validateRecordUrlForAdd(url);
     if (!validation.ok || !validation.sourceUrl) return;
     const next = reducePanelAction(this.state, { name: 'history/add-loaded', url: validation.sourceUrl, thumbnail }).history;
     const item = next[0];
@@ -539,6 +558,21 @@ export class ImageTrailPanel {
     const history = this.recentHistoryStore ? await this.recentHistoryStore.add(item, window.location.href) : next;
     this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
     this.render();
+  }
+
+  private async validateRecordUrlForAdd(url: string): Promise<ReturnType<typeof validateImageRecordUrl>> {
+    const validation = this.validateRecordUrl(url);
+    if (!validation.ok || !validation.sourceUrl) return validation;
+    if (await imageUrlLoads(validation.sourceUrl)) return validation;
+
+    this.state = {
+      ...this.state,
+      message: 'Image Trail could not save this URL because the image failed to load.',
+      status: 'error',
+      lastUpdatedAt: Date.now(),
+    };
+    this.render();
+    return { ok: false, message: this.state.message };
   }
 
   private validateRecordUrl(url: string): ReturnType<typeof validateImageRecordUrl> {

@@ -39,10 +39,14 @@ test('image extension detection supports image service format hints', () => {
   assert.equal(imageExtensionFromUrl('https://images.example.test/render?mime=image%2Fwebp'), 'WEBP');
 });
 
-test('image record URL validation rejects invalid and non-image URLs with messages', () => {
+test('image record URL validation rejects invalid transport before load probing', () => {
   assert.deepEqual(validateImageRecordUrl('https://example.test/photo.png'), {
     ok: true,
     sourceUrl: 'https://example.test/photo.png',
+  });
+  assert.deepEqual(validateImageRecordUrl('https://example.test/gallery/page'), {
+    ok: true,
+    sourceUrl: 'https://example.test/gallery/page',
   });
 
   const invalid = validateImageRecordUrl('not a url');
@@ -52,8 +56,4 @@ test('image record URL validation rejects invalid and non-image URLs with messag
   const nonHttp = validateImageRecordUrl('data:image/png;base64,abc');
   assert.equal(nonHttp.ok, false);
   assert.match(nonHttp.message ?? '', /http\(s\)/i);
-
-  const nonImage = validateImageRecordUrl('https://example.test/gallery/page');
-  assert.equal(nonImage.ok, false);
-  assert.match(nonImage.message ?? '', /does not look like/i);
 });
