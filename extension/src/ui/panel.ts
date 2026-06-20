@@ -706,7 +706,8 @@ export class ImageTrailPanel {
 
   private async captureImage(url: string, sourceType: 'target' | 'history' | 'bookmark', sourceRecordId?: string): Promise<void> {
     if (!this.captureStore) return;
-    if (!isDurableImageSourceUrl(url)) {
+    const isImportedImage = url.startsWith('data:image/');
+    if (!isImportedImage && !isDurableImageSourceUrl(url)) {
       this.state = {
         ...this.state,
         message: 'Only http(s) image URLs can be captured as encrypted originals.',
@@ -718,7 +719,7 @@ export class ImageTrailPanel {
     }
     this.state = reducePanelAction(this.state, { name: 'capture/start' });
     this.render();
-    const result = await this.captureStore.requestCapture(sourceUrlForBookmark(url), sourceType, sourceRecordId);
+    const result = await this.captureStore.requestCapture(isImportedImage ? url : sourceUrlForBookmark(url), sourceType, sourceRecordId);
     this.state = reducePanelAction(this.state, { name: 'capture/complete', result, sourceRecordId });
     if (isCapturedResult(result) && sourceType === 'history' && sourceRecordId && this.recentHistoryStore) {
       const updatedHistory = this.state.history.find((item) => item.id === sourceRecordId);
@@ -796,6 +797,17 @@ export class ImageTrailPanel {
   private async previewUrl(url: string): Promise<void> {
     if (await this.projectUrlToSelectedImage(url)) {
       this.state = { ...this.state, message: 'Projected image into selected host element.', lastUpdatedAt: Date.now() };
+      this.render();
+      return;
+    }
+
+    if (url.startsWith('data:image/') && this.captureStore) {
+      const result = await this.captureStore.requestDataUrlPreview(url);
+      if (result.ok) {
+        this.state = { ...this.state, message: `Opened imported image preview (${(result.byteLength / 1024).toFixed(1)} KB).`, lastUpdatedAt: Date.now() };
+      } else {
+        this.state = { ...this.state, message: result.message, status: 'error', lastUpdatedAt: Date.now() };
+      }
       this.render();
       return;
     }

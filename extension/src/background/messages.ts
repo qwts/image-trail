@@ -16,6 +16,7 @@ export const MessageType = {
   RetrieveBlob: 'imageTrail.retrieveBlob',
   RetrieveBlobResult: 'imageTrail.retrieveBlobResult',
   CreateBlobPreview: 'imageTrail.createBlobPreview',
+  CreateDataUrlPreview: 'imageTrail.createDataUrlPreview',
   CreateBlobPreviewResult: 'imageTrail.createBlobPreviewResult',
   FetchThumbnailSource: 'imageTrail.fetchThumbnailSource',
   FetchThumbnailSourceResult: 'imageTrail.fetchThumbnailSourceResult',
@@ -144,6 +145,12 @@ export interface CreateBlobPreviewMessage {
   readonly type: typeof MessageType.CreateBlobPreview;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload: { readonly blobId: string };
+}
+
+export interface CreateDataUrlPreviewMessage {
+  readonly type: typeof MessageType.CreateDataUrlPreview;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly dataUrl: string };
 }
 
 export interface CreateBlobPreviewResultMessage {
@@ -307,6 +314,7 @@ export type ExtensionRequest =
   | CleanupOrphanedBlobsMessage
   | RetrieveBlobMessage
   | CreateBlobPreviewMessage
+  | CreateDataUrlPreviewMessage
   | FetchThumbnailSourceMessage
   | GrantPermissionAndCaptureMessage
   | BlobKeyStatusMessage
@@ -386,6 +394,10 @@ export function createRetrieveBlobMessage(blobId: string): RetrieveBlobMessage {
 
 export function createCreateBlobPreviewMessage(blobId: string): CreateBlobPreviewMessage {
   return { type: MessageType.CreateBlobPreview, version: MESSAGE_PROTOCOL_VERSION, payload: { blobId } };
+}
+
+export function createCreateDataUrlPreviewMessage(dataUrl: string): CreateDataUrlPreviewMessage {
+  return { type: MessageType.CreateDataUrlPreview, version: MESSAGE_PROTOCOL_VERSION, payload: { dataUrl } };
 }
 
 export function createFetchThumbnailSourceMessage(url: string): FetchThumbnailSourceMessage {
@@ -519,6 +531,7 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.CleanupOrphanedBlobs ||
     value.type === MessageType.RetrieveBlob ||
     value.type === MessageType.CreateBlobPreview ||
+    value.type === MessageType.CreateDataUrlPreview ||
     value.type === MessageType.FetchThumbnailSource ||
     value.type === MessageType.GrantPermissionAndCapture ||
     value.type === MessageType.BlobKeyStatus ||

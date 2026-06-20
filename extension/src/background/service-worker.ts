@@ -119,6 +119,37 @@ function arrayBufferToBase64(bytes: ArrayBuffer): string {
   return btoa(binary);
 }
 
+function dataUrlToImageBytes(dataUrl: string): { readonly ok: true; readonly bytes: ArrayBuffer; readonly mimeType: string; readonly byteLength: number } | { readonly ok: false; readonly message: string } {
+  const match = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/iu.exec(dataUrl);
+  if (!match) return { ok: false, message: 'Imported image data could not be decoded.' };
+  const mimeType = match[1]!.toLowerCase();
+  const base64 = match[2]!.replace(/\s/gu, '');
+  try {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return { ok: true, bytes: bytes.buffer, mimeType, byteLength: bytes.byteLength };
+  } catch {
+    return { ok: false, message: 'Imported image data could not be decoded.' };
+  }
+}
+
+function createPreviewForDataUrl(dataUrl: string): Promise<import('./messages.js').CreateBlobPreviewResultMessage['payload']> {
+  const parsed = dataUrlToImageBytes(dataUrl);
+  if (!parsed.ok) return Promise.resolve({ ok: false, reason: 'invalid-data-url', message: parsed.message });
+  const token = crypto.randomUUID();
+  previewPayloads.set(token, { dataUrl, byteLength: parsed.byteLength, createdAt: Date.now() });
+  setTimeout(() => previewPayloads.delete(token), PREVIEW_TTL_MS);
+  const previewUrl = chrome.runtime.getURL(`src/preview/preview.html#${encodeURIComponent(token)}`);
+  return chrome.tabs
+    .create({ url: previewUrl })
+    .then(() => ({ ok: true as const, previewUrl, byteLength: parsed.byteLength }))
+    .catch(() => {
+      previewPayloads.delete(token);
+      return { ok: false as const, reason: 'preview-blocked', message: 'Preview tab could not be opened by the extension.' };
+    });
+}
+
 async function handleCaptureImage(message: CaptureImageMessage): Promise<import('../core/image/capture-result.js').CaptureResult> {
   const url = canonicalCaptureUrl(message.payload.url);
   const activeBlobKey = getActiveBlobKey();
@@ -130,14 +161,19 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
     };
   }
 
-  const origin = extractOrigin(url);
-  if (origin && !(await hasOriginPermission(origin))) {
-    return { status: 'remote-only', reason: 'permission-needed', message: `Permission needed for ${origin}.`, origin };
-  }
-
-  const fetchResult = await fetchImageBytes(url);
-  if (!fetchResult.ok) {
-    return { status: 'failed', reason: fetchResult.reason, message: fetchResult.message };
+  const bytesResult = url.startsWith('data:image/')
+    ? dataUrlToImageBytes(url)
+    : await (async () => {
+        const origin = extractOrigin(url);
+        if (origin && !(await hasOriginPermission(origin))) {
+          return { ok: false as const, reason: 'permission-needed', message: `Permission needed for ${origin}.`, origin };
+        }
+        return fetchImageBytes(url);
+      })();
+  if (!bytesResult.ok) {
+    return 'reason' in bytesResult && bytesResult.reason === 'permission-needed' && 'origin' in bytesResult && typeof bytesResult.origin === 'string'
+      ? { status: 'remote-only', reason: 'permission-needed', message: bytesResult.message, origin: bytesResult.origin }
+      : { status: 'failed', reason: 'unknown', message: bytesResult.message };
   }
 
   const db = await getDb();
@@ -159,8 +195,8 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
   const sealed = await sealBlobPayload({
     key: activeBlobKey.key,
     aad,
-    metadata: { mimeType: fetchResult.mimeType, byteLength: fetchResult.byteLength, sourceUrl: url, capturedAt: now },
-    bytes: fetchResult.bytes,
+    metadata: { mimeType: bytesResult.mimeType, byteLength: bytesResult.byteLength, sourceUrl: url, capturedAt: now },
+    bytes: bytesResult.bytes,
   });
 
   const record: StoredBlobRecord = {
@@ -176,7 +212,7 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
     referenceCount: 1,
   };
   await blobs.put(record);
-  return { status: 'captured', blobId: record.id, mimeType: fetchResult.mimeType, byteLength: fetchResult.byteLength };
+  return { status: 'captured', blobId: record.id, mimeType: bytesResult.mimeType, byteLength: bytesResult.byteLength };
 }
 
 async function handleDeleteBlob(message: DeleteBlobMessage): Promise<{ deleted: boolean; usage: StorageUsageSummary }> {
@@ -461,6 +497,12 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
 
     case MessageType.CreateBlobPreview:
       handleCreateBlobPreview(message)
+        .then((result) => sendResponse(createCreateBlobPreviewResultMessage(result)))
+        .catch(() => sendResponse(createCreateBlobPreviewResultMessage({ ok: false, reason: 'unknown', message: 'Preview creation failed.' })));
+      return true;
+
+    case MessageType.CreateDataUrlPreview:
+      createPreviewForDataUrl(message.payload.dataUrl)
         .then((result) => sendResponse(createCreateBlobPreviewResultMessage(result)))
         .catch(() => sendResponse(createCreateBlobPreviewResultMessage({ ok: false, reason: 'unknown', message: 'Preview creation failed.' })));
       return true;

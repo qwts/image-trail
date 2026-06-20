@@ -2,6 +2,7 @@ import type { CaptureResult, StorageUsageSummary } from '../core/image/capture-r
 import {
   createCaptureImageMessage,
   createCleanupOrphanedBlobsMessage,
+  createCreateDataUrlPreviewMessage,
   createCreateBlobPreviewMessage,
   createDeleteBlobMessage,
   createRetrieveBlobMessage,
@@ -26,6 +27,7 @@ export interface CaptureStore {
   readonly requestCleanupOrphanedBlobs: () => Promise<{ deletedCount: number; usage: StorageUsageSummary }>;
   readonly requestRetrieveBlob: (blobId: string) => Promise<RetrieveBlobResultMessage['payload']>;
   readonly requestBlobPreview: (blobId: string) => Promise<CreateBlobPreviewResultMessage['payload']>;
+  readonly requestDataUrlPreview: (dataUrl: string) => Promise<CreateBlobPreviewResultMessage['payload']>;
   readonly requestStorageUsage: () => Promise<StorageUsageSummary>;
   readonly requestPermissionAndRetry: (url: string, sourceType: CaptureSourceType, sourceRecordId?: string) => Promise<CaptureResult>;
   readonly requestBlobKeyStatus: () => Promise<BlobKeyStatusResultMessage['payload']>;
@@ -72,6 +74,12 @@ export class CaptureController implements CaptureStore {
 
   async requestBlobPreview(blobId: string): Promise<CreateBlobPreviewResultMessage['payload']> {
     const response = await chrome.runtime.sendMessage(createCreateBlobPreviewMessage(blobId));
+    if (isCreateBlobPreviewResultMessage(response)) return response.payload;
+    return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
+  }
+
+  async requestDataUrlPreview(dataUrl: string): Promise<CreateBlobPreviewResultMessage['payload']> {
+    const response = await chrome.runtime.sendMessage(createCreateDataUrlPreviewMessage(dataUrl));
     if (isCreateBlobPreviewResultMessage(response)) return response.payload;
     return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
   }
