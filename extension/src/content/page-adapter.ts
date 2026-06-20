@@ -42,8 +42,6 @@ export class PageAdapter {
   private readonly loadListeners = new Set<TargetLoadListener>();
   private readonly bookmarkRequestListeners = new Set<TargetBookmarkRequestListener>();
   private pendingLoadTarget: HTMLImageElement | null = null;
-  private pendingLoadRestoreUrl: string | null = null;
-  private pendingLoadRestoreSnapshot: ImageNavigationSnapshot | null = null;
   private selectedOriginalUrl: string | null = null;
   private selectedOriginalSnapshot: ImageNavigationSnapshot | null = null;
   private selectedActiveUrl: string | null = null;
@@ -124,17 +122,15 @@ export class PageAdapter {
     return this.lastSnapshot;
   }
 
-  applyUrlToSelected(url: string): TargetSelectionSnapshot {
+  applyUrlToSelected(url: string, displayUrl = url): TargetSelectionSnapshot {
     if (!this.selected?.isConnected) {
       return this.emit('Select a target image before loading a bookmark.');
     }
 
-    const previousUrl = this.selectedActiveUrl ?? createTargetImageInfo(this.selected)?.url ?? null;
-    const previousSnapshot = captureImageNavigationSnapshot(this.selected);
-    const result = applyImageUrl(this.selected, url);
-    this.selectedActiveUrl = result.url;
-    this.watchSelectedLoad(this.selected, previousUrl, previousSnapshot);
-    return this.emit(result.message);
+    applyImageUrl(this.selected, displayUrl);
+    this.selectedActiveUrl = url;
+    this.watchSelectedLoad(this.selected);
+    return this.emit(`Applied ${url}`);
   }
 
   releaseSelectedTarget(): TargetSelectionSnapshot {
@@ -265,11 +261,7 @@ export class PageAdapter {
     this.selectedActiveUrl = null;
   }
 
-  private watchSelectedLoad(
-    image: HTMLImageElement,
-    restoreUrl: string | null = null,
-    restoreSnapshot: ImageNavigationSnapshot | null = null,
-  ): void {
+  private watchSelectedLoad(image: HTMLImageElement): void {
     this.clearPendingLoadTarget();
     if (isSuccessfulImageLoad(image)) {
       void this.emitSuccessfulLoad(image);
@@ -277,8 +269,6 @@ export class PageAdapter {
     }
 
     this.pendingLoadTarget = image;
-    this.pendingLoadRestoreUrl = restoreUrl;
-    this.pendingLoadRestoreSnapshot = restoreSnapshot;
     image.addEventListener('load', this.onSelectedLoad, { once: true });
     image.addEventListener('error', this.onSelectedError, { once: true });
   }
@@ -288,8 +278,6 @@ export class PageAdapter {
     this.pendingLoadTarget.removeEventListener('load', this.onSelectedLoad);
     this.pendingLoadTarget.removeEventListener('error', this.onSelectedError);
     this.pendingLoadTarget = null;
-    this.pendingLoadRestoreUrl = null;
-    this.pendingLoadRestoreSnapshot = null;
   }
 
   private onSelectedLoad = (event: Event): void => {
@@ -301,31 +289,19 @@ export class PageAdapter {
   };
 
   private onSelectedError = (event: Event): void => {
-    const image = event.currentTarget;
-    if (!(image instanceof HTMLImageElement) || image !== this.pendingLoadTarget) return;
-    const restoreUrl = this.pendingLoadRestoreUrl;
-    const restoreSnapshot = this.pendingLoadRestoreSnapshot;
-    this.clearPendingLoadTarget();
-    if (image === this.selected && restoreUrl) {
-      if (restoreSnapshot) {
-        restoreImageNavigationSnapshot(restoreSnapshot);
-      } else {
-        applyImageUrl(image, restoreUrl);
-      }
-      this.selectedActiveUrl = restoreUrl;
-      this.emit(`Failed to load image; restored ${restoreUrl}.`);
-    }
+    if (event.currentTarget === this.pendingLoadTarget) this.clearPendingLoadTarget();
   };
 
   private async emitSuccessfulLoad(image: HTMLImageElement): Promise<void> {
     const target = createTargetImageInfo(image);
     if (!target) return;
+    const reportedTarget = image === this.selected && this.selectedActiveUrl ? { ...target, url: this.selectedActiveUrl } : target;
     if (image === this.selected) {
-      this.selectedActiveUrl = target.url;
-      this.emit(target.url.startsWith('data:') ? 'Loaded data URL' : `Loaded ${target.url}`);
+      this.selectedActiveUrl = reportedTarget.url;
+      this.emit(reportedTarget.url.startsWith('data:') ? 'Loaded data URL' : `Loaded ${reportedTarget.url}`);
     }
     const thumbnail = (await createThumbnailDataUrlFromImage(image)) ?? undefined;
-    for (const listener of this.loadListeners) listener({ ...target, thumbnail });
+    for (const listener of this.loadListeners) listener({ ...reportedTarget, thumbnail });
   }
 
   private clearHover(): void {

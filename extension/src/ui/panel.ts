@@ -13,11 +13,11 @@ import type { BookmarkStore, ImportedImageFile, PanelAction, PanelState, TargetS
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl } from '../core/image/downloads.js';
 import { DEFAULT_LOCAL_SETTINGS, LocalSettingsRepository } from '../data/local-settings.js';
-import { applyImageUrl, pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
+import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
 import { parseUrl } from '../core/url/parse-url.js';
 import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../core/url/rebuild-url.js';
 import { collectUrlFields, selectDefaultField } from '../core/url/tokenize-fields.js';
-import { createThumbnailDataUrlFromImage, createThumbnailDataUrlFromUrl } from '../content/thumbnail-generator.js';
+import { createThumbnailDataUrlFromImage, createThumbnailDataUrlFromUrl, fetchThumbnailSource } from '../content/thumbnail-generator.js';
 import { importBookmarkletJson } from '../data/import-export/bookmarklet-import.js';
 import { exportEncryptedBookmarks, exportPlainBookmarks } from '../data/import-export/bookmarks-export.js';
 import { importBookmarks as importBookmarkRecords } from '../data/import-export/bookmarks-import.js';
@@ -230,7 +230,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'bookmark/load') {
-      this.loadBookmark(action.id);
+      void this.loadBookmark(action.id);
       return;
     }
 
@@ -267,12 +267,12 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'field-value-change') {
-      this.updateFieldValue(action.id, action.value);
+      void this.updateFieldValue(action.id, action.value);
       return;
     }
 
     if (action.name === 'field-value-bump') {
-      this.bumpFieldValue(action.id, action.delta);
+      void this.bumpFieldValue(action.id, action.delta);
       return;
     }
 
@@ -282,7 +282,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'selected-url/apply') {
-      this.applySelectedUrl(action.url);
+      void this.applySelectedUrl(action.url);
       return;
     }
 
@@ -461,8 +461,6 @@ export class ImageTrailPanel {
     const result = this.governor.request(() => {
       const snapshot = this.pageAdapter.getSnapshot();
       if (!snapshot.selected) return false;
-      const image = this.findSelectedImage(snapshot.selected.handleId);
-      if (!image) return false;
       const currentUrl = snapshot.selected.url;
       if (!currentUrl) return false;
       const model = parseUrl(currentUrl);
@@ -471,7 +469,7 @@ export class ImageTrailPanel {
       if (!field) return false;
       const bumped = bumpUrlField(model, field, delta);
       const nextUrl = rebuildUrl(bumped);
-      applyImageUrl(image, nextUrl);
+      void this.applySelectedUrl(nextUrl);
       return true;
     });
 
@@ -482,7 +480,7 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private updateFieldValue(fieldId: string, nextValue: string): void {
+  private async updateFieldValue(fieldId: string, nextValue: string): Promise<void> {
     const snapshot = this.pageAdapter.getSnapshot();
 
     const model = parseUrl(snapshot.selected?.url ?? window.location.href);
@@ -492,15 +490,10 @@ export class ImageTrailPanel {
 
     const nextModel = setUrlFieldValue(model, field, nextValue);
     const nextUrl = rebuildUrl(nextModel);
-    if (snapshot.selected) {
-      const nextSnapshot = this.pageAdapter.applyUrlToSelected(nextUrl);
-      this.state = setTargetState(this.state, toTargetState(nextSnapshot));
-    }
-    pushVisibleUrlWhenSameOrigin(nextUrl);
-    this.render();
+    await this.applySelectedUrl(nextUrl);
   }
 
-  private bumpFieldValue(fieldId: string, delta: 1 | -1): void {
+  private async bumpFieldValue(fieldId: string, delta: 1 | -1): Promise<void> {
     const snapshot = this.pageAdapter.getSnapshot();
 
     const model = parseUrl(snapshot.selected?.url ?? window.location.href);
@@ -510,27 +503,34 @@ export class ImageTrailPanel {
 
     const nextModel = bumpUrlField(model, field, delta);
     const nextUrl = rebuildUrl(nextModel);
-    if (snapshot.selected) {
-      const nextSnapshot = this.pageAdapter.applyUrlToSelected(nextUrl);
-      this.state = setTargetState(
-        reducePanelAction(this.state, { name: 'active-field/set', id: fieldId }),
-        toTargetState(nextSnapshot),
-      );
-    } else {
-      this.state = reducePanelAction(this.state, { name: 'active-field/set', id: fieldId });
-    }
-    pushVisibleUrlWhenSameOrigin(nextUrl);
-    this.render();
+    this.state = reducePanelAction(this.state, { name: 'active-field/set', id: fieldId });
+    await this.applySelectedUrl(nextUrl);
   }
 
-  private applySelectedUrl(nextUrl: string): void {
+  private async applySelectedUrl(nextUrl: string): Promise<boolean> {
+    const preload = await this.preloadImageUrl(nextUrl);
+    if (!preload.ok) {
+      this.state = { ...this.state, message: preload.message, status: 'error', lastUpdatedAt: Date.now() };
+      this.render();
+      return false;
+    }
+
     const snapshot = this.pageAdapter.getSnapshot();
     if (snapshot.selected) {
-      const nextSnapshot = this.pageAdapter.applyUrlToSelected(nextUrl);
+      const nextSnapshot = this.pageAdapter.applyUrlToSelected(nextUrl, preload.displayUrl);
       this.state = setTargetState(this.state, toTargetState(nextSnapshot));
     }
     pushVisibleUrlWhenSameOrigin(nextUrl);
     this.render();
+    return true;
+  }
+
+  private async preloadImageUrl(
+    url: string,
+  ): Promise<{ readonly ok: true; readonly displayUrl: string } | { readonly ok: false; readonly message: string }> {
+    if (url.startsWith('data:image/')) return { ok: true, displayUrl: url };
+    const result = await fetchThumbnailSource(url);
+    return result.ok ? { ok: true, displayUrl: result.dataUrl } : { ok: false, message: `Image failed to load: ${result.message}` };
   }
 
   private async tryReloadCurrent(): Promise<boolean> {
@@ -566,7 +566,7 @@ export class ImageTrailPanel {
     const url = this.state.target.selectedUrl;
     if (!url) return;
     const image = this.state.target.selectedHandleId ? this.findSelectedImage(this.state.target.selectedHandleId) : null;
-    await this.bookmarkUrl(url, image ? (await createThumbnailDataUrlFromImage(image)) ?? undefined : undefined);
+    await this.bookmarkUrl(url, image ? ((await createThumbnailDataUrlFromImage(image)) ?? undefined) : undefined);
   }
 
   private enqueueBookmarkMutation(work: () => Promise<void>): void {
@@ -602,7 +602,9 @@ export class ImageTrailPanel {
     });
     const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
     const historyItem = createDisplayRecord({ ...draft, id: `${timestamp}:history:${file.name}`, source: 'history' });
-    const history = this.recentHistoryStore ? await this.recentHistoryStore.add(historyItem, window.location.href) : [historyItem, ...this.state.history];
+    const history = this.recentHistoryStore
+      ? await this.recentHistoryStore.add(historyItem, window.location.href)
+      : [historyItem, ...this.state.history];
     this.state = {
       ...this.state,
       history: history.slice(0, 30),
@@ -664,12 +666,10 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private loadBookmark(id: string): void {
+  private async loadBookmark(id: string): Promise<void> {
     const bookmark = this.state.bookmarks.find((item) => item.id === id);
     if (!bookmark) return;
-    const snapshot = this.pageAdapter.applyUrlToSelected(bookmark.url);
-    this.state = setTargetState(this.state, toTargetState(snapshot));
-    this.render();
+    await this.applySelectedUrl(bookmark.url);
   }
 
   private async removeBookmark(id: string): Promise<void> {
@@ -818,7 +818,11 @@ export class ImageTrailPanel {
       this.render();
       return;
     }
-    this.state = { ...this.state, message: `Opened encrypted original preview (${(result.byteLength / 1024).toFixed(1)} KB).`, lastUpdatedAt: Date.now() };
+    this.state = {
+      ...this.state,
+      message: `Opened encrypted original preview (${(result.byteLength / 1024).toFixed(1)} KB).`,
+      lastUpdatedAt: Date.now(),
+    };
     this.render();
   }
 
@@ -832,7 +836,11 @@ export class ImageTrailPanel {
     if (url.startsWith('data:image/') && this.captureStore) {
       const result = await this.captureStore.requestDataUrlPreview(url);
       if (result.ok) {
-        this.state = { ...this.state, message: `Opened imported image preview (${(result.byteLength / 1024).toFixed(1)} KB).`, lastUpdatedAt: Date.now() };
+        this.state = {
+          ...this.state,
+          message: `Opened imported image preview (${(result.byteLength / 1024).toFixed(1)} KB).`,
+          lastUpdatedAt: Date.now(),
+        };
       } else {
         this.state = { ...this.state, message: result.message, status: 'error', lastUpdatedAt: Date.now() };
       }
@@ -847,10 +855,16 @@ export class ImageTrailPanel {
 
   private async projectUrlToSelectedImage(url: string): Promise<boolean> {
     const handleId = this.state.target.selectedHandleId;
-    const previousUrl = this.state.target.selectedUrl;
     if (!handleId) return false;
     const image = this.findSelectedImage(handleId);
     if (!image) return false;
+
+    const preload = await this.preloadImageUrl(url);
+    if (!preload.ok) {
+      this.state = { ...this.state, message: preload.message, status: 'error', lastUpdatedAt: Date.now() };
+      this.render();
+      return false;
+    }
 
     return new Promise<boolean>((resolve) => {
       let settled = false;
@@ -864,23 +878,25 @@ export class ImageTrailPanel {
         if (ok) {
           this.state = setTargetState(this.state, toTargetState(this.pageAdapter.getSnapshot()));
           this.render();
-        } else if (previousUrl) {
-          const snapshot = this.pageAdapter.applyUrlToSelected(previousUrl);
-          this.state = setTargetState(this.state, toTargetState(snapshot));
+        } else {
+          this.state = {
+            ...this.state,
+            message: 'Image failed to load after preload succeeded.',
+            status: 'error',
+            lastUpdatedAt: Date.now(),
+          };
           this.render();
         }
         resolve(ok);
       };
       const isProjectedUrlLoaded = (): boolean =>
-        image.naturalWidth > 0 &&
-        image.naturalHeight > 0 &&
-        (image.currentSrc === url || image.src === url);
+        image.naturalWidth > 0 && image.naturalHeight > 0 && (image.currentSrc === preload.displayUrl || image.src === preload.displayUrl);
       const onLoad = (): void => finish(isProjectedUrlLoaded());
       const onError = (): void => finish(false);
 
       image.addEventListener('load', onLoad, { once: true });
       image.addEventListener('error', onError, { once: true });
-      const snapshot = this.pageAdapter.applyUrlToSelected(url);
+      const snapshot = this.pageAdapter.applyUrlToSelected(url, preload.displayUrl);
       this.state = setTargetState(this.state, toTargetState(snapshot));
       this.render();
       if (image.complete && isProjectedUrlLoaded()) {
@@ -904,7 +920,12 @@ export class ImageTrailPanel {
     const result = await this.captureStore.unlockBlobKey(password);
     this.state = reducePanelAction(
       { ...this.state, message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() },
-      { name: 'blob-key/status', unlocked: result.ok, keyReference: result.ok ? result.keyReference : null, hasKey: this.state.blobKeyAvailable },
+      {
+        name: 'blob-key/status',
+        unlocked: result.ok,
+        keyReference: result.ok ? result.keyReference : null,
+        hasKey: this.state.blobKeyAvailable,
+      },
     );
     this.render();
   }

@@ -7,7 +7,10 @@ import {
 
 export async function createThumbnailDataUrlFromImage(image: HTMLImageElement, maxEdge = THUMBNAIL_MAX_EDGE): Promise<string | null> {
   if (!image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) return null;
-  return createThumbnailDataUrlFromDrawable(image, image.naturalWidth, image.naturalHeight, maxEdge) ?? createThumbnailFromExtensionFetch(image, maxEdge);
+  return (
+    createThumbnailDataUrlFromDrawable(image, image.naturalWidth, image.naturalHeight, maxEdge) ??
+    createThumbnailFromExtensionFetch(image, maxEdge)
+  );
 }
 
 export async function createThumbnailDataUrlFromUrl(url: string, maxEdge = THUMBNAIL_MAX_EDGE): Promise<string | null> {
@@ -46,7 +49,7 @@ async function createThumbnailFromExtensionFetch(image: HTMLImageElement, maxEdg
   return createThumbnailDataUrlFromUrl(sourceUrl, maxEdge);
 }
 
-async function fetchThumbnailSource(url: string): Promise<FetchThumbnailSourceResultMessage['payload']> {
+export async function fetchThumbnailSource(url: string): Promise<FetchThumbnailSourceResultMessage['payload']> {
   try {
     const response = await chrome.runtime.sendMessage(createFetchThumbnailSourceMessage(url));
     if (isFetchThumbnailSourceResultMessage(response)) return response.payload;
