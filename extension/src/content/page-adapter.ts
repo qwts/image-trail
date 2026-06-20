@@ -32,6 +32,15 @@ export type TargetBookmarkRequestListener = (
   target: TargetImageInfo & { readonly thumbnail?: string; readonly trustedLoadedImage?: boolean },
 ) => void;
 
+const TARGET_MESSAGE_URL_MAX = 180;
+
+export function summarizeTargetUrlForMessage(url: string | null | undefined): string {
+  if (!url) return 'the only qualifying image';
+  if (url.startsWith('data:')) return 'data URL';
+  if (url.length <= TARGET_MESSAGE_URL_MAX) return url;
+  return `${url.slice(0, TARGET_MESSAGE_URL_MAX - 1)}…`;
+}
+
 export class PageAdapter {
   private selected: HTMLImageElement | null = null;
   private hovered: HTMLImageElement | null = null;
@@ -83,7 +92,7 @@ export class PageAdapter {
     this.detectedCandidateCount = matches.length;
     if (matches.length === 1) {
       this.selectTarget(matches[0], 'auto');
-      return this.emit(`Auto-selected ${this.lastSnapshot.selected?.url ?? 'the only qualifying image'}.`);
+      return this.emit(`Auto-selected ${summarizeTargetUrlForMessage(this.lastSnapshot.selected?.url)}.`);
     }
 
     this.mode = 'none';

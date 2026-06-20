@@ -10,7 +10,7 @@ import {
   type ImageRecordUrlValidation,
 } from '../core/display-records.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
-import { reducePanelAction } from '../core/actions.js';
+import { applyFieldLoadFailureToState, applyFieldSplitSpecToState, reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
 import { createInitialPanelState, setAutomationState, setTargetState } from '../core/state.js';
@@ -18,6 +18,7 @@ import type { BookmarkStore, ImportedImageFile, PanelAction, PanelState, TargetS
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl } from '../core/image/downloads.js';
 import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
+import { applyFieldSplitSpecs, createFieldSplitSpec } from '../core/url/field-splits.js';
 import { parseUrl } from '../core/url/parse-url.js';
 import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../core/url/rebuild-url.js';
 import { collectUrlFields, selectDefaultField } from '../core/url/tokenize-fields.js';
@@ -287,7 +288,23 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'field-split/apply') {
+      this.applyFieldSplitPattern(action.id, action.pattern);
+      return;
+    }
+
+    if (action.name === 'field-split/clear') {
+      this.state = reducePanelAction(this.state, action);
+      this.render();
+      return;
+    }
+
     if (action.name === 'active-field/set') {
+      this.state = reducePanelAction(this.state, action);
+      return;
+    }
+
+    if (action.name === 'field-unlock/toggle') {
       this.state = reducePanelAction(this.state, action);
       return;
     }
@@ -468,13 +485,43 @@ export class ImageTrailPanel {
     }
   }
 
+  private currentUrlModel(): ParsedUrlModel {
+    const snapshot = this.pageAdapter.getSnapshot();
+    const currentUrl = this.state.draftUrl ?? snapshot.selected?.url ?? window.location.href;
+    return applyFieldSplitSpecs(parseUrl(currentUrl), this.state.fieldSplitSpecs);
+  }
+
+  private applyFieldSplitPattern(fieldId: string, pattern: string): void {
+    let model: ParsedUrlModel;
+    try {
+      model = this.currentUrlModel();
+    } catch {
+      this.state = { ...this.state, status: 'error', message: 'Current URL could not be parsed for splitting.', lastUpdatedAt: Date.now() };
+      this.render();
+      return;
+    }
+
+    const field = collectUrlFields(model).find((item) => item.id === fieldId);
+    if (!field) return;
+
+    const splitSpec = createFieldSplitSpec(field, pattern);
+    if ('ok' in splitSpec) {
+      this.state = { ...this.state, status: 'error', message: splitSpec.message, lastUpdatedAt: Date.now() };
+      this.render();
+      return;
+    }
+
+    this.state = applyFieldSplitSpecToState(this.state, splitSpec);
+    this.render();
+  }
+
   private navigateBy(delta: 1 | -1): void {
     const result = this.governor.request(() => {
       const snapshot = this.pageAdapter.getSnapshot();
       if (!snapshot.selected) return false;
       const currentUrl = snapshot.selected.url;
       if (!currentUrl) return false;
-      const model = parseUrl(this.state.draftUrl ?? currentUrl);
+      const model = this.currentUrlModel();
       const fields = collectUrlFields(model);
       const unlockedFields = fields.filter((field) => this.isUnlockedNavigableField(field));
       const fallback = selectDefaultField(fields);
@@ -497,9 +544,7 @@ export class ImageTrailPanel {
   }
 
   private async updateFieldValue(fieldId: string, nextValue: string): Promise<void> {
-    const snapshot = this.pageAdapter.getSnapshot();
-
-    const model = parseUrl(this.state.draftUrl ?? snapshot.selected?.url ?? window.location.href);
+    const model = this.currentUrlModel();
     const fields = collectUrlFields(model);
     const field = fields.find((item) => item.id === fieldId);
     if (!field) return;
@@ -510,9 +555,7 @@ export class ImageTrailPanel {
   }
 
   private async bumpFieldValue(fieldId: string, delta: 1 | -1): Promise<void> {
-    const snapshot = this.pageAdapter.getSnapshot();
-
-    const model = parseUrl(this.state.draftUrl ?? snapshot.selected?.url ?? window.location.href);
+    const model = this.currentUrlModel();
     const fields = collectUrlFields(model);
     const field = fields.find((item) => item.id === fieldId);
     if (!field) return;
@@ -527,17 +570,7 @@ export class ImageTrailPanel {
     const baselineFingerprint = await this.currentImageFingerprint();
     const preload = await this.preloadImageUrl(nextUrl);
     if (!preload.ok) {
-      this.state = {
-        ...this.state,
-        draftUrl: nextUrl,
-        failedFieldId: attemptedFieldIds[0] ?? null,
-        successfulFieldIds: removeItems(this.state.successfulFieldIds, attemptedFieldIds),
-        unchangedFieldIds: removeItems(this.state.unchangedFieldIds, attemptedFieldIds),
-        unlockedFieldIds: removeItems(this.state.unlockedFieldIds, attemptedFieldIds),
-        message: preload.message,
-        status: 'error',
-        lastUpdatedAt: Date.now(),
-      };
+      this.state = applyFieldLoadFailureToState(this.state, { draftUrl: nextUrl, attemptedFieldIds, message: preload.message });
       this.render();
       return false;
     }
@@ -594,7 +627,9 @@ export class ImageTrailPanel {
   ): PanelState {
     const changed = Boolean(nextFingerprint && previousFingerprint && nextFingerprint !== previousFingerprint);
     const unchanged = Boolean(nextFingerprint && previousFingerprint && nextFingerprint === previousFingerprint);
-    const autoUnlocked = changed ? attemptedFieldIds.filter((fieldId) => this.isAutoUnlockableField(fieldId)) : [];
+    const autoUnlocked = changed
+      ? attemptedFieldIds.filter((fieldId) => this.isAutoUnlockableField(fieldId) && !state.manuallyExcludedFieldIds.includes(fieldId))
+      : [];
 
     return {
       ...state,
@@ -617,8 +652,7 @@ export class ImageTrailPanel {
   }
 
   private isAutoUnlockableField(fieldId: string): boolean {
-    const snapshot = this.pageAdapter.getSnapshot();
-    const model = parseUrl(this.state.draftUrl ?? snapshot.selected?.url ?? window.location.href);
+    const model = this.currentUrlModel();
     const field = collectUrlFields(model).find((candidate) => candidate.id === fieldId);
     return field ? this.isNavigableQueryField(field) : false;
   }

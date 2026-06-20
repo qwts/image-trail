@@ -30,28 +30,38 @@ export function collectUrlFields(model: ParsedUrlModel): UrlField[] {
     if (part.type !== 'segment') return;
     const labelBase = isLikelyFilename(part.tokens.map(tokenValue).join('')) ? 'file' : `path ${partIndex}`;
     part.tokens.forEach((token, tokenIndex) => {
+      const splitLabel = splitLabelSuffix(token);
       fields.push({
         id: `p:${partIndex}:${tokenIndex}`,
         location: 'path',
-        label: labelBase === 'file' ? `file ${tokenIndex}` : `${labelBase}.${tokenIndex}`,
+        label: `${labelBase === 'file' ? `file ${tokenIndex}` : `${labelBase}.${tokenIndex}`}${splitLabel}`,
         value: tokenValue(token),
         tokenKind: token.kind,
         partIndex,
         tokenIndex,
+        originalTokenIndex: token.originalTokenIndex,
+        splitBaseId: token.splitBaseId,
+        splitPartIndex: token.splitPartIndex,
+        splitPartCount: token.splitPartCount,
       });
     });
   });
 
   model.queryFields.forEach((field) => {
     field.valueTokens.forEach((token, tokenIndex) => {
+      const splitLabel = splitLabelSuffix(token);
       fields.push({
         id: `q:${field.index}:${tokenIndex}`,
         location: 'query',
-        label: `query ${field.key}`,
+        label: `query ${field.key}${splitLabel}`,
         value: tokenValue(token),
         tokenKind: token.kind,
         queryIndex: field.index,
         tokenIndex,
+        originalTokenIndex: token.originalTokenIndex,
+        splitBaseId: token.splitBaseId,
+        splitPartIndex: token.splitPartIndex,
+        splitPartCount: token.splitPartCount,
       });
     });
   });
@@ -80,6 +90,11 @@ function createEditableToken(value: string): UrlToken {
 
 function isLikelyFilename(segment: string): boolean {
   return /\.[A-Za-z0-9]{2,8}$/u.test(segment) || segment.includes('.');
+}
+
+function splitLabelSuffix(token: UrlToken): string {
+  if (token.splitPartIndex === undefined || token.splitPartCount === undefined) return '';
+  return ` ${token.splitPartIndex + 1}/${token.splitPartCount}`;
 }
 
 export function detectNumericType(value: string): UrlToken['kind'] {

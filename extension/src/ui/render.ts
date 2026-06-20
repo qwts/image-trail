@@ -9,6 +9,7 @@ import { createImageTransferView, createImportExportView } from './components/im
 import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
 import { parseUrl } from '../core/url/parse-url.js';
+import { applyFieldSplitSpecs } from '../core/url/field-splits.js';
 import { collectUrlFields, tokenValue } from '../core/url/tokenize-fields.js';
 import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
 
@@ -100,7 +101,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
 
   const parseActiveUrl = (): ParsedUrlModel | null => {
     try {
-      return parseUrl(activeUrl);
+      return applyFieldSplitSpecs(parseUrl(activeUrl), state.fieldSplitSpecs);
     } catch {
       return null;
     }
@@ -250,6 +251,12 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
         },
         onToggleUnlock: (fieldId) => {
           target.dispatch({ name: 'field-unlock/toggle', id: fieldId });
+        },
+        onApplySplit: (fieldId, pattern) => {
+          target.dispatch({ name: 'field-split/apply', id: fieldId, pattern });
+        },
+        onClearSplit: (baseFieldId) => {
+          target.dispatch({ name: 'field-split/clear', baseFieldId });
         },
       },
     ),

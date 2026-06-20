@@ -1,6 +1,7 @@
 import type { AutomationPhase } from './automation/types.js';
 import type { CaptureResult, StorageUsageSummary } from './image/capture-result.js';
 import type { ImageDisplayRecord } from './display-records.js';
+import type { UrlFieldSplitSpec } from './url/types.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 
@@ -60,6 +61,8 @@ export interface PanelState {
   readonly successfulFieldIds: readonly string[];
   readonly unchangedFieldIds: readonly string[];
   readonly unlockedFieldIds: readonly string[];
+  readonly manuallyExcludedFieldIds: readonly string[];
+  readonly fieldSplitSpecs: readonly UrlFieldSplitSpec[];
   readonly currentImageFingerprint: string | null;
 }
 
@@ -79,6 +82,8 @@ export type PanelActionName =
   | 'history/select'
   | 'active-field/set'
   | 'field-unlock/toggle'
+  | 'field-split/apply'
+  | 'field-split/clear'
   | 'field-value-change'
   | 'field-value-bump'
   | 'selected-url/apply'
@@ -135,6 +140,8 @@ export type PanelAction =
         | 'selected-url/apply'
         | 'active-field/set'
         | 'field-unlock/toggle'
+        | 'field-split/apply'
+        | 'field-split/clear'
         | 'bookmark/load'
         | 'bookmark/remove'
         | 'bookmarks/page-loaded'
@@ -180,6 +187,8 @@ export type PanelAction =
   | { readonly name: 'history/load' | 'history/download' }
   | { readonly name: 'active-field/set'; readonly id: string | null }
   | { readonly name: 'field-unlock/toggle'; readonly id: string }
+  | { readonly name: 'field-split/apply'; readonly id: string; readonly pattern: string }
+  | { readonly name: 'field-split/clear'; readonly baseFieldId: string }
   | { readonly name: 'field-value-change'; readonly id: string; readonly value: string }
   | { readonly name: 'field-value-bump'; readonly id: string; readonly delta: 1 | -1 }
   | { readonly name: 'selected-url/apply'; readonly url: string }

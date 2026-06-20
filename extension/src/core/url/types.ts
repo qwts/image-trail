@@ -6,6 +6,10 @@ export interface UrlToken {
   readonly width?: number;
   readonly prefix?: '0x' | '0X';
   readonly uppercase?: boolean;
+  readonly originalTokenIndex?: number;
+  readonly splitBaseId?: string;
+  readonly splitPartIndex?: number;
+  readonly splitPartCount?: number;
 }
 
 export interface PathSeparator {
@@ -52,4 +56,18 @@ export interface UrlField {
   readonly partIndex?: number;
   readonly queryIndex?: number;
   readonly tokenIndex: number;
+  readonly originalTokenIndex?: number;
+  readonly splitBaseId?: string;
+  readonly splitPartIndex?: number;
+  readonly splitPartCount?: number;
+}
+
+export interface UrlFieldSplitSpec {
+  readonly baseFieldId: string;
+  readonly location: UrlFieldLocation;
+  readonly partIndex?: number;
+  readonly queryIndex?: number;
+  readonly tokenIndex: number;
+  readonly lengths: readonly number[];
+  readonly pattern: string;
 }

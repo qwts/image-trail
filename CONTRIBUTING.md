@@ -34,6 +34,12 @@ enforced _before_ a PR is opened instead of caught after the fact.
    architecture, storage, security boundaries, automation checks, or CI
    expectations, update the relevant repo doc, user story, acceptance test, or
    ADR in the same PR. If no doc update is needed, say why in the PR description.
+5. **Write a manual test script for user-visible behavior.** When a PR changes
+   UI, browser integration, image loading, storage flows, imports/exports, or
+   any behavior that CI cannot fully exercise, include a short step-by-step
+   manual test in the PR description. The script should state expected results
+   for success, failure, and reset/collapse cases where relevant so reviewers
+   can test while CI is still running.
 
 ## PR scope control
 
@@ -90,6 +96,8 @@ human contributors, plus these extra rules:
     why no documentation change is needed.
   - **Testing** — exact commands run and their results. "All tests passed" without
     naming which tests were run is not sufficient.
+  - **Manual testing** — step-by-step browser/manual checks for user-visible
+    behavior, or why the change is fully covered by automated tests.
 
 ## Code review expectations
 
@@ -149,6 +157,9 @@ round-trip:
   or a documented manual acceptance test under `docs/acceptance-tests/`). "No
   automated tests" is acceptable only when the PR description explains why and
   links the manual acceptance scenario that covers it.
+- Manual tests should be concrete enough for a reviewer to run without
+  rediscovering the workflow: include setup URL/data, actions, expected visible
+  result, expected failure behavior, and any state reset/collapse behavior.
 - Don't leave unused function parameters as a way of silencing "declared but
   unused" - either use the parameter or remove it.
 

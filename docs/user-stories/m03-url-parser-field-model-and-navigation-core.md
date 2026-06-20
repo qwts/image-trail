@@ -75,15 +75,24 @@ This milestone extracts and ports URL parsing, URL rebuilding, token field movem
 - Same-origin `history.pushState` is attempted only when safe; cross-origin updates are skipped with status.
 - Request throttle governs rapid manual controls before automation is introduced.
 - Failed query-field edits turn that field red, keep the previous image applied,
-  and leave the draft URL editable for another attempt.
+  leave the draft URL editable for another attempt, and do not clear existing
+  Previous/Next include/exclude choices.
 - Query-field edits that load the same image stay neutral/unchanged and do not
-  unlock Previous/Next navigation.
+  include the field in Previous/Next navigation.
 - Query-field edits that load a different image turn green; successful numeric
-  or hex query fields auto-unlock for Previous/Next navigation.
-- Global Previous/Next changes all unlocked numeric/hex query fields together
-  and falls back to the default numeric/hex field when nothing is unlocked.
+  or hex query fields are automatically included in Previous/Next navigation.
+- If a user manually excludes an automatically included field, later successful
+  loads for that field do not automatically include it again during the current
+  target session. Manual Include can opt it back in.
+- Global Previous/Next changes all included numeric/hex query fields together
+  and falls back to the default numeric/hex field when nothing is included.
 - Hex fields show their decimal value nearby so users can reason about both
   representations while editing.
+- A single URL token can be split with a target-scoped length pattern such as
+  `2-2-4`, edited as separate metafields, and rebuilt as the same contiguous URL
+  value.
+- Clearing a split pattern collapses all of its metafields back into the
+  original single parsed field.
 
 ## Planning Discipline To Apply Before Build
 
@@ -102,8 +111,13 @@ This milestone extracts and ports URL parsing, URL rebuilding, token field movem
 - Keep image application in `core/image` plus `content/page-adapter`; core computes intent, content mutates DOM.
 - Treat image identity as a first-class part of query-field feedback. A URL that
   fetches successfully but has the same image bytes is not a useful green field.
-- Keep unlock state session-only and target-scoped. Changing the host target
-  clears failed/successful/unchanged/unlocked field state.
+- Keep Previous/Next field inclusion state session-only and target-scoped.
+  Changing the host target clears failed/successful/unchanged/included field
+  state.
+- Keep split patterns session-only and target-scoped. Persisted pattern
+  libraries, domain/path-structure matching, partial collapse, grouping syntax,
+  and calendar-aware date stepping remain out of scope until there is a separate
+  design.
 - Create regression fixtures before broad UI wiring.
 
 ## Test Notes
@@ -113,8 +127,12 @@ This milestone extracts and ports URL parsing, URL rebuilding, token field movem
 - Manual apply to picture/srcset page and confirm responsive attributes are cleared only for target.
 - Manual 404 load confirms no history commit.
 - Test query field feedback for failed load, different-image success, same-image
-  unchanged, auto-unlock, manual lock/unlock, and global Previous/Next over all
-  unlocked fields.
+  unchanged, one-time automatic Previous/Next inclusion, manual exclude/include,
+  global Previous/Next over all included fields, and failed global navigation
+  preserving include/exclude state.
+- Test split patterns for parse/rebuild round-trip, split part bumping,
+  reparse persistence, invalid pattern handling, target-change reset, and clear
+  split collapse.
 
 ## Acceptance Criteria Coverage Review
 
