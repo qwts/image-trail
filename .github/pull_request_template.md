@@ -6,6 +6,10 @@
 
 <!-- What changed? Include implementation notes, user-facing behavior changes, or follow-up work. -->
 
+## Documentation
+
+<!-- Link docs/ADR/user-story/acceptance-test updates, or state why no documentation change is needed. -->
+
 ## Testing
 
 <!-- List the exact commands you ran locally, for example: `npm test`. -->

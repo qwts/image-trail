@@ -30,6 +30,10 @@ enforced _before_ a PR is opened instead of caught after the fact.
    without review. If your local Node version cannot run the same reporter as CI,
    use an equivalent ESLint reporter and note the exact command in the PR until
    the repo has a single `npm run ci` wrapper.
+4. **Review documentation before merge.** If the PR changes behavior,
+   architecture, storage, security boundaries, automation checks, or CI
+   expectations, update the relevant repo doc, user story, acceptance test, or
+   ADR in the same PR. If no doc update is needed, say why in the PR description.
 
 ## PR scope control
 
@@ -82,6 +86,8 @@ human contributors, plus these extra rules:
 - PR descriptions must include, at minimum:
   - **Motivation** — why this change exists, tied to a milestone/user story.
   - **Description** — what changed, file by file or module by module.
+  - **Documentation** — docs updated, ADR/user story/acceptance test linked, or
+    why no documentation change is needed.
   - **Testing** — exact commands run and their results. "All tests passed" without
     naming which tests were run is not sufficient.
 
@@ -170,6 +176,11 @@ round-trip:
 - Keep repository docs limited to source-adjacent material that must version with
   the code: architecture contracts, acceptance tests, milestone criteria, and
   migration notes.
+- Track automation-check and merge-gate decisions in
+  `docs/adr/0001-automation-check-governance.md`. Update it when a PR changes CI
+  requirements, code-owner enforcement, required local checks, security-scan
+  policy, or the rationale for ignoring/deferring automation-related review
+  feedback.
 - Longer-lived planning notes, retrospectives, operating procedures, and narrative
   project documentation should live in the
   [GitHub wiki](https://github.com/qwtm/image-trail/wiki). The current migration is
