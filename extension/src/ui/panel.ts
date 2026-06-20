@@ -505,6 +505,8 @@ export class ImageTrailPanel {
   }
 
   private async removeRecentHistory(id: string): Promise<void> {
+    const existing = this.state.history.find((item) => item.id === id);
+    if (existing?.blobId) await this.removeCapturedBlobReference(existing.blobId);
     const history = this.recentHistoryStore
       ? await this.recentHistoryStore.remove(id, window.location.href)
       : reducePanelAction(this.state, { name: 'history/remove', id }).history;
@@ -523,10 +525,17 @@ export class ImageTrailPanel {
   private async removeBookmark(id: string): Promise<void> {
     const bookmark = this.state.bookmarks.find((item) => item.id === id);
     if (!bookmark) return;
+    if (bookmark.blobId) await this.removeCapturedBlobReference(bookmark.blobId);
     await this.bookmarkStore?.remove(bookmark);
     this.state = reducePanelAction(this.state, { name: 'bookmark/remove', id });
     await this.loadBookmarkPage(this.state.bookmarkOffset);
     this.render();
+  }
+
+  private async removeCapturedBlobReference(blobId: string): Promise<void> {
+    if (!this.captureStore) return;
+    const { usage } = await this.captureStore.requestDeleteBlob(blobId);
+    this.state = reducePanelAction(this.state, { name: 'storage/update', usage });
   }
 
   private async refreshBookmarkThumbnails(): Promise<void> {
