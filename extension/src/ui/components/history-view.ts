@@ -1,4 +1,4 @@
-import { encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
+import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 
 type HistoryAction =
   | { readonly name: 'history/remove'; readonly id: string }
@@ -65,7 +65,7 @@ export function createHistoryView(
     const link = document.createElement('span');
     link.className = 'image-trail-panel__record-link';
     link.textContent = item.label ?? item.url;
-    link.title = item.url;
+    link.title = displayTitleForRecord(item);
 
     const actions = document.createElement('span');
     actions.className = 'image-trail-panel__item-actions';

@@ -1,4 +1,5 @@
 import {
+  displayTitleForRecord,
   encryptedBlobIdForRecord,
   imageExtensionFromUrl,
   imageExtensionFromValue,
@@ -135,7 +136,7 @@ export function createBookmarksView(
     const label = document.createElement('span');
     label.className = 'image-trail-panel__bookmark-name';
     label.textContent = item.label ?? item.url;
-    label.title = item.url;
+    label.title = displayTitleForRecord(item);
     bookmarkLabel.append(source, label);
 
     const actions = document.createElement('span');

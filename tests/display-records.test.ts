@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  createDisplayRecord,
+  displayTitleForRecord,
   encryptedBlobIdForRecord,
   imageExtensionFromUrl,
   isDurableImageSourceUrl,
@@ -47,6 +49,17 @@ test('image extension detection supports image service format hints', () => {
   assert.equal(imageExtensionFromUrl('https://example.test/photo.jpeg'), 'JPEG');
   assert.equal(imageExtensionFromUrl('https://pbs.twimg.com/media/example?format=jpg&name=large'), 'JPG');
   assert.equal(imageExtensionFromUrl('https://images.example.test/render?mime=image%2Fwebp'), 'WEBP');
+  assert.equal(imageExtensionFromUrl('data:image/png;base64,abc'), 'PNG');
+});
+
+test('data image display records keep DOM labels, titles, and generated ids bounded', () => {
+  const dataUrl = `data:image/png;base64,${'a'.repeat(20_000)}`;
+  const record = createDisplayRecord({ url: dataUrl, timestamp: '2026-06-20T00:00:00.000Z' });
+
+  assert.equal(record.label, 'Data URL image (PNG)');
+  assert.equal(record.id, '2026-06-20T00:00:00.000Z:data:image-png:20022');
+  assert.equal(displayTitleForRecord(record), 'Data URL image (PNG)');
+  assert.ok(record.id.length < 80);
 });
 
 test('image record URL validation rejects invalid transport before load probing', () => {

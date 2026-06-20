@@ -30,6 +30,9 @@ export function normalizeDisplayLabel(record: Pick<ImageDisplayRecord, 'url' | '
   if (record.title?.trim()) {
     return record.title.trim();
   }
+  if (isDataImageUrl(record.url)) {
+    return dataImageDisplayLabel(record.url);
+  }
 
   try {
     const parsed = sourceImageUrlFrom(record.url);
@@ -38,6 +41,10 @@ export function normalizeDisplayLabel(record: Pick<ImageDisplayRecord, 'url' | '
   } catch {
     return record.url;
   }
+}
+
+export function displayTitleForRecord(record: Pick<ImageDisplayRecord, 'url' | 'label' | 'title'>): string {
+  return isDataImageUrl(record.url) ? normalizeDisplayLabel(record) : record.url;
 }
 
 export function sourceImageUrlFrom(url: string): URL {
@@ -83,6 +90,8 @@ export function validateImageRecordUrl(url: string): ImageRecordUrlValidation {
 }
 
 export function imageExtensionFromUrl(url: string): string | null {
+  const dataImageType = imageExtensionFromDataImageUrl(url);
+  if (dataImageType) return dataImageType;
   try {
     return imageExtensionFromParsedUrl(sourceImageUrlFrom(url));
   } catch {
@@ -127,7 +136,31 @@ export function createDisplayRecord(
   input: Omit<ImageDisplayRecord, 'id' | 'label' | 'timestamp'> & Partial<Pick<ImageDisplayRecord, 'id' | 'label' | 'timestamp'>>,
 ): ImageDisplayRecord {
   const timestamp = input.timestamp ?? new Date().toISOString();
-  const id = input.id ?? `${timestamp}:${input.url}`;
+  const id = input.id ?? createDisplayRecordId(timestamp, input.url);
   const draft = { ...input, id, timestamp };
   return { ...draft, label: normalizeDisplayLabel(draft) };
+}
+
+function createDisplayRecordId(timestamp: string, url: string): string {
+  if (!isDataImageUrl(url)) return `${timestamp}:${url}`;
+  const mimeType = dataImageMimeType(url)?.replace(/[^a-z0-9.+-]/giu, '-') ?? 'image';
+  return `${timestamp}:data:${mimeType}:${url.length}`;
+}
+
+function isDataImageUrl(url: string): boolean {
+  return url.startsWith('data:image/');
+}
+
+function dataImageDisplayLabel(url: string): string {
+  const extension = imageExtensionFromDataImageUrl(url);
+  return extension ? `Data URL image (${extension})` : 'Data URL image';
+}
+
+function dataImageMimeType(url: string): string | null {
+  return /^data:(image\/[a-z0-9.+-]+)[;,]/iu.exec(url)?.[1]?.toLowerCase() ?? null;
+}
+
+function imageExtensionFromDataImageUrl(url: string): string | null {
+  const subtype = dataImageMimeType(url)?.replace(/^image\//u, '');
+  return imageExtensionFromImageType(subtype);
 }
