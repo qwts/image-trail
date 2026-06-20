@@ -1,6 +1,6 @@
 ## Motivation
 
-<!-- Why is this change needed? Link related issues, plans, or context. -->
+<!-- Why is this change needed? Link related issues, wiki plans, or repo context. -->
 
 ## Description
 

@@ -1,9 +1,10 @@
 # Contributing to Image Trail
 
 Image Trail is built in small, milestone-scoped slices (see `docs/milestones.md` and
-`docs/user-stories/`). This document codifies the rules that recent PRs (#15–#19) have
-repeatedly needed in review, so they're enforced _before_ a PR is opened instead of
-caught after the fact.
+`docs/user-stories/`). Long-lived project notes live in the
+[GitHub wiki](https://github.com/qwtm/image-trail/wiki). This document codifies the
+rules that recent PRs (#15–#19) have repeatedly needed in review, so they're
+enforced _before_ a PR is opened instead of caught after the fact.
 
 ## Before you open a PR
 
@@ -170,8 +171,10 @@ round-trip:
   the code: architecture contracts, acceptance tests, milestone criteria, and
   migration notes.
 - Longer-lived planning notes, retrospectives, operating procedures, and narrative
-  project documentation should live in the GitHub wiki once migrated there. Link
-  from repo docs to the wiki rather than duplicating content in both places.
+  project documentation should live in the
+  [GitHub wiki](https://github.com/qwtm/image-trail/wiki). The current migration is
+  tracked in [issue #71](https://github.com/qwtm/image-trail/issues/71). Link from
+  repo docs to the wiki rather than duplicating content in both places.
 - If your change affects a milestone's deliverables or exit criteria, update
   `docs/milestones.md` and the relevant file in `docs/user-stories/` in the same PR
   until those docs are moved to the wiki.
