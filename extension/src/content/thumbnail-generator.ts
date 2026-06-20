@@ -7,14 +7,12 @@ import {
 
 export async function createThumbnailDataUrlFromImage(image: HTMLImageElement, maxEdge = THUMBNAIL_MAX_EDGE): Promise<string | null> {
   if (!image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) return null;
-  return (
-    createThumbnailDataUrlFromDrawable(image, image.naturalWidth, image.naturalHeight, maxEdge) ??
-    createThumbnailFromExtensionFetch(image, maxEdge)
-  );
+  return createThumbnailDataUrlFromDrawable(image, image.naturalWidth, image.naturalHeight, maxEdge);
 }
 
 export async function createThumbnailDataUrlFromUrl(url: string, maxEdge = THUMBNAIL_MAX_EDGE): Promise<string | null> {
   if (!url) return null;
+  if (url.startsWith('data:image/')) return createThumbnailDataUrlFromDataUrl(url, maxEdge);
   const result = await fetchThumbnailSource(url);
   if (!result.ok) return null;
   return createThumbnailDataUrlFromDataUrl(result.dataUrl, maxEdge);
@@ -40,13 +38,6 @@ function createThumbnailDataUrlFromDrawable(
   } catch {
     return null;
   }
-}
-
-async function createThumbnailFromExtensionFetch(image: HTMLImageElement, maxEdge: number): Promise<string | null> {
-  const sourceUrl = image.currentSrc || image.src || image.getAttribute('src');
-  if (!sourceUrl || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return null;
-
-  return createThumbnailDataUrlFromUrl(sourceUrl, maxEdge);
 }
 
 export async function fetchThumbnailSource(url: string): Promise<FetchThumbnailSourceResultMessage['payload']> {
