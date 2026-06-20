@@ -40,8 +40,7 @@ export async function fetchImageBytes(
   let response: Response;
   try {
     response = await fetch(url, {
-      credentials: 'include',
-      referrer: options.referrer,
+      credentials: credentialsForImageRequest(url, options.referrer),
     });
   } catch {
     return { ok: false, reason: 'network-error', message: 'Network request failed.' };
@@ -107,4 +106,13 @@ export async function fetchImageBytes(
   }
 
   return { ok: true, bytes, mimeType: contentType, byteLength: bytes.byteLength };
+}
+
+function credentialsForImageRequest(url: string, referrer: string | undefined): RequestCredentials {
+  if (!referrer) return 'omit';
+  try {
+    return new URL(url).origin === new URL(referrer).origin ? 'include' : 'omit';
+  } catch {
+    return 'omit';
+  }
 }

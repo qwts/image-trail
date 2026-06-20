@@ -72,7 +72,7 @@ function parseBookmarkEntries(parsed: unknown): Omit<BookmarksImportResult, 'pla
   const skipped: string[] = [];
   for (const item of parsed) {
     if (isValidBookmarkEntry(item)) {
-      entries.push(item);
+      entries.push(stripExternalBlobReference(item));
     } else {
       skipped.push(typeof item === 'object' && item !== null && 'uuid' in item ? String(item.uuid) : 'unknown');
     }
@@ -95,4 +95,9 @@ function isValidBookmarkEntry(value: unknown): value is BookmarksImportEntry {
   if (typeof obj.payload !== 'object' || obj.payload === null) return false;
   const payload = obj.payload as Record<string, unknown>;
   return typeof payload.url === 'string' && typeof payload.bookmarkedAt === 'string';
+}
+
+function stripExternalBlobReference(entry: BookmarksImportEntry): BookmarksImportEntry {
+  const { storedOriginal: _storedOriginal, capturedAt: _capturedAt, ...payload } = entry.payload;
+  return { ...entry, payload };
 }

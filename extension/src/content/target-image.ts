@@ -95,19 +95,35 @@ function sourceUrlFromLink(image: HTMLImageElement): string | null {
   if (!href) return null;
   try {
     const link = new URL(href, document.baseURI);
-    for (const key of ['mediaurl', 'imgurl', 'murl', 'u', 'url']) {
-      const sourceUrl = link.searchParams.get(key)?.trim();
-      if (!sourceUrl) continue;
-      try {
-        return new URL(sourceUrl, link.href).href;
-      } catch {
-        // Keep looking if a wrapper parameter is not URL-like.
+    if (isTrustedImageSearchHost(link.hostname)) {
+      for (const key of ['mediaurl', 'imgurl', 'murl', 'u', 'url']) {
+        const sourceUrl = link.searchParams.get(key)?.trim();
+        if (!sourceUrl) continue;
+        try {
+          return new URL(sourceUrl, link.href).href;
+        } catch {
+          // Keep looking if a wrapper parameter is not URL-like.
+        }
       }
     }
     return isLikelyImageUrl(link.href) ? link.href : null;
   } catch {
     return null;
   }
+}
+
+function isTrustedImageSearchHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === 'duckduckgo.com' ||
+    normalized.endsWith('.duckduckgo.com') ||
+    normalized === 'bing.com' ||
+    normalized.endsWith('.bing.com') ||
+    normalized === 'google.com' ||
+    normalized.endsWith('.google.com') ||
+    normalized === 'yandex.com' ||
+    normalized.endsWith('.yandex.com')
+  );
 }
 
 function isLikelyThumbnailUrl(value: string | null | undefined): boolean {
@@ -132,7 +148,7 @@ function isLikelyThumbnailUrl(value: string | null | undefined): boolean {
 function isLikelyImageUrl(value: string): boolean {
   try {
     const url = new URL(value, document.baseURI);
-    return /\.(avif|gif|jpe?g|png|webp)(?:$|[?#])/iu.test(url.href) || url.hostname === 'pbs.twimg.com';
+    return /\.(avif|gif|jpe?g|png|webp)$/iu.test(url.pathname) || url.hostname === 'pbs.twimg.com';
   } catch {
     return false;
   }

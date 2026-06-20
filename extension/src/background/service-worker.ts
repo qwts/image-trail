@@ -118,8 +118,13 @@ function isStoredBlobKey(record: StoredKeyRecord | undefined): record is StoredK
 }
 
 function arrayBufferToBase64(bytes: ArrayBuffer): string {
-  let binary = '';
-  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
+  const view = new Uint8Array(bytes);
+  const chunks: string[] = [];
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < view.length; offset += chunkSize) {
+    chunks.push(String.fromCharCode(...view.subarray(offset, offset + chunkSize)));
+  }
+  const binary = chunks.join('');
   return btoa(binary);
 }
 

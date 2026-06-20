@@ -106,6 +106,17 @@ test('uses linked source URL when visible image is a Bing thumbnail', () => {
   });
 });
 
+test('ignores wrapper source parameters on untrusted hosts', () => {
+  const source = 'https://evil.example.test/fake.jpg';
+  const thumbnail = 'https://thf.bing.com/th/id/OIP.ybpkfTltBcXM_pn_a8r2zAHaE3?cb=thfc1falcon2&pid=Api';
+  const link = `https://attacker.example.test/gallery?url=${encodeURIComponent(source)}`;
+
+  assert.deepEqual(getImageUrl(fakeImage({ currentSrc: thumbnail, parentHref: link })), {
+    source: 'currentSrc',
+    url: thumbnail,
+  });
+});
+
 test('loaded target info keeps the actual img src instead of unwrapping link source URLs', () => {
   const source = 'https://cdn.example.test/images/source.jpg';
   const thumbnail = 'https://thf.bing.com/th/id/OIP.ybpkfTltBcXM_pn_a8r2zAHaE3?cb=thfc1falcon2&pid=Api';

@@ -244,6 +244,34 @@ test('bookmarks-export: encrypted export does not pass undefined AES-GCM additio
   }
 });
 
+test('bookmarks-import: strips external blob references from imported bookmark payloads', async () => {
+  const exportResult = exportPlainBookmarks({
+    entries: [
+      {
+        uuid: 'imported-captured-bookmark',
+        payload: {
+          url: 'https://example.test/captured.jpg',
+          bookmarkedAt: '2026-06-20T00:00:00.000Z',
+          capturedAt: '2026-06-20T00:00:01.000Z',
+          storedOriginal: {
+            blobId: 'external-blob-id',
+            mimeType: 'image/jpeg',
+            byteLength: 10,
+            capturedAt: '2026-06-20T00:00:01.000Z',
+          },
+        },
+      },
+    ],
+    now: '2026-06-20T00:00:00.000Z',
+  });
+  assert.ok(exportResult.status.ok, exportResult.status.message);
+
+  const result = await importBookmarks(exportResult.fileContent!, '');
+  assert.equal(result.status.ok, true);
+  assert.equal(result.entries[0]?.payload.storedOriginal, undefined);
+  assert.equal(result.entries[0]?.payload.capturedAt, undefined);
+});
+
 test('bookmarks-export: shift/plain export imports without password', async () => {
   const entries = [
     {

@@ -34,6 +34,21 @@ function asArray(list: DOMStringList): string[] {
   return Array.from({ length: list.length }, (_, index) => list.item(index)).filter((value): value is string => value !== null);
 }
 
+function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function transactionDone(transaction: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error ?? new Error('IndexedDB transaction aborted.'));
+  });
+}
+
 function storedKeyRecord(reference: `history:${string}` = 'history:key-001', uuid = 'key-001'): StoredKeyRecord<'history'> {
   return {
     kind: 'history',
@@ -127,6 +142,53 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   });
   assert.equal((metadata as { databaseVersion: number }).databaseVersion, db.version);
   assert.match((metadata as { migratedAt: string }).migratedAt, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test('IndexedDB v4 migration preserves existing blob records', async (t) => {
+  await deleteImageTrailDb();
+  const legacyDb = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(IMAGE_TRAIL_DB_NAME, 3);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      db.createObjectStore(DataStore.Metadata, { keyPath: 'key' });
+      db.createObjectStore(DataStore.Keys, { keyPath: 'reference' });
+      db.createObjectStore(DataStore.History, { keyPath: 'uuid' });
+      db.createObjectStore(DataStore.Bookmarks, { keyPath: 'uuid' });
+      const blobs = db.createObjectStore(DataStore.Blobs, { keyPath: 'id' });
+      blobs.createIndex(SchemaIndex.BlobsBySha256, 'sha256', { unique: false });
+      blobs.createIndex(SchemaIndex.BlobsByCreatedAt, 'createdAt', { unique: false });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  const write = legacyDb.transaction(DataStore.Blobs, 'readwrite');
+  const legacyBlob = {
+    id: 'legacy-blob',
+    kind: 'original',
+    schemaVersion: 1,
+    algorithm: 'AES-GCM',
+    iv: 'legacy-iv',
+    ciphertext: new ArrayBuffer(8),
+    encryptedByteLength: 8,
+    createdAt: '2026-06-19T00:00:00.000Z',
+    sha256: 'a'.repeat(64),
+    referenceCount: 1,
+  };
+  write.objectStore(DataStore.Blobs).put(legacyBlob);
+  await transactionDone(write);
+  legacyDb.close();
+
+  const db = await openImageTrailDb();
+  assert.equal(db.status.ok, true, db.status.message);
+  assert.ok(db.db);
+  t.after(() => db.db?.close());
+
+  const read = db.db.transaction(DataStore.Blobs, 'readonly');
+  const store = read.objectStore(DataStore.Blobs);
+  assert.deepEqual(asArray(store.indexNames), [SchemaIndex.BlobsByCreatedAt, SchemaIndex.BlobsByKeyReference].sort());
+  const migrated = await requestToPromise(store.get('legacy-blob'));
+  await transactionDone(read);
+  assert.deepEqual(migrated, legacyBlob);
 });
 
 test('KeysRepository writes complete transactions and reads records back', async (t) => {
