@@ -25,6 +25,18 @@ interface FocusedTextControlSnapshot {
   readonly selectionEnd: number | null;
 }
 
+interface ScrollSnapshot {
+  readonly selector: string | null;
+  readonly scrollTop: number;
+  readonly scrollLeft: number;
+}
+
+const SCROLL_SNAPSHOT_SELECTORS = [
+  '.image-trail-panel__field-list',
+  '.image-trail-panel__history-section .image-trail-panel__record-list',
+  '.image-trail-panel__bookmarks-section .image-trail-panel__record-list',
+] as const;
+
 function makeButton(label: string, action: PanelAction, dispatch: (action: PanelAction) => void, disabled = false): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
@@ -65,15 +77,40 @@ function restoreFocusedTextControl(root: HTMLElement, snapshot: FocusedTextContr
   if (!next) return;
   next.value = snapshot.value;
   queueMicrotask(() => {
-    next.focus();
+    next.focus({ preventScroll: true });
     if (snapshot.selectionStart !== null && snapshot.selectionEnd !== null) {
       next.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
     }
   });
 }
 
+function scrollSnapshots(root: HTMLElement): readonly ScrollSnapshot[] {
+  const snapshots: ScrollSnapshot[] = [{ selector: null, scrollTop: root.scrollTop, scrollLeft: root.scrollLeft }];
+  for (const selector of SCROLL_SNAPSHOT_SELECTORS) {
+    const element = root.querySelector<HTMLElement>(selector);
+    if (!element) continue;
+    snapshots.push({ selector, scrollTop: element.scrollTop, scrollLeft: element.scrollLeft });
+  }
+  return snapshots;
+}
+
+function restoreScrollSnapshots(root: HTMLElement, snapshots: readonly ScrollSnapshot[]): void {
+  const restore = (): void => {
+    for (const snapshot of snapshots) {
+      const element = snapshot.selector ? root.querySelector<HTMLElement>(snapshot.selector) : root;
+      if (!element) continue;
+      element.scrollTop = snapshot.scrollTop;
+      element.scrollLeft = snapshot.scrollLeft;
+    }
+  };
+
+  restore();
+  queueMicrotask(restore);
+}
+
 export function renderPanel(target: PanelRenderTarget, state: PanelState): void {
   const focusedTextControl = focusedTextControlSnapshot(target.root);
+  const scrollPositions = scrollSnapshots(target.root);
 
   target.root.replaceChildren();
 
@@ -287,5 +324,6 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     ),
     actions,
   );
+  restoreScrollSnapshots(target.root, scrollPositions);
   restoreFocusedTextControl(target.root, focusedTextControl);
 }

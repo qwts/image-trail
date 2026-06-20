@@ -37,7 +37,7 @@ export function createBookmarksView(
   dispatch: (action: BookmarkAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
-  section.className = 'image-trail-panel__section';
+  section.className = 'image-trail-panel__section image-trail-panel__bookmarks-section';
 
   const heading = document.createElement('h3');
   heading.textContent = 'Bookmarks';
