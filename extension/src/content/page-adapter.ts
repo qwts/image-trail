@@ -289,7 +289,7 @@ export class PageAdapter {
     this.mode = mode;
     const handleId = createTargetImageInfo(image)?.handleId;
     if (handleId) image.setAttribute('data-image-trail-handle', handleId);
-    markSelectedTarget(image);
+    markSelectedTarget(image, { lockBox: this.detectedCandidateCount === 1 });
     this.watchSelectedLoad(image);
   }
 
