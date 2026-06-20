@@ -67,30 +67,36 @@ export function createHistoryView(
 
     const actions = document.createElement('span');
     actions.className = 'image-trail-panel__item-actions';
-    actions.addEventListener('click', (event) => event.stopPropagation());
     actions.addEventListener('keydown', (event) => event.stopPropagation());
 
     if (item.captureStatus === 'captured' && item.blobId) {
       const deleteCapture = document.createElement('button');
       deleteCapture.type = 'button';
       deleteCapture.textContent = 'Delete original';
-      deleteCapture.addEventListener('click', () => dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! }));
+      deleteCapture.addEventListener('click', (event) => {
+        event.stopPropagation();
+        dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! });
+      });
       actions.append(deleteCapture);
     } else {
       const capture = document.createElement('button');
       capture.type = 'button';
       capture.textContent = 'Capture';
       capture.disabled = captureInProgress;
-      capture.addEventListener('click', () =>
-        dispatch({ name: 'capture/request', url: item.url, sourceType: 'history', sourceRecordId: item.id }),
-      );
+      capture.addEventListener('click', (event) => {
+        event.stopPropagation();
+        dispatch({ name: 'capture/request', url: item.url, sourceType: 'history', sourceRecordId: item.id });
+      });
       actions.append(capture);
     }
 
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.textContent = 'Remove';
-    remove.addEventListener('click', () => dispatch({ name: 'history/remove', id: item.id }));
+    remove.addEventListener('click', (event) => {
+      event.stopPropagation();
+      dispatch({ name: 'history/remove', id: item.id });
+    });
     actions.append(remove);
     entry.append(visual, link, actions);
     list.append(entry);
