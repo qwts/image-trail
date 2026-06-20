@@ -3,7 +3,7 @@ import type { PanelAction } from '../../core/types.js';
 type EncryptionAction = Extract<PanelAction, { readonly name: 'blob-key/setup' | 'blob-key/unlock' | 'capture/cleanup-orphans' }>;
 
 export function createEncryptionView(
-  state: { readonly unlocked: boolean; readonly keyReference: string | null; readonly hasKey: boolean },
+  state: { readonly unlocked: boolean; readonly keyReference: string | null; readonly hasKey: boolean; readonly storedOriginalCount: number },
   dispatch: (action: EncryptionAction) => void,
 ): HTMLElement {
   const section = document.createElement('details');
@@ -46,10 +46,12 @@ export function createEncryptionView(
   cleanup.addEventListener('click', () => dispatch({ name: 'capture/cleanup-orphans' }));
 
   if (state.unlocked) {
-    const actions = document.createElement('div');
-    actions.className = 'image-trail-panel__actions';
-    actions.append(cleanup);
-    body.append(actions);
+    if (state.storedOriginalCount > 0) {
+      const actions = document.createElement('div');
+      actions.className = 'image-trail-panel__actions';
+      actions.append(cleanup);
+      body.append(actions);
+    }
     section.append(summary, body);
     return section;
   }

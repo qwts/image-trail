@@ -203,7 +203,15 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
       },
     ),
     createTargetPickerView(state.target, target.dispatch),
-    createEncryptionView({ unlocked: state.blobKeyUnlocked, keyReference: state.blobKeyReference, hasKey: state.blobKeyAvailable }, target.dispatch),
+    createEncryptionView(
+      {
+        unlocked: state.blobKeyUnlocked,
+        keyReference: state.blobKeyReference,
+        hasKey: state.blobKeyAvailable,
+        storedOriginalCount: state.storageUsage?.blobCount ?? 0,
+      },
+      target.dispatch,
+    ),
     createImageTransferView(
       {
         busy: state.importExportBusy,
