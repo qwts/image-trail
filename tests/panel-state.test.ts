@@ -39,6 +39,40 @@ test('target changes clear failed field markers', () => {
   assert.equal(next.currentImageFingerprint, null);
 });
 
+test('same target load snapshots preserve learned field markers', () => {
+  const learned = {
+    ...createInitialPanelState(),
+    target: {
+      mode: 'manual' as const,
+      picking: false,
+      candidateCount: 1,
+      selectedUrl: 'https://example.test/image-1.jpg',
+      selectedHandleId: 'handle-1',
+      selectedDimensions: '100 x 100',
+      message: 'Target selected.',
+    },
+    successfulFieldIds: ['q:0:0'],
+    unchangedFieldIds: ['q:1:0'],
+    unlockedFieldIds: ['q:0:0'],
+    currentImageFingerprint: 'a'.repeat(64),
+  };
+
+  const next = setTargetState(learned, {
+    mode: 'manual',
+    picking: false,
+    candidateCount: 1,
+    selectedUrl: 'https://example.test/image-2.jpg',
+    selectedHandleId: 'handle-1',
+    selectedDimensions: '100 x 100',
+    message: 'Target loaded.',
+  });
+
+  assert.deepEqual(next.successfulFieldIds, ['q:0:0']);
+  assert.deepEqual(next.unchangedFieldIds, ['q:1:0']);
+  assert.deepEqual(next.unlockedFieldIds, ['q:0:0']);
+  assert.equal(next.currentImageFingerprint, 'a'.repeat(64));
+});
+
 test('unlock toggle only changes successful fields', () => {
   const state = { ...createInitialPanelState(), successfulFieldIds: ['q:0:0'] };
 
