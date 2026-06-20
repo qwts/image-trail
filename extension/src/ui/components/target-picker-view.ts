@@ -26,23 +26,24 @@ export function createTargetPickerView(target: TargetState, dispatch: (action: P
 
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__actions';
-  const pickButton = document.createElement('button');
-  pickButton.type = 'button';
-  pickButton.textContent = target.picking ? 'Cancel host pick' : 'Set host image';
-  pickButton.addEventListener('click', () => dispatch({ name: target.picking ? 'stop-target-picker' : 'start-target-picker' }));
-  actions.append(pickButton);
-  if (target.selectedUrl) {
-    const releaseButton = document.createElement('button');
-    releaseButton.type = 'button';
-    releaseButton.textContent = 'Release host image';
-    releaseButton.addEventListener('click', () => dispatch({ name: 'target/release' }));
-    actions.append(releaseButton);
-    if (target.selectedDimensions) {
-      const dimensions = document.createElement('span');
-      dimensions.className = 'image-trail-panel__target-badge is-selected';
-      dimensions.textContent = target.selectedDimensions;
-      actions.append(dimensions);
-    }
+  const targetButton = document.createElement('button');
+  targetButton.type = 'button';
+  if (target.picking) {
+    targetButton.textContent = 'Cancel host pick';
+    targetButton.addEventListener('click', () => dispatch({ name: 'stop-target-picker' }));
+  } else if (target.selectedUrl) {
+    targetButton.textContent = 'Release host image';
+    targetButton.addEventListener('click', () => dispatch({ name: 'target/release' }));
+  } else {
+    targetButton.textContent = 'Set host image';
+    targetButton.addEventListener('click', () => dispatch({ name: 'start-target-picker' }));
+  }
+  actions.append(targetButton);
+  if (target.selectedUrl && target.selectedDimensions) {
+    const dimensions = document.createElement('span');
+    dimensions.className = 'image-trail-panel__target-badge is-selected';
+    dimensions.textContent = target.selectedDimensions;
+    actions.append(dimensions);
   }
 
   const body = document.createElement('div');
