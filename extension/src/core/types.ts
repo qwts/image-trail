@@ -177,7 +177,7 @@ export type PanelAction =
   | { readonly name: 'import-export/complete'; readonly message: string }
   | { readonly name: 'import-export/error'; readonly message: string }
   | { readonly name: 'export/history' | 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
-  | { readonly name: 'export/image'; readonly url: string }
+  | { readonly name: 'export/image' }
   | { readonly name: 'import/history' | 'import/bookmarks'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
   | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }

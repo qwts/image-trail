@@ -3,7 +3,7 @@ import type { ImportedImageFile } from '../../core/types.js';
 export type ImportExportAction =
   | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
-  | { readonly name: 'export/image'; readonly url: string }
+  | { readonly name: 'export/image' }
   | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
@@ -147,9 +147,9 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const exportBtn = document.createElement('button');
   exportBtn.type = 'button';
   exportBtn.textContent = 'Export image';
-  exportBtn.disabled = state.busy || !state.currentImageUrl || state.currentImageUrl.startsWith('data:');
+  exportBtn.disabled = state.busy || !state.currentImageUrl;
   exportBtn.addEventListener('click', () => {
-    if (state.currentImageUrl) dispatch({ name: 'export/image', url: state.currentImageUrl });
+    dispatch({ name: 'export/image' });
   });
 
   const actions = document.createElement('div');

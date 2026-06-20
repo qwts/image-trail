@@ -322,7 +322,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'export/image') {
-      this.exportImage(action.url);
+      this.exportImage();
       return;
     }
 
@@ -921,10 +921,23 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private exportImage(url: string): void {
-    downloadUrl(url, filenameFromUrl(url));
+  private exportImage(): void {
+    const url = this.selectedImageExportUrl();
+    if (!url) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: 'Select an image before exporting.' });
+      this.render();
+      return;
+    }
+    downloadUrl(url, filenameForExportedImage(url));
     this.state = reducePanelAction(this.state, { name: 'import-export/complete', message: 'Image export started.' });
     this.render();
+  }
+
+  private selectedImageExportUrl(): string | null {
+    const selectedUrl = this.state.target.selectedUrl;
+    if (selectedUrl && selectedUrl !== 'data:') return selectedUrl;
+    const image = this.state.target.selectedHandleId ? this.findSelectedImage(this.state.target.selectedHandleId) : null;
+    return image?.currentSrc || image?.src || null;
   }
 
   private async importImages(files: readonly ImportedImageFile[]): Promise<void> {
@@ -1121,6 +1134,13 @@ function downloadTextFile(fileContent: string, fileName: string): void {
   const url = URL.createObjectURL(new Blob([fileContent], { type: 'application/json' }));
   downloadUrl(url, fileName);
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function filenameForExportedImage(url: string): string {
+  if (!url.startsWith('data:image/')) return filenameFromUrl(url);
+  const extension = /^data:image\/([a-z0-9.+-]+);/iu.exec(url)?.[1]?.toLowerCase();
+  const normalized = extension === 'jpeg' ? 'jpg' : extension;
+  return `image-trail-image.${normalized && /^[a-z0-9]+$/u.test(normalized) ? normalized : 'png'}`;
 }
 
 function downloadUrl(url: string, fileName: string): void {
