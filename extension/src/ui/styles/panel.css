@@ -482,8 +482,12 @@
   max-width: 100%;
   max-inline-size: 100%;
   min-height: calc(1.4em * 4 + 10px);
+  overflow-x: hidden;
   overflow-y: auto;
+  overflow-wrap: anywhere;
   resize: vertical;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .image-trail-panel-root .image-trail-panel__full-url-input:focus {
@@ -497,6 +501,8 @@
 }
 
 .image-trail-panel-root .image-trail-panel__field-input {
+  inline-size: 100%;
+  max-inline-size: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

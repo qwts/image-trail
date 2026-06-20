@@ -31,6 +31,7 @@ export class PageAdapter {
   private readonly loadListeners = new Set<TargetLoadListener>();
   private readonly bookmarkRequestListeners = new Set<TargetBookmarkRequestListener>();
   private pendingLoadTarget: HTMLImageElement | null = null;
+  private pendingLoadRestoreUrl: string | null = null;
   private selectedOriginalUrl: string | null = null;
   private selectedActiveUrl: string | null = null;
   private bookmarkShortcutActive = false;
@@ -114,9 +115,10 @@ export class PageAdapter {
       return this.emit('Select a target image before loading a bookmark.');
     }
 
+    const previousUrl = this.selectedActiveUrl ?? createTargetImageInfo(this.selected)?.url ?? null;
     const result = applyImageUrl(this.selected, url);
     this.selectedActiveUrl = result.url;
-    this.watchSelectedLoad(this.selected);
+    this.watchSelectedLoad(this.selected, previousUrl);
     return this.emit(result.message);
   }
 
@@ -239,7 +241,7 @@ export class PageAdapter {
     this.selectedActiveUrl = null;
   }
 
-  private watchSelectedLoad(image: HTMLImageElement): void {
+  private watchSelectedLoad(image: HTMLImageElement, restoreUrl: string | null = null): void {
     this.clearPendingLoadTarget();
     if (isSuccessfulImageLoad(image)) {
       void this.emitSuccessfulLoad(image);
@@ -247,6 +249,7 @@ export class PageAdapter {
     }
 
     this.pendingLoadTarget = image;
+    this.pendingLoadRestoreUrl = restoreUrl;
     image.addEventListener('load', this.onSelectedLoad, { once: true });
     image.addEventListener('error', this.onSelectedError, { once: true });
   }
@@ -256,6 +259,7 @@ export class PageAdapter {
     this.pendingLoadTarget.removeEventListener('load', this.onSelectedLoad);
     this.pendingLoadTarget.removeEventListener('error', this.onSelectedError);
     this.pendingLoadTarget = null;
+    this.pendingLoadRestoreUrl = null;
   }
 
   private onSelectedLoad = (event: Event): void => {
@@ -267,7 +271,15 @@ export class PageAdapter {
   };
 
   private onSelectedError = (event: Event): void => {
-    if (event.currentTarget === this.pendingLoadTarget) this.clearPendingLoadTarget();
+    const image = event.currentTarget;
+    if (!(image instanceof HTMLImageElement) || image !== this.pendingLoadTarget) return;
+    const restoreUrl = this.pendingLoadRestoreUrl;
+    this.clearPendingLoadTarget();
+    if (image === this.selected && restoreUrl) {
+      applyImageUrl(image, restoreUrl);
+      this.selectedActiveUrl = restoreUrl;
+      this.emit(`Failed to load image; restored ${restoreUrl}.`);
+    }
   };
 
   private async emitSuccessfulLoad(image: HTMLImageElement): Promise<void> {
