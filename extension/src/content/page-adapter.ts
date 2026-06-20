@@ -249,7 +249,7 @@ export class PageAdapter {
       this.emit(`Could not bookmark image: ${getImageRejectionReason(image) ?? 'Image is not usable.'}`);
       return true;
     }
-    const info = createLoadedTargetImageInfo(image) ?? createTargetImageInfo(image);
+    const info = this.createBookmarkShortcutInfo(image);
     if (!info) {
       this.emit('Could not bookmark image: Image source could not be resolved.');
       return true;
@@ -257,6 +257,20 @@ export class PageAdapter {
 
     void this.emitBookmarkRequest(image, info);
     return true;
+  }
+
+  private createBookmarkShortcutInfo(image: HTMLImageElement): TargetImageInfo | null {
+    const baseInfo = createTargetImageInfo(image) ?? createLoadedTargetImageInfo(image);
+    if (image !== this.selected || !this.selectedActiveUrl) return createLoadedTargetImageInfo(image) ?? baseInfo;
+
+    const rect = image.getBoundingClientRect();
+    return {
+      handleId: baseInfo?.handleId ?? image.getAttribute('data-image-trail-handle') ?? 'image-trail-selected-target',
+      url: this.selectedActiveUrl,
+      width: Math.round(image.naturalWidth || rect.width),
+      height: Math.round(image.naturalHeight || rect.height),
+      source: baseInfo?.source ?? 'srcProperty',
+    };
   }
 
   private async emitBookmarkRequest(image: HTMLImageElement, info: TargetImageInfo): Promise<void> {
