@@ -4,6 +4,7 @@ import {
   isFetchThumbnailSourceResultMessage,
   type FetchThumbnailSourceResultMessage,
 } from '../background/messages.js';
+import { sendRuntimeMessage } from './runtime-message.js';
 
 export async function createThumbnailDataUrlFromImage(image: HTMLImageElement, maxEdge = THUMBNAIL_MAX_EDGE): Promise<string | null> {
   if (!image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) return null;
@@ -42,7 +43,7 @@ function createThumbnailDataUrlFromDrawable(
 
 export async function fetchThumbnailSource(url: string): Promise<FetchThumbnailSourceResultMessage['payload']> {
   try {
-    const response = await chrome.runtime.sendMessage(createFetchThumbnailSourceMessage(url, document.location.href));
+    const response = await sendRuntimeMessage(createFetchThumbnailSourceMessage(url, document.location.href));
     if (isFetchThumbnailSourceResultMessage(response)) return response.payload;
   } catch {
     // Fall through to a null thumbnail.

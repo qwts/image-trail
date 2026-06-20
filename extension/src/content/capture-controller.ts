@@ -25,6 +25,7 @@ import type {
   CreateBlobPreviewResultMessage,
   RetrieveBlobResultMessage,
 } from '../background/messages.js';
+import { sendRuntimeMessage } from './runtime-message.js';
 
 export interface CaptureStore {
   readonly requestCapture: (url: string, sourceType: CaptureSourceType, sourceRecordId?: string) => Promise<CaptureResult>;
@@ -42,7 +43,7 @@ export interface CaptureStore {
 
 export class CaptureController implements CaptureStore {
   async requestCapture(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<CaptureResult> {
-    const response = await chrome.runtime.sendMessage(createCaptureImageMessage(url, sourceType, sourceRecordId));
+    const response = await sendRuntimeMessage(createCaptureImageMessage(url, sourceType, sourceRecordId));
     if (isCaptureResultMessage(response)) {
       return response.payload;
     }
@@ -50,7 +51,7 @@ export class CaptureController implements CaptureStore {
   }
 
   async requestPermissionAndRetry(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<CaptureResult> {
-    const response = await chrome.runtime.sendMessage(createGrantPermissionAndCaptureMessage(url, sourceType, sourceRecordId));
+    const response = await sendRuntimeMessage(createGrantPermissionAndCaptureMessage(url, sourceType, sourceRecordId));
     if (isCaptureResultMessage(response)) {
       return response.payload;
     }
@@ -58,7 +59,7 @@ export class CaptureController implements CaptureStore {
   }
 
   async requestDeleteBlob(blobId: string): Promise<{ deleted: boolean; usage: StorageUsageSummary }> {
-    const response = await chrome.runtime.sendMessage(createDeleteBlobMessage(blobId));
+    const response = await sendRuntimeMessage(createDeleteBlobMessage(blobId));
     if (response && typeof response === 'object' && 'payload' in response) {
       return (response as { payload: { deleted: boolean; usage: StorageUsageSummary } }).payload;
     }
@@ -66,31 +67,31 @@ export class CaptureController implements CaptureStore {
   }
 
   async requestCleanupOrphanedBlobs(): Promise<{ deletedCount: number; usage: StorageUsageSummary }> {
-    const response = await chrome.runtime.sendMessage(createCleanupOrphanedBlobsMessage());
+    const response = await sendRuntimeMessage(createCleanupOrphanedBlobsMessage());
     if (isCleanupOrphanedBlobsResultMessage(response)) return response.payload;
     return { deletedCount: 0, usage: { totalBytes: 0, blobCount: 0 } };
   }
 
   async requestRetrieveBlob(blobId: string): Promise<RetrieveBlobResultMessage['payload']> {
-    const response = await chrome.runtime.sendMessage(createRetrieveBlobMessage(blobId));
+    const response = await sendRuntimeMessage(createRetrieveBlobMessage(blobId));
     if (isRetrieveBlobResultMessage(response)) return response.payload;
     return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
   }
 
   async requestBlobPreview(blobId: string): Promise<CreateBlobPreviewResultMessage['payload']> {
-    const response = await chrome.runtime.sendMessage(createCreateBlobPreviewMessage(blobId));
+    const response = await sendRuntimeMessage(createCreateBlobPreviewMessage(blobId));
     if (isCreateBlobPreviewResultMessage(response)) return response.payload;
     return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
   }
 
   async requestDataUrlPreview(dataUrl: string): Promise<CreateBlobPreviewResultMessage['payload']> {
-    const response = await chrome.runtime.sendMessage(createCreateDataUrlPreviewMessage(dataUrl));
+    const response = await sendRuntimeMessage(createCreateDataUrlPreviewMessage(dataUrl));
     if (isCreateBlobPreviewResultMessage(response)) return response.payload;
     return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
   }
 
   async requestStorageUsage(): Promise<StorageUsageSummary> {
-    const response = await chrome.runtime.sendMessage(createStorageUsageRequestMessage());
+    const response = await sendRuntimeMessage(createStorageUsageRequestMessage());
     if (response && typeof response === 'object' && 'payload' in response) {
       return (response as { payload: StorageUsageSummary }).payload;
     }
@@ -98,19 +99,19 @@ export class CaptureController implements CaptureStore {
   }
 
   async requestBlobKeyStatus(): Promise<BlobKeyStatusResultMessage['payload']> {
-    const response = await chrome.runtime.sendMessage(createBlobKeyStatusMessage());
+    const response = await sendRuntimeMessage(createBlobKeyStatusMessage());
     if (isBlobKeyStatusResultMessage(response)) return response.payload;
     return { unlocked: false, keyReference: null, hasKey: false };
   }
 
   async setupBlobKey(password: string): Promise<BlobKeyResultMessage['payload']> {
-    const response = await chrome.runtime.sendMessage(createSetupBlobKeyMessage(password));
+    const response = await sendRuntimeMessage(createSetupBlobKeyMessage(password));
     if (isBlobKeyResultMessage(response)) return response.payload;
     return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
   }
 
   async unlockBlobKey(password: string, keyReference?: string): Promise<BlobKeyResultMessage['payload']> {
-    const response = await chrome.runtime.sendMessage(createUnlockBlobKeyMessage(password, keyReference));
+    const response = await sendRuntimeMessage(createUnlockBlobKeyMessage(password, keyReference));
     if (isBlobKeyResultMessage(response)) return response.payload;
     return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
   }

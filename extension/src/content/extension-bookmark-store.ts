@@ -9,6 +9,7 @@ import {
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import type { BookmarkStore } from '../core/types.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../data/local-settings.js';
+import { sendRuntimeMessage } from './runtime-message.js';
 
 export class ExtensionBookmarkStore implements BookmarkStore {
   async load(): Promise<readonly ImageDisplayRecord[]> {
@@ -28,19 +29,20 @@ export class ExtensionBookmarkStore implements BookmarkStore {
     readonly hasOlder: boolean;
     readonly hasNewer: boolean;
   }> {
-    const response = await chrome.runtime.sendMessage(createLoadBookmarksMessage(input));
+    const response = await sendRuntimeMessage(createLoadBookmarksMessage(input));
     if (isLoadBookmarksResultMessage(response)) return response.payload;
     return { items: [], offset: input.offset, limit: input.limit, total: 0, hasOlder: false, hasNewer: false };
   }
 
   async save(record: ImageDisplayRecord): Promise<ImageDisplayRecord> {
-    const response = await chrome.runtime.sendMessage(createSaveBookmarkMessage(record));
+    const response = await sendRuntimeMessage(createSaveBookmarkMessage(record));
     if (isSaveBookmarkResultMessage(response) && response.payload.ok) return response.payload.record;
     return record;
   }
 
   async remove(record: ImageDisplayRecord): Promise<void> {
-    const response = await chrome.runtime.sendMessage(createRemoveBookmarkMessage(record));
+    const response = await sendRuntimeMessage(createRemoveBookmarkMessage(record));
+    if (response === null) return;
     if (!isRemoveBookmarkResultMessage(response)) {
       throw new Error('Invalid bookmark removal response from background.');
     }
