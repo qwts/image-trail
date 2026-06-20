@@ -27,6 +27,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     message: 'Image Trail is ready.',
     lastUpdatedAt: now,
     target: EMPTY_TARGET_STATE,
+    draftUrl: null,
     history: [],
     bookmarks: [],
     bookmarkOffset: 0,
@@ -69,6 +70,7 @@ export function setTargetState(state: PanelState, target: TargetState, now = Dat
     status: target.picking ? 'picking' : 'ready',
     message: target.message,
     target,
+    draftUrl: null,
     lastUpdatedAt: now,
   };
 }

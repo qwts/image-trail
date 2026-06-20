@@ -94,8 +94,9 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
   };
 
   const selectedUrl = state.target.selectedUrl;
-  const selectedIsDataUrl = selectedUrl?.startsWith('data:') === true;
-  const activeUrl = selectedIsDataUrl ? window.location.href : (selectedUrl ?? window.location.href);
+  const editableUrl = state.draftUrl ?? selectedUrl;
+  const selectedIsDataUrl = editableUrl?.startsWith('data:') === true;
+  const activeUrl = selectedIsDataUrl ? window.location.href : (editableUrl ?? window.location.href);
 
   const parseActiveUrl = (): ParsedUrlModel | null => {
     try {

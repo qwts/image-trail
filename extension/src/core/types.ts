@@ -35,6 +35,7 @@ export interface PanelState {
   readonly message: string;
   readonly lastUpdatedAt: number;
   readonly target: TargetState;
+  readonly draftUrl: string | null;
   readonly history: readonly ImageDisplayRecord[];
   readonly bookmarks: readonly ImageDisplayRecord[];
   readonly bookmarkOffset: number;

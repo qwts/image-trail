@@ -483,7 +483,7 @@ export class ImageTrailPanel {
   private async updateFieldValue(fieldId: string, nextValue: string): Promise<void> {
     const snapshot = this.pageAdapter.getSnapshot();
 
-    const model = parseUrl(snapshot.selected?.url ?? window.location.href);
+    const model = parseUrl(this.state.draftUrl ?? snapshot.selected?.url ?? window.location.href);
     const fields = collectUrlFields(model);
     const field = fields.find((item) => item.id === fieldId);
     if (!field) return;
@@ -496,7 +496,7 @@ export class ImageTrailPanel {
   private async bumpFieldValue(fieldId: string, delta: 1 | -1): Promise<void> {
     const snapshot = this.pageAdapter.getSnapshot();
 
-    const model = parseUrl(snapshot.selected?.url ?? window.location.href);
+    const model = parseUrl(this.state.draftUrl ?? snapshot.selected?.url ?? window.location.href);
     const fields = collectUrlFields(model);
     const field = fields.find((item) => item.id === fieldId);
     if (!field) return;
@@ -510,7 +510,7 @@ export class ImageTrailPanel {
   private async applySelectedUrl(nextUrl: string): Promise<boolean> {
     const preload = await this.preloadImageUrl(nextUrl);
     if (!preload.ok) {
-      this.state = { ...this.state, message: preload.message, status: 'error', lastUpdatedAt: Date.now() };
+      this.state = { ...this.state, draftUrl: nextUrl, message: preload.message, status: 'error', lastUpdatedAt: Date.now() };
       this.render();
       return false;
     }
