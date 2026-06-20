@@ -61,6 +61,7 @@ export interface PanelState {
   readonly successfulFieldIds: readonly string[];
   readonly unchangedFieldIds: readonly string[];
   readonly unlockedFieldIds: readonly string[];
+  readonly manuallyExcludedFieldIds: readonly string[];
   readonly fieldSplitSpecs: readonly UrlFieldSplitSpec[];
   readonly currentImageFingerprint: string | null;
 }

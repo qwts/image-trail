@@ -39,6 +39,14 @@ function toggleItem(items: readonly string[], item: string): readonly string[] {
   return items.includes(item) ? items.filter((value) => value !== item) : [...items, item];
 }
 
+function addItem(items: readonly string[], item: string): readonly string[] {
+  return items.includes(item) ? items : [...items, item];
+}
+
+function removeItem(items: readonly string[], item: string): readonly string[] {
+  return items.filter((value) => value !== item);
+}
+
 function removeItems(items: readonly string[], removals: readonly string[]): readonly string[] {
   if (removals.length === 0) return items;
   const removalSet = new Set(removals);
@@ -62,6 +70,7 @@ function clearFieldMarkers(state: PanelState, fieldIds: readonly string[]): Pane
     successfulFieldIds: removeItems(state.successfulFieldIds, fieldIds),
     unchangedFieldIds: removeItems(state.unchangedFieldIds, fieldIds),
     unlockedFieldIds: removeItems(state.unlockedFieldIds, fieldIds),
+    manuallyExcludedFieldIds: removeItems(state.manuallyExcludedFieldIds, fieldIds),
     activeFieldId: state.activeFieldId && fieldIds.includes(state.activeFieldId) ? null : state.activeFieldId,
   };
 }
@@ -128,11 +137,15 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         lastUpdatedAt: Date.now(),
       };
     case 'field-unlock/toggle':
+      if (!state.successfulFieldIds.includes(action.id)) {
+        return { ...state, lastUpdatedAt: Date.now() };
+      }
       return {
         ...state,
-        unlockedFieldIds: state.successfulFieldIds.includes(action.id)
-          ? toggleItem(state.unlockedFieldIds, action.id)
-          : state.unlockedFieldIds,
+        unlockedFieldIds: toggleItem(state.unlockedFieldIds, action.id),
+        manuallyExcludedFieldIds: state.unlockedFieldIds.includes(action.id)
+          ? addItem(state.manuallyExcludedFieldIds, action.id)
+          : removeItem(state.manuallyExcludedFieldIds, action.id),
         lastUpdatedAt: Date.now(),
       };
     case 'field-split/apply':

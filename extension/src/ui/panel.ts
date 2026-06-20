@@ -637,7 +637,9 @@ export class ImageTrailPanel {
   ): PanelState {
     const changed = Boolean(nextFingerprint && previousFingerprint && nextFingerprint !== previousFingerprint);
     const unchanged = Boolean(nextFingerprint && previousFingerprint && nextFingerprint === previousFingerprint);
-    const autoUnlocked = changed ? attemptedFieldIds.filter((fieldId) => this.isAutoUnlockableField(fieldId)) : [];
+    const autoUnlocked = changed
+      ? attemptedFieldIds.filter((fieldId) => this.isAutoUnlockableField(fieldId) && !state.manuallyExcludedFieldIds.includes(fieldId))
+      : [];
 
     return {
       ...state,

@@ -20,6 +20,7 @@ test('target changes clear failed field markers', () => {
     successfulFieldIds: ['query-src-0'],
     unchangedFieldIds: ['query-page-0'],
     unlockedFieldIds: ['query-src-0'],
+    manuallyExcludedFieldIds: ['query-src-0'],
     fieldSplitSpecs: [
       {
         baseFieldId: 'q:0:0',
@@ -47,6 +48,7 @@ test('target changes clear failed field markers', () => {
   assert.deepEqual(next.successfulFieldIds, []);
   assert.deepEqual(next.unchangedFieldIds, []);
   assert.deepEqual(next.unlockedFieldIds, []);
+  assert.deepEqual(next.manuallyExcludedFieldIds, []);
   assert.deepEqual(next.fieldSplitSpecs, []);
   assert.equal(next.currentImageFingerprint, null);
 });
@@ -90,12 +92,19 @@ test('Previous/Next inclusion toggle only changes successful fields', () => {
 
   const included = reducePanelAction(state, { name: 'field-unlock/toggle', id: 'q:0:0' });
   assert.deepEqual(included.unlockedFieldIds, ['q:0:0']);
+  assert.deepEqual(included.manuallyExcludedFieldIds, []);
 
   const excluded = reducePanelAction(included, { name: 'field-unlock/toggle', id: 'q:0:0' });
   assert.deepEqual(excluded.unlockedFieldIds, []);
+  assert.deepEqual(excluded.manuallyExcludedFieldIds, ['q:0:0']);
+
+  const includedAgain = reducePanelAction(excluded, { name: 'field-unlock/toggle', id: 'q:0:0' });
+  assert.deepEqual(includedAgain.unlockedFieldIds, ['q:0:0']);
+  assert.deepEqual(includedAgain.manuallyExcludedFieldIds, []);
 
   const ignored = reducePanelAction(state, { name: 'field-unlock/toggle', id: 'q:1:0' });
   assert.deepEqual(ignored.unlockedFieldIds, []);
+  assert.deepEqual(ignored.manuallyExcludedFieldIds, []);
 });
 
 test('clearing split specs collapses fields and clears related markers', () => {
@@ -114,6 +123,7 @@ test('clearing split specs collapses fields and clears related markers', () => {
     successfulFieldIds: ['q:0:0', 'q:0:2', 'q:1:0'],
     unchangedFieldIds: ['q:0:1'],
     unlockedFieldIds: ['q:0:0', 'q:0:2'],
+    manuallyExcludedFieldIds: ['q:0:1'],
     fieldSplitSpecs: [splitSpec],
   };
 
@@ -124,5 +134,6 @@ test('clearing split specs collapses fields and clears related markers', () => {
   assert.deepEqual(next.successfulFieldIds, ['q:1:0']);
   assert.deepEqual(next.unchangedFieldIds, []);
   assert.deepEqual(next.unlockedFieldIds, []);
+  assert.deepEqual(next.manuallyExcludedFieldIds, []);
   assert.deepEqual(next.fieldSplitSpecs, []);
 });

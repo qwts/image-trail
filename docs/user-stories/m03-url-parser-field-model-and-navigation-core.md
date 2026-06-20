@@ -80,6 +80,9 @@ This milestone extracts and ports URL parsing, URL rebuilding, token field movem
   include the field in Previous/Next navigation.
 - Query-field edits that load a different image turn green; successful numeric
   or hex query fields are automatically included in Previous/Next navigation.
+- If a user manually excludes an automatically included field, later successful
+  loads for that field do not automatically include it again during the current
+  target session. Manual Include can opt it back in.
 - Global Previous/Next changes all included numeric/hex query fields together
   and falls back to the default numeric/hex field when nothing is included.
 - Hex fields show their decimal value nearby so users can reason about both
@@ -111,8 +114,9 @@ This milestone extracts and ports URL parsing, URL rebuilding, token field movem
   Changing the host target clears failed/successful/unchanged/included field
   state.
 - Keep split patterns session-only and target-scoped. Persisted pattern
-  libraries, partial collapse, grouping syntax, and calendar-aware date stepping
-  remain out of scope until there is a separate design.
+  libraries, domain/path-structure matching, partial collapse, grouping syntax,
+  and calendar-aware date stepping remain out of scope until there is a separate
+  design.
 - Create regression fixtures before broad UI wiring.
 
 ## Test Notes
@@ -122,8 +126,8 @@ This milestone extracts and ports URL parsing, URL rebuilding, token field movem
 - Manual apply to picture/srcset page and confirm responsive attributes are cleared only for target.
 - Manual 404 load confirms no history commit.
 - Test query field feedback for failed load, different-image success, same-image
-  unchanged, automatic/manual Previous/Next inclusion, and global Previous/Next
-  over all included fields.
+  unchanged, one-time automatic Previous/Next inclusion, manual exclude/include,
+  and global Previous/Next over all included fields.
 - Test split patterns for parse/rebuild round-trip, split part bumping,
   reparse persistence, invalid pattern handling, target-change reset, and clear
   split collapse.
