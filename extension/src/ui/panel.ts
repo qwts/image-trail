@@ -94,6 +94,7 @@ export class ImageTrailPanel {
   private readonly localSettings = this.settingsRepository.load();
   private readonly bookmarkLimit = this.localSettings.visibleBookmarkSoftMax;
   private previewScrollAnchorId: string | null = null;
+  private preserveRootScroll = true;
   private projectionRevision = 0;
   private bookmarkMutationQueue: Promise<void> = Promise.resolve();
 
@@ -972,6 +973,7 @@ export class ImageTrailPanel {
   private async previewRecord(url: string, blobId?: string, scrollAnchorId?: string): Promise<void> {
     this.projectionRevision++;
     this.previewScrollAnchorId = scrollAnchorId ?? null;
+    this.preserveRootScroll = false;
     try {
       if (!blobId) {
         await this.previewUrl(url);
@@ -1008,6 +1010,7 @@ export class ImageTrailPanel {
       this.render();
     } finally {
       this.previewScrollAnchorId = null;
+      this.preserveRootScroll = true;
     }
   }
 
@@ -1296,7 +1299,15 @@ export class ImageTrailPanel {
 
   private render(): void {
     if (this.root) {
-      renderPanel({ root: this.root, dispatch: this.dispatch, scrollAnchorId: this.previewScrollAnchorId }, this.state);
+      renderPanel(
+        {
+          root: this.root,
+          dispatch: this.dispatch,
+          preserveRootScroll: this.preserveRootScroll,
+          scrollAnchorId: this.previewScrollAnchorId,
+        },
+        this.state,
+      );
     }
   }
 }
