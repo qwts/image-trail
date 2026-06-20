@@ -121,6 +121,9 @@ export function createFieldsView(
       trail.textContent = isIncludedInTrail ? 'Exclude' : 'Include';
       trail.title = isIncludedInTrail ? `Exclude ${field.field.label} from Previous/Next` : `Include ${field.field.label} in Previous/Next`;
       trail.setAttribute('aria-label', trail.title);
+      trail.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+      });
       trail.addEventListener('click', () => callbacks.onToggleUnlock(field.field.id));
       controls.append(trail);
     }
