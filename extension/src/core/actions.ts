@@ -165,6 +165,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         selectedBookmarkIds: [],
         lastUpdatedAt: Date.now(),
       };
+    case 'history-selection/clear':
+      return { ...state, selectedHistoryIds: [], lastUpdatedAt: Date.now() };
     case 'active-field/set':
       return {
         ...state,
@@ -229,6 +231,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         selectedHistoryIds: [],
         lastUpdatedAt: Date.now(),
       };
+    case 'bookmark-selection/clear':
+      return { ...state, selectedBookmarkIds: [], lastUpdatedAt: Date.now() };
     case 'bookmarks/page-loaded':
       return {
         ...state,

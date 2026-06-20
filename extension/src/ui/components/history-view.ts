@@ -3,6 +3,7 @@ import { encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/di
 type HistoryAction =
   | { readonly name: 'history/remove'; readonly id: string }
   | { readonly name: 'history-selection/toggle'; readonly id: string }
+  | { readonly name: 'history-selection/clear' }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'history'; readonly sourceRecordId: string }
   | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string }
   | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string };
@@ -49,11 +50,13 @@ export function createHistoryView(
       entry.title = 'Preview this image in the selected host image. Cmd/Ctrl-click to select for export.';
       entry.addEventListener('click', (event) => {
         if (isMultiSelectClick(event)) return;
+        if (selectedIds.length > 0) dispatch({ name: 'history-selection/clear' });
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
       });
       entry.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
+        if (selectedIds.length > 0) dispatch({ name: 'history-selection/clear' });
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
       });
     }

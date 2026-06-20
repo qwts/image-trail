@@ -10,6 +10,7 @@ type BookmarkAction =
   | { readonly name: 'bookmark/load'; readonly id: string }
   | { readonly name: 'bookmark/remove'; readonly id: string }
   | { readonly name: 'bookmark-selection/toggle'; readonly id: string }
+  | { readonly name: 'bookmark-selection/clear' }
   | { readonly name: 'bookmarks/older' }
   | { readonly name: 'bookmarks/newer' }
   | { readonly name: 'bookmarks/toggle-scope' }
@@ -113,11 +114,13 @@ export function createBookmarksView(
       entry.title = 'Preview this image in the selected host image. Cmd/Ctrl-click to select for export.';
       entry.addEventListener('click', (event) => {
         if (isMultiSelectClick(event)) return;
+        if (selectedIds.length > 0) dispatch({ name: 'bookmark-selection/clear' });
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
       });
       entry.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
+        if (selectedIds.length > 0) dispatch({ name: 'bookmark-selection/clear' });
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
       });
     }

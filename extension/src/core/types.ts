@@ -81,6 +81,7 @@ export type PanelActionName =
   | 'history/download'
   | 'history/select'
   | 'history-selection/toggle'
+  | 'history-selection/clear'
   | 'active-field/set'
   | 'field-unlock/toggle'
   | 'field-split/apply'
@@ -92,6 +93,7 @@ export type PanelActionName =
   | 'bookmark/load'
   | 'bookmark/remove'
   | 'bookmark-selection/toggle'
+  | 'bookmark-selection/clear'
   | 'bookmarks/page-loaded'
   | 'bookmarks/older'
   | 'bookmarks/newer'
@@ -138,6 +140,7 @@ export type PanelAction =
         | 'history/remove'
         | 'history/select'
         | 'history-selection/toggle'
+        | 'history-selection/clear'
         | 'field-value-change'
         | 'field-value-bump'
         | 'selected-url/apply'
@@ -148,6 +151,7 @@ export type PanelAction =
         | 'bookmark/load'
         | 'bookmark/remove'
         | 'bookmark-selection/toggle'
+        | 'bookmark-selection/clear'
         | 'bookmarks/page-loaded'
         | 'capture/request'
         | 'capture/start'
@@ -180,6 +184,7 @@ export type PanelAction =
     }
   | { readonly name: 'history/remove' | 'bookmark/load' | 'bookmark/remove' | 'history/select'; readonly id: string }
   | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle'; readonly id: string }
+  | { readonly name: 'history-selection/clear' | 'bookmark-selection/clear' }
   | {
       readonly name: 'bookmarks/page-loaded';
       readonly bookmarks: readonly ImageDisplayRecord[];

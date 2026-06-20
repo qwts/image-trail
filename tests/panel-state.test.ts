@@ -152,6 +152,18 @@ test('record selection toggles one list at a time', () => {
   );
   assert.deepEqual(bookmarkSelected.selectedBookmarkIds, ['bookmark-2']);
   assert.deepEqual(bookmarkSelected.selectedHistoryIds, []);
+
+  const historyCleared = reducePanelAction(
+    { ...createInitialPanelState(), selectedHistoryIds: ['history-1', 'history-2'] },
+    { name: 'history-selection/clear' },
+  );
+  assert.deepEqual(historyCleared.selectedHistoryIds, []);
+
+  const bookmarksCleared = reducePanelAction(
+    { ...createInitialPanelState(), selectedBookmarkIds: ['bookmark-1', 'bookmark-2'] },
+    { name: 'bookmark-selection/clear' },
+  );
+  assert.deepEqual(bookmarksCleared.selectedBookmarkIds, []);
 });
 
 test('record selection prunes removed and unloaded rows', () => {
