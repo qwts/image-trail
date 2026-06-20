@@ -14,6 +14,11 @@ export interface TargetState {
   readonly message: string;
 }
 
+export interface ImportedImageFile {
+  readonly name: string;
+  readonly dataUrl: string;
+}
+
 export interface AutomationState {
   readonly slideshowPhase: AutomationPhase;
   readonly slideshowCount: number;
@@ -175,7 +180,7 @@ export type PanelAction =
   | { readonly name: 'export/image'; readonly url: string }
   | { readonly name: 'import/history' | 'import/bookmarks'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
-  | { readonly name: 'import/image'; readonly fileContent: string }
+  | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
   | { readonly name: 'storage/update'; readonly usage: StorageUsageSummary };
 
 export interface BookmarkStore {

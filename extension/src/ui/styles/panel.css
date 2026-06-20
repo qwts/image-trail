@@ -356,6 +356,7 @@
   cursor: not-allowed;
 }
 
+.image-trail-panel-root .image-trail-panel__image-transfer,
 .image-trail-panel-root .image-trail-panel__import-export {
   display: grid;
   gap: 8px;

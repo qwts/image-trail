@@ -9,7 +9,7 @@ import { reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
 import { createInitialPanelState, setAutomationState, setTargetState } from '../core/state.js';
-import type { BookmarkStore, PanelAction, PanelState, TargetState } from '../core/types.js';
+import type { BookmarkStore, ImportedImageFile, PanelAction, PanelState, TargetState } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl } from '../core/image/downloads.js';
 import { DEFAULT_LOCAL_SETTINGS, LocalSettingsRepository } from '../data/local-settings.js';
@@ -342,7 +342,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'import/image') {
-      void this.importImage(action.fileContent);
+      void this.importImages(action.files);
       return;
     }
 
@@ -555,6 +555,32 @@ export class ImageTrailPanel {
     const draft = createDisplayRecord({ id: sourceUrl, url: sourceUrl, thumbnail, source: 'bookmark' });
     const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
     this.state = { ...this.state, message: `Added to Image Trail: ${bookmark.url}`, lastUpdatedAt: Date.now() };
+    await this.loadBookmarkPage(0);
+    this.render();
+    return true;
+  }
+
+  private async addImportedImage(file: ImportedImageFile): Promise<boolean> {
+    if (!file.dataUrl.startsWith('data:image/')) return false;
+    const timestamp = new Date().toISOString();
+    const draft = createDisplayRecord({
+      id: `${timestamp}:${file.name}`,
+      url: file.dataUrl,
+      title: file.name,
+      label: file.name,
+      thumbnail: file.dataUrl,
+      timestamp,
+      source: 'bookmark',
+    });
+    const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
+    const historyItem = createDisplayRecord({ ...draft, id: `${timestamp}:history:${file.name}`, source: 'history' });
+    const history = this.recentHistoryStore ? await this.recentHistoryStore.add(historyItem, window.location.href) : [historyItem, ...this.state.history];
+    this.state = {
+      ...this.state,
+      history: history.slice(0, 30),
+      message: `Added imported image to Image Trail: ${bookmark.label ?? file.name}`,
+      lastUpdatedAt: Date.now(),
+    };
     await this.loadBookmarkPage(0);
     this.render();
     return true;
@@ -889,18 +915,28 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private async importImage(fileContent: string): Promise<void> {
-    if (!fileContent.startsWith('data:image/')) {
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: 'Choose an image file to import.' });
+  private async importImages(files: readonly ImportedImageFile[]): Promise<void> {
+    if (files.length === 0) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: 'Choose one or more image files to import.' });
       this.render();
       return;
     }
-    if (await this.projectUrlToSelectedImage(fileContent)) {
-      this.state = reducePanelAction(this.state, { name: 'import-export/complete', message: 'Imported image into the selected host image.' });
-      this.render();
-      return;
+
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    let imported = 0;
+    for (const file of files) {
+      if (await this.addImportedImage(file)) imported += 1;
     }
-    this.state = reducePanelAction(this.state, { name: 'import-export/error', message: 'Select a host image before importing an image file.' });
+
+    if (imported === 0) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: 'No selected image files could be imported.' });
+    } else {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/complete',
+        message: `Imported ${imported} image${imported === 1 ? '' : 's'} into bookmarks and recent history.`,
+      });
+    }
     this.render();
   }
 

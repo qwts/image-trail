@@ -5,7 +5,7 @@ import { createEncryptionView } from './components/encryption-view.js';
 import { createFieldsView, type EditableField } from './components/fields-view.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHistoryView } from './components/history-view.js';
-import { createImportExportView } from './components/import-export-view.js';
+import { createImageTransferView, createImportExportView } from './components/import-export-view.js';
 import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
 import { parseUrl } from '../core/url/parse-url.js';
@@ -204,6 +204,15 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     ),
     createTargetPickerView(state.target, target.dispatch),
     createEncryptionView({ unlocked: state.blobKeyUnlocked, keyReference: state.blobKeyReference, hasKey: state.blobKeyAvailable }, target.dispatch),
+    createImageTransferView(
+      {
+        busy: state.importExportBusy,
+        currentImageUrl: state.target.selectedUrl,
+        lastMessage: state.importExportMessage,
+        lastMessageIsError: state.importExportMessageIsError,
+      },
+      target.dispatch,
+    ),
     createImportExportView(
       {
         busy: state.importExportBusy,

@@ -1,3 +1,5 @@
+import type { ImportedImageFile } from '../../core/types.js';
+
 export type ImportExportAction =
   | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
@@ -5,7 +7,7 @@ export type ImportExportAction =
   | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
-  | { readonly name: 'import/image'; readonly fileContent: string };
+  | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] };
 
 export interface ImportExportViewState {
   readonly busy: boolean;
@@ -15,6 +17,26 @@ export interface ImportExportViewState {
 }
 
 let filePickerId = 0;
+
+export function createImageTransferView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'image-trail-panel__section image-trail-panel__image-transfer';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Image';
+  section.append(heading);
+
+  if (state.lastMessage) {
+    const msg = document.createElement('p');
+    msg.className = state.lastMessageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
+    msg.textContent = state.lastMessage;
+    section.append(msg);
+  }
+
+  section.append(createImageGroup(state, dispatch));
+
+  return section;
+}
 
 export function createImportExportView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
   const section = document.createElement('section');
@@ -31,7 +53,7 @@ export function createImportExportView(state: ImportExportViewState, dispatch: (
     section.append(msg);
   }
 
-  section.append(createExportGroup(state, dispatch), createImageGroup(state, dispatch), createImportGroup(state, dispatch));
+  section.append(createExportGroup(state, dispatch), createImportGroup(state, dispatch));
 
   return section;
 }
@@ -105,9 +127,10 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const imageInput = document.createElement('input');
   imageInput.type = 'file';
   imageInput.accept = 'image/*';
+  imageInput.multiple = true;
   imageInput.className = 'image-trail-panel__file-input';
   imageInput.disabled = state.busy;
-  const imagePicker = createFilePicker(imageInput, 'Choose image');
+  const imagePicker = createFilePicker(imageInput, 'Choose images');
 
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__control-stack';
@@ -115,10 +138,10 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
 
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
-  importBtn.textContent = 'Import image';
+  importBtn.textContent = 'Import selected';
   importBtn.disabled = state.busy;
   importBtn.addEventListener('click', () => {
-    readFileInput(imageInput, (content) => dispatch({ name: 'import/image', fileContent: content }), 'data-url');
+    readImageFiles(imageInput, (files) => dispatch({ name: 'import/image', files }));
   });
 
   const exportBtn = document.createElement('button');
@@ -229,11 +252,34 @@ function createFilePicker(input: HTMLInputElement, text: string): HTMLElement {
   name.textContent = 'No file selected';
 
   input.addEventListener('change', () => {
-    name.textContent = input.files?.[0]?.name ?? 'No file selected';
+    const files = Array.from(input.files ?? []);
+    name.textContent = files.length > 1 ? `${files.length} files selected` : (files[0]?.name ?? 'No file selected');
   });
 
   wrapper.append(input, label, name);
   return wrapper;
+}
+
+function readImageFiles(input: HTMLInputElement, onRead: (files: readonly ImportedImageFile[]) => void): void {
+  const files = Array.from(input.files ?? []).filter((file) => file.type.startsWith('image/'));
+  if (files.length === 0) return;
+  let remaining = files.length;
+  const results: ImportedImageFile[] = [];
+  for (const file of files) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string' && reader.result.startsWith('data:image/')) {
+        results.push({ name: file.name, dataUrl: reader.result });
+      }
+      remaining -= 1;
+      if (remaining === 0) onRead(results);
+    };
+    reader.onerror = () => {
+      remaining -= 1;
+      if (remaining === 0) onRead(results);
+    };
+    reader.readAsDataURL(file);
+  }
 }
 
 function readFileInput(input: HTMLInputElement, onRead: (content: string) => void, mode: 'text' | 'data-url' = 'text'): void {
