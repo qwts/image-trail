@@ -12,3 +12,4 @@ These scenarios define the first browser-level acceptance coverage for the Brave
 - [Panel Layout Stability](panel-layout-stability.md)
 - [Multi-Select Image Download](multi-select-image-download.md)
 - [Key Backup Restore](key-backup-restore.md)
+- [Encrypted Image Downloads](encrypted-image-downloads.md)

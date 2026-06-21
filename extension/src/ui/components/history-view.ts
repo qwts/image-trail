@@ -48,7 +48,8 @@ export function createHistoryView(
   });
   for (const item of items) {
     const capturedBlobId = encryptedBlobIdForRecord(item);
-    const keyUnavailable = !blobKeyUnlocked;
+    const encryptedRecord = isEncryptedRecord(item);
+    const keyUnavailable = encryptedRecord && !blobKeyUnlocked;
     const keyMissing = options?.blobKeyAvailable === false;
     const lockedEncrypted = isLockedEncryptedRecord(item, blobKeyUnlocked);
     const previewableEncrypted = isPreviewableEncryptedRecord(item, blobKeyUnlocked);
@@ -153,6 +154,10 @@ export function createHistoryView(
 
 function isLockedEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked: boolean): boolean {
   return !!encryptedBlobIdForRecord(item) && !blobKeyUnlocked;
+}
+
+function isEncryptedRecord(item: ImageDisplayRecord): boolean {
+  return !!encryptedBlobIdForRecord(item);
 }
 
 function isPreviewableEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked: boolean): boolean {

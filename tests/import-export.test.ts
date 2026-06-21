@@ -8,6 +8,7 @@ import {
   PBKDF2_ITERATIONS,
 } from '../extension/src/data/crypto/password-wrap.js';
 import { generateAesGcmKey, getCrypto } from '../extension/src/data/crypto/webcrypto.js';
+import { createKeyReference } from '../extension/src/data/crypto/key-reference.js';
 import {
   buildExportFileHeader,
   serializeExportFile,
@@ -24,6 +25,11 @@ import { importBookmarkletJson } from '../extension/src/data/import-export/bookm
 import { recallEncryptedRecord, recallSelectedRecords } from '../extension/src/data/import-export/recall.js';
 import { exportKeyWithPassword } from '../extension/src/data/import-export/key-export.js';
 import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../extension/src/data/import-export/key-backup.js';
+import {
+  createEncryptedImageFile,
+  openEncryptedImageFile,
+  parseEncryptedImageFileHeader,
+} from '../extension/src/data/import-export/encrypted-image.js';
 import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../extension/src/data/crypto/binary-envelope.js';
@@ -527,6 +533,79 @@ test('key-backup: imported blob key decrypts payloads created before export', as
 
   assert.equal(opened.metadata.sourceUrl, 'https://example.test/original.png');
   assert.deepEqual(Array.from(new Uint8Array(opened.bytes)), [5, 10, 15, 20]);
+});
+
+test('encrypted-image: exports and imports bytes with the blob key', async () => {
+  const key = await generateAesGcmKey(false);
+  const keyReference = createKeyReference('blob', 'image-key');
+  const bytes = new Uint8Array([1, 2, 3, 4]).buffer;
+
+  const exported = await createEncryptedImageFile({
+    bytes,
+    mimeType: 'image/png',
+    sourceUrl: 'https://example.test/photo.png',
+    fileName: 'photo.png',
+    key,
+    keyReference,
+    now: '2026-06-20T00:00:00.000Z',
+  });
+
+  assert.equal(exported.fileName, 'photo.png.image-trail-encrypted.json');
+  const envelope = parseExportFile(exported.fileContent);
+  assert.equal(envelope.header.payloadType, 'image');
+  assert.equal(envelope.header.keyKind, 'blob');
+  assert.equal(envelope.header.keyReference, 'blob:image-key');
+  assert.equal(envelope.header.wrappingMode, 'indexeddb');
+
+  const imported = await openEncryptedImageFile(exported.fileContent, key, keyReference.reference);
+  assert.equal(imported.mimeType, 'image/png');
+  assert.equal(imported.sourceUrl, 'https://example.test/photo.png');
+  assert.equal(imported.fileName, 'photo.png');
+  assert.deepEqual(Array.from(imported.bytes), [1, 2, 3, 4]);
+});
+
+test('encrypted-image: rejects tampered payloads and wrong keys', async () => {
+  const key = await generateAesGcmKey(false);
+  const wrongKey = await generateAesGcmKey(false);
+  const keyReference = createKeyReference('blob', 'image-key');
+  const exported = await createEncryptedImageFile({
+    bytes: new Uint8Array([5, 6, 7]).buffer,
+    mimeType: 'image/jpeg',
+    sourceUrl: 'https://example.test/photo.jpg',
+    fileName: 'photo.jpg',
+    key,
+    keyReference,
+  });
+  const envelope = parseExportFile(exported.fileContent);
+  const tampered = serializeExportFile({ ...envelope, payload: `${envelope.payload.slice(0, -4)}AAAA` });
+
+  await assert.rejects(openEncryptedImageFile(tampered, key, keyReference.reference));
+  await assert.rejects(openEncryptedImageFile(exported.fileContent, wrongKey, keyReference.reference));
+  await assert.rejects(openEncryptedImageFile(exported.fileContent, key, 'blob:other-key'), /Unlock blob:image-key/u);
+});
+
+test('encrypted-image: rejects non-image export JSON before decrypting', async () => {
+  const key = await generateAesGcmKey(false);
+  const keyReference = createKeyReference('blob', 'image-key');
+  const historyExport = await exportEncryptedHistory({
+    entries: [
+      {
+        uuid: 'history-1',
+        payload: {
+          url: 'https://example.test/photo.jpg',
+          capturedAt: '2026-06-20T00:00:00.000Z',
+          captureStatus: 'remote-only',
+        },
+      },
+    ],
+    password: 'history-password',
+    now: '2026-06-20T00:00:00.000Z',
+  });
+
+  assert.ok(historyExport.status.ok);
+  assert.ok(historyExport.fileContent);
+  assert.throws(() => parseEncryptedImageFileHeader(historyExport.fileContent!), /Unexpected payload type: history/u);
+  await assert.rejects(openEncryptedImageFile(historyExport.fileContent, key, keyReference.reference), /Unexpected payload type: history/u);
 });
 
 test('history-import: skips entries with missing captureStatus', async () => {

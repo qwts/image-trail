@@ -1,13 +1,15 @@
-import type { ImportedImageFile } from '../../core/types.js';
+import type { ImportedEncryptedImageFile, ImportedImageFile } from '../../core/types.js';
 
 export type ImportExportAction =
   | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/image'; readonly saveAs?: boolean }
+  | { readonly name: 'export/encrypted-image' }
   | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
-  | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] };
+  | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
+  | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] };
 
 export interface ImportExportViewState {
   readonly busy: boolean;
@@ -16,6 +18,8 @@ export interface ImportExportViewState {
   readonly selectedBookmarkCount: number;
   readonly selectedImageDownloadCount: number;
   readonly imageDownloadAvailable: boolean;
+  readonly encryptedImageTransferAvailable: boolean;
+  readonly blobKeyUnlocked: boolean;
   readonly lastMessage?: string;
   readonly lastMessageIsError?: boolean;
 }
@@ -133,9 +137,17 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   imageInput.disabled = state.busy;
   const imagePicker = createFilePicker(imageInput, 'Choose images');
 
+  const encryptedImageInput = document.createElement('input');
+  encryptedImageInput.type = 'file';
+  encryptedImageInput.accept = '.json,.image-trail-encrypted.json';
+  encryptedImageInput.multiple = true;
+  encryptedImageInput.className = 'image-trail-panel__file-input';
+  encryptedImageInput.disabled = state.busy || !state.blobKeyUnlocked;
+  const encryptedImagePicker = createFilePicker(encryptedImageInput, 'Choose encrypted');
+
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__control-stack';
-  controls.append(imagePicker);
+  controls.append(imagePicker, encryptedImagePicker);
 
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
@@ -143,6 +155,14 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   importBtn.disabled = state.busy;
   importBtn.addEventListener('click', () => {
     readImageFiles(imageInput, (files) => dispatch({ name: 'import/image', files }));
+  });
+
+  const importEncryptedBtn = document.createElement('button');
+  importEncryptedBtn.type = 'button';
+  importEncryptedBtn.textContent = 'Import encrypted';
+  importEncryptedBtn.disabled = state.busy || !state.blobKeyUnlocked;
+  importEncryptedBtn.addEventListener('click', () => {
+    readEncryptedImageFiles(encryptedImageInput, (files) => dispatch({ name: 'import/encrypted-image', files }));
   });
 
   const exportBtn = document.createElement('button');
@@ -153,9 +173,18 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
     dispatch({ name: 'export/image', saveAs: event.shiftKey });
   });
 
+  const exportEncryptedBtn = document.createElement('button');
+  exportEncryptedBtn.type = 'button';
+  exportEncryptedBtn.textContent =
+    state.selectedImageDownloadCount > 0 ? `Export encrypted (${state.selectedImageDownloadCount})` : 'Export encrypted';
+  exportEncryptedBtn.disabled = state.busy || !state.encryptedImageTransferAvailable;
+  exportEncryptedBtn.addEventListener('click', () => {
+    dispatch({ name: 'export/encrypted-image' });
+  });
+
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__actions';
-  actions.append(importBtn, exportBtn);
+  actions.append(importBtn, importEncryptedBtn, exportBtn, exportEncryptedBtn);
 
   group.append(controls, actions);
   return group;
@@ -281,6 +310,28 @@ function readImageFiles(input: HTMLInputElement, onRead: (files: readonly Import
     };
     reader.readAsDataURL(file);
   }
+}
+
+function readEncryptedImageFiles(input: HTMLInputElement, onRead: (files: readonly ImportedEncryptedImageFile[]) => void): void {
+  const files = Array.from(input.files ?? []);
+  if (files.length === 0) return;
+  let remaining = files.length;
+  const results: Array<ImportedEncryptedImageFile | undefined> = new Array(files.length);
+  files.forEach((file, index) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        results[index] = { name: file.name, fileContent: reader.result };
+      }
+      remaining -= 1;
+      if (remaining === 0) onRead(results.filter((result): result is ImportedEncryptedImageFile => result !== undefined));
+    };
+    reader.onerror = () => {
+      remaining -= 1;
+      if (remaining === 0) onRead(results.filter((result): result is ImportedEncryptedImageFile => result !== undefined));
+    };
+    reader.readAsText(file);
+  });
 }
 
 function readFileInput(input: HTMLInputElement, onRead: (content: string) => void, mode: 'text' | 'data-url' = 'text'): void {

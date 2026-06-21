@@ -4,6 +4,7 @@ import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { getActiveBlobKey, lockBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
+import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFileHeader } from '../data/import-export/encrypted-image.js';
 import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../data/import-export/key-backup.js';
 import { openImageTrailDb } from '../data/db.js';
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
@@ -20,7 +21,9 @@ import {
   createCreateBlobPreviewResultMessage,
   createDeleteBlobResultMessage,
   createDownloadImageResultMessage,
+  createExportEncryptedImageResultMessage,
   createFetchThumbnailSourceResultMessage,
+  createImportEncryptedImageResultMessage,
   createLoadBookmarksResultMessage,
   createAddRecentHistoryResultMessage,
   createLoadRecentHistoryResultMessage,
@@ -41,6 +44,7 @@ import type {
   CaptureImageMessage,
   DeleteBlobMessage,
   DownloadImageMessage,
+  ExportEncryptedImageMessage,
   RetrieveBlobMessage,
   GrantPermissionAndCaptureMessage,
 } from './messages.js';
@@ -50,6 +54,7 @@ import type { FetchThumbnailSourceMessage } from './messages.js';
 import type { CreateBlobPreviewMessage } from './messages.js';
 import type { SetupBlobKeyMessage, UnlockBlobKeyMessage, BlobKeyResultMessage } from './messages.js';
 import type { ExportBlobKeyBackupMessage, ImportBlobKeyBackupMessage } from './messages.js';
+import type { ImportEncryptedImageMessage } from './messages.js';
 import { extractOrigin, hasOriginPermission, requestOriginPermission } from './permissions.js';
 
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
@@ -129,8 +134,8 @@ function isStoredBlobKey(record: StoredKeyRecord | undefined): record is StoredK
   return record?.kind === 'blob';
 }
 
-function arrayBufferToBase64(bytes: ArrayBuffer): string {
-  const view = new Uint8Array(bytes);
+function arrayBufferToBase64(bytes: ArrayBuffer | Uint8Array): string {
+  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const chunks: string[] = [];
   const chunkSize = 0x8000;
   for (let offset = 0; offset < view.length; offset += chunkSize) {
@@ -543,6 +548,128 @@ async function handleDownloadImage(message: DownloadImageMessage): Promise<impor
   }
 }
 
+async function handleExportEncryptedImage(
+  message: ExportEncryptedImageMessage,
+): Promise<import('./messages.js').ExportEncryptedImageResultMessage['payload']> {
+  const activeBlobKey = getActiveBlobKey();
+  if (!activeBlobKey) {
+    return { ok: false, reason: 'encryption-locked', message: 'Unlock encrypted originals before exporting encrypted images.' };
+  }
+
+  const bytesResult = message.payload.blobId
+    ? await imageBytesFromStoredBlob(message.payload.blobId)
+    : await imageBytesFromUrl(message.payload.url);
+  if (!bytesResult.ok) return bytesResult;
+
+  const result = await createEncryptedImageFile({
+    bytes: bytesResult.bytes,
+    mimeType: bytesResult.mimeType,
+    sourceUrl: bytesResult.sourceUrl,
+    fileName: message.payload.fileName,
+    key: activeBlobKey.key,
+    keyReference: activeBlobKey.reference,
+  });
+  return {
+    ok: true,
+    fileContent: result.fileContent,
+    fileName: result.fileName,
+    message: `Encrypted image export prepared for ${message.payload.fileName}.`,
+  };
+}
+
+async function imageBytesFromStoredBlob(
+  blobId: string,
+): Promise<
+  | { readonly ok: true; readonly bytes: ArrayBuffer; readonly mimeType: string; readonly sourceUrl: string }
+  | { readonly ok: false; readonly reason: string; readonly message: string }
+> {
+  const activeBlobKey = getActiveBlobKey();
+  if (!activeBlobKey) {
+    return { ok: false, reason: 'encryption-locked', message: 'Unlock encrypted originals before exporting encrypted images.' };
+  }
+  const db = await getDb();
+  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
+  const record = await new BlobsRepository(db).get(blobId);
+  if (!record) return { ok: false, reason: 'not-found', message: 'Encrypted blob was not found.' };
+  if (record.key.reference !== activeBlobKey.reference.reference) {
+    return { ok: false, reason: 'wrong-key', message: `Unlock ${record.key.reference} before exporting this encrypted image.` };
+  }
+  const opened = await openBlobPayload({
+    key: activeBlobKey.key,
+    iv: record.iv,
+    ciphertext: record.ciphertext,
+    aad: {
+      id: record.id,
+      kind: record.kind,
+      schemaVersion: record.schemaVersion,
+      algorithm: record.algorithm,
+      createdAt: record.createdAt,
+      key: record.key,
+    },
+  });
+  return {
+    ok: true,
+    bytes: opened.bytes,
+    mimeType: opened.metadata.mimeType,
+    sourceUrl: opened.metadata.sourceUrl,
+  };
+}
+
+async function imageBytesFromUrl(
+  url: string,
+): Promise<
+  | { readonly ok: true; readonly bytes: ArrayBuffer; readonly mimeType: string; readonly sourceUrl: string }
+  | { readonly ok: false; readonly reason: string; readonly message: string }
+> {
+  const parsed = url.startsWith('data:image/') ? dataUrlToImageBytes(url) : await fetchImageBytes(url);
+  if (!parsed.ok) {
+    const reason = 'reason' in parsed && typeof parsed.reason === 'string' ? parsed.reason : 'invalid-data-url';
+    return { ok: false, reason, message: parsed.message };
+  }
+  return { ok: true, bytes: parsed.bytes, mimeType: parsed.mimeType, sourceUrl: url };
+}
+
+async function handleImportEncryptedImage(
+  message: ImportEncryptedImageMessage,
+): Promise<import('./messages.js').ImportEncryptedImageResultMessage['payload']> {
+  let expectedKeyReference: string;
+  try {
+    expectedKeyReference = parseEncryptedImageFileHeader(message.payload.fileContent).keyReference;
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'invalid-format',
+      message: error instanceof Error ? error.message : 'Encrypted image import file is invalid.',
+    };
+  }
+
+  const activeBlobKey = getActiveBlobKey();
+  if (!activeBlobKey) {
+    return { ok: false, reason: 'encryption-locked', message: 'Unlock encrypted originals before importing encrypted images.' };
+  }
+  if (activeBlobKey.reference.reference !== expectedKeyReference) {
+    return { ok: false, reason: 'wrong-key', message: `Unlock ${expectedKeyReference} before importing this encrypted image.` };
+  }
+  try {
+    const result = await openEncryptedImageFile(message.payload.fileContent, activeBlobKey.key, expectedKeyReference);
+    return {
+      ok: true,
+      dataUrl: `data:${result.mimeType};base64,${arrayBufferToBase64(result.bytes)}`,
+      fileName: result.fileName,
+      sourceUrl: result.sourceUrl,
+      mimeType: result.mimeType,
+      byteLength: result.bytes.byteLength,
+      keyReference: result.keyReference,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'decryption-failed',
+      message: error instanceof Error ? error.message : 'Encrypted image import failed.',
+    };
+  }
+}
+
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   if (!isExtensionRequest(message)) return false;
 
@@ -557,6 +684,26 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleDownloadImage(message)
         .then((result) => sendResponse(createDownloadImageResultMessage(result)))
         .catch(() => sendResponse(createDownloadImageResultMessage({ ok: false, message: 'Image download could not be started.' })));
+      return true;
+
+    case MessageType.ExportEncryptedImage:
+      handleExportEncryptedImage(message)
+        .then((result) => sendResponse(createExportEncryptedImageResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createExportEncryptedImageResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted image export failed.' }),
+          ),
+        );
+      return true;
+
+    case MessageType.ImportEncryptedImage:
+      handleImportEncryptedImage(message)
+        .then((result) => sendResponse(createImportEncryptedImageResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createImportEncryptedImageResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted image import failed.' }),
+          ),
+        );
       return true;
 
     case MessageType.StorageUsageRequest:
