@@ -125,10 +125,6 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const group = document.createElement('div');
   group.className = 'image-trail-panel__subsection';
 
-  const label = document.createElement('h4');
-  label.textContent = 'Image';
-  group.append(label);
-
   const imageInput = document.createElement('input');
   imageInput.type = 'file';
   imageInput.accept = 'image/*';

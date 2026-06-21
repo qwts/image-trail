@@ -482,6 +482,11 @@
   background: #2b2b2b;
 }
 
+.image-trail-panel-root button.is-danger {
+  border-color: rgb(255 112 112 / 70%);
+  background: rgb(110 24 28 / 72%);
+}
+
 .image-trail-panel-root .image-trail-panel__file-input:disabled + .image-trail-panel__file-picker-button {
   opacity: 0.5;
   cursor: not-allowed;
@@ -885,11 +890,21 @@
   opacity: 0.72;
 }
 
+.image-trail-panel-root .image-trail-panel__record-list li.is-key-unavailable {
+  border-color: rgb(255 255 255 / 8%);
+  background: rgb(0 0 0 / 18%);
+  box-shadow: none;
+  opacity: 0.34;
+}
+
 .image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__record-thumbnail,
 .image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__record-link,
-.image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__bookmark-label {
+.image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__bookmark-label,
+.image-trail-panel-root .image-trail-panel__record-list li.is-key-unavailable .image-trail-panel__record-thumbnail,
+.image-trail-panel-root .image-trail-panel__record-list li.is-key-unavailable .image-trail-panel__record-link,
+.image-trail-panel-root .image-trail-panel__record-list li.is-key-unavailable .image-trail-panel__bookmark-label {
   filter: saturate(0.55);
-  opacity: 0.72;
+  opacity: 0.48;
 }
 
 .image-trail-panel-root .image-trail-panel__record-list li[role='button'] {

@@ -27,6 +27,11 @@ export const MessageType = {
   BlobKeyStatusResult: 'imageTrail.blobKeyStatusResult',
   SetupBlobKey: 'imageTrail.setupBlobKey',
   UnlockBlobKey: 'imageTrail.unlockBlobKey',
+  ClearBlobKey: 'imageTrail.clearBlobKey',
+  ExportBlobKeyBackup: 'imageTrail.exportBlobKeyBackup',
+  ExportBlobKeyBackupResult: 'imageTrail.exportBlobKeyBackupResult',
+  ImportBlobKeyBackup: 'imageTrail.importBlobKeyBackup',
+  ImportBlobKeyBackupResult: 'imageTrail.importBlobKeyBackupResult',
   BlobKeyResult: 'imageTrail.blobKeyResult',
   LoadBookmarks: 'imageTrail.loadBookmarks',
   LoadBookmarksResult: 'imageTrail.loadBookmarksResult',
@@ -229,6 +234,46 @@ export interface UnlockBlobKeyMessage {
   readonly payload: { readonly password: string; readonly keyReference?: string };
 }
 
+export interface ClearBlobKeyMessage {
+  readonly type: typeof MessageType.ClearBlobKey;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: Record<string, never>;
+}
+
+export interface ExportBlobKeyBackupMessage {
+  readonly type: typeof MessageType.ExportBlobKeyBackup;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly password: string; readonly keyReference?: string };
+}
+
+export interface ExportBlobKeyBackupResultMessage {
+  readonly type: typeof MessageType.ExportBlobKeyBackupResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | {
+        readonly ok: true;
+        readonly keyReference: string;
+        readonly fileContent: string;
+        readonly fileName: string;
+        readonly message: string;
+      }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
+export interface ImportBlobKeyBackupMessage {
+  readonly type: typeof MessageType.ImportBlobKeyBackup;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly fileContent: string; readonly password: string };
+}
+
+export interface ImportBlobKeyBackupResultMessage {
+  readonly type: typeof MessageType.ImportBlobKeyBackupResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly keyReference: string; readonly imported: boolean; readonly message: string }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
 export interface BlobKeyResultMessage {
   readonly type: typeof MessageType.BlobKeyResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -339,6 +384,9 @@ export type ExtensionRequest =
   | BlobKeyStatusMessage
   | SetupBlobKeyMessage
   | UnlockBlobKeyMessage
+  | ClearBlobKeyMessage
+  | ExportBlobKeyBackupMessage
+  | ImportBlobKeyBackupMessage
   | LoadBookmarksMessage
   | SaveBookmarkMessage
   | RemoveBookmarkMessage
@@ -358,6 +406,8 @@ export type ExtensionResponse =
   | FetchThumbnailSourceResultMessage
   | BlobKeyStatusResultMessage
   | BlobKeyResultMessage
+  | ExportBlobKeyBackupResultMessage
+  | ImportBlobKeyBackupResultMessage
   | LoadBookmarksResultMessage
   | SaveBookmarkResultMessage
   | RemoveBookmarkResultMessage
@@ -483,6 +533,30 @@ export function createUnlockBlobKeyMessage(password: string, keyReference?: stri
   return { type: MessageType.UnlockBlobKey, version: MESSAGE_PROTOCOL_VERSION, payload: { password, keyReference } };
 }
 
+export function createClearBlobKeyMessage(): ClearBlobKeyMessage {
+  return { type: MessageType.ClearBlobKey, version: MESSAGE_PROTOCOL_VERSION, payload: {} };
+}
+
+export function createExportBlobKeyBackupMessage(password: string, keyReference?: string): ExportBlobKeyBackupMessage {
+  return { type: MessageType.ExportBlobKeyBackup, version: MESSAGE_PROTOCOL_VERSION, payload: { password, keyReference } };
+}
+
+export function createExportBlobKeyBackupResultMessage(
+  payload: ExportBlobKeyBackupResultMessage['payload'],
+): ExportBlobKeyBackupResultMessage {
+  return { type: MessageType.ExportBlobKeyBackupResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createImportBlobKeyBackupMessage(fileContent: string, password: string): ImportBlobKeyBackupMessage {
+  return { type: MessageType.ImportBlobKeyBackup, version: MESSAGE_PROTOCOL_VERSION, payload: { fileContent, password } };
+}
+
+export function createImportBlobKeyBackupResultMessage(
+  payload: ImportBlobKeyBackupResultMessage['payload'],
+): ImportBlobKeyBackupResultMessage {
+  return { type: MessageType.ImportBlobKeyBackupResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 export function createBlobKeyResultMessage(payload: BlobKeyResultMessage['payload']): BlobKeyResultMessage {
   return { type: MessageType.BlobKeyResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
@@ -568,6 +642,9 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.BlobKeyStatus ||
     value.type === MessageType.SetupBlobKey ||
     value.type === MessageType.UnlockBlobKey ||
+    value.type === MessageType.ClearBlobKey ||
+    value.type === MessageType.ExportBlobKeyBackup ||
+    value.type === MessageType.ImportBlobKeyBackup ||
     value.type === MessageType.LoadBookmarks ||
     value.type === MessageType.SaveBookmark ||
     value.type === MessageType.RemoveBookmark ||
@@ -592,6 +669,8 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.FetchThumbnailSourceResult ||
     value.type === MessageType.BlobKeyStatusResult ||
     value.type === MessageType.BlobKeyResult ||
+    value.type === MessageType.ExportBlobKeyBackupResult ||
+    value.type === MessageType.ImportBlobKeyBackupResult ||
     value.type === MessageType.LoadBookmarksResult ||
     value.type === MessageType.SaveBookmarkResult ||
     value.type === MessageType.RemoveBookmarkResult ||
@@ -604,6 +683,16 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
 export function isBlobKeyResultMessage(value: unknown): value is BlobKeyResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.BlobKeyResult;
+}
+
+export function isExportBlobKeyBackupResultMessage(value: unknown): value is ExportBlobKeyBackupResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ExportBlobKeyBackupResult;
+}
+
+export function isImportBlobKeyBackupResultMessage(value: unknown): value is ImportBlobKeyBackupResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ImportBlobKeyBackupResult;
 }
 
 export function isBlobKeyStatusResultMessage(value: unknown): value is BlobKeyStatusResultMessage {

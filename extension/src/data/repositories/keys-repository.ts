@@ -29,4 +29,10 @@ export class KeysRepository {
     await transactionDone(transaction);
     return result;
   }
+
+  async remove(reference: string): Promise<void> {
+    const transaction = this.db.transaction(DataStore.Keys, 'readwrite');
+    transaction.objectStore(DataStore.Keys).delete(reference);
+    await transactionDone(transaction);
+  }
 }

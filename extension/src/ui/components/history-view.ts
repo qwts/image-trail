@@ -10,6 +10,7 @@ type HistoryAction =
   | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string };
 
 interface HistoryViewOptions {
+  readonly blobKeyAvailable: boolean;
   readonly listBlockSize: number | null;
   readonly onListResize: (blockSize: number) => void;
 }
@@ -47,6 +48,8 @@ export function createHistoryView(
   });
   for (const item of items) {
     const capturedBlobId = encryptedBlobIdForRecord(item);
+    const keyUnavailable = !blobKeyUnlocked;
+    const keyMissing = options?.blobKeyAvailable === false;
     const lockedEncrypted = isLockedEncryptedRecord(item, blobKeyUnlocked);
     const previewableEncrypted = isPreviewableEncryptedRecord(item, blobKeyUnlocked);
     const selected = selectedIds.includes(item.id);
@@ -62,10 +65,17 @@ export function createHistoryView(
       event.stopImmediatePropagation();
       dispatch({ name: 'history-selection/toggle', id: item.id });
     });
-    if (lockedEncrypted) {
+    if (keyUnavailable) {
+      entry.classList.add('is-locked-encrypted');
+      entry.classList.add('is-key-unavailable');
+      entry.setAttribute('aria-disabled', 'true');
+      entry.title = keyMissing
+        ? 'Import the encrypted originals key backup before using this row.'
+        : 'Unlock encrypted originals before using this row.';
+    } else if (lockedEncrypted) {
       entry.classList.add('is-locked-encrypted');
       entry.setAttribute('aria-disabled', 'true');
-      entry.title = 'Unlock encrypted originals before previewing this row. Cmd/Ctrl-click to select for export.';
+      entry.title = 'Unlock encrypted originals before previewing this row.';
     } else {
       entry.tabIndex = 0;
       entry.setAttribute('role', 'button');
@@ -92,7 +102,7 @@ export function createHistoryView(
     actions.className = 'image-trail-panel__item-actions';
     actions.addEventListener('keydown', (event) => event.stopPropagation());
 
-    if (item.captureStatus === 'captured' && item.blobId) {
+    if (item.captureStatus === 'captured' && item.blobId && !keyMissing) {
       const deleteCapture = document.createElement('button');
       deleteCapture.type = 'button';
       deleteCapture.textContent = 'Delete original';
@@ -101,7 +111,7 @@ export function createHistoryView(
         dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! });
       });
       actions.append(deleteCapture);
-    } else {
+    } else if (blobKeyUnlocked) {
       const capture = document.createElement('button');
       capture.type = 'button';
       capture.textContent = 'Capture';
@@ -113,14 +123,16 @@ export function createHistoryView(
       actions.append(capture);
     }
 
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.textContent = 'Remove';
-    remove.addEventListener('click', (event) => {
-      event.stopPropagation();
-      dispatch({ name: 'history/remove', id: item.id });
-    });
-    actions.append(remove);
+    if (!keyMissing || item.captureStatus === 'captured') {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', (event) => {
+        event.stopPropagation();
+        dispatch({ name: 'history/remove', id: item.id });
+      });
+      actions.append(remove);
+    }
     entry.append(visual, link, actions);
     list.append(entry);
   }
