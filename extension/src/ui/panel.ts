@@ -451,6 +451,12 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'settings/toggle') {
+      this.state = reducePanelAction(this.state, action);
+      this.render();
+      return;
+    }
+
     if (action.name === 'bookmarks/reload') {
       void this.loadBookmarkPage(0, { render: false }).then(() => this.renderPanelAndRefreshRecall());
       return;
