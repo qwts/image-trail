@@ -7,8 +7,11 @@ import { HistoryRepository, type EncryptedHistoryRecord } from '../extension/src
 import { BookmarksRepository, type EncryptedBookmarkRecord } from '../extension/src/data/repositories/bookmarks-repository.js';
 import { PanelPositionRepository } from '../extension/src/data/repositories/panel-position-repository.js';
 import { DownloadsRepository } from '../extension/src/data/repositories/downloads-repository.js';
+import { EncryptedPinsRepository } from '../extension/src/data/repositories/encrypted-pins-repository.js';
+import { EncryptedPinThumbnailsRepository } from '../extension/src/data/repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from '../extension/src/data/repositories/keys-repository.js';
 import type { StoredKeyRecord } from '../extension/src/data/crypto/types.js';
+import { createAndActivateWrappedBlobKey, lockBlobKey, type ActiveBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
 import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
 import { IndexedDbBookmarkStore } from '../extension/src/data/bookmarks-controller.js';
 import { createDisplayRecord } from '../extension/src/core/display-records.js';
@@ -115,11 +118,29 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
 
   assert.deepEqual(
     asArray(db.objectStoreNames),
-    [DataStore.Blobs, DataStore.Bookmarks, DataStore.Downloads, DataStore.History, DataStore.Keys, DataStore.Metadata].sort(),
+    [
+      DataStore.Blobs,
+      DataStore.Bookmarks,
+      DataStore.Downloads,
+      DataStore.EncryptedPins,
+      DataStore.EncryptedPinThumbnails,
+      DataStore.History,
+      DataStore.Keys,
+      DataStore.Metadata,
+    ].sort(),
   );
 
   const transaction = db.transaction(
-    [DataStore.Metadata, DataStore.Keys, DataStore.History, DataStore.Bookmarks, DataStore.Blobs, DataStore.Downloads],
+    [
+      DataStore.Metadata,
+      DataStore.Keys,
+      DataStore.History,
+      DataStore.Bookmarks,
+      DataStore.Blobs,
+      DataStore.Downloads,
+      DataStore.EncryptedPins,
+      DataStore.EncryptedPinThumbnails,
+    ],
     'readonly',
   );
   const keys = transaction.objectStore(DataStore.Keys);
@@ -127,6 +148,8 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   const bookmarks = transaction.objectStore(DataStore.Bookmarks);
   const blobs = transaction.objectStore(DataStore.Blobs);
   const downloads = transaction.objectStore(DataStore.Downloads);
+  const encryptedPins = transaction.objectStore(DataStore.EncryptedPins);
+  const encryptedPinThumbnails = transaction.objectStore(DataStore.EncryptedPinThumbnails);
 
   assert.deepEqual(asArray(keys.indexNames), [SchemaIndex.KeysByKind, SchemaIndex.KeysByReference, SchemaIndex.KeysByUuid].sort());
   assert.deepEqual(asArray(history.indexNames), [SchemaIndex.HistoryByKeyReference, SchemaIndex.HistoryByUpdatedAt].sort());
@@ -141,6 +164,24 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   );
   assert.deepEqual(asArray(blobs.indexNames), [SchemaIndex.BlobsByCreatedAt, SchemaIndex.BlobsByKeyReference].sort());
   assert.deepEqual(asArray(downloads.indexNames), [SchemaIndex.DownloadsByDownloadedAt, SchemaIndex.DownloadsByKeyReference].sort());
+  assert.deepEqual(
+    asArray(encryptedPins.indexNames),
+    [
+      SchemaIndex.EncryptedPinsByKeyReference,
+      SchemaIndex.EncryptedPinsByPlainPinId,
+      SchemaIndex.EncryptedPinsByQueueUpdatedAt,
+      SchemaIndex.EncryptedPinsByUrlHash,
+    ].sort(),
+  );
+  assert.deepEqual(
+    asArray(encryptedPinThumbnails.indexNames),
+    [
+      SchemaIndex.EncryptedPinThumbnailsByByteLength,
+      SchemaIndex.EncryptedPinThumbnailsByCreatedAt,
+      SchemaIndex.EncryptedPinThumbnailsByKeyReference,
+      SchemaIndex.EncryptedPinThumbnailsByPinId,
+    ].sort(),
+  );
 
   const metadata = await new Promise((resolve, reject) => {
     const request = transaction.objectStore(DataStore.Metadata).get('schema');
@@ -264,6 +305,79 @@ test('BookmarksRepository can index imported data URL bookmarks by a small key',
   assert.deepEqual(await repository.getEncryptedByUrl(indexUrl), encrypted);
   assert.equal(await repository.getEncryptedByUrl(dataUrl), undefined);
   assert.equal((await repository.openRecord(encrypted, session.key)).url, dataUrl);
+});
+
+test('EncryptedPinsRepository seals private pin metadata with the active blob key', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const wrapped = await createAndActivateWrappedBlobKey({
+    password: 'pin-password',
+    uuid: 'protected-pin-key',
+    now: '2026-06-21T00:00:00.000Z',
+  });
+  t.after(() => lockBlobKey());
+  const repository = new EncryptedPinsRepository(db);
+
+  const record = await repository.sealAndPut({
+    id: 'encrypted-pin-1',
+    plainPinId: 'plain-pin-1',
+    urlHash: 'a'.repeat(64),
+    queueUpdatedAt: '2026-06-21T00:00:02.000Z',
+    payload: {
+      url: 'https://secret.example.test/private.jpg',
+      title: 'private title',
+      label: 'private label',
+      bookmarkedAt: '2026-06-21T00:00:01.000Z',
+      thumbnailId: 'thumbnail-1',
+    },
+    key: wrapped.active.key,
+    keyReference: wrapped.active.reference,
+  });
+
+  assert.equal(record.envelope.key.reference, 'blob:protected-pin-key');
+  assert.equal(JSON.stringify(record).includes('private title'), false);
+  assert.deepEqual(await repository.getByPlainPinId('plain-pin-1'), record);
+  assert.deepEqual(await repository.getByUrlHash('a'.repeat(64)), record);
+  assert.deepEqual(await repository.openRecord(record, wrapped.active.key), {
+    url: 'https://secret.example.test/private.jpg',
+    title: 'private title',
+    label: 'private label',
+    bookmarkedAt: '2026-06-21T00:00:01.000Z',
+    thumbnailId: 'thumbnail-1',
+  });
+});
+
+test('EncryptedPinThumbnailsRepository stores encrypted thumbnail bytes and usage', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const wrapped = await createAndActivateWrappedBlobKey({
+    password: 'thumb-password',
+    uuid: 'protected-thumb-key',
+    now: '2026-06-21T00:00:00.000Z',
+  });
+  t.after(() => lockBlobKey());
+  const repository = new EncryptedPinThumbnailsRepository(db);
+  const bytes = new TextEncoder().encode('thumbnail bytes').buffer;
+
+  const record = await repository.sealAndPut({
+    id: 'thumb-1',
+    pinId: 'plain-pin-1',
+    mimeType: 'image/png',
+    bytes,
+    key: wrapped.active.key,
+    keyReference: wrapped.active.reference,
+    now: '2026-06-21T00:00:03.000Z',
+  });
+
+  assert.equal(record.pinId, 'plain-pin-1');
+  assert.equal(record.byteLength, bytes.byteLength);
+  assert.equal(JSON.stringify(record).includes('thumbnail bytes'), false);
+  assert.deepEqual(await repository.openRecord(record, wrapped.active.key), {
+    dataUrl: 'data:image/png;base64,dGh1bWJuYWlsIGJ5dGVz',
+    mimeType: 'image/png',
+    byteLength: bytes.byteLength,
+  });
+  assert.deepEqual(await repository.getStorageUsage(), { totalBytes: record.encryptedByteLength, blobCount: 1 });
 });
 
 test('DownloadsRepository writes encrypted records newest first and checks duplicates after decrypting', async (t) => {
@@ -435,6 +549,77 @@ test('IndexedDbBookmarkStore recalls encrypted bookmark thumbnails after reload'
     assert.equal(page.items[0]?.thumbnail, 'data:image/jpeg;base64,thumbnail');
   } finally {
     await reloadedStore.close();
+  }
+});
+
+test('IndexedDbBookmarkStore writes protected pins and locked relationship placeholders', async () => {
+  await deleteImageTrailDb();
+  let active: ActiveBlobKey | null = (
+    await createAndActivateWrappedBlobKey({
+      password: 'pin-store-password',
+      uuid: 'pin-store-key',
+      now: '2026-06-21T00:00:00.000Z',
+    })
+  ).active;
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  let saved;
+  try {
+    saved = await store.save(
+      createDisplayRecord({
+        id: 'https://secret.example.test/protected.jpg',
+        url: 'https://secret.example.test/protected.jpg',
+        title: 'Sensitive title',
+        label: 'Sensitive label',
+        thumbnail: 'data:image/png;base64,dGh1bWJuYWls',
+        width: 640,
+        height: 480,
+        timestamp: '2026-06-21T00:00:01.000Z',
+        source: 'bookmark',
+      }),
+    );
+
+    assert.equal(saved.url, 'https://secret.example.test/protected.jpg');
+    assert.equal(saved.title, 'Sensitive title');
+    assert.equal(saved.thumbnail, 'data:image/png;base64,dGh1bWJuYWls');
+    assert.equal(saved.protectedPin?.hasEncryptedMetadata, true);
+    assert.equal(saved.protectedPin?.hasEncryptedThumbnail, true);
+  } finally {
+    await store.close();
+  }
+
+  assert.ok(saved);
+  const db = await openImageTrailDb();
+  assert.ok(db.db);
+  try {
+    const bookmarkKey = (await new KeysRepository(db.db).listByKind('bookmark')).find(
+      (record): record is StoredKeyRecord<'bookmark'> & { readonly key: CryptoKey } =>
+        record.kind === 'bookmark' && record.key instanceof CryptoKey,
+    );
+    assert.ok(bookmarkKey);
+    const relationship = await new BookmarksRepository(db.db).open(saved.id, bookmarkKey.key);
+    assert.ok(relationship?.protectedPin);
+    assert.equal(relationship.url, `image-trail-private:${saved.id}`);
+    assert.equal(relationship.title, undefined);
+    assert.equal(relationship.thumbnail, undefined);
+    assert.equal(relationship.protectedPin.hasEncryptedMetadata, true);
+    assert.equal(relationship.protectedPin.hasEncryptedThumbnail, true);
+  } finally {
+    db.db.close();
+  }
+
+  active = null;
+  const lockedStore = new IndexedDbBookmarkStore({ getActiveBlobKey: () => null });
+  try {
+    const lockedPage = await lockedStore.loadPage({ offset: 0, limit: 30 });
+    assert.equal(lockedPage.items.length, 1);
+    assert.equal(lockedPage.items[0]?.id, saved.id);
+    assert.equal(lockedPage.items[0]?.privacyStatus, 'locked');
+    assert.equal(lockedPage.items[0]?.label, 'Private pin');
+    assert.equal(lockedPage.items[0]?.thumbnail, undefined);
+    assert.equal(lockedPage.items[0]?.protectedPin?.encryptedPinId, saved.protectedPin?.encryptedPinId);
+  } finally {
+    await lockedStore.close();
+    lockBlobKey();
   }
 });
 

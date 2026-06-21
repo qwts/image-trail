@@ -1413,6 +1413,11 @@ export class ImageTrailPanel {
       { ...this.state, message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() },
       { name: 'blob-key/status', unlocked: result.ok, keyReference: result.ok ? result.keyReference : null, hasKey: result.ok },
     );
+    if (result.ok) {
+      await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
+      this.renderPanelAndRefreshRecall();
+      return;
+    }
     this.render();
   }
 
@@ -1428,6 +1433,11 @@ export class ImageTrailPanel {
         hasKey: this.state.blobKeyAvailable,
       },
     );
+    if (result.ok) {
+      await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
+      this.renderPanelAndRefreshRecall();
+      return;
+    }
     this.render();
   }
 
@@ -1505,7 +1515,8 @@ export class ImageTrailPanel {
     }
     await this.refreshBlobKeyStatus();
     this.state = reducePanelAction(this.state, { name: 'import-export/complete', message: result.message });
-    this.render();
+    await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
+    this.renderPanelAndRefreshRecall();
   }
 
   private async exportImage(saveAs: boolean): Promise<void> {

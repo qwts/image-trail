@@ -1,6 +1,14 @@
 import type { EncryptionAlgorithm, KeyReference } from './crypto/types.js';
 
-export type DataStoreName = 'metadata' | 'keys' | 'history' | 'bookmarks' | 'blobs' | 'downloads';
+export type DataStoreName =
+  | 'metadata'
+  | 'keys'
+  | 'history'
+  | 'bookmarks'
+  | 'blobs'
+  | 'downloads'
+  | 'encryptedPins'
+  | 'encryptedPinThumbnails';
 export type DataStatusCode =
   | 'ok'
   | 'db-open-failed'
@@ -67,6 +75,33 @@ export interface DurableBookmarkPayloadV1 {
   readonly capturedAt?: string;
   readonly sourceCompatibility?: 'favorites';
   readonly storedOriginal?: StoredOriginalReference;
+  readonly protectedPin?: ProtectedPinRelationshipV1;
+}
+
+export interface ProtectedPinRelationshipV1 {
+  readonly schemaVersion: 1;
+  readonly plainPinId: string;
+  readonly encryptedPinId?: string;
+  readonly encryptedThumbnailId?: string;
+  readonly storedOriginalBlobId?: string;
+  readonly queueUpdatedAt: string;
+  readonly hasEncryptedMetadata: boolean;
+  readonly hasEncryptedThumbnail: boolean;
+  readonly hasStoredOriginal: boolean;
+}
+
+export interface DurableEncryptedPinPayloadV1 {
+  readonly url: string;
+  readonly title?: string;
+  readonly label?: string;
+  readonly width?: number;
+  readonly height?: number;
+  readonly bookmarkedAt: string;
+  readonly downloadedAt?: string;
+  readonly capturedAt?: string;
+  readonly sourceCompatibility?: 'favorites';
+  readonly storedOriginal?: StoredOriginalReference;
+  readonly thumbnailId?: string;
 }
 
 export interface DurableDownloadPayloadV1 {

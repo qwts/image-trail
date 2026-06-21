@@ -7,19 +7,23 @@ import {
 } from '../../core/display-records.js';
 
 export function recordDisplayName(record: ImageDisplayRecord): string {
+  if (record.privacyStatus === 'locked') return 'Private pin';
   return normalizeDisplayLabel(record);
 }
 
 export function recordTitle(record: ImageDisplayRecord): string {
+  if (record.privacyStatus === 'locked') return 'Unlock encrypted originals to show private pin metadata.';
   return displayTitleForRecord(record);
 }
 
 export function recordExtensionLabel(record: ImageDisplayRecord): string {
+  if (record.privacyStatus === 'locked') return 'LOCK';
   const extension = imageExtensionFromValue(record.label) ?? imageExtensionFromUrl(record.url);
   return extension ? extension.toUpperCase() : 'IMAGE';
 }
 
 export function recordMetadataText(record: ImageDisplayRecord): string {
+  if (record.privacyStatus === 'locked') return 'Locked';
   const parts = [formatRecordDate(record.timestamp), recordResolutionText(record)].filter((part): part is string => !!part);
   return parts.join(' · ');
 }

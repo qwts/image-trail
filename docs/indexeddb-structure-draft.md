@@ -21,6 +21,8 @@ Version upgrades should be handled only through ordered migrations. Encrypted pa
 keys
 history
 bookmarks
+encryptedPins
+encryptedPinThumbnails
 thumbnails
 imageBlobs
 downloads
@@ -198,7 +200,16 @@ Privacy rule:
 
 ## `bookmarks`
 
-Stores encrypted durable bookmarks. New extension code should use `bookmarks`; legacy import/export can map bookmarklet `favorites`.
+Stores durable pin/bookmark queue rows. New extension code should use `bookmarks`; legacy import/export can map bookmarklet `favorites`.
+
+Current implementation note:
+
+- The `bookmarks` store is the queue and locked-mode relationship surface.
+- For protected pins, it stores only opaque relationship fields and safe status flags by default: plain pin id, encrypted pin id, encrypted thumbnail id, stored-original blob id, queue order, and booleans for protected metadata/thumbnail/original availability.
+- Sensitive display metadata such as URL, domain/path, title, label, dimensions, dates, generated metadata, and thumbnail data belongs in the protected stores unless a later settings feature explicitly permits a plaintext field.
+- Locked UI reads this store and can show private placeholders without decrypting protected pin metadata.
+- Unlocked UI reads this store plus protected pin stores and replaces placeholders with decrypted records where possible.
+- Queue ordering is `queueUpdatedAt`; refreshing protected metadata or thumbnails must not reseal or reorder records unless the action intentionally moves a pin.
 
 Primary key:
 
@@ -230,6 +241,91 @@ Draft record shape is similar to `history`, with a decrypted payload that includ
   "updatedAt": "ISO timestamp"
 }
 ```
+
+Protected relationship payloads use the same store but keep sensitive fields empty/redacted and include:
+
+```json
+{
+  "payloadVersion": 1,
+  "url": "image-trail-private:<plain pin id>",
+  "label": "Private pin",
+  "bookmarkedAt": "queue timestamp",
+  "protectedPin": {
+    "schemaVersion": 1,
+    "plainPinId": "stable relationship row id",
+    "encryptedPinId": "protected metadata id",
+    "encryptedThumbnailId": "protected thumbnail id",
+    "storedOriginalBlobId": "encrypted original blob id",
+    "queueUpdatedAt": "queue timestamp",
+    "hasEncryptedMetadata": true,
+    "hasEncryptedThumbnail": true,
+    "hasStoredOriginal": true
+  }
+}
+```
+
+## `encryptedPins`
+
+Stores protected pin metadata using the existing password-unlocked blob key. This store is owned by the service worker; content scripts request bookmark/Recall data through extension messages and never open encrypted pin storage directly.
+
+Primary key:
+
+```text
+id
+```
+
+Indexes:
+
+```text
+plainPinId
+urlHash
+queueUpdatedAt
+key.reference
+```
+
+Plaintext record fields are limited to ids, URL hash for dedupe, queue order, and envelope/key metadata. The encrypted payload includes sensitive pin display data:
+
+```json
+{
+  "payloadVersion": 1,
+  "url": "image url",
+  "title": "display title",
+  "label": "display label",
+  "width": 1200,
+  "height": 800,
+  "bookmarkedAt": "ISO timestamp",
+  "downloadedAt": "optional ISO timestamp",
+  "capturedAt": "optional ISO timestamp",
+  "thumbnailId": "encrypted thumbnail id",
+  "storedOriginal": {
+    "blobId": "encrypted original blob id",
+    "mimeType": "image/jpeg",
+    "byteLength": 123456,
+    "capturedAt": "ISO timestamp"
+  }
+}
+```
+
+## `encryptedPinThumbnails`
+
+Stores protected thumbnail bytes separately from protected pin metadata. This avoids loading/decrypting thumbnail bytes while paging large queues.
+
+Primary key:
+
+```text
+id
+```
+
+Indexes:
+
+```text
+pinId
+createdAt
+byteLength
+key.reference
+```
+
+The plaintext record contains relationship/accounting fields only: thumbnail id, pin id, encrypted byte length, source byte length, created timestamp, and key reference. The AES-GCM binary envelope contains thumbnail MIME type and bytes.
 
 ## `thumbnails`
 

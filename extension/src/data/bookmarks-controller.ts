@@ -1,14 +1,19 @@
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { createDisplayRecord } from '../core/display-records.js';
+import { computeSha256 } from '../core/image/fingerprints.js';
 import type { BookmarkStore } from '../core/types.js';
+import type { ActiveBlobKey } from './crypto/blob-keyring.js';
 import { createKeyReference } from './crypto/key-reference.js';
 import type { KeyReference, StoredKeyRecord } from './crypto/types.js';
 import { generateAesGcmKey } from './crypto/webcrypto.js';
 import { openImageTrailDb } from './db.js';
 import { DEFAULT_LOCAL_SETTINGS } from './local-settings.js';
+import { BlobsRepository } from './repositories/blobs-repository.js';
 import { BookmarksRepository } from './repositories/bookmarks-repository.js';
+import { EncryptedPinsRepository, type EncryptedPinRecord } from './repositories/encrypted-pins-repository.js';
+import { EncryptedPinThumbnailsRepository } from './repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from './repositories/keys-repository.js';
-import type { DurableBookmarkPayloadV1 } from './types.js';
+import type { DurableBookmarkPayloadV1, DurableEncryptedPinPayloadV1, ProtectedPinRelationshipV1 } from './types.js';
 
 interface DurableBookmarkKeyRecord extends StoredKeyRecord<'bookmark'> {
   readonly key: CryptoKey;
@@ -18,6 +23,19 @@ interface BookmarkKeyContext {
   readonly reference: KeyReference<'bookmark'>;
   readonly key: CryptoKey;
 }
+
+interface ProtectedBookmarkOptions {
+  readonly getActiveBlobKey?: () => ActiveBlobKey | null;
+}
+
+type BookmarkContext = {
+  readonly db: IDBDatabase;
+  readonly repository: BookmarksRepository;
+  readonly bookmarkKey: BookmarkKeyContext;
+  readonly encryptedPins: EncryptedPinsRepository;
+  readonly encryptedThumbnails: EncryptedPinThumbnailsRepository;
+  readonly blobs: BlobsRepository;
+};
 
 export interface BookmarkPage {
   readonly items: readonly ImageDisplayRecord[];
@@ -39,11 +57,9 @@ export interface BookmarkRecallPage {
 }
 
 export class IndexedDbBookmarkStore implements BookmarkStore {
-  private ready: Promise<{
-    readonly db: IDBDatabase;
-    readonly repository: BookmarksRepository;
-    readonly bookmarkKey: BookmarkKeyContext;
-  } | null> | null = null;
+  private ready: Promise<BookmarkContext | null> | null = null;
+
+  constructor(private readonly options: ProtectedBookmarkOptions = {}) {}
 
   async load(): Promise<readonly ImageDisplayRecord[]> {
     return (await this.loadPage({ offset: 0, limit: DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax })).items;
@@ -60,16 +76,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const limit = Math.max(1, input.limit);
     if (!context) return { items: [], offset, limit, total: 0, hasOlder: false, hasNewer: false };
 
-    const records = await context.repository.listEncryptedNewestFirst();
-    const loaded: ImageDisplayRecord[] = [];
-    for (const record of records) {
-      try {
-        const payload = await context.repository.openRecord(record, context.bookmarkKey.key);
-        if (payload) loaded.push(toDisplayRecord(record.uuid, payload));
-      } catch {
-        // Bookmarks encrypted with unavailable legacy keys stay durable but hidden.
-      }
-    }
+    const loaded = this.options.getActiveBlobKey ? await this.loadMergedRecords(context) : await this.loadPlainRecords(context);
     const visible = filterByVisibilityScope(loaded, input.scope ?? 'global', input.currentPageUrl);
     const total = visible.length;
     const clampedOffset = clampPageOffset(offset, limit, total);
@@ -89,6 +96,9 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const importedDataUrl = record.url.startsWith('data:image/');
     const bookmark = createDisplayRecord({ ...record, id: importedDataUrl ? record.id : record.url, source: 'bookmark' });
     if (!context) return bookmark;
+
+    const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
+    if (activeBlobKey) return this.saveProtected(context, bookmark, activeBlobKey);
 
     const indexUrl = importedDataUrl ? `image-trail-import:${bookmark.id}` : bookmark.url;
     const existing = importedDataUrl
@@ -117,6 +127,23 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const offset = Math.max(0, input.offset);
     const limit = Math.max(1, input.limit);
     if (!context) return { items: [], offset, limit, nextOffset: offset, hasMore: false, total: 0, failedCount: 0 };
+
+    if (this.options.getActiveBlobKey) {
+      const loaded = await this.loadMergedRecords(context);
+      const visible = filterByVisibilityScope(loaded, input.scope ?? 'global', input.currentPageUrl);
+      const items = visible.slice(offset, offset + limit + 1);
+      const hasMore = items.length > limit;
+      if (hasMore) items.length = limit;
+      return {
+        items,
+        offset,
+        limit,
+        nextOffset: offset + items.length,
+        hasMore,
+        total: visible.length,
+        failedCount: 0,
+      };
+    }
 
     if ((input.scope ?? 'global') === 'site') {
       return this.loadRecallPageByScanning(context, input, offset, limit);
@@ -158,6 +185,21 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       // Queue pages read queueUpdatedAt newest-first, so earlier selected IDs get later timestamps.
       uniqueIds.map((uuid, index) => ({ uuid, queueUpdatedAt: new Date(baseTime + uniqueIds.length - index).toISOString() })),
     );
+    if (this.options.getActiveBlobKey) {
+      const protectedUpdates: Array<{ readonly id: string; readonly queueUpdatedAt: string }> = [];
+      for (const update of updated) {
+        try {
+          const payload = await context.repository.openRecord(update, context.bookmarkKey.key);
+          if (payload.protectedPin?.encryptedPinId) {
+            protectedUpdates.push({ id: payload.protectedPin.encryptedPinId, queueUpdatedAt: update.queueUpdatedAt });
+          }
+        } catch {
+          // Undecryptable relationship rows cannot be moved in the protected store.
+        }
+      }
+      await context.encryptedPins.updateQueueUpdatedAt(protectedUpdates);
+      return this.loadRecordsByIds(context, uniqueIds);
+    }
     const records: ImageDisplayRecord[] = [];
     for (const record of updated) {
       try {
@@ -174,7 +216,20 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const context = await this.openContext();
     if (!context) return;
     const existing = (await context.repository.getEncrypted(record.id)) ?? (await context.repository.getEncryptedByUrl(record.url));
-    if (existing) await context.repository.remove(existing.uuid);
+    if (!existing) return;
+    if (this.options.getActiveBlobKey) {
+      try {
+        const payload = await context.repository.openRecord(existing, context.bookmarkKey.key);
+        if (payload.protectedPin?.encryptedPinId) await context.encryptedPins.remove(payload.protectedPin.encryptedPinId);
+        if (payload.protectedPin?.encryptedThumbnailId) await context.encryptedThumbnails.remove(payload.protectedPin.encryptedThumbnailId);
+        if (record.privacyStatus === 'locked' && payload.protectedPin?.storedOriginalBlobId) {
+          await context.blobs.remove(payload.protectedPin.storedOriginalBlobId);
+        }
+      } catch {
+        // Still remove the relationship row if its protected side cannot be opened.
+      }
+    }
+    await context.repository.remove(existing.uuid);
   }
 
   async close(): Promise<void> {
@@ -183,24 +238,176 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     this.ready = null;
   }
 
-  private openContext(): Promise<{
-    readonly db: IDBDatabase;
-    readonly repository: BookmarksRepository;
-    readonly bookmarkKey: BookmarkKeyContext;
-  } | null> {
+  private openContext(): Promise<BookmarkContext | null> {
     this.ready ??= this.createContext();
     return this.ready;
   }
 
-  private async createContext(): Promise<{
-    readonly db: IDBDatabase;
-    readonly repository: BookmarksRepository;
-    readonly bookmarkKey: BookmarkKeyContext;
-  } | null> {
+  private async createContext(): Promise<BookmarkContext | null> {
     const result = await openImageTrailDb();
     if (!result.db) return null;
     const bookmarkKey = await ensureDurableBookmarkKey(new KeysRepository(result.db));
-    return { db: result.db, repository: new BookmarksRepository(result.db), bookmarkKey };
+    return {
+      db: result.db,
+      repository: new BookmarksRepository(result.db),
+      bookmarkKey,
+      encryptedPins: new EncryptedPinsRepository(result.db),
+      encryptedThumbnails: new EncryptedPinThumbnailsRepository(result.db),
+      blobs: new BlobsRepository(result.db),
+    };
+  }
+
+  private async loadPlainRecords(context: BookmarkContext): Promise<readonly ImageDisplayRecord[]> {
+    const records = await context.repository.listEncryptedNewestFirst();
+    const loaded: ImageDisplayRecord[] = [];
+    for (const record of records) {
+      try {
+        const payload = await context.repository.openRecord(record, context.bookmarkKey.key);
+        if (payload) loaded.push(toDisplayRecord(record.uuid, payload));
+      } catch {
+        // Bookmarks encrypted with unavailable legacy keys stay durable but hidden.
+      }
+    }
+    return loaded;
+  }
+
+  private async loadMergedRecords(context: BookmarkContext): Promise<readonly ImageDisplayRecord[]> {
+    const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
+    const plain = [...(await this.loadPlainRecords(context))];
+    if (!activeBlobKey) return plain;
+
+    const byId = new Map(plain.map((record) => [record.id, record]));
+    const urlToId = new Map(plain.filter((record) => record.privacyStatus !== 'locked').map((record) => [record.url, record.id]));
+    for (const encrypted of await context.encryptedPins.listNewestFirst()) {
+      try {
+        const display = await this.openProtectedDisplayRecord(context, encrypted, activeBlobKey);
+        const duplicateId = urlToId.get(display.url);
+        if (duplicateId) byId.delete(duplicateId);
+        byId.set(display.id, display);
+      } catch {
+        // Keep the relationship row placeholder if protected metadata cannot be decrypted.
+      }
+    }
+    return [...byId.values()].sort((left, right) => right.timestamp.localeCompare(left.timestamp));
+  }
+
+  private async loadRecordsByIds(context: BookmarkContext, ids: readonly string[]): Promise<readonly ImageDisplayRecord[]> {
+    const loaded = await this.loadMergedRecords(context);
+    const byId = new Map(loaded.map((record) => [record.id, record]));
+    return ids.map((id) => byId.get(id)).filter((record): record is ImageDisplayRecord => !!record);
+  }
+
+  private async saveProtected(
+    context: BookmarkContext,
+    bookmark: ImageDisplayRecord,
+    activeBlobKey: ActiveBlobKey,
+  ): Promise<ImageDisplayRecord> {
+    const urlHash = await hashUrl(bookmark.url);
+    const existingProtected = await context.encryptedPins.getByUrlHash(urlHash);
+    const plainPinId = existingProtected?.plainPinId ?? crypto.randomUUID();
+    const existingPlain = await context.repository.getEncrypted(plainPinId);
+    const encryptedPinId = existingProtected?.id ?? crypto.randomUUID();
+    const existingPlainPayload = existingPlain
+      ? await context.repository.openRecord(existingPlain, context.bookmarkKey.key).catch(() => null)
+      : null;
+    const thumbnail = await this.saveProtectedThumbnail(context, bookmark, activeBlobKey, plainPinId, existingPlainPayload?.protectedPin);
+    const queueUpdatedAt = existingPlain?.queueUpdatedAt ?? existingProtected?.queueUpdatedAt ?? bookmark.timestamp;
+
+    const protectedRecord = await context.encryptedPins.sealAndPut({
+      id: encryptedPinId,
+      plainPinId,
+      urlHash,
+      queueUpdatedAt,
+      payload: toProtectedPayload(bookmark, thumbnail?.id),
+      key: activeBlobKey.key,
+      keyReference: activeBlobKey.reference,
+      now: existingProtected?.envelope.updatedAt,
+    });
+
+    const relationship = protectedRelationship({
+      plainPinId,
+      encryptedPinId,
+      encryptedThumbnailId: thumbnail?.id ?? existingPlainPayload?.protectedPin?.encryptedThumbnailId,
+      storedOriginalBlobId: bookmark.storedOriginal?.blobId ?? bookmark.blobId ?? existingPlainPayload?.protectedPin?.storedOriginalBlobId,
+      queueUpdatedAt,
+    });
+    await context.repository.sealAndPut(
+      plainPinId,
+      toRelationshipPayload(relationship),
+      context.bookmarkKey.key,
+      context.bookmarkKey.reference,
+      existingPlain?.envelope.updatedAt,
+      privatePinUrl(plainPinId),
+      queueUpdatedAt,
+    );
+
+    return this.openProtectedDisplayRecord(context, protectedRecord, activeBlobKey);
+  }
+
+  private async saveProtectedThumbnail(
+    context: BookmarkContext,
+    bookmark: ImageDisplayRecord,
+    activeBlobKey: ActiveBlobKey,
+    plainPinId: string,
+    existing?: ProtectedPinRelationshipV1,
+  ): Promise<{ readonly id: string } | null> {
+    if (!bookmark.thumbnail?.startsWith('data:image/')) return null;
+    const parsed = dataUrlToBytes(bookmark.thumbnail);
+    if (!parsed) return null;
+    const id = existing?.encryptedThumbnailId ?? crypto.randomUUID();
+    await context.encryptedThumbnails.sealAndPut({
+      id,
+      pinId: plainPinId,
+      mimeType: parsed.mimeType,
+      bytes: parsed.bytes,
+      key: activeBlobKey.key,
+      keyReference: activeBlobKey.reference,
+    });
+    return { id };
+  }
+
+  private async openProtectedDisplayRecord(
+    context: BookmarkContext,
+    record: EncryptedPinRecord,
+    activeBlobKey: ActiveBlobKey,
+  ): Promise<ImageDisplayRecord> {
+    const payload = await context.encryptedPins.openRecord(record, activeBlobKey.key);
+    const thumbnail = payload.thumbnailId ? await this.openProtectedThumbnail(context, payload.thumbnailId, activeBlobKey) : undefined;
+    const storedOriginal = payload.storedOriginal;
+    return createDisplayRecord({
+      id: record.plainPinId,
+      url: payload.url,
+      title: payload.title,
+      label: payload.label,
+      thumbnail,
+      width: payload.width,
+      height: payload.height,
+      timestamp: record.queueUpdatedAt,
+      downloadedAt: payload.downloadedAt,
+      capturedAt: payload.capturedAt ?? storedOriginal?.capturedAt,
+      captureStatus: storedOriginal ? 'captured' : undefined,
+      blobId: storedOriginal?.blobId,
+      storedOriginal,
+      source: payload.sourceCompatibility ?? 'bookmark',
+      privacyStatus: 'unlocked',
+      protectedPin: protectedRelationship({
+        plainPinId: record.plainPinId,
+        encryptedPinId: record.id,
+        encryptedThumbnailId: payload.thumbnailId,
+        storedOriginalBlobId: payload.storedOriginal?.blobId,
+        queueUpdatedAt: record.queueUpdatedAt,
+      }),
+    });
+  }
+
+  private async openProtectedThumbnail(
+    context: BookmarkContext,
+    thumbnailId: string,
+    activeBlobKey: ActiveBlobKey,
+  ): Promise<string | undefined> {
+    const record = await context.encryptedThumbnails.get(thumbnailId);
+    if (!record || record.key.reference !== activeBlobKey.reference.reference) return undefined;
+    return (await context.encryptedThumbnails.openRecord(record, activeBlobKey.key)).dataUrl;
   }
 
   private async loadRecallPageByScanning(
@@ -325,10 +532,38 @@ function toPayload(record: ImageDisplayRecord): DurableBookmarkPayloadV1 {
     capturedAt: record.capturedAt,
     sourceCompatibility: 'favorites',
     storedOriginal: record.storedOriginal,
+    protectedPin: record.protectedPin
+      ? protectedRelationship({
+          plainPinId: record.protectedPin.plainPinId,
+          encryptedPinId: record.protectedPin.encryptedPinId,
+          encryptedThumbnailId: record.protectedPin.encryptedThumbnailId,
+          storedOriginalBlobId: record.protectedPin.storedOriginalBlobId,
+          queueUpdatedAt: record.timestamp,
+        })
+      : undefined,
   };
 }
 
 function toDisplayRecord(id: string, payload: DurableBookmarkPayloadV1): ImageDisplayRecord {
+  if (payload.protectedPin) {
+    return createDisplayRecord({
+      id,
+      url: payload.url || privatePinUrl(payload.protectedPin.plainPinId),
+      label: 'Private pin',
+      timestamp: payload.protectedPin.queueUpdatedAt,
+      source: payload.sourceCompatibility ?? 'bookmark',
+      privacyStatus: 'locked',
+      protectedPin: {
+        plainPinId: payload.protectedPin.plainPinId,
+        encryptedPinId: payload.protectedPin.encryptedPinId,
+        encryptedThumbnailId: payload.protectedPin.encryptedThumbnailId,
+        storedOriginalBlobId: payload.protectedPin.storedOriginalBlobId,
+        hasEncryptedMetadata: payload.protectedPin.hasEncryptedMetadata,
+        hasEncryptedThumbnail: payload.protectedPin.hasEncryptedThumbnail,
+        hasStoredOriginal: payload.protectedPin.hasStoredOriginal,
+      },
+    });
+  }
   const storedOriginal = payload.storedOriginal;
   return createDisplayRecord({
     id,
@@ -346,4 +581,71 @@ function toDisplayRecord(id: string, payload: DurableBookmarkPayloadV1): ImageDi
     storedOriginal,
     source: payload.sourceCompatibility ?? 'bookmark',
   });
+}
+
+function toProtectedPayload(record: ImageDisplayRecord, thumbnailId: string | undefined): DurableEncryptedPinPayloadV1 {
+  return {
+    url: record.url,
+    title: record.title,
+    label: record.label,
+    width: record.width,
+    height: record.height,
+    bookmarkedAt: record.timestamp,
+    downloadedAt: record.downloadedAt,
+    capturedAt: record.capturedAt,
+    sourceCompatibility: 'favorites',
+    storedOriginal: record.storedOriginal,
+    thumbnailId,
+  };
+}
+
+function toRelationshipPayload(relationship: ProtectedPinRelationshipV1): DurableBookmarkPayloadV1 {
+  return {
+    url: privatePinUrl(relationship.plainPinId),
+    label: 'Private pin',
+    bookmarkedAt: relationship.queueUpdatedAt,
+    sourceCompatibility: 'favorites',
+    protectedPin: relationship,
+  };
+}
+
+function protectedRelationship(input: {
+  readonly plainPinId: string;
+  readonly encryptedPinId?: string;
+  readonly encryptedThumbnailId?: string;
+  readonly storedOriginalBlobId?: string;
+  readonly queueUpdatedAt: string;
+}): ProtectedPinRelationshipV1 {
+  return {
+    schemaVersion: 1,
+    plainPinId: input.plainPinId,
+    encryptedPinId: input.encryptedPinId,
+    encryptedThumbnailId: input.encryptedThumbnailId,
+    storedOriginalBlobId: input.storedOriginalBlobId,
+    queueUpdatedAt: input.queueUpdatedAt,
+    hasEncryptedMetadata: !!input.encryptedPinId,
+    hasEncryptedThumbnail: !!input.encryptedThumbnailId,
+    hasStoredOriginal: !!input.storedOriginalBlobId,
+  };
+}
+
+function privatePinUrl(plainPinId: string): string {
+  return `image-trail-private:${plainPinId}`;
+}
+
+async function hashUrl(url: string): Promise<string> {
+  return computeSha256(new TextEncoder().encode(url).buffer);
+}
+
+function dataUrlToBytes(dataUrl: string): { readonly mimeType: string; readonly bytes: ArrayBuffer } | null {
+  const match = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/iu.exec(dataUrl);
+  if (!match) return null;
+  try {
+    const binary = atob(match[2]!.replace(/\s/gu, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return { mimeType: match[1]!.toLowerCase(), bytes: bytes.buffer };
+  } catch {
+    return null;
+  }
 }
