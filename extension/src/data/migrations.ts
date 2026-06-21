@@ -82,6 +82,40 @@ export function migrateImageTrailDb(db: IDBDatabase, oldVersion: number, transac
     };
   }
 
+  if (oldVersion < 7) {
+    const encryptedPins = db.objectStoreNames.contains(DataStore.EncryptedPins)
+      ? requireUpgradeTransaction(transaction).objectStore(DataStore.EncryptedPins)
+      : db.createObjectStore(DataStore.EncryptedPins, { keyPath: 'id' });
+    if (!encryptedPins.indexNames.contains(SchemaIndex.EncryptedPinsByPlainPinId)) {
+      encryptedPins.createIndex(SchemaIndex.EncryptedPinsByPlainPinId, 'plainPinId', { unique: true });
+    }
+    if (!encryptedPins.indexNames.contains(SchemaIndex.EncryptedPinsByUrlHash)) {
+      encryptedPins.createIndex(SchemaIndex.EncryptedPinsByUrlHash, 'urlHash', { unique: false });
+    }
+    if (!encryptedPins.indexNames.contains(SchemaIndex.EncryptedPinsByQueueUpdatedAt)) {
+      encryptedPins.createIndex(SchemaIndex.EncryptedPinsByQueueUpdatedAt, 'queueUpdatedAt', { unique: false });
+    }
+    if (!encryptedPins.indexNames.contains(SchemaIndex.EncryptedPinsByKeyReference)) {
+      encryptedPins.createIndex(SchemaIndex.EncryptedPinsByKeyReference, 'envelope.key.reference', { unique: false });
+    }
+
+    const thumbnails = db.objectStoreNames.contains(DataStore.EncryptedPinThumbnails)
+      ? requireUpgradeTransaction(transaction).objectStore(DataStore.EncryptedPinThumbnails)
+      : db.createObjectStore(DataStore.EncryptedPinThumbnails, { keyPath: 'id' });
+    if (!thumbnails.indexNames.contains(SchemaIndex.EncryptedPinThumbnailsByPinId)) {
+      thumbnails.createIndex(SchemaIndex.EncryptedPinThumbnailsByPinId, 'pinId', { unique: false });
+    }
+    if (!thumbnails.indexNames.contains(SchemaIndex.EncryptedPinThumbnailsByCreatedAt)) {
+      thumbnails.createIndex(SchemaIndex.EncryptedPinThumbnailsByCreatedAt, 'createdAt', { unique: false });
+    }
+    if (!thumbnails.indexNames.contains(SchemaIndex.EncryptedPinThumbnailsByByteLength)) {
+      thumbnails.createIndex(SchemaIndex.EncryptedPinThumbnailsByByteLength, 'byteLength', { unique: false });
+    }
+    if (!thumbnails.indexNames.contains(SchemaIndex.EncryptedPinThumbnailsByKeyReference)) {
+      thumbnails.createIndex(SchemaIndex.EncryptedPinThumbnailsByKeyReference, 'key.reference', { unique: false });
+    }
+  }
+
   const metadata = transaction?.objectStore(DataStore.Metadata);
   metadata?.put({
     key: 'schema',

@@ -1267,7 +1267,7 @@ export class ImageTrailPanel {
   private async removeBookmark(id: string): Promise<void> {
     const bookmark = this.state.bookmarks.find((item) => item.id === id);
     if (!bookmark) return;
-    if (bookmark.blobId) await this.removeCapturedBlobReference(bookmark.blobId);
+    if (bookmark.blobId && !bookmark.protectedPin) await this.removeCapturedBlobReference(bookmark.blobId);
     await this.bookmarkStore?.remove(bookmark);
     this.state = reducePanelAction(this.state, { name: 'bookmark/remove', id });
     await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
@@ -1519,6 +1519,11 @@ export class ImageTrailPanel {
       { ...this.state, message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() },
       { name: 'blob-key/status', unlocked: result.ok, keyReference: result.ok ? result.keyReference : null, hasKey: result.ok },
     );
+    if (result.ok) {
+      await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
+      this.renderPanelAndRefreshRecall();
+      return;
+    }
     this.render();
   }
 
@@ -1534,6 +1539,11 @@ export class ImageTrailPanel {
         hasKey: this.state.blobKeyAvailable,
       },
     );
+    if (result.ok) {
+      await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
+      this.renderPanelAndRefreshRecall();
+      return;
+    }
     this.render();
   }
 
@@ -1575,6 +1585,15 @@ export class ImageTrailPanel {
       this.state.selectedBookmarkIds.length > 0
         ? selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds)
         : await this.loadAllBookmarksForExport();
+    if (bookmarks.some(isLockedPrivatePin)) {
+      this.finishExport(
+        undefined,
+        undefined,
+        'Unlock encrypted storage before exporting private pins so the backup includes their metadata and thumbnails.',
+        false,
+      );
+      return;
+    }
     const entries = bookmarks.map(bookmarkRecordToExportEntry);
     const result = plaintext ? exportPlainBookmarks({ entries }) : await exportEncryptedBookmarks({ entries, password });
     this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
@@ -1611,7 +1630,8 @@ export class ImageTrailPanel {
     }
     await this.refreshBlobKeyStatus();
     this.state = reducePanelAction(this.state, { name: 'import-export/complete', message: result.message });
-    this.render();
+    await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
+    this.renderPanelAndRefreshRecall();
   }
 
   private async exportImage(saveAs: boolean): Promise<void> {
@@ -2087,6 +2107,10 @@ function selectedRecords(records: readonly ImageDisplayRecord[], selectedIds: re
   if (selectedIds.length === 0) return records;
   const selected = new Set(selectedIds);
   return records.filter((record) => selected.has(record.id));
+}
+
+function isLockedPrivatePin(record: ImageDisplayRecord): boolean {
+  return record.privacyStatus === 'locked' || record.url.startsWith('image-trail-private:');
 }
 
 function historyPayloadToDisplayRecord(uuid: string, payload: DurableHistoryPayloadV1): ImageDisplayRecord {

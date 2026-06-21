@@ -12,6 +12,8 @@ import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFi
 import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../data/import-export/key-backup.js';
 import { openImageTrailDb } from '../data/db.js';
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
+import { EncryptedPinsRepository } from '../data/repositories/encrypted-pins-repository.js';
+import { EncryptedPinThumbnailsRepository } from '../data/repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from '../data/repositories/keys-repository.js';
 import type { StoredBlobRecord } from '../data/types.js';
 import type { StoredKeyRecord } from '../data/crypto/types.js';
@@ -87,7 +89,7 @@ interface PreviewPayload {
 }
 
 const previewPayloads = new Map<string, PreviewPayload>();
-const bookmarkStore = new IndexedDbBookmarkStore();
+const bookmarkStore = new IndexedDbBookmarkStore({ getActiveBlobKey });
 const panelPositionStore = new IndexedDbPanelPositionStore();
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
 const recentHistoryBySite = new Map<string, import('../core/display-records.js').ImageDisplayRecord[]>();
@@ -387,9 +389,20 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
   const db = await getDb();
   if (!db) return { totalBytes: 0, blobCount: 0 };
   const blobs = new BlobsRepository(db);
-  const [usage, referenced] = await Promise.all([blobs.getStorageUsage(), referencedBlobIds()]);
+  const pins = new EncryptedPinsRepository(db);
+  const thumbnails = new EncryptedPinThumbnailsRepository(db);
+  const [usage, pinUsage, thumbnailUsage, referenced] = await Promise.all([
+    blobs.getStorageUsage(),
+    pins.getStorageUsage(),
+    thumbnails.getStorageUsage(),
+    referencedBlobIds(),
+  ]);
   const all = await blobs.list();
-  return { ...usage, orphanedBlobCount: all.filter((blob) => !referenced.has(blob.id)).length };
+  return {
+    totalBytes: usage.totalBytes + pinUsage.totalBytes + thumbnailUsage.totalBytes,
+    blobCount: usage.blobCount + pinUsage.blobCount + thumbnailUsage.blobCount,
+    orphanedBlobCount: all.filter((blob) => !referenced.has(blob.id)).length,
+  };
 }
 
 async function handleLoadBookmarks(message: LoadBookmarksMessage): Promise<import('./messages.js').LoadBookmarksResultMessage['payload']> {

@@ -1,7 +1,7 @@
 import type { DataStoreName } from './types.js';
 
 export const IMAGE_TRAIL_DB_NAME = 'image-trail';
-export const IMAGE_TRAIL_DB_VERSION = 6;
+export const IMAGE_TRAIL_DB_VERSION = 7;
 
 export const DataStore = {
   Metadata: 'metadata',
@@ -10,6 +10,8 @@ export const DataStore = {
   Bookmarks: 'bookmarks',
   Blobs: 'blobs',
   Downloads: 'downloads',
+  EncryptedPins: 'encryptedPins',
+  EncryptedPinThumbnails: 'encryptedPinThumbnails',
 } as const satisfies Record<string, DataStoreName>;
 
 export const DATA_STORE_NAMES = Object.values(DataStore);
@@ -29,4 +31,12 @@ export const SchemaIndex = {
   BlobsByKeyReference: 'blobs.byKeyReference',
   DownloadsByDownloadedAt: 'downloads.byDownloadedAt',
   DownloadsByKeyReference: 'downloads.byKeyReference',
+  EncryptedPinsByPlainPinId: 'encryptedPins.byPlainPinId',
+  EncryptedPinsByUrlHash: 'encryptedPins.byUrlHash',
+  EncryptedPinsByQueueUpdatedAt: 'encryptedPins.byQueueUpdatedAt',
+  EncryptedPinsByKeyReference: 'encryptedPins.byKeyReference',
+  EncryptedPinThumbnailsByPinId: 'encryptedPinThumbnails.byPinId',
+  EncryptedPinThumbnailsByCreatedAt: 'encryptedPinThumbnails.byCreatedAt',
+  EncryptedPinThumbnailsByByteLength: 'encryptedPinThumbnails.byByteLength',
+  EncryptedPinThumbnailsByKeyReference: 'encryptedPinThumbnails.byKeyReference',
 } as const;

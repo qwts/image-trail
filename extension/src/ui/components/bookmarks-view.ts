@@ -129,6 +129,7 @@ export function createBookmarksView(
   list.className = 'image-trail-panel__record-list';
   for (const item of items) {
     const capturedBlobId = encryptedBlobIdForRecord(item);
+    const privatePlaceholder = item.privacyStatus === 'locked';
     const encryptedRecord = isEncryptedRecord(item);
     const keyUnavailable = encryptedRecord && !blobKeyUnlocked;
     const keyMissing = !blobKeyAvailable;
@@ -147,7 +148,11 @@ export function createBookmarksView(
       event.stopImmediatePropagation();
       dispatch({ name: 'bookmark-selection/toggle', id: item.id });
     });
-    if (keyUnavailable) {
+    if (privatePlaceholder) {
+      entry.classList.add('is-locked-encrypted');
+      entry.setAttribute('aria-disabled', 'true');
+      entry.title = 'Unlock encrypted originals before using this private pin.';
+    } else if (keyUnavailable) {
       entry.classList.add('is-locked-encrypted');
       entry.classList.add('is-key-unavailable');
       entry.setAttribute('aria-disabled', 'true');

@@ -9,12 +9,23 @@ export interface ImageDisplayRecord {
   readonly width?: number;
   readonly height?: number;
   readonly timestamp: string;
+  readonly queueUpdatedAt?: string;
   readonly downloadedAt?: string;
   readonly capturedAt?: string;
   readonly source?: 'history' | 'bookmark' | 'favorites';
   readonly captureStatus?: CaptureStatus;
   readonly blobId?: string;
   readonly storedOriginal?: StoredOriginalReference;
+  readonly privacyStatus?: 'locked' | 'unlocked';
+  readonly protectedPin?: {
+    readonly plainPinId: string;
+    readonly encryptedPinId?: string;
+    readonly encryptedThumbnailId?: string;
+    readonly storedOriginalBlobId?: string;
+    readonly hasEncryptedMetadata: boolean;
+    readonly hasEncryptedThumbnail: boolean;
+    readonly hasStoredOriginal: boolean;
+  };
 }
 
 export const IMAGE_RECORD_EXTENSIONS = ['PNG', 'JPG', 'JPEG', 'GIF', 'WEBP'] as const;
