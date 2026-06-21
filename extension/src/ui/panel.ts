@@ -394,6 +394,7 @@ export class ImageTrailPanel {
       action.name === 'history-selection/toggle' ||
       action.name === 'history-selection/clear' ||
       action.name === 'bookmark-selection/toggle' ||
+      action.name === 'bookmark-selection/single' ||
       action.name === 'bookmark-selection/clear'
     ) {
       this.state = reducePanelAction(this.state, action);

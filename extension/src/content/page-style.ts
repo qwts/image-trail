@@ -1,4 +1,7 @@
-type StyleSnapshot = Pick<CSSStyleDeclaration, 'cursor' | 'height' | 'objectFit' | 'opacity' | 'outline' | 'outlineOffset' | 'width'>;
+type StyleSnapshot = Pick<
+  CSSStyleDeclaration,
+  'backgroundColor' | 'cursor' | 'height' | 'objectFit' | 'opacity' | 'outline' | 'outlineOffset' | 'width'
+>;
 type PageBackdropSnapshot = Pick<CSSStyleDeclaration, 'background' | 'backgroundColor'>;
 
 interface SelectedTargetOptions {
@@ -11,6 +14,7 @@ let pageBackdropSnapshot: { readonly body: PageBackdropSnapshot; readonly docume
 function snapshot(element: HTMLElement): void {
   if (snapshots.has(element)) return;
   snapshots.set(element, {
+    backgroundColor: element.style.backgroundColor,
     cursor: element.style.cursor,
     height: element.style.height,
     objectFit: element.style.objectFit,
@@ -36,11 +40,11 @@ export function markHoveredTarget(element: HTMLElement): void {
 
 export function markSelectedTarget(element: HTMLElement, options: SelectedTargetOptions = {}): void {
   snapshot(element);
-  element.style.backgroundColor = '#000';
   element.dataset.imageTrailSelected = 'true';
   if (options.lockBox) {
     element.dataset.imageTrailLockBox = 'true';
     markPageBackdropBlack();
+    element.style.backgroundColor = '#000';
     element.style.height = '100%';
     element.style.objectFit = 'contain';
     element.style.width = '100%';
@@ -53,6 +57,7 @@ export function markSelectedTarget(element: HTMLElement, options: SelectedTarget
 export function restoreElementStyles(element: HTMLElement): void {
   const original = snapshots.get(element);
   if (original) {
+    element.style.backgroundColor = original.backgroundColor;
     element.style.cursor = original.cursor;
     element.style.height = original.height;
     element.style.objectFit = original.objectFit;

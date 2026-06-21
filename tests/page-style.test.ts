@@ -13,6 +13,7 @@ function createImageElement(): HTMLElement {
       outline: '',
       outlineOffset: '',
       width: '144px',
+      backgroundColor: '',
     } as CSSStyleDeclaration,
   } as unknown as HTMLElement;
 }
@@ -41,6 +42,7 @@ test('selected target lockBox constrains the host image box and restores origina
   assert.equal(element.style.height, '72px');
   assert.equal(element.style.objectFit, 'cover');
   assert.equal(element.style.width, '144px');
+  assert.equal(element.style.backgroundColor, '');
   assert.equal(element.dataset.imageTrailSelected, undefined);
 });
 
@@ -78,4 +80,5 @@ test('selected target without lockBox leaves inline sizing alone', () => {
   assert.equal(element.style.height, '72px');
   assert.equal(element.style.objectFit, 'cover');
   assert.equal(element.style.width, '144px');
+  assert.equal(element.style.backgroundColor, '');
 });
