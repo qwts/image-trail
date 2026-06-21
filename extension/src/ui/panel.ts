@@ -116,6 +116,7 @@ export class ImageTrailPanel {
   private bookmarkMutationQueue: Promise<void> = Promise.resolve();
   private panelPositionRestored = false;
   private panelPositionRestorePromise: Promise<void> | null = null;
+  private panelPositionRestoreAttempt = 0;
   private restoredPanelPosition: PanelPosition | null = null;
   private recallOpeningUntil = 0;
   private recallMessageClearTimer: number | null = null;
@@ -205,6 +206,7 @@ export class ImageTrailPanel {
     document.getElementById(ROOT_ID)?.remove();
     this.root = null;
     this.recallRoot = null;
+    this.panelPositionRestoreAttempt += 1;
     this.panelPositionRestored = false;
     this.panelPositionRestorePromise = null;
     this.restoredPanelPosition = null;
@@ -1842,16 +1844,21 @@ export class ImageTrailPanel {
 
   private async ensurePanelPositionRestored(): Promise<void> {
     if (!this.root) return;
-    this.panelPositionRestorePromise ??= this.restorePanelPosition();
+    this.panelPositionRestorePromise ??= this.beginPanelPositionRestore();
     await this.panelPositionRestorePromise;
   }
 
   private queuePanelPositionRestore(): void {
     if (!this.root || this.panelPositionRestored || this.panelPositionRestorePromise) return;
-    this.panelPositionRestorePromise = this.restorePanelPosition();
+    this.panelPositionRestorePromise = this.beginPanelPositionRestore();
   }
 
-  private async restorePanelPosition(): Promise<void> {
+  private beginPanelPositionRestore(): Promise<void> {
+    const attempt = (this.panelPositionRestoreAttempt += 1);
+    return this.restorePanelPosition(attempt);
+  }
+
+  private async restorePanelPosition(attempt: number): Promise<void> {
     if (!this.root || !this.panelPositionStore || this.panelPositionRestored) return;
     try {
       const hostname = hostnameFromLocation();
@@ -1864,7 +1871,9 @@ export class ImageTrailPanel {
       this.applyRestoredPanelPosition();
       this.renderRecallOnly();
     } finally {
-      this.panelPositionRestored = true;
+      if (this.root && this.panelPositionRestoreAttempt === attempt) {
+        this.panelPositionRestored = true;
+      }
     }
   }
 
