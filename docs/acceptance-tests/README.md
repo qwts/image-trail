@@ -10,3 +10,4 @@ These scenarios define the first browser-level acceptance coverage for the Brave
 - [Third-Party CDN Permission Flow](third-party-cdn-permission-flow.md)
 - [Oversized Original Is Bounded](oversized-original-is-bounded.md)
 - [Panel Layout Stability](panel-layout-stability.md)
+- [Multi-Select Image Download](multi-select-image-download.md)

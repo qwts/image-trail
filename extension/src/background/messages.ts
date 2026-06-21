@@ -7,6 +7,8 @@ export const MessageType = {
   Unknown: 'imageTrail.unknown',
   CaptureImage: 'imageTrail.captureImage',
   CaptureResult: 'imageTrail.captureResult',
+  DownloadImage: 'imageTrail.downloadImage',
+  DownloadImageResult: 'imageTrail.downloadImageResult',
   StorageUsageRequest: 'imageTrail.storageUsageRequest',
   StorageUsageResponse: 'imageTrail.storageUsageResponse',
   DeleteBlob: 'imageTrail.deleteBlob',
@@ -82,6 +84,22 @@ export interface CaptureResultMessage {
   readonly type: typeof MessageType.CaptureResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload: import('../core/image/capture-result.js').CaptureResult;
+}
+
+export interface DownloadImageMessage {
+  readonly type: typeof MessageType.DownloadImage;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: {
+    readonly url: string;
+    readonly fileName: string;
+    readonly saveAs: boolean;
+  };
+}
+
+export interface DownloadImageResultMessage {
+  readonly type: typeof MessageType.DownloadImageResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: true; readonly downloadId: number } | { readonly ok: false; readonly message: string };
 }
 
 export interface StorageUsageRequestMessage {
@@ -309,6 +327,7 @@ export type ExtensionRequest =
   | TogglePanelMessage
   | PingMessage
   | CaptureImageMessage
+  | DownloadImageMessage
   | StorageUsageRequestMessage
   | DeleteBlobMessage
   | CleanupOrphanedBlobsMessage
@@ -330,6 +349,7 @@ export type ExtensionResponse =
   | StatusMessage
   | UnknownMessageResponse
   | CaptureResultMessage
+  | DownloadImageResultMessage
   | StorageUsageResponseMessage
   | DeleteBlobResultMessage
   | CleanupOrphanedBlobsResultMessage
@@ -368,6 +388,14 @@ export function createCaptureImageMessage(url: string, sourceType: CaptureSource
 
 export function createCaptureResultMessage(result: import('../core/image/capture-result.js').CaptureResult): CaptureResultMessage {
   return { type: MessageType.CaptureResult, version: MESSAGE_PROTOCOL_VERSION, payload: result };
+}
+
+export function createDownloadImageMessage(url: string, fileName: string, saveAs: boolean): DownloadImageMessage {
+  return { type: MessageType.DownloadImage, version: MESSAGE_PROTOCOL_VERSION, payload: { url, fileName, saveAs } };
+}
+
+export function createDownloadImageResultMessage(payload: DownloadImageResultMessage['payload']): DownloadImageResultMessage {
+  return { type: MessageType.DownloadImageResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createStorageUsageRequestMessage(): StorageUsageRequestMessage {
@@ -528,6 +556,7 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.TogglePanel ||
     value.type === MessageType.Ping ||
     value.type === MessageType.CaptureImage ||
+    value.type === MessageType.DownloadImage ||
     value.type === MessageType.StorageUsageRequest ||
     value.type === MessageType.DeleteBlob ||
     value.type === MessageType.CleanupOrphanedBlobs ||
@@ -554,6 +583,7 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.Status ||
     value.type === MessageType.Unknown ||
     value.type === MessageType.CaptureResult ||
+    value.type === MessageType.DownloadImageResult ||
     value.type === MessageType.StorageUsageResponse ||
     value.type === MessageType.DeleteBlobResult ||
     value.type === MessageType.CleanupOrphanedBlobsResult ||
@@ -604,6 +634,11 @@ export function isFetchThumbnailSourceResultMessage(value: unknown): value is Fe
 export function isCaptureResultMessage(value: unknown): value is CaptureResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.CaptureResult;
+}
+
+export function isDownloadImageResultMessage(value: unknown): value is DownloadImageResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.DownloadImageResult;
 }
 
 export function isLoadBookmarksResultMessage(value: unknown): value is LoadBookmarksResultMessage {

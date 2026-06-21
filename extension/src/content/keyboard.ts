@@ -10,16 +10,17 @@ export interface KeyBinding {
 
 export type KeyActionHandler = (action: string) => void;
 
-const DEFAULT_BINDINGS: KeyBinding[] = [
+export const DEFAULT_BINDINGS: KeyBinding[] = [
   { key: 'ArrowRight', action: 'next' },
   { key: 'ArrowLeft', action: 'previous' },
-  { key: 'ArrowUp', action: 'field-up' },
-  { key: 'ArrowDown', action: 'field-down' },
+  { key: 'ArrowDown', action: 'download' },
   { key: ' ', action: 'slideshow-toggle' },
   { key: 'Escape', action: 'stop' },
   { key: 's', action: 'slideshow-toggle' },
   { key: 'p', action: 'panel-toggle' },
-  { key: 'Enter', shift: true, action: 'download' },
+  { key: 'd', action: 'download' },
+  { key: 'D', shift: true, action: 'download-save-as' },
+  { key: 'Enter', shift: true, action: 'download-save-as' },
   { key: 'r', action: 'retry' },
 ];
 
@@ -33,6 +34,13 @@ export function classifyTarget(event: KeyboardEvent): KeyTarget {
   if (tag === 'BUTTON') return 'button';
   if (typeof el['closest'] === 'function' && (el as unknown as HTMLElement).closest('#image-trail-panel-root')) return 'panel';
   return 'page';
+}
+
+export function shouldRouteKeyboardShortcut(target: KeyTarget, action: string): boolean {
+  if (target === 'typing') return false;
+  // Keep native button activation intact; only the explicit download shortcuts are global from focused panel controls.
+  if (target === 'button') return action === 'download' || action === 'download-save-as';
+  return true;
 }
 
 function matchesBinding(event: KeyboardEvent, binding: KeyBinding): boolean {
@@ -72,10 +80,10 @@ export class KeyboardRouter {
 
   private onKeyDown = (event: KeyboardEvent): void => {
     const target = classifyTarget(event);
-    if (target === 'typing' || target === 'button') return;
 
     for (const binding of this.bindings) {
       if (matchesBinding(event, binding)) {
+        if (!shouldRouteKeyboardShortcut(target, binding.action)) return;
         event.preventDefault();
         event.stopPropagation();
         this.handler(binding.action);

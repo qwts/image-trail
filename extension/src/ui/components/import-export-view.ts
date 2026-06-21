@@ -3,7 +3,7 @@ import type { ImportedImageFile } from '../../core/types.js';
 export type ImportExportAction =
   | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
-  | { readonly name: 'export/image' }
+  | { readonly name: 'export/image'; readonly saveAs?: boolean }
   | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
@@ -14,6 +14,8 @@ export interface ImportExportViewState {
   readonly currentImageUrl: string | null;
   readonly selectedHistoryCount: number;
   readonly selectedBookmarkCount: number;
+  readonly selectedImageDownloadCount: number;
+  readonly imageDownloadAvailable: boolean;
   readonly lastMessage?: string;
   readonly lastMessageIsError?: boolean;
 }
@@ -149,10 +151,10 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
 
   const exportBtn = document.createElement('button');
   exportBtn.type = 'button';
-  exportBtn.textContent = 'Export image';
-  exportBtn.disabled = state.busy || !state.currentImageUrl;
-  exportBtn.addEventListener('click', () => {
-    dispatch({ name: 'export/image' });
+  exportBtn.textContent = state.selectedImageDownloadCount > 0 ? `Export images (${state.selectedImageDownloadCount})` : 'Export images';
+  exportBtn.disabled = state.busy || !state.imageDownloadAvailable;
+  exportBtn.addEventListener('click', (event) => {
+    dispatch({ name: 'export/image', saveAs: event.shiftKey });
   });
 
   const actions = document.createElement('div');

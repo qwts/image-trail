@@ -1,10 +1,12 @@
 import type { CaptureStore } from '../content/capture-controller.js';
+import { requestImageDownload } from '../content/download-controller.js';
 import type { RecentHistoryStore } from '../content/recent-history-store.js';
 import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
 import type { PageAdapter, TargetSelectionSnapshot } from '../content/page-adapter.js';
 import {
   createDisplayRecord,
+  encryptedBlobIdForRecord,
   isDurableImageSourceUrl,
   validateImageRecordUrl,
   type ImageRecordUrlValidation,
@@ -16,7 +18,7 @@ import { Slideshow } from '../core/automation/slideshow.js';
 import { createInitialPanelState, setAutomationState, setTargetState } from '../core/state.js';
 import type { BookmarkStore, ImportedImageFile, PanelAction, PanelState, TargetState } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
-import { filenameFromUrl } from '../core/image/downloads.js';
+import { filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
 import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
 import { applyFieldSplitSpecs, createFieldSplitSpec } from '../core/url/field-splits.js';
 import { parseUrl } from '../core/url/parse-url.js';
@@ -375,7 +377,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'export/image') {
-      this.exportImage();
+      void this.exportImage(action.saveAs === true);
       return;
     }
 
@@ -499,6 +501,14 @@ export class ImageTrailPanel {
         break;
       case 'retry':
         this.dispatch({ name: 'retry-start' });
+        break;
+      case 'download':
+        if (this.state.importExportBusy) return;
+        this.dispatch({ name: 'export/image', saveAs: false });
+        break;
+      case 'download-save-as':
+        if (this.state.importExportBusy) return;
+        this.dispatch({ name: 'export/image', saveAs: true });
         break;
       default:
         break;
@@ -1161,16 +1171,69 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private exportImage(): void {
-    const url = this.selectedImageExportUrl();
-    if (!url) {
+  private async exportImage(saveAs: boolean): Promise<void> {
+    if (this.state.importExportBusy) return;
+    const selectedRecordsForDownload = this.selectedImageDownloadRecords();
+    const urls =
+      selectedRecordsForDownload.length > 0
+        ? []
+        : selectImageDownloadUrls({
+            history: this.state.history,
+            bookmarks: this.state.bookmarks,
+            selectedHistoryIds: this.state.selectedHistoryIds,
+            selectedBookmarkIds: this.state.selectedBookmarkIds,
+            currentImageUrl: this.selectedImageExportUrl(),
+          });
+    if (selectedRecordsForDownload.length === 0 && urls.length === 0) {
       this.state = reducePanelAction(this.state, { name: 'import-export/error', message: 'Select an image before exporting.' });
       this.render();
       return;
     }
-    downloadUrl(url, filenameForExportedImage(url));
-    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message: 'Image export started.' });
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
     this.render();
+    const downloads =
+      selectedRecordsForDownload.length > 0
+        ? await this.selectedRecordImageDownloads(selectedRecordsForDownload)
+        : urls.map((url) => ({ url, fileName: filenameForExportedImage(url) }));
+    const result = await downloadUrlsInSeries(downloads, saveAs);
+    const message = imageDownloadResultMessage(result);
+    if (result.started === 0) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message });
+      this.render();
+      return;
+    }
+    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message });
+    this.render();
+  }
+
+  private selectedImageDownloadRecords(): readonly ImageDisplayRecord[] {
+    if (this.state.selectedHistoryIds.length > 0) {
+      return selectedRecords(this.state.history, this.state.selectedHistoryIds);
+    }
+    if (this.state.selectedBookmarkIds.length > 0) {
+      return selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds);
+    }
+    return [];
+  }
+
+  private async selectedRecordImageDownloads(
+    records: readonly ImageDisplayRecord[],
+  ): Promise<readonly { readonly url: string; readonly fileName: string }[]> {
+    const downloads: { readonly url: string; readonly fileName: string }[] = [];
+    for (const record of records) {
+      downloads.push({
+        url: await this.recordImageDownloadUrl(record),
+        fileName: filenameForExportedImage(record.url),
+      });
+    }
+    return downloads;
+  }
+
+  private async recordImageDownloadUrl(record: ImageDisplayRecord): Promise<string> {
+    const blobId = encryptedBlobIdForRecord(record);
+    if (!blobId || !this.captureStore || !this.state.blobKeyUnlocked) return record.url;
+    const retrieved = await this.captureStore.requestRetrieveBlob(blobId);
+    return retrieved.ok ? retrieved.dataUrl : record.url;
   }
 
   private selectedImageExportUrl(): string | null {
@@ -1388,6 +1451,71 @@ function downloadTextFile(fileContent: string, fileName: string): void {
   const url = URL.createObjectURL(new Blob([fileContent], { type: 'application/json' }));
   downloadUrl(url, fileName);
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+async function downloadUrlsInSeries(
+  downloads: readonly { readonly url: string; readonly fileName: string }[],
+  saveAs: boolean,
+): Promise<{
+  readonly requested: number;
+  readonly started: number;
+  readonly failed: number;
+  readonly saveAsFallbacks: number;
+  readonly failedFileNames: readonly string[];
+}> {
+  let started = 0;
+  let failed = 0;
+  let saveAsFallbacks = 0;
+  const failedFileNames: string[] = [];
+  for (const [index, download] of downloads.entries()) {
+    const result = await downloadImageFile(download.url, download.fileName, saveAs);
+    if (result.ok) {
+      started += 1;
+      if (result.saveAsFallback) saveAsFallbacks += 1;
+    } else {
+      failed += 1;
+      failedFileNames.push(download.fileName);
+    }
+    if (index < downloads.length - 1) await delay(120);
+  }
+  return { requested: downloads.length, started, failed, saveAsFallbacks, failedFileNames };
+}
+
+async function downloadImageFile(
+  url: string,
+  fileName: string,
+  saveAs: boolean,
+): Promise<{ readonly ok: true; readonly saveAsFallback?: boolean } | { readonly ok: false; readonly message: string }> {
+  const result = await requestImageDownload({ url, fileName, saveAs });
+  if (result.ok) return result;
+  downloadUrl(url, fileName);
+  return { ok: true, saveAsFallback: saveAs };
+}
+
+function imageDownloadResultMessage(result: {
+  readonly requested: number;
+  readonly started: number;
+  readonly failed: number;
+  readonly saveAsFallbacks: number;
+  readonly failedFileNames: readonly string[];
+}): string {
+  if (result.started === 0) {
+    const failedName = result.failedFileNames[0];
+    return failedName ? `Image export failed for ${failedName}.` : 'Image export could not be started.';
+  }
+  if (result.failed > 0) {
+    return `Started ${result.started} of ${result.requested} image downloads. ${result.failed} failed.`;
+  }
+  if (result.saveAsFallbacks > 0) {
+    return `Save As unavailable; started ${result.started === 1 ? '1 image download normally' : `${result.started} image downloads normally`}.`;
+  }
+  return result.started === 1 ? 'Image export started.' : `Started ${result.started} image downloads.`;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 function filenameForExportedImage(url: string): string {

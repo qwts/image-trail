@@ -10,6 +10,19 @@ export interface DownloadDuplicateRecord {
   readonly fingerprint?: string;
 }
 
+export interface ImageDownloadRecord {
+  readonly id: string;
+  readonly url: string;
+}
+
+export interface SelectImageDownloadUrlsInput {
+  readonly history: readonly ImageDownloadRecord[];
+  readonly bookmarks: readonly ImageDownloadRecord[];
+  readonly selectedHistoryIds: readonly string[];
+  readonly selectedBookmarkIds: readonly string[];
+  readonly currentImageUrl: string | null;
+}
+
 export type DownloadDuplicateMatch = 'fingerprint' | 'url';
 
 export function sanitizeFilename(input: string, fallback = 'image'): string {
@@ -71,6 +84,22 @@ export function findDownloadDuplicate<T extends DownloadDuplicateRecord>(
   return urlMatch ? { record: urlMatch, matchedBy: 'url' } : null;
 }
 
+export function selectImageDownloadUrls(input: SelectImageDownloadUrlsInput): readonly string[] {
+  if (input.selectedHistoryIds.length > 0) {
+    return selectedRecordUrls(input.history, input.selectedHistoryIds);
+  }
+  if (input.selectedBookmarkIds.length > 0) {
+    return selectedRecordUrls(input.bookmarks, input.selectedBookmarkIds);
+  }
+  if (input.currentImageUrl) return [input.currentImageUrl];
+  const mostRecentHistoryUrl = input.history[0]?.url;
+  return mostRecentHistoryUrl ? [mostRecentHistoryUrl] : [];
+}
+
 function safeSha256Fingerprint(value: string | undefined): string | null {
   return value && /^[0-9a-f]{64}$/u.test(value) ? value : null;
+}
+
+function selectedRecordUrls(records: readonly ImageDownloadRecord[], selectedIds: readonly string[]): readonly string[] {
+  return records.filter((record) => selectedIds.includes(record.id)).map((record) => record.url);
 }
