@@ -23,6 +23,10 @@ export interface PanelRenderTarget {
   readonly onPanelDragStart?: (event: PointerEvent) => void;
 }
 
+export interface PanelRenderOptions {
+  readonly renderRecall?: boolean;
+}
+
 export interface PanelLayoutState {
   fieldsPanelOpen: boolean;
   fieldsPanelBlockSize: number | null;
@@ -156,7 +160,7 @@ function restoreScrollAnchor(container: HTMLElement, anchor: ScrollSnapshot['anc
   container.scrollTop += next.getBoundingClientRect().top - anchor.top;
 }
 
-export function renderPanel(target: PanelRenderTarget, state: PanelState): void {
+export function renderPanel(target: PanelRenderTarget, state: PanelState, options: PanelRenderOptions = {}): void {
   const focusedTextControl = focusedTextControlSnapshot(target.root);
   const scrollPositions = scrollSnapshots(target.root, target.scrollAnchorId);
   const statusView = target.root.querySelector<HTMLElement>('.image-trail-panel__status-section');
@@ -417,18 +421,27 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
   );
   restoreScrollSnapshots(target.root, scrollPositions);
   restoreFocusedTextControl(target.root, focusedTextControl);
-  renderRecallDrawer(target, state);
+  if (options.renderRecall !== false) renderRecallDrawer(target, state);
 }
 
 export function renderRecallDrawer(target: PanelRenderTarget, state: PanelState): void {
   const recallRoot = target.recallRoot;
   if (!recallRoot) return;
   const animate = !recallRoot.querySelector('.image-trail-panel__recall-drawer');
+  const previousList = recallRoot.querySelector<HTMLElement>('.image-trail-panel__recall-list');
+  const previousScrollTop = previousList?.scrollTop ?? 0;
   recallRoot.replaceChildren();
   if (!state.recall.open) return;
   recallRoot.append(
     createRecallDrawerView(state.recall, recallDrawerGeometry(target.root, state.recall.side), target.dispatch, { animate }),
   );
+  const nextList = recallRoot.querySelector<HTMLElement>('.image-trail-panel__recall-list');
+  if (nextList && previousList) {
+    nextList.scrollTop = previousScrollTop;
+    queueMicrotask(() => {
+      nextList.scrollTop = previousScrollTop;
+    });
+  }
 }
 
 function recallDrawerGeometry(panelRoot: HTMLElement, side: 'left' | 'right'): RecallDrawerGeometry {
