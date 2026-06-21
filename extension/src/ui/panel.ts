@@ -60,6 +60,7 @@ import { clampPanelPosition, hostnameFromLocation } from './panel-position.js';
 
 const ROOT_ID = 'image-trail-panel-root';
 const STYLE_PATH = 'src/ui/styles/panel.css';
+const RECALL_DRAWER_OPEN_ANIMATION_MS = 190;
 
 interface ValidatedRecordUrl extends ImageRecordUrlValidation {
   readonly preloadDataUrl?: string;
@@ -113,6 +114,7 @@ export class ImageTrailPanel {
   private projectionRevision = 0;
   private bookmarkMutationQueue: Promise<void> = Promise.resolve();
   private panelPositionRestored = false;
+  private recallOpeningUntil = 0;
   private readonly layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
     fieldsPanelBlockSize: null,
@@ -246,6 +248,7 @@ export class ImageTrailPanel {
 
   private openRecallDrawer(): void {
     this.state = reducePanelAction(this.state, { name: 'recall/open', side: this.recallDrawerSide() });
+    this.recallOpeningUntil = Date.now() + RECALL_DRAWER_OPEN_ANIMATION_MS;
     this.render();
     void this.loadRecallCandidates({ offset: this.state.bookmarkLimit || this.bookmarkLimit, append: false });
   }
@@ -268,7 +271,7 @@ export class ImageTrailPanel {
     const renderUpdatedRecall = input.renderScope === 'panel' ? () => this.render() : () => this.renderRecallOnly();
     if (input.showBusy !== false) {
       this.state = reducePanelAction(this.state, { name: 'recall/load-start' });
-      renderUpdatedRecall();
+      if (!this.isRecallOpening()) renderUpdatedRecall();
     }
     const result = await this.recallStore.loadCandidates({
       offset: input.offset,
@@ -276,6 +279,7 @@ export class ImageTrailPanel {
       scope: this.state.bookmarkVisibilityScope,
       currentPageUrl: window.location.href,
     });
+    await this.waitForRecallOpening();
     if (!result.ok) {
       if (result.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
       this.state = reducePanelAction(this.state, { name: 'recall/error', message: result.message });
@@ -296,31 +300,45 @@ export class ImageTrailPanel {
     renderUpdatedRecall();
   }
 
+  private isRecallOpening(): boolean {
+    return Date.now() < this.recallOpeningUntil;
+  }
+
+  private async waitForRecallOpening(): Promise<void> {
+    const remaining = this.recallOpeningUntil - Date.now();
+    if (remaining <= 0) return;
+    await new Promise((resolve) => window.setTimeout(resolve, remaining));
+  }
+
   private refreshRecallIfOpen(): void {
     if (!this.state.recall.open) return;
     void this.loadRecallCandidates({ offset: this.state.bookmarkLimit || this.bookmarkLimit, append: false, showBusy: false });
   }
 
+  private renderPanelAndRefreshRecall(): void {
+    this.render({ includeRecall: false });
+    this.refreshRecallIfOpen();
+  }
+
   private async recallSelectedRecords(): Promise<void> {
     if (!this.recallStore || this.state.recall.selectedIds.length === 0) return;
     this.state = reducePanelAction(this.state, { name: 'recall/load-start' });
-    this.render();
+    this.renderRecallOnly();
     const result = await this.recallStore.recall(this.state.recall.selectedIds);
     if (!result.ok) {
       if (result.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
       this.state = reducePanelAction(this.state, { name: 'recall/error', message: result.message });
-      this.render();
+      this.renderRecallOnly();
       return;
     }
-    await this.loadBookmarkPage(0);
+    await this.loadBookmarkPage(0, { render: false });
     this.state = reducePanelAction(this.state, {
       name: 'recall/complete',
       records: result.records,
       failedCount: result.failedCount,
       message: result.message,
     });
-    this.refreshRecallIfOpen();
-    this.render();
+    this.renderPanelAndRefreshRecall();
   }
 
   private dispatch = (action: PanelAction): void => {
@@ -376,12 +394,12 @@ export class ImageTrailPanel {
     if (action.name === 'bookmarks/toggle-scope') {
       this.state = reducePanelAction(this.state, action);
       this.settingsRepository.save({ ...this.localSettings, bookmarkVisibilityScope: this.state.bookmarkVisibilityScope });
-      void this.loadBookmarkPage(0).then(() => this.refreshRecallIfOpen());
+      void this.loadBookmarkPage(0, { render: false }).then(() => this.renderPanelAndRefreshRecall());
       return;
     }
 
     if (action.name === 'bookmarks/reload') {
-      void this.loadBookmarkPage(0).then(() => this.refreshRecallIfOpen());
+      void this.loadBookmarkPage(0, { render: false }).then(() => this.renderPanelAndRefreshRecall());
       return;
     }
 
@@ -920,8 +938,7 @@ export class ImageTrailPanel {
     const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
     this.state = { ...this.state, message: `Added to Image Trail: ${bookmark.url}`, lastUpdatedAt: Date.now() };
     await this.loadBookmarkPage(0, { render: false });
-    this.render();
-    this.refreshRecallIfOpen();
+    this.renderPanelAndRefreshRecall();
     return true;
   }
 
@@ -949,8 +966,7 @@ export class ImageTrailPanel {
       lastUpdatedAt: Date.now(),
     };
     await this.loadBookmarkPage(0, { render: false });
-    this.render();
-    this.refreshRecallIfOpen();
+    this.renderPanelAndRefreshRecall();
     return true;
   }
 
@@ -1057,9 +1073,8 @@ export class ImageTrailPanel {
     if (bookmark.blobId) await this.removeCapturedBlobReference(bookmark.blobId);
     await this.bookmarkStore?.remove(bookmark);
     this.state = reducePanelAction(this.state, { name: 'bookmark/remove', id });
-    await this.loadBookmarkPage(this.state.bookmarkOffset);
-    this.refreshRecallIfOpen();
-    this.render();
+    await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
+    this.renderPanelAndRefreshRecall();
   }
 
   private async removeCapturedBlobReference(blobId: string): Promise<void> {
@@ -1080,7 +1095,7 @@ export class ImageTrailPanel {
       },
       { name: 'storage/update', usage },
     );
-    this.render();
+    this.render({ includeRecall: false });
   }
 
   private async refreshBookmarkThumbnails(): Promise<void> {
@@ -1103,14 +1118,13 @@ export class ImageTrailPanel {
       refreshed += 1;
     }
 
-    await this.loadBookmarkPage(this.state.bookmarkOffset);
+    await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
     this.state = {
       ...this.state,
       message: `Refreshed ${refreshed} thumbnail${refreshed === 1 ? '' : 's'}${unavailable ? `; ${unavailable} unavailable` : ''}.`,
       lastUpdatedAt: Date.now(),
     };
-    this.refreshRecallIfOpen();
-    this.render();
+    this.renderPanelAndRefreshRecall();
   }
 
   private async captureImage(url: string, sourceType: 'target' | 'history' | 'bookmark', sourceRecordId?: string): Promise<void> {
@@ -1130,6 +1144,7 @@ export class ImageTrailPanel {
     this.render();
     const result = await this.captureStore.requestCapture(url, sourceType, sourceRecordId);
     this.state = reducePanelAction(this.state, { name: 'capture/complete', result, sourceRecordId });
+    let queueChanged = false;
     if ((result.status === 'failed' || result.status === 'remote-only') && result.reason === 'encryption-locked') {
       await this.refreshBlobKeyStatus();
     }
@@ -1144,12 +1159,16 @@ export class ImageTrailPanel {
       const updatedBookmark = this.state.bookmarks.find((b) => b.id === sourceRecordId);
       if (updatedBookmark) {
         await this.bookmarkStore.save(updatedBookmark);
-        await this.loadBookmarkPage(this.state.bookmarkOffset);
-        this.refreshRecallIfOpen();
+        await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
+        queueChanged = true;
       }
     }
     await this.refreshStorageUsage();
-    this.render();
+    if (queueChanged) {
+      this.renderPanelAndRefreshRecall();
+    } else {
+      this.render();
+    }
   }
 
   private async deleteCapturedBlob(recordId: string, blobId: string): Promise<void> {
@@ -1163,12 +1182,17 @@ export class ImageTrailPanel {
       this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
     }
     const updatedBookmark = this.state.bookmarks.find((b) => b.id === recordId);
+    let queueChanged = false;
     if (updatedBookmark && this.bookmarkStore) {
       await this.bookmarkStore.save(updatedBookmark);
-      await this.loadBookmarkPage(this.state.bookmarkOffset);
-      this.refreshRecallIfOpen();
+      await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
+      queueChanged = true;
     }
-    this.render();
+    if (queueChanged) {
+      this.renderPanelAndRefreshRecall();
+    } else {
+      this.render();
+    }
   }
 
   private async previewRecord(url: string, blobId?: string, scrollAnchorId?: string): Promise<void> {
@@ -1629,13 +1653,12 @@ export class ImageTrailPanel {
     for (const entry of result.entries) {
       await this.bookmarkStore?.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
     }
-    await this.loadBookmarkPage(0);
-    this.refreshRecallIfOpen();
+    await this.loadBookmarkPage(0, { render: false });
     this.state = reducePanelAction(this.state, {
       name: 'import-export/complete',
       message: `${result.status.message}${result.plaintext ? ' Plaintext import was encrypted into bookmark storage.' : ''}`,
     });
-    this.render();
+    this.renderPanelAndRefreshRecall();
   }
 
   private async importBookmarklet(fileContent: string): Promise<void> {
@@ -1650,10 +1673,9 @@ export class ImageTrailPanel {
     for (const entry of result.bookmarks) {
       await this.bookmarkStore?.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
     }
-    await this.loadBookmarkPage(0);
-    this.refreshRecallIfOpen();
+    await this.loadBookmarkPage(0, { render: false });
     this.state = reducePanelAction(this.state, { name: 'import-export/complete', message: result.status.message });
-    this.render();
+    this.renderPanelAndRefreshRecall();
   }
 
   private async loadAllBookmarksForExport(): Promise<readonly ImageDisplayRecord[]> {
@@ -1695,7 +1717,7 @@ export class ImageTrailPanel {
     }
   }
 
-  private render(): void {
+  private render(options: { readonly includeRecall?: boolean } = {}): void {
     if (this.root) {
       renderPanel(
         {
@@ -1707,6 +1729,7 @@ export class ImageTrailPanel {
           onPanelDragStart: this.handlePanelDragStart,
         },
         this.state,
+        { renderRecall: options.includeRecall !== false },
       );
     }
   }
