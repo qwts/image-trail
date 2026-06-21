@@ -13,3 +13,4 @@ These scenarios define the first browser-level acceptance coverage for the Brave
 - [Multi-Select Image Download](multi-select-image-download.md)
 - [Key Backup Restore](key-backup-restore.md)
 - [Encrypted Image Downloads](encrypted-image-downloads.md)
+- [URL Template Learning](url-template-learning.md)

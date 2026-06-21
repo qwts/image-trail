@@ -26,6 +26,7 @@ import type {
   PanelPositionStore,
   PanelState,
   TargetState,
+  UrlTemplateStore,
 } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
@@ -35,6 +36,12 @@ import { applyFieldSplitSpecs, createFieldSplitSpec } from '../core/url/field-sp
 import { parseUrl } from '../core/url/parse-url.js';
 import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../core/url/rebuild-url.js';
 import { collectUrlFields, selectDefaultField } from '../core/url/tokenize-fields.js';
+import {
+  createUrlTemplateRecord,
+  findBestMatchingTemplate,
+  updateTemplateSettings,
+  type UrlTemplateRecord,
+} from '../core/url/templates.js';
 import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
 import {
   createThumbnailDataUrlFromDataUrl,
@@ -134,10 +141,12 @@ export class ImageTrailPanel {
     private readonly recallStore: RecallStore | null = null,
     private readonly panelPositionStore: PanelPositionStore | null = null,
     private readonly localSettingsStore: LocalSettingsStore | null = null,
+    private readonly urlTemplateStore: UrlTemplateStore | null = null,
   ) {
     this.unsubscribeFromTarget = this.pageAdapter.subscribe((snapshot) => {
       this.state = setTargetState(this.state, toTargetState(snapshot));
       this.render();
+      void this.loadUrlTemplates();
     });
     this.unsubscribeFromLoads = this.pageAdapter.subscribeToSuccessfulLoads((target) => {
       void this.addRecentHistory(target.url, target.thumbnail, {
@@ -157,6 +166,7 @@ export class ImageTrailPanel {
     });
     void this.loadSettingsAndBookmarks();
     void this.loadRecentHistory();
+    void this.loadUrlTemplates();
     void this.refreshStorageUsage();
     void this.refreshBlobKeyStatus();
 
@@ -247,6 +257,86 @@ export class ImageTrailPanel {
   private saveLocalSettings(settings: PlaintextLocalSettings): void {
     this.localSettings = settings;
     void this.localSettingsStore?.save(settings);
+  }
+
+  private async loadUrlTemplates(options: { readonly render?: boolean } = {}): Promise<void> {
+    if (!this.urlTemplateStore) return;
+    const hostname = this.currentUrlTemplateHostname();
+    if (!hostname) return;
+    const templates = await this.urlTemplateStore.load(hostname);
+    this.state = reducePanelAction(this.state, {
+      name: 'url-templates/load',
+      templates,
+      activeTemplateId: this.activeTemplateIdForCurrentUrl(templates),
+    });
+    if (options.render !== false) this.render();
+  }
+
+  private async saveUrlTemplateFromCurrentFields(): Promise<void> {
+    if (!this.urlTemplateStore) return;
+    let model: ParsedUrlModel;
+    try {
+      model = this.currentUrlModel();
+    } catch {
+      return;
+    }
+    const fields = collectUrlFields(model);
+    const existing = findBestMatchingTemplate(this.state.urlTemplates, model) ?? undefined;
+    if (this.state.unlockedFieldIds.length === 0) {
+      if (existing) {
+        await this.urlTemplateStore.remove(existing.hostname, existing.id);
+        await this.loadUrlTemplates({ render: false });
+      }
+      if (this.state.settingsOpen) this.render();
+      return;
+    }
+    const template = createUrlTemplateRecord({
+      model,
+      fields,
+      includedFieldIds: this.state.unlockedFieldIds,
+      existing,
+    });
+    if (!template) return;
+    await this.urlTemplateStore.save(template);
+    await this.loadUrlTemplates({ render: false });
+    if (this.state.settingsOpen) this.render();
+  }
+
+  private async removeUrlTemplate(id: string): Promise<void> {
+    if (!this.urlTemplateStore) return;
+    const hostname = this.state.urlTemplates.find((candidate) => candidate.id === id)?.hostname ?? this.currentUrlTemplateHostname();
+    if (!hostname) return;
+    await this.urlTemplateStore.remove(hostname, id);
+    this.state = reducePanelAction(this.state, { name: 'url-template/remove', id });
+    this.render();
+  }
+
+  private async updateUrlTemplateSettings(
+    id: string,
+    changes: Extract<PanelAction, { readonly name: 'url-template/update-settings' }>,
+  ): Promise<void> {
+    const template = this.state.urlTemplates.find((candidate) => candidate.id === id);
+    if (!template || !this.urlTemplateStore) return;
+    const updated = updateTemplateSettings(template, { matchMode: changes.matchMode, hideExcludedFields: changes.hideExcludedFields });
+    await this.urlTemplateStore.save(updated);
+    this.state = reducePanelAction(this.state, changes);
+    this.render();
+  }
+
+  private activeTemplateIdForCurrentUrl(templates: readonly UrlTemplateRecord[]): string | null {
+    try {
+      return findBestMatchingTemplate(templates, this.currentUrlModel())?.id ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private currentUrlTemplateHostname(): string | null {
+    try {
+      return new URL(rebuildUrl(this.currentUrlModel())).hostname.toLowerCase();
+    } catch {
+      return hostnameFromLocation();
+    }
   }
 
   private async updateVisibleBookmarkSoftMax(value: number): Promise<void> {
@@ -488,6 +578,16 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'url-template/remove') {
+      void this.removeUrlTemplate(action.id);
+      return;
+    }
+
+    if (action.name === 'url-template/update-settings') {
+      void this.updateUrlTemplateSettings(action.id, action);
+      return;
+    }
+
     if (action.name === 'bookmarks/reload') {
       void this.loadBookmarkPage(0, { render: false }).then(() => this.renderPanelAndRefreshRecall());
       return;
@@ -574,6 +674,7 @@ export class ImageTrailPanel {
 
     if (action.name === 'field-unlock/toggle') {
       this.state = reducePanelAction(this.state, action);
+      void this.saveUrlTemplateFromCurrentFields().then(() => this.render());
       return;
     }
 
@@ -833,7 +934,9 @@ export class ImageTrailPanel {
       void this.applySelectedUrl(
         nextUrl,
         navigableFields.filter((field) => field.location === 'query').map((field) => field.id),
-      );
+      ).then((loaded) => {
+        if (loaded) void this.saveUrlTemplateFromCurrentFields();
+      });
       return true;
     });
 
@@ -864,7 +967,8 @@ export class ImageTrailPanel {
     const nextModel = bumpUrlField(model, field, delta);
     const nextUrl = rebuildUrl(nextModel);
     this.state = reducePanelAction(this.state, { name: 'active-field/set', id: fieldId });
-    await this.applySelectedUrl(nextUrl, field.location === 'query' ? [fieldId] : []);
+    const loaded = await this.applySelectedUrl(nextUrl, field.location === 'query' ? [fieldId] : []);
+    if (loaded) await this.saveUrlTemplateFromCurrentFields();
   }
 
   private async applySelectedUrl(nextUrl: string, attemptedFieldIds: readonly string[] = []): Promise<boolean> {
@@ -899,6 +1003,7 @@ export class ImageTrailPanel {
     this.state = this.applyFieldLoadResult(this.state, attemptedFieldIds, preload.sha256, baselineFingerprint);
     pushVisibleUrlWhenSameOrigin(nextUrl);
     this.render();
+    void this.loadUrlTemplates();
     return true;
   }
 
@@ -1400,6 +1505,7 @@ export class ImageTrailPanel {
       const snapshot = this.pageAdapter.applyUrlToSelected(url, preload.displayUrl);
       this.state = setTargetState(this.state, toTargetState(snapshot));
       this.render();
+      void this.loadUrlTemplates();
       if (image.complete && isProjectedUrlLoaded()) {
         queueMicrotask(() => finish(true));
       }

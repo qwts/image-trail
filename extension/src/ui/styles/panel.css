@@ -699,6 +699,99 @@
     sans-serif;
 }
 
+.image-trail-panel-root .image-trail-panel__settings-templates {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+}
+
+.image-trail-panel-root .image-trail-panel__settings-templates h4 {
+  margin: 0;
+  color: #ddd;
+  font:
+    600 12px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-empty,
+.image-trail-panel-root .image-trail-panel__settings-template-meta {
+  margin: 0;
+  color: #aaa;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-template-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  list-style: none;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-template-list li {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 3%);
+}
+
+.image-trail-panel-root .image-trail-panel__settings-template-list li.is-active {
+  border-color: rgb(124 255 168 / 45%);
+}
+
+.image-trail-panel-root .image-trail-panel__settings-template-url {
+  min-width: 0;
+  overflow: hidden;
+  color: #e0e0e0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font:
+    11px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-template-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 7px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #ddd;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-checkbox input {
+  margin: 0;
+}
+
 .image-trail-panel-root .image-trail-panel__toggle {
   display: inline-flex;
   align-items: center;
@@ -779,7 +872,8 @@
 .image-trail-panel-root .image-trail-panel__password-input,
 .image-trail-panel-root .image-trail-panel__field-input,
 .image-trail-panel-root .image-trail-panel__field-split-input,
-.image-trail-panel-root .image-trail-panel__settings-number-input {
+.image-trail-panel-root .image-trail-panel__settings-number-input,
+.image-trail-panel-root .image-trail-panel__settings-select {
   width: 100%;
   min-width: 0;
   display: block;

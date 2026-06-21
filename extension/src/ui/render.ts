@@ -13,6 +13,7 @@ import { createTargetPickerView } from './components/target-picker-view.js';
 import { parseUrl } from '../core/url/parse-url.js';
 import { applyFieldSplitSpecs } from '../core/url/field-splits.js';
 import { collectUrlFields, tokenValue } from '../core/url/tokenize-fields.js';
+import { findBestMatchingTemplate } from '../core/url/templates.js';
 import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
 
 export interface PanelRenderTarget {
@@ -230,23 +231,28 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
 
   const targetModel = parseActiveUrl();
   const fields = targetModel ? collectUrlFields(targetModel) : [];
+  const activeTemplate = targetModel ? findBestMatchingTemplate(state.urlTemplates, targetModel) : null;
+  const visibleFields =
+    activeTemplate?.hideExcludedFields === true
+      ? fields.filter((field) => activeTemplate.fields.some((templateField) => templateField.id === field.id))
+      : fields;
   const editableFields: EditableField[] = targetModel
-    ? fields.map((field) => ({
+    ? visibleFields.map((field) => ({
         field,
         value: fieldValueFor(targetModel, field),
       }))
     : [];
 
   const dispatchActiveField = (delta: -1 | 1): void => {
-    if (fields.length === 0) return;
-    const currentIndex = fields.findIndex((field) => field.id === state.activeFieldId);
+    if (visibleFields.length === 0) return;
+    const currentIndex = visibleFields.findIndex((field) => field.id === state.activeFieldId);
     let nextIndex: number;
     if (currentIndex === -1) {
-      nextIndex = delta > 0 ? 0 : fields.length - 1;
+      nextIndex = delta > 0 ? 0 : visibleFields.length - 1;
     } else {
-      nextIndex = Math.max(0, Math.min(fields.length - 1, currentIndex + delta));
+      nextIndex = Math.max(0, Math.min(visibleFields.length - 1, currentIndex + delta));
     }
-    const nextField = fields[nextIndex];
+    const nextField = visibleFields[nextIndex];
     if (nextField) {
       target.dispatch({ name: 'active-field/set', id: nextField.id });
     }
@@ -307,7 +313,9 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
   target.root.append(
     createPanelHeader(state, target),
     createStatusView(state, target.dispatch, statusView),
-    ...(state.settingsOpen ? [createSettingsView(state.bookmarkLimit, target.dispatch)] : []),
+    ...(state.settingsOpen
+      ? [createSettingsView(state.bookmarkLimit, state.urlTemplates, activeTemplate?.id ?? state.activeUrlTemplateId, target.dispatch)]
+      : []),
     createUrlEditorView(
       { url: activeUrl },
       {

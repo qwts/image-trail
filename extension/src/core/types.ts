@@ -1,6 +1,7 @@
 import type { AutomationPhase } from './automation/types.js';
 import type { CaptureResult, StorageUsageSummary } from './image/capture-result.js';
 import type { ImageDisplayRecord } from './display-records.js';
+import type { UrlTemplateMatchMode, UrlTemplateRecord } from './url/templates.js';
 import type { UrlFieldSplitSpec } from './url/types.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
@@ -45,6 +46,12 @@ export interface PanelPosition {
 export interface PanelPositionStore {
   load(hostname: string): Promise<PanelPosition | null>;
   save(hostname: string, position: PanelPosition): Promise<void>;
+}
+
+export interface UrlTemplateStore {
+  load(hostname: string): Promise<readonly UrlTemplateRecord[]>;
+  save(template: UrlTemplateRecord): Promise<void>;
+  remove(hostname: string, id: string): Promise<void>;
 }
 
 export interface RecallCandidate extends ImageDisplayRecord {
@@ -102,6 +109,8 @@ export interface PanelState {
   readonly unlockedFieldIds: readonly string[];
   readonly manuallyExcludedFieldIds: readonly string[];
   readonly fieldSplitSpecs: readonly UrlFieldSplitSpec[];
+  readonly urlTemplates: readonly UrlTemplateRecord[];
+  readonly activeUrlTemplateId: string | null;
   readonly currentImageFingerprint: string | null;
 }
 
@@ -141,6 +150,9 @@ export type PanelActionName =
   | 'bookmarks/refresh-thumbnails'
   | 'settings/toggle'
   | 'settings/update-visible-bookmark-soft-max'
+  | 'url-templates/load'
+  | 'url-template/remove'
+  | 'url-template/update-settings'
   | 'capture/request'
   | 'capture/start'
   | 'capture/complete'
@@ -211,6 +223,9 @@ export type PanelAction =
         | 'bookmark-selection/clear'
         | 'bookmarks/page-loaded'
         | 'settings/update-visible-bookmark-soft-max'
+        | 'url-templates/load'
+        | 'url-template/remove'
+        | 'url-template/update-settings'
         | 'capture/request'
         | 'capture/start'
         | 'capture/complete'
@@ -266,6 +281,14 @@ export type PanelAction =
     }
   | { readonly name: 'history/load' | 'history/download' }
   | { readonly name: 'settings/update-visible-bookmark-soft-max'; readonly value: number }
+  | { readonly name: 'url-templates/load'; readonly templates: readonly UrlTemplateRecord[]; readonly activeTemplateId?: string | null }
+  | { readonly name: 'url-template/remove'; readonly id: string }
+  | {
+      readonly name: 'url-template/update-settings';
+      readonly id: string;
+      readonly matchMode?: UrlTemplateMatchMode;
+      readonly hideExcludedFields?: boolean;
+    }
   | { readonly name: 'active-field/set'; readonly id: string | null }
   | { readonly name: 'field-unlock/toggle'; readonly id: string }
   | { readonly name: 'field-split/apply'; readonly id: string; readonly pattern: string }

@@ -6,6 +6,7 @@ import { DataStore, IMAGE_TRAIL_DB_NAME, SchemaIndex } from '../extension/src/da
 import { HistoryRepository, type EncryptedHistoryRecord } from '../extension/src/data/repositories/history-repository.js';
 import { BookmarksRepository, type EncryptedBookmarkRecord } from '../extension/src/data/repositories/bookmarks-repository.js';
 import { PanelPositionRepository } from '../extension/src/data/repositories/panel-position-repository.js';
+import { UrlTemplateRepository } from '../extension/src/data/repositories/url-template-repository.js';
 import { DownloadsRepository } from '../extension/src/data/repositories/downloads-repository.js';
 import { EncryptedPinsRepository } from '../extension/src/data/repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from '../extension/src/data/repositories/encrypted-pin-thumbnails-repository.js';
@@ -16,6 +17,7 @@ import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
 import { IndexedDbBookmarkStore } from '../extension/src/data/bookmarks-controller.js';
 import { createDisplayRecord } from '../extension/src/core/display-records.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
+import type { UrlTemplateRecord } from '../extension/src/core/url/templates.js';
 
 async function deleteImageTrailDb(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
@@ -664,6 +666,49 @@ test('PanelPositionRepository saves positions per hostname', async (t) => {
   assert.deepEqual(await repository.get('example.test'), { left: 120, top: 48 });
   assert.deepEqual(await repository.get('other.test'), { left: 24, top: 36 });
   assert.equal(await repository.get('missing.test'), null);
+});
+
+test('UrlTemplateRepository saves templates per hostname', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const repository = new UrlTemplateRepository(db);
+  const template: UrlTemplateRecord = {
+    id: 'template-001',
+    schemaVersion: 1,
+    hostname: 'example.test',
+    templateUrl: 'https://example.test/image/{query-page}.jpg?page={query-page}',
+    matchRules: {
+      mode: 'exact-page-shape',
+      hostname: 'example.test',
+      exactPathSignature: 'exact',
+      pathShapeSignature: 'shape',
+      querySignature: 'page:int',
+    },
+    fields: [
+      {
+        id: 'q:0:0',
+        label: 'query page',
+        placeholder: '{query-page}',
+        location: 'query',
+        tokenKind: 'int',
+        queryIndex: 0,
+        queryKey: 'page',
+        tokenIndex: 0,
+      },
+    ],
+    hideExcludedFields: false,
+    createdAt: '2026-06-21T00:00:00.000Z',
+    updatedAt: '2026-06-21T00:00:00.000Z',
+    useCount: 1,
+  };
+
+  await repository.put(template);
+  await repository.put({ ...template, id: 'other-template', hostname: 'other.test' });
+
+  assert.deepEqual(await repository.listByHostname('example.test'), [template]);
+  assert.deepEqual(await repository.listByHostname('other.test'), [{ ...template, id: 'other-template', hostname: 'other.test' }]);
+  await repository.delete('example.test', 'template-001');
+  assert.deepEqual(await repository.listByHostname('example.test'), []);
 });
 
 test('IndexedDbBookmarkStore keeps bookmark order stable when refreshing an existing thumbnail', async () => {

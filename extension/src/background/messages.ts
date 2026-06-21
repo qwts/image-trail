@@ -61,6 +61,12 @@ export const MessageType = {
   LoadLocalSettingsResult: 'imageTrail.loadLocalSettingsResult',
   SaveLocalSettings: 'imageTrail.saveLocalSettings',
   SaveLocalSettingsResult: 'imageTrail.saveLocalSettingsResult',
+  ListUrlTemplates: 'imageTrail.listUrlTemplates',
+  ListUrlTemplatesResult: 'imageTrail.listUrlTemplatesResult',
+  SaveUrlTemplate: 'imageTrail.saveUrlTemplate',
+  SaveUrlTemplateResult: 'imageTrail.saveUrlTemplateResult',
+  DeleteUrlTemplate: 'imageTrail.deleteUrlTemplate',
+  DeleteUrlTemplateResult: 'imageTrail.deleteUrlTemplateResult',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -525,6 +531,44 @@ export interface SaveLocalSettingsResultMessage {
   readonly payload: { readonly ok: boolean };
 }
 
+export interface ListUrlTemplatesMessage {
+  readonly type: typeof MessageType.ListUrlTemplates;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly hostname: string };
+}
+
+export interface ListUrlTemplatesResultMessage {
+  readonly type: typeof MessageType.ListUrlTemplatesResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly templates: readonly import('../core/url/templates.js').UrlTemplateRecord[] }
+    | { readonly ok: false; readonly message: string };
+}
+
+export interface SaveUrlTemplateMessage {
+  readonly type: typeof MessageType.SaveUrlTemplate;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly template: import('../core/url/templates.js').UrlTemplateRecord };
+}
+
+export interface SaveUrlTemplateResultMessage {
+  readonly type: typeof MessageType.SaveUrlTemplateResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: boolean };
+}
+
+export interface DeleteUrlTemplateMessage {
+  readonly type: typeof MessageType.DeleteUrlTemplate;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly hostname: string; readonly id: string };
+}
+
+export interface DeleteUrlTemplateResultMessage {
+  readonly type: typeof MessageType.DeleteUrlTemplateResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: boolean };
+}
+
 export type ExtensionRequest =
   | TogglePanelMessage
   | PingMessage
@@ -557,7 +601,10 @@ export type ExtensionRequest =
   | LoadPanelPositionMessage
   | SavePanelPositionMessage
   | LoadLocalSettingsMessage
-  | SaveLocalSettingsMessage;
+  | SaveLocalSettingsMessage
+  | ListUrlTemplatesMessage
+  | SaveUrlTemplateMessage
+  | DeleteUrlTemplateMessage;
 export type ExtensionResponse =
   | StatusMessage
   | UnknownMessageResponse
@@ -586,7 +633,10 @@ export type ExtensionResponse =
   | LoadPanelPositionResultMessage
   | SavePanelPositionResultMessage
   | LoadLocalSettingsResultMessage
-  | SaveLocalSettingsResultMessage;
+  | SaveLocalSettingsResultMessage
+  | ListUrlTemplatesResultMessage
+  | SaveUrlTemplateResultMessage
+  | DeleteUrlTemplateResultMessage;
 export type ExtensionMessage = ExtensionRequest | ExtensionResponse;
 
 export function createTogglePanelMessage(): TogglePanelMessage {
@@ -871,6 +921,30 @@ export function createSaveLocalSettingsResultMessage(payload: SaveLocalSettingsR
   return { type: MessageType.SaveLocalSettingsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
+export function createListUrlTemplatesMessage(hostname: string): ListUrlTemplatesMessage {
+  return { type: MessageType.ListUrlTemplates, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
+}
+
+export function createListUrlTemplatesResultMessage(payload: ListUrlTemplatesResultMessage['payload']): ListUrlTemplatesResultMessage {
+  return { type: MessageType.ListUrlTemplatesResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createSaveUrlTemplateMessage(template: import('../core/url/templates.js').UrlTemplateRecord): SaveUrlTemplateMessage {
+  return { type: MessageType.SaveUrlTemplate, version: MESSAGE_PROTOCOL_VERSION, payload: { template } };
+}
+
+export function createSaveUrlTemplateResultMessage(payload: SaveUrlTemplateResultMessage['payload']): SaveUrlTemplateResultMessage {
+  return { type: MessageType.SaveUrlTemplateResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createDeleteUrlTemplateMessage(hostname: string, id: string): DeleteUrlTemplateMessage {
+  return { type: MessageType.DeleteUrlTemplate, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname, id } };
+}
+
+export function createDeleteUrlTemplateResultMessage(payload: DeleteUrlTemplateResultMessage['payload']): DeleteUrlTemplateResultMessage {
+  return { type: MessageType.DeleteUrlTemplateResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 function hasVersionedObjectShape(value: unknown): value is { type?: unknown; version?: unknown; payload?: unknown } {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as { version?: unknown; payload?: unknown };
@@ -911,7 +985,10 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.LoadPanelPosition ||
     value.type === MessageType.SavePanelPosition ||
     value.type === MessageType.LoadLocalSettings ||
-    value.type === MessageType.SaveLocalSettings
+    value.type === MessageType.SaveLocalSettings ||
+    value.type === MessageType.ListUrlTemplates ||
+    value.type === MessageType.SaveUrlTemplate ||
+    value.type === MessageType.DeleteUrlTemplate
   );
 }
 
@@ -945,7 +1022,10 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.LoadPanelPositionResult ||
     value.type === MessageType.SavePanelPositionResult ||
     value.type === MessageType.LoadLocalSettingsResult ||
-    value.type === MessageType.SaveLocalSettingsResult
+    value.type === MessageType.SaveLocalSettingsResult ||
+    value.type === MessageType.ListUrlTemplatesResult ||
+    value.type === MessageType.SaveUrlTemplateResult ||
+    value.type === MessageType.DeleteUrlTemplateResult
   );
 }
 
@@ -1067,6 +1147,21 @@ export function isLoadLocalSettingsResultMessage(value: unknown): value is LoadL
 export function isSaveLocalSettingsResultMessage(value: unknown): value is SaveLocalSettingsResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.SaveLocalSettingsResult;
+}
+
+export function isListUrlTemplatesResultMessage(value: unknown): value is ListUrlTemplatesResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ListUrlTemplatesResult;
+}
+
+export function isSaveUrlTemplateResultMessage(value: unknown): value is SaveUrlTemplateResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.SaveUrlTemplateResult;
+}
+
+export function isDeleteUrlTemplateResultMessage(value: unknown): value is DeleteUrlTemplateResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.DeleteUrlTemplateResult;
 }
 
 export function isStatusMessage(value: unknown): value is StatusMessage {

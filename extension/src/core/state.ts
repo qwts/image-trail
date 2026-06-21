@@ -68,6 +68,8 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     unlockedFieldIds: [],
     manuallyExcludedFieldIds: [],
     fieldSplitSpecs: [],
+    urlTemplates: [],
+    activeUrlTemplateId: null,
     currentImageFingerprint: null,
   };
 }
@@ -101,6 +103,7 @@ export function setTargetState(state: PanelState, target: TargetState, now = Dat
     unlockedFieldIds: targetChanged ? [] : state.unlockedFieldIds,
     manuallyExcludedFieldIds: targetChanged ? [] : state.manuallyExcludedFieldIds,
     fieldSplitSpecs: targetChanged ? [] : state.fieldSplitSpecs,
+    activeUrlTemplateId: targetChanged ? null : state.activeUrlTemplateId,
     currentImageFingerprint: targetChanged ? null : state.currentImageFingerprint,
     lastUpdatedAt: now,
   };

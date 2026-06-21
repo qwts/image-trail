@@ -4,6 +4,7 @@ import type { CaptureResult } from './image/capture-result.js';
 import { isCapturedResult } from './image/capture-result.js';
 import { closePanel, EMPTY_AUTOMATION_STATE, showPanel } from './state.js';
 import type { PanelAction, PanelState } from './types.js';
+import { updateTemplateSettings } from './url/templates.js';
 import type { UrlFieldSplitSpec } from './url/types.js';
 
 function updateRecordCapture(
@@ -349,6 +350,30 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return { ...state, settingsOpen: !state.settingsOpen, lastUpdatedAt: Date.now() };
     case 'settings/update-visible-bookmark-soft-max':
       return { ...state, bookmarkLimit: action.value, bookmarkOffset: 0, lastUpdatedAt: Date.now() };
+    case 'url-templates/load':
+      return {
+        ...state,
+        urlTemplates: action.templates,
+        activeUrlTemplateId: action.activeTemplateId ?? state.activeUrlTemplateId,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'url-template/remove':
+      return {
+        ...state,
+        urlTemplates: state.urlTemplates.filter((template) => template.id !== action.id),
+        activeUrlTemplateId: state.activeUrlTemplateId === action.id ? null : state.activeUrlTemplateId,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'url-template/update-settings':
+      return {
+        ...state,
+        urlTemplates: state.urlTemplates.map((template) =>
+          template.id === action.id
+            ? updateTemplateSettings(template, { matchMode: action.matchMode, hideExcludedFields: action.hideExcludedFields })
+            : template,
+        ),
+        lastUpdatedAt: Date.now(),
+      };
     case 'capture/request':
       return state;
     case 'capture/start':

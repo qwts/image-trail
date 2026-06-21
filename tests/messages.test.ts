@@ -26,6 +26,8 @@ import {
   createLoadLocalSettingsResultMessage,
   createLoadPanelPositionMessage,
   createLoadPanelPositionResultMessage,
+  createListUrlTemplatesMessage,
+  createListUrlTemplatesResultMessage,
   createLoadRecallCandidatesMessage,
   createLoadRecallCandidatesResultMessage,
   createAddRecentHistoryMessage,
@@ -47,6 +49,10 @@ import {
   createSaveLocalSettingsResultMessage,
   createSavePanelPositionMessage,
   createSavePanelPositionResultMessage,
+  createSaveUrlTemplateMessage,
+  createSaveUrlTemplateResultMessage,
+  createDeleteUrlTemplateMessage,
+  createDeleteUrlTemplateResultMessage,
   createStatusMessage,
   createStorageUsageRequestMessage,
   createStorageUsageResponseMessage,
@@ -64,6 +70,7 @@ import {
   isLoadBookmarksResultMessage,
   isLoadLocalSettingsResultMessage,
   isLoadPanelPositionResultMessage,
+  isListUrlTemplatesResultMessage,
   isLoadRecallCandidatesResultMessage,
   isAddRecentHistoryResultMessage,
   isLoadRecentHistoryResultMessage,
@@ -74,6 +81,8 @@ import {
   isSaveBookmarkResultMessage,
   isSaveLocalSettingsResultMessage,
   isSavePanelPositionResultMessage,
+  isSaveUrlTemplateResultMessage,
+  isDeleteUrlTemplateResultMessage,
   isStatusMessage,
 } from '../extension/src/background/messages.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
@@ -146,6 +155,58 @@ test('creates extension-owned local settings messages', () => {
   assert.equal(isExtensionRequest(save), true);
   assert.equal(isExtensionResponse(saveResult), true);
   assert.equal(isSaveLocalSettingsResultMessage(saveResult), true);
+});
+
+test('creates extension-owned URL template messages', () => {
+  const template = {
+    id: 'template-001',
+    schemaVersion: 1 as const,
+    hostname: 'example.test',
+    templateUrl: 'https://example.test/image/{query-page}.jpg?page={query-page}',
+    matchRules: {
+      mode: 'exact-page-shape' as const,
+      hostname: 'example.test',
+      exactPathSignature: 'exact',
+      pathShapeSignature: 'shape',
+      querySignature: 'page:int',
+    },
+    fields: [
+      {
+        id: 'q:0:0',
+        label: 'query page',
+        placeholder: '{query-page}',
+        location: 'query' as const,
+        tokenKind: 'int' as const,
+        queryIndex: 0,
+        queryKey: 'page',
+        tokenIndex: 0,
+      },
+    ],
+    hideExcludedFields: false,
+    createdAt: '2026-06-21T00:00:00.000Z',
+    updatedAt: '2026-06-21T00:00:00.000Z',
+    useCount: 1,
+  };
+
+  const list = createListUrlTemplatesMessage('example.test');
+  const listResult = createListUrlTemplatesResultMessage({ ok: true, templates: [template] });
+  const save = createSaveUrlTemplateMessage(template);
+  const saveResult = createSaveUrlTemplateResultMessage({ ok: true });
+  const remove = createDeleteUrlTemplateMessage('example.test', template.id);
+  const removeResult = createDeleteUrlTemplateResultMessage({ ok: true });
+
+  assert.equal(list.type, MessageType.ListUrlTemplates);
+  assert.equal(isExtensionRequest(list), true);
+  assert.equal(isExtensionResponse(listResult), true);
+  assert.equal(isListUrlTemplatesResultMessage(listResult), true);
+  assert.equal(save.payload.template.id, template.id);
+  assert.equal(isExtensionRequest(save), true);
+  assert.equal(isExtensionResponse(saveResult), true);
+  assert.equal(isSaveUrlTemplateResultMessage(saveResult), true);
+  assert.equal(remove.payload.id, template.id);
+  assert.equal(isExtensionRequest(remove), true);
+  assert.equal(isExtensionResponse(removeResult), true);
+  assert.equal(isDeleteUrlTemplateResultMessage(removeResult), true);
 });
 
 test('recognizes capture-related messages as extension requests', () => {

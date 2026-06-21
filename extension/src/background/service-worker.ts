@@ -3,6 +3,7 @@ import { computeSha256 } from '../core/image/fingerprints.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { IndexedDbPanelPositionStore } from '../data/panel-position-controller.js';
+import { IndexedDbUrlTemplateStore } from '../data/url-template-controller.js';
 import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, migrateLocalSettings } from '../data/local-settings.js';
 import { getActiveBlobKey, lockBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
@@ -35,12 +36,15 @@ import {
   createLoadRecallCandidatesResultMessage,
   createLoadPanelPositionResultMessage,
   createLoadLocalSettingsResultMessage,
+  createListUrlTemplatesResultMessage,
   createRemoveBookmarkResultMessage,
   createRemoveRecentHistoryResultMessage,
   createRecallRecordsResultMessage,
   createSaveBookmarkResultMessage,
   createSavePanelPositionResultMessage,
   createSaveLocalSettingsResultMessage,
+  createSaveUrlTemplateResultMessage,
+  createDeleteUrlTemplateResultMessage,
   createBlobKeyStatusResultMessage,
   createExportBlobKeyBackupResultMessage,
   createImportBlobKeyBackupResultMessage,
@@ -63,6 +67,7 @@ import type { LoadBookmarksMessage, RemoveBookmarkMessage, SaveBookmarkMessage }
 import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHistoryMessage } from './messages.js';
 import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messages.js';
 import type { LoadPanelPositionMessage, SavePanelPositionMessage } from './messages.js';
+import type { DeleteUrlTemplateMessage, ListUrlTemplatesMessage, SaveUrlTemplateMessage } from './messages.js';
 import type { SaveLocalSettingsMessage } from './messages.js';
 import type { FetchThumbnailSourceMessage } from './messages.js';
 import type { CreateBlobPreviewMessage } from './messages.js';
@@ -85,6 +90,7 @@ interface PreviewPayload {
 const previewPayloads = new Map<string, PreviewPayload>();
 const bookmarkStore = new IndexedDbBookmarkStore({ getActiveBlobKey });
 const panelPositionStore = new IndexedDbPanelPositionStore();
+const urlTemplateStore = new IndexedDbUrlTemplateStore();
 const recentHistoryBySite = new Map<string, import('../core/display-records.js').ImageDisplayRecord[]>();
 const MAX_RECENT_HISTORY_ITEMS = 30;
 
@@ -426,6 +432,32 @@ async function handleSavePanelPosition(
   const hostname = normalizeHostname(message.payload.hostname);
   if (!hostname) return { ok: false };
   await panelPositionStore.save(hostname, message.payload.position);
+  return { ok: true };
+}
+
+async function handleListUrlTemplates(
+  message: ListUrlTemplatesMessage,
+): Promise<import('./messages.js').ListUrlTemplatesResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.hostname);
+  if (!hostname) return { ok: true, templates: [] };
+  return { ok: true, templates: await urlTemplateStore.load(hostname) };
+}
+
+async function handleSaveUrlTemplate(
+  message: SaveUrlTemplateMessage,
+): Promise<import('./messages.js').SaveUrlTemplateResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.template.hostname);
+  if (!hostname) return { ok: false };
+  await urlTemplateStore.save({ ...message.payload.template, hostname });
+  return { ok: true };
+}
+
+async function handleDeleteUrlTemplate(
+  message: DeleteUrlTemplateMessage,
+): Promise<import('./messages.js').DeleteUrlTemplateResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.hostname);
+  if (!hostname) return { ok: false };
+  await urlTemplateStore.remove(hostname, message.payload.id);
   return { ok: true };
 }
 
@@ -890,6 +922,24 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleSavePanelPosition(message)
         .then((result) => sendResponse(createSavePanelPositionResultMessage(result)))
         .catch(() => sendResponse(createSavePanelPositionResultMessage({ ok: false })));
+      return true;
+
+    case MessageType.ListUrlTemplates:
+      handleListUrlTemplates(message)
+        .then((result) => sendResponse(createListUrlTemplatesResultMessage(result)))
+        .catch(() => sendResponse(createListUrlTemplatesResultMessage({ ok: false, message: 'URL templates could not be loaded.' })));
+      return true;
+
+    case MessageType.SaveUrlTemplate:
+      handleSaveUrlTemplate(message)
+        .then((result) => sendResponse(createSaveUrlTemplateResultMessage(result)))
+        .catch(() => sendResponse(createSaveUrlTemplateResultMessage({ ok: false })));
+      return true;
+
+    case MessageType.DeleteUrlTemplate:
+      handleDeleteUrlTemplate(message)
+        .then((result) => sendResponse(createDeleteUrlTemplateResultMessage(result)))
+        .catch(() => sendResponse(createDeleteUrlTemplateResultMessage({ ok: false })));
       return true;
 
     case MessageType.LoadLocalSettings:
