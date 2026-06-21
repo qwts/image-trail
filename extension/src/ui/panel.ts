@@ -1,5 +1,5 @@
 import type { CaptureStore } from '../content/capture-controller.js';
-import { requestImageDownload } from '../content/download-controller.js';
+import { requestEncryptedImageExport, requestEncryptedImageImport, requestImageDownload } from '../content/download-controller.js';
 import type { RecentHistoryStore } from '../content/recent-history-store.js';
 import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
@@ -16,7 +16,7 @@ import { applyFieldLoadFailureToState, applyFieldSplitSpecToState, reducePanelAc
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
 import { createInitialPanelState, setAutomationState, setTargetState } from '../core/state.js';
-import type { BookmarkStore, ImportedImageFile, PanelAction, PanelState, TargetState } from '../core/types.js';
+import type { BookmarkStore, ImportedEncryptedImageFile, ImportedImageFile, PanelAction, PanelState, TargetState } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
 import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
@@ -396,6 +396,11 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'export/encrypted-image') {
+      void this.exportEncryptedImages();
+      return;
+    }
+
     if (action.name === 'import/history') {
       void this.importHistory(action.fileContent, action.password);
       return;
@@ -413,6 +418,11 @@ export class ImageTrailPanel {
 
     if (action.name === 'import/image') {
       void this.importImages(action.files);
+      return;
+    }
+
+    if (action.name === 'import/encrypted-image') {
+      void this.importEncryptedImages(action.files);
       return;
     }
 
@@ -1017,6 +1027,7 @@ export class ImageTrailPanel {
       }
       const retrieved = await this.captureStore.requestRetrieveBlob(blobId);
       if (!retrieved.ok) {
+        if (retrieved.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
         this.state = { ...this.state, message: retrieved.message, status: 'error', lastUpdatedAt: Date.now() };
         this.render();
         return;
@@ -1284,7 +1295,61 @@ export class ImageTrailPanel {
     const blobId = encryptedBlobIdForRecord(record);
     if (!blobId || !this.captureStore || !this.state.blobKeyUnlocked) return record.url;
     const retrieved = await this.captureStore.requestRetrieveBlob(blobId);
+    if (!retrieved.ok && retrieved.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
     return retrieved.ok ? retrieved.dataUrl : record.url;
+  }
+
+  private async exportEncryptedImages(): Promise<void> {
+    if (this.state.importExportBusy) return;
+    if (!this.state.blobKeyUnlocked) {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/error',
+        message: 'Unlock encrypted originals before exporting encrypted images.',
+      });
+      this.render();
+      return;
+    }
+    const targets = this.encryptedImageExportTargets();
+    if (targets.length === 0) {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/error',
+        message: 'Select an image before exporting encrypted images.',
+      });
+      this.render();
+      return;
+    }
+
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const result = await exportEncryptedImagesInSeries(targets);
+    if (result.encryptionLocked) await this.refreshBlobKeyStatus();
+    const message = encryptedImageExportResultMessage(result);
+    if (result.started === 0) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message });
+      this.render();
+      return;
+    }
+    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message });
+    this.render();
+  }
+
+  private encryptedImageExportTargets(): readonly { readonly url: string; readonly fileName: string; readonly blobId?: string }[] {
+    const selected = this.selectedImageDownloadRecords();
+    if (selected.length > 0) {
+      return selected.map((record) => ({
+        url: record.url,
+        fileName: filenameForExportedImage(record.url),
+        blobId: encryptedBlobIdForRecord(record),
+      }));
+    }
+    const urls = selectImageDownloadUrls({
+      history: this.state.history,
+      bookmarks: this.state.bookmarks,
+      selectedHistoryIds: this.state.selectedHistoryIds,
+      selectedBookmarkIds: this.state.selectedBookmarkIds,
+      currentImageUrl: this.selectedImageExportUrl(),
+    });
+    return urls.map((url) => ({ url, fileName: filenameForExportedImage(url) }));
   }
 
   private selectedImageExportUrl(): string | null {
@@ -1314,6 +1379,59 @@ export class ImageTrailPanel {
       this.state = reducePanelAction(this.state, {
         name: 'import-export/complete',
         message: `Imported ${imported} image${imported === 1 ? '' : 's'} into bookmarks and recent history.`,
+      });
+    }
+    this.render();
+  }
+
+  private async importEncryptedImages(files: readonly ImportedEncryptedImageFile[]): Promise<void> {
+    if (files.length === 0) {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/error',
+        message: 'Choose one or more encrypted image files to import.',
+      });
+      this.render();
+      return;
+    }
+    if (!this.state.blobKeyUnlocked) {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/error',
+        message: 'Unlock encrypted originals before importing encrypted images.',
+      });
+      this.render();
+      return;
+    }
+
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    let imported = 0;
+    let failed = 0;
+    let firstFailureMessage: string | null = null;
+    for (const file of files) {
+      const result = await requestEncryptedImageImport(file.fileContent);
+      if (!result.ok) {
+        if (result.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
+        firstFailureMessage ??= result.message;
+        failed += 1;
+        continue;
+      }
+      if (await this.addImportedImage({ name: result.fileName || file.name, dataUrl: result.dataUrl })) imported += 1;
+    }
+
+    if (imported === 0) {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/error',
+        message: firstFailureMessage ?? 'No encrypted image files could be imported.',
+      });
+    } else if (failed > 0) {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/complete',
+        message: `Imported ${imported} encrypted image${imported === 1 ? '' : 's'}. ${failed} failed.`,
+      });
+    } else {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/complete',
+        message: `Imported ${imported} encrypted image${imported === 1 ? '' : 's'} into bookmarks and recent history.`,
       });
     }
     this.render();
@@ -1530,6 +1648,51 @@ async function downloadUrlsInSeries(
     if (index < downloads.length - 1) await delay(120);
   }
   return { requested: downloads.length, started, failed, saveAsFallbacks, failedFileNames };
+}
+
+async function exportEncryptedImagesInSeries(
+  downloads: readonly { readonly url: string; readonly fileName: string; readonly blobId?: string }[],
+): Promise<{
+  readonly requested: number;
+  readonly started: number;
+  readonly failed: number;
+  readonly encryptionLocked: boolean;
+  readonly failedFileNames: readonly string[];
+}> {
+  let started = 0;
+  let failed = 0;
+  let encryptionLocked = false;
+  const failedFileNames: string[] = [];
+  for (const [index, download] of downloads.entries()) {
+    const result = await requestEncryptedImageExport(download);
+    if (result.ok) {
+      downloadTextFile(result.fileContent, result.fileName);
+      started += 1;
+    } else {
+      failed += 1;
+      if (result.reason === 'encryption-locked') encryptionLocked = true;
+      failedFileNames.push(download.fileName);
+    }
+    if (index < downloads.length - 1) await delay(120);
+  }
+  return { requested: downloads.length, started, failed, encryptionLocked, failedFileNames };
+}
+
+function encryptedImageExportResultMessage(result: {
+  readonly requested: number;
+  readonly started: number;
+  readonly failed: number;
+  readonly encryptionLocked: boolean;
+  readonly failedFileNames: readonly string[];
+}): string {
+  if (result.started === 0) {
+    const failedName = result.failedFileNames[0];
+    return failedName ? `Encrypted image export failed for ${failedName}.` : 'Encrypted image export could not be started.';
+  }
+  if (result.failed > 0) {
+    return `Started ${result.started} of ${result.requested} encrypted image exports. ${result.failed} failed.`;
+  }
+  return result.started === 1 ? 'Encrypted image export started.' : `Started ${result.started} encrypted image exports.`;
 }
 
 async function downloadImageFile(

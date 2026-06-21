@@ -10,12 +10,16 @@ import {
   createDeleteBlobResultMessage,
   createDownloadImageMessage,
   createDownloadImageResultMessage,
+  createExportEncryptedImageMessage,
+  createExportEncryptedImageResultMessage,
   createExportBlobKeyBackupMessage,
   createExportBlobKeyBackupResultMessage,
   createFetchThumbnailSourceMessage,
   createFetchThumbnailSourceResultMessage,
   createImportBlobKeyBackupMessage,
   createImportBlobKeyBackupResultMessage,
+  createImportEncryptedImageMessage,
+  createImportEncryptedImageResultMessage,
   createLoadBookmarksMessage,
   createLoadBookmarksResultMessage,
   createAddRecentHistoryMessage,
@@ -38,11 +42,13 @@ import {
   createUnknownMessageResponse,
   isCaptureResultMessage,
   isDownloadImageResultMessage,
+  isExportEncryptedImageResultMessage,
   isExtensionRequest,
   isExtensionResponse,
   isExportBlobKeyBackupResultMessage,
   isFetchThumbnailSourceResultMessage,
   isImportBlobKeyBackupResultMessage,
+  isImportEncryptedImageResultMessage,
   isLoadBookmarksResultMessage,
   isAddRecentHistoryResultMessage,
   isLoadRecentHistoryResultMessage,
@@ -149,6 +155,42 @@ test('creates image download messages with save-as intent', () => {
   const failure = createDownloadImageResultMessage({ ok: false, message: 'Nope.' });
   assert.equal(failure.payload.ok, false);
   assert.equal(isDownloadImageResultMessage(failure), true);
+});
+
+test('creates encrypted image import and export messages', () => {
+  const exportRequest = createExportEncryptedImageMessage('https://cdn.example.com/photo.jpg', 'photo.jpg', 'blob-1');
+  assert.equal(exportRequest.type, MessageType.ExportEncryptedImage);
+  assert.equal(exportRequest.payload.url, 'https://cdn.example.com/photo.jpg');
+  assert.equal(exportRequest.payload.fileName, 'photo.jpg');
+  assert.equal(exportRequest.payload.blobId, 'blob-1');
+  assert.equal(isExtensionRequest(exportRequest), true);
+
+  const exportResult = createExportEncryptedImageResultMessage({
+    ok: true,
+    fileContent: '{"header":{}}',
+    fileName: 'photo.jpg.image-trail-encrypted.json',
+    message: 'Encrypted image export prepared.',
+  });
+  assert.equal(exportResult.type, MessageType.ExportEncryptedImageResult);
+  assert.equal(isExtensionResponse(exportResult), true);
+  assert.equal(isExportEncryptedImageResultMessage(exportResult), true);
+
+  const importRequest = createImportEncryptedImageMessage('{"header":{}}');
+  assert.equal(importRequest.type, MessageType.ImportEncryptedImage);
+  assert.equal(isExtensionRequest(importRequest), true);
+
+  const importResult = createImportEncryptedImageResultMessage({
+    ok: true,
+    dataUrl: 'data:image/png;base64,abc',
+    fileName: 'photo.png',
+    sourceUrl: 'https://cdn.example.com/photo.png',
+    mimeType: 'image/png',
+    byteLength: 3,
+    keyReference: 'blob:key-1',
+  });
+  assert.equal(importResult.type, MessageType.ImportEncryptedImageResult);
+  assert.equal(isExtensionResponse(importResult), true);
+  assert.equal(isImportEncryptedImageResultMessage(importResult), true);
 });
 
 test('creates capture result response messages for success and failure', () => {

@@ -3,7 +3,7 @@ import type { EncryptionAlgorithm, KeyKind, KeyWrappingMode } from '../crypto/ty
 export const EXPORT_FORMAT_MAGIC = 'IMAGE-TRAIL-EXPORT';
 export const EXPORT_FORMAT_VERSION = 1;
 
-export type ExportPayloadType = 'history' | 'bookmarks' | 'mixed' | 'keys';
+export type ExportPayloadType = 'history' | 'bookmarks' | 'mixed' | 'keys' | 'image';
 
 export interface ExportFileHeader {
   readonly magic: typeof EXPORT_FORMAT_MAGIC;

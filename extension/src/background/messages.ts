@@ -9,6 +9,10 @@ export const MessageType = {
   CaptureResult: 'imageTrail.captureResult',
   DownloadImage: 'imageTrail.downloadImage',
   DownloadImageResult: 'imageTrail.downloadImageResult',
+  ExportEncryptedImage: 'imageTrail.exportEncryptedImage',
+  ExportEncryptedImageResult: 'imageTrail.exportEncryptedImageResult',
+  ImportEncryptedImage: 'imageTrail.importEncryptedImage',
+  ImportEncryptedImageResult: 'imageTrail.importEncryptedImageResult',
   StorageUsageRequest: 'imageTrail.storageUsageRequest',
   StorageUsageResponse: 'imageTrail.storageUsageResponse',
   DeleteBlob: 'imageTrail.deleteBlob',
@@ -105,6 +109,46 @@ export interface DownloadImageResultMessage {
   readonly type: typeof MessageType.DownloadImageResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload: { readonly ok: true; readonly downloadId: number } | { readonly ok: false; readonly message: string };
+}
+
+export interface ExportEncryptedImageMessage {
+  readonly type: typeof MessageType.ExportEncryptedImage;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: {
+    readonly url: string;
+    readonly fileName: string;
+    readonly blobId?: string;
+  };
+}
+
+export interface ExportEncryptedImageResultMessage {
+  readonly type: typeof MessageType.ExportEncryptedImageResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly fileContent: string; readonly fileName: string; readonly message: string }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
+export interface ImportEncryptedImageMessage {
+  readonly type: typeof MessageType.ImportEncryptedImage;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly fileContent: string };
+}
+
+export interface ImportEncryptedImageResultMessage {
+  readonly type: typeof MessageType.ImportEncryptedImageResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | {
+        readonly ok: true;
+        readonly dataUrl: string;
+        readonly fileName: string;
+        readonly sourceUrl: string;
+        readonly mimeType: string;
+        readonly byteLength: number;
+        readonly keyReference: string;
+      }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 
 export interface StorageUsageRequestMessage {
@@ -373,6 +417,8 @@ export type ExtensionRequest =
   | PingMessage
   | CaptureImageMessage
   | DownloadImageMessage
+  | ExportEncryptedImageMessage
+  | ImportEncryptedImageMessage
   | StorageUsageRequestMessage
   | DeleteBlobMessage
   | CleanupOrphanedBlobsMessage
@@ -398,6 +444,8 @@ export type ExtensionResponse =
   | UnknownMessageResponse
   | CaptureResultMessage
   | DownloadImageResultMessage
+  | ExportEncryptedImageResultMessage
+  | ImportEncryptedImageResultMessage
   | StorageUsageResponseMessage
   | DeleteBlobResultMessage
   | CleanupOrphanedBlobsResultMessage
@@ -446,6 +494,26 @@ export function createDownloadImageMessage(url: string, fileName: string, saveAs
 
 export function createDownloadImageResultMessage(payload: DownloadImageResultMessage['payload']): DownloadImageResultMessage {
   return { type: MessageType.DownloadImageResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createExportEncryptedImageMessage(url: string, fileName: string, blobId?: string): ExportEncryptedImageMessage {
+  return { type: MessageType.ExportEncryptedImage, version: MESSAGE_PROTOCOL_VERSION, payload: { url, fileName, blobId } };
+}
+
+export function createExportEncryptedImageResultMessage(
+  payload: ExportEncryptedImageResultMessage['payload'],
+): ExportEncryptedImageResultMessage {
+  return { type: MessageType.ExportEncryptedImageResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createImportEncryptedImageMessage(fileContent: string): ImportEncryptedImageMessage {
+  return { type: MessageType.ImportEncryptedImage, version: MESSAGE_PROTOCOL_VERSION, payload: { fileContent } };
+}
+
+export function createImportEncryptedImageResultMessage(
+  payload: ImportEncryptedImageResultMessage['payload'],
+): ImportEncryptedImageResultMessage {
+  return { type: MessageType.ImportEncryptedImageResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createStorageUsageRequestMessage(): StorageUsageRequestMessage {
@@ -631,6 +699,8 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.Ping ||
     value.type === MessageType.CaptureImage ||
     value.type === MessageType.DownloadImage ||
+    value.type === MessageType.ExportEncryptedImage ||
+    value.type === MessageType.ImportEncryptedImage ||
     value.type === MessageType.StorageUsageRequest ||
     value.type === MessageType.DeleteBlob ||
     value.type === MessageType.CleanupOrphanedBlobs ||
@@ -661,6 +731,8 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.Unknown ||
     value.type === MessageType.CaptureResult ||
     value.type === MessageType.DownloadImageResult ||
+    value.type === MessageType.ExportEncryptedImageResult ||
+    value.type === MessageType.ImportEncryptedImageResult ||
     value.type === MessageType.StorageUsageResponse ||
     value.type === MessageType.DeleteBlobResult ||
     value.type === MessageType.CleanupOrphanedBlobsResult ||
@@ -728,6 +800,16 @@ export function isCaptureResultMessage(value: unknown): value is CaptureResultMe
 export function isDownloadImageResultMessage(value: unknown): value is DownloadImageResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.DownloadImageResult;
+}
+
+export function isExportEncryptedImageResultMessage(value: unknown): value is ExportEncryptedImageResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ExportEncryptedImageResult;
+}
+
+export function isImportEncryptedImageResultMessage(value: unknown): value is ImportEncryptedImageResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ImportEncryptedImageResult;
 }
 
 export function isLoadBookmarksResultMessage(value: unknown): value is LoadBookmarksResultMessage {

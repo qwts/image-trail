@@ -20,6 +20,11 @@ export interface ImportedImageFile {
   readonly dataUrl: string;
 }
 
+export interface ImportedEncryptedImageFile {
+  readonly name: string;
+  readonly fileContent: string;
+}
+
 export interface AutomationState {
   readonly slideshowPhase: AutomationPhase;
   readonly slideshowCount: number;
@@ -119,10 +124,12 @@ export type PanelActionName =
   | 'export/history'
   | 'export/bookmarks'
   | 'export/image'
+  | 'export/encrypted-image'
   | 'import/history'
   | 'import/bookmarks'
   | 'import/bookmarklet'
   | 'import/image'
+  | 'import/encrypted-image'
   | 'storage/update'
   | 'undo-last'
   | 'slideshow-start'
@@ -174,10 +181,12 @@ export type PanelAction =
         | 'export/history'
         | 'export/bookmarks'
         | 'export/image'
+        | 'export/encrypted-image'
         | 'import/history'
         | 'import/bookmarks'
         | 'import/bookmarklet'
         | 'import/image'
+        | 'import/encrypted-image'
         | 'storage/update'
       >;
     }
@@ -224,9 +233,11 @@ export type PanelAction =
   | { readonly name: 'import-export/error'; readonly message: string }
   | { readonly name: 'export/history' | 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/image'; readonly saveAs?: boolean }
+  | { readonly name: 'export/encrypted-image' }
   | { readonly name: 'import/history' | 'import/bookmarks'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
   | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
+  | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] }
   | { readonly name: 'storage/update'; readonly usage: StorageUsageSummary };
 
 export interface BookmarkStore {

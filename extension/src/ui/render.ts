@@ -301,6 +301,12 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
         selectedImageDownloadCount: state.selectedHistoryIds.length || state.selectedBookmarkIds.length,
         imageDownloadAvailable:
           state.selectedHistoryIds.length + state.selectedBookmarkIds.length > 0 || !!state.target.selectedUrl || state.history.length > 0,
+        encryptedImageTransferAvailable:
+          state.blobKeyUnlocked &&
+          (state.selectedHistoryIds.length + state.selectedBookmarkIds.length > 0 ||
+            !!state.target.selectedUrl ||
+            state.history.length > 0),
+        blobKeyUnlocked: state.blobKeyUnlocked,
         lastMessage: state.importExportMessage,
         lastMessageIsError: state.importExportMessageIsError,
       },
@@ -315,6 +321,12 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
         selectedImageDownloadCount: state.selectedHistoryIds.length || state.selectedBookmarkIds.length,
         imageDownloadAvailable:
           state.selectedHistoryIds.length + state.selectedBookmarkIds.length > 0 || !!state.target.selectedUrl || state.history.length > 0,
+        encryptedImageTransferAvailable:
+          state.blobKeyUnlocked &&
+          (state.selectedHistoryIds.length + state.selectedBookmarkIds.length > 0 ||
+            !!state.target.selectedUrl ||
+            state.history.length > 0),
+        blobKeyUnlocked: state.blobKeyUnlocked,
         lastMessage: state.importExportMessage,
         lastMessageIsError: state.importExportMessageIsError,
       },
