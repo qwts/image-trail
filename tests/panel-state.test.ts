@@ -201,6 +201,137 @@ test('record selection prunes removed and unloaded rows', () => {
   assert.deepEqual(reloadedBookmarks.selectedBookmarkIds, ['bookmark-2']);
 });
 
+test('recall drawer loads candidates and toggles selection', () => {
+  const state = createInitialPanelState();
+  const opened = reducePanelAction(state, { name: 'recall/open', side: 'left' });
+  const loading = reducePanelAction(opened, { name: 'recall/load-start' });
+  const loaded = reducePanelAction(loading, {
+    name: 'recall/load-complete',
+    candidates: [
+      {
+        id: 'recall-1',
+        url: 'https://example.test/recall.jpg',
+        timestamp: '2026-06-20T00:00:00.000Z',
+        source: 'history' as const,
+        envelopeCreatedAt: '2026-06-20T00:00:01.000Z',
+      },
+    ],
+    append: false,
+    offset: 30,
+    nextOffset: 31,
+    hasMore: false,
+    total: 1,
+    failedCount: 0,
+    message: 'Loaded 1 recall record.',
+  });
+  const selected = reducePanelAction(loaded, { name: 'recall-selection/toggle', id: 'recall-1' });
+  const closed = reducePanelAction(selected, { name: 'recall/close' });
+
+  assert.equal(opened.recall.open, true);
+  assert.equal(opened.recall.side, 'left');
+  assert.equal(loading.recall.busy, true);
+  assert.equal(loaded.recall.busy, false);
+  assert.equal(loaded.recall.candidates.length, 1);
+  assert.equal(loaded.recall.nextOffset, 31);
+  assert.equal(loaded.recall.hasMore, false);
+  assert.deepEqual(selected.recall.selectedIds, ['recall-1']);
+  assert.equal(closed.recall.open, false);
+  assert.deepEqual(closed.recall.selectedIds, []);
+});
+
+test('recall drawer appends paged candidates without duplicating rows', () => {
+  const state = reducePanelAction(createInitialPanelState(), {
+    name: 'recall/load-complete',
+    candidates: [
+      {
+        id: 'recall-1',
+        url: 'https://example.test/recall-1.jpg',
+        timestamp: '2026-06-20T00:00:00.000Z',
+        source: 'bookmark' as const,
+        envelopeCreatedAt: '2026-06-20T00:00:01.000Z',
+      },
+    ],
+    append: false,
+    offset: 30,
+    nextOffset: 31,
+    hasMore: true,
+    total: 3,
+    failedCount: 0,
+    message: 'Loaded 1 recall record.',
+  });
+
+  const appended = reducePanelAction(state, {
+    name: 'recall/load-complete',
+    candidates: [
+      {
+        id: 'recall-1',
+        url: 'https://example.test/recall-1.jpg',
+        timestamp: '2026-06-20T00:00:00.000Z',
+        source: 'bookmark' as const,
+        envelopeCreatedAt: '2026-06-20T00:00:01.000Z',
+      },
+      {
+        id: 'recall-2',
+        url: 'https://example.test/recall-2.jpg',
+        timestamp: '2026-06-20T00:00:02.000Z',
+        source: 'bookmark' as const,
+        envelopeCreatedAt: '2026-06-20T00:00:03.000Z',
+      },
+    ],
+    append: true,
+    offset: 31,
+    nextOffset: 33,
+    hasMore: false,
+    total: 3,
+    failedCount: 0,
+    message: 'Loaded 2 recall records.',
+  });
+
+  assert.deepEqual(
+    appended.recall.candidates.map((candidate) => candidate.id),
+    ['recall-1', 'recall-2'],
+  );
+  assert.equal(appended.recall.hasMore, false);
+});
+
+test('recall completion clears drawer state without mutating visible recents directly', () => {
+  const baseHistory = [
+    {
+      id: 'history-1',
+      url: 'https://example.test/history.jpg',
+      timestamp: '2026-06-20T00:00:00.000Z',
+      source: 'history' as const,
+    },
+  ];
+  const recalled = [
+    {
+      id: 'bookmark-1',
+      url: 'https://example.test/new.jpg',
+      timestamp: '2026-06-21T00:00:00.000Z',
+      source: 'bookmark' as const,
+    },
+  ];
+
+  const completed = reducePanelAction(
+    {
+      ...createInitialPanelState(),
+      history: baseHistory,
+      recall: { ...createInitialPanelState().recall, selectedIds: ['bookmark-1'], busy: true },
+    },
+    {
+      name: 'recall/complete',
+      records: recalled,
+      failedCount: 0,
+      message: 'Recalled 1 record.',
+    },
+  );
+
+  assert.deepEqual(completed.history, baseHistory);
+  assert.deepEqual(completed.recall.selectedIds, []);
+  assert.equal(completed.recall.busy, false);
+  assert.equal(completed.recall.message, 'Recalled 1 record.');
+});
+
 test('clearing split specs collapses fields and clears related markers', () => {
   const splitSpec: UrlFieldSplitSpec = {
     baseFieldId: 'q:0:0',

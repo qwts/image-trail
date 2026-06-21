@@ -1,4 +1,4 @@
-import type { AutomationState, PanelState, TargetState } from './types.js';
+import type { AutomationState, PanelState, RecallState, TargetState } from './types.js';
 
 export const EMPTY_TARGET_STATE: TargetState = {
   mode: 'none',
@@ -18,6 +18,19 @@ export const EMPTY_AUTOMATION_STATE: AutomationState = {
   retriesMax: 3,
   governorStatus: 'ready',
   requestsInLastMinute: 0,
+};
+
+export const EMPTY_RECALL_STATE: RecallState = {
+  open: false,
+  busy: false,
+  side: 'right',
+  candidates: [],
+  selectedIds: [],
+  offset: 0,
+  nextOffset: 0,
+  hasMore: false,
+  total: 0,
+  failedCount: 0,
 };
 
 export function createInitialPanelState(now = Date.now()): PanelState {
@@ -44,6 +57,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     blobKeyReference: null,
     importExportBusy: false,
     automation: EMPTY_AUTOMATION_STATE,
+    recall: EMPTY_RECALL_STATE,
     selectedHistoryIds: [],
     selectedBookmarkIds: [],
     activeFieldId: null,

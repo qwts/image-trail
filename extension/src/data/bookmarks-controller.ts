@@ -28,6 +28,16 @@ export interface BookmarkPage {
   readonly hasNewer: boolean;
 }
 
+export interface BookmarkRecallPage {
+  readonly items: readonly ImageDisplayRecord[];
+  readonly offset: number;
+  readonly limit: number;
+  readonly nextOffset: number;
+  readonly hasMore: boolean;
+  readonly total: number;
+  readonly failedCount: number;
+}
+
 export class IndexedDbBookmarkStore implements BookmarkStore {
   private ready: Promise<{
     readonly db: IDBDatabase;
@@ -92,8 +102,72 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       context.bookmarkKey.reference,
       existing?.envelope.updatedAt,
       indexUrl,
+      existing?.queueUpdatedAt ?? bookmark.timestamp,
     );
     return { ...bookmark, id: uuid };
+  }
+
+  async loadRecallPage(input: {
+    readonly offset: number;
+    readonly limit: number;
+    readonly scope?: 'global' | 'site';
+    readonly currentPageUrl?: string;
+  }): Promise<BookmarkRecallPage> {
+    const context = await this.openContext();
+    const offset = Math.max(0, input.offset);
+    const limit = Math.max(1, input.limit);
+    if (!context) return { items: [], offset, limit, nextOffset: offset, hasMore: false, total: 0, failedCount: 0 };
+
+    if ((input.scope ?? 'global') === 'site') {
+      return this.loadRecallPageByScanning(context, input, offset, limit);
+    }
+
+    const items: ImageDisplayRecord[] = [];
+    let failedCount = 0;
+    let pageOffset = offset;
+    let hasMore = false;
+    const chunkLimit = limit + 1;
+    while (items.length <= limit) {
+      const records = await context.repository.listEncryptedPage({ offset: pageOffset, limit: chunkLimit });
+      if (records.length === 0) break;
+      pageOffset += records.length;
+      for (const record of records) {
+        try {
+          const payload = await context.repository.openRecord(record, context.bookmarkKey.key);
+          if (payload) items.push(toDisplayRecord(record.uuid, payload));
+        } catch {
+          failedCount += 1;
+        }
+      }
+      if (records.length < chunkLimit) break;
+    }
+    if (items.length > limit) {
+      hasMore = true;
+      items.length = limit;
+    }
+    const total = await context.repository.countEncrypted();
+    return { items, offset, limit, nextOffset: offset + items.length, hasMore, total: Math.max(0, total - offset), failedCount };
+  }
+
+  async moveToFront(ids: readonly string[]): Promise<readonly ImageDisplayRecord[]> {
+    const context = await this.openContext();
+    if (!context) return [];
+    const uniqueIds = [...new Set(ids)].filter(Boolean);
+    const baseTime = Date.now();
+    const updated = await context.repository.updateQueueUpdatedAt(
+      // Queue pages read queueUpdatedAt newest-first, so earlier selected IDs get later timestamps.
+      uniqueIds.map((uuid, index) => ({ uuid, queueUpdatedAt: new Date(baseTime + uniqueIds.length - index).toISOString() })),
+    );
+    const records: ImageDisplayRecord[] = [];
+    for (const record of updated) {
+      try {
+        const payload = await context.repository.openRecord(record, context.bookmarkKey.key);
+        records.push(toDisplayRecord(record.uuid, payload));
+      } catch {
+        // If a record cannot be decrypted, it was not successfully recalled.
+      }
+    }
+    return records;
   }
 
   async remove(record: ImageDisplayRecord): Promise<void> {
@@ -128,6 +202,62 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const bookmarkKey = await ensureDurableBookmarkKey(new KeysRepository(result.db));
     return { db: result.db, repository: new BookmarksRepository(result.db), bookmarkKey };
   }
+
+  private async loadRecallPageByScanning(
+    context: {
+      readonly repository: BookmarksRepository;
+      readonly bookmarkKey: BookmarkKeyContext;
+    },
+    input: {
+      readonly scope?: 'global' | 'site';
+      readonly currentPageUrl?: string;
+    },
+    offset: number,
+    limit: number,
+  ): Promise<BookmarkRecallPage> {
+    const items: ImageDisplayRecord[] = [];
+    let failedCount = 0;
+    let scannedOffset = 0;
+    let matchingSkipped = 0;
+    let hasMore = false;
+    const chunkLimit = Math.max(limit * 4, DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax, 30);
+
+    while (items.length <= limit) {
+      const records = await context.repository.listEncryptedPage({ offset: scannedOffset, limit: chunkLimit });
+      if (records.length === 0) break;
+      scannedOffset += records.length;
+
+      for (const record of records) {
+        try {
+          const payload = await context.repository.openRecord(record, context.bookmarkKey.key);
+          const displayRecord = payload ? toDisplayRecord(record.uuid, payload) : null;
+          if (!displayRecord || !isVisibleInScope(displayRecord, input.scope ?? 'global', input.currentPageUrl)) continue;
+          if (matchingSkipped < offset) {
+            matchingSkipped += 1;
+            continue;
+          }
+          if (items.length >= limit) {
+            hasMore = true;
+            break;
+          }
+          items.push(displayRecord);
+        } catch {
+          failedCount += 1;
+        }
+      }
+      if (hasMore || records.length < chunkLimit) break;
+    }
+
+    return {
+      items,
+      offset,
+      limit,
+      nextOffset: offset + items.length,
+      hasMore,
+      total: offset + items.length + (hasMore ? 1 : 0),
+      failedCount,
+    };
+  }
 }
 
 function filterByVisibilityScope(
@@ -135,10 +265,14 @@ function filterByVisibilityScope(
   scope: 'global' | 'site',
   currentPageUrl: string | undefined,
 ): readonly ImageDisplayRecord[] {
-  if (scope !== 'site' || !currentPageUrl) return records;
+  return records.filter((record) => isVisibleInScope(record, scope, currentPageUrl));
+}
+
+function isVisibleInScope(record: ImageDisplayRecord, scope: 'global' | 'site', currentPageUrl: string | undefined): boolean {
+  if (scope !== 'site' || !currentPageUrl) return true;
   const currentHostname = hostnameFromUrl(currentPageUrl);
-  if (!currentHostname) return records;
-  return records.filter((record) => hostnameFromUrl(record.url) === currentHostname);
+  if (!currentHostname) return true;
+  return hostnameFromUrl(record.url) === currentHostname;
 }
 
 function hostnameFromUrl(url: string): string | null {

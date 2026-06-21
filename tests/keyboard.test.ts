@@ -51,6 +51,12 @@ test('classifyTarget returns panel for element inside panel root', () => {
   assert.equal(classifyTarget(fakeEvent({ target: mockElement })), 'panel');
 });
 
+test('classifyTarget returns panel for shadow DOM elements inside panel host', () => {
+  const row = { tagName: 'LI' };
+  const host = { tagName: 'DIV', id: 'image-trail-panel-root' };
+  assert.equal(classifyTarget(fakeEvent({ target: host, composedPath: () => [row, host] })), 'panel');
+});
+
 test('default keyboard bindings map d to download and shifted shortcuts to save-as download', () => {
   assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'd' && binding.action === 'download'));
   assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'ArrowDown' && binding.action === 'download'));

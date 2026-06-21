@@ -14,9 +14,14 @@ export async function createThumbnailDataUrlFromImage(image: HTMLImageElement, m
 export async function createThumbnailDataUrlFromUrl(url: string, maxEdge = THUMBNAIL_MAX_EDGE): Promise<string | null> {
   if (!url) return null;
   if (url.startsWith('data:image/')) return createThumbnailDataUrlFromDataUrl(url, maxEdge);
+  if (isTransientBlobUrl(url)) return createThumbnailDataUrlFromBlobUrl(url, maxEdge);
   const result = await fetchThumbnailSource(url);
   if (!result.ok) return null;
   return createThumbnailDataUrlFromDataUrl(result.dataUrl, maxEdge);
+}
+
+export function isTransientBlobUrl(url: string): boolean {
+  return url.startsWith('blob:');
 }
 
 function createThumbnailDataUrlFromDrawable(
@@ -53,6 +58,12 @@ export async function fetchThumbnailSource(url: string): Promise<FetchThumbnailS
 
 export async function createThumbnailDataUrlFromDataUrl(dataUrl: string, maxEdge = THUMBNAIL_MAX_EDGE): Promise<string | null> {
   const image = await loadImage(dataUrl);
+  if (!image) return null;
+  return createThumbnailDataUrlFromDrawable(image, image.naturalWidth, image.naturalHeight, maxEdge);
+}
+
+async function createThumbnailDataUrlFromBlobUrl(blobUrl: string, maxEdge = THUMBNAIL_MAX_EDGE): Promise<string | null> {
+  const image = await loadImage(blobUrl);
   if (!image) return null;
   return createThumbnailDataUrlFromDrawable(image, image.naturalWidth, image.naturalHeight, maxEdge);
 }

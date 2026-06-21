@@ -35,6 +35,27 @@ export interface AutomationState {
   readonly requestsInLastMinute: number;
 }
 
+export type RecallDrawerSide = 'left' | 'right';
+
+export interface RecallCandidate extends ImageDisplayRecord {
+  readonly envelopeCreatedAt: string;
+}
+
+export interface RecallState {
+  readonly open: boolean;
+  readonly busy: boolean;
+  readonly side: RecallDrawerSide;
+  readonly candidates: readonly RecallCandidate[];
+  readonly selectedIds: readonly string[];
+  readonly offset: number;
+  readonly nextOffset: number;
+  readonly hasMore: boolean;
+  readonly total: number;
+  readonly failedCount: number;
+  readonly message?: string;
+  readonly messageIsError?: boolean;
+}
+
 export interface PanelState {
   readonly visible: boolean;
   readonly status: PanelStatus;
@@ -60,6 +81,7 @@ export interface PanelState {
   readonly importExportMessage?: string;
   readonly importExportMessageIsError?: boolean;
   readonly automation: AutomationState;
+  readonly recall: RecallState;
   readonly selectedHistoryIds: readonly string[];
   readonly selectedBookmarkIds: readonly string[];
   readonly activeFieldId: string | null;
@@ -130,6 +152,16 @@ export type PanelActionName =
   | 'import/bookmarklet'
   | 'import/image'
   | 'import/encrypted-image'
+  | 'recall/open'
+  | 'recall/close'
+  | 'recall/load-start'
+  | 'recall/load-more'
+  | 'recall/load-complete'
+  | 'recall/error'
+  | 'recall-selection/toggle'
+  | 'recall-selection/clear'
+  | 'recall/selected'
+  | 'recall/complete'
   | 'storage/update'
   | 'undo-last'
   | 'slideshow-start'
@@ -187,6 +219,11 @@ export type PanelAction =
         | 'import/bookmarklet'
         | 'import/image'
         | 'import/encrypted-image'
+        | 'recall/open'
+        | 'recall/load-complete'
+        | 'recall/error'
+        | 'recall-selection/toggle'
+        | 'recall/complete'
         | 'storage/update'
       >;
     }
@@ -238,6 +275,26 @@ export type PanelAction =
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
   | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
   | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] }
+  | { readonly name: 'recall/open'; readonly side: RecallDrawerSide }
+  | {
+      readonly name: 'recall/load-complete';
+      readonly candidates: readonly RecallCandidate[];
+      readonly append: boolean;
+      readonly offset: number;
+      readonly nextOffset: number;
+      readonly hasMore: boolean;
+      readonly total: number;
+      readonly failedCount: number;
+      readonly message: string;
+    }
+  | { readonly name: 'recall/error'; readonly message: string }
+  | { readonly name: 'recall-selection/toggle'; readonly id: string }
+  | {
+      readonly name: 'recall/complete';
+      readonly records: readonly ImageDisplayRecord[];
+      readonly failedCount: number;
+      readonly message: string;
+    }
   | { readonly name: 'storage/update'; readonly usage: StorageUsageSummary };
 
 export interface BookmarkStore {

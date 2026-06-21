@@ -7,6 +7,7 @@ import type { DurableBookmarkPayloadV1 } from '../types.js';
 export interface EncryptedBookmarkRecord {
   readonly uuid: string;
   readonly url: string;
+  readonly queueUpdatedAt: string;
   readonly envelope: EncryptedEnvelope<{ readonly recordType: 'bookmark' }>;
 }
 
@@ -42,7 +43,7 @@ export class BookmarksRepository {
 
   async listEncryptedPage(input: { readonly offset: number; readonly limit: number }): Promise<readonly EncryptedBookmarkRecord[]> {
     const transaction = this.db.transaction(DataStore.Bookmarks, 'readonly');
-    const index = transaction.objectStore(DataStore.Bookmarks).index(SchemaIndex.BookmarksByUpdatedAt);
+    const index = transaction.objectStore(DataStore.Bookmarks).index(SchemaIndex.BookmarksByQueueUpdatedAt);
     const request = index.openCursor(null, 'prev');
     const result: EncryptedBookmarkRecord[] = [];
     const offset = Math.max(0, input.offset);
@@ -73,7 +74,7 @@ export class BookmarksRepository {
 
   async listEncryptedNewestFirst(): Promise<readonly EncryptedBookmarkRecord[]> {
     const transaction = this.db.transaction(DataStore.Bookmarks, 'readonly');
-    const index = transaction.objectStore(DataStore.Bookmarks).index(SchemaIndex.BookmarksByUpdatedAt);
+    const index = transaction.objectStore(DataStore.Bookmarks).index(SchemaIndex.BookmarksByQueueUpdatedAt);
     const request = index.openCursor(null, 'prev');
     const result: EncryptedBookmarkRecord[] = [];
 
@@ -109,6 +110,24 @@ export class BookmarksRepository {
     await transactionDone(transaction);
   }
 
+  async updateQueueUpdatedAt(
+    updates: readonly { readonly uuid: string; readonly queueUpdatedAt: string }[],
+  ): Promise<readonly EncryptedBookmarkRecord[]> {
+    if (updates.length === 0) return [];
+    const transaction = this.db.transaction(DataStore.Bookmarks, 'readwrite');
+    const store = transaction.objectStore(DataStore.Bookmarks);
+    const updated: EncryptedBookmarkRecord[] = [];
+    for (const update of updates) {
+      const existing = await requestToPromise<EncryptedBookmarkRecord | undefined>(store.get(update.uuid));
+      if (!existing) continue;
+      const next = { ...existing, queueUpdatedAt: update.queueUpdatedAt };
+      store.put(next);
+      updated.push(next);
+    }
+    await transactionDone(transaction);
+    return updated;
+  }
+
   async sealAndPut(
     uuid: string,
     payload: DurableBookmarkPayloadV1,
@@ -116,6 +135,7 @@ export class BookmarksRepository {
     keyReference: EncryptedBookmarkRecord['envelope']['key'],
     now?: string,
     indexUrl = payload.url,
+    queueUpdatedAt = now ?? new Date().toISOString(),
   ): Promise<EncryptedBookmarkRecord> {
     const envelope = await sealJsonEnvelope({
       payload,
@@ -125,7 +145,7 @@ export class BookmarksRepository {
       authenticatedMetadata: { recordType: 'bookmark' as const },
       now,
     });
-    const record = { uuid, url: indexUrl, envelope };
+    const record = { uuid, url: indexUrl, queueUpdatedAt, envelope };
     await this.putEncrypted(record);
     return record;
   }
