@@ -6,6 +6,7 @@ import { createFieldsView, type EditableField } from './components/fields-view.j
 import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHistoryView } from './components/history-view.js';
 import { createImageTransferView, createImportExportView } from './components/import-export-view.js';
+import { createRecallDrawerView, type RecallDrawerGeometry } from './components/recall-drawer-view.js';
 import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
 import { parseUrl } from '../core/url/parse-url.js';
@@ -15,6 +16,7 @@ import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
 
 export interface PanelRenderTarget {
   readonly root: HTMLElement;
+  readonly recallRoot?: HTMLElement | null;
   readonly dispatch: (action: PanelAction) => void;
   readonly layoutState: PanelLayoutState;
   readonly scrollAnchorId?: string | null;
@@ -48,6 +50,9 @@ const SCROLL_SNAPSHOT_SELECTORS = [
   '.image-trail-panel__bookmarks-section .image-trail-panel__record-list',
 ] as const;
 const MIN_FIELDS_PANEL_BLOCK_SIZE = 160;
+const DRAWER_GAP = 8;
+const DRAWER_EDGE_PADDING = 12;
+const DRAWER_INLINE_SIZE = 340;
 
 function makeButton(label: string, action: PanelAction, dispatch: (action: PanelAction) => void, disabled = false): HTMLButtonElement {
   const button = document.createElement('button');
@@ -400,10 +405,37 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
         hasOlder: state.hasOlderBookmarks,
         hasNewer: state.hasNewerBookmarks,
       },
+      { recallOpen: state.recall.open },
       target.dispatch,
     ),
     actions,
   );
   restoreScrollSnapshots(target.root, scrollPositions);
   restoreFocusedTextControl(target.root, focusedTextControl);
+  renderRecallDrawer(target, state);
+}
+
+export function renderRecallDrawer(target: PanelRenderTarget, state: PanelState): void {
+  const recallRoot = target.recallRoot;
+  if (!recallRoot) return;
+  const animate = !recallRoot.querySelector('.image-trail-panel__recall-drawer');
+  recallRoot.replaceChildren();
+  if (!state.recall.open) return;
+  recallRoot.append(
+    createRecallDrawerView(state.recall, recallDrawerGeometry(target.root, state.recall.side), target.dispatch, { animate }),
+  );
+}
+
+function recallDrawerGeometry(panelRoot: HTMLElement, side: 'left' | 'right'): RecallDrawerGeometry {
+  const rect = panelRoot.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const width = Math.min(DRAWER_INLINE_SIZE, Math.max(240, viewportWidth - DRAWER_EDGE_PADDING * 2));
+  const blockStart = Math.max(DRAWER_EDGE_PADDING, Math.min(rect.top, viewportHeight - DRAWER_EDGE_PADDING));
+  const blockSize = Math.max(180, viewportHeight - blockStart - DRAWER_EDGE_PADDING);
+  const left =
+    side === 'left'
+      ? Math.max(DRAWER_EDGE_PADDING, rect.left - width - DRAWER_GAP)
+      : Math.min(rect.right + DRAWER_GAP, viewportWidth - width - DRAWER_EDGE_PADDING);
+  return { side, inlineStart: left, blockStart, blockSize };
 }

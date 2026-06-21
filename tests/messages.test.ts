@@ -22,6 +22,8 @@ import {
   createImportEncryptedImageResultMessage,
   createLoadBookmarksMessage,
   createLoadBookmarksResultMessage,
+  createLoadRecallCandidatesMessage,
+  createLoadRecallCandidatesResultMessage,
   createAddRecentHistoryMessage,
   createAddRecentHistoryResultMessage,
   createLoadRecentHistoryMessage,
@@ -31,6 +33,8 @@ import {
   createRemoveBookmarkResultMessage,
   createRemoveRecentHistoryMessage,
   createRemoveRecentHistoryResultMessage,
+  createRecallRecordsMessage,
+  createRecallRecordsResultMessage,
   createRetrieveBlobMessage,
   createRetrieveBlobResultMessage,
   createSaveBookmarkMessage,
@@ -50,8 +54,10 @@ import {
   isImportBlobKeyBackupResultMessage,
   isImportEncryptedImageResultMessage,
   isLoadBookmarksResultMessage,
+  isLoadRecallCandidatesResultMessage,
   isAddRecentHistoryResultMessage,
   isLoadRecentHistoryResultMessage,
+  isRecallRecordsResultMessage,
   isRemoveBookmarkResultMessage,
   isRemoveRecentHistoryResultMessage,
   isRetrieveBlobResultMessage,
@@ -301,6 +307,36 @@ test('creates transient recent history messages', () => {
   assert.equal(isExtensionRequest(remove), true);
   assert.equal(isExtensionResponse(removeResult), true);
   assert.equal(isRemoveRecentHistoryResultMessage(removeResult), true);
+});
+
+test('creates recall drawer messages', () => {
+  const record = {
+    id: 'recall-1',
+    url: 'https://example.test/recall.jpg',
+    label: 'recall.jpg',
+    timestamp: '2026-06-19T00:00:00.000Z',
+    source: 'history' as const,
+    envelopeCreatedAt: '2026-06-19T00:00:01.000Z',
+  };
+  const load = createLoadRecallCandidatesMessage({ offset: 30, limit: 100, scope: 'global', currentPageUrl: 'https://example.test/page' });
+  const loadResult = createLoadRecallCandidatesResultMessage({
+    ok: true,
+    candidates: [record],
+    total: 1,
+    nextOffset: 31,
+    hasMore: false,
+    failedCount: 0,
+    message: 'Loaded 1 recall record.',
+  });
+  const recall = createRecallRecordsMessage([record.id]);
+  const recallResult = createRecallRecordsResultMessage({ ok: true, records: [record], failedCount: 0, message: 'Recalled 1 record.' });
+
+  assert.equal(isExtensionRequest(load), true);
+  assert.equal(isExtensionResponse(loadResult), true);
+  assert.equal(isLoadRecallCandidatesResultMessage(loadResult), true);
+  assert.equal(isExtensionRequest(recall), true);
+  assert.equal(isExtensionResponse(recallResult), true);
+  assert.equal(isRecallRecordsResultMessage(recallResult), true);
 });
 
 test('recognizes capture result messages as extension responses', () => {

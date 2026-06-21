@@ -1,5 +1,6 @@
 import type { CaptureStore } from '../content/capture-controller.js';
 import { requestEncryptedImageExport, requestEncryptedImageImport, requestImageDownload } from '../content/download-controller.js';
+import type { RecallStore } from '../content/recall-store.js';
 import type { RecentHistoryStore } from '../content/recent-history-store.js';
 import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
@@ -30,6 +31,7 @@ import {
   createThumbnailDataUrlFromImage,
   createThumbnailDataUrlFromUrl,
   fetchThumbnailSource,
+  isTransientBlobUrl,
 } from '../content/thumbnail-generator.js';
 import {
   DEFAULT_LOCAL_SETTINGS,
@@ -44,8 +46,7 @@ import {
   type DurableBookmarkPayloadV1,
   type DurableHistoryPayloadV1,
 } from '../content/panel-services.js';
-import { revokeThumbnailObjectUrls } from './components/thumbnail-source.js';
-import { renderPanel, type PanelLayoutState } from './render.js';
+import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
 
 const ROOT_ID = 'image-trail-panel-root';
 const STYLE_PATH = 'src/ui/styles/panel.css';
@@ -83,6 +84,7 @@ function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
 
 export class ImageTrailPanel {
   private root: HTMLElement | null = null;
+  private recallRoot: HTMLElement | null = null;
   private state: PanelState = createInitialPanelState();
   private unsubscribeFromTarget: (() => void) | null = null;
   private unsubscribeFromLoads: (() => void) | null = null;
@@ -109,6 +111,7 @@ export class ImageTrailPanel {
     private readonly bookmarkStore: BookmarkStore | null = null,
     private readonly captureStore: CaptureStore | null = null,
     private readonly recentHistoryStore: RecentHistoryStore | null = null,
+    private readonly recallStore: RecallStore | null = null,
   ) {
     this.state = { ...this.state, bookmarkVisibilityScope: this.localSettings.bookmarkVisibilityScope };
     this.unsubscribeFromTarget = this.pageAdapter.subscribe((snapshot) => {
@@ -175,9 +178,9 @@ export class ImageTrailPanel {
 
   private cleanupMountedElements(): void {
     this.pageAdapter.cleanup();
-    revokeThumbnailObjectUrls();
     document.getElementById(ROOT_ID)?.remove();
     this.root = null;
+    this.recallRoot = null;
   }
 
   disconnect(): void {
@@ -202,7 +205,7 @@ export class ImageTrailPanel {
     this.render();
   };
 
-  private loadBookmarkPage = async (offset: number): Promise<void> => {
+  private loadBookmarkPage = async (offset: number, options: { readonly render?: boolean } = {}): Promise<void> => {
     if (!this.bookmarkStore) return;
     const page = await this.bookmarkStore.loadPage({
       offset,
@@ -219,8 +222,87 @@ export class ImageTrailPanel {
       hasOlder: page.hasOlder,
       hasNewer: page.hasNewer,
     });
-    this.render();
+    if (options.render !== false) this.render();
   };
+
+  private openRecallDrawer(): void {
+    this.state = reducePanelAction(this.state, { name: 'recall/open', side: this.recallDrawerSide() });
+    this.render();
+    void this.loadRecallCandidates({ offset: this.state.bookmarkLimit || this.bookmarkLimit, append: false });
+  }
+
+  private recallDrawerSide(): 'left' | 'right' {
+    if (!this.root) return 'right';
+    const rect = this.root.getBoundingClientRect();
+    const leftSpace = rect.left;
+    const rightSpace = window.innerWidth - rect.right;
+    return rightSpace >= 360 || rightSpace >= leftSpace ? 'right' : 'left';
+  }
+
+  private async loadRecallCandidates(input: {
+    readonly offset: number;
+    readonly append: boolean;
+    readonly renderScope?: 'panel' | 'recall';
+    readonly showBusy?: boolean;
+  }): Promise<void> {
+    if (!this.recallStore) return;
+    const renderUpdatedRecall = input.renderScope === 'panel' ? () => this.render() : () => this.renderRecallOnly();
+    if (input.showBusy !== false) {
+      this.state = reducePanelAction(this.state, { name: 'recall/load-start' });
+      renderUpdatedRecall();
+    }
+    const result = await this.recallStore.loadCandidates({
+      offset: input.offset,
+      limit: 100,
+      scope: this.state.bookmarkVisibilityScope,
+      currentPageUrl: window.location.href,
+    });
+    if (!result.ok) {
+      if (result.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
+      this.state = reducePanelAction(this.state, { name: 'recall/error', message: result.message });
+      renderUpdatedRecall();
+      return;
+    }
+    this.state = reducePanelAction(this.state, {
+      name: 'recall/load-complete',
+      candidates: result.candidates,
+      append: input.append,
+      offset: input.offset,
+      nextOffset: result.nextOffset,
+      hasMore: result.hasMore,
+      total: result.total,
+      failedCount: result.failedCount,
+      message: result.message,
+    });
+    renderUpdatedRecall();
+  }
+
+  private refreshRecallIfOpen(): void {
+    if (!this.state.recall.open) return;
+    void this.loadRecallCandidates({ offset: this.state.bookmarkLimit || this.bookmarkLimit, append: false, showBusy: false });
+  }
+
+  private async recallSelectedRecords(): Promise<void> {
+    if (!this.recallStore || this.state.recall.selectedIds.length === 0) return;
+    this.state = reducePanelAction(this.state, { name: 'recall/load-start' });
+    this.render();
+    const result = await this.recallStore.recall(this.state.recall.selectedIds);
+    if (!result.ok) {
+      if (result.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
+      this.state = reducePanelAction(this.state, { name: 'recall/error', message: result.message });
+      this.render();
+      return;
+    }
+    await this.loadBookmarkPage(0);
+    this.state = reducePanelAction(this.state, {
+      name: 'recall/complete',
+      records: result.records,
+      failedCount: result.failedCount,
+      message: result.message,
+    });
+    this.refreshRecallIfOpen();
+    this.render();
+  }
 
   private dispatch = (action: PanelAction): void => {
     if (action.name === 'start-target-picker') {
@@ -275,12 +357,12 @@ export class ImageTrailPanel {
     if (action.name === 'bookmarks/toggle-scope') {
       this.state = reducePanelAction(this.state, action);
       this.settingsRepository.save({ ...this.localSettings, bookmarkVisibilityScope: this.state.bookmarkVisibilityScope });
-      void this.loadBookmarkPage(0);
+      void this.loadBookmarkPage(0).then(() => this.refreshRecallIfOpen());
       return;
     }
 
     if (action.name === 'bookmarks/reload') {
-      void this.loadBookmarkPage(0);
+      void this.loadBookmarkPage(0).then(() => this.refreshRecallIfOpen());
       return;
     }
 
@@ -297,6 +379,40 @@ export class ImageTrailPanel {
     ) {
       this.state = reducePanelAction(this.state, action);
       this.render();
+      return;
+    }
+
+    if (action.name === 'recall/open') {
+      if (this.state.recall.open) {
+        this.state = reducePanelAction(this.state, { name: 'recall/close' });
+        this.render();
+        return;
+      }
+      this.openRecallDrawer();
+      return;
+    }
+
+    if (action.name === 'recall/close') {
+      this.state = reducePanelAction(this.state, action);
+      this.render();
+      return;
+    }
+
+    if (action.name === 'recall-selection/toggle' || action.name === 'recall-selection/clear') {
+      this.state = reducePanelAction(this.state, action);
+      this.render();
+      return;
+    }
+
+    if (action.name === 'recall/load-more') {
+      if (!this.state.recall.busy && this.state.recall.hasMore) {
+        void this.loadRecallCandidates({ offset: this.state.recall.nextOffset, append: true });
+      }
+      return;
+    }
+
+    if (action.name === 'recall/selected') {
+      void this.recallSelectedRecords();
       return;
     }
 
@@ -772,8 +888,9 @@ export class ImageTrailPanel {
     const draft = createDisplayRecord({ id: sourceUrl, url: sourceUrl, thumbnail: resolvedThumbnail, source: 'bookmark' });
     const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
     this.state = { ...this.state, message: `Added to Image Trail: ${bookmark.url}`, lastUpdatedAt: Date.now() };
-    await this.loadBookmarkPage(0);
+    await this.loadBookmarkPage(0, { render: false });
     this.render();
+    this.refreshRecallIfOpen();
     return true;
   }
 
@@ -800,8 +917,9 @@ export class ImageTrailPanel {
       message: `Added imported image to Image Trail: ${bookmark.label ?? file.name}`,
       lastUpdatedAt: Date.now(),
     };
-    await this.loadBookmarkPage(0);
+    await this.loadBookmarkPage(0, { render: false });
     this.render();
+    this.refreshRecallIfOpen();
     return true;
   }
 
@@ -827,7 +945,11 @@ export class ImageTrailPanel {
     validation: ValidatedRecordUrl,
     options: RecordAddOptions,
   ): Promise<string | undefined> {
-    if (thumbnail) return thumbnail;
+    if (thumbnail && !isTransientBlobUrl(thumbnail)) return thumbnail;
+    if (thumbnail && isTransientBlobUrl(thumbnail)) {
+      const durableThumbnail = await createThumbnailDataUrlFromUrl(thumbnail);
+      if (durableThumbnail) return durableThumbnail;
+    }
     if (validation.preloadDataUrl) return (await createThumbnailDataUrlFromDataUrl(validation.preloadDataUrl)) ?? undefined;
     if (!options.trustLoadedImage) return undefined;
     return (await createThumbnailDataUrlFromUrl(sourceUrl)) ?? sourceUrl;
@@ -903,6 +1025,7 @@ export class ImageTrailPanel {
     await this.bookmarkStore?.remove(bookmark);
     this.state = reducePanelAction(this.state, { name: 'bookmark/remove', id });
     await this.loadBookmarkPage(this.state.bookmarkOffset);
+    this.refreshRecallIfOpen();
     this.render();
   }
 
@@ -953,6 +1076,7 @@ export class ImageTrailPanel {
       message: `Refreshed ${refreshed} thumbnail${refreshed === 1 ? '' : 's'}${unavailable ? `; ${unavailable} unavailable` : ''}.`,
       lastUpdatedAt: Date.now(),
     };
+    this.refreshRecallIfOpen();
     this.render();
   }
 
@@ -988,6 +1112,7 @@ export class ImageTrailPanel {
       if (updatedBookmark) {
         await this.bookmarkStore.save(updatedBookmark);
         await this.loadBookmarkPage(this.state.bookmarkOffset);
+        this.refreshRecallIfOpen();
       }
     }
     await this.refreshStorageUsage();
@@ -1008,6 +1133,7 @@ export class ImageTrailPanel {
     if (updatedBookmark && this.bookmarkStore) {
       await this.bookmarkStore.save(updatedBookmark);
       await this.loadBookmarkPage(this.state.bookmarkOffset);
+      this.refreshRecallIfOpen();
     }
     this.render();
   }
@@ -1471,6 +1597,7 @@ export class ImageTrailPanel {
       await this.bookmarkStore?.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
     }
     await this.loadBookmarkPage(0);
+    this.refreshRecallIfOpen();
     this.state = reducePanelAction(this.state, {
       name: 'import-export/complete',
       message: `${result.status.message}${result.plaintext ? ' Plaintext import was encrypted into bookmark storage.' : ''}`,
@@ -1491,6 +1618,7 @@ export class ImageTrailPanel {
       await this.bookmarkStore?.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
     }
     await this.loadBookmarkPage(0);
+    this.refreshRecallIfOpen();
     this.state = reducePanelAction(this.state, { name: 'import-export/complete', message: result.status.message });
     this.render();
   }
@@ -1526,7 +1654,9 @@ export class ImageTrailPanel {
       this.root.className = 'image-trail-panel-root image-trail-panel';
       this.root.setAttribute('role', 'dialog');
       this.root.setAttribute('aria-label', 'Image Trail panel');
-      shadow.replaceChildren(link, this.root);
+      this.recallRoot = document.createElement('div');
+      this.recallRoot.className = 'image-trail-panel-recall-root';
+      shadow.replaceChildren(link, this.root, this.recallRoot);
       (document.body ?? document.documentElement).append(host);
     }
   }
@@ -1536,6 +1666,7 @@ export class ImageTrailPanel {
       renderPanel(
         {
           root: this.root,
+          recallRoot: this.recallRoot,
           dispatch: this.dispatch,
           layoutState: this.layoutState,
           scrollAnchorId: this.previewScrollAnchorId,
@@ -1543,6 +1674,20 @@ export class ImageTrailPanel {
         this.state,
       );
     }
+  }
+
+  private renderRecallOnly(): void {
+    if (!this.root || !this.recallRoot) return;
+    renderRecallDrawer(
+      {
+        root: this.root,
+        recallRoot: this.recallRoot,
+        dispatch: this.dispatch,
+        layoutState: this.layoutState,
+        scrollAnchorId: this.previewScrollAnchorId,
+      },
+      this.state,
+    );
   }
 }
 

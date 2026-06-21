@@ -59,6 +59,12 @@ function keepItems(items: readonly string[], allowedItems: readonly string[]): r
   return items.filter((item) => allowed.has(item));
 }
 
+function mergeRecordsById<T extends { readonly id: string }>(existing: readonly T[], additions: readonly T[]): readonly T[] {
+  if (additions.length === 0) return existing;
+  const seen = new Set(existing.map((item) => item.id));
+  return [...existing, ...additions.filter((item) => !seen.has(item.id))];
+}
+
 function splitFieldIds(spec: UrlFieldSplitSpec): readonly string[] {
   const prefix = spec.location === 'path' ? `p:${spec.partIndex}` : `q:${spec.queryIndex}`;
   return spec.lengths.map((_, index) => `${prefix}:${spec.tokenIndex + index}`);
@@ -167,6 +173,74 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       };
     case 'history-selection/clear':
       return { ...state, selectedHistoryIds: [], lastUpdatedAt: Date.now() };
+    case 'recall/open':
+      return {
+        ...state,
+        recall: { ...state.recall, open: true, side: action.side, message: undefined, messageIsError: false },
+        lastUpdatedAt: Date.now(),
+      };
+    case 'recall/close':
+      return { ...state, recall: { ...state.recall, open: false, selectedIds: [] }, lastUpdatedAt: Date.now() };
+    case 'recall/load-start':
+      return {
+        ...state,
+        recall: { ...state.recall, busy: true, message: 'Loading recall records...', messageIsError: false },
+        lastUpdatedAt: Date.now(),
+      };
+    case 'recall/load-complete': {
+      const candidates = action.append ? mergeRecordsById(state.recall.candidates, action.candidates) : action.candidates;
+      return {
+        ...state,
+        recall: {
+          ...state.recall,
+          busy: false,
+          candidates,
+          selectedIds: keepItems(
+            state.recall.selectedIds,
+            candidates.map((candidate) => candidate.id),
+          ),
+          offset: action.offset,
+          nextOffset: action.nextOffset,
+          hasMore: action.hasMore,
+          total: action.total,
+          failedCount: action.failedCount,
+          message: action.message,
+          messageIsError: false,
+        },
+        lastUpdatedAt: Date.now(),
+      };
+    }
+    case 'recall/error':
+      return {
+        ...state,
+        recall: { ...state.recall, busy: false, message: action.message, messageIsError: true },
+        status: 'error',
+        message: action.message,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'recall-selection/toggle':
+      return {
+        ...state,
+        recall: { ...state.recall, selectedIds: toggleItem(state.recall.selectedIds, action.id) },
+        lastUpdatedAt: Date.now(),
+      };
+    case 'recall-selection/clear':
+      return { ...state, recall: { ...state.recall, selectedIds: [] }, lastUpdatedAt: Date.now() };
+    case 'recall/complete': {
+      return {
+        ...state,
+        recall: {
+          ...state.recall,
+          busy: false,
+          selectedIds: [],
+          message: action.message,
+          messageIsError: action.records.length === 0 || action.failedCount > 0,
+        },
+        status: action.records.length === 0 ? 'error' : 'ready',
+        message: action.message,
+        lastUpdatedAt: Date.now(),
+      };
+    }
     case 'active-field/set':
       return {
         ...state,

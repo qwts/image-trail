@@ -25,15 +25,22 @@ export const DEFAULT_BINDINGS: KeyBinding[] = [
 ];
 
 export function classifyTarget(event: KeyboardEvent): KeyTarget {
-  const composedTarget = event.composedPath?.()[0];
+  const composedPath = event.composedPath?.() ?? [];
+  const composedTarget = composedPath[0];
   const el = (composedTarget ?? event.target) as unknown as Record<string, unknown> | null;
   if (!el || typeof el['tagName'] !== 'string') return 'page';
   const tag = el['tagName'] as string;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return 'typing';
   if (el['isContentEditable'] === true) return 'typing';
   if (tag === 'BUTTON') return 'button';
+  if (composedPath.some(isPanelHost)) return 'panel';
   if (typeof el['closest'] === 'function' && (el as unknown as HTMLElement).closest('#image-trail-panel-root')) return 'panel';
   return 'page';
+}
+
+function isPanelHost(node: unknown): boolean {
+  if (!node || typeof node !== 'object') return false;
+  return (node as { id?: unknown }).id === 'image-trail-panel-root';
 }
 
 export function shouldRouteKeyboardShortcut(target: KeyTarget, action: string): boolean {

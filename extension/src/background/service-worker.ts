@@ -1,5 +1,6 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
 import { computeSha256 } from '../core/image/fingerprints.js';
+import type { ImageDisplayRecord } from '../core/display-records.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { getActiveBlobKey, lockBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
@@ -11,6 +12,7 @@ import { BlobsRepository } from '../data/repositories/blobs-repository.js';
 import { KeysRepository } from '../data/repositories/keys-repository.js';
 import type { StoredBlobRecord } from '../data/types.js';
 import type { StoredKeyRecord } from '../data/crypto/types.js';
+import type { RecallCandidate } from '../core/types.js';
 import { fetchImageBytes } from './fetch-image.js';
 import {
   MessageType,
@@ -27,8 +29,10 @@ import {
   createLoadBookmarksResultMessage,
   createAddRecentHistoryResultMessage,
   createLoadRecentHistoryResultMessage,
+  createLoadRecallCandidatesResultMessage,
   createRemoveBookmarkResultMessage,
   createRemoveRecentHistoryResultMessage,
+  createRecallRecordsResultMessage,
   createSaveBookmarkResultMessage,
   createBlobKeyStatusResultMessage,
   createExportBlobKeyBackupResultMessage,
@@ -50,6 +54,7 @@ import type {
 } from './messages.js';
 import type { LoadBookmarksMessage, RemoveBookmarkMessage, SaveBookmarkMessage } from './messages.js';
 import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHistoryMessage } from './messages.js';
+import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messages.js';
 import type { FetchThumbnailSourceMessage } from './messages.js';
 import type { CreateBlobPreviewMessage } from './messages.js';
 import type { SetupBlobKeyMessage, UnlockBlobKeyMessage, BlobKeyResultMessage } from './messages.js';
@@ -407,6 +412,47 @@ function handleRemoveRecentHistory(
   return { items: next };
 }
 
+async function handleLoadRecallCandidates(
+  message: LoadRecallCandidatesMessage,
+): Promise<import('./messages.js').LoadRecallCandidatesResultMessage['payload']> {
+  const offset = Math.max(0, message.payload.offset);
+  const limit = Math.max(1, Math.min(100, message.payload.limit));
+  const page = await bookmarkStore.loadRecallPage({
+    offset,
+    limit,
+    scope: message.payload.scope ?? 'global',
+    currentPageUrl: message.payload.currentPageUrl,
+  });
+  const candidates = page.items.map(toRecallCandidate);
+  const moreMessage = page.hasMore ? ` Showing ${candidates.length} of ${page.total}.` : '';
+  return {
+    ok: true,
+    candidates,
+    total: page.total,
+    nextOffset: page.nextOffset,
+    hasMore: page.hasMore,
+    failedCount: page.failedCount,
+    message: `Loaded ${candidates.length} recall record${candidates.length === 1 ? '' : 's'}.${moreMessage}`,
+  };
+}
+
+async function handleRecallRecords(message: RecallRecordsMessage): Promise<import('./messages.js').RecallRecordsResultMessage['payload']> {
+  const ids = message.payload.ids.filter(Boolean);
+  if (ids.length === 0) return { ok: false, reason: 'empty-selection', message: 'Select one or more records to recall.' };
+  const records = await bookmarkStore.moveToFront(ids);
+  const failedCount = ids.length - records.length;
+  return {
+    ok: true,
+    records,
+    failedCount,
+    message: `Recalled ${records.length} record${records.length === 1 ? '' : 's'}${failedCount ? `, ${failedCount} failed` : ''}.`,
+  };
+}
+
+function toRecallCandidate(record: ImageDisplayRecord): RecallCandidate {
+  return { ...record, envelopeCreatedAt: record.timestamp };
+}
+
 async function handleSetupBlobKey(message: SetupBlobKeyMessage): Promise<BlobKeyResultMessage['payload']> {
   const password = message.payload.password.trim();
   if (!password) return { ok: false, reason: 'empty-password', message: 'Enter a password to set up encrypted blob storage.' };
@@ -740,6 +786,26 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     case MessageType.RemoveRecentHistory:
       sendResponse(createRemoveRecentHistoryResultMessage(handleRemoveRecentHistory(message).items));
       return false;
+
+    case MessageType.LoadRecallCandidates:
+      handleLoadRecallCandidates(message)
+        .then((result) => sendResponse(createLoadRecallCandidatesResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createLoadRecallCandidatesResultMessage({ ok: false, reason: 'unknown', message: 'Recall records could not be loaded.' }),
+          ),
+        );
+      return true;
+
+    case MessageType.RecallRecords:
+      handleRecallRecords(message)
+        .then((result) => sendResponse(createRecallRecordsResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createRecallRecordsResultMessage({ ok: false, reason: 'unknown', message: 'Selected records could not be recalled.' }),
+          ),
+        );
+      return true;
 
     case MessageType.SaveBookmark:
       handleSaveBookmark(message)

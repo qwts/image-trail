@@ -65,6 +65,23 @@ export function migrateImageTrailDb(db: IDBDatabase, oldVersion: number, transac
     }
   }
 
+  if (oldVersion < 6) {
+    const bookmarks = requireUpgradeTransaction(transaction).objectStore(DataStore.Bookmarks);
+    if (!bookmarks.indexNames.contains(SchemaIndex.BookmarksByQueueUpdatedAt)) {
+      bookmarks.createIndex(SchemaIndex.BookmarksByQueueUpdatedAt, 'queueUpdatedAt', { unique: false });
+    }
+    const request = bookmarks.openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      const record = cursor.value as { readonly queueUpdatedAt?: string; readonly envelope?: { readonly updatedAt?: string } };
+      if (!record.queueUpdatedAt) {
+        cursor.update({ ...record, queueUpdatedAt: record.envelope?.updatedAt ?? new Date().toISOString() });
+      }
+      cursor.continue();
+    };
+  }
+
   const metadata = transaction?.objectStore(DataStore.Metadata);
   metadata?.put({
     key: 'schema',

@@ -5,7 +5,6 @@ import {
   imageExtensionFromValue,
   type ImageDisplayRecord,
 } from '../../core/display-records.js';
-import { thumbnailSourceForDom } from './thumbnail-source.js';
 
 type BookmarkAction =
   | { readonly name: 'bookmark/current' }
@@ -18,6 +17,7 @@ type BookmarkAction =
   | { readonly name: 'bookmarks/toggle-scope' }
   | { readonly name: 'bookmarks/reload' }
   | { readonly name: 'bookmarks/refresh-thumbnails' }
+  | { readonly name: 'recall/open'; readonly side: 'left' | 'right' }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'bookmark'; readonly sourceRecordId: string }
   | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string; readonly scrollAnchorId?: string }
   | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string };
@@ -37,6 +37,7 @@ export function createBookmarksView(
     readonly hasOlder: boolean;
     readonly hasNewer: boolean;
   },
+  recall: { readonly recallOpen: boolean },
   dispatch: (action: BookmarkAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
@@ -68,6 +69,14 @@ export function createBookmarksView(
   reload.textContent = 'Reload bookmarks';
   reload.title = 'Reload saved bookmarks from encrypted storage.';
   reload.addEventListener('click', () => dispatch({ name: 'bookmarks/reload' }));
+
+  const recallButton = document.createElement('button');
+  recallButton.type = 'button';
+  recallButton.textContent = recall.recallOpen ? 'Close Recall' : 'Recall';
+  recallButton.className = 'image-trail-panel__primary-action';
+  recallButton.disabled = page.total === 0;
+  recallButton.title = 'Browse offloaded bookmark queue records and recall selected rows into the visible queue.';
+  recallButton.addEventListener('click', () => dispatch({ name: 'recall/open', side: 'right' }));
 
   const pageMeta = document.createElement('p');
   pageMeta.className = 'image-trail-panel__meta';
@@ -196,7 +205,7 @@ export function createBookmarksView(
     selectedIds.length > 0
       ? `${selectedIds.length} bookmark(s) selected for export.`
       : 'Cmd/Ctrl-click rows to select bookmarks for export.';
-  section.append(heading, add, refreshThumbnails, scope, reload, pageMeta, pager, items.length ? selectionMeta : empty);
+  section.append(heading, add, refreshThumbnails, scope, reload, recallButton, pageMeta, pager, items.length ? selectionMeta : empty);
   if (items.length) section.append(list);
   return section;
 }
@@ -205,7 +214,7 @@ function createRecordVisual(item: ImageDisplayRecord): HTMLElement {
   if (item.thumbnail) {
     const image = document.createElement('img');
     image.className = 'image-trail-panel__record-thumbnail';
-    image.src = thumbnailSourceForDom(item.thumbnail);
+    image.src = item.thumbnail;
     image.alt = '';
     image.loading = 'lazy';
     return image;

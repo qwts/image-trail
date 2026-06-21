@@ -1,0 +1,173 @@
+import {
+  displayTitleForRecord,
+  imageExtensionFromUrl,
+  normalizeDisplayLabel,
+  type ImageDisplayRecord,
+} from '../../core/display-records.js';
+import type { PanelAction, RecallDrawerSide, RecallState } from '../../core/types.js';
+
+export interface RecallDrawerGeometry {
+  readonly side: RecallDrawerSide;
+  readonly inlineStart: number;
+  readonly blockStart: number;
+  readonly blockSize: number;
+}
+
+export function createRecallDrawerView(
+  state: RecallState,
+  geometry: RecallDrawerGeometry,
+  dispatch: (action: PanelAction) => void,
+  options: { readonly animate?: boolean } = {},
+): HTMLElement {
+  const drawer = document.createElement('aside');
+  drawer.className = `image-trail-panel-root image-trail-panel__recall-drawer is-${geometry.side}`;
+  if (options.animate) drawer.classList.add('is-opening');
+  drawer.setAttribute('role', 'dialog');
+  drawer.setAttribute('aria-label', 'Recall');
+  drawer.style.left = `${geometry.inlineStart}px`;
+  drawer.style.top = `${geometry.blockStart}px`;
+  drawer.style.maxHeight = `${geometry.blockSize}px`;
+
+  const header = document.createElement('div');
+  header.className = 'image-trail-panel__recall-header';
+
+  const titleGroup = document.createElement('div');
+  titleGroup.className = 'image-trail-panel__recall-title';
+
+  const title = document.createElement('h3');
+  title.textContent = 'Recall';
+
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__meta';
+  meta.textContent = recallMetaText(state);
+
+  titleGroup.append(title, meta);
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.textContent = 'Close';
+  close.addEventListener('click', () => dispatch({ name: 'recall/close' }));
+
+  header.append(titleGroup, close);
+
+  const message = document.createElement('p');
+  message.className = state.messageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
+  message.textContent =
+    state.message ?? (state.busy ? 'Loading recall records...' : 'Select records to bring back into the visible queue.');
+
+  const list = document.createElement('ol');
+  list.className = 'image-trail-panel__recall-list';
+  list.addEventListener('scroll', () => {
+    if (state.busy || !state.hasMore) return;
+    const remaining = list.scrollHeight - list.scrollTop - list.clientHeight;
+    if (remaining < 96) dispatch({ name: 'recall/load-more' });
+  });
+
+  if (state.candidates.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'image-trail-panel__recall-empty';
+    empty.textContent = state.busy ? 'Loading...' : 'No bookmark records available for Recall.';
+    list.append(empty);
+  } else {
+    const selected = new Set(state.selectedIds);
+    for (const candidate of state.candidates) {
+      list.append(createRecallRow(candidate, selected.has(candidate.id), dispatch));
+    }
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'image-trail-panel__actions image-trail-panel__recall-actions';
+
+  const recall = document.createElement('button');
+  recall.type = 'button';
+  recall.textContent = state.selectedIds.length > 0 ? `Recall selected (${state.selectedIds.length})` : 'Recall selected';
+  recall.disabled = state.busy || state.selectedIds.length === 0;
+  recall.addEventListener('click', () => dispatch({ name: 'recall/selected' }));
+
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.textContent = 'Clear selection';
+  clear.disabled = state.busy || state.selectedIds.length === 0;
+  clear.addEventListener('click', () => dispatch({ name: 'recall-selection/clear' }));
+
+  actions.append(recall, clear);
+  if (state.hasMore) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.textContent = state.busy ? 'Loading...' : 'Load more';
+    more.disabled = state.busy;
+    more.addEventListener('click', () => dispatch({ name: 'recall/load-more' }));
+    actions.append(more);
+  }
+  drawer.append(header, message, list, actions);
+  return drawer;
+}
+
+function createRecallRow(record: ImageDisplayRecord, selected: boolean, dispatch: (action: PanelAction) => void): HTMLElement {
+  const item = document.createElement('li');
+  item.className = selected ? 'is-selected' : '';
+  item.tabIndex = 0;
+  item.setAttribute('role', 'button');
+  item.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  item.dataset.imageTrailScrollAnchor = record.id;
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = selected;
+  checkbox.addEventListener('click', (event) => {
+    event.stopPropagation();
+    dispatch({ name: 'recall-selection/toggle', id: record.id });
+  });
+
+  item.append(checkbox, createRecallThumbnail(record), createRecallLabel(record));
+  item.addEventListener('click', () => dispatch({ name: 'recall-selection/toggle', id: record.id }));
+  item.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      dispatch({ name: 'recall-selection/toggle', id: record.id });
+    }
+  });
+  return item;
+}
+
+function createRecallThumbnail(record: ImageDisplayRecord): HTMLElement {
+  if (record.thumbnail) {
+    const image = document.createElement('img');
+    image.className = 'image-trail-panel__record-thumbnail';
+    image.src = record.thumbnail;
+    image.alt = '';
+    image.loading = 'lazy';
+    return image;
+  }
+
+  const fallback = document.createElement('span');
+  fallback.className = 'image-trail-panel__record-thumbnail image-trail-panel__record-thumbnail--empty';
+  fallback.textContent = imageExtensionFromUrl(record.url) ?? 'IMG';
+  return fallback;
+}
+
+function createRecallLabel(record: ImageDisplayRecord): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__recall-label';
+
+  const name = document.createElement('span');
+  name.className = 'image-trail-panel__recall-name';
+  name.textContent = normalizeDisplayLabel(record);
+  name.title = displayTitleForRecord(record);
+
+  const meta = document.createElement('span');
+  meta.className = 'image-trail-panel__recall-row-meta';
+  meta.textContent = `${new Date(record.timestamp).toLocaleString()}${record.storedOriginal ? ' - captured' : ''}`;
+
+  wrapper.append(name, meta);
+  return wrapper;
+}
+
+function recallMetaText(state: RecallState): string {
+  if (state.busy) return 'Loading bookmark records.';
+  if (state.total === 0) return 'No bookmark records found.';
+  const visible = state.candidates.length;
+  const unavailable = state.failedCount > 0 ? ` - ${state.failedCount} unavailable` : '';
+  const more = state.hasMore ? ' - more available' : '';
+  return `${visible} shown of ${state.total}${more}${unavailable}`;
+}

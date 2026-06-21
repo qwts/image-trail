@@ -3,6 +3,7 @@ import { PageAdapter } from './page-adapter.js';
 import { ExtensionBookmarkStore } from './extension-bookmark-store.js';
 import { CaptureController } from './capture-controller.js';
 import { RecentHistoryStore } from './recent-history-store.js';
+import { RecallStore } from './recall-store.js';
 import { ImageTrailPanel } from '../ui/panel.js';
 
 interface ImageTrailContentController {
@@ -22,7 +23,13 @@ function hasRuntimeMessaging(): boolean {
 
 function createController(): ImageTrailContentController {
   const pageAdapter = new PageAdapter();
-  const panel = new ImageTrailPanel(pageAdapter, new ExtensionBookmarkStore(), new CaptureController(), new RecentHistoryStore());
+  const panel = new ImageTrailPanel(
+    pageAdapter,
+    new ExtensionBookmarkStore(),
+    new CaptureController(),
+    new RecentHistoryStore(),
+    new RecallStore(),
+  );
 
   const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
     if (!isExtensionRequest(message)) {

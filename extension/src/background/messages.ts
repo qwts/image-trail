@@ -49,6 +49,10 @@ export const MessageType = {
   AddRecentHistoryResult: 'imageTrail.addRecentHistoryResult',
   RemoveRecentHistory: 'imageTrail.removeRecentHistory',
   RemoveRecentHistoryResult: 'imageTrail.removeRecentHistoryResult',
+  LoadRecallCandidates: 'imageTrail.loadRecallCandidates',
+  LoadRecallCandidatesResult: 'imageTrail.loadRecallCandidatesResult',
+  RecallRecords: 'imageTrail.recallRecords',
+  RecallRecordsResult: 'imageTrail.recallRecordsResult',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -412,6 +416,52 @@ export interface RemoveRecentHistoryResultMessage {
   readonly payload: { readonly items: readonly import('../core/display-records.js').ImageDisplayRecord[] };
 }
 
+export interface LoadRecallCandidatesMessage {
+  readonly type: typeof MessageType.LoadRecallCandidates;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: {
+    readonly offset: number;
+    readonly limit: number;
+    readonly scope?: 'global' | 'site';
+    readonly currentPageUrl?: string;
+  };
+}
+
+export interface LoadRecallCandidatesResultMessage {
+  readonly type: typeof MessageType.LoadRecallCandidatesResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | {
+        readonly ok: true;
+        readonly candidates: readonly import('../core/types.js').RecallCandidate[];
+        readonly total: number;
+        readonly nextOffset: number;
+        readonly hasMore: boolean;
+        readonly failedCount: number;
+        readonly message: string;
+      }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
+export interface RecallRecordsMessage {
+  readonly type: typeof MessageType.RecallRecords;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ids: readonly string[] };
+}
+
+export interface RecallRecordsResultMessage {
+  readonly type: typeof MessageType.RecallRecordsResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | {
+        readonly ok: true;
+        readonly records: readonly import('../core/display-records.js').ImageDisplayRecord[];
+        readonly failedCount: number;
+        readonly message: string;
+      }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
 export type ExtensionRequest =
   | TogglePanelMessage
   | PingMessage
@@ -438,7 +488,9 @@ export type ExtensionRequest =
   | RemoveBookmarkMessage
   | LoadRecentHistoryMessage
   | AddRecentHistoryMessage
-  | RemoveRecentHistoryMessage;
+  | RemoveRecentHistoryMessage
+  | LoadRecallCandidatesMessage
+  | RecallRecordsMessage;
 export type ExtensionResponse =
   | StatusMessage
   | UnknownMessageResponse
@@ -461,7 +513,9 @@ export type ExtensionResponse =
   | RemoveBookmarkResultMessage
   | LoadRecentHistoryResultMessage
   | AddRecentHistoryResultMessage
-  | RemoveRecentHistoryResultMessage;
+  | RemoveRecentHistoryResultMessage
+  | LoadRecallCandidatesResultMessage
+  | RecallRecordsResultMessage;
 export type ExtensionMessage = ExtensionRequest | ExtensionResponse;
 
 export function createTogglePanelMessage(): TogglePanelMessage {
@@ -686,6 +740,29 @@ export function createRemoveRecentHistoryResultMessage(
   return { type: MessageType.RemoveRecentHistoryResult, version: MESSAGE_PROTOCOL_VERSION, payload: { items } };
 }
 
+export function createLoadRecallCandidatesMessage(input: {
+  readonly offset: number;
+  readonly limit: number;
+  readonly scope?: 'global' | 'site';
+  readonly currentPageUrl?: string;
+}): LoadRecallCandidatesMessage {
+  return { type: MessageType.LoadRecallCandidates, version: MESSAGE_PROTOCOL_VERSION, payload: input };
+}
+
+export function createLoadRecallCandidatesResultMessage(
+  payload: LoadRecallCandidatesResultMessage['payload'],
+): LoadRecallCandidatesResultMessage {
+  return { type: MessageType.LoadRecallCandidatesResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createRecallRecordsMessage(ids: readonly string[]): RecallRecordsMessage {
+  return { type: MessageType.RecallRecords, version: MESSAGE_PROTOCOL_VERSION, payload: { ids } };
+}
+
+export function createRecallRecordsResultMessage(payload: RecallRecordsResultMessage['payload']): RecallRecordsResultMessage {
+  return { type: MessageType.RecallRecordsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 function hasVersionedObjectShape(value: unknown): value is { type?: unknown; version?: unknown; payload?: unknown } {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as { version?: unknown; payload?: unknown };
@@ -720,7 +797,9 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.RemoveBookmark ||
     value.type === MessageType.LoadRecentHistory ||
     value.type === MessageType.AddRecentHistory ||
-    value.type === MessageType.RemoveRecentHistory
+    value.type === MessageType.RemoveRecentHistory ||
+    value.type === MessageType.LoadRecallCandidates ||
+    value.type === MessageType.RecallRecords
   );
 }
 
@@ -748,7 +827,9 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.RemoveBookmarkResult ||
     value.type === MessageType.LoadRecentHistoryResult ||
     value.type === MessageType.AddRecentHistoryResult ||
-    value.type === MessageType.RemoveRecentHistoryResult
+    value.type === MessageType.RemoveRecentHistoryResult ||
+    value.type === MessageType.LoadRecallCandidatesResult ||
+    value.type === MessageType.RecallRecordsResult
   );
 }
 
@@ -840,6 +921,16 @@ export function isAddRecentHistoryResultMessage(value: unknown): value is AddRec
 export function isRemoveRecentHistoryResultMessage(value: unknown): value is RemoveRecentHistoryResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.RemoveRecentHistoryResult;
+}
+
+export function isLoadRecallCandidatesResultMessage(value: unknown): value is LoadRecallCandidatesResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.LoadRecallCandidatesResult;
+}
+
+export function isRecallRecordsResultMessage(value: unknown): value is RecallRecordsResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.RecallRecordsResult;
 }
 
 export function isStatusMessage(value: unknown): value is StatusMessage {
