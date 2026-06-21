@@ -34,7 +34,16 @@ enforced _before_ a PR is opened instead of caught after the fact.
    architecture, storage, security boundaries, automation checks, or CI
    expectations, update the relevant repo doc, user story, acceptance test, or
    ADR in the same PR. If no doc update is needed, say why in the PR description.
-5. **Write a manual test script for user-visible behavior.** When a PR changes
+5. **Capture development decisions as durable rules.** When implementation work
+   clarifies product behavior, data flow, security/storage constraints, UI
+   invariants, or edge-case handling, write those decisions into the relevant
+   repo doc before opening the PR. Scope the note to the area actually touched:
+   UI work should capture UI behavior, service-worker work should capture image
+   loading flow, DB/crypto work should capture storage and encryption
+   invariants, and cross-cutting work should document each affected boundary.
+   These notes are the source material for future automation and must not live
+   only in chat, commit messages, or a PR summary.
+6. **Write a manual test script for user-visible behavior.** When a PR changes
    UI, browser integration, image loading, storage flows, imports/exports, or
    any behavior that CI cannot fully exercise, include a short step-by-step
    manual test in the PR description. The script should state expected results

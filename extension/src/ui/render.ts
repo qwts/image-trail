@@ -40,6 +40,11 @@ const SCROLL_SNAPSHOT_SELECTORS = [
   '.image-trail-panel__field-list',
   '.image-trail-panel__bookmarks-section .image-trail-panel__record-list',
 ] as const;
+const MIN_FIELDS_PANEL_BLOCK_SIZE = 160;
+
+let fieldsPanelOpen = false;
+let fieldsPanelBlockSize: number | null = null;
+let historyListBlockSize: number | null = null;
 
 function makeButton(label: string, action: PanelAction, dispatch: (action: PanelAction) => void, disabled = false): HTMLButtonElement {
   const button = document.createElement('button');
@@ -331,6 +336,17 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
         onClearSplit: (baseFieldId) => {
           target.dispatch({ name: 'field-split/clear', baseFieldId });
         },
+        onOpenChange: (open, blockSize) => {
+          fieldsPanelOpen = open;
+          fieldsPanelBlockSize = blockSize;
+        },
+        onResize: (blockSize) => {
+          fieldsPanelBlockSize = Math.max(MIN_FIELDS_PANEL_BLOCK_SIZE, blockSize);
+        },
+      },
+      {
+        open: fieldsPanelOpen,
+        blockSize: fieldsPanelBlockSize,
       },
     ),
     createControlsView({
@@ -340,7 +356,12 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     captureSection,
     navSection,
     autoSection,
-    createHistoryView(state.history, state.selectedHistoryIds, state.captureInProgress, state.blobKeyUnlocked, target.dispatch),
+    createHistoryView(state.history, state.selectedHistoryIds, state.captureInProgress, state.blobKeyUnlocked, target.dispatch, {
+      listBlockSize: historyListBlockSize,
+      onListResize: (blockSize) => {
+        historyListBlockSize = blockSize;
+      },
+    }),
     createBookmarksView(
       state.target.selectedUrl,
       state.bookmarks,

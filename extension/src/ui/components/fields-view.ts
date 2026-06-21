@@ -12,6 +12,42 @@ export interface FieldsViewCallbacks {
   readonly onToggleUnlock: (fieldId: string) => void;
   readonly onApplySplit: (fieldId: string, pattern: string) => void;
   readonly onClearSplit: (baseFieldId: string) => void;
+  readonly onOpenChange: (open: boolean, blockSize: number | null) => void;
+  readonly onResize: (blockSize: number) => void;
+}
+
+export interface FieldsViewOptions {
+  readonly open: boolean;
+  readonly blockSize: number | null;
+}
+
+function computedPixelValue(styles: CSSStyleDeclaration, property: string): number {
+  const value = Number.parseFloat(styles.getPropertyValue(property));
+  return Number.isFinite(value) ? value : 0;
+}
+
+function rowCountBlockSize(wrapper: HTMLElement, summary: HTMLElement, body: HTMLElement, intro: HTMLElement, list: HTMLElement): number {
+  const rows = Array.from(list.children);
+  const row = rows[0];
+  const rowBlockSize = row instanceof HTMLElement ? row.getBoundingClientRect().height : 0;
+  const wrapperStyles = getComputedStyle(wrapper);
+  const bodyStyles = getComputedStyle(body);
+  const listStyles = getComputedStyle(list);
+  const wrapperGap = computedPixelValue(wrapperStyles, 'row-gap');
+  const bodyGap = computedPixelValue(bodyStyles, 'row-gap');
+  const listGap = computedPixelValue(listStyles, 'row-gap');
+  const wrapperChromeBlockSize =
+    computedPixelValue(wrapperStyles, 'padding-block-start') + computedPixelValue(wrapperStyles, 'padding-block-end');
+  const listChromeBlockSize = computedPixelValue(listStyles, 'padding-block-start') + computedPixelValue(listStyles, 'padding-block-end');
+  const listBlockSize = listChromeBlockSize + rows.length * rowBlockSize + Math.max(0, rows.length - 1) * listGap;
+  return Math.ceil(
+    wrapperChromeBlockSize +
+      summary.getBoundingClientRect().height +
+      wrapperGap +
+      intro.getBoundingClientRect().height +
+      bodyGap +
+      listBlockSize,
+  );
 }
 
 export function fieldDisplayValue(field: EditableField): string {
@@ -33,11 +69,47 @@ export function createFieldsView(
   unchangedFieldIds: readonly string[],
   unlockedFieldIds: readonly string[],
   callbacks: FieldsViewCallbacks,
+  options: FieldsViewOptions,
 ): HTMLElement {
-  const wrapper = document.createElement('section');
+  const wrapper = document.createElement('details');
   wrapper.className = 'image-trail-panel__section image-trail-panel__fields';
+  wrapper.open = options.open;
+  if (options.blockSize !== null) {
+    wrapper.classList.add('is-height-locked');
+    wrapper.style.setProperty('--image-trail-fields-size', `${options.blockSize}px`);
+  }
+  wrapper.addEventListener('toggle', () => {
+    if (!wrapper.open) {
+      wrapper.classList.remove('is-height-locked');
+      wrapper.style.removeProperty('--image-trail-fields-size');
+      callbacks.onOpenChange(false, null);
+      return;
+    }
+
+    queueMicrotask(() => {
+      if (options.blockSize !== null) return;
+      const blockSize = rowCountBlockSize(wrapper, summary, body, intro, list);
+      wrapper.classList.add('is-height-locked');
+      wrapper.style.setProperty('--image-trail-fields-size', `${blockSize}px`);
+      callbacks.onOpenChange(true, blockSize);
+    });
+  });
+  wrapper.addEventListener('mouseup', () => {
+    if (!wrapper.open) return;
+    const blockSize = Math.round(wrapper.getBoundingClientRect().height);
+    wrapper.classList.add('is-height-locked');
+    wrapper.style.setProperty('--image-trail-fields-size', `${blockSize}px`);
+    callbacks.onResize(blockSize);
+  });
+
+  const summary = document.createElement('summary');
+  summary.className = 'image-trail-panel__fields-summary';
   const heading = document.createElement('h3');
   heading.textContent = 'Parsed fields';
+  summary.append(heading);
+
+  const body = document.createElement('div');
+  body.className = 'image-trail-panel__fields-body';
   const intro = document.createElement('p');
   intro.className = 'image-trail-panel__meta';
   intro.textContent = fields.length
@@ -199,6 +271,7 @@ export function createFieldsView(
     item.textContent = 'No parsed fields available yet.';
     list.append(item);
   }
-  wrapper.append(heading, intro, list);
+  body.append(intro, list);
+  wrapper.append(summary, body);
   return wrapper;
 }

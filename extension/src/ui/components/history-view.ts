@@ -9,12 +9,18 @@ type HistoryAction =
   | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string }
   | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string };
 
+interface HistoryViewOptions {
+  readonly listBlockSize: number | null;
+  readonly onListResize: (blockSize: number) => void;
+}
+
 export function createHistoryView(
   items: readonly ImageDisplayRecord[],
   selectedIds: readonly string[],
   captureInProgress: boolean,
   blobKeyUnlocked: boolean,
   dispatch: (action: HistoryAction) => void,
+  options?: HistoryViewOptions,
 ): HTMLElement {
   const section = document.createElement('section');
   section.className = 'image-trail-panel__section image-trail-panel__history-section';
@@ -24,6 +30,21 @@ export function createHistoryView(
 
   const list = document.createElement('ol');
   list.className = 'image-trail-panel__record-list';
+  if (options?.listBlockSize) {
+    list.classList.add('is-user-resized');
+    list.style.setProperty('--image-trail-history-size', `${options.listBlockSize}px`);
+  }
+  list.addEventListener('pointerdown', (event) => {
+    const rect = list.getBoundingClientRect();
+    if (rect.bottom - event.clientY > 18) return;
+    const blockSize = Math.round(rect.height);
+    list.classList.add('is-user-resized');
+    list.style.setProperty('--image-trail-history-size', `${blockSize}px`);
+  });
+  list.addEventListener('mouseup', () => {
+    if (!list.classList.contains('is-user-resized')) return;
+    options?.onListResize(Math.round(list.getBoundingClientRect().height));
+  });
   for (const item of items) {
     const capturedBlobId = encryptedBlobIdForRecord(item);
     const lockedEncrypted = isLockedEncryptedRecord(item, blobKeyUnlocked);

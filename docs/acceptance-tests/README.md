@@ -9,3 +9,4 @@ These scenarios define the first browser-level acceptance coverage for the Brave
 - [Target Picker Captures Only The Selected Image](target-picker-captures-only-selected-image.md)
 - [Third-Party CDN Permission Flow](third-party-cdn-permission-flow.md)
 - [Oversized Original Is Bounded](oversized-original-is-bounded.md)
+- [Panel Layout Stability](panel-layout-stability.md)
