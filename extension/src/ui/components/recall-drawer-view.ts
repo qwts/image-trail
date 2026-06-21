@@ -6,6 +6,7 @@ import { recordDisplayName, recordMetadataText, recordTitle } from './record-met
 export interface RecallDrawerGeometry {
   readonly side: RecallDrawerSide;
   readonly inlineStart: number;
+  readonly inlineSize: number;
   readonly blockStart: number;
   readonly blockSize: number;
 }
@@ -23,6 +24,8 @@ export function createRecallDrawerView(
   drawer.setAttribute('aria-label', 'Recall');
   drawer.style.left = `${geometry.inlineStart}px`;
   drawer.style.top = `${geometry.blockStart}px`;
+  drawer.style.width = `${geometry.inlineSize}px`;
+  drawer.style.height = `${geometry.blockSize}px`;
   drawer.style.maxHeight = `${geometry.blockSize}px`;
 
   const header = document.createElement('div');
@@ -52,24 +55,26 @@ export function createRecallDrawerView(
   message.textContent =
     state.message ?? (state.busy ? 'Loading recall records...' : 'Select records to bring back into the visible queue.');
 
-  const list = document.createElement('ol');
-  list.className = 'image-trail-panel__recall-list';
-  list.addEventListener('scroll', () => {
-    if (state.busy || !state.hasMore) return;
-    const remaining = list.scrollHeight - list.scrollTop - list.clientHeight;
-    if (remaining < 96) dispatch({ name: 'recall/load-more' });
-  });
-
+  const content = document.createDocumentFragment();
   if (state.candidates.length === 0) {
-    const empty = document.createElement('li');
+    const empty = document.createElement('p');
     empty.className = 'image-trail-panel__recall-empty';
     empty.textContent = state.busy ? 'Loading...' : 'No bookmark records available for Recall.';
-    list.append(empty);
+    content.append(empty);
   } else {
+    const list = document.createElement('ol');
+    list.className = 'image-trail-panel__recall-list';
+    list.addEventListener('scroll', () => {
+      if (state.busy || !state.hasMore) return;
+      const remaining = list.scrollHeight - list.scrollTop - list.clientHeight;
+      if (remaining < 96) dispatch({ name: 'recall/load-more' });
+    });
+
     const selected = new Set(state.selectedIds);
     for (const candidate of state.candidates) {
       list.append(createRecallRow(candidate, selected.has(candidate.id), dispatch));
     }
+    content.append(list);
   }
 
   const actions = document.createElement('div');
@@ -96,7 +101,7 @@ export function createRecallDrawerView(
     more.addEventListener('click', () => dispatch({ name: 'recall/load-more' }));
     actions.append(more);
   }
-  drawer.append(header, message, list, actions);
+  drawer.append(header, message, content, actions);
   return drawer;
 }
 

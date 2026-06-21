@@ -307,6 +307,7 @@ export type PanelAction =
       readonly message: string;
     }
   | { readonly name: 'recall/error'; readonly message: string }
+  | { readonly name: 'recall/message-clear'; readonly message: string }
   | { readonly name: 'recall-selection/toggle'; readonly id: string }
   | {
       readonly name: 'recall/complete';

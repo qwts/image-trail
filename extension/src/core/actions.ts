@@ -220,6 +220,13 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         message: action.message,
         lastUpdatedAt: Date.now(),
       };
+    case 'recall/message-clear':
+      if (state.recall.message !== action.message || state.recall.messageIsError) return state;
+      return {
+        ...state,
+        recall: { ...state.recall, message: undefined, messageIsError: false },
+        lastUpdatedAt: Date.now(),
+      };
     case 'recall-selection/toggle':
       return {
         ...state,

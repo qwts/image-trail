@@ -59,32 +59,20 @@
 }
 
 .image-trail-panel-root.image-trail-panel__recall-drawer.is-left.is-opening {
-  animation: image-trail-recall-slide-left 190ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: image-trail-recall-fade-in 160ms ease-out;
 }
 
 .image-trail-panel-root.image-trail-panel__recall-drawer.is-right.is-opening {
-  animation: image-trail-recall-slide-right 190ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: image-trail-recall-fade-in 160ms ease-out;
 }
 
-@keyframes image-trail-recall-slide-left {
+@keyframes image-trail-recall-fade-in {
   from {
     opacity: 0;
-    transform: translateX(20px);
   }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
 
-@keyframes image-trail-recall-slide-right {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -1241,6 +1229,8 @@
 }
 
 .image-trail-panel-root .image-trail-panel__recall-empty {
+  display: block;
+  grid-template-columns: none;
   color: #999;
   cursor: default;
   font:
@@ -1249,6 +1239,9 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+  line-height: 1.4;
+  padding: 8px 6px;
+  white-space: normal;
 }
 
 .image-trail-panel-root .image-trail-panel__recall-actions {

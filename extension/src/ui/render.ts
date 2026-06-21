@@ -471,9 +471,17 @@ function recallDrawerGeometry(panelRoot: HTMLElement, side: 'left' | 'right'): R
   const width = Math.min(DRAWER_INLINE_SIZE, Math.max(240, viewportWidth - DRAWER_EDGE_PADDING * 2));
   const blockStart = Math.max(DRAWER_EDGE_PADDING, Math.min(rect.top, viewportHeight - DRAWER_EDGE_PADDING));
   const blockSize = Math.max(180, viewportHeight - blockStart - DRAWER_EDGE_PADDING);
+  const minLeft = DRAWER_EDGE_PADDING;
+  const maxLeft = viewportWidth - width - DRAWER_EDGE_PADDING;
+  const outsideLeft = rect.left - width - DRAWER_GAP;
+  const outsideRight = rect.right + DRAWER_GAP;
   const left =
     side === 'left'
-      ? Math.max(DRAWER_EDGE_PADDING, rect.left - width - DRAWER_GAP)
-      : Math.min(rect.right + DRAWER_GAP, viewportWidth - width - DRAWER_EDGE_PADDING);
-  return { side, inlineStart: left, blockStart, blockSize };
+      ? outsideLeft >= minLeft
+        ? outsideLeft
+        : Math.max(minLeft, Math.min(rect.left, maxLeft))
+      : outsideRight <= maxLeft
+        ? outsideRight
+        : Math.max(minLeft, Math.min(rect.right - width, maxLeft));
+  return { side, inlineStart: left, inlineSize: width, blockStart, blockSize };
 }
