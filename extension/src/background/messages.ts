@@ -39,10 +39,16 @@ export const MessageType = {
   BlobKeyResult: 'imageTrail.blobKeyResult',
   LoadBookmarks: 'imageTrail.loadBookmarks',
   LoadBookmarksResult: 'imageTrail.loadBookmarksResult',
+  LoadBookmarksByIds: 'imageTrail.loadBookmarksByIds',
+  LoadBookmarksByIdsResult: 'imageTrail.loadBookmarksByIdsResult',
   SaveBookmark: 'imageTrail.saveBookmark',
   SaveBookmarkResult: 'imageTrail.saveBookmarkResult',
   RemoveBookmark: 'imageTrail.removeBookmark',
   RemoveBookmarkResult: 'imageTrail.removeBookmarkResult',
+  RemoveBookmarks: 'imageTrail.removeBookmarks',
+  RemoveBookmarksResult: 'imageTrail.removeBookmarksResult',
+  RemoveRecallBookmarks: 'imageTrail.removeRecallBookmarks',
+  RemoveRecallBookmarksResult: 'imageTrail.removeRecallBookmarksResult',
   LoadRecentHistory: 'imageTrail.loadRecentHistory',
   LoadRecentHistoryResult: 'imageTrail.loadRecentHistoryResult',
   AddRecentHistory: 'imageTrail.addRecentHistory',
@@ -368,6 +374,18 @@ export interface LoadBookmarksResultMessage {
   };
 }
 
+export interface LoadBookmarksByIdsMessage {
+  readonly type: typeof MessageType.LoadBookmarksByIds;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ids: readonly string[] };
+}
+
+export interface LoadBookmarksByIdsResultMessage {
+  readonly type: typeof MessageType.LoadBookmarksByIdsResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly items: readonly import('../core/display-records.js').ImageDisplayRecord[] };
+}
+
 export interface SaveBookmarkMessage {
   readonly type: typeof MessageType.SaveBookmark;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -392,6 +410,34 @@ export interface RemoveBookmarkResultMessage {
   readonly type: typeof MessageType.RemoveBookmarkResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload: { readonly ok: boolean };
+}
+
+export interface RemoveBookmarksMessage {
+  readonly type: typeof MessageType.RemoveBookmarks;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ids: readonly string[] };
+}
+
+export interface RemoveBookmarksResultMessage {
+  readonly type: typeof MessageType.RemoveBookmarksResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: boolean; readonly removedCount: number };
+}
+
+export interface RemoveRecallBookmarksMessage {
+  readonly type: typeof MessageType.RemoveRecallBookmarks;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: {
+    readonly offset: number;
+    readonly scope?: 'global' | 'site';
+    readonly currentPageUrl?: string;
+  };
+}
+
+export interface RemoveRecallBookmarksResultMessage {
+  readonly type: typeof MessageType.RemoveRecallBookmarksResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: boolean; readonly removedCount: number };
 }
 
 export interface LoadRecentHistoryMessage {
@@ -591,8 +637,11 @@ export type ExtensionRequest =
   | ExportBlobKeyBackupMessage
   | ImportBlobKeyBackupMessage
   | LoadBookmarksMessage
+  | LoadBookmarksByIdsMessage
   | SaveBookmarkMessage
   | RemoveBookmarkMessage
+  | RemoveBookmarksMessage
+  | RemoveRecallBookmarksMessage
   | LoadRecentHistoryMessage
   | AddRecentHistoryMessage
   | RemoveRecentHistoryMessage
@@ -623,8 +672,11 @@ export type ExtensionResponse =
   | ExportBlobKeyBackupResultMessage
   | ImportBlobKeyBackupResultMessage
   | LoadBookmarksResultMessage
+  | LoadBookmarksByIdsResultMessage
   | SaveBookmarkResultMessage
   | RemoveBookmarkResultMessage
+  | RemoveBookmarksResultMessage
+  | RemoveRecallBookmarksResultMessage
   | LoadRecentHistoryResultMessage
   | AddRecentHistoryResultMessage
   | RemoveRecentHistoryResultMessage
@@ -812,6 +864,16 @@ export function createLoadBookmarksResultMessage(payload: LoadBookmarksResultMes
   return { type: MessageType.LoadBookmarksResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
+export function createLoadBookmarksByIdsMessage(ids: readonly string[]): LoadBookmarksByIdsMessage {
+  return { type: MessageType.LoadBookmarksByIds, version: MESSAGE_PROTOCOL_VERSION, payload: { ids } };
+}
+
+export function createLoadBookmarksByIdsResultMessage(
+  payload: LoadBookmarksByIdsResultMessage['payload'],
+): LoadBookmarksByIdsResultMessage {
+  return { type: MessageType.LoadBookmarksByIdsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 export function createSaveBookmarkMessage(record: import('../core/display-records.js').ImageDisplayRecord): SaveBookmarkMessage {
   return { type: MessageType.SaveBookmark, version: MESSAGE_PROTOCOL_VERSION, payload: { record } };
 }
@@ -826,6 +888,24 @@ export function createRemoveBookmarkMessage(record: import('../core/display-reco
 
 export function createRemoveBookmarkResultMessage(payload: RemoveBookmarkResultMessage['payload']): RemoveBookmarkResultMessage {
   return { type: MessageType.RemoveBookmarkResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createRemoveBookmarksMessage(ids: readonly string[]): RemoveBookmarksMessage {
+  return { type: MessageType.RemoveBookmarks, version: MESSAGE_PROTOCOL_VERSION, payload: { ids } };
+}
+
+export function createRemoveBookmarksResultMessage(payload: RemoveBookmarksResultMessage['payload']): RemoveBookmarksResultMessage {
+  return { type: MessageType.RemoveBookmarksResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createRemoveRecallBookmarksMessage(payload: RemoveRecallBookmarksMessage['payload']): RemoveRecallBookmarksMessage {
+  return { type: MessageType.RemoveRecallBookmarks, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createRemoveRecallBookmarksResultMessage(
+  payload: RemoveRecallBookmarksResultMessage['payload'],
+): RemoveRecallBookmarksResultMessage {
+  return { type: MessageType.RemoveRecallBookmarksResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createLoadRecentHistoryMessage(pageUrl: string): LoadRecentHistoryMessage {
@@ -975,8 +1055,11 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.ExportBlobKeyBackup ||
     value.type === MessageType.ImportBlobKeyBackup ||
     value.type === MessageType.LoadBookmarks ||
+    value.type === MessageType.LoadBookmarksByIds ||
     value.type === MessageType.SaveBookmark ||
     value.type === MessageType.RemoveBookmark ||
+    value.type === MessageType.RemoveBookmarks ||
+    value.type === MessageType.RemoveRecallBookmarks ||
     value.type === MessageType.LoadRecentHistory ||
     value.type === MessageType.AddRecentHistory ||
     value.type === MessageType.RemoveRecentHistory ||
@@ -1012,8 +1095,11 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.ExportBlobKeyBackupResult ||
     value.type === MessageType.ImportBlobKeyBackupResult ||
     value.type === MessageType.LoadBookmarksResult ||
+    value.type === MessageType.LoadBookmarksByIdsResult ||
     value.type === MessageType.SaveBookmarkResult ||
     value.type === MessageType.RemoveBookmarkResult ||
+    value.type === MessageType.RemoveBookmarksResult ||
+    value.type === MessageType.RemoveRecallBookmarksResult ||
     value.type === MessageType.LoadRecentHistoryResult ||
     value.type === MessageType.AddRecentHistoryResult ||
     value.type === MessageType.RemoveRecentHistoryResult ||
@@ -1094,6 +1180,11 @@ export function isLoadBookmarksResultMessage(value: unknown): value is LoadBookm
   return value.type === MessageType.LoadBookmarksResult;
 }
 
+export function isLoadBookmarksByIdsResultMessage(value: unknown): value is LoadBookmarksByIdsResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.LoadBookmarksByIdsResult;
+}
+
 export function isSaveBookmarkResultMessage(value: unknown): value is SaveBookmarkResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.SaveBookmarkResult;
@@ -1102,6 +1193,16 @@ export function isSaveBookmarkResultMessage(value: unknown): value is SaveBookma
 export function isRemoveBookmarkResultMessage(value: unknown): value is RemoveBookmarkResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.RemoveBookmarkResult;
+}
+
+export function isRemoveBookmarksResultMessage(value: unknown): value is RemoveBookmarksResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.RemoveBookmarksResult;
+}
+
+export function isRemoveRecallBookmarksResultMessage(value: unknown): value is RemoveRecallBookmarksResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.RemoveRecallBookmarksResult;
 }
 
 export function isLoadRecentHistoryResultMessage(value: unknown): value is LoadRecentHistoryResultMessage {

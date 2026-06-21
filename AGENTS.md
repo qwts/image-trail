@@ -65,6 +65,21 @@ Before claiming done, run:
 
 If a pre-existing unrelated file breaks a check, do not hide it. Report it clearly and run targeted validation for touched files when useful.
 
+## Manual Verification Handoff
+
+After the first implementation stretch, provide a manual test run before asking for final signoff or PR approval.
+
+The manual test run should include:
+
+- the primary user-facing flows changed by the PR
+- expected results for each flow
+- persistence, reload, and scope checks when storage or queue state is involved
+- locked/private/encrypted-state checks when relevant
+- nearby regression checks for behavior likely to be affected
+- any risks or behavior not verified locally
+
+If the change affects product rules, storage semantics, or acceptance criteria, update the relevant repo acceptance doc or wiki-linked project documentation in the same PR.
+
 ## Tool Paths
 
 If Codex cannot resolve a tool from `PATH`, use these absolute paths:

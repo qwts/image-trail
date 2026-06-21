@@ -4,13 +4,14 @@ import { recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitl
 type BookmarkAction =
   | { readonly name: 'bookmark/current' }
   | { readonly name: 'bookmark/load'; readonly id: string }
-  | { readonly name: 'bookmark/remove'; readonly id: string }
+  | { readonly name: 'bookmark/clear'; readonly id: string }
   | { readonly name: 'bookmark-selection/toggle'; readonly id: string }
   | { readonly name: 'bookmark-selection/single'; readonly id: string }
   | { readonly name: 'bookmark-selection/clear' }
   | { readonly name: 'bookmarks/older' }
   | { readonly name: 'bookmarks/newer' }
   | { readonly name: 'bookmarks/toggle-scope' }
+  | { readonly name: 'bookmarks/clear-visible' }
   | { readonly name: 'bookmarks/reload' }
   | { readonly name: 'bookmarks/refresh-thumbnails' }
   | { readonly name: 'recall/open'; readonly side: 'left' | 'right' }
@@ -94,7 +95,17 @@ export function createBookmarksView(
     dispatch({ name: 'bookmarks/reload' });
   });
 
-  queueMenuActions.append(scope, reload, refreshThumbnails);
+  const clearQueue = document.createElement('button');
+  clearQueue.type = 'button';
+  clearQueue.textContent = 'Clear queue';
+  clearQueue.title = 'Hide the currently visible queue rows until the queue is reloaded.';
+  clearQueue.disabled = items.length === 0;
+  clearQueue.addEventListener('click', () => {
+    queueMenu.open = false;
+    dispatch({ name: 'bookmarks/clear-visible' });
+  });
+
+  queueMenuActions.append(scope, reload, refreshThumbnails, clearQueue);
   queueMenu.append(queueMenuActions);
 
   const toolbar = document.createElement('div');
@@ -216,11 +227,12 @@ export function createBookmarksView(
     }
 
     if (!keyMissing || item.captureStatus === 'captured') {
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.textContent = 'Remove';
-      remove.addEventListener('click', () => dispatch({ name: 'bookmark/remove', id: item.id }));
-      actions.append(remove);
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.textContent = 'Clear';
+      clear.title = 'Hide this queue row until bookmarks are reloaded.';
+      clear.addEventListener('click', () => dispatch({ name: 'bookmark/clear', id: item.id }));
+      actions.append(clear);
     }
     entry.append(visual, bookmarkLabel, actions);
     list.append(entry);

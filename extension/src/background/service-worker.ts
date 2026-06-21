@@ -30,6 +30,7 @@ import {
   createDownloadImageResultMessage,
   createExportEncryptedImageResultMessage,
   createFetchThumbnailSourceResultMessage,
+  createLoadBookmarksByIdsResultMessage,
   createImportEncryptedImageResultMessage,
   createLoadBookmarksResultMessage,
   createAddRecentHistoryResultMessage,
@@ -39,6 +40,8 @@ import {
   createLoadLocalSettingsResultMessage,
   createListUrlTemplatesResultMessage,
   createRemoveBookmarkResultMessage,
+  createRemoveBookmarksResultMessage,
+  createRemoveRecallBookmarksResultMessage,
   createRemoveRecentHistoryResultMessage,
   createRecallRecordsResultMessage,
   createSaveBookmarkResultMessage,
@@ -64,7 +67,14 @@ import type {
   RetrieveBlobMessage,
   GrantPermissionAndCaptureMessage,
 } from './messages.js';
-import type { LoadBookmarksMessage, RemoveBookmarkMessage, SaveBookmarkMessage } from './messages.js';
+import type {
+  LoadBookmarksByIdsMessage,
+  LoadBookmarksMessage,
+  RemoveBookmarkMessage,
+  RemoveBookmarksMessage,
+  RemoveRecallBookmarksMessage,
+  SaveBookmarkMessage,
+} from './messages.js';
 import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHistoryMessage } from './messages.js';
 import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messages.js';
 import type { LoadPanelPositionMessage, SavePanelPositionMessage } from './messages.js';
@@ -409,6 +419,12 @@ async function handleLoadBookmarks(message: LoadBookmarksMessage): Promise<impor
   return bookmarkStore.loadPage(message.payload);
 }
 
+async function handleLoadBookmarksByIds(
+  message: LoadBookmarksByIdsMessage,
+): Promise<import('./messages.js').LoadBookmarksByIdsResultMessage['payload']> {
+  return { items: await bookmarkStore.loadByIds(message.payload.ids) };
+}
+
 async function handleSaveBookmark(message: SaveBookmarkMessage): Promise<import('./messages.js').SaveBookmarkResultMessage['payload']> {
   const record = await bookmarkStore.save(message.payload.record);
   return { ok: true, record };
@@ -419,6 +435,20 @@ async function handleRemoveBookmark(
 ): Promise<import('./messages.js').RemoveBookmarkResultMessage['payload']> {
   await bookmarkStore.remove(message.payload.record);
   return { ok: true };
+}
+
+async function handleRemoveBookmarks(
+  message: RemoveBookmarksMessage,
+): Promise<import('./messages.js').RemoveBookmarksResultMessage['payload']> {
+  const result = await bookmarkStore.removeMany(message.payload.ids);
+  return { ok: true, removedCount: result.removedCount };
+}
+
+async function handleRemoveRecallBookmarks(
+  message: RemoveRecallBookmarksMessage,
+): Promise<import('./messages.js').RemoveRecallBookmarksResultMessage['payload']> {
+  const result = await bookmarkStore.removeRecallPage(message.payload);
+  return { ok: true, removedCount: result.removedCount };
 }
 
 async function handleLoadPanelPosition(
@@ -875,6 +905,12 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       sendResponse(createLoadRecentHistoryResultMessage(handleLoadRecentHistory(message).items));
       return false;
 
+    case MessageType.LoadBookmarksByIds:
+      handleLoadBookmarksByIds(message)
+        .then((result) => sendResponse(createLoadBookmarksByIdsResultMessage(result)))
+        .catch(() => sendResponse(createLoadBookmarksByIdsResultMessage({ items: [] })));
+      return true;
+
     case MessageType.AddRecentHistory:
       sendResponse(createAddRecentHistoryResultMessage(handleAddRecentHistory(message).items));
       return false;
@@ -913,6 +949,18 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleRemoveBookmark(message)
         .then((result) => sendResponse(createRemoveBookmarkResultMessage(result)))
         .catch(() => sendResponse(createRemoveBookmarkResultMessage({ ok: false })));
+      return true;
+
+    case MessageType.RemoveBookmarks:
+      handleRemoveBookmarks(message)
+        .then((result) => sendResponse(createRemoveBookmarksResultMessage(result)))
+        .catch(() => sendResponse(createRemoveBookmarksResultMessage({ ok: false, removedCount: 0 })));
+      return true;
+
+    case MessageType.RemoveRecallBookmarks:
+      handleRemoveRecallBookmarks(message)
+        .then((result) => sendResponse(createRemoveRecallBookmarksResultMessage(result)))
+        .catch(() => sendResponse(createRemoveRecallBookmarksResultMessage({ ok: false, removedCount: 0 })));
       return true;
 
     case MessageType.LoadPanelPosition:

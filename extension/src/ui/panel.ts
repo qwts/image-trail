@@ -550,6 +550,12 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'bookmark/clear' || action.name === 'bookmarks/clear-visible') {
+      this.state = reducePanelAction(this.state, action);
+      this.renderPanelAndRefreshRecall();
+      return;
+    }
+
     if (action.name === 'bookmarks/older') {
       void this.loadBookmarkPage(this.state.bookmarkOffset + this.state.bookmarkLimit);
       return;
@@ -598,6 +604,16 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'bookmarks/delete-visible') {
+      void this.deleteVisibleBookmarks();
+      return;
+    }
+
+    if (action.name === 'recall/delete-all') {
+      void this.deleteRecallBookmarks();
+      return;
+    }
+
     if (
       action.name === 'history-selection/toggle' ||
       action.name === 'history-selection/clear' ||
@@ -628,7 +644,7 @@ export class ImageTrailPanel {
       return;
     }
 
-    if (action.name === 'recall-selection/toggle' || action.name === 'recall-selection/clear') {
+    if (action.name === 'recall-selection/toggle' || action.name === 'recall-selection/clear' || action.name === 'recall/clear-results') {
       this.state = reducePanelAction(this.state, action);
       this.render();
       return;
@@ -1267,10 +1283,42 @@ export class ImageTrailPanel {
   private async removeBookmark(id: string): Promise<void> {
     const bookmark = this.state.bookmarks.find((item) => item.id === id);
     if (!bookmark) return;
-    if (bookmark.blobId && !bookmark.protectedPin) await this.removeCapturedBlobReference(bookmark.blobId);
     await this.bookmarkStore?.remove(bookmark);
+    await this.refreshStorageUsage();
     this.state = reducePanelAction(this.state, { name: 'bookmark/remove', id });
     await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
+    this.renderPanelAndRefreshRecall();
+  }
+
+  private async deleteVisibleBookmarks(): Promise<void> {
+    if (!this.bookmarkStore || this.state.bookmarks.length === 0) return;
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const result = await this.bookmarkStore.removeMany(this.state.bookmarks.map((bookmark) => bookmark.id));
+    await this.refreshStorageUsage();
+    await this.loadBookmarkPage(0, { render: false });
+    this.state = reducePanelAction(this.state, {
+      name: 'import-export/complete',
+      message: `Deleted ${result.removedCount} queue item${result.removedCount === 1 ? '' : 's'}.`,
+    });
+    this.renderPanelAndRefreshRecall();
+  }
+
+  private async deleteRecallBookmarks(): Promise<void> {
+    if (!this.bookmarkStore) return;
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const result = await this.bookmarkStore.removeRecallPage({
+      offset: this.state.bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
+      scope: this.state.bookmarkVisibilityScope,
+      currentPageUrl: window.location.href,
+    });
+    await this.refreshStorageUsage();
+    await this.loadBookmarkPage(0, { render: false });
+    this.state = reducePanelAction(this.state, {
+      name: 'import-export/complete',
+      message: `Deleted ${result.removedCount} Recall item${result.removedCount === 1 ? '' : 's'}.`,
+    });
     this.renderPanelAndRefreshRecall();
   }
 
@@ -1584,7 +1632,9 @@ export class ImageTrailPanel {
     const bookmarks =
       this.state.selectedBookmarkIds.length > 0
         ? selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds)
-        : await this.loadAllBookmarksForExport();
+        : this.state.recall.selectedIds.length > 0
+          ? this.selectedRecallRecords()
+          : await this.loadAllBookmarksForExport();
     if (bookmarks.some(isLockedPrivatePin)) {
       this.finishExport(
         undefined,
@@ -1676,7 +1726,14 @@ export class ImageTrailPanel {
     if (this.state.selectedBookmarkIds.length > 0) {
       return selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds);
     }
+    if (this.state.recall.selectedIds.length > 0) {
+      return this.selectedRecallRecords();
+    }
     return [];
+  }
+
+  private selectedRecallRecords(): readonly ImageDisplayRecord[] {
+    return selectedRecords(this.state.recall.candidates, this.state.recall.selectedIds);
   }
 
   private async selectedRecordImageDownloads(
