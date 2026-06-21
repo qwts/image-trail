@@ -43,7 +43,7 @@ import {
   type DurableHistoryPayloadV1,
 } from '../content/panel-services.js';
 import { revokeThumbnailObjectUrls } from './components/thumbnail-source.js';
-import { renderPanel } from './render.js';
+import { renderPanel, type PanelLayoutState } from './render.js';
 
 const ROOT_ID = 'image-trail-panel-root';
 const STYLE_PATH = 'src/ui/styles/panel.css';
@@ -96,6 +96,11 @@ export class ImageTrailPanel {
   private previewScrollAnchorId: string | null = null;
   private projectionRevision = 0;
   private bookmarkMutationQueue: Promise<void> = Promise.resolve();
+  private readonly layoutState: PanelLayoutState = {
+    fieldsPanelOpen: false,
+    fieldsPanelBlockSize: null,
+    historyListBlockSize: null,
+  };
 
   constructor(
     private readonly pageAdapter: PageAdapter,
@@ -1300,6 +1305,7 @@ export class ImageTrailPanel {
         {
           root: this.root,
           dispatch: this.dispatch,
+          layoutState: this.layoutState,
           scrollAnchorId: this.previewScrollAnchorId,
         },
         this.state,

@@ -262,8 +262,8 @@ export class PageAdapter {
   }
 
   private createBookmarkShortcutInfo(image: HTMLImageElement): TargetImageInfo | null {
-    const baseInfo = createTargetImageInfo(image) ?? createLoadedTargetImageInfo(image);
-    if (image !== this.selected || !this.selectedActiveUrl) return createLoadedTargetImageInfo(image) ?? baseInfo;
+    const baseInfo = createLoadedTargetImageInfo(image) ?? createTargetImageInfo(image);
+    if (image !== this.selected || !this.selectedActiveUrl) return baseInfo;
 
     const rect = image.getBoundingClientRect();
     return {

@@ -78,6 +78,7 @@ export function createFieldsView(
     wrapper.classList.add('is-height-locked');
     wrapper.style.setProperty('--image-trail-fields-size', `${options.blockSize}px`);
   }
+  let resizeStartBlockSize: number | null = null;
   wrapper.addEventListener('toggle', () => {
     if (!wrapper.open) {
       wrapper.classList.remove('is-height-locked');
@@ -94,9 +95,19 @@ export function createFieldsView(
       callbacks.onOpenChange(true, blockSize);
     });
   });
-  wrapper.addEventListener('mouseup', () => {
+  wrapper.addEventListener('pointerdown', (event) => {
     if (!wrapper.open) return;
+    const rect = wrapper.getBoundingClientRect();
+    if (rect.bottom - event.clientY > 18) return;
+    resizeStartBlockSize = Math.round(rect.height);
+  });
+  wrapper.addEventListener('pointerup', () => {
+    if (!wrapper.open) return;
+    if (resizeStartBlockSize === null) return;
     const blockSize = Math.round(wrapper.getBoundingClientRect().height);
+    const changed = blockSize !== resizeStartBlockSize;
+    resizeStartBlockSize = null;
+    if (!changed) return;
     wrapper.classList.add('is-height-locked');
     wrapper.style.setProperty('--image-trail-fields-size', `${blockSize}px`);
     callbacks.onResize(blockSize);

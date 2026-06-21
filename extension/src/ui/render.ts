@@ -16,7 +16,14 @@ import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
 export interface PanelRenderTarget {
   readonly root: HTMLElement;
   readonly dispatch: (action: PanelAction) => void;
+  readonly layoutState: PanelLayoutState;
   readonly scrollAnchorId?: string | null;
+}
+
+export interface PanelLayoutState {
+  fieldsPanelOpen: boolean;
+  fieldsPanelBlockSize: number | null;
+  historyListBlockSize: number | null;
 }
 
 interface FocusedTextControlSnapshot {
@@ -41,10 +48,6 @@ const SCROLL_SNAPSHOT_SELECTORS = [
   '.image-trail-panel__bookmarks-section .image-trail-panel__record-list',
 ] as const;
 const MIN_FIELDS_PANEL_BLOCK_SIZE = 160;
-
-let fieldsPanelOpen = false;
-let fieldsPanelBlockSize: number | null = null;
-let historyListBlockSize: number | null = null;
 
 function makeButton(label: string, action: PanelAction, dispatch: (action: PanelAction) => void, disabled = false): HTMLButtonElement {
   const button = document.createElement('button');
@@ -337,16 +340,16 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
           target.dispatch({ name: 'field-split/clear', baseFieldId });
         },
         onOpenChange: (open, blockSize) => {
-          fieldsPanelOpen = open;
-          fieldsPanelBlockSize = blockSize;
+          target.layoutState.fieldsPanelOpen = open;
+          target.layoutState.fieldsPanelBlockSize = blockSize;
         },
         onResize: (blockSize) => {
-          fieldsPanelBlockSize = Math.max(MIN_FIELDS_PANEL_BLOCK_SIZE, blockSize);
+          target.layoutState.fieldsPanelBlockSize = Math.max(MIN_FIELDS_PANEL_BLOCK_SIZE, blockSize);
         },
       },
       {
-        open: fieldsPanelOpen,
-        blockSize: fieldsPanelBlockSize,
+        open: target.layoutState.fieldsPanelOpen,
+        blockSize: target.layoutState.fieldsPanelBlockSize,
       },
     ),
     createControlsView({
@@ -357,9 +360,9 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     navSection,
     autoSection,
     createHistoryView(state.history, state.selectedHistoryIds, state.captureInProgress, state.blobKeyUnlocked, target.dispatch, {
-      listBlockSize: historyListBlockSize,
+      listBlockSize: target.layoutState.historyListBlockSize,
       onListResize: (blockSize) => {
-        historyListBlockSize = blockSize;
+        target.layoutState.historyListBlockSize = blockSize;
       },
     }),
     createBookmarksView(

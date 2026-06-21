@@ -30,7 +30,7 @@ export function createHistoryView(
 
   const list = document.createElement('ol');
   list.className = 'image-trail-panel__record-list';
-  if (options?.listBlockSize) {
+  if (options?.listBlockSize !== null && options?.listBlockSize !== undefined) {
     list.classList.add('is-user-resized');
     list.style.setProperty('--image-trail-history-size', `${options.listBlockSize}px`);
   }
