@@ -17,7 +17,16 @@ import { applyFieldLoadFailureToState, applyFieldSplitSpecToState, reducePanelAc
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
 import { createInitialPanelState, setAutomationState, setTargetState } from '../core/state.js';
-import type { BookmarkStore, ImportedEncryptedImageFile, ImportedImageFile, PanelAction, PanelState, TargetState } from '../core/types.js';
+import type {
+  BookmarkStore,
+  ImportedEncryptedImageFile,
+  ImportedImageFile,
+  PanelAction,
+  PanelPosition,
+  PanelPositionStore,
+  PanelState,
+  TargetState,
+} from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
 import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
@@ -47,6 +56,7 @@ import {
   type DurableHistoryPayloadV1,
 } from '../content/panel-services.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
+import { clampPanelPosition, hostnameFromLocation } from './panel-position.js';
 
 const ROOT_ID = 'image-trail-panel-root';
 const STYLE_PATH = 'src/ui/styles/panel.css';
@@ -57,6 +67,8 @@ interface ValidatedRecordUrl extends ImageRecordUrlValidation {
 
 interface RecordAddOptions {
   readonly trustLoadedImage?: boolean;
+  readonly width?: number;
+  readonly height?: number;
 }
 
 function addItems(items: readonly string[], nextItems: readonly string[]): readonly string[] {
@@ -100,6 +112,7 @@ export class ImageTrailPanel {
   private previewScrollAnchorId: string | null = null;
   private projectionRevision = 0;
   private bookmarkMutationQueue: Promise<void> = Promise.resolve();
+  private panelPositionRestored = false;
   private readonly layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
     fieldsPanelBlockSize: null,
@@ -112,6 +125,7 @@ export class ImageTrailPanel {
     private readonly captureStore: CaptureStore | null = null,
     private readonly recentHistoryStore: RecentHistoryStore | null = null,
     private readonly recallStore: RecallStore | null = null,
+    private readonly panelPositionStore: PanelPositionStore | null = null,
   ) {
     this.state = { ...this.state, bookmarkVisibilityScope: this.localSettings.bookmarkVisibilityScope };
     this.unsubscribeFromTarget = this.pageAdapter.subscribe((snapshot) => {
@@ -119,11 +133,15 @@ export class ImageTrailPanel {
       this.render();
     });
     this.unsubscribeFromLoads = this.pageAdapter.subscribeToSuccessfulLoads((target) => {
-      void this.addRecentHistory(target.url, target.thumbnail, { trustLoadedImage: target.trustedLoadedImage });
+      void this.addRecentHistory(target.url, target.thumbnail, {
+        trustLoadedImage: target.trustedLoadedImage,
+        width: target.width,
+        height: target.height,
+      });
     });
     this.unsubscribeFromBookmarkRequests = this.pageAdapter.subscribeToBookmarkRequests((target) => {
       this.enqueueBookmarkMutation(async () => {
-        const options = { trustLoadedImage: target.trustedLoadedImage };
+        const options = { trustLoadedImage: target.trustedLoadedImage, width: target.width, height: target.height };
         const bookmarked = await this.bookmarkUrl(target.url, target.thumbnail, options);
         if (bookmarked) {
           await this.addRecentHistory(target.url, target.thumbnail, options);
@@ -181,6 +199,7 @@ export class ImageTrailPanel {
     document.getElementById(ROOT_ID)?.remove();
     this.root = null;
     this.recallRoot = null;
+    this.panelPositionRestored = false;
   }
 
   disconnect(): void {
@@ -870,7 +889,11 @@ export class ImageTrailPanel {
     if (!url) return;
     const image = this.state.target.selectedHandleId ? this.findSelectedImage(this.state.target.selectedHandleId) : null;
     const trustLoadedImage = image ? image.complete && image.naturalWidth > 0 && image.naturalHeight > 0 : false;
-    await this.bookmarkUrl(url, image ? ((await createThumbnailDataUrlFromImage(image)) ?? undefined) : undefined, { trustLoadedImage });
+    await this.bookmarkUrl(url, image ? ((await createThumbnailDataUrlFromImage(image)) ?? undefined) : undefined, {
+      trustLoadedImage,
+      width: image?.naturalWidth || undefined,
+      height: image?.naturalHeight || undefined,
+    });
   }
 
   private enqueueBookmarkMutation(work: () => Promise<void>): void {
@@ -885,7 +908,14 @@ export class ImageTrailPanel {
     }
     const sourceUrl = validation.sourceUrl;
     const resolvedThumbnail = await this.resolveRecordThumbnail(sourceUrl, thumbnail, validation, options);
-    const draft = createDisplayRecord({ id: sourceUrl, url: sourceUrl, thumbnail: resolvedThumbnail, source: 'bookmark' });
+    const draft = createDisplayRecord({
+      id: sourceUrl,
+      url: sourceUrl,
+      thumbnail: resolvedThumbnail,
+      width: options.width,
+      height: options.height,
+      source: 'bookmark',
+    });
     const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
     this.state = { ...this.state, message: `Added to Image Trail: ${bookmark.url}`, lastUpdatedAt: Date.now() };
     await this.loadBookmarkPage(0, { render: false });
@@ -931,6 +961,8 @@ export class ImageTrailPanel {
       name: 'history/add-loaded',
       url: validation.sourceUrl,
       thumbnail: resolvedThumbnail,
+      width: options.width,
+      height: options.height,
     }).history;
     const item = next[0];
     if (!item) return;
@@ -1658,6 +1690,7 @@ export class ImageTrailPanel {
       this.recallRoot.className = 'image-trail-panel-recall-root';
       shadow.replaceChildren(link, this.root, this.recallRoot);
       (document.body ?? document.documentElement).append(host);
+      void this.restorePanelPosition();
     }
   }
 
@@ -1670,6 +1703,7 @@ export class ImageTrailPanel {
           dispatch: this.dispatch,
           layoutState: this.layoutState,
           scrollAnchorId: this.previewScrollAnchorId,
+          onPanelDragStart: this.handlePanelDragStart,
         },
         this.state,
       );
@@ -1685,9 +1719,75 @@ export class ImageTrailPanel {
         dispatch: this.dispatch,
         layoutState: this.layoutState,
         scrollAnchorId: this.previewScrollAnchorId,
+        onPanelDragStart: this.handlePanelDragStart,
       },
       this.state,
     );
+  }
+
+  private async restorePanelPosition(): Promise<void> {
+    if (!this.root || !this.panelPositionStore || this.panelPositionRestored) return;
+    this.panelPositionRestored = true;
+    const hostname = hostnameFromLocation();
+    if (!hostname) return;
+    const saved = await this.panelPositionStore.load(hostname);
+    if (!saved || !this.root) return;
+    this.applyPanelPosition(this.clampPanelPosition(saved));
+    this.renderRecallOnly();
+  }
+
+  private handlePanelDragStart = (event: PointerEvent): void => {
+    if (event.button !== 0 || !this.root) return;
+    event.preventDefault();
+    const root = this.root;
+    const startRect = root.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let latest = this.clampPanelPosition({ left: startRect.left, top: startRect.top });
+
+    const onMove = (moveEvent: PointerEvent): void => {
+      latest = this.clampPanelPosition({
+        left: startRect.left + moveEvent.clientX - startX,
+        top: startRect.top + moveEvent.clientY - startY,
+      });
+      this.applyPanelPosition(latest);
+      this.renderRecallOnly();
+    };
+
+    const onUp = (): void => {
+      document.removeEventListener('pointermove', onMove, true);
+      document.removeEventListener('pointerup', onUp, true);
+      document.removeEventListener('pointercancel', onUp, true);
+      void this.savePanelPosition(latest);
+    };
+
+    document.addEventListener('pointermove', onMove, true);
+    document.addEventListener('pointerup', onUp, true);
+    document.addEventListener('pointercancel', onUp, true);
+  };
+
+  private clampPanelPosition(position: PanelPosition): PanelPosition {
+    if (!this.root) return position;
+    const rect = this.root.getBoundingClientRect();
+    return clampPanelPosition(
+      position,
+      { width: rect.width, height: rect.height },
+      { width: window.innerWidth, height: window.innerHeight },
+    );
+  }
+
+  private applyPanelPosition(position: PanelPosition): void {
+    if (!this.root) return;
+    this.root.style.left = `${Math.round(position.left)}px`;
+    this.root.style.top = `${Math.round(position.top)}px`;
+    this.root.style.right = 'auto';
+  }
+
+  private async savePanelPosition(position: PanelPosition): Promise<void> {
+    if (!this.panelPositionStore) return;
+    const hostname = hostnameFromLocation();
+    if (!hostname) return;
+    await this.panelPositionStore.save(hostname, position);
   }
 }
 
@@ -1714,6 +1814,8 @@ function bookmarkRecordToExportEntry(record: ImageDisplayRecord): { readonly uui
       title: record.title,
       label: record.label,
       thumbnail: record.thumbnail,
+      width: record.width,
+      height: record.height,
       bookmarkedAt: record.timestamp,
       downloadedAt: record.downloadedAt,
       capturedAt: record.capturedAt,
@@ -1751,6 +1853,8 @@ function bookmarkPayloadToDisplayRecord(uuid: string, payload: DurableBookmarkPa
     title: payload.title,
     label: payload.label,
     thumbnail: payload.thumbnail,
+    width: payload.width,
+    height: payload.height,
     timestamp: payload.bookmarkedAt,
     downloadedAt: payload.downloadedAt,
     capturedAt: payload.capturedAt ?? payload.storedOriginal?.capturedAt,

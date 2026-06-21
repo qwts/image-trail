@@ -37,6 +37,16 @@ export interface AutomationState {
 
 export type RecallDrawerSide = 'left' | 'right';
 
+export interface PanelPosition {
+  readonly left: number;
+  readonly top: number;
+}
+
+export interface PanelPositionStore {
+  load(hostname: string): Promise<PanelPosition | null>;
+  save(hostname: string, position: PanelPosition): Promise<void>;
+}
+
 export interface RecallCandidate extends ImageDisplayRecord {
   readonly envelopeCreatedAt: string;
 }
@@ -120,6 +130,7 @@ export type PanelActionName =
   | 'bookmark/load'
   | 'bookmark/remove'
   | 'bookmark-selection/toggle'
+  | 'bookmark-selection/single'
   | 'bookmark-selection/clear'
   | 'bookmarks/page-loaded'
   | 'bookmarks/older'
@@ -193,6 +204,7 @@ export type PanelAction =
         | 'bookmark/load'
         | 'bookmark/remove'
         | 'bookmark-selection/toggle'
+        | 'bookmark-selection/single'
         | 'bookmark-selection/clear'
         | 'bookmarks/page-loaded'
         | 'capture/request'
@@ -233,9 +245,11 @@ export type PanelAction =
       readonly title?: string;
       readonly timestamp?: string;
       readonly thumbnail?: string;
+      readonly width?: number;
+      readonly height?: number;
     }
   | { readonly name: 'history/remove' | 'bookmark/load' | 'bookmark/remove' | 'history/select'; readonly id: string }
-  | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle'; readonly id: string }
+  | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle' | 'bookmark-selection/single'; readonly id: string }
   | { readonly name: 'history-selection/clear' | 'bookmark-selection/clear' }
   | {
       readonly name: 'bookmarks/page-loaded';

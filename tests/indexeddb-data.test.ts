@@ -5,6 +5,7 @@ import { openImageTrailDb } from '../extension/src/data/db.js';
 import { DataStore, IMAGE_TRAIL_DB_NAME, SchemaIndex } from '../extension/src/data/schema.js';
 import { HistoryRepository, type EncryptedHistoryRecord } from '../extension/src/data/repositories/history-repository.js';
 import { BookmarksRepository, type EncryptedBookmarkRecord } from '../extension/src/data/repositories/bookmarks-repository.js';
+import { PanelPositionRepository } from '../extension/src/data/repositories/panel-position-repository.js';
 import { DownloadsRepository } from '../extension/src/data/repositories/downloads-repository.js';
 import { KeysRepository } from '../extension/src/data/repositories/keys-repository.js';
 import type { StoredKeyRecord } from '../extension/src/data/crypto/types.js';
@@ -435,6 +436,49 @@ test('IndexedDbBookmarkStore recalls encrypted bookmark thumbnails after reload'
   } finally {
     await reloadedStore.close();
   }
+});
+
+test('IndexedDbBookmarkStore round-trips optional bookmark dimensions', async () => {
+  await deleteImageTrailDb();
+  const firstStore = new IndexedDbBookmarkStore();
+  try {
+    await firstStore.save(
+      createDisplayRecord({
+        id: 'https://example.test/dimensions.jpg',
+        url: 'https://example.test/dimensions.jpg',
+        label: 'dimensions.jpg',
+        width: 1200,
+        height: 800,
+        timestamp: '2026-06-19T00:00:00.000Z',
+        source: 'bookmark',
+      }),
+    );
+  } finally {
+    await firstStore.close();
+  }
+
+  const reloadedStore = new IndexedDbBookmarkStore();
+  try {
+    const page = await reloadedStore.loadPage({ offset: 0, limit: 30 });
+
+    assert.equal(page.items[0]?.width, 1200);
+    assert.equal(page.items[0]?.height, 800);
+  } finally {
+    await reloadedStore.close();
+  }
+});
+
+test('PanelPositionRepository saves positions per hostname', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const repository = new PanelPositionRepository(db);
+
+  await repository.put('example.test', { left: 120, top: 48 });
+  await repository.put('other.test', { left: 24, top: 36 });
+
+  assert.deepEqual(await repository.get('example.test'), { left: 120, top: 48 });
+  assert.deepEqual(await repository.get('other.test'), { left: 24, top: 36 });
+  assert.equal(await repository.get('missing.test'), null);
 });
 
 test('IndexedDbBookmarkStore keeps bookmark order stable when refreshing an existing thumbnail', async () => {

@@ -2,6 +2,7 @@ import type { StorageUsageSummary } from '../core/image/capture-result.js';
 import { computeSha256 } from '../core/image/fingerprints.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
+import { IndexedDbPanelPositionStore } from '../data/panel-position-controller.js';
 import { getActiveBlobKey, lockBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
@@ -30,10 +31,12 @@ import {
   createAddRecentHistoryResultMessage,
   createLoadRecentHistoryResultMessage,
   createLoadRecallCandidatesResultMessage,
+  createLoadPanelPositionResultMessage,
   createRemoveBookmarkResultMessage,
   createRemoveRecentHistoryResultMessage,
   createRecallRecordsResultMessage,
   createSaveBookmarkResultMessage,
+  createSavePanelPositionResultMessage,
   createBlobKeyStatusResultMessage,
   createExportBlobKeyBackupResultMessage,
   createImportBlobKeyBackupResultMessage,
@@ -55,6 +58,7 @@ import type {
 import type { LoadBookmarksMessage, RemoveBookmarkMessage, SaveBookmarkMessage } from './messages.js';
 import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHistoryMessage } from './messages.js';
 import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messages.js';
+import type { LoadPanelPositionMessage, SavePanelPositionMessage } from './messages.js';
 import type { FetchThumbnailSourceMessage } from './messages.js';
 import type { CreateBlobPreviewMessage } from './messages.js';
 import type { SetupBlobKeyMessage, UnlockBlobKeyMessage, BlobKeyResultMessage } from './messages.js';
@@ -75,6 +79,7 @@ interface PreviewPayload {
 
 const previewPayloads = new Map<string, PreviewPayload>();
 const bookmarkStore = new IndexedDbBookmarkStore();
+const panelPositionStore = new IndexedDbPanelPositionStore();
 const recentHistoryBySite = new Map<string, import('../core/display-records.js').ImageDisplayRecord[]>();
 const MAX_RECENT_HISTORY_ITEMS = 30;
 
@@ -120,6 +125,11 @@ function recentHistoryKey(pageUrl: string): string {
   } catch {
     return 'unknown';
   }
+}
+
+function normalizeHostname(hostname: string): string | null {
+  const normalized = hostname.trim().toLowerCase();
+  return normalized || null;
 }
 
 async function referencedBlobIds(): Promise<Set<string>> {
@@ -385,6 +395,23 @@ async function handleRemoveBookmark(
   message: RemoveBookmarkMessage,
 ): Promise<import('./messages.js').RemoveBookmarkResultMessage['payload']> {
   await bookmarkStore.remove(message.payload.record);
+  return { ok: true };
+}
+
+async function handleLoadPanelPosition(
+  message: LoadPanelPositionMessage,
+): Promise<import('./messages.js').LoadPanelPositionResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.hostname);
+  if (!hostname) return { ok: true, position: null };
+  return { ok: true, position: await panelPositionStore.load(hostname) };
+}
+
+async function handleSavePanelPosition(
+  message: SavePanelPositionMessage,
+): Promise<import('./messages.js').SavePanelPositionResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.hostname);
+  if (!hostname) return { ok: false };
+  await panelPositionStore.save(hostname, message.payload.position);
   return { ok: true };
 }
 
@@ -817,6 +844,18 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleRemoveBookmark(message)
         .then((result) => sendResponse(createRemoveBookmarkResultMessage(result)))
         .catch(() => sendResponse(createRemoveBookmarkResultMessage({ ok: false })));
+      return true;
+
+    case MessageType.LoadPanelPosition:
+      handleLoadPanelPosition(message)
+        .then((result) => sendResponse(createLoadPanelPositionResultMessage(result)))
+        .catch(() => sendResponse(createLoadPanelPositionResultMessage({ ok: false, message: 'Panel position could not be loaded.' })));
+      return true;
+
+    case MessageType.SavePanelPosition:
+      handleSavePanelPosition(message)
+        .then((result) => sendResponse(createSavePanelPositionResultMessage(result)))
+        .catch(() => sendResponse(createSavePanelPositionResultMessage({ ok: false })));
       return true;
 
     case MessageType.DeleteBlob:

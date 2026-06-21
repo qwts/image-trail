@@ -309,6 +309,28 @@ test('bookmarks-export: shift/plain export imports without password', async () =
   assert.equal(importResult.entries[0].payload.url, 'https://example.test/plain-bookmark.webp');
 });
 
+test('bookmarks-export: preserves optional dimensions through plain import', async () => {
+  const entries = [
+    {
+      uuid: 'plain-bookmark-with-dimensions',
+      payload: {
+        url: 'https://example.test/dimensions.jpg',
+        bookmarkedAt: '2026-06-18T00:00:00.000Z',
+        width: 2048,
+        height: 1365,
+      },
+    },
+  ];
+
+  const exportResult = exportPlainBookmarks({ entries, now: '2026-06-18T12:00:00.000Z' });
+  assert.ok(exportResult.status.ok, exportResult.status.message);
+
+  const importResult = await importBookmarks(exportResult.fileContent!, '');
+  assert.ok(importResult.status.ok, importResult.status.message);
+  assert.equal(importResult.entries[0].payload.width, 2048);
+  assert.equal(importResult.entries[0].payload.height, 1365);
+});
+
 test('bookmarks-export: encrypts large thumbnail payloads', async () => {
   const largeThumbnail = `data:image/jpeg;base64,${'a'.repeat(180_000)}`;
   const entries = [

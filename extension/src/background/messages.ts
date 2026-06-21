@@ -53,6 +53,10 @@ export const MessageType = {
   LoadRecallCandidatesResult: 'imageTrail.loadRecallCandidatesResult',
   RecallRecords: 'imageTrail.recallRecords',
   RecallRecordsResult: 'imageTrail.recallRecordsResult',
+  LoadPanelPosition: 'imageTrail.loadPanelPosition',
+  LoadPanelPositionResult: 'imageTrail.loadPanelPositionResult',
+  SavePanelPosition: 'imageTrail.savePanelPosition',
+  SavePanelPositionResult: 'imageTrail.savePanelPositionResult',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -462,6 +466,35 @@ export interface RecallRecordsResultMessage {
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 
+export interface LoadPanelPositionMessage {
+  readonly type: typeof MessageType.LoadPanelPosition;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly hostname: string };
+}
+
+export interface LoadPanelPositionResultMessage {
+  readonly type: typeof MessageType.LoadPanelPositionResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly position: import('../core/types.js').PanelPosition | null }
+    | { readonly ok: false; readonly message: string };
+}
+
+export interface SavePanelPositionMessage {
+  readonly type: typeof MessageType.SavePanelPosition;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: {
+    readonly hostname: string;
+    readonly position: import('../core/types.js').PanelPosition;
+  };
+}
+
+export interface SavePanelPositionResultMessage {
+  readonly type: typeof MessageType.SavePanelPositionResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: boolean };
+}
+
 export type ExtensionRequest =
   | TogglePanelMessage
   | PingMessage
@@ -490,7 +523,9 @@ export type ExtensionRequest =
   | AddRecentHistoryMessage
   | RemoveRecentHistoryMessage
   | LoadRecallCandidatesMessage
-  | RecallRecordsMessage;
+  | RecallRecordsMessage
+  | LoadPanelPositionMessage
+  | SavePanelPositionMessage;
 export type ExtensionResponse =
   | StatusMessage
   | UnknownMessageResponse
@@ -515,7 +550,9 @@ export type ExtensionResponse =
   | AddRecentHistoryResultMessage
   | RemoveRecentHistoryResultMessage
   | LoadRecallCandidatesResultMessage
-  | RecallRecordsResultMessage;
+  | RecallRecordsResultMessage
+  | LoadPanelPositionResultMessage
+  | SavePanelPositionResultMessage;
 export type ExtensionMessage = ExtensionRequest | ExtensionResponse;
 
 export function createTogglePanelMessage(): TogglePanelMessage {
@@ -763,6 +800,25 @@ export function createRecallRecordsResultMessage(payload: RecallRecordsResultMes
   return { type: MessageType.RecallRecordsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
+export function createLoadPanelPositionMessage(hostname: string): LoadPanelPositionMessage {
+  return { type: MessageType.LoadPanelPosition, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
+}
+
+export function createLoadPanelPositionResultMessage(payload: LoadPanelPositionResultMessage['payload']): LoadPanelPositionResultMessage {
+  return { type: MessageType.LoadPanelPositionResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createSavePanelPositionMessage(
+  hostname: string,
+  position: import('../core/types.js').PanelPosition,
+): SavePanelPositionMessage {
+  return { type: MessageType.SavePanelPosition, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname, position } };
+}
+
+export function createSavePanelPositionResultMessage(payload: SavePanelPositionResultMessage['payload']): SavePanelPositionResultMessage {
+  return { type: MessageType.SavePanelPositionResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 function hasVersionedObjectShape(value: unknown): value is { type?: unknown; version?: unknown; payload?: unknown } {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as { version?: unknown; payload?: unknown };
@@ -799,7 +855,9 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.AddRecentHistory ||
     value.type === MessageType.RemoveRecentHistory ||
     value.type === MessageType.LoadRecallCandidates ||
-    value.type === MessageType.RecallRecords
+    value.type === MessageType.RecallRecords ||
+    value.type === MessageType.LoadPanelPosition ||
+    value.type === MessageType.SavePanelPosition
   );
 }
 
@@ -829,7 +887,9 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.AddRecentHistoryResult ||
     value.type === MessageType.RemoveRecentHistoryResult ||
     value.type === MessageType.LoadRecallCandidatesResult ||
-    value.type === MessageType.RecallRecordsResult
+    value.type === MessageType.RecallRecordsResult ||
+    value.type === MessageType.LoadPanelPositionResult ||
+    value.type === MessageType.SavePanelPositionResult
   );
 }
 
@@ -931,6 +991,16 @@ export function isLoadRecallCandidatesResultMessage(value: unknown): value is Lo
 export function isRecallRecordsResultMessage(value: unknown): value is RecallRecordsResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.RecallRecordsResult;
+}
+
+export function isLoadPanelPositionResultMessage(value: unknown): value is LoadPanelPositionResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.LoadPanelPositionResult;
+}
+
+export function isSavePanelPositionResultMessage(value: unknown): value is SavePanelPositionResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.SavePanelPositionResult;
 }
 
 export function isStatusMessage(value: unknown): value is StatusMessage {

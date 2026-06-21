@@ -1,10 +1,12 @@
 type StyleSnapshot = Pick<CSSStyleDeclaration, 'cursor' | 'height' | 'objectFit' | 'opacity' | 'outline' | 'outlineOffset' | 'width'>;
+type PageBackdropSnapshot = Pick<CSSStyleDeclaration, 'background' | 'backgroundColor'>;
 
 interface SelectedTargetOptions {
   readonly lockBox?: boolean;
 }
 
 const snapshots = new WeakMap<HTMLElement, StyleSnapshot>();
+let pageBackdropSnapshot: { readonly body: PageBackdropSnapshot; readonly documentElement: PageBackdropSnapshot } | null = null;
 
 function snapshot(element: HTMLElement): void {
   if (snapshots.has(element)) return;
@@ -34,8 +36,11 @@ export function markHoveredTarget(element: HTMLElement): void {
 
 export function markSelectedTarget(element: HTMLElement, options: SelectedTargetOptions = {}): void {
   snapshot(element);
+  element.style.backgroundColor = '#000';
   element.dataset.imageTrailSelected = 'true';
   if (options.lockBox) {
+    element.dataset.imageTrailLockBox = 'true';
+    markPageBackdropBlack();
     element.style.height = '100%';
     element.style.objectFit = 'contain';
     element.style.width = '100%';
@@ -59,5 +64,37 @@ export function restoreElementStyles(element: HTMLElement): void {
   }
   delete element.dataset.imageTrailCandidate;
   delete element.dataset.imageTrailHover;
+  if (element.dataset.imageTrailLockBox) restorePageBackdrop();
+  delete element.dataset.imageTrailLockBox;
   delete element.dataset.imageTrailSelected;
+}
+
+function markPageBackdropBlack(): void {
+  if (typeof document === 'undefined' || !document.body || !document.documentElement) return;
+  pageBackdropSnapshot ??= {
+    body: {
+      background: document.body.style.background,
+      backgroundColor: document.body.style.backgroundColor,
+    },
+    documentElement: {
+      background: document.documentElement.style.background,
+      backgroundColor: document.documentElement.style.backgroundColor,
+    },
+  };
+  document.documentElement.style.background = '#000';
+  document.documentElement.style.backgroundColor = '#000';
+  document.body.style.background = '#000';
+  document.body.style.backgroundColor = '#000';
+}
+
+function restorePageBackdrop(): void {
+  if (!pageBackdropSnapshot || typeof document === 'undefined' || !document.body || !document.documentElement) {
+    pageBackdropSnapshot = null;
+    return;
+  }
+  document.body.style.background = pageBackdropSnapshot.body.background;
+  document.body.style.backgroundColor = pageBackdropSnapshot.body.backgroundColor;
+  document.documentElement.style.background = pageBackdropSnapshot.documentElement.background;
+  document.documentElement.style.backgroundColor = pageBackdropSnapshot.documentElement.backgroundColor;
+  pageBackdropSnapshot = null;
 }

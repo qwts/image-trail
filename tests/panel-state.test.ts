@@ -166,6 +166,19 @@ test('record selection toggles one list at a time', () => {
   assert.deepEqual(bookmarksCleared.selectedBookmarkIds, []);
 });
 
+test('single bookmark selection clears history selection and selects only clicked bookmark', () => {
+  const state = {
+    ...createInitialPanelState(),
+    selectedHistoryIds: ['history-1'],
+    selectedBookmarkIds: ['bookmark-1', 'bookmark-2'],
+  };
+
+  const selected = reducePanelAction(state, { name: 'bookmark-selection/single', id: 'bookmark-3' });
+
+  assert.deepEqual(selected.selectedHistoryIds, []);
+  assert.deepEqual(selected.selectedBookmarkIds, ['bookmark-3']);
+});
+
 test('record selection prunes removed and unloaded rows', () => {
   const state = {
     ...createInitialPanelState(),
