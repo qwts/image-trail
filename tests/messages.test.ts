@@ -21,6 +21,8 @@ import {
   createImportEncryptedImageMessage,
   createImportEncryptedImageResultMessage,
   createLoadBookmarksMessage,
+  createLoadBookmarksByIdsMessage,
+  createLoadBookmarksByIdsResultMessage,
   createLoadBookmarksResultMessage,
   createLoadLocalSettingsMessage,
   createLoadLocalSettingsResultMessage,
@@ -37,6 +39,10 @@ import {
   createPingMessage,
   createRemoveBookmarkMessage,
   createRemoveBookmarkResultMessage,
+  createRemoveBookmarksMessage,
+  createRemoveBookmarksResultMessage,
+  createRemoveRecallBookmarksMessage,
+  createRemoveRecallBookmarksResultMessage,
   createRemoveRecentHistoryMessage,
   createRemoveRecentHistoryResultMessage,
   createRecallRecordsMessage,
@@ -68,6 +74,7 @@ import {
   isImportBlobKeyBackupResultMessage,
   isImportEncryptedImageResultMessage,
   isLoadBookmarksResultMessage,
+  isLoadBookmarksByIdsResultMessage,
   isLoadLocalSettingsResultMessage,
   isLoadPanelPositionResultMessage,
   isListUrlTemplatesResultMessage,
@@ -76,6 +83,8 @@ import {
   isLoadRecentHistoryResultMessage,
   isRecallRecordsResultMessage,
   isRemoveBookmarkResultMessage,
+  isRemoveBookmarksResultMessage,
+  isRemoveRecallBookmarksResultMessage,
   isRemoveRecentHistoryResultMessage,
   isRetrieveBlobResultMessage,
   isSaveBookmarkResultMessage,
@@ -378,20 +387,38 @@ test('creates bookmark store messages for extension-origin persistence', () => {
     hasOlder: false,
     hasNewer: false,
   });
+  const loadByIds = createLoadBookmarksByIdsMessage(['bookmark-1']);
+  const loadByIdsResult = createLoadBookmarksByIdsResultMessage({ items: [record] });
   const save = createSaveBookmarkMessage(record);
   const saveResult = createSaveBookmarkResultMessage({ ok: true, record });
   const remove = createRemoveBookmarkMessage(record);
   const removeResult = createRemoveBookmarkResultMessage({ ok: true });
+  const removeMany = createRemoveBookmarksMessage(['bookmark-1', 'bookmark-2']);
+  const removeManyResult = createRemoveBookmarksResultMessage({ ok: true, removedCount: 2 });
+  const removeRecall = createRemoveRecallBookmarksMessage({ offset: 30, scope: 'site', currentPageUrl: 'https://example.test/' });
+  const removeRecallResult = createRemoveRecallBookmarksResultMessage({ ok: true, removedCount: 3 });
 
   assert.equal(isExtensionRequest(load), true);
   assert.equal(isExtensionResponse(loadResult), true);
   assert.equal(isLoadBookmarksResultMessage(loadResult), true);
+  assert.deepEqual(loadByIds.payload.ids, ['bookmark-1']);
+  assert.equal(isExtensionRequest(loadByIds), true);
+  assert.equal(isExtensionResponse(loadByIdsResult), true);
+  assert.equal(isLoadBookmarksByIdsResultMessage(loadByIdsResult), true);
   assert.equal(isExtensionRequest(save), true);
   assert.equal(isExtensionResponse(saveResult), true);
   assert.equal(isSaveBookmarkResultMessage(saveResult), true);
   assert.equal(isExtensionRequest(remove), true);
   assert.equal(isExtensionResponse(removeResult), true);
   assert.equal(isRemoveBookmarkResultMessage(removeResult), true);
+  assert.deepEqual(removeMany.payload.ids, ['bookmark-1', 'bookmark-2']);
+  assert.equal(isExtensionRequest(removeMany), true);
+  assert.equal(isExtensionResponse(removeManyResult), true);
+  assert.equal(isRemoveBookmarksResultMessage(removeManyResult), true);
+  assert.equal(removeRecall.payload.offset, 30);
+  assert.equal(isExtensionRequest(removeRecall), true);
+  assert.equal(isExtensionResponse(removeRecallResult), true);
+  assert.equal(isRemoveRecallBookmarksResultMessage(removeRecallResult), true);
 });
 
 test('creates transient recent history messages', () => {

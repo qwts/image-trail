@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyFieldLoadFailureToState, reducePanelAction } from '../extension/src/core/actions.js';
 import { createInitialPanelState, setTargetState } from '../extension/src/core/state.js';
+import { isLockedPrivatePin } from '../extension/src/ui/panel.js';
+import { recallDeleteCountForQueue } from '../extension/src/ui/render.js';
 import type { UrlFieldSplitSpec } from '../extension/src/core/url/types.js';
 
 test('switching active fields clears a previous failed field marker', () => {
@@ -192,6 +194,31 @@ test('updating visible bookmark soft max resets the queue window', () => {
   assert.equal(updated.bookmarkOffset, 0);
 });
 
+test('clearing visible bookmarks is presentation-only state', () => {
+  const state = {
+    ...createInitialPanelState(),
+    bookmarks: [
+      { id: 'bookmark-1', url: 'https://example.test/1.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'bookmark' as const },
+      { id: 'bookmark-2', url: 'https://example.test/2.jpg', timestamp: '2026-06-20T00:00:01.000Z', source: 'bookmark' as const },
+    ],
+    selectedBookmarkIds: ['bookmark-1'],
+    bookmarkTotal: 2,
+    hasOlderBookmarks: true,
+  };
+
+  const cleared = reducePanelAction(state, { name: 'bookmarks/clear-visible' });
+
+  assert.deepEqual(cleared.bookmarks, []);
+  assert.deepEqual(cleared.selectedBookmarkIds, []);
+  assert.equal(cleared.bookmarkTotal, 0);
+  assert.equal(cleared.hasOlderBookmarks, false);
+});
+
+test('recall delete count is derived from durable queue totals', () => {
+  assert.equal(recallDeleteCountForQueue({ bookmarkTotal: 47, bookmarkLimit: 3 }), 44);
+  assert.equal(recallDeleteCountForQueue({ bookmarkTotal: 2, bookmarkLimit: 3 }), 0);
+});
+
 test('settings toggle opens and closes the panel settings section', () => {
   const opened = reducePanelAction(createInitialPanelState(), { name: 'settings/toggle' });
   assert.equal(opened.settingsOpen, true);
@@ -271,6 +298,58 @@ test('recall drawer loads candidates and toggles selection', () => {
   assert.deepEqual(selected.recall.selectedIds, ['recall-1']);
   assert.equal(closed.recall.open, false);
   assert.deepEqual(closed.recall.selectedIds, []);
+});
+
+test('clearing recall results does not mutate visible bookmarks', () => {
+  const state = reducePanelAction(createInitialPanelState(), {
+    name: 'recall/load-complete',
+    candidates: [
+      {
+        id: 'recall-1',
+        url: 'https://example.test/1.jpg',
+        timestamp: '2026-06-20T00:00:00.000Z',
+        source: 'bookmark' as const,
+        envelopeCreatedAt: '2026-06-20T00:00:00.000Z',
+      },
+    ],
+    append: false,
+    offset: 30,
+    nextOffset: 31,
+    hasMore: true,
+    total: 4,
+    failedCount: 0,
+    message: 'Loaded 1 recall record.',
+  });
+  const selected = reducePanelAction(state, { name: 'recall-selection/toggle', id: 'recall-1' });
+
+  const cleared = reducePanelAction(selected, { name: 'recall/clear-results' });
+
+  assert.deepEqual(cleared.recall.candidates, []);
+  assert.deepEqual(cleared.recall.selectedIds, []);
+  assert.equal(cleared.recall.hasMore, false);
+  assert.equal(cleared.bookmarks.length, 0);
+});
+
+test('locked private placeholders are detected before image export', () => {
+  assert.equal(
+    isLockedPrivatePin({
+      id: 'private-pin',
+      url: 'image-trail-private:private-pin',
+      timestamp: '2026-06-21T00:00:00.000Z',
+      source: 'bookmark',
+      privacyStatus: 'locked',
+    }),
+    true,
+  );
+  assert.equal(
+    isLockedPrivatePin({
+      id: 'plain-pin',
+      url: 'https://example.test/plain.jpg',
+      timestamp: '2026-06-21T00:00:00.000Z',
+      source: 'bookmark',
+    }),
+    false,
+  );
 });
 
 test('recall drawer appends paged candidates without duplicating rows', () => {

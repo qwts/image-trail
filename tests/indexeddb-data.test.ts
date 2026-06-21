@@ -634,6 +634,76 @@ test('IndexedDbBookmarkStore removes protected original blobs through relationsh
   }
 });
 
+test('IndexedDbBookmarkStore batch removes locked protected backing rows without decrypting private metadata', async () => {
+  await deleteImageTrailDb();
+  let active: ActiveBlobKey | null = (
+    await createAndActivateWrappedBlobKey({
+      password: 'pin-batch-delete-password',
+      uuid: 'pin-batch-delete-key',
+      now: '2026-06-21T00:00:00.000Z',
+    })
+  ).active;
+  const dbResult = await openImageTrailDb();
+  assert.ok(dbResult.db);
+  await new BlobsRepository(dbResult.db).put({
+    id: 'blob-batch-protected-original',
+    kind: 'original',
+    schemaVersion: 1,
+    algorithm: 'AES-GCM',
+    iv: 'iv',
+    ciphertext: new ArrayBuffer(4),
+    encryptedByteLength: 4,
+    createdAt: '2026-06-21T00:00:00.000Z',
+    key: active.reference,
+    referenceCount: 1,
+  });
+  dbResult.db.close();
+
+  let saved;
+  const unlockedStore = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  try {
+    saved = await unlockedStore.save(
+      createDisplayRecord({
+        id: 'https://secret.example.test/batch-delete.jpg',
+        url: 'https://secret.example.test/batch-delete.jpg',
+        label: 'batch-delete.jpg',
+        thumbnail: 'data:image/png;base64,dGh1bWJuYWls',
+        timestamp: '2026-06-21T00:00:01.000Z',
+        source: 'bookmark',
+        storedOriginal: {
+          blobId: 'blob-batch-protected-original',
+          mimeType: 'image/jpeg',
+          byteLength: 4,
+          capturedAt: '2026-06-21T00:00:00.000Z',
+        },
+      }),
+    );
+  } finally {
+    await unlockedStore.close();
+    active = null;
+    lockBlobKey();
+  }
+
+  const lockedStore = new IndexedDbBookmarkStore({ getActiveBlobKey: () => null });
+  try {
+    const result = await lockedStore.removeMany([saved.id]);
+    assert.equal(result.removedCount, 1);
+  } finally {
+    await lockedStore.close();
+  }
+
+  const verifyResult = await openImageTrailDb();
+  assert.ok(verifyResult.db);
+  try {
+    assert.equal(await new BookmarksRepository(verifyResult.db).getEncrypted(saved.id), undefined);
+    assert.equal(await new EncryptedPinsRepository(verifyResult.db).get(saved.protectedPin!.encryptedPinId!), undefined);
+    assert.equal(await new EncryptedPinThumbnailsRepository(verifyResult.db).get(saved.protectedPin!.encryptedThumbnailId!), undefined);
+    assert.equal(await new BlobsRepository(verifyResult.db).get('blob-batch-protected-original'), undefined);
+  } finally {
+    verifyResult.db.close();
+  }
+});
+
 test('IndexedDbBookmarkStore recalls encrypted bookmark thumbnails after reload', async () => {
   await deleteImageTrailDb();
   const firstStore = new IndexedDbBookmarkStore();
@@ -883,6 +953,35 @@ test('IndexedDbBookmarkStore loads recall records after the visible soft max', a
     );
     assert.equal(recall.nextOffset, 33);
     assert.equal(recall.hasMore, true);
+  } finally {
+    await store.close();
+  }
+});
+
+test('IndexedDbBookmarkStore deletes recall records after the visible soft max', async () => {
+  await deleteImageTrailDb();
+  const store = new IndexedDbBookmarkStore();
+  try {
+    for (let index = 0; index < 5; index += 1) {
+      await store.save(
+        createDisplayRecord({
+          id: `https://example.test/delete-recall-${index}.jpg`,
+          url: `https://example.test/delete-recall-${index}.jpg`,
+          label: `delete-recall-${index}.jpg`,
+          timestamp: `2026-06-20T00:00:0${index}.000Z`,
+          source: 'bookmark',
+        }),
+      );
+    }
+
+    const result = await store.removeRecallPage({ offset: 2, scope: 'global' });
+    const page = await store.loadPage({ offset: 0, limit: 10 });
+
+    assert.equal(result.removedCount, 3);
+    assert.deepEqual(
+      page.items.map((item) => item.url),
+      ['https://example.test/delete-recall-4.jpg', 'https://example.test/delete-recall-3.jpg'],
+    );
   } finally {
     await store.close();
   }

@@ -236,6 +236,23 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       };
     case 'recall-selection/clear':
       return { ...state, recall: { ...state.recall, selectedIds: [] }, lastUpdatedAt: Date.now() };
+    case 'recall/clear-results':
+      return {
+        ...state,
+        recall: {
+          ...state.recall,
+          candidates: [],
+          selectedIds: [],
+          offset: 0,
+          nextOffset: 0,
+          hasMore: false,
+          total: 0,
+          failedCount: 0,
+          message: undefined,
+          messageIsError: false,
+        },
+        lastUpdatedAt: Date.now(),
+      };
     case 'recall/complete': {
       return {
         ...state,
@@ -308,6 +325,13 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         selectedBookmarkIds: removeItem(state.selectedBookmarkIds, action.id),
         lastUpdatedAt: Date.now(),
       };
+    case 'bookmark/clear':
+      return {
+        ...state,
+        bookmarks: state.bookmarks.filter((item) => item.id !== action.id),
+        selectedBookmarkIds: removeItem(state.selectedBookmarkIds, action.id),
+        lastUpdatedAt: Date.now(),
+      };
     case 'bookmark-selection/toggle':
       return {
         ...state,
@@ -339,6 +363,19 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         hasNewerBookmarks: action.hasNewer,
         lastUpdatedAt: Date.now(),
       };
+    case 'bookmarks/clear-visible': {
+      const visibleIds = state.bookmarks.map((bookmark) => bookmark.id);
+      return {
+        ...state,
+        bookmarks: [],
+        selectedBookmarkIds: state.selectedBookmarkIds.filter((id) => !visibleIds.includes(id)),
+        bookmarkOffset: 0,
+        bookmarkTotal: 0,
+        hasOlderBookmarks: false,
+        hasNewerBookmarks: false,
+        lastUpdatedAt: Date.now(),
+      };
+    }
     case 'bookmarks/toggle-scope':
       return {
         ...state,

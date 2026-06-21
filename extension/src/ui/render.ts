@@ -35,6 +35,10 @@ export interface PanelLayoutState {
   historyListBlockSize: number | null;
 }
 
+export function recallDeleteCountForQueue(state: Pick<PanelState, 'bookmarkTotal' | 'bookmarkLimit'>): number {
+  return Math.max(0, state.bookmarkTotal - state.bookmarkLimit);
+}
+
 interface FocusedTextControlSnapshot {
   readonly selector: string;
   readonly value: string;
@@ -314,7 +318,19 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     createPanelHeader(state, target),
     createStatusView(state, target.dispatch, statusView),
     ...(state.settingsOpen
-      ? [createSettingsView(state.bookmarkLimit, state.urlTemplates, activeTemplate?.id ?? state.activeUrlTemplateId, target.dispatch)]
+      ? [
+          createSettingsView(
+            state.bookmarkLimit,
+            state.urlTemplates,
+            activeTemplate?.id ?? state.activeUrlTemplateId,
+            {
+              visibleQueueCount: state.bookmarks.length,
+              recallCount: recallDeleteCountForQueue(state),
+              busy: state.importExportBusy || state.recall.busy,
+            },
+            target.dispatch,
+          ),
+        ]
       : []),
     createUrlEditorView(
       { url: activeUrl },
@@ -341,12 +357,14 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
         currentImageUrl: state.target.selectedUrl,
         selectedHistoryCount: state.selectedHistoryIds.length,
         selectedBookmarkCount: state.selectedBookmarkIds.length,
-        selectedImageDownloadCount: state.selectedHistoryIds.length || state.selectedBookmarkIds.length,
+        selectedImageDownloadCount: state.selectedHistoryIds.length || state.selectedBookmarkIds.length || state.recall.selectedIds.length,
         imageDownloadAvailable:
-          state.selectedHistoryIds.length + state.selectedBookmarkIds.length > 0 || !!state.target.selectedUrl || state.history.length > 0,
+          state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
+          !!state.target.selectedUrl ||
+          state.history.length > 0,
         encryptedImageTransferAvailable:
           state.blobKeyUnlocked &&
-          (state.selectedHistoryIds.length + state.selectedBookmarkIds.length > 0 ||
+          (state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
             !!state.target.selectedUrl ||
             state.history.length > 0),
         blobKeyUnlocked: state.blobKeyUnlocked,
@@ -360,13 +378,15 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
         busy: state.importExportBusy,
         currentImageUrl: state.target.selectedUrl,
         selectedHistoryCount: state.selectedHistoryIds.length,
-        selectedBookmarkCount: state.selectedBookmarkIds.length,
-        selectedImageDownloadCount: state.selectedHistoryIds.length || state.selectedBookmarkIds.length,
+        selectedBookmarkCount: state.selectedBookmarkIds.length + state.recall.selectedIds.length,
+        selectedImageDownloadCount: state.selectedHistoryIds.length || state.selectedBookmarkIds.length || state.recall.selectedIds.length,
         imageDownloadAvailable:
-          state.selectedHistoryIds.length + state.selectedBookmarkIds.length > 0 || !!state.target.selectedUrl || state.history.length > 0,
+          state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
+          !!state.target.selectedUrl ||
+          state.history.length > 0,
         encryptedImageTransferAvailable:
           state.blobKeyUnlocked &&
-          (state.selectedHistoryIds.length + state.selectedBookmarkIds.length > 0 ||
+          (state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
             !!state.target.selectedUrl ||
             state.history.length > 0),
         blobKeyUnlocked: state.blobKeyUnlocked,

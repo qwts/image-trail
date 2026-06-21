@@ -1,9 +1,15 @@
 import {
   createLoadBookmarksMessage,
+  createLoadBookmarksByIdsMessage,
   createRemoveBookmarkMessage,
+  createRemoveBookmarksMessage,
+  createRemoveRecallBookmarksMessage,
   createSaveBookmarkMessage,
   isLoadBookmarksResultMessage,
+  isLoadBookmarksByIdsResultMessage,
   isRemoveBookmarkResultMessage,
+  isRemoveBookmarksResultMessage,
+  isRemoveRecallBookmarksResultMessage,
   isSaveBookmarkResultMessage,
 } from '../background/messages.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
@@ -40,11 +46,34 @@ export class ExtensionBookmarkStore implements BookmarkStore {
     return record;
   }
 
+  async loadByIds(ids: readonly string[]): Promise<readonly ImageDisplayRecord[]> {
+    if (ids.length === 0) return [];
+    const response = await sendRuntimeMessage(createLoadBookmarksByIdsMessage(ids));
+    if (isLoadBookmarksByIdsResultMessage(response)) return response.payload.items;
+    return [];
+  }
+
   async remove(record: ImageDisplayRecord): Promise<void> {
     const response = await sendRuntimeMessage(createRemoveBookmarkMessage(record));
     if (response === null) return;
     if (!isRemoveBookmarkResultMessage(response)) {
       throw new Error('Invalid bookmark removal response from background.');
     }
+  }
+
+  async removeMany(ids: readonly string[]): Promise<{ readonly removedCount: number }> {
+    const response = await sendRuntimeMessage(createRemoveBookmarksMessage(ids));
+    if (isRemoveBookmarksResultMessage(response) && response.payload.ok) return { removedCount: response.payload.removedCount };
+    return { removedCount: 0 };
+  }
+
+  async removeRecallPage(input: {
+    readonly offset: number;
+    readonly scope?: 'global' | 'site';
+    readonly currentPageUrl?: string;
+  }): Promise<{ readonly removedCount: number }> {
+    const response = await sendRuntimeMessage(createRemoveRecallBookmarksMessage(input));
+    if (isRemoveRecallBookmarksResultMessage(response) && response.payload.ok) return { removedCount: response.payload.removedCount };
+    return { removedCount: 0 };
   }
 }

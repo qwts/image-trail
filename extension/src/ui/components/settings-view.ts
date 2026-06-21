@@ -12,6 +12,11 @@ export function createSettingsView(
   visibleBookmarkSoftMax: number,
   templates: readonly UrlTemplateRecord[],
   activeTemplateId: string | null,
+  destructiveState: {
+    readonly visibleQueueCount: number;
+    readonly recallCount: number;
+    readonly busy: boolean;
+  },
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
@@ -52,8 +57,71 @@ export function createSettingsView(
   });
 
   form.append(label, apply);
-  section.append(heading, form, createTemplateSettingsView(templates, activeTemplateId, dispatch));
+  section.append(
+    heading,
+    form,
+    createDestructiveSettingsView(destructiveState, dispatch),
+    createTemplateSettingsView(templates, activeTemplateId, dispatch),
+  );
   return section;
+}
+
+function createDestructiveSettingsView(
+  state: {
+    readonly visibleQueueCount: number;
+    readonly recallCount: number;
+    readonly busy: boolean;
+  },
+  dispatch: (action: PanelAction) => void,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'Delete pins';
+
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__settings-empty';
+  meta.textContent =
+    'Deletion removes durable pin records and linked originals. Clear actions outside Settings only hide rows temporarily.';
+
+  const actions = document.createElement('div');
+  actions.className = 'image-trail-panel__settings-template-controls';
+
+  actions.append(
+    createDangerButton(`Delete current queue (${state.visibleQueueCount})`, state.busy || state.visibleQueueCount === 0, () =>
+      dispatch({ name: 'bookmarks/delete-visible' }),
+    ),
+    createDangerButton(`Delete Recall items (${state.recallCount})`, state.busy || state.recallCount === 0, () =>
+      dispatch({ name: 'recall/delete-all' }),
+    ),
+  );
+
+  wrapper.append(heading, meta, actions);
+  return wrapper;
+}
+
+function createDangerButton(label: string, disabled: boolean, onConfirm: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = label;
+  button.disabled = disabled;
+  button.className = 'is-danger';
+  button.addEventListener('click', () => {
+    if (button.dataset.confirm === 'true') {
+      onConfirm();
+      button.dataset.confirm = 'false';
+      button.textContent = label;
+      return;
+    }
+    button.dataset.confirm = 'true';
+    button.textContent = `Confirm ${label}`;
+  });
+  button.addEventListener('blur', () => {
+    button.dataset.confirm = 'false';
+    button.textContent = label;
+  });
+  return button;
 }
 
 function createTemplateSettingsView(

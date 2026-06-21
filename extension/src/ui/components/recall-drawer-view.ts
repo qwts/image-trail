@@ -92,7 +92,14 @@ export function createRecallDrawerView(
   clear.disabled = state.busy || state.selectedIds.length === 0;
   clear.addEventListener('click', () => dispatch({ name: 'recall-selection/clear' }));
 
-  actions.append(recall, clear);
+  const clearResults = document.createElement('button');
+  clearResults.type = 'button';
+  clearResults.textContent = 'Clear results';
+  clearResults.disabled = state.busy || state.candidates.length === 0;
+  clearResults.title = 'Hide loaded Recall results until Recall is reopened or reloaded.';
+  clearResults.addEventListener('click', () => dispatch({ name: 'recall/clear-results' }));
+
+  actions.append(recall, clear, clearResults);
   if (state.hasMore) {
     const more = document.createElement('button');
     more.type = 'button';

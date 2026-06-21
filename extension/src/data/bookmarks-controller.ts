@@ -212,22 +212,46 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     return records;
   }
 
-  async remove(record: ImageDisplayRecord): Promise<void> {
+  async loadByIds(ids: readonly string[]): Promise<readonly ImageDisplayRecord[]> {
     const context = await this.openContext();
-    if (!context) return;
-    const existing = (await context.repository.getEncrypted(record.id)) ?? (await context.repository.getEncryptedByUrl(record.url));
-    if (!existing) return;
-    if (this.options.getActiveBlobKey) {
+    if (!context) return [];
+    return this.loadRecordsByIds(context, [...new Set(ids)].filter(Boolean));
+  }
+
+  async remove(record: ImageDisplayRecord): Promise<void> {
+    await this.removeMany([record.id]);
+  }
+
+  async removeMany(ids: readonly string[]): Promise<{ readonly removedCount: number }> {
+    const context = await this.openContext();
+    if (!context) return { removedCount: 0 };
+    let removedCount = 0;
+    for (const id of [...new Set(ids)].filter(Boolean)) {
+      const existing = await context.repository.getEncrypted(id);
+      if (!existing) continue;
       try {
         const payload = await context.repository.openRecord(existing, context.bookmarkKey.key);
-        if (payload.protectedPin?.encryptedPinId) await context.encryptedPins.remove(payload.protectedPin.encryptedPinId);
-        if (payload.protectedPin?.encryptedThumbnailId) await context.encryptedThumbnails.remove(payload.protectedPin.encryptedThumbnailId);
-        if (payload.protectedPin?.storedOriginalBlobId) await context.blobs.remove(payload.protectedPin.storedOriginalBlobId);
+        await removeLinkedPinStorage(context, payload);
       } catch {
         // Still remove the relationship row if its protected side cannot be opened.
       }
+      await context.repository.remove(existing.uuid);
+      removedCount += 1;
     }
-    await context.repository.remove(existing.uuid);
+    return { removedCount };
+  }
+
+  async removeRecallPage(input: {
+    readonly offset: number;
+    readonly scope?: 'global' | 'site';
+    readonly currentPageUrl?: string;
+  }): Promise<{ readonly removedCount: number }> {
+    const context = await this.openContext();
+    if (!context) return { removedCount: 0 };
+    const records = this.options.getActiveBlobKey ? await this.loadMergedRecords(context) : await this.loadPlainRecords(context);
+    const visible = filterByVisibilityScope(records, input.scope ?? 'global', input.currentPageUrl);
+    const ids = visible.slice(Math.max(0, input.offset)).map((record) => record.id);
+    return this.removeMany(ids);
   }
 
   async close(): Promise<void> {
@@ -343,7 +367,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       plainPinId,
       encryptedPinId,
       encryptedThumbnailId: thumbnail?.id ?? existingPlainPayload?.protectedPin?.encryptedThumbnailId,
-      storedOriginalBlobId: bookmark.storedOriginal?.blobId ?? bookmark.blobId ?? existingPlainPayload?.protectedPin?.storedOriginalBlobId,
+      storedOriginalBlobId: bookmark.storedOriginal?.blobId ?? bookmark.blobId,
       queueUpdatedAt,
     });
     await context.repository.sealAndPut(
@@ -504,6 +528,17 @@ function hostnameFromUrl(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+async function removeLinkedPinStorage(context: BookmarkContext, payload: DurableBookmarkPayloadV1): Promise<void> {
+  if (payload.protectedPin?.encryptedPinId) await context.encryptedPins.remove(payload.protectedPin.encryptedPinId);
+  if (payload.protectedPin?.encryptedThumbnailId) await context.encryptedThumbnails.remove(payload.protectedPin.encryptedThumbnailId);
+  const protectedOriginalBlobId = payload.protectedPin?.storedOriginalBlobId;
+  if (protectedOriginalBlobId) {
+    await context.blobs.remove(protectedOriginalBlobId);
+    return;
+  }
+  if (payload.storedOriginal?.blobId) await context.blobs.remove(payload.storedOriginal.blobId);
 }
 
 async function ensureDurableBookmarkKey(repository: KeysRepository): Promise<BookmarkKeyContext> {
