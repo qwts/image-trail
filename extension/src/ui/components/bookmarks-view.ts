@@ -28,6 +28,7 @@ export function createBookmarksView(
   selectedIds: readonly string[],
   captureInProgress: boolean,
   blobKeyUnlocked: boolean,
+  blobKeyAvailable: boolean,
   visibilityScope: 'global' | 'site',
   page: {
     readonly offset: number;
@@ -92,6 +93,8 @@ export function createBookmarksView(
   list.className = 'image-trail-panel__record-list';
   for (const item of items) {
     const capturedBlobId = encryptedBlobIdForRecord(item);
+    const keyUnavailable = !blobKeyUnlocked;
+    const keyMissing = !blobKeyAvailable;
     const lockedEncrypted = isLockedEncryptedRecord(item, blobKeyUnlocked);
     const previewableEncrypted = isPreviewableEncryptedRecord(item, blobKeyUnlocked);
     const selected = selectedIds.includes(item.id);
@@ -107,10 +110,17 @@ export function createBookmarksView(
       event.stopImmediatePropagation();
       dispatch({ name: 'bookmark-selection/toggle', id: item.id });
     });
-    if (lockedEncrypted) {
+    if (keyUnavailable) {
+      entry.classList.add('is-locked-encrypted');
+      entry.classList.add('is-key-unavailable');
+      entry.setAttribute('aria-disabled', 'true');
+      entry.title = keyMissing
+        ? 'Import the encrypted originals key backup before using this row.'
+        : 'Unlock encrypted originals before using this row.';
+    } else if (lockedEncrypted) {
       entry.classList.add('is-locked-encrypted');
       entry.setAttribute('aria-disabled', 'true');
-      entry.title = 'Unlock encrypted originals before previewing this row. Cmd/Ctrl-click to select for export.';
+      entry.title = 'Unlock encrypted originals before previewing this row.';
     } else {
       entry.tabIndex = 0;
       entry.setAttribute('role', 'button');
@@ -145,13 +155,13 @@ export function createBookmarksView(
     actions.addEventListener('click', (event) => event.stopPropagation());
     actions.addEventListener('keydown', (event) => event.stopPropagation());
 
-    if (item.captureStatus === 'captured' && item.blobId) {
+    if (item.captureStatus === 'captured' && item.blobId && !keyMissing) {
       const deleteCapture = document.createElement('button');
       deleteCapture.type = 'button';
       deleteCapture.textContent = 'Delete original';
       deleteCapture.addEventListener('click', () => dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! }));
       actions.append(deleteCapture);
-    } else {
+    } else if (blobKeyUnlocked) {
       const capture = document.createElement('button');
       capture.type = 'button';
       capture.textContent = 'Capture';
@@ -162,11 +172,13 @@ export function createBookmarksView(
       actions.append(capture);
     }
 
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.textContent = 'Remove';
-    remove.addEventListener('click', () => dispatch({ name: 'bookmark/remove', id: item.id }));
-    actions.append(remove);
+    if (!keyMissing || item.captureStatus === 'captured') {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', () => dispatch({ name: 'bookmark/remove', id: item.id }));
+      actions.append(remove);
+    }
     entry.append(visual, bookmarkLabel, actions);
     list.append(entry);
   }

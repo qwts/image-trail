@@ -287,6 +287,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
         unlocked: state.blobKeyUnlocked,
         keyReference: state.blobKeyReference,
         hasKey: state.blobKeyAvailable,
+        busy: state.importExportBusy,
         abandonedOriginalCount: state.storageUsage?.orphanedBlobCount ?? 0,
       },
       target.dispatch,
@@ -366,6 +367,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
     navSection,
     autoSection,
     createHistoryView(state.history, state.selectedHistoryIds, state.captureInProgress, state.blobKeyUnlocked, target.dispatch, {
+      blobKeyAvailable: state.blobKeyAvailable,
       listBlockSize: target.layoutState.historyListBlockSize,
       onListResize: (blockSize) => {
         target.layoutState.historyListBlockSize = blockSize;
@@ -377,6 +379,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
       state.selectedBookmarkIds,
       state.captureInProgress,
       state.blobKeyUnlocked,
+      state.blobKeyAvailable,
       state.bookmarkVisibilityScope,
       {
         offset: state.bookmarkOffset,

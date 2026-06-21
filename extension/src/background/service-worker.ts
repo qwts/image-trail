@@ -1,9 +1,10 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
 import { computeSha256 } from '../core/image/fingerprints.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
-import { getActiveBlobKey } from '../data/crypto/blob-keyring.js';
+import { getActiveBlobKey, lockBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
+import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../data/import-export/key-backup.js';
 import { openImageTrailDb } from '../data/db.js';
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
 import { KeysRepository } from '../data/repositories/keys-repository.js';
@@ -27,6 +28,8 @@ import {
   createRemoveRecentHistoryResultMessage,
   createSaveBookmarkResultMessage,
   createBlobKeyStatusResultMessage,
+  createExportBlobKeyBackupResultMessage,
+  createImportBlobKeyBackupResultMessage,
   createPingMessage,
   createRetrieveBlobResultMessage,
   createStorageUsageResponseMessage,
@@ -46,6 +49,7 @@ import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHis
 import type { FetchThumbnailSourceMessage } from './messages.js';
 import type { CreateBlobPreviewMessage } from './messages.js';
 import type { SetupBlobKeyMessage, UnlockBlobKeyMessage, BlobKeyResultMessage } from './messages.js';
+import type { ExportBlobKeyBackupMessage, ImportBlobKeyBackupMessage } from './messages.js';
 import { extractOrigin, hasOriginPermission, requestOriginPermission } from './permissions.js';
 
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
@@ -428,6 +432,77 @@ async function handleUnlockBlobKey(message: UnlockBlobKeyMessage): Promise<BlobK
   return { ok: true, keyReference: blobKey.reference, message: `Encrypted blob storage unlocked with ${blobKey.reference}.` };
 }
 
+async function handleExportBlobKeyBackup(
+  message: ExportBlobKeyBackupMessage,
+): Promise<import('./messages.js').ExportBlobKeyBackupResultMessage['payload']> {
+  const password = message.payload.password.trim();
+  if (!password) return { ok: false, reason: 'empty-password', message: 'Enter a password to export a key backup.' };
+  const db = await getDb();
+  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
+  const keys = new KeysRepository(db);
+  const blobKey = message.payload.keyReference
+    ? await keys.get(message.payload.keyReference)
+    : [...(await keys.listByKind('blob'))].sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+  if (!isStoredBlobKey(blobKey)) {
+    return { ok: false, reason: 'missing-key', message: 'No encrypted blob key exists to back up.' };
+  }
+  const result = await exportStoredKeyBackupWithPassword(blobKey, password);
+  if (!result.status.ok || !result.fileContent || !result.fileName) {
+    return { ok: false, reason: result.status.code, message: result.status.message };
+  }
+  return {
+    ok: true,
+    keyReference: blobKey.reference,
+    fileContent: result.fileContent,
+    fileName: result.fileName,
+    message: result.status.message,
+  };
+}
+
+async function handleImportBlobKeyBackup(
+  message: ImportBlobKeyBackupMessage,
+): Promise<import('./messages.js').ImportBlobKeyBackupResultMessage['payload']> {
+  const password = message.payload.password.trim();
+  if (!password) return { ok: false, reason: 'empty-password', message: 'Enter a password to import a key backup.' };
+  const db = await getDb();
+  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
+  const result = await importStoredKeyBackupWithPassword(message.payload.fileContent, password);
+  if (!result.status.ok || !result.record) {
+    return { ok: false, reason: result.status.code, message: result.status.message };
+  }
+  if (!isStoredBlobKey(result.record)) {
+    return { ok: false, reason: 'unsupported-key', message: 'Only blob key backups can be imported here.' };
+  }
+  const keys = new KeysRepository(db);
+  if (await keys.get(result.record.reference)) {
+    return {
+      ok: true,
+      keyReference: result.record.reference,
+      imported: false,
+      message: `Key backup already exists for ${result.record.reference}.`,
+    };
+  }
+  await keys.put(result.record);
+  return {
+    ok: true,
+    keyReference: result.record.reference,
+    imported: true,
+    message: `Imported key backup for ${result.record.reference}.`,
+  };
+}
+
+async function handleLockBlobKey(): Promise<BlobKeyResultMessage['payload']> {
+  lockBlobKey();
+  const db = await getDb();
+  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
+  const keys = new KeysRepository(db);
+  const blobKeys = await keys.listByKind('blob');
+  for (const key of blobKeys) {
+    await keys.remove(key.reference);
+  }
+  return { ok: true, keyReference: '', message: 'Encrypted blob key cleared. Import a key backup to recover encrypted originals.' };
+}
+
 async function handleGrantPermissionAndCapture(
   message: GrantPermissionAndCaptureMessage,
 ): Promise<import('../core/image/capture-result.js').CaptureResult> {
@@ -587,6 +662,28 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleUnlockBlobKey(message)
         .then((result) => sendResponse(createBlobKeyResultMessage(result)))
         .catch(() => sendResponse(createBlobKeyResultMessage({ ok: false, reason: 'unknown', message: 'Blob key unlock failed.' })));
+      return true;
+
+    case MessageType.LockBlobKey:
+      handleLockBlobKey()
+        .then((result) => sendResponse(createBlobKeyResultMessage(result)))
+        .catch(() => sendResponse(createBlobKeyResultMessage({ ok: false, reason: 'unknown', message: 'Blob key lock failed.' })));
+      return true;
+
+    case MessageType.ExportBlobKeyBackup:
+      handleExportBlobKeyBackup(message)
+        .then((result) => sendResponse(createExportBlobKeyBackupResultMessage(result)))
+        .catch(() =>
+          sendResponse(createExportBlobKeyBackupResultMessage({ ok: false, reason: 'unknown', message: 'Key backup export failed.' })),
+        );
+      return true;
+
+    case MessageType.ImportBlobKeyBackup:
+      handleImportBlobKeyBackup(message)
+        .then((result) => sendResponse(createImportBlobKeyBackupResultMessage(result)))
+        .catch(() =>
+          sendResponse(createImportBlobKeyBackupResultMessage({ ok: false, reason: 'unknown', message: 'Key backup import failed.' })),
+        );
       return true;
 
     case MessageType.GrantPermissionAndCapture:

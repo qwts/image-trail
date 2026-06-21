@@ -11,3 +11,4 @@ These scenarios define the first browser-level acceptance coverage for the Brave
 - [Oversized Original Is Bounded](oversized-original-is-bounded.md)
 - [Panel Layout Stability](panel-layout-stability.md)
 - [Multi-Select Image Download](multi-select-image-download.md)
+- [Key Backup Restore](key-backup-restore.md)

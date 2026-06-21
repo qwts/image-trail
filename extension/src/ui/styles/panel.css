@@ -885,11 +885,21 @@
   opacity: 0.72;
 }
 
+.image-trail-panel-root .image-trail-panel__record-list li.is-key-unavailable {
+  border-color: rgb(255 255 255 / 8%);
+  background: rgb(0 0 0 / 18%);
+  box-shadow: none;
+  opacity: 0.34;
+}
+
 .image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__record-thumbnail,
 .image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__record-link,
-.image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__bookmark-label {
+.image-trail-panel-root .image-trail-panel__record-list li.is-locked-encrypted .image-trail-panel__bookmark-label,
+.image-trail-panel-root .image-trail-panel__record-list li.is-key-unavailable .image-trail-panel__record-thumbnail,
+.image-trail-panel-root .image-trail-panel__record-list li.is-key-unavailable .image-trail-panel__record-link,
+.image-trail-panel-root .image-trail-panel__record-list li.is-key-unavailable .image-trail-panel__bookmark-label {
   filter: saturate(0.55);
-  opacity: 0.72;
+  opacity: 0.48;
 }
 
 .image-trail-panel-root .image-trail-panel__record-list li[role='button'] {

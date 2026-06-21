@@ -7,8 +7,11 @@ import {
   createDeleteBlobMessage,
   createRetrieveBlobMessage,
   createBlobKeyStatusMessage,
+  createLockBlobKeyMessage,
   createSetupBlobKeyMessage,
+  createExportBlobKeyBackupMessage,
   createGrantPermissionAndCaptureMessage,
+  createImportBlobKeyBackupMessage,
   createStorageUsageRequestMessage,
   createUnlockBlobKeyMessage,
   isBlobKeyStatusResultMessage,
@@ -16,6 +19,8 @@ import {
   isCaptureResultMessage,
   isCleanupOrphanedBlobsResultMessage,
   isCreateBlobPreviewResultMessage,
+  isExportBlobKeyBackupResultMessage,
+  isImportBlobKeyBackupResultMessage,
   isRetrieveBlobResultMessage,
 } from '../background/messages.js';
 import type { CaptureSourceType } from '../background/messages.js';
@@ -23,6 +28,8 @@ import type {
   BlobKeyResultMessage,
   BlobKeyStatusResultMessage,
   CreateBlobPreviewResultMessage,
+  ExportBlobKeyBackupResultMessage,
+  ImportBlobKeyBackupResultMessage,
   RetrieveBlobResultMessage,
 } from '../background/messages.js';
 import { sendRuntimeMessage } from './runtime-message.js';
@@ -39,6 +46,9 @@ export interface CaptureStore {
   readonly requestBlobKeyStatus: () => Promise<BlobKeyStatusResultMessage['payload']>;
   readonly setupBlobKey: (password: string) => Promise<BlobKeyResultMessage['payload']>;
   readonly unlockBlobKey: (password: string, keyReference?: string) => Promise<BlobKeyResultMessage['payload']>;
+  readonly lockBlobKey: () => Promise<BlobKeyResultMessage['payload']>;
+  readonly exportBlobKeyBackup: (password: string, keyReference?: string) => Promise<ExportBlobKeyBackupResultMessage['payload']>;
+  readonly importBlobKeyBackup: (fileContent: string, password: string) => Promise<ImportBlobKeyBackupResultMessage['payload']>;
 }
 
 export class CaptureController implements CaptureStore {
@@ -113,6 +123,24 @@ export class CaptureController implements CaptureStore {
   async unlockBlobKey(password: string, keyReference?: string): Promise<BlobKeyResultMessage['payload']> {
     const response = await sendRuntimeMessage(createUnlockBlobKeyMessage(password, keyReference));
     if (isBlobKeyResultMessage(response)) return response.payload;
+    return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
+  }
+
+  async lockBlobKey(): Promise<BlobKeyResultMessage['payload']> {
+    const response = await sendRuntimeMessage(createLockBlobKeyMessage());
+    if (isBlobKeyResultMessage(response)) return response.payload;
+    return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
+  }
+
+  async exportBlobKeyBackup(password: string, keyReference?: string): Promise<ExportBlobKeyBackupResultMessage['payload']> {
+    const response = await sendRuntimeMessage(createExportBlobKeyBackupMessage(password, keyReference));
+    if (isExportBlobKeyBackupResultMessage(response)) return response.payload;
+    return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
+  }
+
+  async importBlobKeyBackup(fileContent: string, password: string): Promise<ImportBlobKeyBackupResultMessage['payload']> {
+    const response = await sendRuntimeMessage(createImportBlobKeyBackupMessage(fileContent, password));
+    if (isImportBlobKeyBackupResultMessage(response)) return response.payload;
     return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
   }
 }

@@ -16,6 +16,10 @@ declare global {
   }
 }
 
+function hasRuntimeMessaging(): boolean {
+  return typeof chrome !== 'undefined' && !!chrome.runtime?.onMessage && typeof chrome.runtime.getURL === 'function';
+}
+
 function createController(): ImageTrailContentController {
   const pageAdapter = new PageAdapter();
   const panel = new ImageTrailPanel(pageAdapter, new ExtensionBookmarkStore(), new CaptureController(), new RecentHistoryStore());
@@ -41,7 +45,7 @@ function createController(): ImageTrailContentController {
   };
 
   const destroy = (): void => {
-    chrome.runtime.onMessage.removeListener(handleMessage);
+    if (hasRuntimeMessaging()) chrome.runtime.onMessage.removeListener(handleMessage);
     panel.disconnect();
     delete window.__imageTrailContentController;
   };
@@ -52,6 +56,6 @@ function createController(): ImageTrailContentController {
   return { panel, destroy };
 }
 
-if (!window.__imageTrailContentController) {
+if (hasRuntimeMessaging() && !window.__imageTrailContentController) {
   window.__imageTrailContentController = createController();
 }

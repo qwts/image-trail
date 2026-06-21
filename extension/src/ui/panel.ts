@@ -366,6 +366,21 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'blob-key/lock') {
+      void this.lockBlobKey();
+      return;
+    }
+
+    if (action.name === 'blob-key/export') {
+      void this.exportBlobKeyBackup(action.password);
+      return;
+    }
+
+    if (action.name === 'blob-key/import') {
+      void this.importBlobKeyBackup(action.fileContent, action.password);
+      return;
+    }
+
     if (action.name === 'export/history') {
       void this.exportHistory(action.password, action.plaintext);
       return;
@@ -948,6 +963,9 @@ export class ImageTrailPanel {
     this.render();
     const result = await this.captureStore.requestCapture(url, sourceType, sourceRecordId);
     this.state = reducePanelAction(this.state, { name: 'capture/complete', result, sourceRecordId });
+    if ((result.status === 'failed' || result.status === 'remote-only') && result.reason === 'encryption-locked') {
+      await this.refreshBlobKeyStatus();
+    }
     if (isCapturedResult(result) && sourceType === 'history' && sourceRecordId && this.recentHistoryStore) {
       const updatedHistory = this.state.history.find((item) => item.id === sourceRecordId);
       if (updatedHistory) {
@@ -1127,6 +1145,16 @@ export class ImageTrailPanel {
     this.render();
   }
 
+  private async lockBlobKey(): Promise<void> {
+    if (!this.captureStore) return;
+    const result = await this.captureStore.lockBlobKey();
+    this.state = reducePanelAction(
+      { ...this.state, message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() },
+      { name: 'blob-key/status', unlocked: false, keyReference: null, hasKey: false },
+    );
+    this.render();
+  }
+
   private async refreshBlobKeyStatus(): Promise<void> {
     if (!this.captureStore) return;
     const result = await this.captureStore.requestBlobKeyStatus();
@@ -1168,6 +1196,29 @@ export class ImageTrailPanel {
     }
     downloadTextFile(fileContent, fileName);
     this.state = reducePanelAction(this.state, { name: 'import-export/complete', message });
+    this.render();
+  }
+
+  private async exportBlobKeyBackup(password: string): Promise<void> {
+    if (!this.captureStore || this.state.importExportBusy) return;
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const result = await this.captureStore.exportBlobKeyBackup(password, this.state.blobKeyReference ?? undefined);
+    this.finishExport(result.ok ? result.fileContent : undefined, result.ok ? result.fileName : undefined, result.message, result.ok);
+  }
+
+  private async importBlobKeyBackup(fileContent: string, password: string): Promise<void> {
+    if (!this.captureStore || this.state.importExportBusy) return;
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const result = await this.captureStore.importBlobKeyBackup(fileContent, password);
+    if (!result.ok) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.message });
+      this.render();
+      return;
+    }
+    await this.refreshBlobKeyStatus();
+    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message: result.message });
     this.render();
   }
 

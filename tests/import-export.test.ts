@@ -23,9 +23,18 @@ import { importBookmarks } from '../extension/src/data/import-export/bookmarks-i
 import { importBookmarkletJson } from '../extension/src/data/import-export/bookmarklet-import.js';
 import { recallEncryptedRecord, recallSelectedRecords } from '../extension/src/data/import-export/recall.js';
 import { exportKeyWithPassword } from '../extension/src/data/import-export/key-export.js';
+import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../extension/src/data/import-export/key-backup.js';
 import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
+import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
+import { openBlobPayload, sealBlobPayload } from '../extension/src/data/crypto/binary-envelope.js';
 import { sealJsonEnvelope } from '../extension/src/data/crypto/envelope.js';
 import type { DurableHistoryPayloadV1 } from '../extension/src/data/types.js';
+import type { StoredKeyRecord } from '../extension/src/data/crypto/types.js';
+
+function requireBlobKeyRecord(record: StoredKeyRecord | undefined): StoredKeyRecord<'blob'> {
+  if (record?.kind !== 'blob') throw new Error('Expected a blob key backup record.');
+  return record as StoredKeyRecord<'blob'>;
+}
 
 test('password-wrap: derives a wrapping key from password and salt', async () => {
   const salt = createPasswordSalt();
@@ -424,6 +433,83 @@ test('key-export: rejects non-extractable keys without attempting export', async
   assert.equal(result.status.ok, false);
   assert.equal(result.status.code, 'encryption-failed');
   assert.ok(result.status.message.includes('not extractable'));
+});
+
+test('key-backup: exports and imports password-wrapped blob key records', async () => {
+  const wrapped = await createAndActivateWrappedBlobKey({
+    password: 'capture-password',
+    uuid: '00000000-0000-4000-8000-000000000001',
+    now: '2026-06-20T12:00:00.000Z',
+  });
+
+  const exportResult = await exportStoredKeyBackupWithPassword(wrapped.metadata, 'backup-password', '2026-06-20T13:00:00.000Z');
+  assert.ok(exportResult.status.ok, exportResult.status.message);
+  assert.equal(exportResult.fileName, 'image-trail-key-backup-blob-2026-06-20.json');
+
+  const importResult = await importStoredKeyBackupWithPassword(exportResult.fileContent!, 'backup-password');
+  assert.ok(importResult.status.ok, importResult.status.message);
+  assert.equal(importResult.record?.reference, wrapped.metadata.reference);
+  assert.equal(importResult.record?.kind, 'blob');
+  assert.equal(importResult.record?.wrapping.wrappedKey, wrapped.metadata.wrapping.wrappedKey);
+  assert.equal(importResult.record?.extractable, false);
+  assert.equal(Object.hasOwn(importResult.record!, 'key'), false);
+  const importedRecord = requireBlobKeyRecord(importResult.record);
+
+  const active = await activateWrappedBlobKey(importedRecord, 'capture-password');
+  assert.equal(active.reference.reference, wrapped.metadata.reference);
+  assert.equal(active.key.extractable, false);
+});
+
+test('key-backup: rejects wrong backup password without returning a key record', async () => {
+  const wrapped = await createAndActivateWrappedBlobKey({
+    password: 'capture-password',
+    uuid: '00000000-0000-4000-8000-000000000002',
+  });
+  const exportResult = await exportStoredKeyBackupWithPassword(wrapped.metadata, 'backup-password');
+
+  const importResult = await importStoredKeyBackupWithPassword(exportResult.fileContent!, 'wrong-backup-password');
+
+  assert.equal(importResult.status.ok, false);
+  assert.equal(importResult.status.code, 'decryption-failed');
+  assert.equal(importResult.record, undefined);
+});
+
+test('key-backup: imported blob key decrypts payloads created before export', async () => {
+  const wrapped = await createAndActivateWrappedBlobKey({
+    password: 'capture-password',
+    uuid: '00000000-0000-4000-8000-000000000003',
+    now: '2026-06-20T12:00:00.000Z',
+  });
+  const aad = {
+    id: 'blob-before-backup',
+    kind: 'original' as const,
+    schemaVersion: 1 as const,
+    algorithm: 'AES-GCM' as const,
+    createdAt: '2026-06-20T12:05:00.000Z',
+    key: wrapped.active.reference,
+  };
+  const bytes = Uint8Array.from([5, 10, 15, 20]).buffer;
+  const sealed = await sealBlobPayload({
+    key: wrapped.active.key,
+    aad,
+    metadata: {
+      mimeType: 'image/png',
+      byteLength: 4,
+      sourceUrl: 'https://example.test/original.png',
+      capturedAt: '2026-06-20T12:05:00.000Z',
+    },
+    bytes,
+  });
+  const exportResult = await exportStoredKeyBackupWithPassword(wrapped.metadata, 'backup-password');
+  const importResult = await importStoredKeyBackupWithPassword(exportResult.fileContent!, 'backup-password');
+  assert.ok(importResult.status.ok, importResult.status.message);
+  const importedRecord = requireBlobKeyRecord(importResult.record);
+
+  const restored = await activateWrappedBlobKey(importedRecord, 'capture-password');
+  const opened = await openBlobPayload({ key: restored.key, iv: sealed.iv, ciphertext: sealed.ciphertext, aad });
+
+  assert.equal(opened.metadata.sourceUrl, 'https://example.test/original.png');
+  assert.deepEqual(Array.from(new Uint8Array(opened.bytes)), [5, 10, 15, 20]);
 });
 
 test('history-import: skips entries with missing captureStatus', async () => {

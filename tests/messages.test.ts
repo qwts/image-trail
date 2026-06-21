@@ -9,8 +9,13 @@ import {
   createDeleteBlobResultMessage,
   createDownloadImageMessage,
   createDownloadImageResultMessage,
+  createExportBlobKeyBackupMessage,
+  createExportBlobKeyBackupResultMessage,
   createFetchThumbnailSourceMessage,
   createFetchThumbnailSourceResultMessage,
+  createImportBlobKeyBackupMessage,
+  createImportBlobKeyBackupResultMessage,
+  createLockBlobKeyMessage,
   createLoadBookmarksMessage,
   createLoadBookmarksResultMessage,
   createAddRecentHistoryMessage,
@@ -35,7 +40,9 @@ import {
   isDownloadImageResultMessage,
   isExtensionRequest,
   isExtensionResponse,
+  isExportBlobKeyBackupResultMessage,
   isFetchThumbnailSourceResultMessage,
+  isImportBlobKeyBackupResultMessage,
   isLoadBookmarksResultMessage,
   isAddRecentHistoryResultMessage,
   isLoadRecentHistoryResultMessage,
@@ -86,6 +93,44 @@ test('recognizes capture-related messages as extension requests', () => {
   assert.equal(isExtensionRequest(createRetrieveBlobMessage('blob-1')), true);
   assert.equal(isExtensionRequest(createFetchThumbnailSourceMessage('https://example.com/a.jpg')), true);
   assert.equal(isExtensionRequest(createDownloadImageMessage('https://example.com/a.jpg', 'a.jpg', false)), true);
+});
+
+test('creates blob key backup import and export messages', () => {
+  const lockRequest = createLockBlobKeyMessage();
+  assert.equal(lockRequest.type, MessageType.LockBlobKey);
+  assert.equal(isExtensionRequest(lockRequest), true);
+
+  const exportRequest = createExportBlobKeyBackupMessage('backup-password', 'blob:key-1');
+  assert.equal(exportRequest.type, MessageType.ExportBlobKeyBackup);
+  assert.equal(exportRequest.payload.password, 'backup-password');
+  assert.equal(exportRequest.payload.keyReference, 'blob:key-1');
+  assert.equal(isExtensionRequest(exportRequest), true);
+
+  const exportResult = createExportBlobKeyBackupResultMessage({
+    ok: true,
+    keyReference: 'blob:key-1',
+    fileContent: '{"header":{}}',
+    fileName: 'image-trail-key-backup-blob-2026-06-20.json',
+    message: 'Exported key backup for blob:key-1.',
+  });
+  assert.equal(exportResult.type, MessageType.ExportBlobKeyBackupResult);
+  assert.equal(isExtensionResponse(exportResult), true);
+  assert.equal(isExportBlobKeyBackupResultMessage(exportResult), true);
+
+  const importRequest = createImportBlobKeyBackupMessage('{"header":{}}', 'backup-password');
+  assert.equal(importRequest.type, MessageType.ImportBlobKeyBackup);
+  assert.equal(importRequest.payload.fileContent, '{"header":{}}');
+  assert.equal(isExtensionRequest(importRequest), true);
+
+  const importResult = createImportBlobKeyBackupResultMessage({
+    ok: true,
+    keyReference: 'blob:key-1',
+    imported: false,
+    message: 'Key backup already imported.',
+  });
+  assert.equal(importResult.type, MessageType.ImportBlobKeyBackupResult);
+  assert.equal(isExtensionResponse(importResult), true);
+  assert.equal(isImportBlobKeyBackupResultMessage(importResult), true);
 });
 
 test('creates image download messages with save-as intent', () => {
