@@ -63,6 +63,7 @@ import { clampPanelPosition, hostnameFromLocation } from './panel-position.js';
 const ROOT_ID = 'image-trail-panel-root';
 const STYLE_PATH = 'src/ui/styles/panel.css';
 const RECALL_DRAWER_OPEN_ANIMATION_MS = 190;
+const RECALL_SUCCESS_MESSAGE_MS = 1800;
 
 interface ValidatedRecordUrl extends ImageRecordUrlValidation {
   readonly preloadDataUrl?: string;
@@ -114,7 +115,10 @@ export class ImageTrailPanel {
   private projectionRevision = 0;
   private bookmarkMutationQueue: Promise<void> = Promise.resolve();
   private panelPositionRestored = false;
+  private panelPositionRestorePromise: Promise<void> | null = null;
+  private restoredPanelPosition: PanelPosition | null = null;
   private recallOpeningUntil = 0;
+  private recallMessageClearTimer: number | null = null;
   private readonly layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
     fieldsPanelBlockSize: null,
@@ -202,6 +206,9 @@ export class ImageTrailPanel {
     this.root = null;
     this.recallRoot = null;
     this.panelPositionRestored = false;
+    this.panelPositionRestorePromise = null;
+    this.restoredPanelPosition = null;
+    this.clearRecallMessageTimer();
   }
 
   disconnect(): void {
@@ -282,10 +289,14 @@ export class ImageTrailPanel {
     if (options.render !== false) this.render();
   };
 
-  private openRecallDrawer(): void {
+  private async openRecallDrawer(): Promise<void> {
+    await this.ensurePanelPositionRestored();
     this.state = reducePanelAction(this.state, { name: 'recall/open', side: this.recallDrawerSide() });
     this.recallOpeningUntil = Date.now() + RECALL_DRAWER_OPEN_ANIMATION_MS;
     this.render();
+    if (!this.recallStore) {
+      return;
+    }
     void this.loadRecallCandidates({ offset: this.state.bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax, append: false });
   }
 
@@ -307,6 +318,7 @@ export class ImageTrailPanel {
     const renderUpdatedRecall = input.renderScope === 'panel' ? () => this.render() : () => this.renderRecallOnly();
     let pending = true;
     if (input.showBusy !== false) {
+      this.clearRecallMessageTimer();
       this.state = reducePanelAction(this.state, { name: 'recall/load-start' });
       if (this.isRecallOpening()) {
         void this.waitForRecallOpening().then(() => {
@@ -325,6 +337,7 @@ export class ImageTrailPanel {
     pending = false;
     await this.waitForRecallOpening();
     if (!result.ok) {
+      this.clearRecallMessageTimer();
       if (result.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
       this.state = reducePanelAction(this.state, { name: 'recall/error', message: result.message });
       renderUpdatedRecall();
@@ -341,6 +354,7 @@ export class ImageTrailPanel {
       failedCount: result.failedCount,
       message: result.message,
     });
+    this.scheduleRecallMessageClear(result.message);
     renderUpdatedRecall();
   }
 
@@ -361,6 +375,21 @@ export class ImageTrailPanel {
       append: false,
       showBusy: false,
     });
+  }
+
+  private scheduleRecallMessageClear(message: string): void {
+    this.clearRecallMessageTimer();
+    this.recallMessageClearTimer = window.setTimeout(() => {
+      this.recallMessageClearTimer = null;
+      this.state = reducePanelAction(this.state, { name: 'recall/message-clear', message });
+      this.renderRecallOnly();
+    }, RECALL_SUCCESS_MESSAGE_MS);
+  }
+
+  private clearRecallMessageTimer(): void {
+    if (this.recallMessageClearTimer === null) return;
+    window.clearTimeout(this.recallMessageClearTimer);
+    this.recallMessageClearTimer = null;
   }
 
   private renderPanelAndRefreshRecall(): void {
@@ -481,15 +510,17 @@ export class ImageTrailPanel {
 
     if (action.name === 'recall/open') {
       if (this.state.recall.open) {
+        this.clearRecallMessageTimer();
         this.state = reducePanelAction(this.state, { name: 'recall/close' });
         this.render();
         return;
       }
-      this.openRecallDrawer();
+      void this.openRecallDrawer();
       return;
     }
 
     if (action.name === 'recall/close') {
+      this.clearRecallMessageTimer();
       this.state = reducePanelAction(this.state, action);
       this.render();
       return;
@@ -1772,7 +1803,6 @@ export class ImageTrailPanel {
       this.recallRoot.className = 'image-trail-panel-recall-root';
       shadow.replaceChildren(link, this.root, this.recallRoot);
       (document.body ?? document.documentElement).append(host);
-      void this.restorePanelPosition();
     }
   }
 
@@ -1790,6 +1820,8 @@ export class ImageTrailPanel {
         this.state,
         { renderRecall: options.includeRecall !== false },
       );
+      this.queuePanelPositionRestore();
+      this.applyRestoredPanelPosition();
     }
   }
 
@@ -1808,15 +1840,37 @@ export class ImageTrailPanel {
     );
   }
 
+  private async ensurePanelPositionRestored(): Promise<void> {
+    if (!this.root) return;
+    this.panelPositionRestorePromise ??= this.restorePanelPosition();
+    await this.panelPositionRestorePromise;
+  }
+
+  private queuePanelPositionRestore(): void {
+    if (!this.root || this.panelPositionRestored || this.panelPositionRestorePromise) return;
+    this.panelPositionRestorePromise = this.restorePanelPosition();
+  }
+
   private async restorePanelPosition(): Promise<void> {
     if (!this.root || !this.panelPositionStore || this.panelPositionRestored) return;
-    this.panelPositionRestored = true;
-    const hostname = hostnameFromLocation();
-    if (!hostname) return;
-    const saved = await this.panelPositionStore.load(hostname);
-    if (!saved || !this.root) return;
-    this.applyPanelPosition(this.clampPanelPosition(saved));
-    this.renderRecallOnly();
+    try {
+      const hostname = hostnameFromLocation();
+      if (!hostname) return;
+      const saved = await this.panelPositionStore.load(hostname);
+      if (!saved || !this.root) return;
+      await this.waitForPanelLayout();
+      if (!this.root) return;
+      this.restoredPanelPosition = this.clampPanelPosition(saved);
+      this.applyRestoredPanelPosition();
+      this.renderRecallOnly();
+    } finally {
+      this.panelPositionRestored = true;
+    }
+  }
+
+  private async waitForPanelLayout(): Promise<void> {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }
 
   private handlePanelDragStart = (event: PointerEvent): void => {
@@ -1834,6 +1888,7 @@ export class ImageTrailPanel {
         top: startRect.top + moveEvent.clientY - startY,
       });
       this.applyPanelPosition(latest);
+      this.restoredPanelPosition = latest;
       this.renderRecallOnly();
     };
 
@@ -1864,6 +1919,11 @@ export class ImageTrailPanel {
     this.root.style.left = `${Math.round(position.left)}px`;
     this.root.style.top = `${Math.round(position.top)}px`;
     this.root.style.right = 'auto';
+  }
+
+  private applyRestoredPanelPosition(): void {
+    if (!this.restoredPanelPosition) return;
+    this.applyPanelPosition(this.restoredPanelPosition);
   }
 
   private async savePanelPosition(position: PanelPosition): Promise<void> {

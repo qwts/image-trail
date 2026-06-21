@@ -328,6 +328,30 @@ test('recall drawer appends paged candidates without duplicating rows', () => {
   assert.equal(appended.recall.hasMore, false);
 });
 
+test('recall message clear restores default instructions without clearing errors', () => {
+  const loaded = reducePanelAction(createInitialPanelState(), {
+    name: 'recall/load-complete',
+    candidates: [],
+    append: false,
+    offset: 30,
+    nextOffset: 30,
+    hasMore: false,
+    total: 0,
+    failedCount: 0,
+    message: 'Loaded 0 recall records.',
+  });
+
+  const staleClear = reducePanelAction(loaded, { name: 'recall/message-clear', message: 'Loaded 1 recall record.' });
+  const cleared = reducePanelAction(loaded, { name: 'recall/message-clear', message: 'Loaded 0 recall records.' });
+  const errored = reducePanelAction(loaded, { name: 'recall/error', message: 'Recall failed.' });
+  const errorClear = reducePanelAction(errored, { name: 'recall/message-clear', message: 'Recall failed.' });
+
+  assert.equal(staleClear.recall.message, 'Loaded 0 recall records.');
+  assert.equal(cleared.recall.message, undefined);
+  assert.equal(errorClear.recall.message, 'Recall failed.');
+  assert.equal(errorClear.recall.messageIsError, true);
+});
+
 test('recall completion clears drawer state without mutating visible recents directly', () => {
   const baseHistory = [
     {
