@@ -22,6 +22,8 @@ import {
   createImportEncryptedImageResultMessage,
   createLoadBookmarksMessage,
   createLoadBookmarksResultMessage,
+  createLoadPanelPositionMessage,
+  createLoadPanelPositionResultMessage,
   createLoadRecallCandidatesMessage,
   createLoadRecallCandidatesResultMessage,
   createAddRecentHistoryMessage,
@@ -39,6 +41,8 @@ import {
   createRetrieveBlobResultMessage,
   createSaveBookmarkMessage,
   createSaveBookmarkResultMessage,
+  createSavePanelPositionMessage,
+  createSavePanelPositionResultMessage,
   createStatusMessage,
   createStorageUsageRequestMessage,
   createStorageUsageResponseMessage,
@@ -54,6 +58,7 @@ import {
   isImportBlobKeyBackupResultMessage,
   isImportEncryptedImageResultMessage,
   isLoadBookmarksResultMessage,
+  isLoadPanelPositionResultMessage,
   isLoadRecallCandidatesResultMessage,
   isAddRecentHistoryResultMessage,
   isLoadRecentHistoryResultMessage,
@@ -62,6 +67,7 @@ import {
   isRemoveRecentHistoryResultMessage,
   isRetrieveBlobResultMessage,
   isSaveBookmarkResultMessage,
+  isSavePanelPositionResultMessage,
   isStatusMessage,
 } from '../extension/src/background/messages.js';
 
@@ -96,6 +102,24 @@ test('creates capture image request messages with correct structure', () => {
   const withId = createCaptureImageMessage('https://example.com/img.png', 'history', 'record-42');
   assert.equal(withId.payload.sourceRecordId, 'record-42');
   assert.equal(withId.payload.sourceType, 'history');
+});
+
+test('creates panel position messages', () => {
+  const load = createLoadPanelPositionMessage('example.test');
+  const loadResult = createLoadPanelPositionResultMessage({ ok: true, position: { left: 120, top: 48 } });
+  const save = createSavePanelPositionMessage('example.test', { left: 144, top: 72 });
+  const saveResult = createSavePanelPositionResultMessage({ ok: true });
+
+  assert.equal(load.type, MessageType.LoadPanelPosition);
+  assert.equal(load.payload.hostname, 'example.test');
+  assert.equal(isExtensionRequest(load), true);
+  assert.equal(isExtensionResponse(loadResult), true);
+  assert.equal(isLoadPanelPositionResultMessage(loadResult), true);
+  assert.equal(save.type, MessageType.SavePanelPosition);
+  assert.deepEqual(save.payload.position, { left: 144, top: 72 });
+  assert.equal(isExtensionRequest(save), true);
+  assert.equal(isExtensionResponse(saveResult), true);
+  assert.equal(isSavePanelPositionResultMessage(saveResult), true);
 });
 
 test('recognizes capture-related messages as extension requests', () => {

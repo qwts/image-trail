@@ -144,6 +144,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         title: action.title,
         timestamp: action.timestamp,
         thumbnail: action.thumbnail,
+        width: action.width,
+        height: action.height,
         source: 'history',
       });
       const history = [item, ...state.history.filter((entry) => entry.url !== item.url && entry.id !== item.id)].slice(0, 30);
@@ -302,6 +304,13 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return {
         ...state,
         selectedBookmarkIds: toggleItem(state.selectedBookmarkIds, action.id),
+        selectedHistoryIds: [],
+        lastUpdatedAt: Date.now(),
+      };
+    case 'bookmark-selection/single':
+      return {
+        ...state,
+        selectedBookmarkIds: [action.id],
         selectedHistoryIds: [],
         lastUpdatedAt: Date.now(),
       };

@@ -20,6 +20,7 @@ export interface PanelRenderTarget {
   readonly dispatch: (action: PanelAction) => void;
   readonly layoutState: PanelLayoutState;
   readonly scrollAnchorId?: string | null;
+  readonly onPanelDragStart?: (event: PointerEvent) => void;
 }
 
 export interface PanelLayoutState {
@@ -219,7 +220,11 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
   const isNoTarget = !state.target.selectedUrl;
 
   const heading = document.createElement('h2');
+  heading.className = 'image-trail-panel__title';
   heading.textContent = 'Image Trail';
+  if (target.onPanelDragStart) {
+    heading.addEventListener('pointerdown', target.onPanelDragStart);
+  }
 
   const captureSection = document.createElement('div');
   captureSection.className = 'image-trail-panel__capture-actions';

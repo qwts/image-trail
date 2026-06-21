@@ -1,10 +1,7 @@
-import {
-  displayTitleForRecord,
-  imageExtensionFromUrl,
-  normalizeDisplayLabel,
-  type ImageDisplayRecord,
-} from '../../core/display-records.js';
+import { imageExtensionFromUrl, type ImageDisplayRecord } from '../../core/display-records.js';
 import type { PanelAction, RecallDrawerSide, RecallState } from '../../core/types.js';
+import { createExtensionIndicator } from './bookmarks-view.js';
+import { recordDisplayName, recordMetadataText, recordTitle } from './record-metadata.js';
 
 export interface RecallDrawerGeometry {
   readonly side: RecallDrawerSide;
@@ -152,14 +149,15 @@ function createRecallLabel(record: ImageDisplayRecord): HTMLElement {
 
   const name = document.createElement('span');
   name.className = 'image-trail-panel__recall-name';
-  name.textContent = normalizeDisplayLabel(record);
-  name.title = displayTitleForRecord(record);
+  name.textContent = recordDisplayName(record);
+  name.title = recordTitle(record);
 
   const meta = document.createElement('span');
   meta.className = 'image-trail-panel__recall-row-meta';
-  meta.textContent = `${new Date(record.timestamp).toLocaleString()}${record.storedOriginal ? ' - captured' : ''}`;
+  meta.textContent = recordMetadataText(record);
+  meta.title = meta.textContent;
 
-  wrapper.append(name, meta);
+  wrapper.append(createExtensionIndicator(record), name, meta);
   return wrapper;
 }
 

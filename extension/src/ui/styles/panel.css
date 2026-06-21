@@ -119,6 +119,16 @@
     sans-serif;
 }
 
+.image-trail-panel-root .image-trail-panel__title {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.image-trail-panel-root .image-trail-panel__title:active {
+  cursor: grabbing;
+}
+
 .image-trail-panel-root h3 {
   margin: 0;
   color: #ddd;
@@ -991,8 +1001,15 @@
 
 .image-trail-panel-root .image-trail-panel__recall-label {
   display: grid;
-  gap: 1px;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 7px;
   min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__recall-label .image-trail-panel__record-row-meta,
+.image-trail-panel-root .image-trail-panel__recall-label .image-trail-panel__recall-row-meta {
+  grid-column: 2;
 }
 
 .image-trail-panel-root .image-trail-panel__recall-name {
@@ -1040,11 +1057,7 @@
 }
 
 .image-trail-panel-root .image-trail-panel__record-list li.is-captured {
-  border-color: rgb(89 255 178 / 28%);
-  background: linear-gradient(135deg, rgb(89 255 178 / 5%), transparent 45%), rgb(8 28 18 / 24%);
-  box-shadow:
-    0 0 0 1px rgb(89 255 178 / 8%),
-    0 0 10px rgb(89 255 178 / 10%);
+  border-top-color: rgb(255 255 255 / 12%);
 }
 
 .image-trail-panel-root .image-trail-panel__record-list li.is-selected {
@@ -1174,6 +1187,13 @@
   padding: 4px 0;
 }
 
+.image-trail-panel-root .image-trail-panel__record-extension-wrap {
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
 .image-trail-panel-root .image-trail-panel__bookmark-source {
   max-width: 72px;
   overflow: hidden;
@@ -1193,9 +1213,34 @@
   white-space: nowrap;
 }
 
+.image-trail-panel-root .image-trail-panel__stored-original-dot {
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 35%),
+    0 0 6px rgb(255 255 255 / 70%);
+}
+
 .image-trail-panel-root .image-trail-panel__bookmark-name {
   min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__record-row-meta {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  color: #999;
+  font:
+    10px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

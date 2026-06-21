@@ -60,6 +60,8 @@ export interface DurableBookmarkPayloadV1 {
   readonly title?: string;
   readonly label?: string;
   readonly thumbnail?: string;
+  readonly width?: number;
+  readonly height?: number;
   readonly bookmarkedAt: string;
   readonly downloadedAt?: string;
   readonly capturedAt?: string;

@@ -1,16 +1,12 @@
-import {
-  displayTitleForRecord,
-  encryptedBlobIdForRecord,
-  imageExtensionFromUrl,
-  imageExtensionFromValue,
-  type ImageDisplayRecord,
-} from '../../core/display-records.js';
+import { encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
+import { recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitle } from './record-metadata.js';
 
 type BookmarkAction =
   | { readonly name: 'bookmark/current' }
   | { readonly name: 'bookmark/load'; readonly id: string }
   | { readonly name: 'bookmark/remove'; readonly id: string }
   | { readonly name: 'bookmark-selection/toggle'; readonly id: string }
+  | { readonly name: 'bookmark-selection/single'; readonly id: string }
   | { readonly name: 'bookmark-selection/clear' }
   | { readonly name: 'bookmarks/older' }
   | { readonly name: 'bookmarks/newer' }
@@ -137,28 +133,29 @@ export function createBookmarksView(
       entry.title = 'Preview this image in the selected host image. Cmd/Ctrl-click to select for export.';
       entry.addEventListener('click', (event) => {
         if (isMultiSelectClick(event)) return;
-        if (selectedIds.length > 0) dispatch({ name: 'bookmark-selection/clear' });
+        dispatch({ name: 'bookmark-selection/single', id: item.id });
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId, scrollAnchorId: `bookmark:${item.id}` });
       });
       entry.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
-        if (selectedIds.length > 0) dispatch({ name: 'bookmark-selection/clear' });
+        dispatch({ name: 'bookmark-selection/single', id: item.id });
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId, scrollAnchorId: `bookmark:${item.id}` });
       });
     }
     const visual = createRecordVisual(item);
     const bookmarkLabel = document.createElement('div');
     bookmarkLabel.className = 'image-trail-panel__bookmark-label';
-    const source = document.createElement('span');
-    source.className = 'image-trail-panel__bookmark-source';
-    source.textContent = extensionLabelFor(item);
-    source.title = source.textContent;
+    const source = createExtensionIndicator(item);
     const label = document.createElement('span');
     label.className = 'image-trail-panel__bookmark-name';
-    label.textContent = item.label ?? item.url;
-    label.title = displayTitleForRecord(item);
-    bookmarkLabel.append(source, label);
+    label.textContent = recordDisplayName(item);
+    label.title = recordTitle(item);
+    const meta = document.createElement('span');
+    meta.className = 'image-trail-panel__record-row-meta';
+    meta.textContent = recordMetadataText(item);
+    meta.title = meta.textContent;
+    bookmarkLabel.append(source, label, meta);
 
     const actions = document.createElement('span');
     actions.className = 'image-trail-panel__item-actions';
@@ -227,8 +224,27 @@ function createRecordVisual(item: ImageDisplayRecord): HTMLElement {
 }
 
 export function extensionLabelFor(item: ImageDisplayRecord): string {
-  const extension = imageExtensionFromValue(item.label) ?? imageExtensionFromUrl(item.url);
-  return extension ? extension.toUpperCase() : 'IMAGE';
+  return recordExtensionLabel(item);
+}
+
+export function createExtensionIndicator(item: ImageDisplayRecord): HTMLElement {
+  const wrapper = document.createElement('span');
+  wrapper.className = 'image-trail-panel__record-extension-wrap';
+
+  const source = document.createElement('span');
+  source.className = 'image-trail-panel__bookmark-source';
+  source.textContent = extensionLabelFor(item);
+  source.title = source.textContent;
+  wrapper.append(source);
+
+  if (item.storedOriginal || item.captureStatus === 'captured') {
+    const dot = document.createElement('span');
+    dot.className = 'image-trail-panel__stored-original-dot';
+    dot.title = 'Original stored';
+    wrapper.append(dot);
+  }
+
+  return wrapper;
 }
 
 function isLockedEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked: boolean): boolean {
