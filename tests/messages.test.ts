@@ -7,6 +7,8 @@ import {
   createCaptureResultMessage,
   createDeleteBlobMessage,
   createDeleteBlobResultMessage,
+  createDownloadImageMessage,
+  createDownloadImageResultMessage,
   createFetchThumbnailSourceMessage,
   createFetchThumbnailSourceResultMessage,
   createLoadBookmarksMessage,
@@ -30,6 +32,7 @@ import {
   createTogglePanelMessage,
   createUnknownMessageResponse,
   isCaptureResultMessage,
+  isDownloadImageResultMessage,
   isExtensionRequest,
   isExtensionResponse,
   isFetchThumbnailSourceResultMessage,
@@ -82,6 +85,25 @@ test('recognizes capture-related messages as extension requests', () => {
   assert.equal(isExtensionRequest(createDeleteBlobMessage('blob-1')), true);
   assert.equal(isExtensionRequest(createRetrieveBlobMessage('blob-1')), true);
   assert.equal(isExtensionRequest(createFetchThumbnailSourceMessage('https://example.com/a.jpg')), true);
+  assert.equal(isExtensionRequest(createDownloadImageMessage('https://example.com/a.jpg', 'a.jpg', false)), true);
+});
+
+test('creates image download messages with save-as intent', () => {
+  const request = createDownloadImageMessage('https://cdn.example.com/photo.jpg', 'photo.jpg', true);
+  assert.equal(request.type, MessageType.DownloadImage);
+  assert.equal(request.payload.url, 'https://cdn.example.com/photo.jpg');
+  assert.equal(request.payload.fileName, 'photo.jpg');
+  assert.equal(request.payload.saveAs, true);
+  assert.equal(isExtensionRequest(request), true);
+
+  const success = createDownloadImageResultMessage({ ok: true, downloadId: 42 });
+  assert.equal(success.type, MessageType.DownloadImageResult);
+  assert.equal(isExtensionResponse(success), true);
+  assert.equal(isDownloadImageResultMessage(success), true);
+
+  const failure = createDownloadImageResultMessage({ ok: false, message: 'Nope.' });
+  assert.equal(failure.payload.ok, false);
+  assert.equal(isDownloadImageResultMessage(failure), true);
 });
 
 test('creates capture result response messages for success and failure', () => {

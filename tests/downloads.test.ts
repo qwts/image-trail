@@ -7,6 +7,7 @@ import {
   findDownloadDuplicate,
   normalizeAbsoluteUrl,
   sanitizeFilename,
+  selectImageDownloadUrls,
 } from '../extension/src/core/image/downloads.js';
 
 const HASH_A = 'a'.repeat(64);
@@ -47,4 +48,40 @@ test('findDownloadDuplicate falls back to exact URL and ignores bogus fingerprin
   assert.equal(findDownloadDuplicate(records, { sourceUrl: 'https://example.test/other.jpg', fingerprint: 'not-a-real-hash' }), null);
   const duplicate = findDownloadDuplicate(records, { sourceUrl: 'https://example.test/a.jpg', fingerprint: 'not-a-real-hash' });
   assert.equal(duplicate?.matchedBy, 'url');
+});
+
+test('selectImageDownloadUrls prioritizes selected history and bookmarks before fallbacks', () => {
+  const history = [
+    { id: 'h1', url: 'https://example.test/history-1.jpg' },
+    { id: 'h2', url: 'https://example.test/history-2.jpg' },
+  ];
+  const bookmarks = [
+    { id: 'b1', url: 'https://example.test/bookmark-1.jpg' },
+    { id: 'b2', url: 'https://example.test/bookmark-2.jpg' },
+  ];
+
+  assert.deepEqual(
+    selectImageDownloadUrls({
+      history,
+      bookmarks,
+      selectedHistoryIds: ['h2'],
+      selectedBookmarkIds: ['b1'],
+      currentImageUrl: 'https://example.test/current.jpg',
+    }),
+    ['https://example.test/history-2.jpg'],
+  );
+  assert.deepEqual(
+    selectImageDownloadUrls({
+      history,
+      bookmarks,
+      selectedHistoryIds: [],
+      selectedBookmarkIds: ['b2', 'b1'],
+      currentImageUrl: 'https://example.test/current.jpg',
+    }),
+    ['https://example.test/bookmark-1.jpg', 'https://example.test/bookmark-2.jpg'],
+  );
+  assert.deepEqual(
+    selectImageDownloadUrls({ history, bookmarks, selectedHistoryIds: [], selectedBookmarkIds: [], currentImageUrl: null }),
+    ['https://example.test/history-1.jpg'],
+  );
 });

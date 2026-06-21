@@ -18,6 +18,7 @@ import {
   createCleanupOrphanedBlobsResultMessage,
   createCreateBlobPreviewResultMessage,
   createDeleteBlobResultMessage,
+  createDownloadImageResultMessage,
   createFetchThumbnailSourceResultMessage,
   createLoadBookmarksResultMessage,
   createAddRecentHistoryResultMessage,
@@ -33,7 +34,13 @@ import {
   isExtensionRequest,
   isStatusMessage,
 } from './messages.js';
-import type { CaptureImageMessage, DeleteBlobMessage, RetrieveBlobMessage, GrantPermissionAndCaptureMessage } from './messages.js';
+import type {
+  CaptureImageMessage,
+  DeleteBlobMessage,
+  DownloadImageMessage,
+  RetrieveBlobMessage,
+  GrantPermissionAndCaptureMessage,
+} from './messages.js';
 import type { LoadBookmarksMessage, RemoveBookmarkMessage, SaveBookmarkMessage } from './messages.js';
 import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHistoryMessage } from './messages.js';
 import type { FetchThumbnailSourceMessage } from './messages.js';
@@ -440,6 +447,23 @@ async function handleGrantPermissionAndCapture(
   return handleCaptureImage(createCaptureImageMessage(url, sourceType, sourceRecordId));
 }
 
+async function handleDownloadImage(message: DownloadImageMessage): Promise<import('./messages.js').DownloadImageResultMessage['payload']> {
+  try {
+    const downloadId = await chrome.downloads.download({
+      url: message.payload.url,
+      filename: message.payload.fileName,
+      saveAs: message.payload.saveAs,
+      conflictAction: 'uniquify',
+    });
+    return { ok: true, downloadId };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Image download could not be started.',
+    };
+  }
+}
+
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   if (!isExtensionRequest(message)) return false;
 
@@ -448,6 +472,12 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleCaptureImage(message)
         .then((result) => sendResponse(createCaptureResultMessage(result)))
         .catch(() => sendResponse(createCaptureResultMessage({ status: 'failed', reason: 'unknown', message: 'Internal capture error.' })));
+      return true;
+
+    case MessageType.DownloadImage:
+      handleDownloadImage(message)
+        .then((result) => sendResponse(createDownloadImageResultMessage(result)))
+        .catch(() => sendResponse(createDownloadImageResultMessage({ ok: false, message: 'Image download could not be started.' })));
       return true;
 
     case MessageType.StorageUsageRequest:
