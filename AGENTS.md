@@ -57,7 +57,7 @@
 ## GitHub And Wiki Operations
 
 - Normal developer-flow git commands, GitHub issue/PR updates, and GitHub wiki edits are authorized by the CODEOWNER and user when they are requested, advised, or necessary to complete the tracked work.
-- Before starting implementation from a GitHub issue, check the issue for an existing active claim/in-progress note. If it is unclaimed, update the issue by assignment, label/status change, or a short comment so parallel agents do not duplicate the work.
+- Before starting implementation from a GitHub issue, check the issue for an existing active claim/in-progress note. If it is unclaimed, prefer assigning the active developer/agent when possible. If assignment is unavailable or unclear, prefix the issue title with `[WIP]` and add a short claim comment naming the branch or planned work. Remove `[WIP]` when the work merges or is abandoned.
 - When opening a PR for tracked issue work, link the issue in the PR body with an explicit close/fix reference when the PR is intended to complete it. After merge, verify the issue actually closed; if automation missed it, close the issue with a comment naming the merged PR.
 - When a change request, follow-up, known bug, or deferred improvement is discovered, capture it as a GitHub issue or documented project note so it can be tracked and resolved in future work.
 - Keep GitHub and wiki writes scoped to the current task. Do not close issues, resolve review threads, merge PRs, or make broad project-management changes unless the user explicitly asks.

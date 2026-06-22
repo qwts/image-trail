@@ -80,9 +80,10 @@ human contributors, plus these extra rules:
 - Start from a clean branch off the intended base branch unless the user explicitly
   asks to continue an existing branch.
 - Before starting implementation from a GitHub issue, check whether another agent
-  or developer has already claimed it. If it is unclaimed, mark it as claimed or
-  in progress by assignment, label/status change, or a short comment so parallel
-  agents know the work is underway.
+  or developer has already claimed it. If it is unclaimed, prefer assigning the
+  active developer/agent when possible. If assignment is unavailable or unclear,
+  prefix the issue title with `[WIP]` and add a short claim comment naming the
+  branch or planned work. Remove `[WIP]` when the work merges or is abandoned.
 - Do not merge unrelated user changes into the task. If the worktree is dirty,
   inspect it and preserve user work.
 - Verify before claiming success. At minimum run the same gate CI runs: lint,
