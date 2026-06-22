@@ -36,6 +36,12 @@ export class PanelPositionRepository {
     transaction.objectStore(DataStore.Metadata).put(record);
     await transactionDone(transaction);
   }
+
+  async delete(hostname: string): Promise<void> {
+    const transaction = this.db.transaction(DataStore.Metadata, 'readwrite');
+    transaction.objectStore(DataStore.Metadata).delete(panelPositionKey(hostname));
+    await transactionDone(transaction);
+  }
 }
 
 function panelPositionKey(hostname: string): string {

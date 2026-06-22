@@ -35,6 +35,7 @@ import {
   createImportEncryptedImageResultMessage,
   createLoadBookmarksResultMessage,
   createAddRecentHistoryResultMessage,
+  createDeletePanelPositionResultMessage,
   createLoadRecentHistoryResultMessage,
   createLoadRecallCandidatesResultMessage,
   createLoadPanelPositionResultMessage,
@@ -81,7 +82,7 @@ import type {
 } from './messages.js';
 import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHistoryMessage } from './messages.js';
 import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messages.js';
-import type { LoadPanelPositionMessage, SavePanelPositionMessage } from './messages.js';
+import type { DeletePanelPositionMessage, LoadPanelPositionMessage, SavePanelPositionMessage } from './messages.js';
 import type {
   DeleteGrabSourcePatternMessage,
   DeleteUrlTemplateMessage,
@@ -541,6 +542,15 @@ async function handleSavePanelPosition(
   const hostname = normalizeHostname(message.payload.hostname);
   if (!hostname) return { ok: false };
   await panelPositionStore.save(hostname, message.payload.position);
+  return { ok: true };
+}
+
+async function handleDeletePanelPosition(
+  message: DeletePanelPositionMessage,
+): Promise<import('./messages.js').DeletePanelPositionResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.hostname);
+  if (!hostname) return { ok: false };
+  await panelPositionStore.remove(hostname);
   return { ok: true };
 }
 
@@ -1079,6 +1089,12 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleSavePanelPosition(message)
         .then((result) => sendResponse(createSavePanelPositionResultMessage(result)))
         .catch(() => sendResponse(createSavePanelPositionResultMessage({ ok: false })));
+      return true;
+
+    case MessageType.DeletePanelPosition:
+      handleDeletePanelPosition(message)
+        .then((result) => sendResponse(createDeletePanelPositionResultMessage(result)))
+        .catch(() => sendResponse(createDeletePanelPositionResultMessage({ ok: false })));
       return true;
 
     case MessageType.ListUrlTemplates:

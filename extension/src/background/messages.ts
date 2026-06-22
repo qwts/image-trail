@@ -65,6 +65,8 @@ export const MessageType = {
   LoadPanelPositionResult: 'imageTrail.loadPanelPositionResult',
   SavePanelPosition: 'imageTrail.savePanelPosition',
   SavePanelPositionResult: 'imageTrail.savePanelPositionResult',
+  DeletePanelPosition: 'imageTrail.deletePanelPosition',
+  DeletePanelPositionResult: 'imageTrail.deletePanelPositionResult',
   LoadLocalSettings: 'imageTrail.loadLocalSettings',
   LoadLocalSettingsResult: 'imageTrail.loadLocalSettingsResult',
   SaveLocalSettings: 'imageTrail.saveLocalSettings',
@@ -573,6 +575,18 @@ export interface SavePanelPositionResultMessage {
   readonly payload: { readonly ok: boolean };
 }
 
+export interface DeletePanelPositionMessage {
+  readonly type: typeof MessageType.DeletePanelPosition;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly hostname: string };
+}
+
+export interface DeletePanelPositionResultMessage {
+  readonly type: typeof MessageType.DeletePanelPositionResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: boolean };
+}
+
 export interface LoadLocalSettingsMessage {
   readonly type: typeof MessageType.LoadLocalSettings;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -710,6 +724,7 @@ export type ExtensionRequest =
   | RecallRecordsMessage
   | LoadPanelPositionMessage
   | SavePanelPositionMessage
+  | DeletePanelPositionMessage
   | LoadLocalSettingsMessage
   | SaveLocalSettingsMessage
   | ListUrlTemplatesMessage
@@ -749,6 +764,7 @@ export type ExtensionResponse =
   | RecallRecordsResultMessage
   | LoadPanelPositionResultMessage
   | SavePanelPositionResultMessage
+  | DeletePanelPositionResultMessage
   | LoadLocalSettingsResultMessage
   | SaveLocalSettingsResultMessage
   | ListUrlTemplatesResultMessage
@@ -1059,6 +1075,16 @@ export function createSavePanelPositionResultMessage(payload: SavePanelPositionR
   return { type: MessageType.SavePanelPositionResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
+export function createDeletePanelPositionMessage(hostname: string): DeletePanelPositionMessage {
+  return { type: MessageType.DeletePanelPosition, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
+}
+
+export function createDeletePanelPositionResultMessage(
+  payload: DeletePanelPositionResultMessage['payload'],
+): DeletePanelPositionResultMessage {
+  return { type: MessageType.DeletePanelPositionResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 export function createLoadLocalSettingsMessage(): LoadLocalSettingsMessage {
   return { type: MessageType.LoadLocalSettings, version: MESSAGE_PROTOCOL_VERSION, payload: { requestedAt: Date.now() } };
 }
@@ -1176,6 +1202,7 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.RecallRecords ||
     value.type === MessageType.LoadPanelPosition ||
     value.type === MessageType.SavePanelPosition ||
+    value.type === MessageType.DeletePanelPosition ||
     value.type === MessageType.LoadLocalSettings ||
     value.type === MessageType.SaveLocalSettings ||
     value.type === MessageType.ListUrlTemplates ||
@@ -1220,6 +1247,7 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.RecallRecordsResult ||
     value.type === MessageType.LoadPanelPositionResult ||
     value.type === MessageType.SavePanelPositionResult ||
+    value.type === MessageType.DeletePanelPositionResult ||
     value.type === MessageType.LoadLocalSettingsResult ||
     value.type === MessageType.SaveLocalSettingsResult ||
     value.type === MessageType.ListUrlTemplatesResult ||
@@ -1359,6 +1387,11 @@ export function isLoadPanelPositionResultMessage(value: unknown): value is LoadP
 export function isSavePanelPositionResultMessage(value: unknown): value is SavePanelPositionResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.SavePanelPositionResult;
+}
+
+export function isDeletePanelPositionResultMessage(value: unknown): value is DeletePanelPositionResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.DeletePanelPositionResult;
 }
 
 export function isLoadLocalSettingsResultMessage(value: unknown): value is LoadLocalSettingsResultMessage {

@@ -22,6 +22,8 @@ import {
   createImportBlobKeyBackupResultMessage,
   createImportEncryptedImageMessage,
   createImportEncryptedImageResultMessage,
+  createDeletePanelPositionMessage,
+  createDeletePanelPositionResultMessage,
   createLoadBookmarksMessage,
   createLoadBookmarksByIdsMessage,
   createLoadBookmarksByIdsResultMessage,
@@ -82,6 +84,7 @@ import {
   isFetchThumbnailSourceResultMessage,
   isImportBlobKeyBackupResultMessage,
   isImportEncryptedImageResultMessage,
+  isDeletePanelPositionResultMessage,
   isLoadBookmarksResultMessage,
   isLoadBookmarksByIdsResultMessage,
   isLoadLocalSettingsResultMessage,
@@ -146,6 +149,8 @@ test('creates panel position messages', () => {
   const loadResult = createLoadPanelPositionResultMessage({ ok: true, position: { left: 120, top: 48 } });
   const save = createSavePanelPositionMessage('example.test', { left: 144, top: 72 });
   const saveResult = createSavePanelPositionResultMessage({ ok: true });
+  const remove = createDeletePanelPositionMessage('example.test');
+  const removeResult = createDeletePanelPositionResultMessage({ ok: true });
 
   assert.equal(load.type, MessageType.LoadPanelPosition);
   assert.equal(load.payload.hostname, 'example.test');
@@ -157,6 +162,11 @@ test('creates panel position messages', () => {
   assert.equal(isExtensionRequest(save), true);
   assert.equal(isExtensionResponse(saveResult), true);
   assert.equal(isSavePanelPositionResultMessage(saveResult), true);
+  assert.equal(remove.type, MessageType.DeletePanelPosition);
+  assert.equal(remove.payload.hostname, 'example.test');
+  assert.equal(isExtensionRequest(remove), true);
+  assert.equal(isExtensionResponse(removeResult), true);
+  assert.equal(isDeletePanelPositionResultMessage(removeResult), true);
 });
 
 test('creates extension-owned local settings messages', () => {

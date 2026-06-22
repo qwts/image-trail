@@ -1286,6 +1286,9 @@ test('PanelPositionRepository saves positions per hostname', async (t) => {
   assert.deepEqual(await repository.get('example.test'), { left: 120, top: 48 });
   assert.deepEqual(await repository.get('other.test'), { left: 24, top: 36 });
   assert.equal(await repository.get('missing.test'), null);
+  await repository.delete('example.test');
+  assert.equal(await repository.get('example.test'), null);
+  assert.deepEqual(await repository.get('other.test'), { left: 24, top: 36 });
 });
 
 test('UrlTemplateRepository saves templates per hostname', async (t) => {

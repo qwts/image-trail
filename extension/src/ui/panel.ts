@@ -736,6 +736,11 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'settings/reset-panel-position') {
+      void this.resetPanelPosition();
+      return;
+    }
+
     if (action.name === 'settings/toggle') {
       this.state = reducePanelAction(this.state, action);
       this.render();
@@ -2342,9 +2347,9 @@ export class ImageTrailPanel {
       const hostname = hostnameFromLocation();
       if (!hostname) return;
       const saved = await this.panelPositionStore.load(hostname);
-      if (!saved || !this.root) return;
+      if (!saved || !this.isPanelPositionRestoreCurrent(attempt)) return;
       await this.waitForPanelLayout();
-      if (!this.root) return;
+      if (!this.isPanelPositionRestoreCurrent(attempt)) return;
       this.restoredPanelPosition = this.clampPanelPosition(saved);
       this.applyRestoredPanelPosition();
       this.renderRecallOnly();
@@ -2353,6 +2358,10 @@ export class ImageTrailPanel {
         this.panelPositionRestored = true;
       }
     }
+  }
+
+  private isPanelPositionRestoreCurrent(attempt: number): boolean {
+    return Boolean(this.root) && this.panelPositionRestoreAttempt === attempt && !this.panelPositionRestored;
   }
 
   private async waitForPanelLayout(): Promise<void> {
@@ -2408,6 +2417,13 @@ export class ImageTrailPanel {
     this.root.style.right = 'auto';
   }
 
+  private clearPanelPosition(): void {
+    if (!this.root) return;
+    this.root.style.removeProperty('left');
+    this.root.style.removeProperty('top');
+    this.root.style.removeProperty('right');
+  }
+
   private applyRestoredPanelPosition(): void {
     if (!this.restoredPanelPosition) return;
     this.applyPanelPosition(this.restoredPanelPosition);
@@ -2418,6 +2434,20 @@ export class ImageTrailPanel {
     const hostname = hostnameFromLocation();
     if (!hostname) return;
     await this.panelPositionStore.save(hostname, position);
+  }
+
+  private async resetPanelPosition(): Promise<void> {
+    const hostname = hostnameFromLocation();
+    if (!hostname) return;
+    this.panelPositionRestoreAttempt += 1;
+    this.panelPositionRestorePromise = null;
+    await this.panelPositionStore?.remove(hostname);
+    this.restoredPanelPosition = null;
+    this.panelPositionRestored = true;
+    this.clearPanelPosition();
+    this.state = { ...this.state, message: 'Panel position reset for this site.', status: 'ready', lastUpdatedAt: Date.now() };
+    this.render();
+    this.renderRecallOnly();
   }
 }
 

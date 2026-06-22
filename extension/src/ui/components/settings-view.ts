@@ -82,6 +82,7 @@ export function createSettingsView(
     form,
     createPrivatePinSettingsView(privatePinState, dispatch),
     createPrivacySettingsView(privacyModeEnabled, dispatch),
+    createPanelLayoutSettingsView(dispatch),
     createDestructiveSettingsView(destructiveState, dispatch),
     createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
     createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),
@@ -159,6 +160,26 @@ function privatePinSettingsMessage(state: {
   if (state.blobKeyUnlocked) return 'New pins save encrypted while encrypted storage is unlocked.';
   if (state.blobKeyAvailable) return 'New pins save plaintext until encrypted storage is unlocked.';
   return 'New pins save plaintext until encrypted storage is set up.';
+}
+
+function createPanelLayoutSettingsView(dispatch: (action: PanelAction) => void): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'Panel layout';
+
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.textContent = 'Reset panel position';
+  reset.addEventListener('click', () => dispatch({ name: 'settings/reset-panel-position' }));
+
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__settings-empty';
+  meta.textContent = 'Clears the saved position for this site and returns the panel to its default placement.';
+
+  wrapper.append(heading, reset, meta);
+  return wrapper;
 }
 
 function createDestructiveSettingsView(

@@ -18,6 +18,11 @@ export class IndexedDbPanelPositionStore implements PanelPositionStore {
     await context?.repository.put(hostname, position);
   }
 
+  async remove(hostname: string): Promise<void> {
+    const context = await this.openContext();
+    await context?.repository.delete(hostname);
+  }
+
   async close(): Promise<void> {
     const context = await this.ready;
     context?.db.close();

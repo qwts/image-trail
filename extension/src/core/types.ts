@@ -49,6 +49,7 @@ export interface PanelPosition {
 export interface PanelPositionStore {
   load(hostname: string): Promise<PanelPosition | null>;
   save(hostname: string, position: PanelPosition): Promise<void>;
+  remove(hostname: string): Promise<void>;
 }
 
 export interface UrlTemplateStore {
@@ -168,6 +169,7 @@ export type PanelActionName =
   | 'settings/update-visible-bookmark-soft-max'
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
+  | 'settings/reset-panel-position'
   | 'url-templates/load'
   | 'url-template/remove'
   | 'url-template/update-settings'
