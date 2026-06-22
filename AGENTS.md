@@ -57,8 +57,27 @@
 ## GitHub And Wiki Operations
 
 - Normal developer-flow git commands, GitHub issue/PR updates, and GitHub wiki edits are authorized by the CODEOWNER and user when they are requested, advised, or necessary to complete the tracked work.
-- Before starting implementation from a GitHub issue, check the issue for an existing active claim/in-progress note. If it is unclaimed, prefer assigning the active developer/agent when possible. If assignment is unavailable or unclear, prefix the issue title with `[WIP]` and add a short claim comment naming the branch or planned work. Remove `[WIP]` when the work merges or is abandoned.
-- When opening a PR for tracked issue work, link the issue in the PR body with an explicit close/fix reference when the PR is intended to complete it. After merge, verify the issue actually closed; if automation missed it, close the issue with a comment naming the merged PR.
+- Before starting implementation from a GitHub issue, claim the issue as the first write. Check for an active claim signal first: `[WIP]` in the title, an assignee, an in-progress/status label, an open linked PR, or a recent claim comment. Treat any active claim as a stop sign and ask before taking over.
+- If the issue is unclaimed, prefer assigning the active developer/agent when possible. If assignment is unavailable or unclear, prefix the issue title with `[WIP]` and add a claim comment before branch work begins:
+
+  ```md
+  Claiming this for implementation.
+
+  Branch: `codex/<branch-name>`
+  Scope: <one sentence>
+  Expected PR: normal PR when local validation passes
+  ```
+
+- If work is abandoned before merge, release the claim with a comment and remove `[WIP]` or in-progress labels:
+  ```md
+  Releasing this claim without a PR. No remaining branch work is active from me.
+  ```
+- If work is abandoned after a PR opened, close the PR when appropriate, remove stale claim markers from the issue, and comment:
+  ```md
+  Releasing this claim after closing PR #<number>. No remaining branch work is active from me.
+  ```
+- When opening a PR for tracked issue work, link the issue in the PR body with an explicit close/fix reference when the PR is intended to complete it. The linked PR becomes the active claim signal until merge or abandonment.
+- After merge, verify the issue actually closed; if automation missed it, close the issue with a comment naming the merged PR. Remove `[WIP]` or in-progress labels if they remain.
 - When a change request, follow-up, known bug, or deferred improvement is discovered, capture it as a GitHub issue or documented project note so it can be tracked and resolved in future work.
 - Keep GitHub and wiki writes scoped to the current task. Do not close issues, resolve review threads, merge PRs, or make broad project-management changes unless the user explicitly asks.
 - Prefer durable tracking over chat-only notes for decisions or follow-ups that future engineers/models will need.

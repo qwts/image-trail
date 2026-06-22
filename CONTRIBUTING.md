@@ -79,11 +79,36 @@ human contributors, plus these extra rules:
 
 - Start from a clean branch off the intended base branch unless the user explicitly
   asks to continue an existing branch.
-- Before starting implementation from a GitHub issue, check whether another agent
-  or developer has already claimed it. If it is unclaimed, prefer assigning the
-  active developer/agent when possible. If assignment is unavailable or unclear,
-  prefix the issue title with `[WIP]` and add a short claim comment naming the
-  branch or planned work. Remove `[WIP]` when the work merges or is abandoned.
+- Before starting implementation from a GitHub issue, claim the issue as the
+  first write. Check for active claim signals first: `[WIP]` in the title, an
+  assignee, an in-progress/status label, an open linked PR, or a recent claim
+  comment. Treat any active claim as a stop sign and ask before taking over.
+- If the issue is unclaimed, prefer assigning the active developer/agent when
+  possible. If assignment is unavailable or unclear, prefix the issue title with
+  `[WIP]` and add this claim comment before branch work begins:
+
+  ```
+  Claiming this for implementation.
+
+  Branch: `codex/<branch-name>`
+  Scope: <one sentence>
+  Expected PR: normal PR when local validation passes
+  ```
+
+- If work is abandoned before merge, release the claim with a comment and remove
+  `[WIP]` or in-progress labels:
+  ```
+  Releasing this claim without a PR. No remaining branch work is active from me.
+  ```
+- If work is abandoned after a PR opened, close the PR when appropriate, remove
+  stale claim markers from the issue, and comment:
+  ```
+  Releasing this claim after closing PR #<number>. No remaining branch work is active from me.
+  ```
+- When a PR opens, link the issue with an explicit close/fix reference if the PR
+  is intended to complete it. The linked PR becomes the active claim signal until
+  merge or abandonment. After merge, verify the issue closed and remove any stale
+  `[WIP]` or in-progress markers.
 - Do not merge unrelated user changes into the task. If the worktree is dirty,
   inspect it and preserve user work.
 - Verify before claiming success. At minimum run the same gate CI runs: lint,
