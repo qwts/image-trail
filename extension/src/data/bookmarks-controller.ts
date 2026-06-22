@@ -38,6 +38,11 @@ type BookmarkContext = {
   readonly blobs: BlobsRepository;
 };
 
+interface MergedRecordsCache {
+  readonly keyReference: string;
+  readonly records: readonly ImageDisplayRecord[];
+}
+
 export interface BookmarkPage {
   readonly items: readonly ImageDisplayRecord[];
   readonly offset: number;
@@ -59,6 +64,8 @@ export interface BookmarkRecallPage {
 
 export class IndexedDbBookmarkStore implements BookmarkStore {
   private ready: Promise<BookmarkContext | null> | null = null;
+  private mergedRecordsCache: MergedRecordsCache | null = null;
+  private mergedRecordsCacheGeneration = 0;
 
   constructor(private readonly options: ProtectedBookmarkOptions = {}) {}
 
@@ -81,7 +88,8 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const visible = filterByVisibilityScope(loaded, input.scope ?? 'global', input.currentPageUrl);
     const total = visible.length;
     const clampedOffset = clampPageOffset(offset, limit, total);
-    const items = visible.slice(clampedOffset, clampedOffset + limit);
+    const pageItems = visible.slice(clampedOffset, clampedOffset + limit);
+    const items = this.options.getActiveBlobKey ? await this.loadProtectedThumbnailsForRecords(context, pageItems) : pageItems;
     return {
       items,
       offset: clampedOffset,
@@ -142,6 +150,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       indexUrl,
       existing?.queueUpdatedAt ?? bookmark.timestamp,
     );
+    this.invalidateMergedRecordsCache();
     return { ...bookmark, id: uuid, pinSaveStorage };
   }
 
@@ -163,7 +172,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     if (this.options.getActiveBlobKey) {
       const loaded = await this.loadMergedRecords(context);
       const visible = filterByVisibilityScope(loaded, input.scope ?? 'global', input.currentPageUrl);
-      const items = visible.slice(offset, offset + limit + 1);
+      const items = [...(await this.loadProtectedThumbnailsForRecords(context, visible.slice(offset, offset + limit + 1)))];
       const hasMore = items.length > limit;
       if (hasMore) items.length = limit;
       return {
@@ -217,6 +226,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       // Queue pages read queueUpdatedAt newest-first, so earlier selected IDs get later timestamps.
       uniqueIds.map((uuid, index) => ({ uuid, queueUpdatedAt: new Date(baseTime + uniqueIds.length - index).toISOString() })),
     );
+    this.invalidateMergedRecordsCache();
     if (this.options.getActiveBlobKey) {
       const protectedUpdates: Array<{ readonly id: string; readonly queueUpdatedAt: string }> = [];
       for (const update of updated) {
@@ -270,6 +280,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       await context.repository.remove(existing.uuid);
       removedCount += 1;
     }
+    if (removedCount > 0) this.invalidateMergedRecordsCache();
     return { removedCount };
   }
 
@@ -329,12 +340,15 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
     const plain = [...(await this.loadPlainRecords(context))];
     if (!activeBlobKey) return plain;
+    const keyReference = activeBlobKey.reference.reference;
+    if (this.mergedRecordsCache?.keyReference === keyReference) return this.mergedRecordsCache.records;
+    const cacheGeneration = this.mergedRecordsCacheGeneration;
 
     const byId = new Map(plain.map((record) => [record.id, record]));
     const urlToId = new Map(plain.filter((record) => record.privacyStatus !== 'locked').map((record) => [record.url, record.id]));
     for (const encrypted of await context.encryptedPins.listNewestFirst()) {
       try {
-        const display = await this.openProtectedDisplayRecord(context, encrypted, activeBlobKey);
+        const display = await this.openProtectedDisplayRecord(context, encrypted, activeBlobKey, { includeThumbnail: false });
         const duplicateId = urlToId.get(display.url);
         if (duplicateId) byId.delete(duplicateId);
         byId.set(display.id, display);
@@ -342,7 +356,11 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         // Keep the relationship row placeholder if protected metadata cannot be decrypted.
       }
     }
-    return [...byId.values()].sort((left, right) => recordQueueTime(right).localeCompare(recordQueueTime(left)));
+    const records = [...byId.values()].sort((left, right) => recordQueueTime(right).localeCompare(recordQueueTime(left)));
+    if (this.mergedRecordsCacheGeneration === cacheGeneration) {
+      this.mergedRecordsCache = { keyReference, records };
+    }
+    return records;
   }
 
   private async loadRecordsByIds(context: BookmarkContext, ids: readonly string[]): Promise<readonly ImageDisplayRecord[]> {
@@ -374,6 +392,15 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     activeBlobKey: ActiveBlobKey,
   ): Promise<ImageDisplayRecord> {
     const urlHash = await hashUrl(bookmark.url);
+    return withProtectedPinSaveLock(urlHash, () => this.saveProtectedForHash(context, bookmark, activeBlobKey, urlHash));
+  }
+
+  private async saveProtectedForHash(
+    context: BookmarkContext,
+    bookmark: ImageDisplayRecord,
+    activeBlobKey: ActiveBlobKey,
+    urlHash: string,
+  ): Promise<ImageDisplayRecord> {
     const existingProtected = await context.encryptedPins.getByUrlHash(urlHash);
     const plainPinId = existingProtected?.plainPinId ?? crypto.randomUUID();
     const existingPlain = await context.repository.getEncrypted(plainPinId);
@@ -414,11 +441,13 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         queueUpdatedAt,
       );
 
+      this.invalidateMergedRecordsCache();
       return this.openProtectedDisplayRecord(context, protectedRecord, activeBlobKey);
     } catch (error) {
       const existingThumbnailId = existingPlainPayload?.protectedPin?.encryptedThumbnailId;
       if (thumbnail?.id && thumbnail.id !== existingThumbnailId) await context.encryptedThumbnails.remove(thumbnail.id);
       if (!existingProtected) await context.encryptedPins.remove(encryptedPinId);
+      this.invalidateMergedRecordsCache();
       throw error;
     }
   }
@@ -449,9 +478,13 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     context: BookmarkContext,
     record: EncryptedPinRecord,
     activeBlobKey: ActiveBlobKey,
+    options: { readonly includeThumbnail?: boolean } = {},
   ): Promise<ImageDisplayRecord> {
     const payload = await context.encryptedPins.openRecord(record, activeBlobKey.key);
-    const thumbnail = payload.thumbnailId ? await this.openProtectedThumbnail(context, payload.thumbnailId, activeBlobKey) : undefined;
+    const thumbnail =
+      options.includeThumbnail !== false && payload.thumbnailId
+        ? await this.openProtectedThumbnail(context, payload.thumbnailId, activeBlobKey)
+        : undefined;
     const storedOriginal = payload.storedOriginal;
     return createDisplayRecord({
       id: record.plainPinId,
@@ -478,6 +511,30 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         queueUpdatedAt: record.queueUpdatedAt,
       }),
     });
+  }
+
+  private async loadProtectedThumbnailsForRecords(
+    context: BookmarkContext,
+    records: readonly ImageDisplayRecord[],
+  ): Promise<readonly ImageDisplayRecord[]> {
+    const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
+    if (!activeBlobKey) return records;
+    const loaded: ImageDisplayRecord[] = [];
+    for (const record of records) {
+      const thumbnailId = record.protectedPin?.encryptedThumbnailId;
+      if (!thumbnailId || record.thumbnail) {
+        loaded.push(record);
+        continue;
+      }
+      const thumbnail = await this.openProtectedThumbnail(context, thumbnailId, activeBlobKey).catch(() => undefined);
+      loaded.push(thumbnail ? createDisplayRecord({ ...record, thumbnail }) : record);
+    }
+    return loaded;
+  }
+
+  private invalidateMergedRecordsCache(): void {
+    this.mergedRecordsCacheGeneration += 1;
+    this.mergedRecordsCache = null;
   }
 
   private async openProtectedThumbnail(
@@ -728,6 +785,25 @@ function privatePinUrl(plainPinId: string): string {
 
 function recordQueueTime(record: ImageDisplayRecord): string {
   return record.queueUpdatedAt ?? record.timestamp;
+}
+
+const protectedPinSaveLocks = new Map<string, Promise<void>>();
+
+async function withProtectedPinSaveLock<T>(urlHash: string, work: () => Promise<T>): Promise<T> {
+  const previous = protectedPinSaveLocks.get(urlHash) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const next = previous.catch(() => undefined).then(() => current);
+  protectedPinSaveLocks.set(urlHash, next);
+  await previous.catch(() => undefined);
+  try {
+    return await work();
+  } finally {
+    release();
+    if (protectedPinSaveLocks.get(urlHash) === next) protectedPinSaveLocks.delete(urlHash);
+  }
 }
 
 async function hashUrl(url: string): Promise<string> {

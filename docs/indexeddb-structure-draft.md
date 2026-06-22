@@ -208,7 +208,7 @@ Current implementation note:
 - For protected pins, it stores only opaque relationship fields and safe status flags by default: plain pin id, encrypted pin id, encrypted thumbnail id, stored-original blob id, queue order, and booleans for protected metadata/thumbnail/original availability.
 - Sensitive display metadata such as URL, domain/path, title, label, dimensions, dates, generated metadata, and thumbnail data belongs in the protected stores unless a later settings feature explicitly permits a plaintext field.
 - Locked UI reads this store and can show private placeholders without decrypting protected pin metadata.
-- Unlocked UI reads this store plus protected pin stores and replaces placeholders with decrypted records where possible.
+- Unlocked UI reads this store plus protected pin stores and replaces placeholders with decrypted records where possible. The service worker may cache decrypted protected metadata for the active unlocked key and must invalidate that cache on save, delete, or queue reorder.
 - Queue ordering is `queueUpdatedAt`; refreshing protected metadata or thumbnails must not reseal or reorder records unless the action intentionally moves a pin.
 
 Primary key:
@@ -310,7 +310,7 @@ Plaintext record fields are limited to ids, URL hash for dedupe, queue order, an
 
 ## `encryptedPinThumbnails`
 
-Stores protected thumbnail bytes separately from protected pin metadata. This avoids loading/decrypting thumbnail bytes while paging large queues.
+Stores protected thumbnail bytes separately from protected pin metadata. This avoids loading/decrypting thumbnail bytes while paging large queues. Unlocked queue and Recall loads should hydrate encrypted thumbnails only for the rows returned to the visible page, not for every protected metadata row scanned during merge.
 
 Primary key:
 

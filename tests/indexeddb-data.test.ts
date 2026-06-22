@@ -940,6 +940,226 @@ test('IndexedDbBookmarkStore preserves existing protected pins when plaintext sa
   }
 });
 
+test('IndexedDbBookmarkStore caches merged protected metadata and hydrates only visible thumbnails', async () => {
+  await deleteImageTrailDb();
+  const active = (
+    await createAndActivateWrappedBlobKey({
+      password: 'pin-merge-cache-password',
+      uuid: 'pin-merge-cache-key',
+      now: '2026-06-21T00:00:00.000Z',
+    })
+  ).active;
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  try {
+    for (let index = 0; index < 3; index += 1) {
+      await store.save(
+        createDisplayRecord({
+          id: `https://secret.example.test/cache-${index}.jpg`,
+          url: `https://secret.example.test/cache-${index}.jpg`,
+          label: `cache-${index}.jpg`,
+          thumbnail: `data:image/png;base64,${btoa(`thumb-${index}`)}`,
+          timestamp: `2026-06-21T00:00:0${index + 1}.000Z`,
+          source: 'bookmark',
+        }),
+      );
+    }
+
+    const originalOpenPin = EncryptedPinsRepository.prototype.openRecord;
+    const originalOpenThumbnail = EncryptedPinThumbnailsRepository.prototype.openRecord;
+    let openedPinMetadata = 0;
+    let openedThumbnails = 0;
+    EncryptedPinsRepository.prototype.openRecord = function countedOpenPinRecord(
+      record,
+      key,
+    ): ReturnType<EncryptedPinsRepository['openRecord']> {
+      openedPinMetadata += 1;
+      return originalOpenPin.call(this, record, key);
+    };
+    EncryptedPinThumbnailsRepository.prototype.openRecord = function countedOpenThumbnailRecord(
+      record,
+      key,
+    ): ReturnType<EncryptedPinThumbnailsRepository['openRecord']> {
+      openedThumbnails += 1;
+      return originalOpenThumbnail.call(this, record, key);
+    };
+    try {
+      const firstPage = await store.loadPage({ offset: 0, limit: 1 });
+      const secondPage = await store.loadPage({ offset: 1, limit: 1 });
+
+      assert.equal(firstPage.items.length, 1);
+      assert.equal(secondPage.items.length, 1);
+      assert.ok(firstPage.items[0]?.thumbnail);
+      assert.ok(secondPage.items[0]?.thumbnail);
+      assert.equal(openedPinMetadata, 3);
+      assert.equal(openedThumbnails, 2);
+    } finally {
+      EncryptedPinsRepository.prototype.openRecord = originalOpenPin;
+      EncryptedPinThumbnailsRepository.prototype.openRecord = originalOpenThumbnail;
+    }
+  } finally {
+    await store.close();
+    lockBlobKey();
+  }
+});
+
+test('IndexedDbBookmarkStore does not cache stale protected merges invalidated during load', async () => {
+  await deleteImageTrailDb();
+  const active = (
+    await createAndActivateWrappedBlobKey({
+      password: 'pin-stale-cache-password',
+      uuid: 'pin-stale-cache-key',
+      now: '2026-06-21T00:00:00.000Z',
+    })
+  ).active;
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  const originalOpenPin = EncryptedPinsRepository.prototype.openRecord;
+  try {
+    await store.save(
+      createDisplayRecord({
+        id: 'https://secret.example.test/stale-before.jpg',
+        url: 'https://secret.example.test/stale-before.jpg',
+        label: 'stale-before.jpg',
+        timestamp: '2026-06-21T00:00:01.000Z',
+        source: 'bookmark',
+      }),
+    );
+
+    let releaseMergeOpen!: () => void;
+    const mergeOpenStarted = new Promise<void>((resolve) => {
+      EncryptedPinsRepository.prototype.openRecord = async function blockedOpenPinRecord(
+        record,
+        key,
+      ): ReturnType<EncryptedPinsRepository['openRecord']> {
+        EncryptedPinsRepository.prototype.openRecord = originalOpenPin;
+        resolve();
+        await new Promise<void>((release) => {
+          releaseMergeOpen = release;
+        });
+        return originalOpenPin.call(this, record, key);
+      };
+    });
+    const staleLoad = store.loadPage({ offset: 0, limit: 30 });
+    await mergeOpenStarted;
+    await store.save(
+      createDisplayRecord({
+        id: 'https://secret.example.test/stale-after.jpg',
+        url: 'https://secret.example.test/stale-after.jpg',
+        label: 'stale-after.jpg',
+        timestamp: '2026-06-21T00:00:02.000Z',
+        source: 'bookmark',
+      }),
+    );
+
+    releaseMergeOpen();
+    await staleLoad;
+    const freshPage = await store.loadPage({ offset: 0, limit: 30 });
+
+    assert.equal(freshPage.items.length, 2);
+    assert.deepEqual(freshPage.items.map((item) => item.url).sort(), [
+      'https://secret.example.test/stale-after.jpg',
+      'https://secret.example.test/stale-before.jpg',
+    ]);
+  } finally {
+    EncryptedPinsRepository.prototype.openRecord = originalOpenPin;
+    await store.close();
+    lockBlobKey();
+  }
+});
+
+test('IndexedDbBookmarkStore keeps protected page loads alive when thumbnail hydration fails', async () => {
+  await deleteImageTrailDb();
+  const active = (
+    await createAndActivateWrappedBlobKey({
+      password: 'pin-thumbnail-failure-password',
+      uuid: 'pin-thumbnail-failure-key',
+      now: '2026-06-21T00:00:00.000Z',
+    })
+  ).active;
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  const originalOpenThumbnail = EncryptedPinThumbnailsRepository.prototype.openRecord;
+  try {
+    await store.save(
+      createDisplayRecord({
+        id: 'https://secret.example.test/bad-thumbnail.jpg',
+        url: 'https://secret.example.test/bad-thumbnail.jpg',
+        label: 'bad-thumbnail.jpg',
+        thumbnail: 'data:image/png;base64,dGh1bWI=',
+        timestamp: '2026-06-21T00:00:01.000Z',
+        source: 'bookmark',
+      }),
+    );
+    EncryptedPinThumbnailsRepository.prototype.openRecord = async function failingOpenThumbnail(): ReturnType<
+      EncryptedPinThumbnailsRepository['openRecord']
+    > {
+      throw new Error('simulated thumbnail open failure');
+    };
+
+    const page = await store.loadPage({ offset: 0, limit: 30 });
+
+    assert.equal(page.items.length, 1);
+    assert.equal(page.items[0]?.url, 'https://secret.example.test/bad-thumbnail.jpg');
+    assert.equal(page.items[0]?.thumbnail, undefined);
+  } finally {
+    EncryptedPinThumbnailsRepository.prototype.openRecord = originalOpenThumbnail;
+    await store.close();
+    lockBlobKey();
+  }
+});
+
+test('IndexedDbBookmarkStore serializes concurrent protected saves for the same URL', async () => {
+  await deleteImageTrailDb();
+  const active = (
+    await createAndActivateWrappedBlobKey({
+      password: 'pin-concurrent-password',
+      uuid: 'pin-concurrent-key',
+      now: '2026-06-21T00:00:00.000Z',
+    })
+  ).active;
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  try {
+    const [first, second] = await Promise.all([
+      store.save(
+        createDisplayRecord({
+          id: 'https://secret.example.test/concurrent.jpg',
+          url: 'https://secret.example.test/concurrent.jpg',
+          label: 'concurrent-first.jpg',
+          thumbnail: 'data:image/png;base64,Zmlyc3Q=',
+          timestamp: '2026-06-21T00:00:01.000Z',
+          source: 'bookmark',
+        }),
+      ),
+      store.save(
+        createDisplayRecord({
+          id: 'https://secret.example.test/concurrent.jpg',
+          url: 'https://secret.example.test/concurrent.jpg',
+          label: 'concurrent-second.jpg',
+          thumbnail: 'data:image/png;base64,c2Vjb25k',
+          timestamp: '2026-06-21T00:00:02.000Z',
+          source: 'bookmark',
+        }),
+      ),
+    ]);
+
+    assert.equal(first.id, second.id);
+    assert.equal(first.protectedPin?.encryptedPinId, second.protectedPin?.encryptedPinId);
+    const page = await store.loadPage({ offset: 0, limit: 30 });
+    assert.equal(page.items.length, 1);
+  } finally {
+    await store.close();
+    lockBlobKey();
+  }
+
+  const db = await openImageTrailDb();
+  assert.ok(db.db);
+  try {
+    assert.equal((await new EncryptedPinsRepository(db.db).getStorageUsage()).blobCount, 1);
+    assert.equal((await new EncryptedPinThumbnailsRepository(db.db).getStorageUsage()).blobCount, 1);
+    assert.equal(await new BookmarksRepository(db.db).countEncrypted(), 1);
+  } finally {
+    db.db.close();
+  }
+});
+
 test('IndexedDbBookmarkStore cleans failed protected save attempts before plaintext fallback', async () => {
   await deleteImageTrailDb();
   const active = (
