@@ -54,6 +54,13 @@
 - Repo docs are for source-adjacent contracts, acceptance tests, architecture notes, migrations, and CI/automation policy.
 - If a PR changes behavior but repo docs are not updated, explain why in the PR description.
 
+## GitHub And Wiki Operations
+
+- Normal developer-flow git commands, GitHub issue/PR updates, and GitHub wiki edits are authorized by the CODEOWNER and user when they are requested, advised, or necessary to complete the tracked work.
+- When a change request, follow-up, known bug, or deferred improvement is discovered, capture it as a GitHub issue or documented project note so it can be tracked and resolved in future work.
+- Keep GitHub and wiki writes scoped to the current task. Do not close issues, resolve review threads, merge PRs, or make broad project-management changes unless the user explicitly asks.
+- Prefer durable tracking over chat-only notes for decisions or follow-ups that future engineers/models will need.
+
 ## Validation
 
 Before claiming done, run:
