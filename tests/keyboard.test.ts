@@ -61,6 +61,7 @@ test('default keyboard bindings map d to download and shifted shortcuts to save-
   assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'd' && binding.action === 'download'));
   assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'ArrowDown' && binding.action === 'download'));
   assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'D' && binding.shift === true && binding.action === 'download-save-as'));
+  assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'G' && binding.shift === true && binding.action === 'grab-mode-toggle'));
   assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'Enter' && binding.shift === true && binding.action === 'download-save-as'));
 });
 
@@ -69,6 +70,7 @@ test('keyboard shortcuts route from panel controls but not typing targets', () =
   assert.equal(shouldRouteKeyboardShortcut('button', 'slideshow-toggle'), false);
   assert.equal(shouldRouteKeyboardShortcut('button', 'download'), true);
   assert.equal(shouldRouteKeyboardShortcut('button', 'download-save-as'), true);
+  assert.equal(shouldRouteKeyboardShortcut('button', 'grab-mode-toggle'), true);
   assert.equal(shouldRouteKeyboardShortcut('panel', 'slideshow-toggle'), true);
   assert.equal(shouldRouteKeyboardShortcut('page', 'download'), true);
 });

@@ -73,6 +73,7 @@ test('target selection alone does not commit runtime history before load success
     {
       mode: 'manual',
       picking: false,
+      grabModeActive: false,
       candidateCount: 1,
       selectedUrl: 'https://example.test/pending.jpg',
       selectedHandleId: 'target-1',

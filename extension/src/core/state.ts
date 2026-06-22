@@ -3,6 +3,7 @@ import type { AutomationState, PanelState, RecallState, TargetState } from './ty
 export const EMPTY_TARGET_STATE: TargetState = {
   mode: 'none',
   picking: false,
+  grabModeActive: false,
   candidateCount: 0,
   selectedUrl: null,
   selectedHandleId: null,

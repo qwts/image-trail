@@ -15,3 +15,4 @@ These scenarios define the first browser-level acceptance coverage for the Brave
 - [Encrypted Image Downloads](encrypted-image-downloads.md)
 - [URL Template Learning](url-template-learning.md)
 - [Queue And Recall Clear/Delete Semantics](queue-recall-clear-delete.md)
+- [Grab Mode Strategies](grab-mode-strategies.md)

@@ -20,6 +20,7 @@ export const DEFAULT_BINDINGS: KeyBinding[] = [
   { key: 'p', action: 'panel-toggle' },
   { key: 'd', action: 'download' },
   { key: 'D', shift: true, action: 'download-save-as' },
+  { key: 'G', shift: true, action: 'grab-mode-toggle' },
   { key: 'Enter', shift: true, action: 'download-save-as' },
   { key: 'r', action: 'retry' },
 ];
@@ -45,8 +46,8 @@ function isPanelHost(node: unknown): boolean {
 
 export function shouldRouteKeyboardShortcut(target: KeyTarget, action: string): boolean {
   if (target === 'typing') return false;
-  // Keep native button activation intact; only the explicit download shortcuts are global from focused panel controls.
-  if (target === 'button') return action === 'download' || action === 'download-save-as';
+  // Keep native button activation intact; only explicit global shortcuts route from focused panel controls.
+  if (target === 'button') return action === 'download' || action === 'download-save-as' || action === 'grab-mode-toggle';
   return true;
 }
 

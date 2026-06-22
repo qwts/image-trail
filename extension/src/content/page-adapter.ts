@@ -21,6 +21,7 @@ export type TargetSelectionMode = 'auto' | 'manual' | 'none';
 export interface TargetSelectionSnapshot {
   readonly mode: TargetSelectionMode;
   readonly picking: boolean;
+  readonly grabModeActive: boolean;
   readonly candidateCount: number;
   readonly selected: TargetImageInfo | null;
   readonly message: string;
@@ -31,6 +32,14 @@ export type TargetLoadListener = (target: TargetImageInfo & { readonly thumbnail
 export type TargetBookmarkRequestListener = (
   target: TargetImageInfo & { readonly thumbnail?: string; readonly trustedLoadedImage?: boolean },
 ) => void;
+
+type GrabStrategyId = 'bookmark-image';
+
+interface GrabStrategy {
+  readonly id: GrabStrategyId;
+  readonly label: string;
+  execute(image: HTMLImageElement): Promise<void>;
+}
 
 const TARGET_MESSAGE_URL_MAX = 180;
 
@@ -59,7 +68,15 @@ export class PageAdapter {
   private selectedActiveUrl: string | null = null;
   private selectedLockBox = false;
   private bookmarkShortcutActive = false;
+  private grabModeActive = false;
   private suppressNextBookmarkShortcutClick = false;
+  private readonly grabStrategies: readonly GrabStrategy[] = [
+    {
+      id: 'bookmark-image',
+      label: 'Bookmark page image',
+      execute: (image) => this.bookmarkPageImage(image),
+    },
+  ];
 
   subscribe(listener: TargetSelectionListener): () => void {
     this.listeners.add(listener);
@@ -108,6 +125,7 @@ export class PageAdapter {
   }
 
   startPickMode(): TargetSelectionSnapshot {
+    if (this.grabModeActive) this.stopGrabMode();
     this.picking = true;
     this.mode = 'manual';
     this.observer.start();
@@ -126,8 +144,21 @@ export class PageAdapter {
     return this.emit(this.selected ? 'Pick mode stopped; selected target is preserved.' : 'Pick mode stopped.');
   }
 
+  startGrabMode(): TargetSelectionSnapshot {
+    if (this.picking) this.stopPickMode();
+    this.grabModeActive = true;
+    return this.emit('Grab Mode is active. Click page images to add them to the queue.');
+  }
+
+  stopGrabMode(): TargetSelectionSnapshot {
+    if (!this.grabModeActive) return this.lastSnapshot;
+    this.grabModeActive = false;
+    return this.emit('Grab Mode stopped.');
+  }
+
   cleanup(): void {
     this.disableBookmarkShortcut();
+    this.grabModeActive = false;
     this.stopPickMode();
     this.restoreSelectedTarget();
     this.mode = 'none';
@@ -238,7 +269,7 @@ export class PageAdapter {
   };
 
   private handleBookmarkShortcutEvent(event: MouseEvent): boolean {
-    if (!event.shiftKey || event.button !== 0) return false;
+    if ((!event.shiftKey && !this.grabModeActive) || event.button !== 0) return false;
     const target = event.target;
     if (!(target instanceof Element)) return false;
     const image = findImageFromShortcutTarget(target);
@@ -251,14 +282,23 @@ export class PageAdapter {
       this.emit(`Could not bookmark image: ${getImageRejectionReason(image) ?? 'Image is not usable.'}`);
       return true;
     }
+    void this.activeGrabStrategy().execute(image);
+    return true;
+  }
+
+  private activeGrabStrategy(): GrabStrategy {
+    return this.grabStrategies[0];
+  }
+
+  private async bookmarkPageImage(image: HTMLImageElement): Promise<void> {
     const info = this.createBookmarkShortcutInfo(image);
     if (!info) {
       this.emit('Could not bookmark image: Image source could not be resolved.');
-      return true;
+      return;
     }
 
-    void this.emitBookmarkRequest(image, info);
-    return true;
+    await this.emitBookmarkRequest(image, info);
+    this.emit(`Grabbed ${summarizeTargetUrlForMessage(info.url)} with ${this.activeGrabStrategy().label}.`);
   }
 
   private createBookmarkShortcutInfo(image: HTMLImageElement): TargetImageInfo | null {
@@ -372,6 +412,7 @@ export class PageAdapter {
     return {
       mode: this.mode,
       picking: this.picking,
+      grabModeActive: this.grabModeActive,
       candidateCount: this.picking ? this.candidates.size : this.detectedCandidateCount,
       selected: selected && this.selectedActiveUrl ? { ...selected, url: this.selectedActiveUrl } : selected,
       message,

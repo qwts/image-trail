@@ -46,6 +46,7 @@ test('target changes clear failed field markers', () => {
   const next = setTargetState(failed, {
     mode: 'manual',
     picking: false,
+    grabModeActive: false,
     candidateCount: 1,
     selectedUrl: 'https://example.test/image.jpg',
     selectedHandleId: 'handle-1',
@@ -68,6 +69,7 @@ test('same target load snapshots preserve learned field markers', () => {
     target: {
       mode: 'manual' as const,
       picking: false,
+      grabModeActive: false,
       candidateCount: 1,
       selectedUrl: 'https://example.test/image-1.jpg',
       selectedHandleId: 'handle-1',
@@ -83,6 +85,7 @@ test('same target load snapshots preserve learned field markers', () => {
   const next = setTargetState(learned, {
     mode: 'manual',
     picking: false,
+    grabModeActive: false,
     candidateCount: 1,
     selectedUrl: 'https://example.test/image-2.jpg',
     selectedHandleId: 'handle-1',
@@ -94,6 +97,18 @@ test('same target load snapshots preserve learned field markers', () => {
   assert.deepEqual(next.unchangedFieldIds, ['q:1:0']);
   assert.deepEqual(next.unlockedFieldIds, ['q:0:0']);
   assert.equal(next.currentImageFingerprint, 'a'.repeat(64));
+});
+
+test('Grab Mode actions expose sticky page-image grab status', () => {
+  const state = createInitialPanelState();
+
+  const started = reducePanelAction(state, { name: 'grab-mode/start' });
+  assert.equal(started.status, 'ready');
+  assert.match(started.message, /Grab Mode is active/u);
+
+  const stopped = reducePanelAction(started, { name: 'grab-mode/stop' });
+  assert.equal(stopped.status, 'ready');
+  assert.equal(stopped.message, 'Grab Mode stopped.');
 });
 
 test('Previous/Next inclusion toggle only changes successful fields', () => {

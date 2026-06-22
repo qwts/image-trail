@@ -98,6 +98,7 @@ function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
   return {
     mode: snapshot.mode,
     picking: snapshot.picking,
+    grabModeActive: snapshot.grabModeActive,
     candidateCount: snapshot.candidateCount,
     selectedUrl: selectedUrl?.startsWith('data:') ? 'data:' : selectedUrl,
     selectedHandleId: snapshot.selected?.handleId ?? null,
@@ -573,6 +574,20 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'grab-mode/start') {
+      this.state = reducePanelAction(this.state, action);
+      this.state = setTargetState(this.state, toTargetState(this.pageAdapter.startGrabMode()));
+      this.render();
+      return;
+    }
+
+    if (action.name === 'grab-mode/stop') {
+      this.state = reducePanelAction(this.state, action);
+      this.state = setTargetState(this.state, toTargetState(this.pageAdapter.stopGrabMode()));
+      this.render();
+      return;
+    }
+
     if (action.name === 'target/release') {
       const snapshot = this.pageAdapter.releaseSelectedTarget();
       this.state = setTargetState(this.state, toTargetState(snapshot));
@@ -959,6 +974,9 @@ export class ImageTrailPanel {
         break;
       case 'panel-toggle':
         this.dispatch({ name: 'toggle-panel' });
+        break;
+      case 'grab-mode-toggle':
+        this.dispatch({ name: this.state.target.grabModeActive ? 'grab-mode/stop' : 'grab-mode/start' });
         break;
       case 'retry':
         this.dispatch({ name: 'retry-start' });

@@ -137,6 +137,15 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return { ...state, status: 'picking', message: 'Pick mode is active. Click the intended image.', lastUpdatedAt: Date.now() };
     case 'stop-target-picker':
       return { ...state, status: 'ready', message: state.target.message, lastUpdatedAt: Date.now() };
+    case 'grab-mode/start':
+      return {
+        ...state,
+        status: 'ready',
+        message: 'Grab Mode is active. Click page images to add them to the queue.',
+        lastUpdatedAt: Date.now(),
+      };
+    case 'grab-mode/stop':
+      return { ...state, status: 'ready', message: 'Grab Mode stopped.', lastUpdatedAt: Date.now() };
     case 'target/release':
       return state;
     case 'history/add-loaded': {

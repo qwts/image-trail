@@ -21,9 +21,11 @@ export function createTargetPickerView(
 
   const description = document.createElement('p');
   description.className = 'image-trail-panel__meta';
-  description.textContent = target.selectedUrl
-    ? `Rows and URL edits project into this host image.`
-    : `Choose which page image receives the current edited URL. ${target.candidateCount} candidate${target.candidateCount === 1 ? '' : 's'} detected.`;
+  description.textContent = target.grabModeActive
+    ? 'Grab Mode is active. Click page images to add them to the queue.'
+    : target.selectedUrl
+      ? `Rows and URL edits project into this host image.`
+      : `Choose which page image receives the current edited URL. ${target.candidateCount} candidate${target.candidateCount === 1 ? '' : 's'} detected.`;
 
   const current = document.createElement('p');
   current.className = 'image-trail-panel__target-url';
@@ -54,6 +56,13 @@ export function createTargetPickerView(
     targetButton.addEventListener('click', () => dispatch({ name: 'start-target-picker' }));
   }
   actions.append(targetButton);
+  const grabButton = document.createElement('button');
+  grabButton.type = 'button';
+  grabButton.textContent = target.grabModeActive ? 'Stop Grab Mode' : 'Grab Mode';
+  grabButton.className = target.grabModeActive ? 'is-active' : '';
+  grabButton.setAttribute('aria-pressed', target.grabModeActive ? 'true' : 'false');
+  grabButton.addEventListener('click', () => dispatch({ name: target.grabModeActive ? 'grab-mode/stop' : 'grab-mode/start' }));
+  actions.append(grabButton);
   if (target.selectedUrl && target.selectedDimensions) {
     const dimensions = document.createElement('span');
     dimensions.className = 'image-trail-panel__target-badge is-selected';

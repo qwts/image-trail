@@ -10,6 +10,7 @@ export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
 export interface TargetState {
   readonly mode: 'auto' | 'manual' | 'none';
   readonly picking: boolean;
+  readonly grabModeActive: boolean;
   readonly candidateCount: number;
   readonly selectedUrl: string | null;
   readonly selectedHandleId: string | null;
@@ -124,6 +125,8 @@ export type PanelActionName =
   | 'close-panel'
   | 'start-target-picker'
   | 'stop-target-picker'
+  | 'grab-mode/start'
+  | 'grab-mode/stop'
   | 'target/release'
   | 'history/add-loaded'
   | 'history/remove'
