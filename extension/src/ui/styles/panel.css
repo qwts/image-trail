@@ -493,6 +493,12 @@
   text-align: center;
 }
 
+.image-trail-panel-root .image-trail-panel__history-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
 .image-trail-panel-root .image-trail-panel__bookmark-toolbar > button,
 .image-trail-panel-root .image-trail-panel__bookmark-toolbar > .image-trail-panel__queue-menu,
 .image-trail-panel-root .image-trail-panel__bookmark-toolbar .image-trail-panel__queue-menu summary {

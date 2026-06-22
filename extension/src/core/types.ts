@@ -127,6 +127,7 @@ export type PanelActionName =
   | 'target/release'
   | 'history/add-loaded'
   | 'history/remove'
+  | 'history/delete-all'
   | 'history/load'
   | 'history/download'
   | 'history/select'
@@ -212,6 +213,7 @@ export type PanelAction =
         PanelActionName,
         | 'history/add-loaded'
         | 'history/remove'
+        | 'history/delete-all'
         | 'history/select'
         | 'history-selection/toggle'
         | 'history-selection/clear'
@@ -278,7 +280,7 @@ export type PanelAction =
     }
   | { readonly name: 'history/remove' | 'bookmark/load' | 'bookmark/remove' | 'bookmark/clear' | 'history/select'; readonly id: string }
   | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle' | 'bookmark-selection/single'; readonly id: string }
-  | { readonly name: 'history-selection/clear' | 'bookmark-selection/clear' }
+  | { readonly name: 'history/delete-all' | 'history-selection/clear' | 'bookmark-selection/clear' }
   | { readonly name: 'bookmarks/clear-visible' | 'bookmarks/delete-visible' | 'recall/delete-all' }
   | {
       readonly name: 'bookmarks/page-loaded';

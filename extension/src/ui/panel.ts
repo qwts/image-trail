@@ -590,6 +590,11 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'history/delete-all') {
+      void this.deleteRecentHistory();
+      return;
+    }
+
     if (action.name === 'bookmark/load') {
       void this.loadBookmark(action.id);
       return;
@@ -1335,11 +1340,28 @@ export class ImageTrailPanel {
 
   private async removeRecentHistory(id: string): Promise<void> {
     const existing = this.state.history.find((item) => item.id === id);
-    if (existing?.blobId) await this.removeCapturedBlobReference(existing.blobId);
+    const blobId = existing ? encryptedBlobIdForRecord(existing) : undefined;
+    if (blobId) await this.removeCapturedBlobReference(blobId);
     const history = this.recentHistoryStore
       ? await this.recentHistoryStore.remove(id, window.location.href)
       : reducePanelAction(this.state, { name: 'history/remove', id }).history;
     this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
+    this.render();
+  }
+
+  private async deleteRecentHistory(): Promise<void> {
+    const records = this.state.history;
+    if (records.length === 0) return;
+    for (const record of records) {
+      const blobId = encryptedBlobIdForRecord(record);
+      if (blobId) await this.removeCapturedBlobReference(blobId);
+    }
+    if (this.recentHistoryStore) {
+      for (const record of records) {
+        await this.recentHistoryStore.remove(record.id, window.location.href);
+      }
+    }
+    this.state = reducePanelAction(this.state, { name: 'history/delete-all' });
     this.render();
   }
 

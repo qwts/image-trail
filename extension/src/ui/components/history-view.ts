@@ -3,6 +3,7 @@ import { createPrivacyThumbnail, PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recor
 
 type HistoryAction =
   | { readonly name: 'history/remove'; readonly id: string }
+  | { readonly name: 'history/delete-all' }
   | { readonly name: 'history-selection/toggle'; readonly id: string }
   | { readonly name: 'history-selection/clear' }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'history'; readonly sourceRecordId: string }
@@ -29,6 +30,16 @@ export function createHistoryView(
 
   const heading = document.createElement('h3');
   heading.textContent = 'Recent history';
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'image-trail-panel__history-toolbar';
+  if (items.length > 0) {
+    const deleteAll = document.createElement('button');
+    deleteAll.type = 'button';
+    deleteAll.textContent = `Delete recents (${items.length})`;
+    deleteAll.addEventListener('click', () => dispatch({ name: 'history/delete-all' }));
+    toolbar.append(deleteAll);
+  }
 
   const list = document.createElement('ol');
   list.className = 'image-trail-panel__record-list';
@@ -156,7 +167,7 @@ export function createHistoryView(
     selectedIds.length > 0
       ? `${selectedIds.length} recent item(s) selected for export.`
       : 'Cmd/Ctrl-click rows to select recent items for export.';
-  section.append(heading, items.length ? selectionMeta : empty);
+  section.append(heading, toolbar, items.length ? selectionMeta : empty);
   if (items.length) section.append(list);
   return section;
 }

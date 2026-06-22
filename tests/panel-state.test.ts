@@ -304,6 +304,26 @@ test('clearing visible bookmarks is presentation-only state', () => {
   assert.equal(cleared.hasOlderBookmarks, false);
 });
 
+test('deleting recents drops transient history and selections', () => {
+  const state = {
+    ...createInitialPanelState(),
+    history: [
+      { id: 'history-1', url: 'https://example.test/1.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'history' as const },
+      { id: 'history-2', url: 'https://example.test/2.jpg', timestamp: '2026-06-20T00:00:01.000Z', source: 'history' as const },
+    ],
+    selectedHistoryIds: ['history-1'],
+    bookmarks: [
+      { id: 'bookmark-1', url: 'https://example.test/bookmark.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'bookmark' as const },
+    ],
+  };
+
+  const deleted = reducePanelAction(state, { name: 'history/delete-all' });
+
+  assert.deepEqual(deleted.history, []);
+  assert.deepEqual(deleted.selectedHistoryIds, []);
+  assert.equal(deleted.bookmarks, state.bookmarks);
+});
+
 test('recall delete count is derived from durable queue totals', () => {
   assert.equal(recallDeleteCountForQueue({ bookmarkTotal: 47, bookmarkLimit: 3 }), 44);
   assert.equal(recallDeleteCountForQueue({ bookmarkTotal: 2, bookmarkLimit: 3 }), 0);
