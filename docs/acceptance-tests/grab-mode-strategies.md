@@ -9,16 +9,19 @@ template-specific linked-page extraction stays declarative instead of running us
 2. Open Image Trail and verify the Host target section shows a `Grab Mode` button.
 3. Click `Grab Mode`.
 4. Verify the button changes to `Stop Grab Mode` and the Host target copy says Grab Mode is active.
-5. Click a qualifying page image.
-6. Verify the image is added to the bookmark queue and recent history through the normal pin/bookmark flow.
-7. Verify Grab Mode remains active after the grab.
-8. Click another qualifying page image and verify it is also added to the queue.
-9. Press `Shift+G`.
-10. Verify Grab Mode stops.
-11. Press `Shift+G` again and verify Grab Mode starts.
-12. Click `Stop Grab Mode`.
-13. Click another page image without holding Shift and verify no new queue item is added.
-14. Shift-click a qualifying page image and verify it uses the same grab behavior, adding the image to the queue.
+5. Hover a qualifying page image.
+6. Verify the image shows the valid Grab preview outline without changing the selected host target.
+7. Click the qualifying page image.
+8. Verify the image is added to the bookmark queue and recent history through the normal pin/bookmark flow.
+9. Verify Grab Mode remains active after the grab.
+10. Click another qualifying page image and verify it is also added to the queue.
+11. Hover a non-image/invalid area and verify the preview clears or shows invalid feedback without creating a queue item.
+12. Press `Shift+G`.
+13. Verify Grab Mode stops and the preview outline is cleared.
+14. Press `Shift+G` again and verify Grab Mode starts.
+15. Click `Stop Grab Mode`.
+16. Click another page image without holding Shift and verify no new queue item is added.
+17. Shift-click a qualifying page image and verify it uses the same grab behavior, adding the image to the queue.
 
 ## Linked-Page Image Scenario
 
@@ -27,11 +30,13 @@ template-specific linked-page extraction stays declarative instead of running us
 3. Leave the default ordered extractors, or add a site-specific line in `selector@attribute` form such as `#main-image@src`.
 4. Close settings.
 5. Click `Grab Mode`.
-6. Click a page link whose linked HTML contains an image matching one of the configured extractors.
-7. Verify Image Trail fetches the linked page, resolves relative image URLs against the linked page URL, and adds the resolved image URL to the durable queue through the normal pin/bookmark flow.
-8. Shift-click the same kind of link with Grab Mode off and verify it uses the same linked-page strategy.
-9. Configure an invalid selector or click a link whose page has no matching image.
-10. Verify Image Trail shows a failure message and does not create a pin.
+6. Hover a page link whose linked HTML contains an image matching one of the configured extractors.
+7. Verify the link/source wrapper shows the valid Grab preview outline.
+8. Click the link.
+9. Verify Image Trail fetches the linked page, resolves relative image URLs against the linked page URL, and adds the resolved image URL to the durable queue through the normal pin/bookmark flow.
+10. Shift-click the same kind of link with Grab Mode off and verify it uses the same linked-page strategy.
+11. Configure an invalid selector or click a link whose page has no matching image.
+12. Verify Image Trail shows a failure message and does not create a pin.
 
 ## Grab Pattern Scenario
 
@@ -51,6 +56,10 @@ template-specific linked-page extraction stays declarative instead of running us
 - `Shift+G` toggles Grab Mode except while typing in text controls.
 - Shift-click remains a one-shot shortcut into the same grab strategy.
 - Grab Mode does not change the selected host target image.
+- Grab Mode preview uses a page-local outline and does not rerender the panel on pointer movement.
+- Valid previews are visually distinct from selected/captured/bookmarked target styling.
+- Invalid targets show distinct invalid feedback or clear the preview and do not silently create pins.
+- Preview styling clears when Grab Mode is disabled, the pointer leaves the page target, or the panel cleans up.
 - Non-qualifying images show a failure message and do not create pins.
 - Without an active template strategy, grabbing uses the default clicked-image strategy.
 - A template can opt into the linked-page image strategy.

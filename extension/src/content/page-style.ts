@@ -3,12 +3,14 @@ type StyleSnapshot = Pick<
   'backgroundColor' | 'cursor' | 'height' | 'objectFit' | 'opacity' | 'outline' | 'outlineOffset' | 'width'
 >;
 type PageBackdropSnapshot = Pick<CSSStyleDeclaration, 'background' | 'backgroundColor'>;
+type GrabPreviewStyleSnapshot = Pick<CSSStyleDeclaration, 'boxShadow' | 'cursor' | 'outline' | 'outlineOffset'>;
 
 interface SelectedTargetOptions {
   readonly lockBox?: boolean;
 }
 
 const snapshots = new WeakMap<HTMLElement, StyleSnapshot>();
+const grabPreviewSnapshots = new WeakMap<HTMLElement, GrabPreviewStyleSnapshot>();
 let pageBackdropSnapshot: { readonly body: PageBackdropSnapshot; readonly documentElement: PageBackdropSnapshot } | null = null;
 
 function snapshot(element: HTMLElement): void {
@@ -36,6 +38,34 @@ export function markHoveredTarget(element: HTMLElement): void {
   element.dataset.imageTrailHover = 'true';
   element.style.outline = '3px dashed #f59e0b';
   element.style.outlineOffset = '3px';
+}
+
+export function markGrabPreviewTarget(element: HTMLElement, state: 'valid' | 'invalid'): void {
+  if (!grabPreviewSnapshots.has(element)) {
+    grabPreviewSnapshots.set(element, {
+      boxShadow: element.style.boxShadow,
+      cursor: element.style.cursor,
+      outline: element.style.outline,
+      outlineOffset: element.style.outlineOffset,
+    });
+  }
+  element.dataset.imageTrailGrabPreview = state;
+  element.style.cursor = state === 'valid' ? 'copy' : 'not-allowed';
+  element.style.outline = state === 'valid' ? '3px solid #38bdf8' : '3px solid #ef4444';
+  element.style.outlineOffset = '4px';
+  element.style.boxShadow = state === 'valid' ? '0 0 0 4px rgb(56 189 248 / 22%)' : '0 0 0 4px rgb(239 68 68 / 24%)';
+}
+
+export function restoreGrabPreviewTarget(element: HTMLElement): void {
+  const original = grabPreviewSnapshots.get(element);
+  if (original) {
+    element.style.boxShadow = original.boxShadow;
+    element.style.cursor = original.cursor;
+    element.style.outline = original.outline;
+    element.style.outlineOffset = original.outlineOffset;
+    grabPreviewSnapshots.delete(element);
+  }
+  delete element.dataset.imageTrailGrabPreview;
 }
 
 export function markSelectedTarget(element: HTMLElement, options: SelectedTargetOptions = {}): void {

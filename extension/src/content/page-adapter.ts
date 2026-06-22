@@ -21,7 +21,14 @@ import {
   isQualifyingImage,
   type TargetImageInfo,
 } from './target-image.js';
-import { markHoveredTarget, markPickModeCandidate, markSelectedTarget, restoreElementStyles } from './page-style.js';
+import {
+  markGrabPreviewTarget,
+  markHoveredTarget,
+  markPickModeCandidate,
+  markSelectedTarget,
+  restoreElementStyles,
+  restoreGrabPreviewTarget,
+} from './page-style.js';
 import { createThumbnailDataUrlFromImage } from './thumbnail-generator.js';
 import { createFetchLinkedPageMessage, isFetchLinkedPageResultMessage } from '../background/messages.js';
 import { sendRuntimeMessage } from './runtime-message.js';
@@ -57,6 +64,13 @@ interface GrabStrategy {
   execute(target: Element): Promise<boolean>;
 }
 
+interface GrabPreviewResolution {
+  readonly state: 'valid' | 'invalid';
+  readonly element: HTMLElement;
+  readonly strategy: GrabStrategy;
+  readonly reason?: string;
+}
+
 const TARGET_MESSAGE_URL_MAX = 180;
 
 export function summarizeTargetUrlForMessage(url: string | null | undefined): string {
@@ -64,6 +78,23 @@ export function summarizeTargetUrlForMessage(url: string | null | undefined): st
   if (url.startsWith('data:')) return 'data URL';
   if (url.length <= TARGET_MESSAGE_URL_MAX) return url;
   return `${url.slice(0, TARGET_MESSAGE_URL_MAX - 1)}…`;
+}
+
+export function isEventFromImageTrailPanel(event: Event): boolean {
+  const composedPath = event.composedPath?.() ?? [];
+  if (composedPath.some(isImageTrailPanelHost)) return true;
+  const composedTarget = composedPath[0] ?? event.target;
+  return closestImageTrailPanelRoot(composedTarget);
+}
+
+function isImageTrailPanelHost(node: unknown): boolean {
+  return !!node && typeof node === 'object' && (node as { id?: unknown }).id === 'image-trail-panel-root';
+}
+
+function closestImageTrailPanelRoot(node: unknown): boolean {
+  if (!node || typeof node !== 'object') return false;
+  const closest = (node as { closest?: unknown }).closest;
+  return typeof closest === 'function' && closest.call(node, '#image-trail-panel-root') !== null;
 }
 
 export class PageAdapter {
@@ -89,6 +120,7 @@ export class PageAdapter {
   private grabSourcePatterns: readonly GrabSourcePattern[] = [];
   private activeTemplateGrabStrategy: UrlTemplateGrabStrategy | undefined;
   private suppressBookmarkShortcutClickTarget: EventTarget | null = null;
+  private grabPreview: { readonly element: HTMLElement; readonly state: 'valid' | 'invalid' } | null = null;
   private readonly grabStrategies: readonly GrabStrategy[] = [
     {
       id: 'linked-page-image',
@@ -127,6 +159,8 @@ export class PageAdapter {
     if (this.bookmarkShortcutActive) return;
     this.bookmarkShortcutActive = true;
     document.addEventListener('pointerdown', this.onBookmarkShortcutPointerDown, true);
+    document.addEventListener('pointermove', this.onGrabPreviewPointerMove, true);
+    document.addEventListener('pointerout', this.onGrabPreviewPointerOut, true);
     document.addEventListener('click', this.onBookmarkShortcutClick, true);
   }
 
@@ -134,7 +168,10 @@ export class PageAdapter {
     if (!this.bookmarkShortcutActive) return;
     this.bookmarkShortcutActive = false;
     document.removeEventListener('pointerdown', this.onBookmarkShortcutPointerDown, true);
+    document.removeEventListener('pointermove', this.onGrabPreviewPointerMove, true);
+    document.removeEventListener('pointerout', this.onGrabPreviewPointerOut, true);
     document.removeEventListener('click', this.onBookmarkShortcutClick, true);
+    this.clearGrabPreview();
   }
 
   autoSelectSingleImage(): TargetSelectionSnapshot {
@@ -182,6 +219,7 @@ export class PageAdapter {
   stopGrabMode(): TargetSelectionSnapshot {
     if (!this.grabModeActive) return this.lastSnapshot;
     this.grabModeActive = false;
+    this.clearGrabPreview();
     return this.emit('Grab Mode stopped.');
   }
 
@@ -197,6 +235,7 @@ export class PageAdapter {
   cleanup(): void {
     this.disableBookmarkShortcut();
     this.grabModeActive = false;
+    this.clearGrabPreview();
     this.stopPickMode();
     this.restoreSelectedTarget();
     this.mode = 'none';
@@ -314,17 +353,43 @@ export class PageAdapter {
     this.handleBookmarkShortcutEvent(event);
   };
 
+  private onGrabPreviewPointerMove = (event: PointerEvent): void => {
+    if (!this.grabModeActive) {
+      this.clearGrabPreview();
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof Element) || isEventFromImageTrailPanel(event)) {
+      this.clearGrabPreview();
+      return;
+    }
+    this.applyGrabPreview(this.resolveGrabPreview(target));
+  };
+
+  private onGrabPreviewPointerOut = (event: PointerEvent): void => {
+    if (!event.relatedTarget) this.clearGrabPreview();
+  };
+
   private handleBookmarkShortcutEvent(event: MouseEvent): boolean {
     if ((!event.shiftKey && !this.grabModeActive) || event.button !== 0) return false;
+    if (isEventFromImageTrailPanel(event)) {
+      this.clearGrabPreview();
+      return false;
+    }
     const target = event.target;
     if (!(target instanceof Element)) return false;
-    const strategy = this.activeGrabStrategyForTarget(target);
-    if (!canGrabTarget(strategy.id, target)) return false;
+    const preview = this.resolveGrabPreview(target);
+    if (preview.state === 'invalid' && !this.grabModeActive) return false;
+    this.applyGrabPreview(preview);
 
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
-    void strategy.execute(target);
+    if (preview.state === 'invalid') {
+      this.emit(`Could not grab target: ${preview.reason ?? 'No usable image or link matched the active grab strategy.'}`);
+      return true;
+    }
+    void preview.strategy.execute(target);
     return true;
   }
 
@@ -338,6 +403,41 @@ export class PageAdapter {
       ? (normalizeGrabStrategy(sourcePattern.grabStrategy) ?? { kind: 'clicked-image' })
       : this.activeTemplateGrabStrategy;
     return this.grabStrategies.find((candidate) => candidate.id === strategy?.kind) ?? this.grabStrategies[1]!;
+  }
+
+  private resolveGrabPreview(target: Element): GrabPreviewResolution {
+    const strategy = this.activeGrabStrategyForTarget(target);
+    const previewElement = previewElementForTarget(target);
+    if (strategy.id === 'linked-page-image') {
+      const link = target.closest('a[href]');
+      if (link instanceof HTMLAnchorElement) {
+        const element = link instanceof HTMLElement ? link : previewElement;
+        const linkUrl = safeHttpUrl(link.href, document.baseURI);
+        return linkUrl ? { state: 'valid', element, strategy } : { state: 'invalid', element, strategy, reason: 'Link URL is not usable.' };
+      }
+    }
+
+    const image = findImageFromShortcutTarget(target);
+    if (!(image instanceof HTMLImageElement)) {
+      return { state: 'invalid', element: previewElement, strategy, reason: 'No usable image target was found.' };
+    }
+    if (!isQualifyingImage(image)) {
+      return { state: 'invalid', element: image, strategy, reason: getImageRejectionReason(image) ?? 'Image is not usable.' };
+    }
+    return { state: 'valid', element: image, strategy };
+  }
+
+  private applyGrabPreview(preview: GrabPreviewResolution): void {
+    if (this.grabPreview?.element === preview.element && this.grabPreview.state === preview.state) return;
+    this.clearGrabPreview();
+    markGrabPreviewTarget(preview.element, preview.state);
+    this.grabPreview = { element: preview.element, state: preview.state };
+  }
+
+  private clearGrabPreview(): void {
+    if (!this.grabPreview) return;
+    restoreGrabPreviewTarget(this.grabPreview.element);
+    this.grabPreview = null;
   }
 
   private async grabClickedImage(target: Element): Promise<boolean> {
@@ -579,9 +679,14 @@ function findImageFromShortcutTarget(target: Element): HTMLImageElement | null {
   return nestedInteractive instanceof HTMLImageElement ? nestedInteractive : null;
 }
 
-function canGrabTarget(strategyId: GrabStrategyId, target: Element): boolean {
-  if (strategyId === 'linked-page-image' && target.closest('a[href]')) return true;
-  return findImageFromShortcutTarget(target) instanceof HTMLImageElement;
+function previewElementForTarget(target: Element): HTMLElement {
+  const image = findImageFromShortcutTarget(target);
+  if (image instanceof HTMLElement) return image;
+  const link = target.closest('a[href]');
+  if (link instanceof HTMLElement) return link;
+  const interactive = target.closest('[role="button"],article,[data-testid]');
+  if (interactive instanceof HTMLElement) return interactive;
+  return target instanceof HTMLElement ? target : document.body;
 }
 
 async function resolveLinkedPageImage(pageUrl: string, strategy: LinkedPageImageGrabStrategy): Promise<string> {
