@@ -993,7 +993,8 @@ export class ImageTrailPanel {
 
     const nextModel = setUrlFieldValue(model, field, nextValue);
     const nextUrl = rebuildUrl(nextModel);
-    await this.applySelectedUrl(nextUrl, field.location === 'query' ? [fieldId] : []);
+    const loaded = await this.applySelectedUrl(nextUrl, field.location === 'query' ? [fieldId] : []);
+    if (loaded && this.state.unlockedFieldIds.length > 0) await this.saveUrlTemplateFromCurrentFields();
   }
 
   private async bumpFieldValue(fieldId: string, delta: 1 | -1): Promise<void> {
