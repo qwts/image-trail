@@ -2,7 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseUrl } from '../extension/src/core/url/parse-url.js';
 import { collectUrlFields } from '../extension/src/core/url/tokenize-fields.js';
-import { createUrlTemplateRecord, templateMatchesModel, updateTemplateSettings } from '../extension/src/core/url/templates.js';
+import {
+  createUrlTemplateRecord,
+  templateMatchesModel,
+  updateTemplateFields,
+  updateTemplateSettings,
+} from '../extension/src/core/url/templates.js';
 
 test('url templates replace included fields with readable placeholders', () => {
   const model = parseUrl('https://example.test/gallery/page/0007.jpg?chapter=12&size=large');
@@ -52,4 +57,45 @@ test('url template match modes are explicit instead of opaque confidence scores'
   const broad = updateTemplateSettings(template, { matchMode: 'broad-site', now: '2026-06-21T00:00:02.000Z' });
   assert.equal(templateMatchesModel(broad, differentPathLiteral), true);
   assert.equal(templateMatchesModel(broad, parseUrl('https://elsewhere.test/gallery/page/0008.jpg?chapter=13&size=large')), false);
+});
+
+test('url template field updates preserve review settings and use count', () => {
+  const model = parseUrl('https://example.test/gallery/page/0007.jpg?chapter=12&size=large');
+  const fields = collectUrlFields(model);
+  const chapter = fields.find((field) => field.label === 'query chapter');
+  const file = fields.find((field) => field.label === 'file 0');
+  assert.ok(chapter);
+  assert.ok(file);
+
+  const template = createUrlTemplateRecord({
+    model,
+    fields,
+    includedFieldIds: [chapter.id],
+    now: '2026-06-21T00:00:00.000Z',
+  });
+  assert.ok(template);
+  const configured = updateTemplateSettings(template, {
+    matchMode: 'same-path-query-shape',
+    hideExcludedFields: true,
+    now: '2026-06-21T00:00:01.000Z',
+  });
+
+  const updated = updateTemplateFields({
+    template: configured,
+    model,
+    fields,
+    includedFieldIds: [file.id],
+    now: '2026-06-21T00:00:02.000Z',
+  });
+
+  assert.ok(updated);
+  assert.equal(updated.useCount, configured.useCount);
+  assert.equal(updated.hideExcludedFields, true);
+  assert.equal(updated.matchRules.mode, 'same-path-query-shape');
+  assert.deepEqual(
+    updated.fields.map((field) => field.id),
+    [file.id],
+  );
+  assert.equal(updated.templateUrl, 'https://example.test/gallery/page/{file-0}.jpg?chapter=12&size=large');
+  assert.equal(updateTemplateFields({ template: configured, model, fields, includedFieldIds: [], now: '2026-06-21T00:00:03.000Z' }), null);
 });

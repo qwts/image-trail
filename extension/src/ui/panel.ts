@@ -40,6 +40,7 @@ import {
   createUrlTemplateRecord,
   findBestMatchingTemplate,
   updateTemplateSettings,
+  updateTemplateFields,
   type UrlTemplateRecord,
 } from '../core/url/templates.js';
 import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
@@ -322,6 +323,42 @@ export class ImageTrailPanel {
     const updated = updateTemplateSettings(template, { matchMode: changes.matchMode, hideExcludedFields: changes.hideExcludedFields });
     await this.urlTemplateStore.save(updated);
     this.state = reducePanelAction(this.state, changes);
+    this.render();
+  }
+
+  private async updateUrlTemplateFields(
+    id: string,
+    changes: Extract<PanelAction, { readonly name: 'url-template/update-fields' }>,
+  ): Promise<void> {
+    const template = this.state.urlTemplates.find((candidate) => candidate.id === id);
+    if (!template || !this.urlTemplateStore) return;
+    let model: ParsedUrlModel;
+    try {
+      model = this.currentUrlModel();
+    } catch {
+      return;
+    }
+    const fields = collectUrlFields(model);
+    const updated = updateTemplateFields({
+      template,
+      model,
+      fields,
+      includedFieldIds: changes.includedFieldIds,
+    });
+    if (!updated) {
+      await this.urlTemplateStore.remove(template.hostname, template.id);
+      this.state = reducePanelAction(this.state, { name: 'url-template/remove', id: template.id });
+      this.render();
+      return;
+    }
+    await this.urlTemplateStore.save(updated);
+    this.state = reducePanelAction(
+      {
+        ...this.state,
+        urlTemplates: this.state.urlTemplates.map((candidate) => (candidate.id === id ? updated : candidate)),
+      },
+      changes,
+    );
     this.render();
   }
 
@@ -613,6 +650,11 @@ export class ImageTrailPanel {
 
     if (action.name === 'url-template/update-settings') {
       void this.updateUrlTemplateSettings(action.id, action);
+      return;
+    }
+
+    if (action.name === 'url-template/update-fields') {
+      void this.updateUrlTemplateFields(action.id, action);
       return;
     }
 

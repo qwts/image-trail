@@ -276,7 +276,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         lastUpdatedAt: Date.now(),
       };
     case 'field-unlock/toggle':
-      if (!state.successfulFieldIds.includes(action.id)) {
+      if (!state.successfulFieldIds.includes(action.id) && !state.unlockedFieldIds.includes(action.id)) {
         return { ...state, lastUpdatedAt: Date.now() };
       }
       return {
@@ -391,20 +391,34 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return { ...state, pinSaveStoragePreference: action.value, lastUpdatedAt: Date.now() };
     case 'settings/update-privacy-mode':
       return { ...state, privacyModeEnabled: action.enabled, lastUpdatedAt: Date.now() };
-    case 'url-templates/load':
+    case 'url-templates/load': {
+      const activeTemplate = action.templates.find((template) => template.id === action.activeTemplateId);
+      const previousActiveTemplate = state.urlTemplates.find((template) => template.id === state.activeUrlTemplateId);
+      const previousActiveFieldIds =
+        !activeTemplate && previousActiveTemplate ? previousActiveTemplate.fields.map((field) => field.id) : [];
       return {
         ...state,
         urlTemplates: action.templates,
-        activeUrlTemplateId: action.activeTemplateId ?? state.activeUrlTemplateId,
+        activeUrlTemplateId: action.activeTemplateId ?? null,
+        unlockedFieldIds: activeTemplate
+          ? activeTemplate.fields.map((field) => field.id)
+          : removeItems(state.unlockedFieldIds, previousActiveFieldIds),
         lastUpdatedAt: Date.now(),
       };
-    case 'url-template/remove':
+    }
+    case 'url-template/remove': {
+      const removedTemplate = state.urlTemplates.find((template) => template.id === action.id);
+      const removedFieldIds =
+        removedTemplate && state.activeUrlTemplateId === action.id ? removedTemplate.fields.map((field) => field.id) : [];
       return {
         ...state,
         urlTemplates: state.urlTemplates.filter((template) => template.id !== action.id),
         activeUrlTemplateId: state.activeUrlTemplateId === action.id ? null : state.activeUrlTemplateId,
+        unlockedFieldIds: removeItems(state.unlockedFieldIds, removedFieldIds),
+        manuallyExcludedFieldIds: removeItems(state.manuallyExcludedFieldIds, removedFieldIds),
         lastUpdatedAt: Date.now(),
       };
+    }
     case 'url-template/update-settings':
       return {
         ...state,
@@ -413,6 +427,12 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
             ? updateTemplateSettings(template, { matchMode: action.matchMode, hideExcludedFields: action.hideExcludedFields })
             : template,
         ),
+        lastUpdatedAt: Date.now(),
+      };
+    case 'url-template/update-fields':
+      return {
+        ...state,
+        unlockedFieldIds: state.activeUrlTemplateId === action.id ? action.includedFieldIds : state.unlockedFieldIds,
         lastUpdatedAt: Date.now(),
       };
     case 'capture/request':

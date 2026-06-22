@@ -1,5 +1,6 @@
 import type { PanelAction, PinSaveStoragePreference } from '../../core/types.js';
 import type { UrlTemplateMatchMode, UrlTemplateRecord } from '../../core/url/templates.js';
+import type { UrlField } from '../../core/url/types.js';
 import { VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../../core/settings.js';
 
 const MATCH_MODES: readonly { readonly value: UrlTemplateMatchMode; readonly label: string }[] = [
@@ -13,6 +14,7 @@ export function createSettingsView(
   privacyModeEnabled: boolean,
   templates: readonly UrlTemplateRecord[],
   activeTemplateId: string | null,
+  currentFields: readonly UrlField[],
   privatePinState: {
     readonly pinSaveStoragePreference: PinSaveStoragePreference;
     readonly blobKeyUnlocked: boolean;
@@ -69,7 +71,7 @@ export function createSettingsView(
     createPrivatePinSettingsView(privatePinState, dispatch),
     createPrivacySettingsView(privacyModeEnabled, dispatch),
     createDestructiveSettingsView(destructiveState, dispatch),
-    createTemplateSettingsView(templates, activeTemplateId, dispatch),
+    createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
   );
   return section;
 }
@@ -207,6 +209,7 @@ function createDangerButton(label: string, disabled: boolean, onConfirm: () => v
 function createTemplateSettingsView(
   templates: readonly UrlTemplateRecord[],
   activeTemplateId: string | null,
+  currentFields: readonly UrlField[],
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
   const wrapper = document.createElement('div');
@@ -227,13 +230,18 @@ function createTemplateSettingsView(
   const list = document.createElement('ul');
   list.className = 'image-trail-panel__settings-template-list';
   for (const template of templates) {
-    list.append(createTemplateItem(template, template.id === activeTemplateId, dispatch));
+    list.append(createTemplateItem(template, template.id === activeTemplateId, currentFields, dispatch));
   }
   wrapper.append(list);
   return wrapper;
 }
 
-function createTemplateItem(template: UrlTemplateRecord, active: boolean, dispatch: (action: PanelAction) => void): HTMLElement {
+function createTemplateItem(
+  template: UrlTemplateRecord,
+  active: boolean,
+  currentFields: readonly UrlField[],
+  dispatch: (action: PanelAction) => void,
+): HTMLElement {
   const item = document.createElement('li');
   item.className = active ? 'is-active' : '';
 
@@ -244,7 +252,8 @@ function createTemplateItem(template: UrlTemplateRecord, active: boolean, dispat
 
   const meta = document.createElement('p');
   meta.className = 'image-trail-panel__settings-template-meta';
-  meta.textContent = `${template.fields.length} included field${template.fields.length === 1 ? '' : 's'} · used ${template.useCount} time${template.useCount === 1 ? '' : 's'}${active ? ' · active' : ''}`;
+  const includedLabels = template.fields.map((field) => field.label).join(', ');
+  meta.textContent = `${template.fields.length} included field${template.fields.length === 1 ? '' : 's'}${includedLabels ? `: ${includedLabels}` : ''} · used ${template.useCount} time${template.useCount === 1 ? '' : 's'}${active ? ' · active' : ''}`;
 
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__settings-template-controls';
@@ -286,5 +295,47 @@ function createTemplateItem(template: UrlTemplateRecord, active: boolean, dispat
 
   controls.append(modeLabel, hiddenLabel, clear);
   item.append(url, meta, controls);
+  if (active && currentFields.length > 0) {
+    item.append(createTemplateFieldControls(template, currentFields, dispatch));
+  }
   return item;
+}
+
+function createTemplateFieldControls(
+  template: UrlTemplateRecord,
+  currentFields: readonly UrlField[],
+  dispatch: (action: PanelAction) => void,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-template-fields';
+
+  const title = document.createElement('span');
+  title.className = 'image-trail-panel__settings-template-meta';
+  title.textContent = 'Included fields';
+  wrapper.append(title);
+
+  const included = new Set(template.fields.map((field) => field.id));
+  for (const field of currentFields.filter((candidate) => candidate.tokenKind === 'int' || candidate.tokenKind === 'hex')) {
+    const label = document.createElement('label');
+    label.className = 'image-trail-panel__settings-checkbox';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = included.has(field.id);
+    input.dataset.templateFieldId = field.id;
+    input.addEventListener('change', () => {
+      const next = Array.from(wrapper.querySelectorAll<HTMLInputElement>('input[data-template-field-id]'))
+        .filter((candidate) => candidate.checked)
+        .map((candidate) => candidate.dataset.templateFieldId)
+        .filter((fieldId): fieldId is string => fieldId !== undefined);
+      dispatch({ name: 'url-template/update-fields', id: template.id, includedFieldIds: next });
+    });
+
+    const text = document.createElement('span');
+    text.textContent = field.label;
+    label.append(input, text);
+    wrapper.append(label);
+  }
+
+  return wrapper;
 }

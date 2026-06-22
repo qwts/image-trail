@@ -115,6 +115,26 @@ export function updateTemplateSettings(
   };
 }
 
+export function updateTemplateFields(input: {
+  readonly template: UrlTemplateRecord;
+  readonly model: ParsedUrlModel;
+  readonly fields: readonly UrlField[];
+  readonly includedFieldIds: readonly string[];
+  readonly now?: string;
+}): UrlTemplateRecord | null {
+  const included = input.fields.filter((field) => input.includedFieldIds.includes(field.id));
+  if (included.length === 0) return null;
+  const matchRules = templateMatchRules(input.model, input.template.matchRules.mode);
+  return {
+    ...input.template,
+    hostname: matchRules.hostname,
+    templateUrl: templateUrlForFields(input.model, included),
+    matchRules,
+    fields: included.map((field) => templateField(input.model, field)),
+    updatedAt: input.now ?? new Date().toISOString(),
+  };
+}
+
 function templateUrlForFields(model: ParsedUrlModel, fields: readonly UrlField[]): string {
   const templated = fields.reduce<ParsedUrlModel>(
     (nextModel, field) => setUrlFieldValue(nextModel, field, templateFieldPlaceholder(field)),

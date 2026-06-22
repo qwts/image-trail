@@ -11,6 +11,7 @@ import {
 } from '../extension/src/ui/components/record-metadata.js';
 import { recallDeleteCountForQueue } from '../extension/src/ui/render.js';
 import type { UrlFieldSplitSpec } from '../extension/src/core/url/types.js';
+import type { UrlTemplateRecord } from '../extension/src/core/url/templates.js';
 
 test('switching active fields clears a previous failed field marker', () => {
   const failed = { ...createInitialPanelState(), activeFieldId: 'query-src-0', failedFieldId: 'query-src-0' };
@@ -113,6 +114,66 @@ test('Previous/Next inclusion toggle only changes successful fields', () => {
   const ignored = reducePanelAction(state, { name: 'field-unlock/toggle', id: 'q:1:0' });
   assert.deepEqual(ignored.unlockedFieldIds, []);
   assert.deepEqual(ignored.manuallyExcludedFieldIds, []);
+});
+
+test('loaded active URL templates restore included fields for navigation', () => {
+  const template: UrlTemplateRecord = {
+    id: 'template-001',
+    schemaVersion: 1,
+    hostname: 'example.test',
+    templateUrl: 'https://example.test/image.jpg?page={query-page}',
+    matchRules: {
+      mode: 'exact-page-shape',
+      hostname: 'example.test',
+      exactPathSignature: 'exact',
+      pathShapeSignature: 'shape',
+      querySignature: 'page:int',
+    },
+    fields: [
+      {
+        id: 'q:0:0',
+        label: 'query page',
+        placeholder: '{query-page}',
+        location: 'query',
+        tokenKind: 'int',
+        queryIndex: 0,
+        queryKey: 'page',
+        tokenIndex: 0,
+      },
+    ],
+    hideExcludedFields: true,
+    createdAt: '2026-06-21T00:00:00.000Z',
+    updatedAt: '2026-06-21T00:00:00.000Z',
+    useCount: 1,
+  };
+
+  const loaded = reducePanelAction(createInitialPanelState(), {
+    name: 'url-templates/load',
+    templates: [template],
+    activeTemplateId: template.id,
+  });
+  assert.equal(loaded.activeUrlTemplateId, template.id);
+  assert.deepEqual(loaded.unlockedFieldIds, ['q:0:0']);
+
+  const excluded = reducePanelAction(loaded, { name: 'field-unlock/toggle', id: 'q:0:0' });
+  assert.deepEqual(excluded.unlockedFieldIds, []);
+  assert.deepEqual(excluded.manuallyExcludedFieldIds, ['q:0:0']);
+
+  const inactive = reducePanelAction(
+    { ...loaded, unlockedFieldIds: ['q:0:0', 'q:1:0'], manuallyExcludedFieldIds: ['q:0:0', 'q:2:0'] },
+    { name: 'url-templates/load', templates: [template], activeTemplateId: null },
+  );
+  assert.equal(inactive.activeUrlTemplateId, null);
+  assert.deepEqual(inactive.unlockedFieldIds, ['q:1:0']);
+  assert.deepEqual(inactive.manuallyExcludedFieldIds, ['q:0:0', 'q:2:0']);
+
+  const cleared = reducePanelAction(
+    { ...loaded, unlockedFieldIds: ['q:0:0', 'q:1:0'], manuallyExcludedFieldIds: ['q:0:0', 'q:2:0'] },
+    { name: 'url-template/remove', id: template.id },
+  );
+  assert.equal(cleared.activeUrlTemplateId, null);
+  assert.deepEqual(cleared.unlockedFieldIds, ['q:1:0']);
+  assert.deepEqual(cleared.manuallyExcludedFieldIds, ['q:2:0']);
 });
 
 test('failed field load preserves Previous/Next inclusion choices', () => {

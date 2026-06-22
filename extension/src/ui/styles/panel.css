@@ -775,6 +775,18 @@
   min-width: 0;
 }
 
+.image-trail-panel-root .image-trail-panel__settings-template-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 9px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-template-fields > .image-trail-panel__settings-template-meta {
+  flex-basis: 100%;
+}
+
 .image-trail-panel-root .image-trail-panel__settings-checkbox {
   display: inline-flex;
   align-items: center;

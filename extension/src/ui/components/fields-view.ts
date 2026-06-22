@@ -142,7 +142,9 @@ export function createFieldsView(
     const isIncludedInTrail = unlockedFieldIds.includes(field.field.id);
     const isSplitField = field.field.splitBaseId !== undefined;
     const canUnlock =
-      isSuccessful && field.field.location === 'query' && (field.field.tokenKind === 'int' || field.field.tokenKind === 'hex');
+      (isSuccessful || isIncludedInTrail) &&
+      field.field.location === 'query' &&
+      (field.field.tokenKind === 'int' || field.field.tokenKind === 'hex');
     const canSplit = !isSplitField && field.value.length > 1;
     const fieldLabel = options.privacyMode ? 'Private field' : field.field.label;
     container.className = `image-trail-panel__field-row${field.field.id === activeFieldId ? ' is-active' : ''}${isSuccessful ? ' is-success' : ''}${isUnchanged ? ' is-unchanged' : ''}${isFailed ? ' is-error' : ''}`;

@@ -324,6 +324,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
             state.privacyModeEnabled,
             state.urlTemplates,
             activeTemplate?.id ?? state.activeUrlTemplateId,
+            fields,
             {
               pinSaveStoragePreference: state.pinSaveStoragePreference,
               blobKeyUnlocked: state.blobKeyUnlocked,

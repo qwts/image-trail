@@ -158,6 +158,7 @@ export type PanelActionName =
   | 'url-templates/load'
   | 'url-template/remove'
   | 'url-template/update-settings'
+  | 'url-template/update-fields'
   | 'capture/request'
   | 'capture/start'
   | 'capture/complete'
@@ -233,6 +234,7 @@ export type PanelAction =
         | 'url-templates/load'
         | 'url-template/remove'
         | 'url-template/update-settings'
+        | 'url-template/update-fields'
         | 'capture/request'
         | 'capture/start'
         | 'capture/complete'
@@ -299,6 +301,7 @@ export type PanelAction =
       readonly matchMode?: UrlTemplateMatchMode;
       readonly hideExcludedFields?: boolean;
     }
+  | { readonly name: 'url-template/update-fields'; readonly id: string; readonly includedFieldIds: readonly string[] }
   | { readonly name: 'active-field/set'; readonly id: string | null }
   | { readonly name: 'field-unlock/toggle'; readonly id: string }
   | { readonly name: 'field-split/apply'; readonly id: string; readonly pattern: string }
