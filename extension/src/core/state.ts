@@ -73,6 +73,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     manuallyExcludedFieldIds: [],
     fieldSplitSpecs: [],
     urlTemplates: [],
+    grabSourcePatterns: [],
     activeUrlTemplateId: null,
     currentImageFingerprint: null,
   };

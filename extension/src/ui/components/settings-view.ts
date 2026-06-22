@@ -1,5 +1,5 @@
 import type { PanelAction, PinSaveStoragePreference } from '../../core/types.js';
-import type { UrlTemplateMatchMode, UrlTemplateRecord } from '../../core/url/templates.js';
+import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from '../../core/url/templates.js';
 import {
   defaultGrabStrategy,
   grabStrategyLabel,
@@ -24,6 +24,7 @@ export function createSettingsView(
   visibleBookmarkSoftMax: number,
   privacyModeEnabled: boolean,
   templates: readonly UrlTemplateRecord[],
+  grabSourcePatterns: readonly GrabSourcePattern[],
   activeTemplateId: string | null,
   currentFields: readonly UrlField[],
   privatePinState: {
@@ -83,6 +84,7 @@ export function createSettingsView(
     createPrivacySettingsView(privacyModeEnabled, dispatch),
     createDestructiveSettingsView(destructiveState, dispatch),
     createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
+    createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),
   );
   return section;
 }
@@ -371,6 +373,131 @@ function createTemplateGrabStrategyControls(template: UrlTemplateRecord, dispatc
       dispatch({
         name: 'url-template/update-settings',
         id: template.id,
+        grabStrategy: { ...linkedStrategy, extractors: parseExtractorLines(extractors.value) },
+      });
+    });
+    extractorsLabel.append(extractorsText, extractors);
+    wrapper.append(extractorsLabel);
+  }
+  return wrapper;
+}
+
+function createGrabSourcePatternSettingsView(patterns: readonly GrabSourcePattern[], dispatch: (action: PanelAction) => void): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'Grab patterns';
+  wrapper.append(heading);
+
+  if (patterns.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'image-trail-panel__settings-empty';
+    empty.textContent = 'Cmd-click an image or link to learn a grab pattern for this site.';
+    wrapper.append(empty);
+    return wrapper;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'image-trail-panel__settings-template-list';
+  for (const pattern of patterns) {
+    list.append(createGrabSourcePatternItem(pattern, dispatch));
+  }
+  wrapper.append(list);
+
+  return wrapper;
+}
+
+function createGrabSourcePatternItem(pattern: GrabSourcePattern, dispatch: (action: PanelAction) => void): HTMLElement {
+  const item = document.createElement('li');
+
+  const url = document.createElement('code');
+  url.className = 'image-trail-panel__settings-template-url';
+  url.textContent = pattern.patternUrl;
+  url.title = pattern.patternUrl;
+
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__settings-template-meta';
+  meta.textContent = `${matchModeLabel(pattern.matchRules.mode)} · ${grabStrategyLabel(pattern.grabStrategy)} grab · used ${pattern.useCount} time${pattern.useCount === 1 ? '' : 's'}`;
+
+  const controls = document.createElement('div');
+  controls.className = 'image-trail-panel__settings-template-controls';
+
+  const modeLabel = document.createElement('label');
+  modeLabel.className = 'image-trail-panel__settings-field';
+  modeLabel.classList.add('image-trail-panel__settings-template-match');
+  const modeText = document.createElement('span');
+  modeText.textContent = 'Match';
+  const mode = document.createElement('select');
+  mode.className = 'image-trail-panel__settings-select';
+  for (const option of MATCH_MODES) {
+    const element = document.createElement('option');
+    element.value = option.value;
+    element.textContent = option.label;
+    element.selected = pattern.matchRules.mode === option.value;
+    mode.append(element);
+  }
+  mode.addEventListener('change', () => {
+    dispatch({ name: 'grab-source-pattern/update-settings', id: pattern.id, matchMode: mode.value as UrlTemplateMatchMode });
+  });
+  modeLabel.append(modeText, mode);
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'image-trail-panel__settings-template-clear';
+  remove.textContent = 'Clear';
+  remove.addEventListener('click', () => dispatch({ name: 'grab-source-pattern/remove', id: pattern.id }));
+
+  controls.append(modeLabel, remove);
+  item.append(url, meta, controls, createGrabSourcePatternStrategyControls(pattern, dispatch));
+  return item;
+}
+
+function createGrabSourcePatternStrategyControls(pattern: GrabSourcePattern, dispatch: (action: PanelAction) => void): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-template-fields';
+
+  const strategyLabel = document.createElement('label');
+  strategyLabel.className = 'image-trail-panel__settings-field';
+  const strategyText = document.createElement('span');
+  strategyText.textContent = 'Grab strategy';
+  const strategy = document.createElement('select');
+  strategy.className = 'image-trail-panel__settings-select';
+  const currentKind = pattern.grabStrategy?.kind ?? 'clicked-image';
+  for (const option of [
+    { value: 'clicked-image', label: 'Clicked image' },
+    { value: 'linked-page-image', label: 'Linked page image' },
+  ] satisfies readonly { readonly value: GrabStrategyKind; readonly label: string }[]) {
+    const element = document.createElement('option');
+    element.value = option.value;
+    element.textContent = option.label;
+    element.selected = currentKind === option.value;
+    strategy.append(element);
+  }
+  strategy.addEventListener('change', () => {
+    dispatch({
+      name: 'grab-source-pattern/update-settings',
+      id: pattern.id,
+      grabStrategy: defaultGrabStrategy(strategy.value as GrabStrategyKind),
+    });
+  });
+  strategyLabel.append(strategyText, strategy);
+  wrapper.append(strategyLabel);
+
+  const linkedStrategy = pattern.grabStrategy?.kind === 'linked-page-image' ? pattern.grabStrategy : null;
+  if (linkedStrategy) {
+    const extractorsLabel = document.createElement('label');
+    extractorsLabel.className = 'image-trail-panel__settings-field';
+    const extractorsText = document.createElement('span');
+    extractorsText.textContent = 'Image extractors';
+    const extractors = document.createElement('textarea');
+    extractors.className = 'image-trail-panel__settings-template-extractors';
+    extractors.rows = 4;
+    extractors.value = serializeExtractorLines(linkedStrategy.extractors);
+    extractors.addEventListener('change', () => {
+      dispatch({
+        name: 'grab-source-pattern/update-settings',
+        id: pattern.id,
         grabStrategy: { ...linkedStrategy, extractors: parseExtractorLines(extractors.value) },
       });
     });

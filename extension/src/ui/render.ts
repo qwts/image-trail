@@ -351,6 +351,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
             state.bookmarkLimit,
             state.privacyModeEnabled,
             state.urlTemplates,
+            state.grabSourcePatterns,
             activeTemplate?.id ?? state.activeUrlTemplateId,
             fields,
             {

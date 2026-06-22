@@ -39,8 +39,10 @@ import { collectUrlFields, selectDefaultField } from '../core/url/tokenize-field
 import {
   createUrlTemplateRecord,
   findBestMatchingTemplate,
+  updateGrabSourcePatternSettings,
   updateTemplateSettings,
   updateTemplateFields,
+  upsertGrabSourcePattern,
   type UrlTemplateRecord,
 } from '../core/url/templates.js';
 import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
@@ -114,6 +116,7 @@ export class ImageTrailPanel {
   private unsubscribeFromTarget: (() => void) | null = null;
   private unsubscribeFromLoads: (() => void) | null = null;
   private unsubscribeFromBookmarkRequests: (() => void) | null = null;
+  private unsubscribeFromGrabSourcePatternRequests: (() => void) | null = null;
 
   private readonly governor = new RequestGovernor();
   private readonly keyboard: KeyboardRouter;
@@ -148,7 +151,7 @@ export class ImageTrailPanel {
     this.unsubscribeFromTarget = this.pageAdapter.subscribe((snapshot) => {
       this.state = setTargetState(this.state, toTargetState(snapshot));
       this.render();
-      void this.loadUrlTemplates();
+      void this.loadGrabSettings();
     });
     this.unsubscribeFromLoads = this.pageAdapter.subscribeToSuccessfulLoads((target) => {
       void this.addRecentHistory(target.url, target.thumbnail, {
@@ -166,9 +169,12 @@ export class ImageTrailPanel {
         }
       });
     });
+    this.unsubscribeFromGrabSourcePatternRequests = this.pageAdapter.subscribeToGrabSourcePatternRequests((url) => {
+      void this.learnGrabSourcePattern(url);
+    });
     void this.loadSettingsAndBookmarks();
     void this.loadRecentHistory();
-    void this.loadUrlTemplates();
+    void this.loadGrabSettings();
     void this.refreshStorageUsage();
     void this.refreshBlobKeyStatus();
 
@@ -233,6 +239,8 @@ export class ImageTrailPanel {
     this.unsubscribeFromLoads = null;
     this.unsubscribeFromBookmarkRequests?.();
     this.unsubscribeFromBookmarkRequests = null;
+    this.unsubscribeFromGrabSourcePatternRequests?.();
+    this.unsubscribeFromGrabSourcePatternRequests = null;
   }
 
   private loadBookmarks = async (): Promise<void> => {
@@ -263,17 +271,24 @@ export class ImageTrailPanel {
     void this.localSettingsStore?.save(settings);
   }
 
-  private async loadUrlTemplates(options: { readonly render?: boolean } = {}): Promise<void> {
+  private async loadGrabSettings(options: { readonly render?: boolean } = {}): Promise<void> {
     if (!this.urlTemplateStore) return;
     const hostname = this.currentUrlTemplateHostname();
     if (!hostname) return;
-    const templates = await this.urlTemplateStore.load(hostname);
+    const [templates, grabSourcePatterns] = await Promise.all([
+      this.urlTemplateStore.load(hostname),
+      this.urlTemplateStore.loadGrabSourcePatterns(hostname),
+    ]);
     this.state = reducePanelAction(this.state, {
       name: 'url-templates/load',
       templates,
       activeTemplateId: this.activeTemplateIdForCurrentUrl(templates),
     });
-    this.syncActiveGrabTemplate();
+    this.state = reducePanelAction(this.state, {
+      name: 'grab-source-patterns/load',
+      patterns: grabSourcePatterns,
+    });
+    this.syncGrabSettings();
     if (options.render !== false) this.render();
   }
 
@@ -290,7 +305,7 @@ export class ImageTrailPanel {
     if (this.state.unlockedFieldIds.length === 0) {
       if (existing) {
         await this.urlTemplateStore.remove(existing.hostname, existing.id);
-        await this.loadUrlTemplates({ render: false });
+        await this.loadGrabSettings({ render: false });
       }
       if (this.state.settingsOpen) this.render();
       return;
@@ -303,7 +318,7 @@ export class ImageTrailPanel {
     });
     if (!template) return;
     await this.urlTemplateStore.save(template);
-    await this.loadUrlTemplates({ render: false });
+    await this.loadGrabSettings({ render: false });
     if (this.state.settingsOpen) this.render();
   }
 
@@ -313,7 +328,7 @@ export class ImageTrailPanel {
     if (!hostname) return;
     await this.urlTemplateStore.remove(hostname, id);
     this.state = reducePanelAction(this.state, { name: 'url-template/remove', id });
-    this.syncActiveGrabTemplate();
+    this.syncGrabSettings();
     this.render();
   }
 
@@ -331,7 +346,7 @@ export class ImageTrailPanel {
     });
     await this.urlTemplateStore.save(updated);
     this.state = reducePanelAction(this.state, changes);
-    this.syncActiveGrabTemplate();
+    this.syncGrabSettings();
     this.render();
   }
 
@@ -357,7 +372,7 @@ export class ImageTrailPanel {
     if (!updated) {
       await this.urlTemplateStore.remove(template.hostname, template.id);
       this.state = reducePanelAction(this.state, { name: 'url-template/remove', id: template.id });
-      this.syncActiveGrabTemplate();
+      this.syncGrabSettings();
       this.render();
       return;
     }
@@ -369,14 +384,62 @@ export class ImageTrailPanel {
       },
       changes,
     );
-    this.syncActiveGrabTemplate();
+    this.syncGrabSettings();
     this.render();
   }
 
-  private syncActiveGrabTemplate(): void {
-    this.pageAdapter.setActiveUrlTemplate(
-      this.state.urlTemplates.find((template) => template.id === this.state.activeUrlTemplateId) ?? null,
-    );
+  private async learnGrabSourcePattern(url: string): Promise<void> {
+    if (!this.urlTemplateStore) return;
+    let model: ParsedUrlModel;
+    try {
+      model = parseUrl(url);
+    } catch {
+      this.state = { ...this.state, status: 'error', message: 'Grab source link is not a valid URL.', lastUpdatedAt: Date.now() };
+      this.render();
+      return;
+    }
+
+    const updated = upsertGrabSourcePattern(this.state.grabSourcePatterns, { model });
+    await this.urlTemplateStore.saveGrabSourcePattern(updated);
+    this.state = {
+      ...this.state,
+      grabSourcePatterns: [updated, ...this.state.grabSourcePatterns.filter((pattern) => pattern.id !== updated.id)],
+      message: `Learned grab pattern for ${new URL(url).hostname}.`,
+      status: 'ready',
+      lastUpdatedAt: Date.now(),
+    };
+    this.syncGrabSettings();
+    this.render();
+  }
+
+  private async updateGrabSourcePattern(
+    id: string,
+    changes: Extract<PanelAction, { readonly name: 'grab-source-pattern/update-settings' }>,
+  ): Promise<void> {
+    const pattern = this.state.grabSourcePatterns.find((candidate) => candidate.id === id);
+    if (!pattern || !this.urlTemplateStore) return;
+    const updated = updateGrabSourcePatternSettings(pattern, {
+      matchMode: changes.matchMode,
+      grabStrategy: changes.grabStrategy,
+    });
+    await this.urlTemplateStore.saveGrabSourcePattern(updated);
+    this.state = reducePanelAction(this.state, changes);
+    this.syncGrabSettings();
+    this.render();
+  }
+
+  private async removeGrabSourcePattern(id: string): Promise<void> {
+    const pattern = this.state.grabSourcePatterns.find((candidate) => candidate.id === id);
+    if (!pattern || !this.urlTemplateStore) return;
+    await this.urlTemplateStore.removeGrabSourcePattern(pattern.hostname, id);
+    this.state = reducePanelAction(this.state, { name: 'grab-source-pattern/remove', id });
+    this.syncGrabSettings();
+    this.render();
+  }
+
+  private syncGrabSettings(): void {
+    this.pageAdapter.setUrlTemplates(this.state.urlTemplates, this.state.activeUrlTemplateId);
+    this.pageAdapter.setGrabSourcePatterns(this.state.grabSourcePatterns);
   }
 
   private activeTemplateIdForCurrentUrl(templates: readonly UrlTemplateRecord[]): string | null {
@@ -695,6 +758,16 @@ export class ImageTrailPanel {
 
     if (action.name === 'url-template/update-settings') {
       void this.updateUrlTemplateSettings(action.id, action);
+      return;
+    }
+
+    if (action.name === 'grab-source-pattern/update-settings') {
+      void this.updateGrabSourcePattern(action.id, action);
+      return;
+    }
+
+    if (action.name === 'grab-source-pattern/remove') {
+      void this.removeGrabSourcePattern(action.id);
       return;
     }
 
@@ -1137,7 +1210,7 @@ export class ImageTrailPanel {
     this.state = this.applyFieldLoadResult(this.state, attemptedFieldIds, preload.sha256, baselineFingerprint);
     pushVisibleUrlWhenSameOrigin(nextUrl);
     this.render();
-    void this.loadUrlTemplates();
+    void this.loadGrabSettings();
     return true;
   }
 
@@ -1757,7 +1830,7 @@ export class ImageTrailPanel {
       const snapshot = this.pageAdapter.applyUrlToSelected(url, preload.displayUrl);
       this.state = setTargetState(this.state, toTargetState(snapshot));
       this.render();
-      void this.loadUrlTemplates();
+      void this.loadGrabSettings();
       if (image.complete && isProjectedUrlLoaded()) {
         queueMicrotask(() => finish(true));
       }

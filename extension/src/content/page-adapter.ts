@@ -4,7 +4,8 @@ import {
   type LinkedPageImageGrabStrategy,
   type UrlTemplateGrabStrategy,
 } from '../core/url/grab-strategies.js';
-import type { UrlTemplateRecord } from '../core/url/templates.js';
+import { findBestMatchingGrabSourcePattern, type GrabSourcePattern, type UrlTemplateRecord } from '../core/url/templates.js';
+import { parseUrl } from '../core/url/parse-url.js';
 import {
   applyImageUrl,
   captureImageNavigationSnapshot,
@@ -46,6 +47,7 @@ export type TargetBookmarkRequestListener = (
     readonly trustedLoadedImage?: boolean;
   },
 ) => void;
+export type TargetGrabSourcePatternRequestListener = (url: string) => void;
 
 type GrabStrategyId = 'clicked-image' | 'linked-page-image';
 
@@ -76,6 +78,7 @@ export class PageAdapter {
   private readonly listeners = new Set<TargetSelectionListener>();
   private readonly loadListeners = new Set<TargetLoadListener>();
   private readonly bookmarkRequestListeners = new Set<TargetBookmarkRequestListener>();
+  private readonly grabSourcePatternRequestListeners = new Set<TargetGrabSourcePatternRequestListener>();
   private pendingLoadTarget: HTMLImageElement | null = null;
   private selectedOriginalUrl: string | null = null;
   private selectedOriginalSnapshot: ImageNavigationSnapshot | null = null;
@@ -83,6 +86,7 @@ export class PageAdapter {
   private selectedLockBox = false;
   private bookmarkShortcutActive = false;
   private grabModeActive = false;
+  private grabSourcePatterns: readonly GrabSourcePattern[] = [];
   private activeTemplateGrabStrategy: UrlTemplateGrabStrategy | undefined;
   private suppressBookmarkShortcutClickTarget: EventTarget | null = null;
   private readonly grabStrategies: readonly GrabStrategy[] = [
@@ -112,6 +116,11 @@ export class PageAdapter {
   subscribeToBookmarkRequests(listener: TargetBookmarkRequestListener): () => void {
     this.bookmarkRequestListeners.add(listener);
     return () => this.bookmarkRequestListeners.delete(listener);
+  }
+
+  subscribeToGrabSourcePatternRequests(listener: TargetGrabSourcePatternRequestListener): () => void {
+    this.grabSourcePatternRequestListeners.add(listener);
+    return () => this.grabSourcePatternRequestListeners.delete(listener);
   }
 
   enableBookmarkShortcut(): void {
@@ -176,8 +185,13 @@ export class PageAdapter {
     return this.emit('Grab Mode stopped.');
   }
 
-  setActiveUrlTemplate(template: UrlTemplateRecord | null): void {
+  setUrlTemplates(templates: readonly UrlTemplateRecord[], activeTemplateId: string | null): void {
+    const template = templates.find((candidate) => candidate.id === activeTemplateId) ?? null;
     this.activeTemplateGrabStrategy = normalizeGrabStrategy(template?.grabStrategy);
+  }
+
+  setGrabSourcePatterns(patterns: readonly GrabSourcePattern[]): void {
+    this.grabSourcePatterns = patterns;
   }
 
   cleanup(): void {
@@ -274,6 +288,13 @@ export class PageAdapter {
   };
 
   private onBookmarkShortcutPointerDown = (event: PointerEvent): void => {
+    if (this.handleGrabSourcePatternRequestEvent(event)) {
+      this.suppressBookmarkShortcutClickTarget = event.target;
+      window.setTimeout(() => {
+        if (this.suppressBookmarkShortcutClickTarget === event.target) this.suppressBookmarkShortcutClickTarget = null;
+      }, 700);
+      return;
+    }
     if (this.handleBookmarkShortcutEvent(event)) {
       this.suppressBookmarkShortcutClickTarget = event.target;
       window.setTimeout(() => {
@@ -297,7 +318,7 @@ export class PageAdapter {
     if ((!event.shiftKey && !this.grabModeActive) || event.button !== 0) return false;
     const target = event.target;
     if (!(target instanceof Element)) return false;
-    const strategy = this.activeGrabStrategy();
+    const strategy = this.activeGrabStrategyForTarget(target);
     if (!canGrabTarget(strategy.id, target)) return false;
 
     event.preventDefault();
@@ -309,6 +330,14 @@ export class PageAdapter {
 
   private activeGrabStrategy(): GrabStrategy {
     return this.grabStrategies.find((strategy) => strategy.id === this.activeTemplateGrabStrategy?.kind) ?? this.grabStrategies[1]!;
+  }
+
+  private activeGrabStrategyForTarget(target: Element): GrabStrategy {
+    const sourcePattern = this.grabSourcePatternForTarget(target);
+    const strategy = sourcePattern
+      ? (normalizeGrabStrategy(sourcePattern.grabStrategy) ?? { kind: 'clicked-image' })
+      : this.activeTemplateGrabStrategy;
+    return this.grabStrategies.find((candidate) => candidate.id === strategy?.kind) ?? this.grabStrategies[1]!;
   }
 
   private async grabClickedImage(target: Element): Promise<boolean> {
@@ -333,17 +362,56 @@ export class PageAdapter {
     }
 
     try {
-      const strategy =
-        this.activeTemplateGrabStrategy?.kind === 'linked-page-image'
-          ? this.activeTemplateGrabStrategy
-          : DEFAULT_LINKED_PAGE_IMAGE_GRAB_STRATEGY;
+      const sourcePattern = this.grabSourcePatternForTarget(target);
+      const grabStrategy = sourcePattern
+        ? (normalizeGrabStrategy(sourcePattern.grabStrategy) ?? { kind: 'clicked-image' })
+        : this.activeTemplateGrabStrategy;
+      const strategy = grabStrategy?.kind === 'linked-page-image' ? grabStrategy : DEFAULT_LINKED_PAGE_IMAGE_GRAB_STRATEGY;
       const imageUrl = await resolveLinkedPageImage(pageUrl.href, strategy);
       await this.emitBookmarkResolvedUrl(imageUrl);
-      this.emit(`Grabbed ${summarizeTargetUrlForMessage(imageUrl)} with ${this.activeGrabStrategy().label}.`);
+      this.emit(`Grabbed ${summarizeTargetUrlForMessage(imageUrl)} with Linked page image.`);
     } catch (error) {
       this.emit(`Could not grab linked page image: ${error instanceof Error ? error.message : 'Strategy failed.'}`);
     }
     return true;
+  }
+
+  private handleGrabSourcePatternRequestEvent(event: MouseEvent): boolean {
+    if (!event.metaKey || event.shiftKey || event.button !== 0) return false;
+    const target = event.target;
+    if (!(target instanceof Element)) return false;
+    const sourceUrl = this.grabSourcePatternUrlForTarget(target);
+    if (!sourceUrl) return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    for (const listener of this.grabSourcePatternRequestListeners) listener(sourceUrl.href);
+    return true;
+  }
+
+  private grabSourcePatternForTarget(target: Element): GrabSourcePattern | null {
+    const sourceUrl = this.grabSourcePatternUrlForTarget(target);
+    if (!sourceUrl) return null;
+    try {
+      return findBestMatchingGrabSourcePattern(this.grabSourcePatterns, parseUrl(sourceUrl.href));
+    } catch {
+      return null;
+    }
+  }
+
+  private grabSourcePatternUrlForTarget(target: Element): URL | null {
+    const link = target.closest('a[href]');
+    if (link instanceof HTMLAnchorElement) {
+      const linkUrl = safeHttpUrl(link.href, document.baseURI);
+      if (linkUrl) return linkUrl;
+    }
+    const image = findImageFromShortcutTarget(target);
+    if (image instanceof HTMLImageElement) {
+      const imageUrl = safeHttpUrl(image.currentSrc || image.src, document.baseURI);
+      if (imageUrl) return imageUrl;
+    }
+    return null;
   }
 
   private async bookmarkPageImage(image: HTMLImageElement): Promise<void> {

@@ -1,7 +1,7 @@
 import type { AutomationPhase } from './automation/types.js';
 import type { CaptureResult, StorageUsageSummary } from './image/capture-result.js';
 import type { ImageDisplayRecord } from './display-records.js';
-import type { UrlTemplateMatchMode, UrlTemplateRecord } from './url/templates.js';
+import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from './url/templates.js';
 import type { UrlTemplateGrabStrategy } from './url/grab-strategies.js';
 import type { UrlFieldSplitSpec } from './url/types.js';
 
@@ -53,8 +53,11 @@ export interface PanelPositionStore {
 
 export interface UrlTemplateStore {
   load(hostname: string): Promise<readonly UrlTemplateRecord[]>;
+  loadGrabSourcePatterns(hostname: string): Promise<readonly GrabSourcePattern[]>;
   save(template: UrlTemplateRecord): Promise<void>;
+  saveGrabSourcePattern(pattern: GrabSourcePattern): Promise<void>;
   remove(hostname: string, id: string): Promise<void>;
+  removeGrabSourcePattern(hostname: string, id: string): Promise<void>;
 }
 
 export interface RecallCandidate extends ImageDisplayRecord {
@@ -116,6 +119,7 @@ export interface PanelState {
   readonly manuallyExcludedFieldIds: readonly string[];
   readonly fieldSplitSpecs: readonly UrlFieldSplitSpec[];
   readonly urlTemplates: readonly UrlTemplateRecord[];
+  readonly grabSourcePatterns: readonly GrabSourcePattern[];
   readonly activeUrlTemplateId: string | null;
   readonly currentImageFingerprint: string | null;
 }
@@ -168,6 +172,9 @@ export type PanelActionName =
   | 'url-template/remove'
   | 'url-template/update-settings'
   | 'url-template/update-fields'
+  | 'grab-source-patterns/load'
+  | 'grab-source-pattern/remove'
+  | 'grab-source-pattern/update-settings'
   | 'capture/request'
   | 'capture/start'
   | 'capture/complete'
@@ -246,6 +253,9 @@ export type PanelAction =
         | 'url-template/remove'
         | 'url-template/update-settings'
         | 'url-template/update-fields'
+        | 'grab-source-patterns/load'
+        | 'grab-source-pattern/remove'
+        | 'grab-source-pattern/update-settings'
         | 'capture/request'
         | 'capture/start'
         | 'capture/complete'
@@ -318,6 +328,14 @@ export type PanelAction =
       readonly grabStrategy?: UrlTemplateGrabStrategy | null;
     }
   | { readonly name: 'url-template/update-fields'; readonly id: string; readonly includedFieldIds: readonly string[] }
+  | { readonly name: 'grab-source-patterns/load'; readonly patterns: readonly GrabSourcePattern[] }
+  | { readonly name: 'grab-source-pattern/remove'; readonly id: string }
+  | {
+      readonly name: 'grab-source-pattern/update-settings';
+      readonly id: string;
+      readonly matchMode?: UrlTemplateMatchMode;
+      readonly grabStrategy?: UrlTemplateGrabStrategy | null;
+    }
   | { readonly name: 'active-field/set'; readonly id: string | null }
   | { readonly name: 'field-unlock/toggle'; readonly id: string }
   | { readonly name: 'field-split/apply'; readonly id: string; readonly pattern: string }

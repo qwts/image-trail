@@ -5,10 +5,14 @@ import { defaultGrabStrategy } from '../extension/src/core/url/grab-strategies.j
 import { collectUrlFields } from '../extension/src/core/url/tokenize-fields.js';
 import {
   createUrlTemplateRecord,
+  findBestMatchingGrabSourcePattern,
   findBestMatchingTemplate,
+  grabSourcePatternMatches,
   templateMatchesModel,
   updateTemplateFields,
+  updateGrabSourcePatternSettings,
   updateTemplateSettings,
+  upsertGrabSourcePattern,
 } from '../extension/src/core/url/templates.js';
 
 test('url templates replace included fields with readable placeholders', () => {
@@ -140,4 +144,40 @@ test('url template settings preserve declarative grab strategy configuration', (
 
   const cleared = updateTemplateSettings(linked, { grabStrategy: null, now: '2026-06-21T00:00:03.000Z' });
   assert.equal(cleared.grabStrategy, undefined);
+});
+
+test('grab source patterns match clicked targets independently from image URL templates', () => {
+  const imageModel = parseUrl('https://cdn.example.test/images/0007.jpg');
+  const imageFields = collectUrlFields(imageModel);
+  const imageField = imageFields.find((field) => field.label === 'file 0');
+  assert.ok(imageField);
+
+  const template = createUrlTemplateRecord({
+    model: imageModel,
+    fields: imageFields,
+    includedFieldIds: [imageField.id],
+    now: '2026-06-21T00:00:00.000Z',
+  });
+  assert.ok(template);
+
+  const pattern = upsertGrabSourcePattern([], {
+    model: parseUrl('https://example.test/post/12345?src=feed'),
+    now: '2026-06-21T00:00:01.000Z',
+  });
+  assert.equal(pattern.patternUrl, 'https://example.test/post/12345?src=feed');
+  assert.equal(pattern.hostname, 'example.test');
+  assert.equal(pattern.grabStrategy, undefined);
+  assert.equal(grabSourcePatternMatches(pattern, parseUrl('https://example.test/post/67890?src=feed')), true);
+  assert.equal(grabSourcePatternMatches(pattern, parseUrl('https://example.test/other/67890?src=feed')), false);
+
+  const configured = updateGrabSourcePatternSettings(pattern, {
+    grabStrategy: defaultGrabStrategy('linked-page-image'),
+    now: '2026-06-21T00:00:02.000Z',
+  });
+  assert.equal(configured.grabStrategy?.kind, 'linked-page-image');
+
+  const match = findBestMatchingGrabSourcePattern([configured], parseUrl('https://example.test/post/67890?src=feed'));
+  assert.equal(match?.id, pattern.id);
+
+  assert.equal(findBestMatchingTemplate([template], parseUrl('https://example.test/post/67890?src=feed')), null);
 });

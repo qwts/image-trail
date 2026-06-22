@@ -11,7 +11,7 @@ import {
 } from '../extension/src/ui/components/record-metadata.js';
 import { recallDeleteCountForQueue } from '../extension/src/ui/render.js';
 import type { UrlFieldSplitSpec } from '../extension/src/core/url/types.js';
-import type { UrlTemplateRecord } from '../extension/src/core/url/templates.js';
+import type { GrabSourcePattern, UrlTemplateRecord } from '../extension/src/core/url/templates.js';
 
 test('switching active fields clears a previous failed field marker', () => {
   const failed = { ...createInitialPanelState(), activeFieldId: 'query-src-0', failedFieldId: 'query-src-0' };
@@ -238,6 +238,59 @@ test('failed field load preserves Previous/Next inclusion choices', () => {
   assert.deepEqual(next.unchangedFieldIds, []);
   assert.deepEqual(next.unlockedFieldIds, ['q:0:0', 'q:1:0']);
   assert.deepEqual(next.manuallyExcludedFieldIds, ['q:2:0']);
+});
+
+test('removing a grab source pattern preserves URL templates', () => {
+  const template: UrlTemplateRecord = {
+    id: 'template-001',
+    schemaVersion: 1,
+    hostname: 'example.test',
+    templateUrl: 'https://example.test/image.jpg?page={query-page}',
+    matchRules: {
+      mode: 'exact-page-shape',
+      hostname: 'example.test',
+      exactPathSignature: 'exact',
+      pathShapeSignature: 'shape',
+      querySignature: 'page:int',
+    },
+    fields: [],
+    hideExcludedFields: false,
+    autoApplyEnabled: true,
+    createdAt: '2026-06-21T00:00:00.000Z',
+    updatedAt: '2026-06-21T00:00:00.000Z',
+    useCount: 1,
+  };
+  const pattern: GrabSourcePattern = {
+    id: 'grab-source-1',
+    schemaVersion: 1,
+    hostname: 'example.test',
+    patternUrl: 'https://example.test/post/123',
+    matchRules: {
+      mode: 'exact-page-shape',
+      hostname: 'example.test',
+      exactPathSignature: 'post:int',
+      pathShapeSignature: 'post:int',
+      querySignature: '',
+    },
+    createdAt: '2026-06-21T00:00:00.000Z',
+    updatedAt: '2026-06-21T00:00:00.000Z',
+    useCount: 1,
+  };
+
+  const withTemplate = reducePanelAction(createInitialPanelState(), {
+    name: 'url-templates/load',
+    templates: [template],
+    activeTemplateId: template.id,
+  });
+  const loaded = reducePanelAction(withTemplate, {
+    name: 'grab-source-patterns/load',
+    patterns: [pattern],
+  });
+  const next = reducePanelAction(loaded, { name: 'grab-source-pattern/remove', id: pattern.id });
+
+  assert.equal(next.urlTemplates.length, 1);
+  assert.deepEqual(next.urlTemplates[0], template);
+  assert.deepEqual(next.grabSourcePatterns, []);
 });
 
 test('record selection toggles one list at a time', () => {
