@@ -446,6 +446,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
                 matchMode: action.matchMode,
                 hideExcludedFields: action.hideExcludedFields,
                 autoApplyEnabled: action.autoApplyEnabled,
+                grabStrategy: action.grabStrategy,
               })
             : template,
         ),

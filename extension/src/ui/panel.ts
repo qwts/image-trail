@@ -273,6 +273,7 @@ export class ImageTrailPanel {
       templates,
       activeTemplateId: this.activeTemplateIdForCurrentUrl(templates),
     });
+    this.syncActiveGrabTemplate();
     if (options.render !== false) this.render();
   }
 
@@ -312,6 +313,7 @@ export class ImageTrailPanel {
     if (!hostname) return;
     await this.urlTemplateStore.remove(hostname, id);
     this.state = reducePanelAction(this.state, { name: 'url-template/remove', id });
+    this.syncActiveGrabTemplate();
     this.render();
   }
 
@@ -325,9 +327,11 @@ export class ImageTrailPanel {
       matchMode: changes.matchMode,
       hideExcludedFields: changes.hideExcludedFields,
       autoApplyEnabled: changes.autoApplyEnabled,
+      grabStrategy: changes.grabStrategy,
     });
     await this.urlTemplateStore.save(updated);
     this.state = reducePanelAction(this.state, changes);
+    this.syncActiveGrabTemplate();
     this.render();
   }
 
@@ -353,6 +357,7 @@ export class ImageTrailPanel {
     if (!updated) {
       await this.urlTemplateStore.remove(template.hostname, template.id);
       this.state = reducePanelAction(this.state, { name: 'url-template/remove', id: template.id });
+      this.syncActiveGrabTemplate();
       this.render();
       return;
     }
@@ -364,7 +369,14 @@ export class ImageTrailPanel {
       },
       changes,
     );
+    this.syncActiveGrabTemplate();
     this.render();
+  }
+
+  private syncActiveGrabTemplate(): void {
+    this.pageAdapter.setActiveUrlTemplate(
+      this.state.urlTemplates.find((template) => template.id === this.state.activeUrlTemplateId) ?? null,
+    );
   }
 
   private activeTemplateIdForCurrentUrl(templates: readonly UrlTemplateRecord[]): string | null {

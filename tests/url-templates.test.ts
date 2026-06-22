@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseUrl } from '../extension/src/core/url/parse-url.js';
+import { defaultGrabStrategy } from '../extension/src/core/url/grab-strategies.js';
 import { collectUrlFields } from '../extension/src/core/url/tokenize-fields.js';
 import {
   createUrlTemplateRecord,
@@ -104,4 +105,39 @@ test('url template field updates preserve review settings and use count', () => 
   );
   assert.equal(updated.templateUrl, 'https://example.test/gallery/page/{file-0}.jpg?chapter=12&size=large');
   assert.equal(updateTemplateFields({ template: configured, model, fields, includedFieldIds: [], now: '2026-06-21T00:00:03.000Z' }), null);
+});
+
+test('url template settings preserve declarative grab strategy configuration', () => {
+  const model = parseUrl('https://example.test/gallery/page/0007.jpg?chapter=12&size=large');
+  const fields = collectUrlFields(model);
+  const chapter = fields.find((field) => field.label === 'query chapter');
+  const file = fields.find((field) => field.label === 'file 0');
+  assert.ok(chapter);
+  assert.ok(file);
+
+  const template = createUrlTemplateRecord({
+    model,
+    fields,
+    includedFieldIds: [chapter.id],
+    now: '2026-06-21T00:00:00.000Z',
+  });
+  assert.ok(template);
+
+  const linked = updateTemplateSettings(template, {
+    grabStrategy: defaultGrabStrategy('linked-page-image'),
+    now: '2026-06-21T00:00:01.000Z',
+  });
+  assert.equal(linked.grabStrategy?.kind, 'linked-page-image');
+
+  const updatedFields = updateTemplateFields({
+    template: linked,
+    model,
+    fields,
+    includedFieldIds: [file.id],
+    now: '2026-06-21T00:00:02.000Z',
+  });
+  assert.equal(updatedFields?.grabStrategy?.kind, 'linked-page-image');
+
+  const cleared = updateTemplateSettings(linked, { grabStrategy: null, now: '2026-06-21T00:00:03.000Z' });
+  assert.equal(cleared.grabStrategy, undefined);
 });

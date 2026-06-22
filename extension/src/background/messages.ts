@@ -26,6 +26,8 @@ export const MessageType = {
   CreateBlobPreviewResult: 'imageTrail.createBlobPreviewResult',
   FetchThumbnailSource: 'imageTrail.fetchThumbnailSource',
   FetchThumbnailSourceResult: 'imageTrail.fetchThumbnailSourceResult',
+  FetchLinkedPage: 'imageTrail.fetchLinkedPage',
+  FetchLinkedPageResult: 'imageTrail.fetchLinkedPageResult',
   GrantPermissionAndCapture: 'imageTrail.grantPermissionAndCapture',
   BlobKeyStatus: 'imageTrail.blobKeyStatus',
   BlobKeyStatusResult: 'imageTrail.blobKeyStatusResult',
@@ -263,6 +265,20 @@ export interface FetchThumbnailSourceResultMessage {
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload:
     | { readonly ok: true; readonly dataUrl: string; readonly mimeType: string; readonly byteLength: number; readonly sha256?: string }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
+export interface FetchLinkedPageMessage {
+  readonly type: typeof MessageType.FetchLinkedPage;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly url: string; readonly maxBytes: number; readonly timeoutMs: number };
+}
+
+export interface FetchLinkedPageResultMessage {
+  readonly type: typeof MessageType.FetchLinkedPageResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly text: string; readonly byteLength: number; readonly finalUrl: string }
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 
@@ -629,6 +645,7 @@ export type ExtensionRequest =
   | CreateBlobPreviewMessage
   | CreateDataUrlPreviewMessage
   | FetchThumbnailSourceMessage
+  | FetchLinkedPageMessage
   | GrantPermissionAndCaptureMessage
   | BlobKeyStatusMessage
   | SetupBlobKeyMessage
@@ -667,6 +684,7 @@ export type ExtensionResponse =
   | RetrieveBlobResultMessage
   | CreateBlobPreviewResultMessage
   | FetchThumbnailSourceResultMessage
+  | FetchLinkedPageResultMessage
   | BlobKeyStatusResultMessage
   | BlobKeyResultMessage
   | ExportBlobKeyBackupResultMessage
@@ -777,6 +795,10 @@ export function createFetchThumbnailSourceMessage(url: string, referrer?: string
   return { type: MessageType.FetchThumbnailSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer } };
 }
 
+export function createFetchLinkedPageMessage(url: string, maxBytes: number, timeoutMs: number): FetchLinkedPageMessage {
+  return { type: MessageType.FetchLinkedPage, version: MESSAGE_PROTOCOL_VERSION, payload: { url, maxBytes, timeoutMs } };
+}
+
 export function createRetrieveBlobResultMessage(payload: RetrieveBlobResultMessage['payload']): RetrieveBlobResultMessage {
   return { type: MessageType.RetrieveBlobResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
@@ -789,6 +811,10 @@ export function createFetchThumbnailSourceResultMessage(
   payload: FetchThumbnailSourceResultMessage['payload'],
 ): FetchThumbnailSourceResultMessage {
   return { type: MessageType.FetchThumbnailSourceResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createFetchLinkedPageResultMessage(payload: FetchLinkedPageResultMessage['payload']): FetchLinkedPageResultMessage {
+  return { type: MessageType.FetchLinkedPageResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createGrantPermissionAndCaptureMessage(
@@ -1047,6 +1073,7 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.CreateBlobPreview ||
     value.type === MessageType.CreateDataUrlPreview ||
     value.type === MessageType.FetchThumbnailSource ||
+    value.type === MessageType.FetchLinkedPage ||
     value.type === MessageType.GrantPermissionAndCapture ||
     value.type === MessageType.BlobKeyStatus ||
     value.type === MessageType.SetupBlobKey ||
@@ -1090,6 +1117,7 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.RetrieveBlobResult ||
     value.type === MessageType.CreateBlobPreviewResult ||
     value.type === MessageType.FetchThumbnailSourceResult ||
+    value.type === MessageType.FetchLinkedPageResult ||
     value.type === MessageType.BlobKeyStatusResult ||
     value.type === MessageType.BlobKeyResult ||
     value.type === MessageType.ExportBlobKeyBackupResult ||
@@ -1153,6 +1181,11 @@ export function isCreateBlobPreviewResultMessage(value: unknown): value is Creat
 export function isFetchThumbnailSourceResultMessage(value: unknown): value is FetchThumbnailSourceResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.FetchThumbnailSourceResult;
+}
+
+export function isFetchLinkedPageResultMessage(value: unknown): value is FetchLinkedPageResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.FetchLinkedPageResult;
 }
 
 export function isCaptureResultMessage(value: unknown): value is CaptureResultMessage {

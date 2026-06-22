@@ -2,6 +2,7 @@ import type { AutomationPhase } from './automation/types.js';
 import type { CaptureResult, StorageUsageSummary } from './image/capture-result.js';
 import type { ImageDisplayRecord } from './display-records.js';
 import type { UrlTemplateMatchMode, UrlTemplateRecord } from './url/templates.js';
+import type { UrlTemplateGrabStrategy } from './url/grab-strategies.js';
 import type { UrlFieldSplitSpec } from './url/types.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
@@ -311,6 +312,7 @@ export type PanelAction =
       readonly matchMode?: UrlTemplateMatchMode;
       readonly hideExcludedFields?: boolean;
       readonly autoApplyEnabled?: boolean;
+      readonly grabStrategy?: UrlTemplateGrabStrategy | null;
     }
   | { readonly name: 'url-template/update-fields'; readonly id: string; readonly includedFieldIds: readonly string[] }
   | { readonly name: 'active-field/set'; readonly id: string | null }

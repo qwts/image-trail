@@ -13,7 +13,8 @@ export interface TargetImageInfo {
     | 'srcAttribute'
     | 'srcProperty'
     | 'data-src'
-    | 'data-original';
+    | 'data-original'
+    | 'linkedPageExtractor';
 }
 
 const MIN_VISIBLE_DIMENSION = 32;

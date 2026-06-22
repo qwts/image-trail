@@ -1318,6 +1318,12 @@ test('UrlTemplateRepository saves templates per hostname', async (t) => {
     ],
     hideExcludedFields: false,
     autoApplyEnabled: true,
+    grabStrategy: {
+      kind: 'linked-page-image',
+      timeoutMs: 5000,
+      maxBytes: 1_048_576,
+      extractors: [{ selector: 'meta[property="og:image"]', attribute: 'content' }],
+    },
     createdAt: '2026-06-21T00:00:00.000Z',
     updatedAt: '2026-06-21T00:00:00.000Z',
     useCount: 1,

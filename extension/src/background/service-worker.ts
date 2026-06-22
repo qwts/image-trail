@@ -29,6 +29,7 @@ import {
   createDeleteBlobResultMessage,
   createDownloadImageResultMessage,
   createExportEncryptedImageResultMessage,
+  createFetchLinkedPageResultMessage,
   createFetchThumbnailSourceResultMessage,
   createLoadBookmarksByIdsResultMessage,
   createImportEncryptedImageResultMessage,
@@ -80,7 +81,7 @@ import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messag
 import type { LoadPanelPositionMessage, SavePanelPositionMessage } from './messages.js';
 import type { DeleteUrlTemplateMessage, ListUrlTemplatesMessage, SaveUrlTemplateMessage } from './messages.js';
 import type { SaveLocalSettingsMessage } from './messages.js';
-import type { FetchThumbnailSourceMessage } from './messages.js';
+import type { FetchLinkedPageMessage, FetchThumbnailSourceMessage } from './messages.js';
 import type { CreateBlobPreviewMessage } from './messages.js';
 import type { SetupBlobKeyMessage, UnlockBlobKeyMessage, BlobKeyResultMessage } from './messages.js';
 import type { ExportBlobKeyBackupMessage, ImportBlobKeyBackupMessage } from './messages.js';
@@ -91,6 +92,8 @@ const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
 const PREVIEW_TTL_MS = 60_000;
 const MAX_THUMBNAIL_SOURCE_BYTES = 5 * 1024 * 1024;
+const MAX_LINKED_PAGE_BYTES = 2 * 1024 * 1024;
+const MAX_LINKED_PAGE_TIMEOUT_MS = 15_000;
 
 interface PreviewPayload {
   readonly dataUrl: string;
@@ -396,6 +399,66 @@ async function handleFetchThumbnailSource(
     byteLength: fetchResult.byteLength,
     sha256: await computeSha256(fetchResult.bytes),
   };
+}
+
+async function handleFetchLinkedPage(
+  message: FetchLinkedPageMessage,
+): Promise<import('./messages.js').FetchLinkedPageResultMessage['payload']> {
+  const maxBytes = Math.min(MAX_LINKED_PAGE_BYTES, Math.max(32_768, message.payload.maxBytes));
+  const timeoutMs = Math.min(MAX_LINKED_PAGE_TIMEOUT_MS, Math.max(1000, message.payload.timeoutMs));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const url = new URL(message.payload.url);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return { ok: false, reason: 'unsupported-url', message: 'Linked page URL must use HTTP or HTTPS.' };
+    }
+
+    const response = await fetch(url.href, { credentials: 'include', signal: controller.signal });
+    if (!response.ok) return { ok: false, reason: 'http-error', message: `Linked page returned ${response.status}.` };
+    const contentLength = Number(response.headers.get('content-length') ?? 0);
+    if (contentLength > maxBytes) {
+      return { ok: false, reason: 'too-large', message: 'Linked page is larger than the strategy limit.' };
+    }
+
+    const result = await readLimitedText(response, maxBytes);
+    return { ok: true, text: result.text, byteLength: result.byteLength, finalUrl: response.url };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return { ok: false, reason: 'timeout', message: 'Linked page fetch timed out.' };
+    }
+    if (error instanceof Error && error.message === 'too-large') {
+      return { ok: false, reason: 'too-large', message: 'Linked page is larger than the strategy limit.' };
+    }
+    return { ok: false, reason: 'network-error', message: 'Linked page fetch failed.' };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function readLimitedText(response: Response, maxBytes: number): Promise<{ readonly text: string; readonly byteLength: number }> {
+  if (!response.body) {
+    const text = await response.text();
+    const byteLength = new TextEncoder().encode(text).byteLength;
+    if (byteLength > maxBytes) throw new Error('too-large');
+    return { text, byteLength };
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let byteLength = 0;
+  let text = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    byteLength += value.byteLength;
+    if (byteLength > maxBytes) {
+      await reader.cancel();
+      throw new Error('too-large');
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return { text: text + decoder.decode(), byteLength };
 }
 
 async function handleStorageUsage(): Promise<StorageUsageSummary> {
@@ -1053,6 +1116,14 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
           sendResponse(
             createFetchThumbnailSourceResultMessage({ ok: false, reason: 'unknown', message: 'Thumbnail source fetch failed.' }),
           ),
+        );
+      return true;
+
+    case MessageType.FetchLinkedPage:
+      handleFetchLinkedPage(message)
+        .then((result) => sendResponse(createFetchLinkedPageResultMessage(result)))
+        .catch(() =>
+          sendResponse(createFetchLinkedPageResultMessage({ ok: false, reason: 'unknown', message: 'Linked page fetch failed.' })),
         );
       return true;
 

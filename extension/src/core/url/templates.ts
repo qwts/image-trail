@@ -1,5 +1,6 @@
 import { rebuildUrl, setUrlFieldValue } from './rebuild-url.js';
 import { tokenValue } from './tokenize-fields.js';
+import { normalizeGrabStrategy, type UrlTemplateGrabStrategy } from './grab-strategies.js';
 import type { ParsedUrlModel, UrlField } from './types.js';
 
 export type UrlTemplateMatchMode = 'exact-page-shape' | 'same-path-query-shape' | 'broad-site';
@@ -33,6 +34,7 @@ export interface UrlTemplateRecord {
   readonly fields: readonly UrlTemplateField[];
   readonly hideExcludedFields: boolean;
   readonly autoApplyEnabled: boolean;
+  readonly grabStrategy?: UrlTemplateGrabStrategy;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly useCount: number;
@@ -61,6 +63,7 @@ export function createUrlTemplateRecord(input: {
     fields: included.map((field) => templateField(input.model, field)),
     hideExcludedFields: input.existing?.hideExcludedFields ?? false,
     autoApplyEnabled: input.existing?.autoApplyEnabled ?? true,
+    grabStrategy: normalizeGrabStrategy(input.existing?.grabStrategy),
     createdAt: input.existing?.createdAt ?? now,
     updatedAt: now,
     useCount: (input.existing?.useCount ?? 0) + 1,
@@ -120,14 +123,22 @@ export function updateTemplateSettings(
     readonly matchMode?: UrlTemplateMatchMode;
     readonly hideExcludedFields?: boolean;
     readonly autoApplyEnabled?: boolean;
+    readonly grabStrategy?: UrlTemplateGrabStrategy | null;
     readonly now?: string;
   },
 ): UrlTemplateRecord {
+  const grabStrategy =
+    changes.grabStrategy === null
+      ? undefined
+      : changes.grabStrategy === undefined
+        ? template.grabStrategy
+        : normalizeGrabStrategy(changes.grabStrategy);
   return {
     ...template,
     matchRules: changes.matchMode ? { ...template.matchRules, mode: changes.matchMode } : template.matchRules,
     hideExcludedFields: changes.hideExcludedFields ?? template.hideExcludedFields,
     autoApplyEnabled: changes.autoApplyEnabled ?? template.autoApplyEnabled ?? true,
+    grabStrategy,
     updatedAt: changes.now ?? new Date().toISOString(),
   };
 }

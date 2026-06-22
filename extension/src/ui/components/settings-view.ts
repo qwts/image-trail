@@ -1,5 +1,12 @@
 import type { PanelAction, PinSaveStoragePreference } from '../../core/types.js';
 import type { UrlTemplateMatchMode, UrlTemplateRecord } from '../../core/url/templates.js';
+import {
+  defaultGrabStrategy,
+  grabStrategyLabel,
+  parseExtractorLines,
+  serializeExtractorLines,
+  type GrabStrategyKind,
+} from '../../core/url/grab-strategies.js';
 import type { UrlField } from '../../core/url/types.js';
 import { VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../../core/settings.js';
 
@@ -256,7 +263,7 @@ function createTemplateItem(
 
   const meta = document.createElement('p');
   meta.className = 'image-trail-panel__settings-template-meta';
-  meta.textContent = `${template.fields.length} included field${template.fields.length === 1 ? '' : 's'} · ${matchModeLabel(template.matchRules.mode)} · used ${template.useCount} time${template.useCount === 1 ? '' : 's'}${template.autoApplyEnabled === false ? ' · auto-apply off' : ''}${active ? ' · active' : ''}`;
+  meta.textContent = `${template.fields.length} included field${template.fields.length === 1 ? '' : 's'} · ${matchModeLabel(template.matchRules.mode)} · ${grabStrategyLabel(template.grabStrategy)} grab · used ${template.useCount} time${template.useCount === 1 ? '' : 's'}${template.autoApplyEnabled === false ? ' · auto-apply off' : ''}${active ? ' · active' : ''}`;
 
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__settings-template-controls';
@@ -312,10 +319,66 @@ function createTemplateItem(
 
   controls.append(modeLabel, autoApplyLabel, hiddenLabel, clear);
   item.append(url, meta, controls);
+  item.append(createTemplateGrabStrategyControls(template, dispatch));
   if (active && currentFields.length > 0) {
     item.append(createTemplateFieldControls(template, currentFields, dispatch));
   }
   return item;
+}
+
+function createTemplateGrabStrategyControls(template: UrlTemplateRecord, dispatch: (action: PanelAction) => void): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-template-fields';
+
+  const strategyLabel = document.createElement('label');
+  strategyLabel.className = 'image-trail-panel__settings-field';
+  const strategyText = document.createElement('span');
+  strategyText.textContent = 'Grab strategy';
+  const strategy = document.createElement('select');
+  strategy.className = 'image-trail-panel__settings-select';
+  const currentKind = template.grabStrategy?.kind ?? 'clicked-image';
+  for (const option of [
+    { value: 'clicked-image', label: 'Clicked image' },
+    { value: 'linked-page-image', label: 'Linked page image' },
+  ] satisfies readonly { readonly value: GrabStrategyKind; readonly label: string }[]) {
+    const element = document.createElement('option');
+    element.value = option.value;
+    element.textContent = option.label;
+    element.selected = currentKind === option.value;
+    strategy.append(element);
+  }
+  strategy.addEventListener('change', () => {
+    dispatch({
+      name: 'url-template/update-settings',
+      id: template.id,
+      grabStrategy: defaultGrabStrategy(strategy.value as GrabStrategyKind),
+    });
+  });
+  strategyLabel.append(strategyText, strategy);
+  wrapper.append(strategyLabel);
+
+  const linkedStrategy = template.grabStrategy?.kind === 'linked-page-image' ? template.grabStrategy : null;
+  if (linkedStrategy) {
+    const extractorsLabel = document.createElement('label');
+    extractorsLabel.className = 'image-trail-panel__settings-field';
+    const extractorsText = document.createElement('span');
+    extractorsText.textContent = 'Image extractors';
+    const extractors = document.createElement('textarea');
+    extractors.className = 'image-trail-panel__settings-template-extractors';
+    extractors.rows = 4;
+    extractors.value = serializeExtractorLines(linkedStrategy.extractors);
+    extractors.addEventListener('change', () => {
+      dispatch({
+        name: 'url-template/update-settings',
+        id: template.id,
+        grabStrategy: { ...linkedStrategy, extractors: parseExtractorLines(extractors.value) },
+      });
+    });
+    extractorsLabel.append(extractorsText, extractors);
+    wrapper.append(extractorsLabel);
+  }
+
+  return wrapper;
 }
 
 function createTemplateFieldControls(

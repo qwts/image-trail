@@ -812,6 +812,18 @@
   inline-size: min(100%, 370px);
 }
 
+.image-trail-panel-root .image-trail-panel__settings-template-extractors {
+  inline-size: min(100%, 520px);
+  min-inline-size: 260px;
+  resize: vertical;
+  font:
+    11px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
 .image-trail-panel-root .image-trail-panel__settings-template-clear {
   align-self: center;
   margin-inline-start: auto;

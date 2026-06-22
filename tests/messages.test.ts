@@ -14,6 +14,8 @@ import {
   createExportEncryptedImageResultMessage,
   createExportBlobKeyBackupMessage,
   createExportBlobKeyBackupResultMessage,
+  createFetchLinkedPageMessage,
+  createFetchLinkedPageResultMessage,
   createFetchThumbnailSourceMessage,
   createFetchThumbnailSourceResultMessage,
   createImportBlobKeyBackupMessage,
@@ -70,6 +72,7 @@ import {
   isExtensionRequest,
   isExtensionResponse,
   isExportBlobKeyBackupResultMessage,
+  isFetchLinkedPageResultMessage,
   isFetchThumbnailSourceResultMessage,
   isImportBlobKeyBackupResultMessage,
   isImportEncryptedImageResultMessage,
@@ -225,6 +228,7 @@ test('recognizes capture-related messages as extension requests', () => {
   assert.equal(isExtensionRequest(createDeleteBlobMessage('blob-1')), true);
   assert.equal(isExtensionRequest(createRetrieveBlobMessage('blob-1')), true);
   assert.equal(isExtensionRequest(createFetchThumbnailSourceMessage('https://example.com/a.jpg')), true);
+  assert.equal(isExtensionRequest(createFetchLinkedPageMessage('https://example.com/page', 1024, 2000)), true);
   assert.equal(isExtensionRequest(createDownloadImageMessage('https://example.com/a.jpg', 'a.jpg', false)), true);
 });
 
@@ -369,6 +373,31 @@ test('creates thumbnail source fetch messages', () => {
   const failure = createFetchThumbnailSourceResultMessage({ ok: false, reason: 'network-error', message: 'Nope.' });
   assert.equal(failure.payload.ok, false);
   assert.equal(isFetchThumbnailSourceResultMessage(failure), true);
+});
+
+test('creates linked-page fetch messages', () => {
+  const request = createFetchLinkedPageMessage('https://example.test/page', 1024, 2000);
+  assert.equal(request.type, MessageType.FetchLinkedPage);
+  assert.equal(request.payload.url, 'https://example.test/page');
+  assert.equal(request.payload.maxBytes, 1024);
+  assert.equal(request.payload.timeoutMs, 2000);
+  assert.equal(isExtensionRequest(request), true);
+
+  const success = createFetchLinkedPageResultMessage({
+    ok: true,
+    text: '<img src="a.jpg">',
+    byteLength: 17,
+    finalUrl: 'https://example.test/canonical/page',
+  });
+  assert.equal(success.type, MessageType.FetchLinkedPageResult);
+  assert.equal(success.payload.ok, true);
+  assert.equal(success.payload.ok ? success.payload.finalUrl : undefined, 'https://example.test/canonical/page');
+  assert.equal(isExtensionResponse(success), true);
+  assert.equal(isFetchLinkedPageResultMessage(success), true);
+
+  const failure = createFetchLinkedPageResultMessage({ ok: false, reason: 'timeout', message: 'Nope.' });
+  assert.equal(failure.payload.ok, false);
+  assert.equal(isFetchLinkedPageResultMessage(failure), true);
 });
 
 test('creates bookmark store messages for extension-origin persistence', () => {

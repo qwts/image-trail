@@ -1,4 +1,11 @@
 import {
+  DEFAULT_LINKED_PAGE_IMAGE_GRAB_STRATEGY,
+  normalizeGrabStrategy,
+  type LinkedPageImageGrabStrategy,
+  type UrlTemplateGrabStrategy,
+} from '../core/url/grab-strategies.js';
+import type { UrlTemplateRecord } from '../core/url/templates.js';
+import {
   applyImageUrl,
   captureImageNavigationSnapshot,
   restoreImageNavigationSnapshot,
@@ -15,6 +22,8 @@ import {
 } from './target-image.js';
 import { markHoveredTarget, markPickModeCandidate, markSelectedTarget, restoreElementStyles } from './page-style.js';
 import { createThumbnailDataUrlFromImage } from './thumbnail-generator.js';
+import { createFetchLinkedPageMessage, isFetchLinkedPageResultMessage } from '../background/messages.js';
+import { sendRuntimeMessage } from './runtime-message.js';
 
 export type TargetSelectionMode = 'auto' | 'manual' | 'none';
 
@@ -30,15 +39,20 @@ export interface TargetSelectionSnapshot {
 export type TargetSelectionListener = (snapshot: TargetSelectionSnapshot) => void;
 export type TargetLoadListener = (target: TargetImageInfo & { readonly thumbnail?: string; readonly trustedLoadedImage?: boolean }) => void;
 export type TargetBookmarkRequestListener = (
-  target: TargetImageInfo & { readonly thumbnail?: string; readonly trustedLoadedImage?: boolean },
+  target: Omit<TargetImageInfo, 'width' | 'height'> & {
+    readonly width?: number;
+    readonly height?: number;
+    readonly thumbnail?: string;
+    readonly trustedLoadedImage?: boolean;
+  },
 ) => void;
 
-type GrabStrategyId = 'bookmark-image';
+type GrabStrategyId = 'clicked-image' | 'linked-page-image';
 
 interface GrabStrategy {
   readonly id: GrabStrategyId;
   readonly label: string;
-  execute(image: HTMLImageElement): Promise<void>;
+  execute(target: Element): Promise<boolean>;
 }
 
 const TARGET_MESSAGE_URL_MAX = 180;
@@ -69,12 +83,18 @@ export class PageAdapter {
   private selectedLockBox = false;
   private bookmarkShortcutActive = false;
   private grabModeActive = false;
+  private activeTemplateGrabStrategy: UrlTemplateGrabStrategy | undefined;
   private suppressBookmarkShortcutClickTarget: EventTarget | null = null;
   private readonly grabStrategies: readonly GrabStrategy[] = [
     {
-      id: 'bookmark-image',
-      label: 'Bookmark page image',
-      execute: (image) => this.bookmarkPageImage(image),
+      id: 'linked-page-image',
+      label: 'Linked page image',
+      execute: (target) => this.grabLinkedPageImage(target),
+    },
+    {
+      id: 'clicked-image',
+      label: 'Clicked image',
+      execute: (target) => this.grabClickedImage(target),
     },
   ];
 
@@ -154,6 +174,10 @@ export class PageAdapter {
     if (!this.grabModeActive) return this.lastSnapshot;
     this.grabModeActive = false;
     return this.emit('Grab Mode stopped.');
+  }
+
+  setActiveUrlTemplate(template: UrlTemplateRecord | null): void {
+    this.activeTemplateGrabStrategy = normalizeGrabStrategy(template?.grabStrategy);
   }
 
   cleanup(): void {
@@ -273,22 +297,53 @@ export class PageAdapter {
     if ((!event.shiftKey && !this.grabModeActive) || event.button !== 0) return false;
     const target = event.target;
     if (!(target instanceof Element)) return false;
-    const image = findImageFromShortcutTarget(target);
-    if (!(image instanceof HTMLImageElement)) return false;
+    const strategy = this.activeGrabStrategy();
+    if (!canGrabTarget(strategy.id, target)) return false;
 
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
-    if (!isQualifyingImage(image)) {
-      this.emit(`Could not bookmark image: ${getImageRejectionReason(image) ?? 'Image is not usable.'}`);
-      return true;
-    }
-    void this.activeGrabStrategy().execute(image);
+    void strategy.execute(target);
     return true;
   }
 
   private activeGrabStrategy(): GrabStrategy {
-    return this.grabStrategies[0];
+    return this.grabStrategies.find((strategy) => strategy.id === this.activeTemplateGrabStrategy?.kind) ?? this.grabStrategies[1]!;
+  }
+
+  private async grabClickedImage(target: Element): Promise<boolean> {
+    const image = findImageFromShortcutTarget(target);
+    if (!(image instanceof HTMLImageElement)) return false;
+    if (!isQualifyingImage(image)) {
+      this.emit(`Could not bookmark image: ${getImageRejectionReason(image) ?? 'Image is not usable.'}`);
+      return true;
+    }
+    await this.bookmarkPageImage(image);
+    return true;
+  }
+
+  private async grabLinkedPageImage(target: Element): Promise<boolean> {
+    const link = target.closest('a[href]');
+    if (!(link instanceof HTMLAnchorElement)) return this.grabClickedImage(target);
+
+    const pageUrl = safeHttpUrl(link.href, document.baseURI);
+    if (!pageUrl) {
+      this.emit('Could not grab linked page image: Link URL is not usable.');
+      return true;
+    }
+
+    try {
+      const strategy =
+        this.activeTemplateGrabStrategy?.kind === 'linked-page-image'
+          ? this.activeTemplateGrabStrategy
+          : DEFAULT_LINKED_PAGE_IMAGE_GRAB_STRATEGY;
+      const imageUrl = await resolveLinkedPageImage(pageUrl.href, strategy);
+      await this.emitBookmarkResolvedUrl(imageUrl);
+      this.emit(`Grabbed ${summarizeTargetUrlForMessage(imageUrl)} with ${this.activeGrabStrategy().label}.`);
+    } catch (error) {
+      this.emit(`Could not grab linked page image: ${error instanceof Error ? error.message : 'Strategy failed.'}`);
+    }
+    return true;
   }
 
   private async bookmarkPageImage(image: HTMLImageElement): Promise<void> {
@@ -300,6 +355,16 @@ export class PageAdapter {
 
     await this.emitBookmarkRequest(image, info);
     this.emit(`Grabbed ${summarizeTargetUrlForMessage(info.url)} with ${this.activeGrabStrategy().label}.`);
+  }
+
+  private async emitBookmarkResolvedUrl(url: string): Promise<void> {
+    for (const listener of this.bookmarkRequestListeners) {
+      listener({
+        handleId: `image-trail-linked-page:${url}`,
+        url,
+        source: 'linkedPageExtractor',
+      });
+    }
   }
 
   private createBookmarkShortcutInfo(image: HTMLImageElement): TargetImageInfo | null {
@@ -444,4 +509,53 @@ function findImageFromShortcutTarget(target: Element): HTMLImageElement | null {
   const interactive = target.closest('[role="button"],article,[data-testid]');
   const nestedInteractive = interactive?.querySelector('img');
   return nestedInteractive instanceof HTMLImageElement ? nestedInteractive : null;
+}
+
+function canGrabTarget(strategyId: GrabStrategyId, target: Element): boolean {
+  if (strategyId === 'linked-page-image' && target.closest('a[href]')) return true;
+  return findImageFromShortcutTarget(target) instanceof HTMLImageElement;
+}
+
+async function resolveLinkedPageImage(pageUrl: string, strategy: LinkedPageImageGrabStrategy): Promise<string> {
+  const page = await fetchLinkedPageText(pageUrl, strategy);
+  const html = page.text;
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  for (const extractor of strategy.extractors) {
+    let element: Element | null;
+    try {
+      element = document.querySelector(extractor.selector);
+    } catch {
+      continue;
+    }
+    const raw = element?.getAttribute(extractor.attribute)?.trim();
+    const resolved = safeHttpUrl(raw, page.finalUrl);
+    if (resolved) return resolved.href;
+  }
+  throw new Error('No image matched the configured extractors.');
+}
+
+async function fetchLinkedPageText(
+  pageUrl: string,
+  strategy: Pick<LinkedPageImageGrabStrategy, 'maxBytes' | 'timeoutMs'>,
+): Promise<{ readonly text: string; readonly finalUrl: string }> {
+  try {
+    const response = await sendRuntimeMessage(createFetchLinkedPageMessage(pageUrl, strategy.maxBytes, strategy.timeoutMs));
+    if (isFetchLinkedPageResultMessage(response)) {
+      if (response.payload.ok) return { text: response.payload.text, finalUrl: response.payload.finalUrl };
+      throw new Error(response.payload.message);
+    }
+  } catch (error) {
+    if (error instanceof Error) throw error;
+  }
+  throw new Error('Linked page fetch failed.');
+}
+
+function safeHttpUrl(value: string | null | undefined, baseUrl: string): URL | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value, baseUrl);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
 }
