@@ -130,6 +130,7 @@ export type PanelActionName =
   | 'target/release'
   | 'history/add-loaded'
   | 'history/remove'
+  | 'history/pin'
   | 'history/delete-all'
   | 'history/load'
   | 'history/download'
@@ -216,6 +217,7 @@ export type PanelAction =
         PanelActionName,
         | 'history/add-loaded'
         | 'history/remove'
+        | 'history/pin'
         | 'history/delete-all'
         | 'history/select'
         | 'history-selection/toggle'
@@ -281,7 +283,10 @@ export type PanelAction =
       readonly width?: number;
       readonly height?: number;
     }
-  | { readonly name: 'history/remove' | 'bookmark/load' | 'bookmark/remove' | 'bookmark/clear' | 'history/select'; readonly id: string }
+  | {
+      readonly name: 'history/remove' | 'history/pin' | 'bookmark/load' | 'bookmark/remove' | 'bookmark/clear' | 'history/select';
+      readonly id: string;
+    }
   | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle' | 'bookmark-selection/single'; readonly id: string }
   | { readonly name: 'history/delete-all' | 'history-selection/clear' | 'bookmark-selection/clear' }
   | { readonly name: 'bookmarks/clear-visible' | 'bookmarks/delete-visible' | 'recall/delete-all' }
@@ -377,6 +382,9 @@ export interface BookmarkStore {
   }>;
   readonly loadByIds: (ids: readonly string[]) => Promise<readonly ImageDisplayRecord[]>;
   readonly save: (record: ImageDisplayRecord) => Promise<ImageDisplayRecord>;
+  readonly saveResult?: (
+    record: ImageDisplayRecord,
+  ) => Promise<{ readonly ok: true; readonly record: ImageDisplayRecord } | { readonly ok: false; readonly message: string }>;
   readonly remove: (record: ImageDisplayRecord) => Promise<void>;
   readonly removeMany: (ids: readonly string[]) => Promise<{ readonly removedCount: number }>;
   readonly removeRecallPage: (input: {

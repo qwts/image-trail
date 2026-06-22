@@ -1237,6 +1237,44 @@ test('IndexedDbBookmarkStore round-trips optional bookmark dimensions', async ()
   }
 });
 
+test('IndexedDbBookmarkStore preserves captured originals when pinning a recent record', async () => {
+  await deleteImageTrailDb();
+  const store = new IndexedDbBookmarkStore();
+  try {
+    const recent = createDisplayRecord({
+      id: 'recent-001',
+      url: 'https://example.test/captured-recent.jpg',
+      label: 'captured-recent.jpg',
+      thumbnail: 'data:image/jpeg;base64,thumbnail',
+      timestamp: '2026-06-19T00:00:00.000Z',
+      source: 'history',
+      captureStatus: 'captured',
+      blobId: 'blob-captured-recent',
+      capturedAt: '2026-06-19T00:00:01.000Z',
+      storedOriginal: {
+        blobId: 'blob-captured-recent',
+        mimeType: 'image/jpeg',
+        byteLength: 4096,
+        capturedAt: '2026-06-19T00:00:01.000Z',
+      },
+    });
+
+    await store.save(createDisplayRecord({ ...recent, id: recent.url, timestamp: '2026-06-19T00:00:02.000Z', source: 'bookmark' }));
+
+    const page = await store.loadPage({ offset: 0, limit: 30 });
+    const pinned = page.items[0];
+
+    assert.equal(pinned?.source, 'favorites');
+    assert.equal(pinned?.url, recent.url);
+    assert.equal(pinned?.captureStatus, 'captured');
+    assert.equal(pinned?.blobId, 'blob-captured-recent');
+    assert.deepEqual(pinned?.storedOriginal, recent.storedOriginal);
+    assert.equal(pinned?.thumbnail, recent.thumbnail);
+  } finally {
+    await store.close();
+  }
+});
+
 test('PanelPositionRepository saves positions per hostname', async (t) => {
   const db = await openFreshImageTrailDb();
   t.after(() => db.close());

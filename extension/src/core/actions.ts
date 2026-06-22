@@ -176,6 +176,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         selectedHistoryIds: removeItem(state.selectedHistoryIds, action.id),
         lastUpdatedAt: Date.now(),
       };
+    case 'history/pin':
+      return state;
     case 'history/delete-all':
       return {
         ...state,

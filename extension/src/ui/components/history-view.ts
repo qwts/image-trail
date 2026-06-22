@@ -2,6 +2,7 @@ import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecor
 import { createPrivacyThumbnail, PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordTitle } from './record-metadata.js';
 
 type HistoryAction =
+  | { readonly name: 'history/pin'; readonly id: string }
   | { readonly name: 'history/remove'; readonly id: string }
   | { readonly name: 'history/delete-all' }
   | { readonly name: 'history-selection/toggle'; readonly id: string }
@@ -122,6 +123,17 @@ export function createHistoryView(
     const actions = document.createElement('span');
     actions.className = 'image-trail-panel__item-actions';
     actions.addEventListener('keydown', (event) => event.stopPropagation());
+
+    if (!keyUnavailable && !lockedEncrypted) {
+      const pin = document.createElement('button');
+      pin.type = 'button';
+      pin.textContent = 'Pin';
+      pin.addEventListener('click', (event) => {
+        event.stopPropagation();
+        dispatch({ name: 'history/pin', id: item.id });
+      });
+      actions.append(pin);
+    }
 
     if (item.captureStatus === 'captured' && item.blobId && !keyMissing) {
       const deleteCapture = document.createElement('button');

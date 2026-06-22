@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { createSaveBookmarkResultMessage } from '../extension/src/background/messages.js';
+import { ExtensionBookmarkStore } from '../extension/src/content/extension-bookmark-store.js';
 import { sendRuntimeMessage } from '../extension/src/content/runtime-message.js';
+import { createDisplayRecord } from '../extension/src/core/display-records.js';
 
 test('sendRuntimeMessage returns null when the extension context is invalidated', async () => {
   const originalChrome = globalThis.chrome;
@@ -35,6 +38,33 @@ test('sendRuntimeMessage rethrows unexpected runtime errors', async () => {
 
   try {
     await assert.rejects(() => sendRuntimeMessage({ type: 'imageTrail.cleanupOrphanedBlobs' }), /Background exploded/);
+  } finally {
+    globalThis.chrome = originalChrome;
+  }
+});
+
+test('ExtensionBookmarkStore exposes failed bookmark saves without treating the draft as durable', async () => {
+  const originalChrome = globalThis.chrome;
+  const draft = createDisplayRecord({
+    id: 'https://example.test/recent.jpg',
+    url: 'https://example.test/recent.jpg',
+    timestamp: '2026-06-22T00:00:00.000Z',
+    source: 'bookmark',
+  });
+  globalThis.chrome = {
+    runtime: {
+      id: 'test-extension',
+      sendMessage: async () => createSaveBookmarkResultMessage({ ok: false, message: 'Bookmark save failed.' }),
+    },
+  } as unknown as typeof chrome;
+
+  try {
+    const store = new ExtensionBookmarkStore();
+    const result = await store.saveResult(draft);
+    const legacySave = await store.save(draft);
+
+    assert.deepEqual(result, { ok: false, message: 'Bookmark save failed.' });
+    assert.equal(legacySave, draft);
   } finally {
     globalThis.chrome = originalChrome;
   }

@@ -787,6 +787,11 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'history/pin') {
+      void this.pinRecentHistory(action.id);
+      return;
+    }
+
     if (action.name === 'capture/request') {
       void this.captureImage(action.url, action.sourceType, action.sourceRecordId);
       return;
@@ -1293,6 +1298,56 @@ export class ImageTrailPanel {
     this.render();
   }
 
+  private async pinRecentHistory(id: string): Promise<void> {
+    const record = this.state.history.find((item) => item.id === id);
+    if (!record) return;
+    const result = await this.saveRecentRecordAsBookmark(record, { render: false });
+    if (!result.ok) {
+      this.state = { ...this.state, message: result.message, status: 'error', lastUpdatedAt: Date.now() };
+      this.render();
+      return;
+    }
+    await this.hideRecentHistoryRow(id);
+    this.renderPanelAndRefreshRecall();
+  }
+
+  private async saveRecentRecordAsBookmark(
+    record: ImageDisplayRecord,
+    options: { readonly timestamp?: string; readonly render?: boolean } = {},
+  ): Promise<{ readonly ok: true; readonly record: ImageDisplayRecord } | { readonly ok: false; readonly message: string }> {
+    const timestamp = options.timestamp ?? new Date().toISOString();
+    const draft = createDisplayRecord({
+      ...record,
+      id: record.url.startsWith('data:image/') ? record.id : record.url,
+      timestamp,
+      source: 'bookmark',
+    });
+    if (!this.bookmarkStore) {
+      return { ok: false, message: 'Bookmark storage is unavailable.' };
+    }
+    const result = this.bookmarkStore.saveResult
+      ? await this.bookmarkStore.saveResult(draft)
+      : { ok: true as const, record: await this.bookmarkStore.save(draft) };
+    if (!result.ok) return result;
+    const bookmark = result.record;
+    this.state = { ...this.state, message: bookmarkSaveMessage(bookmark, bookmark.label), lastUpdatedAt: Date.now() };
+    await this.loadBookmarkPage(0, { render: false });
+    if (options.render !== false) this.renderPanelAndRefreshRecall();
+    return { ok: true, record: bookmark };
+  }
+
+  private async hideRecentHistoryRow(id: string): Promise<void> {
+    const history = this.recentHistoryStore
+      ? await this.recentHistoryStore.remove(id, window.location.href)
+      : reducePanelAction(this.state, { name: 'history/remove', id }).history;
+    this.state = {
+      ...this.state,
+      history,
+      selectedHistoryIds: this.state.selectedHistoryIds.filter((selectedId) => selectedId !== id),
+      lastUpdatedAt: Date.now(),
+    };
+  }
+
   private async resolveRecordThumbnail(
     sourceUrl: string,
     thumbnail: string | undefined,
@@ -1502,11 +1557,30 @@ export class ImageTrailPanel {
     if ((result.status === 'failed' || result.status === 'remote-only') && result.reason === 'encryption-locked') {
       await this.refreshBlobKeyStatus();
     }
-    if (isCapturedResult(result) && sourceType === 'history' && sourceRecordId && this.recentHistoryStore) {
+    if (isCapturedResult(result) && sourceType === 'history' && sourceRecordId) {
       const updatedHistory = this.state.history.find((item) => item.id === sourceRecordId);
       if (updatedHistory) {
-        const history = await this.recentHistoryStore.add(updatedHistory, window.location.href);
-        this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
+        const saved = await this.saveRecentRecordAsBookmark(updatedHistory, { render: false });
+        if (saved.ok) {
+          await this.hideRecentHistoryRow(sourceRecordId);
+          this.state = {
+            ...this.state,
+            message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image. ${bookmarkSaveMessage(saved.record, saved.record.label)}`,
+            lastUpdatedAt: Date.now(),
+          };
+          queueChanged = true;
+        } else {
+          const history = this.recentHistoryStore
+            ? await this.recentHistoryStore.add(updatedHistory, window.location.href)
+            : this.state.history;
+          this.state = {
+            ...this.state,
+            history,
+            message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image, but the recent row was not pinned: ${saved.message}`,
+            status: 'error',
+            lastUpdatedAt: Date.now(),
+          };
+        }
       }
     }
     if (isCapturedResult(result) && sourceType === 'bookmark' && sourceRecordId && this.bookmarkStore) {

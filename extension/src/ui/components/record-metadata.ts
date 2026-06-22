@@ -28,7 +28,8 @@ export function recordTitle(record: ImageDisplayRecord, options: RecordPrivacyOp
 
 export function recordExtensionLabel(record: ImageDisplayRecord): string {
   if (record.privacyStatus === 'locked') return 'LOCK';
-  const extension = imageExtensionFromValue(record.label) ?? imageExtensionFromUrl(record.url);
+  const extension =
+    imageExtensionFromUrl(record.url) ?? imageExtensionFromUrl(record.thumbnail ?? '') ?? imageExtensionFromValue(record.label);
   return extension ? extension.toUpperCase() : 'IMAGE';
 }
 

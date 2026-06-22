@@ -26,6 +26,17 @@ test('bookmark extension label falls back to image only when no type is availabl
   assert.equal(extensionLabelFor(record('https://example.test/image')), 'IMAGE');
 });
 
+test('bookmark extension label uses thumbnail data type before generic labels', () => {
+  assert.equal(
+    extensionLabelFor({
+      ...record('https://example.test/image'),
+      label: 'image',
+      thumbnail: 'data:image/webp;base64,abc',
+    }),
+    'WEBP',
+  );
+});
+
 function record(url: string) {
   return {
     id: url,

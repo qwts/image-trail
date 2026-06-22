@@ -41,9 +41,16 @@ export class ExtensionBookmarkStore implements BookmarkStore {
   }
 
   async save(record: ImageDisplayRecord): Promise<ImageDisplayRecord> {
+    const result = await this.saveResult(record);
+    return result.ok ? result.record : record;
+  }
+
+  async saveResult(
+    record: ImageDisplayRecord,
+  ): Promise<{ readonly ok: true; readonly record: ImageDisplayRecord } | { readonly ok: false; readonly message: string }> {
     const response = await sendRuntimeMessage(createSaveBookmarkMessage(record));
-    if (isSaveBookmarkResultMessage(response) && response.payload.ok) return response.payload.record;
-    return record;
+    if (isSaveBookmarkResultMessage(response)) return response.payload;
+    return { ok: false, message: 'Bookmark save failed.' };
   }
 
   async loadByIds(ids: readonly string[]): Promise<readonly ImageDisplayRecord[]> {
