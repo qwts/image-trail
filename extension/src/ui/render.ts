@@ -321,6 +321,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
       ? [
           createSettingsView(
             state.bookmarkLimit,
+            state.privacyModeEnabled,
             state.urlTemplates,
             activeTemplate?.id ?? state.activeUrlTemplateId,
             {
@@ -338,14 +339,14 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
         ]
       : []),
     createUrlEditorView(
-      { url: activeUrl },
+      { url: activeUrl, privacyMode: state.privacyModeEnabled },
       {
         onApply: (url) => {
           target.dispatch({ name: 'selected-url/apply', url });
         },
       },
     ),
-    createTargetPickerView(state.target, target.dispatch),
+    createTargetPickerView(state.target, target.dispatch, { privacyMode: state.privacyModeEnabled }),
     createEncryptionView(
       {
         unlocked: state.blobKeyUnlocked,
@@ -437,6 +438,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
       {
         open: target.layoutState.fieldsPanelOpen,
         blockSize: target.layoutState.fieldsPanelBlockSize,
+        privacyMode: state.privacyModeEnabled,
       },
     ),
     createControlsView({
@@ -452,6 +454,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
       onListResize: (blockSize) => {
         target.layoutState.historyListBlockSize = blockSize;
       },
+      privacyMode: state.privacyModeEnabled,
     }),
     createBookmarksView(
       state.target.selectedUrl,
@@ -469,6 +472,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
         hasNewer: state.hasNewerBookmarks,
       },
       { recallOpen: state.recall.open },
+      { privacyMode: state.privacyModeEnabled },
       target.dispatch,
     ),
   );
@@ -486,7 +490,10 @@ export function renderRecallDrawer(target: PanelRenderTarget, state: PanelState)
   recallRoot.replaceChildren();
   if (!state.recall.open) return;
   recallRoot.append(
-    createRecallDrawerView(state.recall, recallDrawerGeometry(target.root, state.recall.side), target.dispatch, { animate }),
+    createRecallDrawerView(state.recall, recallDrawerGeometry(target.root, state.recall.side), target.dispatch, {
+      animate,
+      privacyMode: state.privacyModeEnabled,
+    }),
   );
   const nextList = recallRoot.querySelector<HTMLElement>('.image-trail-panel__recall-list');
   if (nextList && previousList) {

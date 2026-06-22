@@ -1,4 +1,5 @@
 import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
+import { createPrivacyThumbnail, PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordTitle } from './record-metadata.js';
 
 type HistoryAction =
   | { readonly name: 'history/remove'; readonly id: string }
@@ -12,6 +13,7 @@ interface HistoryViewOptions {
   readonly blobKeyAvailable: boolean;
   readonly listBlockSize: number | null;
   readonly onListResize: (blockSize: number) => void;
+  readonly privacyMode?: boolean;
 }
 
 export function createHistoryView(
@@ -55,6 +57,7 @@ export function createHistoryView(
     const selected = selectedIds.includes(item.id);
     const entry = document.createElement('li');
     entry.className = 'image-trail-panel__history-item';
+    if (options?.privacyMode && item.privacyStatus !== 'locked') entry.classList.add('is-privacy-masked');
     if (previewableEncrypted) entry.classList.add('is-captured');
     if (selected) entry.classList.add('is-selected');
     entry.setAttribute('aria-selected', String(selected));
@@ -92,11 +95,18 @@ export function createHistoryView(
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
       });
     }
-    const visual = createRecordVisual(item);
+    const visual = createRecordVisual(item, options);
     const link = document.createElement('span');
     link.className = 'image-trail-panel__record-link';
-    link.textContent = item.label ?? item.url;
-    link.title = displayTitleForRecord(item);
+    link.textContent = options?.privacyMode && item.privacyStatus !== 'locked' ? PRIVACY_RECORD_NAME : (item.label ?? item.url);
+    link.title = options?.privacyMode && item.privacyStatus !== 'locked' ? recordTitle(item, options) : displayTitleForRecord(item);
+    if (options?.privacyMode && item.privacyStatus !== 'locked') {
+      const meta = document.createElement('span');
+      meta.className = 'image-trail-panel__record-row-meta';
+      meta.textContent = PRIVACY_RECORD_META;
+      meta.title = meta.textContent;
+      link.append(document.createElement('br'), meta);
+    }
 
     const actions = document.createElement('span');
     actions.className = 'image-trail-panel__item-actions';
@@ -163,7 +173,8 @@ function isPreviewableEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked:
   return !!encryptedBlobIdForRecord(item) && blobKeyUnlocked;
 }
 
-function createRecordVisual(item: ImageDisplayRecord): HTMLElement {
+function createRecordVisual(item: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
+  if (options.privacyMode && item.privacyStatus !== 'locked') return createPrivacyThumbnail();
   if (item.thumbnail) {
     const image = document.createElement('img');
     image.className = 'image-trail-panel__record-thumbnail';

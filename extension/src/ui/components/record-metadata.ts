@@ -6,12 +6,22 @@ import {
   type ImageDisplayRecord,
 } from '../../core/display-records.js';
 
-export function recordDisplayName(record: ImageDisplayRecord): string {
+export interface RecordPrivacyOptions {
+  readonly privacyMode?: boolean;
+}
+
+export const PRIVACY_RECORD_NAME = 'Private image';
+export const PRIVACY_RECORD_META = 'Details hidden';
+export const PRIVACY_URL_TEXT = 'Private URL hidden';
+
+export function recordDisplayName(record: ImageDisplayRecord, options: RecordPrivacyOptions = {}): string {
+  if (options.privacyMode && record.privacyStatus !== 'locked') return PRIVACY_RECORD_NAME;
   if (record.privacyStatus === 'locked') return 'Private pin';
   return normalizeDisplayLabel(record);
 }
 
-export function recordTitle(record: ImageDisplayRecord): string {
+export function recordTitle(record: ImageDisplayRecord, options: RecordPrivacyOptions = {}): string {
+  if (options.privacyMode && record.privacyStatus !== 'locked') return 'Privacy mode is hiding this image metadata for screen sharing.';
   if (record.privacyStatus === 'locked') return 'Unlock encrypted originals to show private pin metadata.';
   return displayTitleForRecord(record);
 }
@@ -22,10 +32,18 @@ export function recordExtensionLabel(record: ImageDisplayRecord): string {
   return extension ? extension.toUpperCase() : 'IMAGE';
 }
 
-export function recordMetadataText(record: ImageDisplayRecord): string {
+export function recordMetadataText(record: ImageDisplayRecord, options: RecordPrivacyOptions = {}): string {
+  if (options.privacyMode && record.privacyStatus !== 'locked') return PRIVACY_RECORD_META;
   if (record.privacyStatus === 'locked') return 'Locked';
   const parts = [formatRecordDate(record.timestamp), recordResolutionText(record)].filter((part): part is string => !!part);
   return parts.join(' · ');
+}
+
+export function createPrivacyThumbnail(label = 'PRIVATE'): HTMLElement {
+  const fallback = document.createElement('span');
+  fallback.className = 'image-trail-panel__record-thumbnail image-trail-panel__record-thumbnail--privacy';
+  fallback.textContent = label;
+  return fallback;
 }
 
 export function recordResolutionText(record: ImageDisplayRecord): string | null {

@@ -389,6 +389,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return { ...state, bookmarkLimit: action.value, bookmarkOffset: 0, lastUpdatedAt: Date.now() };
     case 'settings/update-pin-save-storage-preference':
       return { ...state, pinSaveStoragePreference: action.value, lastUpdatedAt: Date.now() };
+    case 'settings/update-privacy-mode':
+      return { ...state, privacyModeEnabled: action.enabled, lastUpdatedAt: Date.now() };
     case 'url-templates/load':
       return {
         ...state,

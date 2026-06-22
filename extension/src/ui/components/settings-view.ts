@@ -10,6 +10,7 @@ const MATCH_MODES: readonly { readonly value: UrlTemplateMatchMode; readonly lab
 
 export function createSettingsView(
   visibleBookmarkSoftMax: number,
+  privacyModeEnabled: boolean,
   templates: readonly UrlTemplateRecord[],
   activeTemplateId: string | null,
   privatePinState: {
@@ -66,6 +67,7 @@ export function createSettingsView(
     heading,
     form,
     createPrivatePinSettingsView(privatePinState, dispatch),
+    createPrivacySettingsView(privacyModeEnabled, dispatch),
     createDestructiveSettingsView(destructiveState, dispatch),
     createTemplateSettingsView(templates, activeTemplateId, dispatch),
   );
@@ -102,6 +104,33 @@ function createPrivatePinSettingsView(
   meta.className = 'image-trail-panel__settings-empty';
   meta.textContent = privatePinSettingsMessage(state);
 
+  wrapper.append(heading, label, meta);
+  return wrapper;
+}
+
+function createPrivacySettingsView(privacyModeEnabled: boolean, dispatch: (action: PanelAction) => void): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'Privacy';
+
+  const label = document.createElement('label');
+  label.className = 'image-trail-panel__settings-checkbox';
+
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = privacyModeEnabled;
+  input.addEventListener('change', () => dispatch({ name: 'settings/update-privacy-mode', enabled: input.checked }));
+
+  const text = document.createElement('span');
+  text.textContent = 'Privacy mode';
+
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__settings-empty';
+  meta.textContent = 'Masks panel rows and visible URLs for screen sharing without changing saved records or actions.';
+
+  label.append(input, text);
   wrapper.append(heading, label, meta);
   return wrapper;
 }

@@ -99,6 +99,7 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().visibleBookmarkSoftMax, 30);
   assert.equal(repository.load().bookmarkVisibilityScope, 'global');
   assert.equal(repository.load().pinSaveStoragePreference, 'encrypted');
+  assert.equal(repository.load().privacyModeEnabled, false);
   repository.save({ ...DEFAULT_LOCAL_SETTINGS, pinSaveStoragePreference: 'plaintext' });
   assert.equal(repository.load().pinSaveStoragePreference, 'plaintext');
 });
@@ -176,6 +177,20 @@ test('migrates pin save storage preference setting safely', () => {
   assert.equal(plaintext.load().pinSaveStoragePreference, 'plaintext');
   assert.equal(encrypted.load().pinSaveStoragePreference, 'encrypted');
   assert.equal(invalid.load().pinSaveStoragePreference, DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference);
+});
+
+test('migrates privacy mode setting safely', () => {
+  const enabled = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ privacyModeEnabled: true }),
+    setItem: () => {},
+  });
+  const invalid = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ privacyModeEnabled: 'yes' }),
+    setItem: () => {},
+  });
+
+  assert.equal(enabled.load().privacyModeEnabled, true);
+  assert.equal(invalid.load().privacyModeEnabled, false);
 });
 
 test('tracks session unlock state without persisting key material', async () => {

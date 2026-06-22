@@ -9,6 +9,7 @@ export interface PlaintextLocalSettings {
   readonly visibleBookmarkSoftMax: number;
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
+  readonly privacyModeEnabled: boolean;
 }
 
 export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
@@ -19,6 +20,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   visibleBookmarkSoftMax: 30,
   bookmarkVisibilityScope: 'global',
   pinSaveStoragePreference: 'encrypted',
+  privacyModeEnabled: false,
 };
 
 export const LOCAL_SETTINGS_KEY = 'imageTrail.localSettings';
@@ -67,6 +69,7 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
     pinSaveStoragePreference: isPinSaveStoragePreference(input.pinSaveStoragePreference)
       ? input.pinSaveStoragePreference
       : DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference,
+    privacyModeEnabled: input.privacyModeEnabled === true,
   };
 }
 

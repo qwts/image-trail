@@ -250,6 +250,7 @@ export class ImageTrailPanel {
       bookmarkVisibilityScope: this.localSettings.bookmarkVisibilityScope,
       bookmarkLimit: this.localSettings.visibleBookmarkSoftMax,
       pinSaveStoragePreference: this.localSettings.pinSaveStoragePreference,
+      privacyModeEnabled: this.localSettings.privacyModeEnabled,
       lastUpdatedAt: Date.now(),
     };
     this.render();
@@ -588,6 +589,14 @@ export class ImageTrailPanel {
 
     if (action.name === 'settings/update-pin-save-storage-preference') {
       this.updatePinSaveStoragePreference(action.value);
+      return;
+    }
+
+    if (action.name === 'settings/update-privacy-mode') {
+      this.state = reducePanelAction(this.state, action);
+      this.saveLocalSettings({ ...this.localSettings, privacyModeEnabled: action.enabled });
+      this.render();
+      this.refreshRecallIfOpen();
       return;
     }
 

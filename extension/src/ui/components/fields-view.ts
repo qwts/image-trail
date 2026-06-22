@@ -19,6 +19,7 @@ export interface FieldsViewCallbacks {
 export interface FieldsViewOptions {
   readonly open: boolean;
   readonly blockSize: number | null;
+  readonly privacyMode?: boolean;
 }
 
 function computedPixelValue(styles: CSSStyleDeclaration, property: string): number {
@@ -73,6 +74,7 @@ export function createFieldsView(
 ): HTMLElement {
   const wrapper = document.createElement('details');
   wrapper.className = 'image-trail-panel__section image-trail-panel__fields';
+  if (options.privacyMode) wrapper.classList.add('is-privacy-masked');
   wrapper.open = options.open;
   if (options.blockSize !== null) {
     wrapper.classList.add('is-height-locked');
@@ -123,9 +125,11 @@ export function createFieldsView(
   body.className = 'image-trail-panel__fields-body';
   const intro = document.createElement('p');
   intro.className = 'image-trail-panel__meta';
-  intro.textContent = fields.length
-    ? `${fields.length} token${fields.length === 1 ? '' : 's'} parsed from the selected image URL.`
-    : 'Select a target image to inspect its parsed URL tokens.';
+  intro.textContent = options.privacyMode
+    ? 'Parsed URL fields are hidden for screen sharing.'
+    : fields.length
+      ? `${fields.length} token${fields.length === 1 ? '' : 's'} parsed from the selected image URL.`
+      : 'Select a target image to inspect its parsed URL tokens.';
   const list = document.createElement('ul');
   list.className = 'image-trail-panel__field-list';
   for (const field of fields) {
@@ -140,15 +144,18 @@ export function createFieldsView(
     const canUnlock =
       isSuccessful && field.field.location === 'query' && (field.field.tokenKind === 'int' || field.field.tokenKind === 'hex');
     const canSplit = !isSplitField && field.value.length > 1;
+    const fieldLabel = options.privacyMode ? 'Private field' : field.field.label;
     container.className = `image-trail-panel__field-row${field.field.id === activeFieldId ? ' is-active' : ''}${isSuccessful ? ' is-success' : ''}${isUnchanged ? ' is-unchanged' : ''}${isFailed ? ' is-error' : ''}`;
 
     const value = document.createElement('input');
     value.type = 'text';
-    value.value = field.value;
-    value.placeholder = field.field.label;
+    value.value = options.privacyMode ? 'Private value' : field.value;
+    value.placeholder = fieldLabel;
     value.className = 'image-trail-panel__field-input';
-    value.title = field.value;
-    value.setAttribute('aria-label', `Edit ${field.field.label}`);
+    if (options.privacyMode) value.classList.add('is-privacy-masked');
+    value.readOnly = options.privacyMode === true;
+    value.title = options.privacyMode ? 'Privacy mode is hiding this URL field for screen sharing.' : field.value;
+    value.setAttribute('aria-label', options.privacyMode ? 'Private URL field' : `Edit ${field.field.label}`);
     value.dataset.fieldId = field.field.id;
     value.addEventListener('focus', () => {
       if (field.field.id !== activeFieldId) callbacks.onActivate(field.field.id);
@@ -156,8 +163,8 @@ export function createFieldsView(
 
     const label = document.createElement('span');
     label.className = 'image-trail-panel__field-label';
-    label.textContent = field.field.label;
-    label.title = field.field.label;
+    label.textContent = fieldLabel;
+    label.title = options.privacyMode ? 'Privacy mode is hiding this field label for screen sharing.' : field.field.label;
 
     const meta = document.createElement('span');
     meta.className = 'image-trail-panel__field-meta';
@@ -171,7 +178,9 @@ export function createFieldsView(
       isUnchanged ? 'unchanged' : '',
       isFailed ? 'failed load' : '',
     ].filter(Boolean);
-    meta.textContent = `${field.field.location} · ${field.field.tokenKind} · ${fieldDisplayValue(field)}${statuses.length ? ` · ${statuses.join(' · ')}` : ''}`;
+    meta.textContent = options.privacyMode
+      ? `Details hidden${statuses.length ? ` · ${statuses.join(' · ')}` : ''}`
+      : `${field.field.location} · ${field.field.tokenKind} · ${fieldDisplayValue(field)}${statuses.length ? ` · ${statuses.join(' · ')}` : ''}`;
     meta.title = meta.textContent;
 
     const hasStepControls = field.field.tokenKind === 'int' || field.field.tokenKind === 'hex';
@@ -185,16 +194,16 @@ export function createFieldsView(
       decrement.type = 'button';
       decrement.className = 'image-trail-panel__field-step-button';
       decrement.textContent = '-';
-      decrement.title = `Decrement ${field.field.label}`;
-      decrement.setAttribute('aria-label', `Decrement ${field.field.label}`);
+      decrement.title = options.privacyMode ? 'Decrement private field' : `Decrement ${field.field.label}`;
+      decrement.setAttribute('aria-label', decrement.title);
       decrement.addEventListener('click', () => callbacks.onStep(field.field.id, -1));
 
       const increment = document.createElement('button');
       increment.type = 'button';
       increment.className = 'image-trail-panel__field-step-button';
       increment.textContent = '+';
-      increment.title = `Increment ${field.field.label}`;
-      increment.setAttribute('aria-label', `Increment ${field.field.label}`);
+      increment.title = options.privacyMode ? 'Increment private field' : `Increment ${field.field.label}`;
+      increment.setAttribute('aria-label', increment.title);
       increment.addEventListener('click', () => callbacks.onStep(field.field.id, 1));
 
       controls.append(decrement, increment);
@@ -205,7 +214,11 @@ export function createFieldsView(
       trail.type = 'button';
       trail.className = `image-trail-panel__field-trail-button${isIncludedInTrail ? ' is-included' : ''}`;
       trail.textContent = isIncludedInTrail ? 'Exclude' : 'Include';
-      trail.title = isIncludedInTrail ? `Exclude ${field.field.label} from Previous/Next` : `Include ${field.field.label} in Previous/Next`;
+      trail.title = options.privacyMode
+        ? `${isIncludedInTrail ? 'Exclude' : 'Include'} private field in Previous/Next`
+        : isIncludedInTrail
+          ? `Exclude ${field.field.label} from Previous/Next`
+          : `Include ${field.field.label} in Previous/Next`;
       trail.setAttribute('aria-label', trail.title);
       trail.addEventListener('mousedown', (event) => {
         event.preventDefault();
@@ -214,7 +227,11 @@ export function createFieldsView(
         const nextIncluded = !trail.classList.contains('is-included');
         trail.classList.toggle('is-included', nextIncluded);
         trail.textContent = nextIncluded ? 'Exclude' : 'Include';
-        trail.title = nextIncluded ? `Exclude ${field.field.label} from Previous/Next` : `Include ${field.field.label} in Previous/Next`;
+        trail.title = options.privacyMode
+          ? `${nextIncluded ? 'Exclude' : 'Include'} private field in Previous/Next`
+          : nextIncluded
+            ? `Exclude ${field.field.label} from Previous/Next`
+            : `Include ${field.field.label} in Previous/Next`;
         trail.setAttribute('aria-label', trail.title);
         callbacks.onToggleUnlock(field.field.id);
       });
@@ -231,13 +248,16 @@ export function createFieldsView(
         splitPattern.inputMode = 'numeric';
         splitPattern.placeholder = '2-2-4';
         splitPattern.className = 'image-trail-panel__field-split-input';
-        splitPattern.setAttribute('aria-label', `Split pattern for ${field.field.label}`);
+        splitPattern.setAttribute(
+          'aria-label',
+          options.privacyMode ? 'Split pattern for private field' : `Split pattern for ${field.field.label}`,
+        );
 
         const applySplit = document.createElement('button');
         applySplit.type = 'button';
         applySplit.className = 'image-trail-panel__field-split-button';
         applySplit.textContent = 'Split';
-        applySplit.title = `Split ${field.field.label}`;
+        applySplit.title = options.privacyMode ? 'Split private field' : `Split ${field.field.label}`;
         applySplit.setAttribute('aria-label', applySplit.title);
         applySplit.addEventListener('click', () => callbacks.onApplySplit(field.field.id, splitPattern.value));
         splitPattern.addEventListener('keydown', (event) => {
@@ -254,7 +274,9 @@ export function createFieldsView(
         clearSplit.type = 'button';
         clearSplit.className = 'image-trail-panel__field-split-button';
         clearSplit.textContent = 'Clear split';
-        clearSplit.title = `Collapse ${field.field.label} back into one field`;
+        clearSplit.title = options.privacyMode
+          ? 'Collapse private field back into one field'
+          : `Collapse ${field.field.label} back into one field`;
         clearSplit.setAttribute('aria-label', clearSplit.title);
         clearSplit.addEventListener('click', () => callbacks.onClearSplit(field.field.splitBaseId ?? field.field.id));
         splitControls.append(clearSplit);
@@ -262,11 +284,13 @@ export function createFieldsView(
     }
 
     value.addEventListener('change', () => {
+      if (options.privacyMode) return;
       callbacks.onValueChange(field.field.id, value.value);
     });
     value.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
+        if (options.privacyMode) return;
         callbacks.onValueChange(field.field.id, value.value);
       }
     });

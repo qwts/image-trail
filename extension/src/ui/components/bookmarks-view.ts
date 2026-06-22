@@ -1,5 +1,5 @@
 import { encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
-import { recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitle } from './record-metadata.js';
+import { createPrivacyThumbnail, recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitle } from './record-metadata.js';
 
 type BookmarkAction =
   | { readonly name: 'bookmark/current' }
@@ -35,6 +35,7 @@ export function createBookmarksView(
     readonly hasNewer: boolean;
   },
   recall: { readonly recallOpen: boolean },
+  options: { readonly privacyMode?: boolean },
   dispatch: (action: BookmarkAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
@@ -149,6 +150,7 @@ export function createBookmarksView(
     const selected = selectedIds.includes(item.id);
     const entry = document.createElement('li');
     entry.dataset.imageTrailScrollAnchor = `bookmark:${item.id}`;
+    if (options.privacyMode && !privatePlaceholder) entry.classList.add('is-privacy-masked');
     if (previewableEncrypted) entry.classList.add('is-captured');
     if (selected) entry.classList.add('is-selected');
     entry.setAttribute('aria-selected', String(selected));
@@ -190,17 +192,17 @@ export function createBookmarksView(
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId, scrollAnchorId: `bookmark:${item.id}` });
       });
     }
-    const visual = createRecordVisual(item);
+    const visual = createRecordVisual(item, options);
     const bookmarkLabel = document.createElement('div');
     bookmarkLabel.className = 'image-trail-panel__bookmark-label';
     const source = createExtensionIndicator(item);
     const label = document.createElement('span');
     label.className = 'image-trail-panel__bookmark-name';
-    label.textContent = recordDisplayName(item);
-    label.title = recordTitle(item);
+    label.textContent = recordDisplayName(item, options);
+    label.title = recordTitle(item, options);
     const meta = document.createElement('span');
     meta.className = 'image-trail-panel__record-row-meta';
-    meta.textContent = recordMetadataText(item);
+    meta.textContent = recordMetadataText(item, options);
     meta.title = meta.textContent;
     bookmarkLabel.append(source, label, meta);
 
@@ -255,7 +257,8 @@ export function createBookmarksView(
   return section;
 }
 
-function createRecordVisual(item: ImageDisplayRecord): HTMLElement {
+function createRecordVisual(item: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
+  if (options.privacyMode && item.privacyStatus !== 'locked') return createPrivacyThumbnail();
   if (item.thumbnail) {
     const image = document.createElement('img');
     image.className = 'image-trail-panel__record-thumbnail';

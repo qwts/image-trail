@@ -1,6 +1,11 @@
 import type { PanelAction, TargetState } from '../../core/types.js';
+import { PRIVACY_URL_TEXT } from './record-metadata.js';
 
-export function createTargetPickerView(target: TargetState, dispatch: (action: PanelAction) => void): HTMLElement {
+export function createTargetPickerView(
+  target: TargetState,
+  dispatch: (action: PanelAction) => void,
+  options: { readonly privacyMode?: boolean } = {},
+): HTMLElement {
   const wrapper = document.createElement('details');
   wrapper.className = 'image-trail-panel__section image-trail-panel__target-utility';
   wrapper.open = target.picking || target.mode !== 'auto' || target.candidateCount !== 1;
@@ -22,8 +27,17 @@ export function createTargetPickerView(target: TargetState, dispatch: (action: P
 
   const current = document.createElement('p');
   current.className = 'image-trail-panel__target-url';
-  current.textContent = target.selectedUrl?.startsWith('data:') ? 'data URL' : (target.selectedUrl ?? 'No host image selected yet.');
-  current.title = target.selectedUrl ?? current.textContent;
+  if (options.privacyMode && target.selectedUrl) current.classList.add('is-privacy-masked');
+  current.textContent =
+    options.privacyMode && target.selectedUrl
+      ? PRIVACY_URL_TEXT
+      : target.selectedUrl?.startsWith('data:')
+        ? 'data URL'
+        : (target.selectedUrl ?? 'No host image selected yet.');
+  current.title =
+    options.privacyMode && target.selectedUrl
+      ? 'Privacy mode is hiding this URL for screen sharing.'
+      : (target.selectedUrl ?? current.textContent);
 
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__actions';

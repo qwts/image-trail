@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { applyFieldLoadFailureToState, reducePanelAction } from '../extension/src/core/actions.js';
 import { createInitialPanelState, setTargetState } from '../extension/src/core/state.js';
 import { isLockedPrivatePin } from '../extension/src/ui/panel.js';
+import {
+  PRIVACY_RECORD_META,
+  PRIVACY_RECORD_NAME,
+  recordDisplayName,
+  recordMetadataText,
+} from '../extension/src/ui/components/record-metadata.js';
 import { recallDeleteCountForQueue } from '../extension/src/ui/render.js';
 import type { UrlFieldSplitSpec } from '../extension/src/core/url/types.js';
 
@@ -194,6 +200,28 @@ test('updating visible bookmark soft max resets the queue window', () => {
   assert.equal(updated.bookmarkOffset, 0);
 });
 
+test('toggling privacy mode does not mutate rows or selections', () => {
+  const state = {
+    ...createInitialPanelState(),
+    history: [
+      { id: 'history-1', url: 'https://example.test/history.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'history' as const },
+    ],
+    bookmarks: [
+      { id: 'bookmark-1', url: 'https://example.test/bookmark.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'bookmark' as const },
+    ],
+    selectedHistoryIds: ['history-1'],
+    selectedBookmarkIds: ['bookmark-1'],
+  };
+
+  const updated = reducePanelAction(state, { name: 'settings/update-privacy-mode', enabled: true });
+
+  assert.equal(updated.privacyModeEnabled, true);
+  assert.equal(updated.history, state.history);
+  assert.equal(updated.bookmarks, state.bookmarks);
+  assert.deepEqual(updated.selectedHistoryIds, ['history-1']);
+  assert.deepEqual(updated.selectedBookmarkIds, ['bookmark-1']);
+});
+
 test('clearing visible bookmarks is presentation-only state', () => {
   const state = {
     ...createInitialPanelState(),
@@ -359,6 +387,23 @@ test('locked private placeholders are detected before image export', () => {
     }),
     false,
   );
+});
+
+test('privacy display helpers mask row name and metadata only in privacy mode', () => {
+  const record = {
+    id: 'record-1',
+    url: 'https://example.test/private-name.jpg',
+    label: 'private-name.jpg',
+    timestamp: '2026-06-20T00:00:00.000Z',
+    width: 640,
+    height: 480,
+    source: 'bookmark' as const,
+  };
+
+  assert.equal(recordDisplayName(record), 'private-name.jpg');
+  assert.notEqual(recordMetadataText(record), PRIVACY_RECORD_META);
+  assert.equal(recordDisplayName(record, { privacyMode: true }), PRIVACY_RECORD_NAME);
+  assert.equal(recordMetadataText(record, { privacyMode: true }), PRIVACY_RECORD_META);
 });
 
 test('recall drawer appends paged candidates without duplicating rows', () => {

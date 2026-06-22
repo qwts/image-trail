@@ -1,7 +1,7 @@
 import { imageExtensionFromUrl, type ImageDisplayRecord } from '../../core/display-records.js';
 import type { PanelAction, RecallDrawerSide, RecallState } from '../../core/types.js';
 import { createExtensionIndicator } from './bookmarks-view.js';
-import { recordDisplayName, recordMetadataText, recordTitle } from './record-metadata.js';
+import { createPrivacyThumbnail, recordDisplayName, recordMetadataText, recordTitle } from './record-metadata.js';
 
 export interface RecallDrawerGeometry {
   readonly side: RecallDrawerSide;
@@ -15,7 +15,7 @@ export function createRecallDrawerView(
   state: RecallState,
   geometry: RecallDrawerGeometry,
   dispatch: (action: PanelAction) => void,
-  options: { readonly animate?: boolean } = {},
+  options: { readonly animate?: boolean; readonly privacyMode?: boolean } = {},
 ): HTMLElement {
   const drawer = document.createElement('aside');
   drawer.className = `image-trail-panel-root image-trail-panel__recall-drawer is-${geometry.side}`;
@@ -72,7 +72,7 @@ export function createRecallDrawerView(
 
     const selected = new Set(state.selectedIds);
     for (const candidate of state.candidates) {
-      list.append(createRecallRow(candidate, selected.has(candidate.id), dispatch));
+      list.append(createRecallRow(candidate, selected.has(candidate.id), dispatch, options));
     }
     content.append(list);
   }
@@ -112,9 +112,15 @@ export function createRecallDrawerView(
   return drawer;
 }
 
-function createRecallRow(record: ImageDisplayRecord, selected: boolean, dispatch: (action: PanelAction) => void): HTMLElement {
+function createRecallRow(
+  record: ImageDisplayRecord,
+  selected: boolean,
+  dispatch: (action: PanelAction) => void,
+  options: { readonly privacyMode?: boolean } = {},
+): HTMLElement {
   const item = document.createElement('li');
   item.className = selected ? 'is-selected' : '';
+  if (options.privacyMode && record.privacyStatus !== 'locked') item.classList.add('is-privacy-masked');
   item.tabIndex = 0;
   item.setAttribute('role', 'button');
   item.setAttribute('aria-pressed', selected ? 'true' : 'false');
@@ -128,7 +134,7 @@ function createRecallRow(record: ImageDisplayRecord, selected: boolean, dispatch
     dispatch({ name: 'recall-selection/toggle', id: record.id });
   });
 
-  item.append(checkbox, createRecallThumbnail(record), createRecallLabel(record));
+  item.append(checkbox, createRecallThumbnail(record, options), createRecallLabel(record, options));
   item.addEventListener('click', () => dispatch({ name: 'recall-selection/toggle', id: record.id }));
   item.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -139,7 +145,8 @@ function createRecallRow(record: ImageDisplayRecord, selected: boolean, dispatch
   return item;
 }
 
-function createRecallThumbnail(record: ImageDisplayRecord): HTMLElement {
+function createRecallThumbnail(record: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
+  if (options.privacyMode && record.privacyStatus !== 'locked') return createPrivacyThumbnail();
   if (record.thumbnail) {
     const image = document.createElement('img');
     image.className = 'image-trail-panel__record-thumbnail';
@@ -155,18 +162,18 @@ function createRecallThumbnail(record: ImageDisplayRecord): HTMLElement {
   return fallback;
 }
 
-function createRecallLabel(record: ImageDisplayRecord): HTMLElement {
+function createRecallLabel(record: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'image-trail-panel__recall-label';
 
   const name = document.createElement('span');
   name.className = 'image-trail-panel__recall-name';
-  name.textContent = recordDisplayName(record);
-  name.title = recordTitle(record);
+  name.textContent = recordDisplayName(record, options);
+  name.title = recordTitle(record, options);
 
   const meta = document.createElement('span');
   meta.className = 'image-trail-panel__recall-row-meta';
-  meta.textContent = recordMetadataText(record);
+  meta.textContent = recordMetadataText(record, options);
   meta.title = meta.textContent;
 
   wrapper.append(createExtensionIndicator(record), name, meta);
