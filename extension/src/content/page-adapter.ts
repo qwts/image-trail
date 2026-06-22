@@ -517,7 +517,8 @@ function canGrabTarget(strategyId: GrabStrategyId, target: Element): boolean {
 }
 
 async function resolveLinkedPageImage(pageUrl: string, strategy: LinkedPageImageGrabStrategy): Promise<string> {
-  const html = await fetchLinkedPageText(pageUrl, strategy);
+  const page = await fetchLinkedPageText(pageUrl, strategy);
+  const html = page.text;
   const document = new DOMParser().parseFromString(html, 'text/html');
   for (const extractor of strategy.extractors) {
     let element: Element | null;
@@ -527,7 +528,7 @@ async function resolveLinkedPageImage(pageUrl: string, strategy: LinkedPageImage
       continue;
     }
     const raw = element?.getAttribute(extractor.attribute)?.trim();
-    const resolved = safeHttpUrl(raw, pageUrl);
+    const resolved = safeHttpUrl(raw, page.finalUrl);
     if (resolved) return resolved.href;
   }
   throw new Error('No image matched the configured extractors.');
@@ -536,11 +537,11 @@ async function resolveLinkedPageImage(pageUrl: string, strategy: LinkedPageImage
 async function fetchLinkedPageText(
   pageUrl: string,
   strategy: Pick<LinkedPageImageGrabStrategy, 'maxBytes' | 'timeoutMs'>,
-): Promise<string> {
+): Promise<{ readonly text: string; readonly finalUrl: string }> {
   try {
     const response = await sendRuntimeMessage(createFetchLinkedPageMessage(pageUrl, strategy.maxBytes, strategy.timeoutMs));
     if (isFetchLinkedPageResultMessage(response)) {
-      if (response.payload.ok) return response.payload.text;
+      if (response.payload.ok) return { text: response.payload.text, finalUrl: response.payload.finalUrl };
       throw new Error(response.payload.message);
     }
   } catch (error) {

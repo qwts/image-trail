@@ -278,7 +278,7 @@ export interface FetchLinkedPageResultMessage {
   readonly type: typeof MessageType.FetchLinkedPageResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload:
-    | { readonly ok: true; readonly text: string; readonly byteLength: number }
+    | { readonly ok: true; readonly text: string; readonly byteLength: number; readonly finalUrl: string }
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 

@@ -422,7 +422,7 @@ async function handleFetchLinkedPage(
     }
 
     const result = await readLimitedText(response, maxBytes);
-    return { ok: true, text: result.text, byteLength: result.byteLength };
+    return { ok: true, text: result.text, byteLength: result.byteLength, finalUrl: response.url };
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return { ok: false, reason: 'timeout', message: 'Linked page fetch timed out.' };

@@ -383,9 +383,15 @@ test('creates linked-page fetch messages', () => {
   assert.equal(request.payload.timeoutMs, 2000);
   assert.equal(isExtensionRequest(request), true);
 
-  const success = createFetchLinkedPageResultMessage({ ok: true, text: '<img src="a.jpg">', byteLength: 17 });
+  const success = createFetchLinkedPageResultMessage({
+    ok: true,
+    text: '<img src="a.jpg">',
+    byteLength: 17,
+    finalUrl: 'https://example.test/canonical/page',
+  });
   assert.equal(success.type, MessageType.FetchLinkedPageResult);
   assert.equal(success.payload.ok, true);
+  assert.equal(success.payload.ok ? success.payload.finalUrl : undefined, 'https://example.test/canonical/page');
   assert.equal(isExtensionResponse(success), true);
   assert.equal(isFetchLinkedPageResultMessage(success), true);
 
