@@ -85,6 +85,12 @@ interface RecordAddOptions {
   readonly height?: number;
 }
 
+function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {
+  const match = value?.match(/^\s*(\d+)\s*[x×]\s*(\d+)\s*$/iu);
+  if (!match) return {};
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
 function addItems(items: readonly string[], nextItems: readonly string[]): readonly string[] {
   return [...items, ...nextItems.filter((item) => !items.includes(item))];
 }
@@ -125,6 +131,7 @@ export class ImageTrailPanel {
   private localSettings: PlaintextLocalSettings = DEFAULT_LOCAL_SETTINGS;
   private previewScrollAnchorId: string | null = null;
   private projectionRevision = 0;
+  private storageUsageRequestId = 0;
   private bookmarkMutationQueue: Promise<void> = Promise.resolve();
   private panelPositionRestored = false;
   private panelPositionRestorePromise: Promise<void> | null = null;
@@ -1588,7 +1595,7 @@ export class ImageTrailPanel {
   private async removeCapturedBlobReference(blobId: string): Promise<void> {
     if (!this.captureStore) return;
     const { usage } = await this.captureStore.requestDeleteBlob(blobId);
-    this.state = reducePanelAction(this.state, { name: 'storage/update', usage });
+    this.applyStorageUsage(usage);
   }
 
   private async cleanupOrphanedBlobs(): Promise<void> {
@@ -1603,6 +1610,7 @@ export class ImageTrailPanel {
       },
       { name: 'storage/update', usage },
     );
+    this.storageUsageRequestId += 1;
     this.render({ includeRecall: false });
   }
 
@@ -1637,6 +1645,7 @@ export class ImageTrailPanel {
 
   private async captureImage(url: string, sourceType: 'target' | 'history' | 'bookmark', sourceRecordId?: string): Promise<void> {
     if (!this.captureStore) return;
+    if (this.state.captureInProgress) return;
     const isImportedImage = url.startsWith('data:image/');
     if (!isImportedImage && !isDurableImageSourceUrl(url)) {
       this.state = {
@@ -1682,6 +1691,57 @@ export class ImageTrailPanel {
         }
       }
     }
+    if (isCapturedResult(result) && sourceType === 'target') {
+      const capturedAt = new Date().toISOString();
+      const dimensions = parseDimensionText(this.state.target.selectedDimensions);
+      const draft = createDisplayRecord({
+        id: url,
+        url,
+        timestamp: capturedAt,
+        width: dimensions.width,
+        height: dimensions.height,
+        source: 'bookmark',
+        capturedAt,
+        captureStatus: 'captured',
+        blobId: result.blobId,
+        storedOriginal: {
+          blobId: result.blobId,
+          mimeType: result.mimeType,
+          byteLength: result.byteLength,
+          capturedAt,
+        },
+      });
+      if (!this.bookmarkStore) {
+        await this.removeCapturedBlobReference(result.blobId);
+        this.state = {
+          ...this.state,
+          message: 'Captured original was discarded because bookmark storage is unavailable.',
+          status: 'error',
+          lastUpdatedAt: Date.now(),
+        };
+      } else {
+        const saved = this.bookmarkStore.saveResult
+          ? await this.bookmarkStore.saveResult(draft)
+          : { ok: true as const, record: await this.bookmarkStore.save(draft) };
+        if (saved.ok) {
+          await this.loadBookmarkPage(0, { render: false });
+          this.state = {
+            ...this.state,
+            message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image. ${bookmarkSaveMessage(saved.record, saved.record.label)}`,
+            lastUpdatedAt: Date.now(),
+          };
+          queueChanged = true;
+        } else {
+          await this.removeCapturedBlobReference(result.blobId);
+          this.state = {
+            ...this.state,
+            message: `Captured original was discarded because the target pin was not saved: ${saved.message}`,
+            status: 'error',
+            lastUpdatedAt: Date.now(),
+          };
+        }
+      }
+    }
     if (isCapturedResult(result) && sourceType === 'bookmark' && sourceRecordId && this.bookmarkStore) {
       const updatedBookmark = this.state.bookmarks.find((b) => b.id === sourceRecordId);
       if (updatedBookmark) {
@@ -1702,7 +1762,7 @@ export class ImageTrailPanel {
     if (!this.captureStore) return;
     this.state = reducePanelAction(this.state, { name: 'capture/delete', id: recordId, blobId });
     const { usage } = await this.captureStore.requestDeleteBlob(blobId);
-    this.state = reducePanelAction(this.state, { name: 'storage/update', usage });
+    this.applyStorageUsage(usage);
     const updatedHistory = this.state.history.find((b) => b.id === recordId);
     if (updatedHistory && this.recentHistoryStore) {
       const history = await this.recentHistoryStore.add(updatedHistory, window.location.href);
@@ -2266,7 +2326,14 @@ export class ImageTrailPanel {
 
   private async refreshStorageUsage(): Promise<void> {
     if (!this.captureStore) return;
+    const requestId = (this.storageUsageRequestId += 1);
     const usage = await this.captureStore.requestStorageUsage();
+    if (requestId !== this.storageUsageRequestId) return;
+    this.applyStorageUsage(usage, { preserveRequestId: true });
+  }
+
+  private applyStorageUsage(usage: NonNullable<PanelState['storageUsage']>, options: { readonly preserveRequestId?: boolean } = {}): void {
+    if (!options.preserveRequestId) this.storageUsageRequestId += 1;
     this.state = reducePanelAction(this.state, { name: 'storage/update', usage });
   }
 

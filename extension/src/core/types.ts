@@ -392,6 +392,7 @@ export type PanelAction =
 
 export interface BookmarkStore {
   readonly load: () => Promise<readonly ImageDisplayRecord[]>;
+  readonly loadOriginalBlobIds: () => Promise<ReadonlySet<string>>;
   readonly loadPage: (input: {
     readonly offset: number;
     readonly limit: number;

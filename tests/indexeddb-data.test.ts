@@ -634,6 +634,162 @@ test('IndexedDbBookmarkStore removes protected original blobs through relationsh
   }
 });
 
+test('IndexedDbBookmarkStore reports original blob ids beyond the visible queue page', async () => {
+  await deleteImageTrailDb();
+  const store = new IndexedDbBookmarkStore();
+  try {
+    const limit = DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax;
+    for (let index = 0; index <= limit; index += 1) {
+      await store.save(
+        createDisplayRecord({
+          id: `https://example.test/offscreen-${index}.jpg`,
+          url: `https://example.test/offscreen-${index}.jpg`,
+          label: `offscreen-${index}.jpg`,
+          timestamp: `2026-06-21T00:00:${String(index).padStart(2, '0')}.000Z`,
+          source: 'bookmark',
+          storedOriginal:
+            index === 0
+              ? {
+                  blobId: 'blob-offscreen-original',
+                  mimeType: 'image/jpeg',
+                  byteLength: 4,
+                  capturedAt: '2026-06-21T00:00:00.000Z',
+                }
+              : undefined,
+        }),
+      );
+    }
+
+    const visible = await store.load();
+    assert.equal(
+      visible.some((record) => record.storedOriginal?.blobId === 'blob-offscreen-original'),
+      false,
+    );
+    assert.equal((await store.loadOriginalBlobIds()).has('blob-offscreen-original'), true);
+  } finally {
+    await store.close();
+  }
+});
+
+test('IndexedDbBookmarkStore reports protected original blob ids while locked', async () => {
+  await deleteImageTrailDb();
+  let active: ActiveBlobKey | null = (
+    await createAndActivateWrappedBlobKey({
+      password: 'pin-original-reference-password',
+      uuid: 'pin-original-reference-key',
+      now: '2026-06-21T00:00:00.000Z',
+    })
+  ).active;
+  const unlockedStore = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  try {
+    await unlockedStore.save(
+      createDisplayRecord({
+        id: 'https://secret.example.test/referenced-original.jpg',
+        url: 'https://secret.example.test/referenced-original.jpg',
+        label: 'referenced-original.jpg',
+        timestamp: '2026-06-21T00:00:01.000Z',
+        source: 'bookmark',
+        storedOriginal: {
+          blobId: 'blob-locked-protected-original',
+          mimeType: 'image/jpeg',
+          byteLength: 4,
+          capturedAt: '2026-06-21T00:00:00.000Z',
+        },
+      }),
+    );
+  } finally {
+    await unlockedStore.close();
+    active = null;
+    lockBlobKey();
+  }
+
+  const lockedStore = new IndexedDbBookmarkStore({ getActiveBlobKey: () => null });
+  try {
+    assert.equal((await lockedStore.loadOriginalBlobIds()).has('blob-locked-protected-original'), true);
+  } finally {
+    await lockedStore.close();
+  }
+});
+
+test('IndexedDbBookmarkStore removes a replaced protected original blob', async () => {
+  await deleteImageTrailDb();
+  let active: ActiveBlobKey | null = (
+    await createAndActivateWrappedBlobKey({
+      password: 'pin-replace-original-password',
+      uuid: 'pin-replace-original-key',
+      now: '2026-06-21T00:00:00.000Z',
+    })
+  ).active;
+  const dbResult = await openImageTrailDb();
+  assert.ok(dbResult.db);
+  const blobRepo = new BlobsRepository(dbResult.db);
+  for (const id of ['blob-old-protected-original', 'blob-new-protected-original']) {
+    await blobRepo.put({
+      id,
+      kind: 'original',
+      schemaVersion: 1,
+      algorithm: 'AES-GCM',
+      iv: 'iv',
+      ciphertext: new ArrayBuffer(4),
+      encryptedByteLength: 4,
+      createdAt: '2026-06-21T00:00:00.000Z',
+      key: active.reference,
+      referenceCount: 1,
+    });
+  }
+  dbResult.db.close();
+
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  try {
+    const base = createDisplayRecord({
+      id: 'https://secret.example.test/replace-original.jpg',
+      url: 'https://secret.example.test/replace-original.jpg',
+      label: 'replace-original.jpg',
+      timestamp: '2026-06-21T00:00:01.000Z',
+      source: 'bookmark',
+    });
+    await store.save(
+      createDisplayRecord({
+        ...base,
+        storedOriginal: {
+          blobId: 'blob-old-protected-original',
+          mimeType: 'image/jpeg',
+          byteLength: 4,
+          capturedAt: '2026-06-21T00:00:00.000Z',
+        },
+      }),
+    );
+    await store.save(
+      createDisplayRecord({
+        ...base,
+        storedOriginal: {
+          blobId: 'blob-new-protected-original',
+          mimeType: 'image/jpeg',
+          byteLength: 4,
+          capturedAt: '2026-06-21T00:00:02.000Z',
+        },
+      }),
+    );
+    const ids = await store.loadOriginalBlobIds();
+    assert.equal(ids.has('blob-old-protected-original'), false);
+    assert.equal(ids.has('blob-new-protected-original'), true);
+  } finally {
+    await store.close();
+    active = null;
+    lockBlobKey();
+  }
+
+  const verifyResult = await openImageTrailDb();
+  assert.ok(verifyResult.db);
+  try {
+    const verifyBlobs = new BlobsRepository(verifyResult.db);
+    assert.equal(await verifyBlobs.get('blob-old-protected-original'), undefined);
+    assert.notEqual(await verifyBlobs.get('blob-new-protected-original'), undefined);
+  } finally {
+    verifyResult.db.close();
+  }
+});
+
 test('IndexedDbBookmarkStore batch removes locked protected backing rows without decrypting private metadata', async () => {
   await deleteImageTrailDb();
   let active: ActiveBlobKey | null = (

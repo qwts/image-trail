@@ -172,10 +172,7 @@ function normalizeHostname(hostname: string): string | null {
 }
 
 async function referencedBlobIds(): Promise<Set<string>> {
-  const referenced = new Set<string>();
-  for (const bookmark of await bookmarkStore.load()) {
-    if (bookmark.blobId) referenced.add(bookmark.blobId);
-  }
+  const referenced = new Set(await bookmarkStore.loadOriginalBlobIds());
   for (const history of recentHistoryBySite.values()) {
     for (const item of history) {
       if (item.blobId) referenced.add(item.blobId);
@@ -314,8 +311,6 @@ async function handleDeleteBlob(message: DeleteBlobMessage): Promise<{ deleted: 
 }
 
 async function handleCleanupOrphanedBlobs(): Promise<import('./messages.js').CleanupOrphanedBlobsResultMessage['payload']> {
-  if (!getActiveBlobKey()) return { deletedCount: 0, usage: await handleStorageUsage() };
-
   const db = await getDb();
   if (!db) return { deletedCount: 0, usage: { totalBytes: 0, blobCount: 0 } };
 
