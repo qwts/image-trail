@@ -32,6 +32,7 @@ export interface UrlTemplateRecord {
   readonly matchRules: UrlTemplateMatchRules;
   readonly fields: readonly UrlTemplateField[];
   readonly hideExcludedFields: boolean;
+  readonly autoApplyEnabled: boolean;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly useCount: number;
@@ -59,6 +60,7 @@ export function createUrlTemplateRecord(input: {
     matchRules: input.existing?.matchRules ? { ...matchRules, mode: input.existing.matchRules.mode } : matchRules,
     fields: included.map((field) => templateField(input.model, field)),
     hideExcludedFields: input.existing?.hideExcludedFields ?? false,
+    autoApplyEnabled: input.existing?.autoApplyEnabled ?? true,
     createdAt: input.existing?.createdAt ?? now,
     updatedAt: now,
     useCount: (input.existing?.useCount ?? 0) + 1,
@@ -75,8 +77,12 @@ export function templateMatchRules(model: ParsedUrlModel, mode: UrlTemplateMatch
   };
 }
 
-export function findBestMatchingTemplate(templates: readonly UrlTemplateRecord[], model: ParsedUrlModel): UrlTemplateRecord | null {
-  const candidates = templates.filter((template) => templateMatchesModel(template, model));
+export function findBestMatchingTemplate(
+  templates: readonly UrlTemplateRecord[],
+  model: ParsedUrlModel,
+  options: { readonly includeDisabled?: boolean } = {},
+): UrlTemplateRecord | null {
+  const candidates = templates.filter((template) => templateMatchesModel(template, model, options));
   return (
     candidates.sort(
       (a, b) => matchSpecificity(b.matchRules.mode) - matchSpecificity(a.matchRules.mode) || b.updatedAt.localeCompare(a.updatedAt),
@@ -84,7 +90,12 @@ export function findBestMatchingTemplate(templates: readonly UrlTemplateRecord[]
   );
 }
 
-export function templateMatchesModel(template: UrlTemplateRecord, model: ParsedUrlModel): boolean {
+export function templateMatchesModel(
+  template: UrlTemplateRecord,
+  model: ParsedUrlModel,
+  options: { readonly includeDisabled?: boolean } = {},
+): boolean {
+  if (template.autoApplyEnabled === false && options.includeDisabled !== true) return false;
   const current = templateMatchRules(model, template.matchRules.mode);
   if (template.matchRules.hostname !== current.hostname) return false;
   switch (template.matchRules.mode) {
@@ -105,12 +116,18 @@ export function templateMatchesModel(template: UrlTemplateRecord, model: ParsedU
 
 export function updateTemplateSettings(
   template: UrlTemplateRecord,
-  changes: { readonly matchMode?: UrlTemplateMatchMode; readonly hideExcludedFields?: boolean; readonly now?: string },
+  changes: {
+    readonly matchMode?: UrlTemplateMatchMode;
+    readonly hideExcludedFields?: boolean;
+    readonly autoApplyEnabled?: boolean;
+    readonly now?: string;
+  },
 ): UrlTemplateRecord {
   return {
     ...template,
     matchRules: changes.matchMode ? { ...template.matchRules, mode: changes.matchMode } : template.matchRules,
     hideExcludedFields: changes.hideExcludedFields ?? template.hideExcludedFields,
+    autoApplyEnabled: changes.autoApplyEnabled ?? template.autoApplyEnabled ?? true,
     updatedAt: changes.now ?? new Date().toISOString(),
   };
 }

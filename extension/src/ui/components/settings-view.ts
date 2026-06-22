@@ -9,6 +9,10 @@ const MATCH_MODES: readonly { readonly value: UrlTemplateMatchMode; readonly lab
   { value: 'broad-site', label: 'Broad site match' },
 ];
 
+function matchModeLabel(mode: UrlTemplateMatchMode): string {
+  return MATCH_MODES.find((option) => option.value === mode)?.label ?? mode;
+}
+
 export function createSettingsView(
   visibleBookmarkSoftMax: number,
   privacyModeEnabled: boolean,
@@ -252,14 +256,14 @@ function createTemplateItem(
 
   const meta = document.createElement('p');
   meta.className = 'image-trail-panel__settings-template-meta';
-  const includedLabels = template.fields.map((field) => field.label).join(', ');
-  meta.textContent = `${template.fields.length} included field${template.fields.length === 1 ? '' : 's'}${includedLabels ? `: ${includedLabels}` : ''} · used ${template.useCount} time${template.useCount === 1 ? '' : 's'}${active ? ' · active' : ''}`;
+  meta.textContent = `${template.fields.length} included field${template.fields.length === 1 ? '' : 's'} · ${matchModeLabel(template.matchRules.mode)} · used ${template.useCount} time${template.useCount === 1 ? '' : 's'}${template.autoApplyEnabled === false ? ' · auto-apply off' : ''}${active ? ' · active' : ''}`;
 
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__settings-template-controls';
 
   const modeLabel = document.createElement('label');
   modeLabel.className = 'image-trail-panel__settings-field';
+  modeLabel.classList.add('image-trail-panel__settings-template-match');
   const modeText = document.createElement('span');
   modeText.textContent = 'Match';
   const mode = document.createElement('select');
@@ -288,12 +292,25 @@ function createTemplateItem(
   hiddenText.textContent = 'Hide excluded fields';
   hiddenLabel.append(hidden, hiddenText);
 
+  const autoApplyLabel = document.createElement('label');
+  autoApplyLabel.className = 'image-trail-panel__settings-checkbox';
+  const autoApply = document.createElement('input');
+  autoApply.type = 'checkbox';
+  autoApply.checked = template.autoApplyEnabled !== false;
+  autoApply.addEventListener('change', () => {
+    dispatch({ name: 'url-template/update-settings', id: template.id, autoApplyEnabled: autoApply.checked });
+  });
+  const autoApplyText = document.createElement('span');
+  autoApplyText.textContent = 'Auto-apply';
+  autoApplyLabel.append(autoApply, autoApplyText);
+
   const clear = document.createElement('button');
   clear.type = 'button';
+  clear.className = 'image-trail-panel__settings-template-clear';
   clear.textContent = 'Clear';
   clear.addEventListener('click', () => dispatch({ name: 'url-template/remove', id: template.id }));
 
-  controls.append(modeLabel, hiddenLabel, clear);
+  controls.append(modeLabel, autoApplyLabel, hiddenLabel, clear);
   item.append(url, meta, controls);
   if (active && currentFields.length > 0) {
     item.append(createTemplateFieldControls(template, currentFields, dispatch));

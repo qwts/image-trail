@@ -300,6 +300,7 @@ export type PanelAction =
       readonly id: string;
       readonly matchMode?: UrlTemplateMatchMode;
       readonly hideExcludedFields?: boolean;
+      readonly autoApplyEnabled?: boolean;
     }
   | { readonly name: 'url-template/update-fields'; readonly id: string; readonly includedFieldIds: readonly string[] }
   | { readonly name: 'active-field/set'; readonly id: string | null }

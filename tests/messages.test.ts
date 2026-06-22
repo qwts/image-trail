@@ -192,6 +192,7 @@ test('creates extension-owned URL template messages', () => {
       },
     ],
     hideExcludedFields: false,
+    autoApplyEnabled: true,
     createdAt: '2026-06-21T00:00:00.000Z',
     updatedAt: '2026-06-21T00:00:00.000Z',
     useCount: 1,

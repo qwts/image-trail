@@ -284,7 +284,7 @@ export class ImageTrailPanel {
       return;
     }
     const fields = collectUrlFields(model);
-    const existing = findBestMatchingTemplate(this.state.urlTemplates, model) ?? undefined;
+    const existing = findBestMatchingTemplate(this.state.urlTemplates, model, { includeDisabled: true }) ?? undefined;
     if (this.state.unlockedFieldIds.length === 0) {
       if (existing) {
         await this.urlTemplateStore.remove(existing.hostname, existing.id);
@@ -320,7 +320,11 @@ export class ImageTrailPanel {
   ): Promise<void> {
     const template = this.state.urlTemplates.find((candidate) => candidate.id === id);
     if (!template || !this.urlTemplateStore) return;
-    const updated = updateTemplateSettings(template, { matchMode: changes.matchMode, hideExcludedFields: changes.hideExcludedFields });
+    const updated = updateTemplateSettings(template, {
+      matchMode: changes.matchMode,
+      hideExcludedFields: changes.hideExcludedFields,
+      autoApplyEnabled: changes.autoApplyEnabled,
+    });
     await this.urlTemplateStore.save(updated);
     this.state = reducePanelAction(this.state, changes);
     this.render();
@@ -364,7 +368,7 @@ export class ImageTrailPanel {
 
   private activeTemplateIdForCurrentUrl(templates: readonly UrlTemplateRecord[]): string | null {
     try {
-      return findBestMatchingTemplate(templates, this.currentUrlModel())?.id ?? null;
+      return findBestMatchingTemplate(templates, this.currentUrlModel(), { includeDisabled: true })?.id ?? null;
     } catch {
       return null;
     }

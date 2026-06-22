@@ -424,7 +424,11 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         ...state,
         urlTemplates: state.urlTemplates.map((template) =>
           template.id === action.id
-            ? updateTemplateSettings(template, { matchMode: action.matchMode, hideExcludedFields: action.hideExcludedFields })
+            ? updateTemplateSettings(template, {
+                matchMode: action.matchMode,
+                hideExcludedFields: action.hideExcludedFields,
+                autoApplyEnabled: action.autoApplyEnabled,
+              })
             : template,
         ),
         lastUpdatedAt: Date.now(),

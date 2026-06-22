@@ -4,6 +4,7 @@ import { parseUrl } from '../extension/src/core/url/parse-url.js';
 import { collectUrlFields } from '../extension/src/core/url/tokenize-fields.js';
 import {
   createUrlTemplateRecord,
+  findBestMatchingTemplate,
   templateMatchesModel,
   updateTemplateFields,
   updateTemplateSettings,
@@ -26,6 +27,7 @@ test('url templates replace included fields with readable placeholders', () => {
 
   assert.ok(template);
   assert.equal(template.hostname, 'example.test');
+  assert.equal(template.autoApplyEnabled, true);
   assert.equal(template.templateUrl, 'https://example.test/gallery/page/{file-0}.jpg?chapter={query-chapter}&size=large');
   assert.deepEqual(
     template.fields.map((field) => field.placeholder),
@@ -57,6 +59,10 @@ test('url template match modes are explicit instead of opaque confidence scores'
   const broad = updateTemplateSettings(template, { matchMode: 'broad-site', now: '2026-06-21T00:00:02.000Z' });
   assert.equal(templateMatchesModel(broad, differentPathLiteral), true);
   assert.equal(templateMatchesModel(broad, parseUrl('https://elsewhere.test/gallery/page/0008.jpg?chapter=13&size=large')), false);
+  const disabled = updateTemplateSettings(broad, { autoApplyEnabled: false, now: '2026-06-21T00:00:03.000Z' });
+  assert.equal(templateMatchesModel(disabled, sameShape), false);
+  assert.equal(findBestMatchingTemplate([disabled], sameShape), null);
+  assert.equal(findBestMatchingTemplate([disabled], sameShape, { includeDisabled: true })?.id, disabled.id);
 });
 
 test('url template field updates preserve review settings and use count', () => {

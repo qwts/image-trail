@@ -1279,6 +1279,7 @@ test('UrlTemplateRepository saves templates per hostname', async (t) => {
       },
     ],
     hideExcludedFields: false,
+    autoApplyEnabled: true,
     createdAt: '2026-06-21T00:00:00.000Z',
     updatedAt: '2026-06-21T00:00:00.000Z',
     useCount: 1,

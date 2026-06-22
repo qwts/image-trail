@@ -142,6 +142,7 @@ test('loaded active URL templates restore included fields for navigation', () =>
       },
     ],
     hideExcludedFields: true,
+    autoApplyEnabled: true,
     createdAt: '2026-06-21T00:00:00.000Z',
     updatedAt: '2026-06-21T00:00:00.000Z',
     useCount: 1,
