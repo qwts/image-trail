@@ -1230,6 +1230,8 @@
 
 .image-trail-panel-root .image-trail-panel__recall-list {
   display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 3px;
   min-width: 0;
   overflow: auto;
