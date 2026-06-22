@@ -75,6 +75,12 @@ export const MessageType = {
   SaveUrlTemplateResult: 'imageTrail.saveUrlTemplateResult',
   DeleteUrlTemplate: 'imageTrail.deleteUrlTemplate',
   DeleteUrlTemplateResult: 'imageTrail.deleteUrlTemplateResult',
+  ListGrabSourcePatterns: 'imageTrail.listGrabSourcePatterns',
+  ListGrabSourcePatternsResult: 'imageTrail.listGrabSourcePatternsResult',
+  SaveGrabSourcePattern: 'imageTrail.saveGrabSourcePattern',
+  SaveGrabSourcePatternResult: 'imageTrail.saveGrabSourcePatternResult',
+  DeleteGrabSourcePattern: 'imageTrail.deleteGrabSourcePattern',
+  DeleteGrabSourcePatternResult: 'imageTrail.deleteGrabSourcePatternResult',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -631,6 +637,44 @@ export interface DeleteUrlTemplateResultMessage {
   readonly payload: { readonly ok: boolean };
 }
 
+export interface ListGrabSourcePatternsMessage {
+  readonly type: typeof MessageType.ListGrabSourcePatterns;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly hostname: string };
+}
+
+export interface ListGrabSourcePatternsResultMessage {
+  readonly type: typeof MessageType.ListGrabSourcePatternsResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly patterns: readonly import('../core/url/templates.js').GrabSourcePattern[] }
+    | { readonly ok: false; readonly message: string };
+}
+
+export interface SaveGrabSourcePatternMessage {
+  readonly type: typeof MessageType.SaveGrabSourcePattern;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly pattern: import('../core/url/templates.js').GrabSourcePattern };
+}
+
+export interface SaveGrabSourcePatternResultMessage {
+  readonly type: typeof MessageType.SaveGrabSourcePatternResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: boolean };
+}
+
+export interface DeleteGrabSourcePatternMessage {
+  readonly type: typeof MessageType.DeleteGrabSourcePattern;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly hostname: string; readonly id: string };
+}
+
+export interface DeleteGrabSourcePatternResultMessage {
+  readonly type: typeof MessageType.DeleteGrabSourcePatternResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: boolean };
+}
+
 export type ExtensionRequest =
   | TogglePanelMessage
   | PingMessage
@@ -670,7 +714,10 @@ export type ExtensionRequest =
   | SaveLocalSettingsMessage
   | ListUrlTemplatesMessage
   | SaveUrlTemplateMessage
-  | DeleteUrlTemplateMessage;
+  | DeleteUrlTemplateMessage
+  | ListGrabSourcePatternsMessage
+  | SaveGrabSourcePatternMessage
+  | DeleteGrabSourcePatternMessage;
 export type ExtensionResponse =
   | StatusMessage
   | UnknownMessageResponse
@@ -706,7 +753,10 @@ export type ExtensionResponse =
   | SaveLocalSettingsResultMessage
   | ListUrlTemplatesResultMessage
   | SaveUrlTemplateResultMessage
-  | DeleteUrlTemplateResultMessage;
+  | DeleteUrlTemplateResultMessage
+  | ListGrabSourcePatternsResultMessage
+  | SaveGrabSourcePatternResultMessage
+  | DeleteGrabSourcePatternResultMessage;
 export type ExtensionMessage = ExtensionRequest | ExtensionResponse;
 
 export function createTogglePanelMessage(): TogglePanelMessage {
@@ -1051,6 +1101,38 @@ export function createDeleteUrlTemplateResultMessage(payload: DeleteUrlTemplateR
   return { type: MessageType.DeleteUrlTemplateResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
+export function createListGrabSourcePatternsMessage(hostname: string): ListGrabSourcePatternsMessage {
+  return { type: MessageType.ListGrabSourcePatterns, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
+}
+
+export function createListGrabSourcePatternsResultMessage(
+  payload: ListGrabSourcePatternsResultMessage['payload'],
+): ListGrabSourcePatternsResultMessage {
+  return { type: MessageType.ListGrabSourcePatternsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createSaveGrabSourcePatternMessage(
+  pattern: import('../core/url/templates.js').GrabSourcePattern,
+): SaveGrabSourcePatternMessage {
+  return { type: MessageType.SaveGrabSourcePattern, version: MESSAGE_PROTOCOL_VERSION, payload: { pattern } };
+}
+
+export function createSaveGrabSourcePatternResultMessage(
+  payload: SaveGrabSourcePatternResultMessage['payload'],
+): SaveGrabSourcePatternResultMessage {
+  return { type: MessageType.SaveGrabSourcePatternResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createDeleteGrabSourcePatternMessage(hostname: string, id: string): DeleteGrabSourcePatternMessage {
+  return { type: MessageType.DeleteGrabSourcePattern, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname, id } };
+}
+
+export function createDeleteGrabSourcePatternResultMessage(
+  payload: DeleteGrabSourcePatternResultMessage['payload'],
+): DeleteGrabSourcePatternResultMessage {
+  return { type: MessageType.DeleteGrabSourcePatternResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 function hasVersionedObjectShape(value: unknown): value is { type?: unknown; version?: unknown; payload?: unknown } {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as { version?: unknown; payload?: unknown };
@@ -1098,7 +1180,10 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.SaveLocalSettings ||
     value.type === MessageType.ListUrlTemplates ||
     value.type === MessageType.SaveUrlTemplate ||
-    value.type === MessageType.DeleteUrlTemplate
+    value.type === MessageType.DeleteUrlTemplate ||
+    value.type === MessageType.ListGrabSourcePatterns ||
+    value.type === MessageType.SaveGrabSourcePattern ||
+    value.type === MessageType.DeleteGrabSourcePattern
   );
 }
 
@@ -1139,7 +1224,10 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.SaveLocalSettingsResult ||
     value.type === MessageType.ListUrlTemplatesResult ||
     value.type === MessageType.SaveUrlTemplateResult ||
-    value.type === MessageType.DeleteUrlTemplateResult
+    value.type === MessageType.DeleteUrlTemplateResult ||
+    value.type === MessageType.ListGrabSourcePatternsResult ||
+    value.type === MessageType.SaveGrabSourcePatternResult ||
+    value.type === MessageType.DeleteGrabSourcePatternResult
   );
 }
 
@@ -1296,6 +1384,21 @@ export function isSaveUrlTemplateResultMessage(value: unknown): value is SaveUrl
 export function isDeleteUrlTemplateResultMessage(value: unknown): value is DeleteUrlTemplateResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.DeleteUrlTemplateResult;
+}
+
+export function isListGrabSourcePatternsResultMessage(value: unknown): value is ListGrabSourcePatternsResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ListGrabSourcePatternsResult;
+}
+
+export function isSaveGrabSourcePatternResultMessage(value: unknown): value is SaveGrabSourcePatternResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.SaveGrabSourcePatternResult;
+}
+
+export function isDeleteGrabSourcePatternResultMessage(value: unknown): value is DeleteGrabSourcePatternResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.DeleteGrabSourcePatternResult;
 }
 
 export function isStatusMessage(value: unknown): value is StatusMessage {

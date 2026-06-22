@@ -30,6 +30,8 @@ import {
   createLoadLocalSettingsResultMessage,
   createLoadPanelPositionMessage,
   createLoadPanelPositionResultMessage,
+  createListGrabSourcePatternsMessage,
+  createListGrabSourcePatternsResultMessage,
   createListUrlTemplatesMessage,
   createListUrlTemplatesResultMessage,
   createLoadRecallCandidatesMessage,
@@ -57,8 +59,12 @@ import {
   createSaveLocalSettingsResultMessage,
   createSavePanelPositionMessage,
   createSavePanelPositionResultMessage,
+  createSaveGrabSourcePatternMessage,
+  createSaveGrabSourcePatternResultMessage,
   createSaveUrlTemplateMessage,
   createSaveUrlTemplateResultMessage,
+  createDeleteGrabSourcePatternMessage,
+  createDeleteGrabSourcePatternResultMessage,
   createDeleteUrlTemplateMessage,
   createDeleteUrlTemplateResultMessage,
   createStatusMessage,
@@ -80,6 +86,7 @@ import {
   isLoadBookmarksByIdsResultMessage,
   isLoadLocalSettingsResultMessage,
   isLoadPanelPositionResultMessage,
+  isListGrabSourcePatternsResultMessage,
   isListUrlTemplatesResultMessage,
   isLoadRecallCandidatesResultMessage,
   isAddRecentHistoryResultMessage,
@@ -93,7 +100,9 @@ import {
   isSaveBookmarkResultMessage,
   isSaveLocalSettingsResultMessage,
   isSavePanelPositionResultMessage,
+  isSaveGrabSourcePatternResultMessage,
   isSaveUrlTemplateResultMessage,
+  isDeleteGrabSourcePatternResultMessage,
   isDeleteUrlTemplateResultMessage,
   isStatusMessage,
 } from '../extension/src/background/messages.js';
@@ -207,6 +216,28 @@ test('creates extension-owned URL template messages', () => {
   const saveResult = createSaveUrlTemplateResultMessage({ ok: true });
   const remove = createDeleteUrlTemplateMessage('example.test', template.id);
   const removeResult = createDeleteUrlTemplateResultMessage({ ok: true });
+  const pattern = {
+    id: 'grab-source-001',
+    schemaVersion: 1 as const,
+    hostname: 'example.test',
+    patternUrl: 'https://example.test/post/123',
+    matchRules: {
+      mode: 'exact-page-shape' as const,
+      hostname: 'example.test',
+      exactPathSignature: 'post:int',
+      pathShapeSignature: 'post:int',
+      querySignature: '',
+    },
+    createdAt: '2026-06-21T00:00:00.000Z',
+    updatedAt: '2026-06-21T00:00:00.000Z',
+    useCount: 1,
+  };
+  const listPatterns = createListGrabSourcePatternsMessage('example.test');
+  const listPatternsResult = createListGrabSourcePatternsResultMessage({ ok: true, patterns: [pattern] });
+  const savePattern = createSaveGrabSourcePatternMessage(pattern);
+  const savePatternResult = createSaveGrabSourcePatternResultMessage({ ok: true });
+  const removePattern = createDeleteGrabSourcePatternMessage('example.test', pattern.id);
+  const removePatternResult = createDeleteGrabSourcePatternResultMessage({ ok: true });
 
   assert.equal(list.type, MessageType.ListUrlTemplates);
   assert.equal(isExtensionRequest(list), true);
@@ -220,6 +251,18 @@ test('creates extension-owned URL template messages', () => {
   assert.equal(isExtensionRequest(remove), true);
   assert.equal(isExtensionResponse(removeResult), true);
   assert.equal(isDeleteUrlTemplateResultMessage(removeResult), true);
+  assert.equal(listPatterns.type, MessageType.ListGrabSourcePatterns);
+  assert.equal(isExtensionRequest(listPatterns), true);
+  assert.equal(isExtensionResponse(listPatternsResult), true);
+  assert.equal(isListGrabSourcePatternsResultMessage(listPatternsResult), true);
+  assert.equal(savePattern.payload.pattern.id, pattern.id);
+  assert.equal(isExtensionRequest(savePattern), true);
+  assert.equal(isExtensionResponse(savePatternResult), true);
+  assert.equal(isSaveGrabSourcePatternResultMessage(savePatternResult), true);
+  assert.equal(removePattern.payload.id, pattern.id);
+  assert.equal(isExtensionRequest(removePattern), true);
+  assert.equal(isExtensionResponse(removePatternResult), true);
+  assert.equal(isDeleteGrabSourcePatternResultMessage(removePatternResult), true);
 });
 
 test('recognizes capture-related messages as extension requests', () => {

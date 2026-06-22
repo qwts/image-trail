@@ -18,7 +18,7 @@ import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
 import { IndexedDbBookmarkStore } from '../extension/src/data/bookmarks-controller.js';
 import { createDisplayRecord } from '../extension/src/core/display-records.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
-import type { UrlTemplateRecord } from '../extension/src/core/url/templates.js';
+import type { GrabSourcePattern, UrlTemplateRecord } from '../extension/src/core/url/templates.js';
 
 async function deleteImageTrailDb(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
@@ -1328,12 +1328,42 @@ test('UrlTemplateRepository saves templates per hostname', async (t) => {
     updatedAt: '2026-06-21T00:00:00.000Z',
     useCount: 1,
   };
+  const pattern: GrabSourcePattern = {
+    id: 'grab-source-001',
+    schemaVersion: 1,
+    hostname: 'example.test',
+    patternUrl: 'https://example.test/post/123',
+    matchRules: {
+      mode: 'exact-page-shape',
+      hostname: 'example.test',
+      exactPathSignature: 'post:int',
+      pathShapeSignature: 'post:int',
+      querySignature: '',
+    },
+    grabStrategy: {
+      kind: 'linked-page-image',
+      timeoutMs: 5000,
+      maxBytes: 1_048_576,
+      extractors: [{ selector: 'meta[property="og:image"]', attribute: 'content' }],
+    },
+    createdAt: '2026-06-21T00:00:00.000Z',
+    updatedAt: '2026-06-21T00:00:00.000Z',
+    useCount: 1,
+  };
 
   await repository.put(template);
   await repository.put({ ...template, id: 'other-template', hostname: 'other.test' });
+  await repository.putGrabSourcePattern(pattern);
+  await repository.putGrabSourcePattern({ ...pattern, id: 'other-pattern', hostname: 'other.test' });
 
   assert.deepEqual(await repository.listByHostname('example.test'), [template]);
   assert.deepEqual(await repository.listByHostname('other.test'), [{ ...template, id: 'other-template', hostname: 'other.test' }]);
+  assert.deepEqual(await repository.listGrabSourcePatternsByHostname('example.test'), [pattern]);
+  assert.deepEqual(await repository.listGrabSourcePatternsByHostname('other.test'), [
+    { ...pattern, id: 'other-pattern', hostname: 'other.test' },
+  ]);
+  await repository.deleteGrabSourcePattern('example.test', 'grab-source-001');
+  assert.deepEqual(await repository.listGrabSourcePatternsByHostname('example.test'), []);
   await repository.delete('example.test', 'template-001');
   assert.deepEqual(await repository.listByHostname('example.test'), []);
 });

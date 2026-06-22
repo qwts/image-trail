@@ -39,6 +39,7 @@ import {
   createLoadRecallCandidatesResultMessage,
   createLoadPanelPositionResultMessage,
   createLoadLocalSettingsResultMessage,
+  createListGrabSourcePatternsResultMessage,
   createListUrlTemplatesResultMessage,
   createRemoveBookmarkResultMessage,
   createRemoveBookmarksResultMessage,
@@ -48,7 +49,9 @@ import {
   createSaveBookmarkResultMessage,
   createSavePanelPositionResultMessage,
   createSaveLocalSettingsResultMessage,
+  createSaveGrabSourcePatternResultMessage,
   createSaveUrlTemplateResultMessage,
+  createDeleteGrabSourcePatternResultMessage,
   createDeleteUrlTemplateResultMessage,
   createBlobKeyStatusResultMessage,
   createExportBlobKeyBackupResultMessage,
@@ -79,7 +82,14 @@ import type {
 import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHistoryMessage } from './messages.js';
 import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messages.js';
 import type { LoadPanelPositionMessage, SavePanelPositionMessage } from './messages.js';
-import type { DeleteUrlTemplateMessage, ListUrlTemplatesMessage, SaveUrlTemplateMessage } from './messages.js';
+import type {
+  DeleteGrabSourcePatternMessage,
+  DeleteUrlTemplateMessage,
+  ListGrabSourcePatternsMessage,
+  ListUrlTemplatesMessage,
+  SaveGrabSourcePatternMessage,
+  SaveUrlTemplateMessage,
+} from './messages.js';
 import type { SaveLocalSettingsMessage } from './messages.js';
 import type { FetchLinkedPageMessage, FetchThumbnailSourceMessage } from './messages.js';
 import type { CreateBlobPreviewMessage } from './messages.js';
@@ -557,6 +567,32 @@ async function handleDeleteUrlTemplate(
   const hostname = normalizeHostname(message.payload.hostname);
   if (!hostname) return { ok: false };
   await urlTemplateStore.remove(hostname, message.payload.id);
+  return { ok: true };
+}
+
+async function handleListGrabSourcePatterns(
+  message: ListGrabSourcePatternsMessage,
+): Promise<import('./messages.js').ListGrabSourcePatternsResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.hostname);
+  if (!hostname) return { ok: true, patterns: [] };
+  return { ok: true, patterns: await urlTemplateStore.loadGrabSourcePatterns(hostname) };
+}
+
+async function handleSaveGrabSourcePattern(
+  message: SaveGrabSourcePatternMessage,
+): Promise<import('./messages.js').SaveGrabSourcePatternResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.pattern.hostname);
+  if (!hostname) return { ok: false };
+  await urlTemplateStore.saveGrabSourcePattern({ ...message.payload.pattern, hostname });
+  return { ok: true };
+}
+
+async function handleDeleteGrabSourcePattern(
+  message: DeleteGrabSourcePatternMessage,
+): Promise<import('./messages.js').DeleteGrabSourcePatternResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.hostname);
+  if (!hostname) return { ok: false };
+  await urlTemplateStore.removeGrabSourcePattern(hostname, message.payload.id);
   return { ok: true };
 }
 
@@ -1061,6 +1097,26 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleDeleteUrlTemplate(message)
         .then((result) => sendResponse(createDeleteUrlTemplateResultMessage(result)))
         .catch(() => sendResponse(createDeleteUrlTemplateResultMessage({ ok: false })));
+      return true;
+
+    case MessageType.ListGrabSourcePatterns:
+      handleListGrabSourcePatterns(message)
+        .then((result) => sendResponse(createListGrabSourcePatternsResultMessage(result)))
+        .catch(() =>
+          sendResponse(createListGrabSourcePatternsResultMessage({ ok: false, message: 'Grab source patterns could not be loaded.' })),
+        );
+      return true;
+
+    case MessageType.SaveGrabSourcePattern:
+      handleSaveGrabSourcePattern(message)
+        .then((result) => sendResponse(createSaveGrabSourcePatternResultMessage(result)))
+        .catch(() => sendResponse(createSaveGrabSourcePatternResultMessage({ ok: false })));
+      return true;
+
+    case MessageType.DeleteGrabSourcePattern:
+      handleDeleteGrabSourcePattern(message)
+        .then((result) => sendResponse(createDeleteGrabSourcePatternResultMessage(result)))
+        .catch(() => sendResponse(createDeleteGrabSourcePatternResultMessage({ ok: false })));
       return true;
 
     case MessageType.LoadLocalSettings:

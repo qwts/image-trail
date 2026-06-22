@@ -1,11 +1,14 @@
-import type { UrlTemplateRecord } from '../core/url/templates.js';
+import type { GrabSourcePattern, UrlTemplateRecord } from '../core/url/templates.js';
 import { openImageTrailDb } from './db.js';
 import { UrlTemplateRepository } from './repositories/url-template-repository.js';
 
 export interface UrlTemplateStore {
   load(hostname: string): Promise<readonly UrlTemplateRecord[]>;
+  loadGrabSourcePatterns(hostname: string): Promise<readonly GrabSourcePattern[]>;
   save(template: UrlTemplateRecord): Promise<void>;
+  saveGrabSourcePattern(pattern: GrabSourcePattern): Promise<void>;
   remove(hostname: string, id: string): Promise<void>;
+  removeGrabSourcePattern(hostname: string, id: string): Promise<void>;
 }
 
 export class IndexedDbUrlTemplateStore implements UrlTemplateStore {
@@ -19,14 +22,29 @@ export class IndexedDbUrlTemplateStore implements UrlTemplateStore {
     return context ? context.repository.listByHostname(hostname) : [];
   }
 
+  async loadGrabSourcePatterns(hostname: string): Promise<readonly GrabSourcePattern[]> {
+    const context = await this.openContext();
+    return context ? context.repository.listGrabSourcePatternsByHostname(hostname) : [];
+  }
+
   async save(template: UrlTemplateRecord): Promise<void> {
     const context = await this.openContext();
     await context?.repository.put(template);
   }
 
+  async saveGrabSourcePattern(pattern: GrabSourcePattern): Promise<void> {
+    const context = await this.openContext();
+    await context?.repository.putGrabSourcePattern(pattern);
+  }
+
   async remove(hostname: string, id: string): Promise<void> {
     const context = await this.openContext();
     await context?.repository.delete(hostname, id);
+  }
+
+  async removeGrabSourcePattern(hostname: string, id: string): Promise<void> {
+    const context = await this.openContext();
+    await context?.repository.deleteGrabSourcePattern(hostname, id);
   }
 
   async close(): Promise<void> {

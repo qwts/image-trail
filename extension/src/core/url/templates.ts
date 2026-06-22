@@ -25,6 +25,18 @@ export interface UrlTemplateMatchRules {
   readonly querySignature: string;
 }
 
+export interface GrabSourcePattern {
+  readonly id: string;
+  readonly schemaVersion: 1;
+  readonly hostname: string;
+  readonly patternUrl: string;
+  readonly matchRules: UrlTemplateMatchRules;
+  readonly grabStrategy?: UrlTemplateGrabStrategy;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly useCount: number;
+}
+
 export interface UrlTemplateRecord {
   readonly id: string;
   readonly schemaVersion: 1;
@@ -68,6 +80,85 @@ export function createUrlTemplateRecord(input: {
     updatedAt: now,
     useCount: (input.existing?.useCount ?? 0) + 1,
   };
+}
+
+export function createGrabSourcePattern(input: {
+  readonly model: ParsedUrlModel;
+  readonly existing?: GrabSourcePattern;
+  readonly grabStrategy?: UrlTemplateGrabStrategy;
+  readonly now?: string;
+}): GrabSourcePattern {
+  const now = input.now ?? new Date().toISOString();
+  const matchRules = templateMatchRules(input.model, 'exact-page-shape');
+  return {
+    id: input.existing?.id ?? `grab-source:${templateId(matchRules)}`,
+    schemaVersion: 1,
+    hostname: matchRules.hostname,
+    patternUrl: rebuildUrl(input.model),
+    matchRules: input.existing?.matchRules ? { ...matchRules, mode: input.existing.matchRules.mode } : matchRules,
+    grabStrategy: normalizeGrabStrategy(input.grabStrategy ?? input.existing?.grabStrategy),
+    createdAt: input.existing?.createdAt ?? now,
+    updatedAt: now,
+    useCount: (input.existing?.useCount ?? 0) + 1,
+  };
+}
+
+export function upsertGrabSourcePattern(
+  patterns: readonly GrabSourcePattern[],
+  input: { readonly model: ParsedUrlModel; readonly now?: string },
+): GrabSourcePattern {
+  const matchRules = templateMatchRules(input.model, 'exact-page-shape');
+  const id = `grab-source:${templateId(matchRules)}`;
+  const existing = patterns.find((pattern) => pattern.id === id);
+  return createGrabSourcePattern({ model: input.model, existing, now: input.now });
+}
+
+export function updateGrabSourcePatternSettings(
+  pattern: GrabSourcePattern,
+  changes: {
+    readonly matchMode?: UrlTemplateMatchMode;
+    readonly grabStrategy?: UrlTemplateGrabStrategy | null;
+    readonly now?: string;
+  },
+): GrabSourcePattern {
+  const grabStrategy =
+    changes.grabStrategy === null
+      ? undefined
+      : changes.grabStrategy === undefined
+        ? pattern.grabStrategy
+        : normalizeGrabStrategy(changes.grabStrategy);
+  return {
+    ...pattern,
+    matchRules: changes.matchMode ? { ...pattern.matchRules, mode: changes.matchMode } : pattern.matchRules,
+    grabStrategy,
+    updatedAt: changes.now ?? new Date().toISOString(),
+  };
+}
+
+export function findBestMatchingGrabSourcePattern(patterns: readonly GrabSourcePattern[], model: ParsedUrlModel): GrabSourcePattern | null {
+  const matches = patterns.filter((pattern) => grabSourcePatternMatches(pattern, model));
+  return (
+    matches.sort(
+      (a, b) => matchSpecificity(b.matchRules.mode) - matchSpecificity(a.matchRules.mode) || b.updatedAt.localeCompare(a.updatedAt),
+    )[0] ?? null
+  );
+}
+
+export function grabSourcePatternMatches(pattern: GrabSourcePattern, model: ParsedUrlModel): boolean {
+  const current = templateMatchRules(model, pattern.matchRules.mode);
+  if (pattern.matchRules.hostname !== current.hostname) return false;
+  switch (pattern.matchRules.mode) {
+    case 'exact-page-shape':
+      return (
+        pattern.matchRules.exactPathSignature === current.exactPathSignature && pattern.matchRules.querySignature === current.querySignature
+      );
+    case 'same-path-query-shape':
+      return (
+        pattern.matchRules.pathShapeSignature === current.pathShapeSignature && pattern.matchRules.querySignature === current.querySignature
+      );
+    case 'broad-site':
+      return true;
+  }
 }
 
 export function templateMatchRules(model: ParsedUrlModel, mode: UrlTemplateMatchMode): UrlTemplateMatchRules {

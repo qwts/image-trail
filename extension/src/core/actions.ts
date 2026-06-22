@@ -4,7 +4,7 @@ import type { CaptureResult } from './image/capture-result.js';
 import { isCapturedResult } from './image/capture-result.js';
 import { closePanel, EMPTY_AUTOMATION_STATE, showPanel } from './state.js';
 import type { PanelAction, PanelState } from './types.js';
-import { updateTemplateSettings } from './url/templates.js';
+import { updateGrabSourcePatternSettings, updateTemplateSettings } from './url/templates.js';
 import type { UrlFieldSplitSpec } from './url/types.js';
 
 function updateRecordCapture(
@@ -460,6 +460,27 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return {
         ...state,
         unlockedFieldIds: state.activeUrlTemplateId === action.id ? action.includedFieldIds : state.unlockedFieldIds,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'grab-source-patterns/load':
+      return { ...state, grabSourcePatterns: action.patterns, lastUpdatedAt: Date.now() };
+    case 'grab-source-pattern/remove':
+      return {
+        ...state,
+        grabSourcePatterns: state.grabSourcePatterns.filter((pattern) => pattern.id !== action.id),
+        lastUpdatedAt: Date.now(),
+      };
+    case 'grab-source-pattern/update-settings':
+      return {
+        ...state,
+        grabSourcePatterns: state.grabSourcePatterns.map((pattern) =>
+          pattern.id === action.id
+            ? updateGrabSourcePatternSettings(pattern, {
+                matchMode: action.matchMode,
+                grabStrategy: action.grabStrategy,
+              })
+            : pattern,
+        ),
         lastUpdatedAt: Date.now(),
       };
     case 'capture/request':

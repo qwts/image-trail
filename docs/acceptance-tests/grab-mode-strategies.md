@@ -33,6 +33,18 @@ template-specific linked-page extraction stays declarative instead of running us
 9. Configure an invalid selector or click a link whose page has no matching image.
 10. Verify Image Trail shows a failure message and does not create a pin.
 
+## Grab Pattern Scenario
+
+1. On a site with images or source/detail/gallery links, open Image Trail settings.
+2. Cmd-click an image URL shape or a page link shape that should use a specific grab behavior.
+3. Verify settings shows the learned URL under `Grab patterns`, separate from `URL templates`.
+4. Set that grab pattern's `Grab strategy` to `Linked page image` when the clicked URL is a page that must be fetched and parsed.
+5. Leave the strategy as `Clicked image` when the clicked URL is already the image-like source pattern.
+6. Turn on Grab Mode or Shift-click another image/link with the same learned shape.
+7. Verify Image Trail uses the learned grab pattern's strategy and adds the intended image to the queue.
+8. Remove the grab pattern in settings.
+9. Verify the same image/link shape falls back to the normal active/default grab behavior.
+
 ## Expected Results
 
 - Grab Mode is sticky until the user turns it off.
@@ -46,3 +58,7 @@ template-specific linked-page extraction stays declarative instead of running us
 - Linked-page image extraction does not run uploaded JavaScript, `eval`, or user-authored privileged extension code.
 - Linked-page fetches are bounded by timeout and maximum response size before parsing.
 - Resolved image URLs still pass through the normal queue validation and thumbnail-loading path before becoming durable pins.
+- Grab patterns are stored separately from parsed image URL fields and URL templates.
+- Cmd-click learning records clicked image/link URL shapes, not increment/decrement image URL fields.
+- Matching a grab pattern can activate a linked-page strategy even when the clicked link is not a direct image URL.
+- Matching a grab pattern can also preserve an image-like source shape for future strategy work such as URL transforms.
