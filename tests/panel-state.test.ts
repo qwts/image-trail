@@ -9,6 +9,7 @@ import {
   recordDisplayName,
   recordMetadataText,
 } from '../extension/src/ui/components/record-metadata.js';
+import { selectedRangeIds } from '../extension/src/ui/components/selection-ranges.js';
 import { recallDeleteCountForQueue } from '../extension/src/ui/render.js';
 import type { UrlFieldSplitSpec } from '../extension/src/core/url/types.js';
 import type { GrabSourcePattern, UrlTemplateRecord } from '../extension/src/core/url/templates.js';
@@ -296,7 +297,7 @@ test('removing a grab source pattern preserves URL templates', () => {
   assert.deepEqual(next.grabSourcePatterns, []);
 });
 
-test('record selection toggles one list at a time', () => {
+test('record selection toggles can span visible lists', () => {
   const state = {
     ...createInitialPanelState(),
     selectedBookmarkIds: ['bookmark-1'],
@@ -304,20 +305,14 @@ test('record selection toggles one list at a time', () => {
 
   const historySelected = reducePanelAction(state, { name: 'history-selection/toggle', id: 'history-1' });
   assert.deepEqual(historySelected.selectedHistoryIds, ['history-1']);
-  assert.deepEqual(historySelected.selectedBookmarkIds, []);
+  assert.deepEqual(historySelected.selectedBookmarkIds, ['bookmark-1']);
 
   const historyUnselected = reducePanelAction(historySelected, { name: 'history-selection/toggle', id: 'history-1' });
   assert.deepEqual(historyUnselected.selectedHistoryIds, []);
 
-  const bookmarkSelected = reducePanelAction(
-    {
-      ...historySelected,
-      selectedBookmarkIds: [],
-    },
-    { name: 'bookmark-selection/toggle', id: 'bookmark-2' },
-  );
-  assert.deepEqual(bookmarkSelected.selectedBookmarkIds, ['bookmark-2']);
-  assert.deepEqual(bookmarkSelected.selectedHistoryIds, []);
+  const bookmarkSelected = reducePanelAction(historySelected, { name: 'bookmark-selection/toggle', id: 'bookmark-2' });
+  assert.deepEqual(bookmarkSelected.selectedBookmarkIds, ['bookmark-1', 'bookmark-2']);
+  assert.deepEqual(bookmarkSelected.selectedHistoryIds, ['history-1']);
 
   const historyCleared = reducePanelAction(
     { ...createInitialPanelState(), selectedHistoryIds: ['history-1', 'history-2'] },
@@ -330,6 +325,108 @@ test('record selection toggles one list at a time', () => {
     { name: 'bookmark-selection/clear' },
   );
   assert.deepEqual(bookmarksCleared.selectedBookmarkIds, []);
+});
+
+test('select-all and range actions update only their own selection surface', () => {
+  const state = {
+    ...createInitialPanelState(),
+    selectedHistoryIds: ['history-1'],
+    selectedBookmarkIds: ['bookmark-1'],
+    recall: { ...createInitialPanelState().recall, selectedIds: ['recall-1'] },
+  };
+
+  const historySelected = reducePanelAction(state, {
+    name: 'history-selection/select',
+    ids: ['history-2', 'history-3', 'history-2'],
+  });
+  assert.deepEqual(historySelected.selectedHistoryIds, ['history-2', 'history-3']);
+  assert.deepEqual(historySelected.selectedBookmarkIds, ['bookmark-1']);
+  assert.deepEqual(historySelected.recall.selectedIds, ['recall-1']);
+
+  const bookmarkRange = reducePanelAction(historySelected, {
+    name: 'bookmark-selection/select',
+    ids: ['bookmark-2', 'bookmark-3'],
+    mode: 'add',
+  });
+  assert.deepEqual(bookmarkRange.selectedBookmarkIds, ['bookmark-1', 'bookmark-2', 'bookmark-3']);
+  assert.deepEqual(bookmarkRange.selectedHistoryIds, ['history-2', 'history-3']);
+
+  const recallRange = reducePanelAction(bookmarkRange, {
+    name: 'recall-selection/select',
+    ids: ['recall-2', 'recall-3'],
+    mode: 'add',
+  });
+  assert.deepEqual(recallRange.recall.selectedIds, ['recall-1', 'recall-2', 'recall-3']);
+  assert.deepEqual(recallRange.selectedBookmarkIds, ['bookmark-1', 'bookmark-2', 'bookmark-3']);
+});
+
+test('select visible selects recents, visible queue rows, and loaded Recall rows', () => {
+  const state = {
+    ...createInitialPanelState(),
+    history: [
+      { id: 'history-1', url: 'https://example.test/history-1.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'history' as const },
+      { id: 'history-2', url: 'https://example.test/history-2.jpg', timestamp: '2026-06-20T00:00:01.000Z', source: 'history' as const },
+    ],
+    bookmarks: [
+      { id: 'bookmark-1', url: 'https://example.test/bookmark-1.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'bookmark' as const },
+    ],
+    recall: {
+      ...createInitialPanelState().recall,
+      open: true,
+      candidates: [
+        {
+          id: 'recall-1',
+          url: 'https://example.test/recall-1.jpg',
+          timestamp: '2026-06-20T00:00:00.000Z',
+          source: 'bookmark' as const,
+          envelopeCreatedAt: '2026-06-20T00:00:00.000Z',
+        },
+      ],
+    },
+  };
+
+  const selected = reducePanelAction(state, { name: 'selection/select-visible' });
+
+  assert.deepEqual(selected.selectedHistoryIds, ['history-1', 'history-2']);
+  assert.deepEqual(selected.selectedBookmarkIds, ['bookmark-1']);
+  assert.deepEqual(selected.recall.selectedIds, ['recall-1']);
+});
+
+test('select visible ignores cached Recall rows while the drawer is closed', () => {
+  const state = {
+    ...createInitialPanelState(),
+    history: [
+      { id: 'history-1', url: 'https://example.test/history-1.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'history' as const },
+    ],
+    bookmarks: [
+      { id: 'bookmark-1', url: 'https://example.test/bookmark-1.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'bookmark' as const },
+    ],
+    recall: {
+      ...createInitialPanelState().recall,
+      open: false,
+      candidates: [
+        {
+          id: 'hidden-recall-1',
+          url: 'https://example.test/hidden-recall-1.jpg',
+          timestamp: '2026-06-20T00:00:00.000Z',
+          source: 'bookmark' as const,
+          envelopeCreatedAt: '2026-06-20T00:00:00.000Z',
+        },
+      ],
+    },
+  };
+
+  const selected = reducePanelAction(state, { name: 'selection/select-visible' });
+
+  assert.deepEqual(selected.selectedHistoryIds, ['history-1']);
+  assert.deepEqual(selected.selectedBookmarkIds, ['bookmark-1']);
+  assert.deepEqual(selected.recall.selectedIds, []);
+});
+
+test('visible range selection uses the most recent selected anchor', () => {
+  assert.deepEqual(selectedRangeIds(['a', 'b', 'c', 'd'], ['b'], 'd'), ['b', 'c', 'd']);
+  assert.deepEqual(selectedRangeIds(['a', 'b', 'c', 'd'], ['a', 'c'], 'b'), ['b', 'c']);
+  assert.deepEqual(selectedRangeIds(['a', 'b', 'c', 'd'], [], 'c'), ['c']);
 });
 
 test('single bookmark selection clears history selection and selects only clicked bookmark', () => {

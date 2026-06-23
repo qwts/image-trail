@@ -1,5 +1,6 @@
 import { encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import { createPrivacyThumbnail, recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitle } from './record-metadata.js';
+import { selectedRangeIds } from './selection-ranges.js';
 
 type BookmarkAction =
   | { readonly name: 'bookmark/current' }
@@ -7,6 +8,7 @@ type BookmarkAction =
   | { readonly name: 'bookmark/clear'; readonly id: string }
   | { readonly name: 'bookmark-selection/toggle'; readonly id: string }
   | { readonly name: 'bookmark-selection/single'; readonly id: string }
+  | { readonly name: 'bookmark-selection/select'; readonly ids: readonly string[]; readonly mode?: 'replace' | 'add' }
   | { readonly name: 'bookmark-selection/clear' }
   | { readonly name: 'bookmarks/older' }
   | { readonly name: 'bookmarks/newer' }
@@ -96,6 +98,35 @@ export function createBookmarksView(
     dispatch({ name: 'bookmarks/reload' });
   });
 
+  const selectAllQueue = document.createElement('button');
+  selectAllQueue.type = 'button';
+  selectAllQueue.textContent = 'Select all queue';
+  selectAllQueue.disabled = items.length === 0;
+  selectAllQueue.addEventListener('click', () => {
+    queueMenu.open = false;
+    dispatch({ name: 'bookmark-selection/select', ids: items.map((item) => item.id) });
+  });
+
+  const queuePins = items.filter((item) => !isBookmarkRecord(item));
+  const selectPins = document.createElement('button');
+  selectPins.type = 'button';
+  selectPins.textContent = 'Select queue pins';
+  selectPins.disabled = queuePins.length === 0;
+  selectPins.addEventListener('click', () => {
+    queueMenu.open = false;
+    dispatch({ name: 'bookmark-selection/select', ids: queuePins.map((item) => item.id) });
+  });
+
+  const queueBookmarks = items.filter(isBookmarkRecord);
+  const selectBookmarks = document.createElement('button');
+  selectBookmarks.type = 'button';
+  selectBookmarks.textContent = 'Select queue bookmarks';
+  selectBookmarks.disabled = queueBookmarks.length === 0;
+  selectBookmarks.addEventListener('click', () => {
+    queueMenu.open = false;
+    dispatch({ name: 'bookmark-selection/select', ids: queueBookmarks.map((item) => item.id) });
+  });
+
   const clearQueue = document.createElement('button');
   clearQueue.type = 'button';
   clearQueue.textContent = 'Clear queue';
@@ -106,7 +137,7 @@ export function createBookmarksView(
     dispatch({ name: 'bookmarks/clear-visible' });
   });
 
-  queueMenuActions.append(scope, reload, refreshThumbnails, clearQueue);
+  queueMenuActions.append(scope, reload, selectAllQueue, selectPins, selectBookmarks, refreshThumbnails, clearQueue);
   queueMenu.append(queueMenuActions);
 
   const toolbar = document.createElement('div');
@@ -155,10 +186,22 @@ export function createBookmarksView(
     if (selected) entry.classList.add('is-selected');
     entry.setAttribute('aria-selected', String(selected));
     entry.addEventListener('click', (event) => {
-      if (!isMultiSelectClick(event)) return;
+      if (!isSelectionClick(event)) return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
+      if (event.shiftKey) {
+        dispatch({
+          name: 'bookmark-selection/select',
+          ids: selectedRangeIds(
+            items.map((record) => record.id),
+            selectedIds,
+            item.id,
+          ),
+          mode: 'add',
+        });
+        return;
+      }
       dispatch({ name: 'bookmark-selection/toggle', id: item.id });
     });
     if (privatePlaceholder) {
@@ -179,9 +222,9 @@ export function createBookmarksView(
     } else {
       entry.tabIndex = 0;
       entry.setAttribute('role', 'button');
-      entry.title = 'Preview this image in the selected host image. Cmd/Ctrl-click to select for export.';
+      entry.title = 'Preview this image in the selected host image. Cmd/Ctrl-click to select for export. Shift-click selects a range.';
       entry.addEventListener('click', (event) => {
-        if (isMultiSelectClick(event)) return;
+        if (isSelectionClick(event)) return;
         dispatch({ name: 'bookmark-selection/single', id: item.id });
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId, scrollAnchorId: `bookmark:${item.id}` });
       });
@@ -251,7 +294,7 @@ export function createBookmarksView(
   selectionMeta.textContent =
     selectedIds.length > 0
       ? `${selectedIds.length} bookmark(s) selected for export.`
-      : 'Cmd/Ctrl-click rows to select bookmarks for export.';
+      : 'Cmd/Ctrl-click rows to select bookmarks for export. Shift-click selects a range.';
   section.append(heading, toolbar, statusRow, items.length ? selectionMeta : empty);
   if (items.length) section.append(list);
   return section;
@@ -310,6 +353,10 @@ function isPreviewableEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked:
   return !!encryptedBlobIdForRecord(item) && blobKeyUnlocked;
 }
 
-function isMultiSelectClick(event: MouseEvent): boolean {
-  return event.metaKey || event.ctrlKey;
+function isSelectionClick(event: MouseEvent): boolean {
+  return event.metaKey || event.ctrlKey || event.shiftKey;
+}
+
+function isBookmarkRecord(item: ImageDisplayRecord): boolean {
+  return item.captureStatus === 'captured' || !!item.storedOriginal || item.protectedPin?.hasStoredOriginal === true;
 }

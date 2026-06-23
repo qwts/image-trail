@@ -2,6 +2,7 @@ import { imageExtensionFromUrl, type ImageDisplayRecord } from '../../core/displ
 import type { PanelAction, RecallDrawerSide, RecallState } from '../../core/types.js';
 import { createExtensionIndicator } from './bookmarks-view.js';
 import { createPrivacyThumbnail, recordDisplayName, recordMetadataText, recordTitle } from './record-metadata.js';
+import { selectedRangeIds } from './selection-ranges.js';
 
 export interface RecallDrawerGeometry {
   readonly side: RecallDrawerSide;
@@ -71,8 +72,9 @@ export function createRecallDrawerView(
     });
 
     const selected = new Set(state.selectedIds);
+    const orderedIds = state.candidates.map((candidate) => candidate.id);
     for (const candidate of state.candidates) {
-      list.append(createRecallRow(candidate, selected.has(candidate.id), dispatch, options));
+      list.append(createRecallRow(candidate, selected.has(candidate.id), state.selectedIds, orderedIds, dispatch, options));
     }
     content.append(list);
   }
@@ -92,6 +94,32 @@ export function createRecallDrawerView(
   clear.disabled = state.busy || state.selectedIds.length === 0;
   clear.addEventListener('click', () => dispatch({ name: 'recall-selection/clear' }));
 
+  const selectAll = document.createElement('button');
+  selectAll.type = 'button';
+  selectAll.textContent = 'Select all Recall';
+  selectAll.disabled = state.busy || state.candidates.length === 0;
+  selectAll.addEventListener('click', () =>
+    dispatch({ name: 'recall-selection/select', ids: state.candidates.map((candidate) => candidate.id) }),
+  );
+
+  const recallPins = state.candidates.filter((candidate) => !isBookmarkRecord(candidate));
+  const selectPins = document.createElement('button');
+  selectPins.type = 'button';
+  selectPins.textContent = 'Select Recall pins';
+  selectPins.disabled = state.busy || recallPins.length === 0;
+  selectPins.addEventListener('click', () =>
+    dispatch({ name: 'recall-selection/select', ids: recallPins.map((candidate) => candidate.id) }),
+  );
+
+  const recallBookmarks = state.candidates.filter(isBookmarkRecord);
+  const selectBookmarks = document.createElement('button');
+  selectBookmarks.type = 'button';
+  selectBookmarks.textContent = 'Select Recall bookmarks';
+  selectBookmarks.disabled = state.busy || recallBookmarks.length === 0;
+  selectBookmarks.addEventListener('click', () =>
+    dispatch({ name: 'recall-selection/select', ids: recallBookmarks.map((candidate) => candidate.id) }),
+  );
+
   const clearResults = document.createElement('button');
   clearResults.type = 'button';
   clearResults.textContent = 'Clear results';
@@ -99,7 +127,7 @@ export function createRecallDrawerView(
   clearResults.title = 'Hide loaded Recall results until Recall is reopened or reloaded.';
   clearResults.addEventListener('click', () => dispatch({ name: 'recall/clear-results' }));
 
-  actions.append(recall, clear, clearResults);
+  actions.append(recall, selectAll, selectPins, selectBookmarks, clear, clearResults);
   if (state.hasMore) {
     const more = document.createElement('button');
     more.type = 'button';
@@ -115,6 +143,8 @@ export function createRecallDrawerView(
 function createRecallRow(
   record: ImageDisplayRecord,
   selected: boolean,
+  selectedIds: readonly string[],
+  orderedIds: readonly string[],
   dispatch: (action: PanelAction) => void,
   options: { readonly privacyMode?: boolean } = {},
 ): HTMLElement {
@@ -131,11 +161,21 @@ function createRecallRow(
   checkbox.checked = selected;
   checkbox.addEventListener('click', (event) => {
     event.stopPropagation();
+    if (event.shiftKey) {
+      dispatch({ name: 'recall-selection/select', ids: selectedRangeIds(orderedIds, selectedIds, record.id), mode: 'add' });
+      return;
+    }
     dispatch({ name: 'recall-selection/toggle', id: record.id });
   });
 
   item.append(checkbox, createRecallThumbnail(record, options), createRecallLabel(record, options));
-  item.addEventListener('click', () => dispatch({ name: 'recall-selection/toggle', id: record.id }));
+  item.addEventListener('click', (event) => {
+    if (event.shiftKey) {
+      dispatch({ name: 'recall-selection/select', ids: selectedRangeIds(orderedIds, selectedIds, record.id), mode: 'add' });
+      return;
+    }
+    dispatch({ name: 'recall-selection/toggle', id: record.id });
+  });
   item.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -187,4 +227,8 @@ function recallMetaText(state: RecallState): string {
   const unavailable = state.failedCount > 0 ? ` - ${state.failedCount} unavailable` : '';
   const more = state.hasMore ? ' - more available' : '';
   return `${visible} shown of ${state.total}${more}${unavailable}`;
+}
+
+function isBookmarkRecord(item: ImageDisplayRecord): boolean {
+  return item.captureStatus === 'captured' || !!item.storedOriginal || item.protectedPin?.hasStoredOriginal === true;
 }

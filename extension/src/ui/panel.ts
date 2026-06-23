@@ -821,10 +821,13 @@ export class ImageTrailPanel {
     }
 
     if (
+      action.name === 'selection/select-visible' ||
       action.name === 'history-selection/toggle' ||
+      action.name === 'history-selection/select' ||
       action.name === 'history-selection/clear' ||
       action.name === 'bookmark-selection/toggle' ||
       action.name === 'bookmark-selection/single' ||
+      action.name === 'bookmark-selection/select' ||
       action.name === 'bookmark-selection/clear'
     ) {
       this.state = reducePanelAction(this.state, action);
@@ -850,7 +853,12 @@ export class ImageTrailPanel {
       return;
     }
 
-    if (action.name === 'recall-selection/toggle' || action.name === 'recall-selection/clear' || action.name === 'recall/clear-results') {
+    if (
+      action.name === 'recall-selection/toggle' ||
+      action.name === 'recall-selection/select' ||
+      action.name === 'recall-selection/clear' ||
+      action.name === 'recall/clear-results'
+    ) {
       this.state = reducePanelAction(this.state, action);
       this.render();
       return;
@@ -1983,12 +1991,11 @@ export class ImageTrailPanel {
   private async exportBookmarks(password: string, plaintext: boolean): Promise<void> {
     this.state = reducePanelAction(this.state, { name: 'import-export/start' });
     this.render();
-    const bookmarks =
-      this.state.selectedBookmarkIds.length > 0
-        ? selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds)
-        : this.state.recall.selectedIds.length > 0
-          ? this.selectedRecallRecords()
-          : await this.loadAllBookmarksForExport();
+    const selectedBookmarks = [
+      ...(this.state.selectedBookmarkIds.length > 0 ? selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds) : []),
+      ...(this.state.recall.selectedIds.length > 0 ? this.selectedRecallRecords() : []),
+    ];
+    const bookmarks = selectedBookmarks.length > 0 ? selectedBookmarks : await this.loadAllBookmarksForExport();
     if (bookmarks.some(isLockedPrivatePin)) {
       this.finishExport(
         undefined,
@@ -2082,16 +2089,11 @@ export class ImageTrailPanel {
   }
 
   private selectedImageDownloadRecords(): readonly ImageDisplayRecord[] {
-    if (this.state.selectedHistoryIds.length > 0) {
-      return selectedRecords(this.state.history, this.state.selectedHistoryIds);
-    }
-    if (this.state.selectedBookmarkIds.length > 0) {
-      return selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds);
-    }
-    if (this.state.recall.selectedIds.length > 0) {
-      return this.selectedRecallRecords();
-    }
-    return [];
+    return [
+      ...(this.state.selectedHistoryIds.length > 0 ? selectedRecords(this.state.history, this.state.selectedHistoryIds) : []),
+      ...(this.state.selectedBookmarkIds.length > 0 ? selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds) : []),
+      ...(this.state.recall.selectedIds.length > 0 ? this.selectedRecallRecords() : []),
+    ];
   }
 
   private selectedRecallRecords(): readonly ImageDisplayRecord[] {

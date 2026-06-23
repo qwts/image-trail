@@ -1,11 +1,13 @@
 import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import { createPrivacyThumbnail, PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordTitle } from './record-metadata.js';
+import { selectedRangeIds } from './selection-ranges.js';
 
 type HistoryAction =
   | { readonly name: 'history/pin'; readonly id: string }
   | { readonly name: 'history/remove'; readonly id: string }
   | { readonly name: 'history/delete-all' }
   | { readonly name: 'history-selection/toggle'; readonly id: string }
+  | { readonly name: 'history-selection/select'; readonly ids: readonly string[]; readonly mode?: 'replace' | 'add' }
   | { readonly name: 'history-selection/clear' }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'history'; readonly sourceRecordId: string }
   | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string }
@@ -35,11 +37,17 @@ export function createHistoryView(
   const toolbar = document.createElement('div');
   toolbar.className = 'image-trail-panel__history-toolbar';
   if (items.length > 0) {
+    const selectAll = document.createElement('button');
+    selectAll.type = 'button';
+    selectAll.textContent = `Select all recents`;
+    selectAll.disabled = selectedIds.length === items.length;
+    selectAll.addEventListener('click', () => dispatch({ name: 'history-selection/select', ids: items.map((item) => item.id) }));
+
     const deleteAll = document.createElement('button');
     deleteAll.type = 'button';
     deleteAll.textContent = `Delete recents (${items.length})`;
     deleteAll.addEventListener('click', () => dispatch({ name: 'history/delete-all' }));
-    toolbar.append(deleteAll);
+    toolbar.append(selectAll, deleteAll);
   }
 
   const list = document.createElement('ol');
@@ -74,10 +82,22 @@ export function createHistoryView(
     if (selected) entry.classList.add('is-selected');
     entry.setAttribute('aria-selected', String(selected));
     entry.addEventListener('click', (event) => {
-      if (!isMultiSelectClick(event)) return;
+      if (!isSelectionClick(event)) return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
+      if (event.shiftKey) {
+        dispatch({
+          name: 'history-selection/select',
+          ids: selectedRangeIds(
+            items.map((record) => record.id),
+            selectedIds,
+            item.id,
+          ),
+          mode: 'add',
+        });
+        return;
+      }
       dispatch({ name: 'history-selection/toggle', id: item.id });
     });
     if (keyUnavailable) {
@@ -94,9 +114,9 @@ export function createHistoryView(
     } else {
       entry.tabIndex = 0;
       entry.setAttribute('role', 'button');
-      entry.title = 'Preview this image in the selected host image. Cmd/Ctrl-click to select for export.';
+      entry.title = 'Preview this image in the selected host image. Cmd/Ctrl-click to select for export. Shift-click selects a range.';
       entry.addEventListener('click', (event) => {
-        if (isMultiSelectClick(event)) return;
+        if (isSelectionClick(event)) return;
         if (selectedIds.length > 0) dispatch({ name: 'history-selection/clear' });
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
       });
@@ -178,7 +198,7 @@ export function createHistoryView(
   selectionMeta.textContent =
     selectedIds.length > 0
       ? `${selectedIds.length} recent item(s) selected for export.`
-      : 'Cmd/Ctrl-click rows to select recent items for export.';
+      : 'Cmd/Ctrl-click rows to select recent items for export. Shift-click selects a range.';
   section.append(heading, toolbar, items.length ? selectionMeta : empty);
   if (items.length) section.append(list);
   return section;
@@ -213,6 +233,6 @@ function createRecordVisual(item: ImageDisplayRecord, options: { readonly privac
   return fallback;
 }
 
-function isMultiSelectClick(event: MouseEvent): boolean {
-  return event.metaKey || event.ctrlKey;
+function isSelectionClick(event: MouseEvent): boolean {
+  return event.metaKey || event.ctrlKey || event.shiftKey;
 }

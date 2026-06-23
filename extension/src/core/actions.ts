@@ -44,6 +44,19 @@ function addItem(items: readonly string[], item: string): readonly string[] {
   return items.includes(item) ? items : [...items, item];
 }
 
+function addItems(items: readonly string[], additions: readonly string[]): readonly string[] {
+  if (additions.length === 0) return items;
+  const next = [...items];
+  for (const item of additions) {
+    if (!next.includes(item)) next.push(item);
+  }
+  return next;
+}
+
+function uniqueItems(items: readonly string[]): readonly string[] {
+  return [...new Set(items)];
+}
+
 function removeItem(items: readonly string[], item: string): readonly string[] {
   return items.filter((value) => value !== item);
 }
@@ -189,11 +202,27 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         selectedHistoryIds: [],
         lastUpdatedAt: Date.now(),
       };
+    case 'selection/select-visible':
+      return {
+        ...state,
+        selectedHistoryIds: state.history.map((item) => item.id),
+        selectedBookmarkIds: state.bookmarks.map((item) => item.id),
+        recall: {
+          ...state.recall,
+          selectedIds: state.recall.open ? state.recall.candidates.map((candidate) => candidate.id) : [],
+        },
+        lastUpdatedAt: Date.now(),
+      };
     case 'history-selection/toggle':
       return {
         ...state,
         selectedHistoryIds: toggleItem(state.selectedHistoryIds, action.id),
-        selectedBookmarkIds: [],
+        lastUpdatedAt: Date.now(),
+      };
+    case 'history-selection/select':
+      return {
+        ...state,
+        selectedHistoryIds: action.mode === 'add' ? addItems(state.selectedHistoryIds, action.ids) : uniqueItems(action.ids),
         lastUpdatedAt: Date.now(),
       };
     case 'history-selection/clear':
@@ -254,6 +283,15 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return {
         ...state,
         recall: { ...state.recall, selectedIds: toggleItem(state.recall.selectedIds, action.id) },
+        lastUpdatedAt: Date.now(),
+      };
+    case 'recall-selection/select':
+      return {
+        ...state,
+        recall: {
+          ...state.recall,
+          selectedIds: action.mode === 'add' ? addItems(state.recall.selectedIds, action.ids) : uniqueItems(action.ids),
+        },
         lastUpdatedAt: Date.now(),
       };
     case 'recall-selection/clear':
@@ -358,7 +396,6 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return {
         ...state,
         selectedBookmarkIds: toggleItem(state.selectedBookmarkIds, action.id),
-        selectedHistoryIds: [],
         lastUpdatedAt: Date.now(),
       };
     case 'bookmark-selection/single':
@@ -370,6 +407,12 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       };
     case 'bookmark-selection/clear':
       return { ...state, selectedBookmarkIds: [], lastUpdatedAt: Date.now() };
+    case 'bookmark-selection/select':
+      return {
+        ...state,
+        selectedBookmarkIds: action.mode === 'add' ? addItems(state.selectedBookmarkIds, action.ids) : uniqueItems(action.ids),
+        lastUpdatedAt: Date.now(),
+      };
     case 'bookmarks/page-loaded':
       return {
         ...state,

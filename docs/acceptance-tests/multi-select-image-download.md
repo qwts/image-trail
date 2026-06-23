@@ -6,7 +6,10 @@ Purpose: verify that selected recent-history and bookmark rows can be downloaded
 
 - The Image transfer button is labeled `Export images`.
 - When recent-history or bookmark rows are selected, the button shows the selected count, for example `Export images (3)`.
-- Recent-history selections download before bookmark selections; normal selection behavior keeps those lists mutually exclusive.
+- Recent-history, visible queue, and Recall selections can be active at the same time; selected downloads run in recent-history, visible-queue, then Recall order.
+- Recents expose `Select all recents`; queue and Recall expose select-all plus pin/bookmark filtered selection controls for their visible rows.
+- Image transfer exposes `Select everything shown`, which selects visible recents, the visible queue page, and loaded Recall rows.
+- Cmd/Ctrl-click toggles individual rows. Shift-click adds the visible range from the most recently selected row in the same list.
 - Selected record downloads use captured encrypted originals when a captured original is available and unlocked.
 - Selected records without a retrievable captured original download from their record URL.
 - If no records are selected, image export downloads the current selected host image.
@@ -21,23 +24,29 @@ Purpose: verify that selected recent-history and bookmark rows can be downloaded
 3. Verify the Image transfer button reads `Export images (N)`.
 4. Click `Export images (N)`.
 5. Verify one browser download starts for each selected recent-history row, in visible order.
-6. Select multiple bookmark rows with Cmd/Ctrl-click.
-7. Press `d`.
-8. Verify one browser download starts for each selected bookmark row, in visible order.
-9. Press `ArrowDown`.
-10. Verify the same selected bookmark export behavior starts.
-11. Capture one selected record as an encrypted original, unlock blob storage, then export that selected row.
-12. Verify the captured original is downloaded instead of fetching the record URL.
-13. Clear all row selections and select a host image.
-14. Press `d`.
-15. Verify the current selected host image downloads.
-16. Press `Shift+D`.
-17. Verify the same fallback path requests Save As before downloading.
-18. Clear the host image selection while leaving recent history populated.
-19. Click `Export images`.
-20. Verify the most recent history image downloads without requesting Save As.
-21. Shift-click `Export images`.
-22. Verify the most recent history image requests Save As before downloading.
+6. Use `Select all recents` and verify every visible recent row is selected.
+7. Select multiple queue rows with Cmd/Ctrl-click.
+8. Shift-click another queue row and verify the visible range is added to the queue selection.
+9. Use the queue menu to select all visible queue rows, then select only queue pins and only queue bookmarks.
+10. Press `d`.
+11. Verify downloads include selected recents followed by selected visible queue rows, each in visible order.
+12. Open Recall, use `Select all Recall`, `Select Recall pins`, and `Select Recall bookmarks`, then Shift-click a Recall range.
+13. Press `ArrowDown`.
+14. Verify selected Recall rows export after selected visible queue rows.
+15. Use `Select everything shown` from Image transfer.
+16. Verify every visible recent, visible queue, and loaded Recall row is selected.
+17. Capture one selected record as an encrypted original, unlock blob storage, then export that selected row.
+18. Verify the captured original is downloaded instead of fetching the record URL.
+19. Clear all row selections and select a host image.
+20. Press `d`.
+21. Verify the current selected host image downloads.
+22. Press `Shift+D`.
+23. Verify the same fallback path requests Save As before downloading.
+24. Clear the host image selection while leaving recent history populated.
+25. Click `Export images`.
+26. Verify the most recent history image downloads without requesting Save As.
+27. Shift-click `Export images`.
+28. Verify the most recent history image requests Save As before downloading.
 
 ## Expected Result
 

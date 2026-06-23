@@ -393,7 +393,8 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
         currentImageUrl: state.target.selectedUrl,
         selectedHistoryCount: state.selectedHistoryIds.length,
         selectedBookmarkCount: state.selectedBookmarkIds.length,
-        selectedImageDownloadCount: state.selectedHistoryIds.length || state.selectedBookmarkIds.length || state.recall.selectedIds.length,
+        selectedImageDownloadCount: selectedRecordCount(state),
+        visibleImageSelectionCount: visibleImageSelectionCount(state),
         imageDownloadAvailable:
           state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
           !!state.target.selectedUrl ||
@@ -415,7 +416,8 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
         currentImageUrl: state.target.selectedUrl,
         selectedHistoryCount: state.selectedHistoryIds.length,
         selectedBookmarkCount: state.selectedBookmarkIds.length + state.recall.selectedIds.length,
-        selectedImageDownloadCount: state.selectedHistoryIds.length || state.selectedBookmarkIds.length || state.recall.selectedIds.length,
+        selectedImageDownloadCount: selectedRecordCount(state),
+        visibleImageSelectionCount: visibleImageSelectionCount(state),
         imageDownloadAvailable:
           state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
           !!state.target.selectedUrl ||
@@ -536,6 +538,14 @@ export function renderRecallDrawer(target: PanelRenderTarget, state: PanelState)
       nextList.scrollTop = previousScrollTop;
     });
   }
+}
+
+function selectedRecordCount(state: PanelState): number {
+  return state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length;
+}
+
+function visibleImageSelectionCount(state: PanelState): number {
+  return state.history.length + state.bookmarks.length + (state.recall.open ? state.recall.candidates.length : 0);
 }
 
 function recallDrawerGeometry(panelRoot: HTMLElement, side: 'left' | 'right'): RecallDrawerGeometry {

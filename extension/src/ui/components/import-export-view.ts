@@ -1,6 +1,7 @@
 import type { ImportedEncryptedImageFile, ImportedImageFile } from '../../core/types.js';
 
 export type ImportExportAction =
+  | { readonly name: 'selection/select-visible' }
   | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/image'; readonly saveAs?: boolean }
@@ -17,6 +18,7 @@ export interface ImportExportViewState {
   readonly selectedHistoryCount: number;
   readonly selectedBookmarkCount: number;
   readonly selectedImageDownloadCount: number;
+  readonly visibleImageSelectionCount: number;
   readonly imageDownloadAvailable: boolean;
   readonly encryptedImageTransferAvailable: boolean;
   readonly blobKeyUnlocked: boolean;
@@ -165,6 +167,12 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
     readEncryptedImageFiles(encryptedImageInput, (files) => dispatch({ name: 'import/encrypted-image', files }));
   });
 
+  const selectEverythingBtn = document.createElement('button');
+  selectEverythingBtn.type = 'button';
+  selectEverythingBtn.textContent = 'Select everything shown';
+  selectEverythingBtn.disabled = state.busy || state.visibleImageSelectionCount === 0;
+  selectEverythingBtn.addEventListener('click', () => dispatch({ name: 'selection/select-visible' }));
+
   const exportBtn = document.createElement('button');
   exportBtn.type = 'button';
   exportBtn.textContent = state.selectedImageDownloadCount > 0 ? `Export images (${state.selectedImageDownloadCount})` : 'Export images';
@@ -184,7 +192,7 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
 
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__actions';
-  actions.append(importBtn, importEncryptedBtn, exportBtn, exportEncryptedBtn);
+  actions.append(importBtn, importEncryptedBtn, selectEverythingBtn, exportBtn, exportEncryptedBtn);
 
   group.append(controls, actions);
   return group;

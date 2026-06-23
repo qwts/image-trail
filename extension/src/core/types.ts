@@ -146,7 +146,9 @@ export type PanelActionName =
   | 'history/load'
   | 'history/download'
   | 'history/select'
+  | 'selection/select-visible'
   | 'history-selection/toggle'
+  | 'history-selection/select'
   | 'history-selection/clear'
   | 'active-field/set'
   | 'field-unlock/toggle'
@@ -160,6 +162,7 @@ export type PanelActionName =
   | 'bookmark/remove'
   | 'bookmark-selection/toggle'
   | 'bookmark-selection/single'
+  | 'bookmark-selection/select'
   | 'bookmark-selection/clear'
   | 'bookmarks/page-loaded'
   | 'bookmarks/older'
@@ -211,6 +214,7 @@ export type PanelActionName =
   | 'recall/load-complete'
   | 'recall/error'
   | 'recall-selection/toggle'
+  | 'recall-selection/select'
   | 'recall-selection/clear'
   | 'recall/selected'
   | 'recall/complete'
@@ -235,7 +239,9 @@ export type PanelAction =
         | 'history/pin'
         | 'history/delete-all'
         | 'history/select'
+        | 'selection/select-visible'
         | 'history-selection/toggle'
+        | 'history-selection/select'
         | 'history-selection/clear'
         | 'field-value-change'
         | 'field-value-bump'
@@ -249,6 +255,7 @@ export type PanelAction =
         | 'bookmark/remove'
         | 'bookmark-selection/toggle'
         | 'bookmark-selection/single'
+        | 'bookmark-selection/select'
         | 'bookmark-selection/clear'
         | 'bookmarks/page-loaded'
         | 'settings/update-visible-bookmark-soft-max'
@@ -289,6 +296,7 @@ export type PanelAction =
         | 'recall/load-complete'
         | 'recall/error'
         | 'recall-selection/toggle'
+        | 'recall-selection/select'
         | 'recall/complete'
         | 'storage/update'
       >;
@@ -306,7 +314,13 @@ export type PanelAction =
       readonly name: 'history/remove' | 'history/pin' | 'bookmark/load' | 'bookmark/remove' | 'bookmark/clear' | 'history/select';
       readonly id: string;
     }
+  | { readonly name: 'selection/select-visible' }
   | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle' | 'bookmark-selection/single'; readonly id: string }
+  | {
+      readonly name: 'history-selection/select' | 'bookmark-selection/select' | 'recall-selection/select';
+      readonly ids: readonly string[];
+      readonly mode?: 'replace' | 'add';
+    }
   | { readonly name: 'history/delete-all' | 'history-selection/clear' | 'bookmark-selection/clear' }
   | { readonly name: 'bookmarks/clear-visible' | 'bookmarks/delete-visible' | 'recall/delete-all' }
   | {
