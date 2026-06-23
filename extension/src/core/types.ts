@@ -16,6 +16,7 @@ export interface TargetState {
   readonly selectedUrl: string | null;
   readonly selectedHandleId: string | null;
   readonly selectedDimensions: string | null;
+  readonly fillScreen: boolean;
   readonly message: string;
 }
 
@@ -136,6 +137,7 @@ export type PanelActionName =
   | 'stop-target-picker'
   | 'grab-mode/start'
   | 'grab-mode/stop'
+  | 'target/fill-screen'
   | 'target/release'
   | 'history/add-loaded'
   | 'history/remove'
@@ -238,6 +240,7 @@ export type PanelAction =
         | 'field-value-change'
         | 'field-value-bump'
         | 'selected-url/apply'
+        | 'target/fill-screen'
         | 'active-field/set'
         | 'field-unlock/toggle'
         | 'field-split/apply'
@@ -339,6 +342,7 @@ export type PanelAction =
       readonly grabStrategy?: UrlTemplateGrabStrategy | null;
     }
   | { readonly name: 'active-field/set'; readonly id: string | null }
+  | { readonly name: 'target/fill-screen'; readonly enabled: boolean }
   | { readonly name: 'field-unlock/toggle'; readonly id: string }
   | { readonly name: 'field-split/apply'; readonly id: string; readonly pattern: string }
   | { readonly name: 'field-split/clear'; readonly baseFieldId: string }

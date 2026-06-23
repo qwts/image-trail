@@ -125,8 +125,8 @@ Failed/remote-only: 37 records
 - Startup auto-selects a target image only when exactly one qualifying image exists.
 - Manual target picking lets the user choose an image in the page. Uses a visible indication as the user is finding the element to target.
 - Applying a URL removes `srcset`/`sizes`, updates `img.src`, and binds load/error handling to drive status, history, 404 traversal, thumbnails, and downloads.
-- Optional preview styling can make the selected image the primary visible page item while preserving original DOM state for cleanup. Default is on when one image element is on page.
-- When exactly one image is present on injection, preview styling should be applied immediately.
+- Optional preview styling can make the selected image the primary visible page item while preserving original DOM state for cleanup.
+- When exactly one image is present on injection, auto-selection should happen immediately but full-page preview styling should wait for an explicit host-image `Fill screen` action.
 - When an image is loaded into existing image element it preserves the previous in history for restore if target changes.
 
 ### URL Controls With Advanced Configuration
@@ -276,7 +276,7 @@ The first implementation should be a narrow vertical slice:
 - Day-one storage limits for originals, thumbnails, active view size, and remote-only records.
 - Storage usage indicator scaffold with captured count, original bytes, thumbnail bytes, and failed/remote-only count.
 - Target image detection/picking, current URL display, parser/rebuilder port, active numeric field movement, and apply-to-image behavior.
-- Immediate preview styling when injection finds exactly one image.
+- Immediate auto-selection when injection finds exactly one image, with full preview styling deferred until the user turns on `Fill screen`.
 - Basic DOM reactivity for target picking and late image changes.
 - Request throttling scaffold so manual and automated navigation cannot overwhelm the site.
 - Minimal manual verification against the known bookmarklet URL patterns.

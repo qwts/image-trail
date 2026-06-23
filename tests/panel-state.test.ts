@@ -51,6 +51,7 @@ test('target changes clear failed field markers', () => {
     selectedUrl: 'https://example.test/image.jpg',
     selectedHandleId: 'handle-1',
     selectedDimensions: '100 x 100',
+    fillScreen: false,
     message: 'Target selected.',
   });
 
@@ -74,6 +75,7 @@ test('same target load snapshots preserve learned field markers', () => {
       selectedUrl: 'https://example.test/image-1.jpg',
       selectedHandleId: 'handle-1',
       selectedDimensions: '100 x 100',
+      fillScreen: false,
       message: 'Target selected.',
     },
     successfulFieldIds: ['q:0:0'],
@@ -90,6 +92,7 @@ test('same target load snapshots preserve learned field markers', () => {
     selectedUrl: 'https://example.test/image-2.jpg',
     selectedHandleId: 'handle-1',
     selectedDimensions: '100 x 100',
+    fillScreen: false,
     message: 'Target loaded.',
   });
 

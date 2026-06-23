@@ -89,6 +89,50 @@ test('selected target without lockBox leaves inline sizing alone', () => {
   assert.equal(element.style.backgroundColor, '');
 });
 
+test('selected target can defer lockBox styling until preview replaces the image', () => {
+  const originalDocument = globalThis.document;
+  const body = createStyledElement('white', 'white');
+  const documentElement = createStyledElement('lightgray', 'lightgray');
+  globalThis.document = { body, documentElement } as Document;
+  const element = createImageElement();
+
+  try {
+    markSelectedTarget(element);
+
+    assert.equal(element.style.height, '72px');
+    assert.equal(element.style.objectFit, 'cover');
+    assert.equal(element.style.width, '144px');
+    assert.equal(body.style.background, 'white');
+
+    markSelectedTarget(element, { lockBox: true });
+
+    assert.equal(element.style.height, '100%');
+    assert.equal(element.style.objectFit, 'contain');
+    assert.equal(element.style.width, '100%');
+    assert.equal(body.style.background, '#000');
+
+    markSelectedTarget(element);
+
+    assert.equal(element.style.height, '72px');
+    assert.equal(element.style.objectFit, 'cover');
+    assert.equal(element.style.width, '144px');
+    assert.equal(body.style.background, 'white');
+    assert.equal(documentElement.style.background, 'lightgray');
+    assert.equal(element.dataset.imageTrailSelected, 'true');
+    assert.equal(element.dataset.imageTrailLockBox, undefined);
+
+    restoreElementStyles(element);
+
+    assert.equal(element.style.height, '72px');
+    assert.equal(element.style.objectFit, 'cover');
+    assert.equal(element.style.width, '144px');
+    assert.equal(body.style.background, 'white');
+    assert.equal(documentElement.style.background, 'lightgray');
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});
+
 test('grab preview marks valid and invalid targets and restores preview-only styles', () => {
   const element = createImageElement();
   element.style.cursor = 'pointer';
