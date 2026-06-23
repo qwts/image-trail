@@ -73,6 +73,10 @@ function keepItems(items: readonly string[], allowedItems: readonly string[]): r
   return items.filter((item) => allowed.has(item));
 }
 
+function visibleRecentHistory(records: readonly ImageDisplayRecord[], limit: number): readonly ImageDisplayRecord[] {
+  return records.slice(0, limit);
+}
+
 function mergeRecordsById<T extends { readonly id: string }>(existing: readonly T[], additions: readonly T[]): readonly T[] {
   if (additions.length === 0) return existing;
   const seen = new Set(existing.map((item) => item.id));
@@ -175,7 +179,10 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         height: action.height,
         source: 'history',
       });
-      const history = [item, ...state.history.filter((entry) => entry.url !== item.url && entry.id !== item.id)].slice(0, 30);
+      const history = visibleRecentHistory(
+        [item, ...state.history.filter((entry) => entry.url !== item.url && entry.id !== item.id)],
+        state.recentHistoryLimit,
+      );
       return {
         ...state,
         history,
@@ -452,6 +459,20 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return { ...state, settingsOpen: !state.settingsOpen, lastUpdatedAt: Date.now() };
     case 'settings/update-visible-bookmark-soft-max':
       return { ...state, bookmarkLimit: action.value, bookmarkOffset: 0, lastUpdatedAt: Date.now() };
+    case 'settings/update-recent-history-retention': {
+      const history = visibleRecentHistory(state.history, action.limit);
+      return {
+        ...state,
+        recentHistoryLimit: action.limit,
+        recentHistoryOverflowBehavior: action.overflowBehavior,
+        history,
+        selectedHistoryIds: keepItems(
+          state.selectedHistoryIds,
+          history.map((item) => item.id),
+        ),
+        lastUpdatedAt: Date.now(),
+      };
+    }
     case 'settings/update-pin-save-storage-preference':
       return { ...state, pinSaveStoragePreference: action.value, lastUpdatedAt: Date.now() };
     case 'settings/update-privacy-mode':

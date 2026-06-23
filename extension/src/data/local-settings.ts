@@ -1,5 +1,5 @@
-import { VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../core/settings.js';
-import type { PinSaveStoragePreference } from '../core/types.js';
+import { RECENT_HISTORY_LIMITS, VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../core/settings.js';
+import type { PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../core/types.js';
 
 export interface PlaintextLocalSettings {
   readonly schemaVersion: 1;
@@ -7,6 +7,8 @@ export interface PlaintextLocalSettings {
   readonly requestThrottleMs: number;
   readonly panelDock: 'right' | 'left';
   readonly visibleBookmarkSoftMax: number;
+  readonly recentHistoryLimit: number;
+  readonly recentHistoryOverflowBehavior: RecentHistoryOverflowBehavior;
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
@@ -18,6 +20,8 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   requestThrottleMs: 250,
   panelDock: 'right',
   visibleBookmarkSoftMax: 30,
+  recentHistoryLimit: 30,
+  recentHistoryOverflowBehavior: 'drop-oldest',
   bookmarkVisibilityScope: 'global',
   pinSaveStoragePreference: 'encrypted',
   privacyModeEnabled: false,
@@ -65,6 +69,12 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
     visibleBookmarkSoftMax: isSafeVisibleBookmarkSoftMax(input.visibleBookmarkSoftMax)
       ? input.visibleBookmarkSoftMax
       : DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
+    recentHistoryLimit: isSafeRecentHistoryLimit(input.recentHistoryLimit)
+      ? input.recentHistoryLimit
+      : DEFAULT_LOCAL_SETTINGS.recentHistoryLimit,
+    recentHistoryOverflowBehavior: isRecentHistoryOverflowBehavior(input.recentHistoryOverflowBehavior)
+      ? input.recentHistoryOverflowBehavior
+      : DEFAULT_LOCAL_SETTINGS.recentHistoryOverflowBehavior,
     bookmarkVisibilityScope: input.bookmarkVisibilityScope === 'site' ? 'site' : 'global',
     pinSaveStoragePreference: isPinSaveStoragePreference(input.pinSaveStoragePreference)
       ? input.pinSaveStoragePreference
@@ -75,6 +85,10 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
 
 export function isPinSaveStoragePreference(value: unknown): value is PinSaveStoragePreference {
   return value === 'encrypted' || value === 'plaintext';
+}
+
+export function isRecentHistoryOverflowBehavior(value: unknown): value is RecentHistoryOverflowBehavior {
+  return value === 'drop-oldest' || value === 'keep-session';
 }
 
 function isSafeThrottle(value: unknown): value is number {
@@ -88,4 +102,8 @@ function isSafeVisibleBookmarkSoftMax(value: unknown): value is number {
     value >= VISIBLE_BOOKMARK_SOFT_MAX_LIMITS.min &&
     value <= VISIBLE_BOOKMARK_SOFT_MAX_LIMITS.max
   );
+}
+
+function isSafeRecentHistoryLimit(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= RECENT_HISTORY_LIMITS.min && value <= RECENT_HISTORY_LIMITS.max;
 }

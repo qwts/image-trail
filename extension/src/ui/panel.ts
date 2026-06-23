@@ -35,7 +35,7 @@ import type {
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
 import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
-import { VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../core/settings.js';
+import { RECENT_HISTORY_LIMITS, VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../core/settings.js';
 import { applyFieldSplitSpecs, createFieldSplitSpec } from '../core/url/field-splits.js';
 import { parseUrl } from '../core/url/parse-url.js';
 import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../core/url/rebuild-url.js';
@@ -220,8 +220,7 @@ export class ImageTrailPanel {
     this.unsubscribeFromGrabSourcePatternRequests = this.pageAdapter.subscribeToGrabSourcePatternRequests((url) => {
       void this.learnGrabSourcePattern(url);
     });
-    void this.loadSettingsAndBookmarks();
-    void this.loadRecentHistory();
+    void this.loadSettingsBookmarksAndRecents();
     void this.loadGrabSettings().then(() => this.restoreParsedFieldState());
     void this.refreshStorageUsage();
     void this.refreshBlobKeyStatus();
@@ -299,32 +298,42 @@ export class ImageTrailPanel {
     this.unsubscribeFromGrabSourcePatternRequests = null;
   }
 
-  private loadBookmarks = async (): Promise<void> => {
+  private loadBookmarks = async (options: { readonly render?: boolean } = {}): Promise<void> => {
     if (!this.bookmarkStore) return;
-    await this.loadBookmarkPage(0);
+    await this.loadBookmarkPage(0, options);
   };
 
-  private loadSettingsAndBookmarks = async (): Promise<void> => {
-    await this.loadLocalSettings();
-    await this.loadBookmarks();
+  private loadSettingsBookmarksAndRecents = async (): Promise<void> => {
+    await this.loadLocalSettings({ render: false });
+    await Promise.all([this.loadBookmarks({ render: false }), this.loadRecentHistory({ render: false })]);
+    this.render();
   };
 
-  private async loadLocalSettings(): Promise<void> {
+  private async loadLocalSettings(options: { readonly render?: boolean } = {}): Promise<void> {
     this.localSettings = this.localSettingsStore ? await this.localSettingsStore.load() : DEFAULT_LOCAL_SETTINGS;
+    const history = this.state.history.slice(0, this.localSettings.recentHistoryLimit);
     this.state = {
       ...this.state,
+      history,
+      selectedHistoryIds: this.state.selectedHistoryIds.filter((id) => history.some((item) => item.id === id)),
       bookmarkVisibilityScope: this.localSettings.bookmarkVisibilityScope,
       bookmarkLimit: this.localSettings.visibleBookmarkSoftMax,
+      recentHistoryLimit: this.localSettings.recentHistoryLimit,
+      recentHistoryOverflowBehavior: this.localSettings.recentHistoryOverflowBehavior,
       pinSaveStoragePreference: this.localSettings.pinSaveStoragePreference,
       privacyModeEnabled: this.localSettings.privacyModeEnabled,
       lastUpdatedAt: Date.now(),
     };
-    this.render();
+    if (options.render !== false) this.render();
   }
 
   private saveLocalSettings(settings: PlaintextLocalSettings): void {
+    void this.saveLocalSettingsAsync(settings);
+  }
+
+  private async saveLocalSettingsAsync(settings: PlaintextLocalSettings): Promise<void> {
     this.localSettings = settings;
-    void this.localSettingsStore?.save(settings);
+    await this.localSettingsStore?.save(settings);
   }
 
   private async loadGrabSettings(options: { readonly render?: boolean } = {}): Promise<void> {
@@ -642,6 +651,36 @@ export class ImageTrailPanel {
     this.renderPanelAndRefreshRecall();
   }
 
+  private async updateRecentHistoryRetention(input: {
+    readonly limit: number;
+    readonly overflowBehavior: PlaintextLocalSettings['recentHistoryOverflowBehavior'];
+  }): Promise<void> {
+    if (
+      !Number.isInteger(input.limit) ||
+      input.limit < RECENT_HISTORY_LIMITS.min ||
+      input.limit > RECENT_HISTORY_LIMITS.max ||
+      (input.limit === this.state.recentHistoryLimit && input.overflowBehavior === this.state.recentHistoryOverflowBehavior)
+    ) {
+      return;
+    }
+    const previousLimit = this.state.recentHistoryLimit;
+    this.state = reducePanelAction(this.state, {
+      name: 'settings/update-recent-history-retention',
+      limit: input.limit,
+      overflowBehavior: input.overflowBehavior,
+    });
+    await this.saveLocalSettingsAsync({
+      ...this.localSettings,
+      recentHistoryLimit: input.limit,
+      recentHistoryOverflowBehavior: input.overflowBehavior,
+    });
+    if (input.limit > previousLimit && input.overflowBehavior === 'keep-session') {
+      await this.loadRecentHistory();
+      return;
+    }
+    this.render();
+  }
+
   private updatePinSaveStoragePreference(value: PlaintextLocalSettings['pinSaveStoragePreference']): void {
     if (value === this.state.pinSaveStoragePreference) return;
     this.state = reducePanelAction(this.state, { name: 'settings/update-pin-save-storage-preference', value });
@@ -649,11 +688,11 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private loadRecentHistory = async (): Promise<void> => {
+  private loadRecentHistory = async (options: { readonly render?: boolean } = {}): Promise<void> => {
     if (!this.recentHistoryStore) return;
     const history = await this.recentHistoryStore.load(window.location.href);
     this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
-    this.render();
+    if (options.render !== false) this.render();
   };
 
   private loadBookmarkPage = async (offset: number, options: { readonly render?: boolean } = {}): Promise<void> => {
@@ -896,6 +935,11 @@ export class ImageTrailPanel {
 
     if (action.name === 'settings/update-visible-bookmark-soft-max') {
       void this.updateVisibleBookmarkSoftMax(action.value);
+      return;
+    }
+
+    if (action.name === 'settings/update-recent-history-retention') {
+      void this.updateRecentHistoryRetention({ limit: action.limit, overflowBehavior: action.overflowBehavior });
       return;
     }
 
@@ -2655,6 +2699,7 @@ export class ImageTrailPanel {
 
   private render(options: { readonly includeRecall?: boolean } = {}): void {
     if (this.root) {
+      const focusedControl = this.captureFocusedPanelControl();
       renderPanel(
         {
           root: this.root,
@@ -2667,11 +2712,90 @@ export class ImageTrailPanel {
         this.state,
         { renderRecall: options.includeRecall !== false },
       );
+      this.restoreFocusedPanelControl(focusedControl);
       if (!this.state.minimized && this.panelStylesReady) {
         this.queuePanelPositionRestore();
         this.applyRestoredPanelPosition();
       }
     }
+  }
+
+  private captureFocusedPanelControl(): {
+    readonly index: number;
+    readonly tagName: string;
+    readonly inputType?: string;
+    readonly value?: string;
+    readonly selectionStart?: number | null;
+    readonly selectionEnd?: number | null;
+  } | null {
+    if (!this.root) return null;
+    const rootNode = this.root.getRootNode();
+    const activeElement = rootNode instanceof ShadowRoot ? rootNode.activeElement : document.activeElement;
+    if (!(activeElement instanceof HTMLElement) || !this.root.contains(activeElement)) return null;
+    if (!isFocusablePanelControl(activeElement)) return null;
+    const controls = this.focusablePanelControls();
+    const index = controls.indexOf(activeElement);
+    if (index < 0) return null;
+    if (activeElement instanceof HTMLInputElement) {
+      if (activeElement.type === 'file') return { index, tagName: activeElement.tagName, inputType: activeElement.type };
+      return {
+        index,
+        tagName: activeElement.tagName,
+        inputType: activeElement.type,
+        value: activeElement.value,
+        selectionStart: activeElement.selectionStart,
+        selectionEnd: activeElement.selectionEnd,
+      };
+    }
+    if (activeElement instanceof HTMLTextAreaElement) {
+      return {
+        index,
+        tagName: activeElement.tagName,
+        value: activeElement.value,
+        selectionStart: activeElement.selectionStart,
+        selectionEnd: activeElement.selectionEnd,
+      };
+    }
+    return { index, tagName: activeElement.tagName };
+  }
+
+  private restoreFocusedPanelControl(
+    focusedControl: {
+      readonly index: number;
+      readonly tagName: string;
+      readonly inputType?: string;
+      readonly value?: string;
+      readonly selectionStart?: number | null;
+      readonly selectionEnd?: number | null;
+    } | null,
+  ): void {
+    if (!this.root || !focusedControl) return;
+    const nextControl = this.focusablePanelControls()[focusedControl.index];
+    if (!nextControl || nextControl.tagName !== focusedControl.tagName) return;
+    if (
+      focusedControl.inputType !== undefined &&
+      (!(nextControl instanceof HTMLInputElement) || nextControl.type !== focusedControl.inputType)
+    ) {
+      return;
+    }
+    if (nextControl instanceof HTMLInputElement && nextControl.type === 'file') {
+      nextControl.focus();
+      return;
+    }
+    if (focusedControl.value !== undefined && (nextControl instanceof HTMLInputElement || nextControl instanceof HTMLTextAreaElement)) {
+      nextControl.value = focusedControl.value;
+      try {
+        nextControl.setSelectionRange(focusedControl.selectionStart ?? null, focusedControl.selectionEnd ?? null);
+      } catch {
+        // Some input types, such as number, do not support selection ranges.
+      }
+    }
+    nextControl.focus();
+  }
+
+  private focusablePanelControls(): HTMLElement[] {
+    if (!this.root) return [];
+    return Array.from(this.root.querySelectorAll<HTMLElement>('button, input, select, textarea'));
   }
 
   private renderRecallOnly(): void {
@@ -3026,6 +3150,17 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function isFocusablePanelControl(
+  element: HTMLElement,
+): element is HTMLButtonElement | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
+  return (
+    element instanceof HTMLButtonElement ||
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLSelectElement ||
+    element instanceof HTMLTextAreaElement
+  );
 }
 
 function filenameForExportedImage(url: string): string {

@@ -15,7 +15,8 @@ export class ExtensionLocalSettingsStore implements LocalSettingsStore {
 
   async save(settings: PlaintextLocalSettings): Promise<void> {
     const response = await sendRuntimeMessage(createSaveLocalSettingsMessage(settings));
-    if (response === null || isSaveLocalSettingsResultMessage(response)) return;
+    if (response === null) return;
+    if (isSaveLocalSettingsResultMessage(response) && response.payload.ok) return;
     throw new Error('Invalid local settings save response from background.');
   }
 }

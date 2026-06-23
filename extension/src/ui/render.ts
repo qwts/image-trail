@@ -349,6 +349,10 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
       ? [
           createSettingsView(
             state.bookmarkLimit,
+            {
+              limit: state.recentHistoryLimit,
+              overflowBehavior: state.recentHistoryOverflowBehavior,
+            },
             state.privacyModeEnabled,
             state.urlTemplates,
             state.grabSourcePatterns,

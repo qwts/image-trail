@@ -97,6 +97,8 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().showHistoryThumbnails, true);
   assert.equal(repository.load().panelDock, 'left');
   assert.equal(repository.load().visibleBookmarkSoftMax, 30);
+  assert.equal(repository.load().recentHistoryLimit, 30);
+  assert.equal(repository.load().recentHistoryOverflowBehavior, 'drop-oldest');
   assert.equal(repository.load().bookmarkVisibilityScope, 'global');
   assert.equal(repository.load().pinSaveStoragePreference, 'encrypted');
   assert.equal(repository.load().privacyModeEnabled, false);
@@ -144,6 +146,37 @@ test('rejects out-of-range bookmark soft max setting migrations', () => {
   assert.equal(high.load().visibleBookmarkSoftMax, DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax);
   assert.equal(low.load().visibleBookmarkSoftMax, DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax);
   assert.equal(valid.load().visibleBookmarkSoftMax, 75);
+});
+
+test('migrates recent history retention settings safely', () => {
+  const high = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentHistoryLimit: 201 }),
+    setItem: () => {},
+  });
+  const low = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentHistoryLimit: 0 }),
+    setItem: () => {},
+  });
+  const validDrop = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentHistoryLimit: 75, recentHistoryOverflowBehavior: 'drop-oldest' }),
+    setItem: () => {},
+  });
+  const validKeep = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentHistoryLimit: 12, recentHistoryOverflowBehavior: 'keep-session' }),
+    setItem: () => {},
+  });
+  const invalidBehavior = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentHistoryOverflowBehavior: 'pin-overflow' }),
+    setItem: () => {},
+  });
+
+  assert.equal(high.load().recentHistoryLimit, DEFAULT_LOCAL_SETTINGS.recentHistoryLimit);
+  assert.equal(low.load().recentHistoryLimit, DEFAULT_LOCAL_SETTINGS.recentHistoryLimit);
+  assert.equal(validDrop.load().recentHistoryLimit, 75);
+  assert.equal(validDrop.load().recentHistoryOverflowBehavior, 'drop-oldest');
+  assert.equal(validKeep.load().recentHistoryLimit, 12);
+  assert.equal(validKeep.load().recentHistoryOverflowBehavior, 'keep-session');
+  assert.equal(invalidBehavior.load().recentHistoryOverflowBehavior, DEFAULT_LOCAL_SETTINGS.recentHistoryOverflowBehavior);
 });
 
 test('migrates bookmark visibility scope setting safely', () => {
