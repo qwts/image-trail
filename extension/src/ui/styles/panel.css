@@ -1011,6 +1011,7 @@
 .image-trail-panel-root .image-trail-panel__full-url-input,
 .image-trail-panel-root .image-trail-panel__password-input,
 .image-trail-panel-root .image-trail-panel__field-input,
+.image-trail-panel-root .image-trail-panel__field-width-input,
 .image-trail-panel-root .image-trail-panel__field-split-input,
 .image-trail-panel-root .image-trail-panel__settings-number-input,
 .image-trail-panel-root .image-trail-panel__settings-select {
@@ -1077,6 +1078,7 @@
 }
 
 .image-trail-panel-root .image-trail-panel__field-input:focus,
+.image-trail-panel-root .image-trail-panel__field-width-input:focus,
 .image-trail-panel-root .image-trail-panel__field-split-input:focus {
   outline: 1px solid #8fd;
   border-color: #8fd;
@@ -1088,6 +1090,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__field-width-input {
+  inline-size: 46px;
+  max-inline-size: 46px;
+  padding-inline: 4px;
+  text-align: center;
 }
 
 .image-trail-panel-root .image-trail-panel__password-input:focus {
@@ -1230,11 +1239,11 @@
 }
 
 .image-trail-panel-root .image-trail-panel__field-control.has-step-controls {
-  grid-template-columns: minmax(0, 1fr) 26px 26px;
+  grid-template-columns: minmax(0, 1fr) 46px 26px 26px;
 }
 
 .image-trail-panel-root .image-trail-panel__field-control.has-step-controls.has-trail-control {
-  grid-template-columns: minmax(0, 1fr) 26px 26px minmax(58px, max-content);
+  grid-template-columns: minmax(0, 1fr) 46px 26px 26px minmax(58px, max-content);
 }
 
 .image-trail-panel-root .image-trail-panel__field-split-control {

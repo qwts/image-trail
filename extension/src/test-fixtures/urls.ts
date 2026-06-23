@@ -435,17 +435,17 @@ export const urlFixtures: UrlFixture[] = [
   },
 
   {
-    label: 'Width is never reduced on decrement',
+    label: 'Natural integer width is not padded on decrement',
     category: 'width-preservation',
     input: 'https://example.com/img/100.jpg',
     incrementCases: [
       {
         fieldHint: 'file numeric 100',
         delta: -1,
-        expectedUrl: 'https://example.com/img/099.jpg',
+        expectedUrl: 'https://example.com/img/99.jpg',
       },
     ],
-    notes: 'Decrementing 100 to 99 must zero-pad to preserve the width of 3.',
+    notes: 'Decrementing an unpadded 100 to 99 must not invent a leading zero. Explicit digit width handles padded workflows.',
   },
 
   {

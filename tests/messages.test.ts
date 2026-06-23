@@ -205,6 +205,7 @@ test('creates parsed field state messages', () => {
     unlockedFieldIds: ['query:0:0'],
     manuallyExcludedFieldIds: [],
     fieldSplitSpecs: [],
+    fieldDigitWidthSpecs: [{ fieldId: 'query:0:0', width: 4 }],
     activeUrlTemplateId: 'template-1',
     updatedAt: '2026-06-22T00:00:00.000Z',
   };

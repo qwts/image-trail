@@ -53,6 +53,7 @@ export interface UrlField {
   readonly label: string;
   readonly value: string;
   readonly tokenKind: UrlTokenKind;
+  readonly digitWidth?: number;
   readonly partIndex?: number;
   readonly queryIndex?: number;
   readonly tokenIndex: number;
@@ -70,4 +71,9 @@ export interface UrlFieldSplitSpec {
   readonly tokenIndex: number;
   readonly lengths: readonly number[];
   readonly pattern: string;
+}
+
+export interface UrlFieldDigitWidthSpec {
+  readonly fieldId: string;
+  readonly width: number;
 }

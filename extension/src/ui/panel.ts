@@ -37,6 +37,7 @@ import { filenameFromUrl, selectImageDownloadUrls } from '../core/image/download
 import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
 import { RECENT_HISTORY_LIMITS, VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../core/settings.js';
 import { applyFieldSplitSpecs, createFieldSplitSpec } from '../core/url/field-splits.js';
+import { applyFieldDigitWidthSpecs, normalizeFieldDigitWidth, upsertFieldDigitWidthSpec } from '../core/url/field-widths.js';
 import { parseUrl } from '../core/url/parse-url.js';
 import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../core/url/rebuild-url.js';
 import { collectUrlFields, selectDefaultField } from '../core/url/tokenize-fields.js';
@@ -558,6 +559,7 @@ export class ImageTrailPanel {
       unlockedFieldIds: this.state.unlockedFieldIds,
       manuallyExcludedFieldIds: this.state.manuallyExcludedFieldIds,
       fieldSplitSpecs: this.state.fieldSplitSpecs,
+      fieldDigitWidthSpecs: this.state.fieldDigitWidthSpecs,
       activeUrlTemplateId: this.state.activeUrlTemplateId,
       updatedAt: this.nextParsedFieldStateUpdatedAt(),
     };
@@ -618,9 +620,11 @@ export class ImageTrailPanel {
 
   private filterParsedFieldStateForCurrentUrl(record: ParsedFieldStateRecord): ParsedFieldStateRecord {
     try {
-      const fieldIds = new Set(
-        collectUrlFields(applyFieldSplitSpecs(parseUrl(record.sourceUrl), record.fieldSplitSpecs)).map((field) => field.id),
+      const model = applyFieldDigitWidthSpecs(
+        applyFieldSplitSpecs(parseUrl(record.sourceUrl), record.fieldSplitSpecs),
+        record.fieldDigitWidthSpecs ?? [],
       );
+      const fieldIds = new Set(collectUrlFields(model).map((field) => field.id));
       const keep = (ids: readonly string[]): readonly string[] => ids.filter((id) => fieldIds.has(id));
       return {
         ...record,
@@ -630,6 +634,7 @@ export class ImageTrailPanel {
         unchangedFieldIds: keep(record.unchangedFieldIds),
         unlockedFieldIds: keep(record.unlockedFieldIds),
         manuallyExcludedFieldIds: keep(record.manuallyExcludedFieldIds),
+        fieldDigitWidthSpecs: (record.fieldDigitWidthSpecs ?? []).filter((spec) => fieldIds.has(spec.fieldId)),
       };
     } catch {
       return { ...record, activeFieldId: null, failedFieldId: null };
@@ -1089,6 +1094,11 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'field-digit-width/change') {
+      void this.updateFieldDigitWidth(action.id, action.value);
+      return;
+    }
+
     if (action.name === 'field-split/apply') {
       this.applyFieldSplitPattern(action.id, action.pattern);
       return;
@@ -1348,7 +1358,11 @@ export class ImageTrailPanel {
   }
 
   private currentUrlModel(): ParsedUrlModel {
-    return applyFieldSplitSpecs(parseUrl(this.currentRawUrl()), this.state.fieldSplitSpecs);
+    return this.applyCurrentFieldDigitWidthSpecs(applyFieldSplitSpecs(parseUrl(this.currentRawUrl()), this.state.fieldSplitSpecs));
+  }
+
+  private applyCurrentFieldDigitWidthSpecs(model: ParsedUrlModel): ParsedUrlModel {
+    return applyFieldDigitWidthSpecs(model, this.state.fieldDigitWidthSpecs);
   }
 
   private currentRawUrl(): string {
@@ -1425,6 +1439,32 @@ export class ImageTrailPanel {
 
     const nextModel = setUrlFieldValue(model, field, nextValue);
     const nextUrl = rebuildUrl(nextModel);
+    const loaded = await this.applySelectedUrl(nextUrl, [fieldId]);
+    if (loaded && this.state.unlockedFieldIds.length > 0) await this.saveUrlTemplateFromCurrentFields();
+  }
+
+  private async updateFieldDigitWidth(fieldId: string, value: string): Promise<void> {
+    const normalized = normalizeFieldDigitWidth(value);
+    if (typeof normalized === 'object' && normalized !== null && 'ok' in normalized) {
+      this.state = { ...this.state, status: 'error', message: normalized.message, lastUpdatedAt: Date.now() };
+      this.render();
+      return;
+    }
+
+    this.state = {
+      ...this.state,
+      activeFieldId: fieldId,
+      fieldDigitWidthSpecs: upsertFieldDigitWidthSpec(this.state.fieldDigitWidthSpecs, fieldId, normalized),
+      lastUpdatedAt: Date.now(),
+    };
+
+    const nextUrl = rebuildUrl(this.currentUrlModel());
+    if (nextUrl === this.currentRawUrl()) {
+      void this.saveParsedFieldState();
+      this.render();
+      return;
+    }
+
     const loaded = await this.applySelectedUrl(nextUrl, [fieldId]);
     if (loaded && this.state.unlockedFieldIds.length > 0) await this.saveUrlTemplateFromCurrentFields();
   }

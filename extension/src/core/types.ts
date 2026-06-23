@@ -3,7 +3,7 @@ import type { CaptureResult, StorageUsageSummary } from './image/capture-result.
 import type { ImageDisplayRecord } from './display-records.js';
 import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from './url/templates.js';
 import type { UrlTemplateGrabStrategy } from './url/grab-strategies.js';
-import type { UrlFieldSplitSpec } from './url/types.js';
+import type { UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from './url/types.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
@@ -77,6 +77,7 @@ export interface ParsedFieldStateRecord {
   readonly unlockedFieldIds: readonly string[];
   readonly manuallyExcludedFieldIds: readonly string[];
   readonly fieldSplitSpecs: readonly UrlFieldSplitSpec[];
+  readonly fieldDigitWidthSpecs?: readonly UrlFieldDigitWidthSpec[];
   readonly activeUrlTemplateId: string | null;
   readonly updatedAt: string;
 }
@@ -168,6 +169,7 @@ export interface PanelState {
   readonly unlockedFieldIds: readonly string[];
   readonly manuallyExcludedFieldIds: readonly string[];
   readonly fieldSplitSpecs: readonly UrlFieldSplitSpec[];
+  readonly fieldDigitWidthSpecs: readonly UrlFieldDigitWidthSpec[];
   readonly urlTemplates: readonly UrlTemplateRecord[];
   readonly grabSourcePatterns: readonly GrabSourcePattern[];
   readonly activeUrlTemplateId: string | null;
@@ -301,6 +303,7 @@ export type PanelAction =
         | 'field-unlock/toggle'
         | 'field-split/apply'
         | 'field-split/clear'
+        | 'field-digit-width/change'
         | 'bookmark/load'
         | 'bookmark/remove'
         | 'bookmark-selection/toggle'
@@ -418,6 +421,7 @@ export type PanelAction =
   | { readonly name: 'field-unlock/toggle'; readonly id: string }
   | { readonly name: 'field-split/apply'; readonly id: string; readonly pattern: string }
   | { readonly name: 'field-split/clear'; readonly baseFieldId: string }
+  | { readonly name: 'field-digit-width/change'; readonly id: string; readonly value: string }
   | { readonly name: 'field-value-change'; readonly id: string; readonly value: string }
   | { readonly name: 'field-value-bump'; readonly id: string; readonly delta: 1 | -1 }
   | { readonly name: 'selected-url/apply'; readonly url: string }

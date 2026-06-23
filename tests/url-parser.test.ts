@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseUrl } from '../extension/src/core/url/parse-url.js';
 import { applyFieldSplitSpecs, createFieldSplitSpec, parseFieldSplitPattern } from '../extension/src/core/url/field-splits.js';
+import { applyFieldDigitWidthSpecs } from '../extension/src/core/url/field-widths.js';
 import { bumpUrlField, rebuildUrl } from '../extension/src/core/url/rebuild-url.js';
 import { collectUrlFields, selectDefaultField } from '../extension/src/core/url/tokenize-fields.js';
 import type { UrlField } from '../extension/src/core/url/types.js';
@@ -36,6 +37,27 @@ test('selects the first numeric field by default before hex fields', () => {
 
   const hexOnly = selectDefaultField(collectUrlFields(parseUrl('https://example.test/path/a1b2c3.jpg')));
   assert.equal(hexOnly?.tokenKind, 'hex');
+});
+
+test('integer fields only preserve padding when leading zeroes or explicit digit width are present', () => {
+  const naturalModel = parseUrl('https://example.test/images/image-1000.jpg');
+  const naturalField = collectUrlFields(naturalModel).find((candidate) => candidate.value === '1000');
+  assert.ok(naturalField);
+  assert.equal(rebuildUrl(bumpUrlField(naturalModel, naturalField, -1)), 'https://example.test/images/image-999.jpg');
+
+  const paddedModel = parseUrl('https://example.test/images/image-001.jpg');
+  const paddedField = collectUrlFields(paddedModel).find((candidate) => candidate.value === '001');
+  assert.ok(paddedField);
+  assert.equal(rebuildUrl(bumpUrlField(paddedModel, paddedField, 1)), 'https://example.test/images/image-002.jpg');
+
+  const explicitBaseModel = parseUrl('https://example.test/images/image-999.jpg');
+  const explicitBaseField = collectUrlFields(explicitBaseModel).find((candidate) => candidate.value === '999');
+  assert.ok(explicitBaseField);
+  const explicitWidthModel = applyFieldDigitWidthSpecs(explicitBaseModel, [{ fieldId: explicitBaseField.id, width: 5 }]);
+  const explicitWidthField = collectUrlFields(explicitWidthModel).find((candidate) => candidate.value === '00999');
+  assert.ok(explicitWidthField);
+  assert.equal(rebuildUrl(explicitWidthModel), 'https://example.test/images/image-00999.jpg');
+  assert.equal(rebuildUrl(bumpUrlField(explicitWidthModel, explicitWidthField, -1)), 'https://example.test/images/image-00998.jpg');
 });
 
 test('decodes ampersand entities only for query-shaped separators', () => {

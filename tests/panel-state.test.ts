@@ -16,7 +16,7 @@ import {
 } from '../extension/src/ui/components/record-metadata.js';
 import { selectedRangeIds } from '../extension/src/ui/components/selection-ranges.js';
 import { recallDeleteCountForQueue } from '../extension/src/ui/render.js';
-import type { UrlFieldSplitSpec } from '../extension/src/core/url/types.js';
+import type { UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from '../extension/src/core/url/types.js';
 import type { GrabSourcePattern, UrlTemplateRecord } from '../extension/src/core/url/templates.js';
 
 test('switching active fields clears a previous failed field marker', () => {
@@ -908,6 +908,7 @@ test('clearing split specs collapses fields and clears related markers', () => {
     unlockedFieldIds: ['q:0:0', 'q:0:2'],
     manuallyExcludedFieldIds: ['q:0:1'],
     fieldSplitSpecs: [splitSpec],
+    fieldDigitWidthSpecs: [{ fieldId: 'q:0:2', width: 4 }],
   };
 
   const next = reducePanelAction(state, { name: 'field-split/clear', baseFieldId: 'q:0:0' });
@@ -919,6 +920,7 @@ test('clearing split specs collapses fields and clears related markers', () => {
   assert.deepEqual(next.unlockedFieldIds, []);
   assert.deepEqual(next.manuallyExcludedFieldIds, []);
   assert.deepEqual(next.fieldSplitSpecs, []);
+  assert.deepEqual(next.fieldDigitWidthSpecs, []);
 });
 
 test('parsed field state restore revives saved field markers', () => {
@@ -930,6 +932,7 @@ test('parsed field state restore revives saved field markers', () => {
     lengths: [2, 2],
     pattern: '2-2',
   };
+  const digitWidthSpec: UrlFieldDigitWidthSpec = { fieldId: 'q:0:1', width: 5 };
 
   const next = reducePanelAction(createInitialPanelState(), {
     name: 'parsed-field-state/restore',
@@ -947,6 +950,7 @@ test('parsed field state restore revives saved field markers', () => {
       unlockedFieldIds: ['q:0:1'],
       manuallyExcludedFieldIds: ['q:2:0'],
       fieldSplitSpecs: [splitSpec],
+      fieldDigitWidthSpecs: [digitWidthSpec],
       activeUrlTemplateId: 'template-1',
       updatedAt: '2026-06-22T00:00:00.000Z',
     },
@@ -959,6 +963,7 @@ test('parsed field state restore revives saved field markers', () => {
   assert.deepEqual(next.unlockedFieldIds, ['q:0:1']);
   assert.deepEqual(next.manuallyExcludedFieldIds, ['q:2:0']);
   assert.deepEqual(next.fieldSplitSpecs, [splitSpec]);
+  assert.deepEqual(next.fieldDigitWidthSpecs, [digitWidthSpec]);
   assert.equal(next.activeUrlTemplateId, 'template-1');
   assert.equal(next.draftUrl, null);
 });

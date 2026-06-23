@@ -101,6 +101,7 @@ function clearFieldMarkers(state: PanelState, fieldIds: readonly string[]): Pane
     unchangedFieldIds: removeItems(state.unchangedFieldIds, fieldIds),
     unlockedFieldIds: removeItems(state.unlockedFieldIds, fieldIds),
     manuallyExcludedFieldIds: removeItems(state.manuallyExcludedFieldIds, fieldIds),
+    fieldDigitWidthSpecs: state.fieldDigitWidthSpecs.filter((spec) => !fieldIds.includes(spec.fieldId)),
     activeFieldId: state.activeFieldId && fieldIds.includes(state.activeFieldId) ? null : state.activeFieldId,
   };
 }
@@ -561,6 +562,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         unlockedFieldIds: action.record.unlockedFieldIds,
         manuallyExcludedFieldIds: action.record.manuallyExcludedFieldIds,
         fieldSplitSpecs: action.record.fieldSplitSpecs,
+        fieldDigitWidthSpecs: action.record.fieldDigitWidthSpecs ?? [],
         activeUrlTemplateId: action.record.activeUrlTemplateId,
         draftUrl: action.record.sourceUrl === action.record.selectedUrl ? null : action.record.sourceUrl,
         lastUpdatedAt: Date.now(),

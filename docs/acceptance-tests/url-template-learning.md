@@ -15,6 +15,8 @@
 - Settings must allow the active template's included fields to be reviewed and changed without clearing the template.
 - If a template is configured to hide excluded fields, the panel field list should show only the template's included fields while preserving a settings path to change or clear the template.
 - Parsed-field work-in-progress state is stored as extension-owned metadata for the current hostname/page and selected image context. It may restore active, successful, unchanged, failed, included/excluded, split-field, and draft URL state after panel close, extension reload, or page recovery.
+- Numeric parsed fields infer padding only from leading zeroes by default. For example, `001` increments to `002`, but `1000` decrements to `999`.
+- Users can set an explicit digit width for a parsed numeric field. Explicit widths are field-scoped parsed-field metadata, survive panel close/reopen for the same selected image context, and are not stored in Recents, pins/bookmarks, or originals.
 - Parsed-field resume state is not Recents, is not a pin/bookmark, and must not write to host-page `localStorage`.
 
 ## Manual Acceptance
@@ -30,7 +32,10 @@
 9. Create parsed-field work-in-progress state by activating a field, applying a split pattern, and attempting a URL that fails or does not change the image.
 10. Close/reopen the panel, or reload the extension on the same page.
 11. Confirm the active field, split fields, included/excluded choices, failed or unchanged markers, and draft URL return for the same selected image context.
-12. Navigate to a different selected image URL on the same page.
-13. Confirm stale parsed-field markers do not apply to the different image.
-14. Clear the template.
-15. Confirm it disappears from Settings and hidden fields are no longer hidden by that template.
+12. Select or enter a URL containing a naturally unpadded number such as `image-1000.jpg`; decrement it and confirm the result is `image-999.jpg`, not `image-0999.jpg`.
+13. Select or enter a URL containing a padded number such as `image-001.jpg`; increment it and confirm the result is `image-002.jpg`.
+14. Set an explicit digit width such as `5` for a numeric field whose value is `999`; confirm the URL uses `00999`, close/reopen the panel, and confirm the width returns for the same selected image context.
+15. Navigate to a different selected image URL on the same page.
+16. Confirm stale parsed-field markers and digit-width overrides do not apply to the different image.
+17. Clear the template.
+18. Confirm it disappears from Settings and hidden fields are no longer hidden by that template.

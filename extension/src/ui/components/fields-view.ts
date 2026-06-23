@@ -1,4 +1,4 @@
-import type { UrlField } from '../../core/url/types.js';
+import type { UrlField, UrlFieldDigitWidthSpec } from '../../core/url/types.js';
 
 export interface EditableField {
   readonly field: UrlField;
@@ -8,6 +8,7 @@ export interface EditableField {
 export interface FieldsViewCallbacks {
   readonly onValueChange: (fieldId: string, value: string) => void;
   readonly onStep: (fieldId: string, delta: 1 | -1) => void;
+  readonly onDigitWidthChange: (fieldId: string, value: string) => void;
   readonly onActivate: (fieldId: string) => void;
   readonly onToggleUnlock: (fieldId: string) => void;
   readonly onApplySplit: (fieldId: string, pattern: string) => void;
@@ -62,6 +63,18 @@ export function fieldDisplayValue(field: EditableField): string {
   }
 }
 
+export function fieldDigitWidthInputDisplay(
+  field: UrlField,
+  digitWidth: number | undefined,
+  privacyMode: boolean,
+): { readonly value: string; readonly placeholder: string } {
+  if (privacyMode) return { value: '', placeholder: '' };
+  return {
+    value: digitWidth === undefined ? '' : String(digitWidth),
+    placeholder: field.digitWidth === undefined ? 'auto' : String(field.digitWidth),
+  };
+}
+
 export function createFieldsView(
   fields: EditableField[],
   activeFieldId: string | null,
@@ -69,6 +82,7 @@ export function createFieldsView(
   successfulFieldIds: readonly string[],
   unchangedFieldIds: readonly string[],
   unlockedFieldIds: readonly string[],
+  fieldDigitWidthSpecs: readonly UrlFieldDigitWidthSpec[],
   callbacks: FieldsViewCallbacks,
   options: FieldsViewOptions,
 ): HTMLElement {
@@ -141,6 +155,7 @@ export function createFieldsView(
     const isUnchanged = unchangedFieldIds.includes(field.field.id);
     const isIncludedInTrail = unlockedFieldIds.includes(field.field.id);
     const isSplitField = field.field.splitBaseId !== undefined;
+    const digitWidth = fieldDigitWidthSpecs.find((spec) => spec.fieldId === field.field.id)?.width;
     const canUnlock =
       (isSuccessful || isIncludedInTrail) &&
       field.field.location === 'query' &&
@@ -192,6 +207,34 @@ export function createFieldsView(
     let splitControls: HTMLSpanElement | null = null;
 
     if (hasStepControls) {
+      const digitWidthDisplay = fieldDigitWidthInputDisplay(field.field, digitWidth, options.privacyMode === true);
+      const digitWidthInput = document.createElement('input');
+      digitWidthInput.type = 'number';
+      digitWidthInput.min = '1';
+      digitWidthInput.max = '64';
+      digitWidthInput.step = '1';
+      digitWidthInput.inputMode = 'numeric';
+      digitWidthInput.value = digitWidthDisplay.value;
+      digitWidthInput.placeholder = digitWidthDisplay.placeholder;
+      digitWidthInput.className = 'image-trail-panel__field-width-input';
+      digitWidthInput.readOnly = options.privacyMode === true;
+      digitWidthInput.title = options.privacyMode ? 'Privacy mode is hiding this digit width.' : `Digit width for ${field.field.label}`;
+      digitWidthInput.setAttribute(
+        'aria-label',
+        options.privacyMode ? 'Private field digit width' : `Digit width for ${field.field.label}`,
+      );
+      digitWidthInput.addEventListener('change', () => {
+        if (options.privacyMode) return;
+        callbacks.onDigitWidthChange(field.field.id, digitWidthInput.value);
+      });
+      digitWidthInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          if (options.privacyMode) return;
+          callbacks.onDigitWidthChange(field.field.id, digitWidthInput.value);
+        }
+      });
+
       const decrement = document.createElement('button');
       decrement.type = 'button';
       decrement.className = 'image-trail-panel__field-step-button';
@@ -208,7 +251,7 @@ export function createFieldsView(
       increment.setAttribute('aria-label', increment.title);
       increment.addEventListener('click', () => callbacks.onStep(field.field.id, 1));
 
-      controls.append(decrement, increment);
+      controls.append(digitWidthInput, decrement, increment);
     }
 
     if (canUnlock) {

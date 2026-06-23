@@ -12,6 +12,7 @@ import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
 import { parseUrl } from '../core/url/parse-url.js';
 import { applyFieldSplitSpecs } from '../core/url/field-splits.js';
+import { applyFieldDigitWidthSpecs } from '../core/url/field-widths.js';
 import { collectUrlFields, tokenValue } from '../core/url/tokenize-fields.js';
 import { findBestMatchingTemplate } from '../core/url/templates.js';
 import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
@@ -255,7 +256,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
 
   const parseActiveUrl = (): ParsedUrlModel | null => {
     try {
-      return applyFieldSplitSpecs(parseUrl(activeUrl), state.fieldSplitSpecs);
+      return applyFieldDigitWidthSpecs(applyFieldSplitSpecs(parseUrl(activeUrl), state.fieldSplitSpecs), state.fieldDigitWidthSpecs);
     } catch {
       return null;
     }
@@ -444,6 +445,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
       state.successfulFieldIds,
       state.unchangedFieldIds,
       state.unlockedFieldIds,
+      state.fieldDigitWidthSpecs,
       {
         onActivate: (fieldId) => {
           target.dispatch({ name: 'active-field/set', id: fieldId });
@@ -453,6 +455,9 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
         },
         onStep: (fieldId, delta) => {
           target.dispatch({ name: 'field-value-bump', id: fieldId, delta });
+        },
+        onDigitWidthChange: (fieldId, value) => {
+          target.dispatch({ name: 'field-digit-width/change', id: fieldId, value });
         },
         onToggleUnlock: (fieldId) => {
           target.dispatch({ name: 'field-unlock/toggle', id: fieldId });

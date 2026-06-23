@@ -116,12 +116,17 @@ function createSplitToken(value: string): UrlToken {
   if (kind === 'hex' && /^0[xX]/u.test(value)) {
     const prefix = value.slice(0, 2) as '0x' | '0X';
     const digits = value.slice(2);
-    return { kind, value: digits, width: digits.length, prefix, uppercase: /[A-F]/u.test(digits) };
+    return { kind, value: digits, width: paddedDigitWidth(digits), prefix, uppercase: /[A-F]/u.test(digits) };
   }
 
   if (kind === 'hex' || kind === 'int') {
-    return { kind, value, width: value.replace(/^0[xX]/u, '').length, uppercase: /[A-F]/u.test(value) };
+    const digits = value.replace(/^0[xX]/u, '');
+    return { kind, value, width: paddedDigitWidth(digits), uppercase: /[A-F]/u.test(value) };
   }
 
   return { kind, value };
+}
+
+function paddedDigitWidth(digits: string): number | undefined {
+  return digits.length > 1 && digits.startsWith('0') ? digits.length : undefined;
 }

@@ -57,7 +57,7 @@ function bumpToken(token: UrlToken, delta: number): UrlToken {
   const clamped = next < 0n ? 0n : next;
   const raw = clamped.toString(radix);
   const cased = token.kind === 'hex' && token.uppercase ? raw.toUpperCase() : raw.toLowerCase();
-  return { ...token, value: cased.padStart(token.width ?? cased.length, '0') };
+  return { ...token, value: padTokenValue(cased, token.width) };
 }
 
 function normalizeTokenValue(raw: string): string {
@@ -72,14 +72,14 @@ function setTokenValue(token: UrlToken, raw: string): UrlToken {
 
   const hasPrefix = /^0[xX]/u.test(normalized);
   const digits = hasPrefix ? normalized.slice(2) : normalized;
-  const width = Math.max(token.width ?? 0, digits.length);
+  const width = nextTokenWidth(token.width, digits);
   const uppercase = kind === 'hex' ? /[A-F]/u.test(digits) || token.uppercase === true : undefined;
   const value = kind === 'hex' && uppercase ? digits.toUpperCase() : kind === 'hex' ? digits.toLowerCase() : digits;
 
   if (kind === 'hex' && hasPrefix) {
     return {
       kind,
-      value: value.padStart(width, '0'),
+      value: padTokenValue(value, width),
       width,
       prefix: normalized.slice(0, 2) as '0x' | '0X',
       uppercase,
@@ -88,10 +88,19 @@ function setTokenValue(token: UrlToken, raw: string): UrlToken {
 
   return {
     kind,
-    value: value.padStart(width, '0'),
+    value: padTokenValue(value, width),
     width,
     uppercase,
   };
+}
+
+function nextTokenWidth(previousWidth: number | undefined, digits: string): number | undefined {
+  if (previousWidth !== undefined) return Math.max(previousWidth, digits.length);
+  return digits.length > 1 && digits.startsWith('0') ? digits.length : undefined;
+}
+
+function padTokenValue(value: string, width: number | undefined): string {
+  return width === undefined ? value : value.padStart(width, '0');
 }
 
 function rebuildQueryField(field: ParsedUrlModel['queryFields'][number]): string {

@@ -1476,6 +1476,7 @@ test('ParsedFieldStateRepository saves parsed field resume state per hostname an
         pattern: '2-2',
       },
     ],
+    fieldDigitWidthSpecs: [{ fieldId: 'path:0:0', width: 5 }],
     activeUrlTemplateId: 'template-123',
     updatedAt: '2026-06-22T00:00:00.000Z',
   };
