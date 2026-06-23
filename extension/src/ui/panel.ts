@@ -120,12 +120,22 @@ function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
 
 export function shouldRestoreParsedFieldState(
   record: ParsedFieldStateRecord,
-  currentRawUrl: string,
+  currentSelectedUrl: string | null,
   selectedHandleId: string | null,
 ): boolean {
-  if (record.sourceUrl === currentRawUrl) return true;
+  if (record.sourceUrl === currentSelectedUrl) return true;
+  if (record.pageUrl === currentSelectedUrl && (!record.selectedHandleId || record.selectedHandleId === selectedHandleId)) return true;
   if (!record.selectedHandleId || record.selectedHandleId !== selectedHandleId) return false;
-  return !!record.selectedUrl && record.selectedUrl === currentRawUrl;
+  return !!record.selectedUrl && record.selectedUrl === currentSelectedUrl;
+}
+
+export function nextParsedFieldStatePageKey(
+  currentPageUrl: string,
+  storedPageKey: string,
+  extensionProjectedPageUrl: string | null,
+): string {
+  if (currentPageUrl === storedPageKey || currentPageUrl === extensionProjectedPageUrl) return storedPageKey;
+  return currentPageUrl;
 }
 
 export class ImageTrailPanel {
@@ -156,6 +166,9 @@ export class ImageTrailPanel {
   private recallMessageClearTimer: number | null = null;
   private parsedFieldStateRestoreInProgress = false;
   private parsedFieldStateUpdatedAtMs = 0;
+  private parsedFieldStateSaveQueue: Promise<void> = Promise.resolve();
+  private parsedFieldStatePageKey = window.location.href;
+  private extensionProjectedPageUrl: string | null = null;
   private readonly layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
     fieldsPanelBlockSize: null,
@@ -232,7 +245,9 @@ export class ImageTrailPanel {
   }
 
   toggle(): PanelState {
+    const wasVisible = this.state.visible;
     this.dispatch({ name: 'toggle-panel' });
+    if (!wasVisible && this.state.visible) this.restoreParsedFieldStateForCurrentPanel();
     return this.state;
   }
 
@@ -241,11 +256,15 @@ export class ImageTrailPanel {
     this.slideshow.destroy();
     this.retry.destroy();
     this.keyboard.disable();
-    this.cleanupMountedElements();
+    this.cleanupMountedElements({ releaseTarget: true });
   }
 
-  private cleanupMountedElements(): void {
-    this.pageAdapter.cleanup();
+  private cleanupMountedElements(options: { readonly releaseTarget?: boolean } = {}): void {
+    if (options.releaseTarget) {
+      this.pageAdapter.cleanup();
+    } else {
+      this.pageAdapter.suspend();
+    }
     document.getElementById(ROOT_ID)?.remove();
     this.root = null;
     this.recallRoot = null;
@@ -490,7 +509,16 @@ export class ImageTrailPanel {
   }
 
   private parsedFieldStatePageUrl(): string {
-    return window.location.href;
+    this.refreshParsedFieldStatePageKey();
+    return this.parsedFieldStatePageKey;
+  }
+
+  private refreshParsedFieldStatePageKey(): void {
+    const currentPageUrl = window.location.href;
+    const nextPageKey = nextParsedFieldStatePageKey(currentPageUrl, this.parsedFieldStatePageKey, this.extensionProjectedPageUrl);
+    if (nextPageKey === this.parsedFieldStatePageKey) return;
+    this.parsedFieldStatePageKey = nextPageKey;
+    this.extensionProjectedPageUrl = null;
   }
 
   private createParsedFieldStateRecord(): ParsedFieldStateRecord | null {
@@ -526,19 +554,27 @@ export class ImageTrailPanel {
     if (!this.parsedFieldStateStore) return;
     const record = this.createParsedFieldStateRecord();
     if (!record) return;
-    await this.parsedFieldStateStore.save(record);
+    this.parsedFieldStateSaveQueue = this.parsedFieldStateSaveQueue.then(
+      () => this.parsedFieldStateStore?.save(record) ?? Promise.resolve(),
+    );
+    await this.parsedFieldStateSaveQueue;
   }
 
   private async restoreParsedFieldState(): Promise<void> {
     if (this.parsedFieldStateRestoreInProgress) return;
     if (!this.parsedFieldStateStore) return;
+    this.state = setTargetState(this.state, toTargetState(this.pageAdapter.getSnapshot()));
     const hostname = this.parsedFieldStateHostname();
     if (!hostname) return;
-    const record = await this.parsedFieldStateStore.load(hostname, this.parsedFieldStatePageUrl());
+    const currentSelectedUrl = this.currentSelectedUrl();
+    const exactRecord = await this.parsedFieldStateStore.load(hostname, this.parsedFieldStatePageUrl());
+    const sourceRecord = currentSelectedUrl ? await this.parsedFieldStateStore.loadForSource(hostname, currentSelectedUrl) : null;
+    const record = [exactRecord, sourceRecord].find(
+      (candidate): candidate is ParsedFieldStateRecord =>
+        !!candidate && shouldRestoreParsedFieldState(candidate, currentSelectedUrl, this.state.target.selectedHandleId),
+    );
     if (!record) return;
-    const currentRawUrl = this.currentRawUrl();
-    const sameSource = record.sourceUrl === currentRawUrl;
-    if (!shouldRestoreParsedFieldState(record, currentRawUrl, this.state.target.selectedHandleId)) return;
+    const sameSource = record.sourceUrl === currentSelectedUrl;
     this.parsedFieldStateRestoreInProgress = true;
     try {
       if (!sameSource) {
@@ -555,6 +591,10 @@ export class ImageTrailPanel {
     } finally {
       this.parsedFieldStateRestoreInProgress = false;
     }
+  }
+
+  private restoreParsedFieldStateForCurrentPanel(): void {
+    void this.loadGrabSettings({ render: false }).then(() => this.restoreParsedFieldState());
   }
 
   private filterParsedFieldStateForCurrentUrl(record: ParsedFieldStateRecord): ParsedFieldStateRecord {
@@ -874,11 +914,13 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'panel/minimize' || action.name === 'panel/expand') {
+      if (action.name === 'panel/minimize') void this.saveParsedFieldState();
       this.state = reducePanelAction(this.state, action);
       this.mount();
       this.keyboard.enable();
       this.pageAdapter.enableBookmarkShortcut();
       this.render();
+      if (action.name === 'panel/expand') this.restoreParsedFieldStateForCurrentPanel();
       return;
     }
 
@@ -1019,7 +1061,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'selected-url/apply') {
-      void this.applySelectedUrl(action.url);
+      void this.applySelectedUrl(action.url, [], { pushVisibleUrl: true });
       return;
     }
 
@@ -1180,6 +1222,7 @@ export class ImageTrailPanel {
 
     this.state = reducePanelAction(this.state, action);
     if (!this.state.visible) {
+      void this.saveParsedFieldState();
       this.slideshow.destroy();
       this.retry.destroy();
       this.keyboard.disable();
@@ -1242,6 +1285,12 @@ export class ImageTrailPanel {
   private currentRawUrl(): string {
     const snapshot = this.pageAdapter.getSnapshot();
     return this.state.draftUrl ?? snapshot.selected?.url ?? window.location.href;
+  }
+
+  private currentSelectedUrl(): string | null {
+    const snapshot = this.pageAdapter.getSnapshot();
+    const selectedUrl = snapshot.selected?.url ?? this.state.target.selectedUrl;
+    return selectedUrl?.startsWith('data:') ? 'data:' : (selectedUrl ?? null);
   }
 
   private applyFieldSplitPattern(fieldId: string, pattern: string): void {
@@ -1324,7 +1373,11 @@ export class ImageTrailPanel {
     if (loaded) await this.saveUrlTemplateFromCurrentFields();
   }
 
-  private async applySelectedUrl(nextUrl: string, attemptedFieldIds: readonly string[] = []): Promise<boolean> {
+  private async applySelectedUrl(
+    nextUrl: string,
+    attemptedFieldIds: readonly string[] = [],
+    options: { readonly pushVisibleUrl?: boolean } = {},
+  ): Promise<boolean> {
     const revision = ++this.projectionRevision;
     const baselineFingerprint = await this.currentImageFingerprint();
     if (revision !== this.projectionRevision) return false;
@@ -1356,7 +1409,7 @@ export class ImageTrailPanel {
       this.state = { ...setTargetState(this.state, toTargetState(nextSnapshot)), draftUrl: null };
     }
     this.state = this.applyFieldLoadResult(this.state, attemptedFieldIds, preload.sha256, baselineFingerprint);
-    pushVisibleUrlWhenSameOrigin(nextUrl);
+    if (options.pushVisibleUrl && pushVisibleUrlWhenSameOrigin(nextUrl)) this.extensionProjectedPageUrl = window.location.href;
     void this.saveParsedFieldState();
     this.render();
     void this.loadGrabSettings();

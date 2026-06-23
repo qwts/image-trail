@@ -1521,6 +1521,47 @@ test('ParsedFieldStateRepository ignores stale parsed field resume saves', async
   assert.deepEqual(await repository.get('example.test', 'https://example.test/gallery'), newer);
 });
 
+test('ParsedFieldStateRepository finds resume state by selected image source', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const repository = new ParsedFieldStateRepository(db);
+  const originalPageRecord = {
+    schemaVersion: 1 as const,
+    hostname: 'external-content.duckduckgo.com',
+    pageUrl: 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fexample.test%2Fimage-0001.jpg',
+    sourceUrl: 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fexample.test%2Fimage-0002.jpg',
+    selectedUrl: 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fexample.test%2Fimage-0002.jpg',
+    selectedHandleId: 'image-trail-target-1',
+    activeFieldId: 'q:0:1',
+    failedFieldId: null,
+    successfulFieldIds: ['q:0:1'],
+    unchangedFieldIds: [],
+    unlockedFieldIds: ['q:0:1'],
+    manuallyExcludedFieldIds: [],
+    fieldSplitSpecs: [],
+    activeUrlTemplateId: 'template-123',
+    updatedAt: '2026-06-22T00:00:03.000Z',
+  };
+  const olderRecord = {
+    ...originalPageRecord,
+    pageUrl: 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fexample.test%2Fold.jpg',
+    updatedAt: '2026-06-22T00:00:02.000Z',
+  };
+
+  await repository.put(olderRecord);
+  await repository.put(originalPageRecord);
+
+  assert.deepEqual(
+    await repository.getForSource(
+      'external-content.duckduckgo.com',
+      'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fexample.test%2Fimage-0002.jpg',
+    ),
+    originalPageRecord,
+  );
+  assert.deepEqual(await repository.getForSource('external-content.duckduckgo.com', originalPageRecord.pageUrl), originalPageRecord);
+  assert.equal(await repository.getForSource('other.test', originalPageRecord.sourceUrl), null);
+});
+
 test('UrlTemplateRepository saves templates per hostname', async (t) => {
   const db = await openFreshImageTrailDb();
   t.after(() => db.close());

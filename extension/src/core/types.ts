@@ -82,6 +82,7 @@ export interface ParsedFieldStateRecord {
 
 export interface ParsedFieldStateStore {
   load(hostname: string, pageUrl: string): Promise<ParsedFieldStateRecord | null>;
+  loadForSource(hostname: string, sourceUrl: string): Promise<ParsedFieldStateRecord | null>;
   save(record: ParsedFieldStateRecord): Promise<void>;
 }
 

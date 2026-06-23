@@ -78,8 +78,9 @@ test('selected target lockBox makes the page backdrop black and restores it', ()
   }
 });
 
-test('selected target without lockBox leaves inline sizing alone', () => {
+test('selected target without lockBox leaves inline sizing alone and defaults image fit to cover', () => {
   const element = createImageElement();
+  element.style.objectFit = 'contain';
 
   markSelectedTarget(element);
 
@@ -87,6 +88,10 @@ test('selected target without lockBox leaves inline sizing alone', () => {
   assert.equal(element.style.objectFit, 'cover');
   assert.equal(element.style.width, '144px');
   assert.equal(element.style.backgroundColor, '');
+
+  restoreElementStyles(element);
+
+  assert.equal(element.style.objectFit, 'contain');
 });
 
 test('selected target can defer lockBox styling until preview replaces the image', () => {

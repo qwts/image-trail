@@ -32,6 +32,8 @@ import {
   createLoadLocalSettingsResultMessage,
   createLoadPanelPositionMessage,
   createLoadPanelPositionResultMessage,
+  createLoadParsedFieldStateBySourceMessage,
+  createLoadParsedFieldStateBySourceResultMessage,
   createLoadParsedFieldStateMessage,
   createLoadParsedFieldStateResultMessage,
   createListGrabSourcePatternsMessage,
@@ -93,6 +95,7 @@ import {
   isLoadBookmarksByIdsResultMessage,
   isLoadLocalSettingsResultMessage,
   isLoadPanelPositionResultMessage,
+  isLoadParsedFieldStateBySourceResultMessage,
   isLoadParsedFieldStateResultMessage,
   isListGrabSourcePatternsResultMessage,
   isListUrlTemplatesResultMessage,
@@ -195,6 +198,8 @@ test('creates parsed field state messages', () => {
   };
   const load = createLoadParsedFieldStateMessage('example.test', 'https://example.test/gallery');
   const loadResult = createLoadParsedFieldStateResultMessage({ ok: true, record });
+  const loadBySource = createLoadParsedFieldStateBySourceMessage('example.test', 'https://cdn.example.test/image-0001.jpg');
+  const loadBySourceResult = createLoadParsedFieldStateBySourceResultMessage({ ok: true, record });
   const save = createSaveParsedFieldStateMessage(record);
   const saveResult = createSaveParsedFieldStateResultMessage({ ok: true });
 
@@ -204,6 +209,12 @@ test('creates parsed field state messages', () => {
   assert.equal(isExtensionRequest(load), true);
   assert.equal(isExtensionResponse(loadResult), true);
   assert.equal(isLoadParsedFieldStateResultMessage(loadResult), true);
+  assert.equal(loadBySource.type, MessageType.LoadParsedFieldStateBySource);
+  assert.equal(loadBySource.payload.hostname, 'example.test');
+  assert.equal(loadBySource.payload.sourceUrl, 'https://cdn.example.test/image-0001.jpg');
+  assert.equal(isExtensionRequest(loadBySource), true);
+  assert.equal(isExtensionResponse(loadBySourceResult), true);
+  assert.equal(isLoadParsedFieldStateBySourceResultMessage(loadBySourceResult), true);
   assert.equal(save.type, MessageType.SaveParsedFieldState);
   assert.deepEqual(save.payload.record, record);
   assert.equal(isExtensionRequest(save), true);

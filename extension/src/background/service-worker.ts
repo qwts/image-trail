@@ -33,6 +33,7 @@ import {
   createFetchLinkedPageResultMessage,
   createFetchThumbnailSourceResultMessage,
   createLoadBookmarksByIdsResultMessage,
+  createLoadParsedFieldStateBySourceResultMessage,
   createImportEncryptedImageResultMessage,
   createLoadBookmarksResultMessage,
   createAddRecentHistoryResultMessage,
@@ -560,6 +561,14 @@ async function handleLoadParsedFieldState(
   const hostname = normalizeHostname(message.payload.hostname);
   if (!hostname) return { ok: true, record: null };
   return { ok: true, record: await parsedFieldStateStore.load(hostname, message.payload.pageUrl) };
+}
+
+async function handleLoadParsedFieldStateBySource(
+  message: import('./messages.js').LoadParsedFieldStateBySourceMessage,
+): Promise<import('./messages.js').LoadParsedFieldStateBySourceResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.hostname);
+  if (!hostname) return { ok: true, record: null };
+  return { ok: true, record: await parsedFieldStateStore.loadForSource(hostname, message.payload.sourceUrl) };
 }
 
 async function handleSaveParsedFieldState(
@@ -1119,6 +1128,14 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
         .then((result) => sendResponse(createLoadParsedFieldStateResultMessage(result)))
         .catch(() =>
           sendResponse(createLoadParsedFieldStateResultMessage({ ok: false, message: 'Parsed field state could not be loaded.' })),
+        );
+      return true;
+
+    case MessageType.LoadParsedFieldStateBySource:
+      handleLoadParsedFieldStateBySource(message)
+        .then((result) => sendResponse(createLoadParsedFieldStateBySourceResultMessage(result)))
+        .catch(() =>
+          sendResponse(createLoadParsedFieldStateBySourceResultMessage({ ok: false, message: 'Parsed field state could not be loaded.' })),
         );
       return true;
 

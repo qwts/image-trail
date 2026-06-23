@@ -69,6 +69,8 @@ export const MessageType = {
   DeletePanelPositionResult: 'imageTrail.deletePanelPositionResult',
   LoadParsedFieldState: 'imageTrail.loadParsedFieldState',
   LoadParsedFieldStateResult: 'imageTrail.loadParsedFieldStateResult',
+  LoadParsedFieldStateBySource: 'imageTrail.loadParsedFieldStateBySource',
+  LoadParsedFieldStateBySourceResult: 'imageTrail.loadParsedFieldStateBySourceResult',
   SaveParsedFieldState: 'imageTrail.saveParsedFieldState',
   SaveParsedFieldStateResult: 'imageTrail.saveParsedFieldStateResult',
   LoadLocalSettings: 'imageTrail.loadLocalSettings',
@@ -605,6 +607,20 @@ export interface LoadParsedFieldStateResultMessage {
     | { readonly ok: false; readonly message: string };
 }
 
+export interface LoadParsedFieldStateBySourceMessage {
+  readonly type: typeof MessageType.LoadParsedFieldStateBySource;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly hostname: string; readonly sourceUrl: string };
+}
+
+export interface LoadParsedFieldStateBySourceResultMessage {
+  readonly type: typeof MessageType.LoadParsedFieldStateBySourceResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly record: import('../core/types.js').ParsedFieldStateRecord | null }
+    | { readonly ok: false; readonly message: string };
+}
+
 export interface SaveParsedFieldStateMessage {
   readonly type: typeof MessageType.SaveParsedFieldState;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -756,6 +772,7 @@ export type ExtensionRequest =
   | SavePanelPositionMessage
   | DeletePanelPositionMessage
   | LoadParsedFieldStateMessage
+  | LoadParsedFieldStateBySourceMessage
   | SaveParsedFieldStateMessage
   | LoadLocalSettingsMessage
   | SaveLocalSettingsMessage
@@ -798,6 +815,7 @@ export type ExtensionResponse =
   | SavePanelPositionResultMessage
   | DeletePanelPositionResultMessage
   | LoadParsedFieldStateResultMessage
+  | LoadParsedFieldStateBySourceResultMessage
   | SaveParsedFieldStateResultMessage
   | LoadLocalSettingsResultMessage
   | SaveLocalSettingsResultMessage
@@ -1129,6 +1147,16 @@ export function createLoadParsedFieldStateResultMessage(
   return { type: MessageType.LoadParsedFieldStateResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
+export function createLoadParsedFieldStateBySourceMessage(hostname: string, sourceUrl: string): LoadParsedFieldStateBySourceMessage {
+  return { type: MessageType.LoadParsedFieldStateBySource, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname, sourceUrl } };
+}
+
+export function createLoadParsedFieldStateBySourceResultMessage(
+  payload: LoadParsedFieldStateBySourceResultMessage['payload'],
+): LoadParsedFieldStateBySourceResultMessage {
+  return { type: MessageType.LoadParsedFieldStateBySourceResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 export function createSaveParsedFieldStateMessage(record: import('../core/types.js').ParsedFieldStateRecord): SaveParsedFieldStateMessage {
   return { type: MessageType.SaveParsedFieldState, version: MESSAGE_PROTOCOL_VERSION, payload: { record } };
 }
@@ -1258,6 +1286,7 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.SavePanelPosition ||
     value.type === MessageType.DeletePanelPosition ||
     value.type === MessageType.LoadParsedFieldState ||
+    value.type === MessageType.LoadParsedFieldStateBySource ||
     value.type === MessageType.SaveParsedFieldState ||
     value.type === MessageType.LoadLocalSettings ||
     value.type === MessageType.SaveLocalSettings ||
@@ -1305,6 +1334,7 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.SavePanelPositionResult ||
     value.type === MessageType.DeletePanelPositionResult ||
     value.type === MessageType.LoadParsedFieldStateResult ||
+    value.type === MessageType.LoadParsedFieldStateBySourceResult ||
     value.type === MessageType.SaveParsedFieldStateResult ||
     value.type === MessageType.LoadLocalSettingsResult ||
     value.type === MessageType.SaveLocalSettingsResult ||
@@ -1455,6 +1485,11 @@ export function isDeletePanelPositionResultMessage(value: unknown): value is Del
 export function isLoadParsedFieldStateResultMessage(value: unknown): value is LoadParsedFieldStateResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.LoadParsedFieldStateResult;
+}
+
+export function isLoadParsedFieldStateBySourceResultMessage(value: unknown): value is LoadParsedFieldStateBySourceResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.LoadParsedFieldStateBySourceResult;
 }
 
 export function isSaveParsedFieldStateResultMessage(value: unknown): value is SaveParsedFieldStateResultMessage {

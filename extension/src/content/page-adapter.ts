@@ -179,6 +179,9 @@ export class PageAdapter {
     const matches = findQualifyingImages();
     this.detectedCandidateCount = matches.length;
     if (matches.length === 1) {
+      if (matches[0] === this.selected && this.selected.isConnected) {
+        return this.emit(`Auto-selected ${summarizeTargetUrlForMessage(this.lastSnapshot.selected?.url)}.`);
+      }
       this.selectTarget(matches[0], 'auto');
       return this.emit(`Auto-selected ${summarizeTargetUrlForMessage(this.lastSnapshot.selected?.url)}.`);
     }
@@ -234,13 +237,17 @@ export class PageAdapter {
   }
 
   cleanup(): void {
+    this.suspend();
+    this.restoreSelectedTarget();
+    this.emit('Target selection cleaned up.');
+  }
+
+  suspend(): void {
     this.disableBookmarkShortcut();
     this.grabModeActive = false;
     this.clearGrabPreview();
     this.stopPickMode();
-    this.restoreSelectedTarget();
     this.mode = 'none';
-    this.emit('Target selection cleaned up.');
   }
 
   getSnapshot(): TargetSelectionSnapshot {

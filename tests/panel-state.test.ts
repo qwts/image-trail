@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyFieldLoadFailureToState, reducePanelAction } from '../extension/src/core/actions.js';
 import { createInitialPanelState, setTargetState } from '../extension/src/core/state.js';
-import { isLockedPrivatePin, shouldRestoreParsedFieldState } from '../extension/src/ui/panel.js';
+import { isLockedPrivatePin, nextParsedFieldStatePageKey, shouldRestoreParsedFieldState } from '../extension/src/ui/panel.js';
 import {
   PRIVACY_RECORD_META,
   PRIVACY_RECORD_NAME,
@@ -999,4 +999,60 @@ test('parsed field state restore does not replay drafts onto reused target handl
   assert.equal(shouldRestoreParsedFieldState(record, 'https://cdn.example.test/image-0002.jpg', 'target-2'), true);
   assert.equal(shouldRestoreParsedFieldState(record, 'https://cdn.example.test/image-0001.jpg', 'target-1'), true);
   assert.equal(shouldRestoreParsedFieldState(record, 'https://cdn.example.test/image-0003.jpg', 'target-1'), false);
+});
+
+test('parsed field state restore can replay edits from the original image page URL', () => {
+  const record = {
+    schemaVersion: 1 as const,
+    hostname: 'external-content.duckduckgo.com',
+    pageUrl: 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fexample.test%2Fimage-0001.jpg',
+    sourceUrl: 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fexample.test%2Fimage-0002.jpg',
+    selectedUrl: 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fexample.test%2Fimage-0002.jpg',
+    selectedHandleId: 'image-trail-target-1',
+    activeFieldId: 'q:0:1',
+    failedFieldId: null,
+    successfulFieldIds: ['q:0:1'],
+    unchangedFieldIds: [],
+    unlockedFieldIds: ['q:0:1'],
+    manuallyExcludedFieldIds: [],
+    fieldSplitSpecs: [],
+    activeUrlTemplateId: 'template-1',
+    updatedAt: '2026-06-22T00:00:00.000Z',
+  };
+
+  assert.equal(shouldRestoreParsedFieldState(record, record.pageUrl, 'image-trail-target-1'), true);
+  assert.equal(shouldRestoreParsedFieldState(record, record.pageUrl, 'image-trail-target-2'), false);
+});
+
+test('parsed field state restore ignores stale draft URLs for same host image elements', () => {
+  const record = {
+    schemaVersion: 1 as const,
+    hostname: 'example.test',
+    pageUrl: 'https://example.test/gallery',
+    sourceUrl: 'https://cdn.example.test/image-0003.jpg',
+    selectedUrl: 'https://cdn.example.test/image-0003.jpg',
+    selectedHandleId: 'target-1',
+    activeFieldId: 'q:0:0',
+    failedFieldId: null,
+    successfulFieldIds: ['q:0:0'],
+    unchangedFieldIds: [],
+    unlockedFieldIds: ['q:0:0'],
+    manuallyExcludedFieldIds: [],
+    fieldSplitSpecs: [],
+    activeUrlTemplateId: 'template-1',
+    updatedAt: '2026-06-22T00:00:00.000Z',
+  };
+
+  assert.equal(shouldRestoreParsedFieldState(record, 'https://cdn.example.test/image-0003.jpg', 'target-1'), true);
+  assert.equal(shouldRestoreParsedFieldState(record, 'https://cdn.example.test/image-0002.jpg', 'target-1'), false);
+});
+
+test('parsed field page key ignores extension projections but follows page navigation', () => {
+  const originalPage = 'https://example.test/gallery/1';
+  const projectedImage = 'https://example.test/images/2.jpg';
+  const spaRoute = 'https://example.test/gallery/2';
+
+  assert.equal(nextParsedFieldStatePageKey(originalPage, originalPage, null), originalPage);
+  assert.equal(nextParsedFieldStatePageKey(projectedImage, originalPage, projectedImage), originalPage);
+  assert.equal(nextParsedFieldStatePageKey(spaRoute, originalPage, projectedImage), spaRoute);
 });

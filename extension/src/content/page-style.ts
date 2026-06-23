@@ -79,6 +79,8 @@ export function markSelectedTarget(element: HTMLElement, options: SelectedTarget
     element.style.height = '100%';
     element.style.objectFit = 'contain';
     element.style.width = '100%';
+  } else {
+    element.style.objectFit = 'cover';
   }
   element.style.opacity = '1';
   element.style.outline = '4px solid #10b981';

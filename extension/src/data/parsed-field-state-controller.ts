@@ -13,6 +13,11 @@ export class IndexedDbParsedFieldStateStore implements ParsedFieldStateStore {
     return context ? context.repository.get(hostname, pageUrl) : null;
   }
 
+  async loadForSource(hostname: string, sourceUrl: string): Promise<ParsedFieldStateRecord | null> {
+    const context = await this.openContext();
+    return context ? context.repository.getForSource(hostname, sourceUrl) : null;
+  }
+
   async save(record: ParsedFieldStateRecord): Promise<void> {
     const context = await this.openContext();
     await context?.repository.put(record);

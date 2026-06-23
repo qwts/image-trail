@@ -21,6 +21,22 @@ export class ParsedFieldStateRepository {
     return record?.kind === 'parsedFieldState' ? stripMetadataKey(record) : null;
   }
 
+  async getForSource(hostname: string, sourceUrl: string): Promise<ParsedFieldStateRecord | null> {
+    const transaction = this.db.transaction(DataStore.Metadata, 'readonly');
+    const store = transaction.objectStore(DataStore.Metadata);
+    const prefix = parsedFieldStateHostPrefix(hostname);
+    const records = await requestToPromise<ParsedFieldStateMetadataRecord[]>(store.getAll(IDBKeyRange.bound(prefix, `${prefix}\uffff`)));
+    await transactionDone(transaction);
+    const latest = records
+      .filter(
+        (record) =>
+          record.kind === 'parsedFieldState' &&
+          (record.sourceUrl === sourceUrl || record.selectedUrl === sourceUrl || record.pageUrl === sourceUrl),
+      )
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+    return latest ? stripMetadataKey(latest) : null;
+  }
+
   async put(record: ParsedFieldStateRecord): Promise<void> {
     const transaction = this.db.transaction(DataStore.Metadata, 'readwrite');
     const store = transaction.objectStore(DataStore.Metadata);
@@ -45,5 +61,9 @@ function stripMetadataKey(record: ParsedFieldStateMetadataRecord): ParsedFieldSt
 }
 
 function parsedFieldStateKey(hostname: string, pageUrl: string): string {
-  return `${PARSED_FIELD_STATE_KEY_PREFIX}${hostname.toLowerCase()}:${encodeURIComponent(pageUrl)}`;
+  return `${parsedFieldStateHostPrefix(hostname)}${encodeURIComponent(pageUrl)}`;
+}
+
+function parsedFieldStateHostPrefix(hostname: string): string {
+  return `${PARSED_FIELD_STATE_KEY_PREFIX}${hostname.toLowerCase()}:`;
 }
