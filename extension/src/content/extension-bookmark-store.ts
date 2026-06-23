@@ -22,6 +22,22 @@ export class ExtensionBookmarkStore implements BookmarkStore {
     return (await this.loadPage({ offset: 0, limit: DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax })).items;
   }
 
+  async loadOriginalBlobIds(): Promise<ReadonlySet<string>> {
+    const ids = new Set<string>();
+    const limit = Math.max(DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax, 50);
+    let offset = 0;
+    for (;;) {
+      const page = await this.loadPage({ offset, limit });
+      for (const item of page.items) {
+        if (item.storedOriginal?.blobId) ids.add(item.storedOriginal.blobId);
+        if (item.protectedPin?.storedOriginalBlobId) ids.add(item.protectedPin.storedOriginalBlobId);
+      }
+      if (!page.hasOlder || page.items.length === 0) break;
+      offset = page.offset + page.items.length;
+    }
+    return ids;
+  }
+
   async loadPage(input: {
     readonly offset: number;
     readonly limit: number;

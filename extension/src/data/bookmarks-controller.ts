@@ -73,6 +73,22 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     return (await this.loadPage({ offset: 0, limit: DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax })).items;
   }
 
+  async loadOriginalBlobIds(): Promise<ReadonlySet<string>> {
+    const context = await this.openContext();
+    const ids = new Set<string>();
+    if (!context) return ids;
+    for (const record of await context.repository.listEncryptedNewestFirst()) {
+      try {
+        const payload = await context.repository.openRecord(record, context.bookmarkKey.key);
+        if (payload.storedOriginal?.blobId) ids.add(payload.storedOriginal.blobId);
+        if (payload.protectedPin?.storedOriginalBlobId) ids.add(payload.protectedPin.storedOriginalBlobId);
+      } catch {
+        // Unreadable legacy rows cannot safely identify linked originals.
+      }
+    }
+    return ids;
+  }
+
   async loadPage(input: {
     readonly offset: number;
     readonly limit: number;
@@ -140,6 +156,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const existing = importedDataUrl
       ? await context.repository.getEncrypted(bookmark.id)
       : await context.repository.getEncryptedByUrl(bookmark.url);
+    const existingPayload = existing ? await context.repository.openRecord(existing, context.bookmarkKey.key).catch(() => null) : null;
     const uuid = existing?.uuid ?? crypto.randomUUID();
     await context.repository.sealAndPut(
       uuid,
@@ -150,6 +167,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       indexUrl,
       existing?.queueUpdatedAt ?? bookmark.timestamp,
     );
+    await removeReplacedOriginal(context, existingPayload, bookmark.storedOriginal?.blobId ?? bookmark.blobId);
     this.invalidateMergedRecordsCache();
     return { ...bookmark, id: uuid, pinSaveStorage };
   }
@@ -441,6 +459,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         queueUpdatedAt,
       );
 
+      await removeReplacedOriginal(context, existingPlainPayload, relationship.storedOriginalBlobId);
       this.invalidateMergedRecordsCache();
       return this.openProtectedDisplayRecord(context, protectedRecord, activeBlobKey);
     } catch (error) {
@@ -636,6 +655,16 @@ async function removeLinkedPinStorage(context: BookmarkContext, payload: Durable
     return;
   }
   if (payload.storedOriginal?.blobId) await context.blobs.remove(payload.storedOriginal.blobId);
+}
+
+async function removeReplacedOriginal(
+  context: BookmarkContext,
+  previous: DurableBookmarkPayloadV1 | null,
+  nextBlobId: string | undefined,
+): Promise<void> {
+  const previousBlobId = previous?.protectedPin?.storedOriginalBlobId ?? previous?.storedOriginal?.blobId;
+  if (!previousBlobId || previousBlobId === nextBlobId) return;
+  await context.blobs.remove(previousBlobId);
 }
 
 async function ensureDurableBookmarkKey(repository: KeysRepository): Promise<BookmarkKeyContext> {
