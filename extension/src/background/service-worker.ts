@@ -5,6 +5,7 @@ import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { IndexedDbPanelPositionStore } from '../data/panel-position-controller.js';
 import { IndexedDbParsedFieldStateStore } from '../data/parsed-field-state-controller.js';
 import { IndexedDbUrlTemplateStore } from '../data/url-template-controller.js';
+import { IndexedDbUrlReviewStatusStore } from '../data/url-review-status-controller.js';
 import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, migrateLocalSettings } from '../data/local-settings.js';
 import { getActiveBlobKey, lockBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
@@ -25,6 +26,7 @@ import {
   createCaptureImageMessage,
   createBlobKeyResultMessage,
   createCaptureResultMessage,
+  createClearUrlReviewStatusResultMessage,
   createCleanupOrphanedBlobsResultMessage,
   createCreateBlobPreviewResultMessage,
   createDeleteBlobResultMessage,
@@ -35,6 +37,7 @@ import {
   createLoadBookmarksByIdsResultMessage,
   createLoadParsedFieldStateBySourceResultMessage,
   createImportEncryptedImageResultMessage,
+  createImportUrlReviewStatusResultMessage,
   createLoadBookmarksResultMessage,
   createAddRecentHistoryResultMessage,
   createDeletePanelPositionResultMessage,
@@ -45,6 +48,7 @@ import {
   createLoadLocalSettingsResultMessage,
   createListGrabSourcePatternsResultMessage,
   createListUrlTemplatesResultMessage,
+  createListUrlReviewStatusResultMessage,
   createRemoveBookmarkResultMessage,
   createRemoveBookmarksResultMessage,
   createRemoveRecallBookmarksResultMessage,
@@ -53,6 +57,7 @@ import {
   createSaveBookmarkResultMessage,
   createSavePanelPositionResultMessage,
   createSaveParsedFieldStateResultMessage,
+  createSaveUrlReviewStatusResultMessage,
   createSaveLocalSettingsResultMessage,
   createSaveGrabSourcePatternResultMessage,
   createSaveUrlTemplateResultMessage,
@@ -89,6 +94,12 @@ import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messag
 import type { DeletePanelPositionMessage, LoadPanelPositionMessage, SavePanelPositionMessage } from './messages.js';
 import type { LoadParsedFieldStateMessage, SaveParsedFieldStateMessage } from './messages.js';
 import type {
+  ClearUrlReviewStatusMessage,
+  ImportUrlReviewStatusMessage,
+  ListUrlReviewStatusMessage,
+  SaveUrlReviewStatusMessage,
+} from './messages.js';
+import type {
   DeleteGrabSourcePatternMessage,
   DeleteUrlTemplateMessage,
   ListGrabSourcePatternsMessage,
@@ -124,6 +135,7 @@ const bookmarkStore = new IndexedDbBookmarkStore({
 });
 const panelPositionStore = new IndexedDbPanelPositionStore();
 const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
+const urlReviewStatusStore = new IndexedDbUrlReviewStatusStore();
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
 const recentHistoryBySite = new Map<string, import('../core/display-records.js').ImageDisplayRecord[]>();
 const MAX_RECENT_HISTORY_ITEMS = 30;
@@ -578,6 +590,43 @@ async function handleSaveParsedFieldState(
   if (!hostname) return { ok: false };
   await parsedFieldStateStore.save({ ...message.payload.record, hostname });
   return { ok: true };
+}
+
+async function handleListUrlReviewStatus(
+  message: ListUrlReviewStatusMessage,
+): Promise<import('./messages.js').ListUrlReviewStatusResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.hostname);
+  if (!hostname) return { ok: true, records: [] };
+  return { ok: true, records: await urlReviewStatusStore.list(hostname) };
+}
+
+async function handleSaveUrlReviewStatus(
+  message: SaveUrlReviewStatusMessage,
+): Promise<import('./messages.js').SaveUrlReviewStatusResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.record.hostname);
+  if (!hostname) return { ok: false };
+  await urlReviewStatusStore.save({ ...message.payload.record, hostname });
+  return { ok: true };
+}
+
+async function handleImportUrlReviewStatus(
+  message: ImportUrlReviewStatusMessage,
+): Promise<import('./messages.js').ImportUrlReviewStatusResultMessage['payload']> {
+  const records = message.payload.records
+    .map((record) => {
+      const hostname = normalizeHostname(record.hostname);
+      return hostname ? { ...record, hostname } : null;
+    })
+    .filter((record): record is NonNullable<typeof record> => record !== null);
+  return { ok: true, importedCount: await urlReviewStatusStore.importMany(records) };
+}
+
+async function handleClearUrlReviewStatus(
+  message: ClearUrlReviewStatusMessage,
+): Promise<import('./messages.js').ClearUrlReviewStatusResultMessage['payload']> {
+  const hostname = normalizeHostname(message.payload.hostname);
+  if (!hostname) return { ok: false, message: 'URL review status hostname is invalid.' };
+  return { ok: true, deletedCount: await urlReviewStatusStore.clear(hostname) };
 }
 
 async function handleListUrlTemplates(
@@ -1143,6 +1192,36 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleSaveParsedFieldState(message)
         .then((result) => sendResponse(createSaveParsedFieldStateResultMessage(result)))
         .catch(() => sendResponse(createSaveParsedFieldStateResultMessage({ ok: false })));
+      return true;
+
+    case MessageType.ListUrlReviewStatus:
+      handleListUrlReviewStatus(message)
+        .then((result) => sendResponse(createListUrlReviewStatusResultMessage(result)))
+        .catch(() =>
+          sendResponse(createListUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be loaded.' })),
+        );
+      return true;
+
+    case MessageType.SaveUrlReviewStatus:
+      handleSaveUrlReviewStatus(message)
+        .then((result) => sendResponse(createSaveUrlReviewStatusResultMessage(result)))
+        .catch(() => sendResponse(createSaveUrlReviewStatusResultMessage({ ok: false })));
+      return true;
+
+    case MessageType.ImportUrlReviewStatus:
+      handleImportUrlReviewStatus(message)
+        .then((result) => sendResponse(createImportUrlReviewStatusResultMessage(result)))
+        .catch(() =>
+          sendResponse(createImportUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be imported.' })),
+        );
+      return true;
+
+    case MessageType.ClearUrlReviewStatus:
+      handleClearUrlReviewStatus(message)
+        .then((result) => sendResponse(createClearUrlReviewStatusResultMessage(result)))
+        .catch(() =>
+          sendResponse(createClearUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be cleared.' })),
+        );
       return true;
 
     case MessageType.ListUrlTemplates:

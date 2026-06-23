@@ -8,6 +8,7 @@ import { ExtensionPanelPositionStore } from './panel-position-store.js';
 import { ExtensionParsedFieldStateStore } from './parsed-field-state-store.js';
 import { ExtensionLocalSettingsStore } from './local-settings-store.js';
 import { ExtensionUrlTemplateStore } from './url-template-store.js';
+import { ExtensionUrlReviewStatusStore } from './url-review-status-store.js';
 import { ImageTrailPanel } from '../ui/panel.js';
 
 interface ImageTrailContentController {
@@ -37,6 +38,7 @@ function createController(): ImageTrailContentController {
     new ExtensionLocalSettingsStore(),
     new ExtensionUrlTemplateStore(),
     new ExtensionParsedFieldStateStore(),
+    new ExtensionUrlReviewStatusStore(),
   );
 
   const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {

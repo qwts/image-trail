@@ -30,6 +30,7 @@ import {
   openEncryptedImageFile,
   parseEncryptedImageFileHeader,
 } from '../extension/src/data/import-export/encrypted-image.js';
+import { exportUrlReviewStatus, importUrlReviewStatus } from '../extension/src/data/import-export/url-review-status.js';
 import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../extension/src/data/crypto/binary-envelope.js';
@@ -650,6 +651,78 @@ test('history-import: skips entries with missing captureStatus', async () => {
   assert.equal(importResult.entries.length, 1);
   assert.equal(importResult.entries[0].uuid, 'valid-entry');
   assert.equal(importResult.skipped.length, 1);
+});
+
+test('url-review-status: exports and imports reviewed URL state', () => {
+  const records = [
+    {
+      schemaVersion: 1 as const,
+      hostname: 'example.test',
+      pageUrl: 'https://example.test/gallery',
+      sourceUrl: 'https://example.test/image-0002.jpg',
+      status: 'passed' as const,
+      fieldIds: ['path:0:0'],
+      activeFieldId: 'path:0:0',
+      updatedAt: '2026-06-23T00:00:00.000Z',
+    },
+    {
+      schemaVersion: 1 as const,
+      hostname: 'example.test',
+      pageUrl: 'https://example.test/gallery',
+      sourceUrl: 'https://example.test/image-0003.jpg',
+      status: 'failed' as const,
+      fieldIds: ['path:0:0'],
+      activeFieldId: 'path:0:0',
+      reason: 'Image failed to load: HTTP 404',
+      updatedAt: '2026-06-23T00:00:01.000Z',
+    },
+  ];
+
+  const exported = exportUrlReviewStatus({ records, now: '2026-06-23T12:00:00.000Z' });
+  assert.ok(exported.status.ok, exported.status.message);
+  assert.equal(exported.fileName, 'image-trail-url-review-status-2026-06-23.json');
+
+  const imported = importUrlReviewStatus(exported.fileContent!);
+  assert.ok(imported.status.ok, imported.status.message);
+  assert.deepEqual(imported.records, records);
+  assert.deepEqual(imported.skipped, []);
+});
+
+test('url-review-status: skips invalid imported status records', () => {
+  const fileContent = JSON.stringify({
+    format: 'image-trail.url-review-status',
+    formatVersion: 1,
+    createdAt: '2026-06-23T00:00:00.000Z',
+    recordCount: 2,
+    records: [
+      {
+        schemaVersion: 1,
+        hostname: 'example.test',
+        pageUrl: 'https://example.test/gallery',
+        sourceUrl: 'https://example.test/image-0002.jpg',
+        status: 'unchanged',
+        fieldIds: ['path:0:0'],
+        activeFieldId: null,
+        updatedAt: '2026-06-23T00:00:00.000Z',
+      },
+      {
+        schemaVersion: 1,
+        hostname: 'example.test',
+        pageUrl: 'https://example.test/gallery',
+        sourceUrl: 'https://example.test/image-0003.jpg',
+        status: 'maybe',
+        fieldIds: ['path:0:0'],
+        activeFieldId: null,
+        updatedAt: '2026-06-23T00:00:00.000Z',
+      },
+    ],
+  });
+
+  const imported = importUrlReviewStatus(fileContent);
+  assert.ok(imported.status.ok, imported.status.message);
+  assert.equal(imported.records.length, 1);
+  assert.equal(imported.records[0]?.status, 'unchanged');
+  assert.deepEqual(imported.skipped, ['https://example.test/image-0003.jpg']);
 });
 
 test('encrypted-file-format: header contains all required metadata fields', () => {

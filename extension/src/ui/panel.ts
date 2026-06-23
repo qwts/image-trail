@@ -29,6 +29,8 @@ import type {
   ParsedFieldStateStore,
   TargetState,
   UrlTemplateStore,
+  UrlReviewStatus,
+  UrlReviewStatusStore,
 } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
@@ -61,9 +63,11 @@ import {
   exportEncryptedHistory,
   exportPlainBookmarks,
   exportPlainHistory,
+  exportUrlReviewStatus as exportUrlReviewStatusFile,
   importBookmarkletJson,
   importBookmarks as importBookmarkRecords,
   importEncryptedHistory,
+  importUrlReviewStatus as importUrlReviewStatusFile,
   type LocalSettingsStore,
   type PlaintextLocalSettings,
   type DurableBookmarkPayloadV1,
@@ -101,6 +105,11 @@ function removeItems(items: readonly string[], removedItems: readonly string[]):
   if (removedItems.length === 0) return items;
   const removed = new Set(removedItems);
   return items.filter((item) => !removed.has(item));
+}
+
+export function urlReviewStatusForLoadResult(nextFingerprint: string | null, previousFingerprint: string | null): UrlReviewStatus | null {
+  if (!nextFingerprint || !previousFingerprint) return null;
+  return nextFingerprint === previousFingerprint ? 'unchanged' : 'passed';
 }
 
 function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
@@ -185,6 +194,7 @@ export class ImageTrailPanel {
     private readonly localSettingsStore: LocalSettingsStore | null = null,
     private readonly urlTemplateStore: UrlTemplateStore | null = null,
     private readonly parsedFieldStateStore: ParsedFieldStateStore | null = null,
+    private readonly urlReviewStatusStore: UrlReviewStatusStore | null = null,
   ) {
     this.unsubscribeFromTarget = this.pageAdapter.subscribe((snapshot) => {
       this.state = setTargetState(this.state, toTargetState(snapshot));
@@ -1135,6 +1145,16 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'export/url-review-status') {
+      void this.exportUrlReviewStatus();
+      return;
+    }
+
+    if (action.name === 'clear/url-review-status') {
+      void this.clearUrlReviewStatus();
+      return;
+    }
+
     if (action.name === 'import/history') {
       void this.importHistory(action.fileContent, action.password);
       return;
@@ -1142,6 +1162,11 @@ export class ImageTrailPanel {
 
     if (action.name === 'import/bookmarks') {
       void this.importBookmarks(action.fileContent, action.password);
+      return;
+    }
+
+    if (action.name === 'import/url-review-status') {
+      void this.importUrlReviewStatus(action.fileContent);
       return;
     }
 
@@ -1334,7 +1359,7 @@ export class ImageTrailPanel {
       const nextUrl = rebuildUrl(bumped);
       void this.applySelectedUrl(
         nextUrl,
-        navigableFields.filter((field) => field.location === 'query').map((field) => field.id),
+        navigableFields.map((field) => field.id),
       ).then((loaded) => {
         if (loaded) void this.saveUrlTemplateFromCurrentFields();
       });
@@ -1356,7 +1381,7 @@ export class ImageTrailPanel {
 
     const nextModel = setUrlFieldValue(model, field, nextValue);
     const nextUrl = rebuildUrl(nextModel);
-    const loaded = await this.applySelectedUrl(nextUrl, field.location === 'query' ? [fieldId] : []);
+    const loaded = await this.applySelectedUrl(nextUrl, [fieldId]);
     if (loaded && this.state.unlockedFieldIds.length > 0) await this.saveUrlTemplateFromCurrentFields();
   }
 
@@ -1369,7 +1394,7 @@ export class ImageTrailPanel {
     const nextModel = bumpUrlField(model, field, delta);
     const nextUrl = rebuildUrl(nextModel);
     this.state = reducePanelAction(this.state, { name: 'active-field/set', id: fieldId });
-    const loaded = await this.applySelectedUrl(nextUrl, field.location === 'query' ? [fieldId] : []);
+    const loaded = await this.applySelectedUrl(nextUrl, [fieldId]);
     if (loaded) await this.saveUrlTemplateFromCurrentFields();
   }
 
@@ -1385,18 +1410,21 @@ export class ImageTrailPanel {
     if (revision !== this.projectionRevision) return false;
     if (!preload.ok) {
       this.state = applyFieldLoadFailureToState(this.state, { draftUrl: nextUrl, attemptedFieldIds, message: preload.message });
+      void this.saveUrlReviewStatus('failed', nextUrl, attemptedFieldIds, preload.message);
       void this.saveParsedFieldState();
       this.render();
       return false;
     }
 
-    if (attemptedFieldIds.length > 0 && baselineFingerprint && preload.sha256 === baselineFingerprint) {
+    const reviewStatus = urlReviewStatusForLoadResult(preload.sha256, baselineFingerprint);
+    if (attemptedFieldIds.length > 0 && reviewStatus === 'unchanged') {
       this.state = this.applyFieldLoadResult(
         { ...this.state, draftUrl: nextUrl, message: 'Image loaded but did not change.', status: 'ready', lastUpdatedAt: Date.now() },
         attemptedFieldIds,
         preload.sha256,
         baselineFingerprint,
       );
+      void this.saveUrlReviewStatus('unchanged', nextUrl, attemptedFieldIds, 'Image loaded but did not change.');
       void this.saveParsedFieldState();
       this.render();
       return false;
@@ -1409,6 +1437,7 @@ export class ImageTrailPanel {
       this.state = { ...setTargetState(this.state, toTargetState(nextSnapshot)), draftUrl: null };
     }
     this.state = this.applyFieldLoadResult(this.state, attemptedFieldIds, preload.sha256, baselineFingerprint);
+    if (reviewStatus === 'passed') void this.saveUrlReviewStatus(reviewStatus, nextUrl, attemptedFieldIds);
     if (options.pushVisibleUrl && pushVisibleUrlWhenSameOrigin(nextUrl)) this.extensionProjectedPageUrl = window.location.href;
     void this.saveParsedFieldState();
     this.render();
@@ -1476,6 +1505,28 @@ export class ImageTrailPanel {
 
   private isNavigableQueryField(field: UrlField): boolean {
     return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
+  }
+
+  private async saveUrlReviewStatus(
+    status: UrlReviewStatus,
+    sourceUrl: string,
+    fieldIds: readonly string[],
+    reason?: string,
+  ): Promise<void> {
+    if (!this.urlReviewStatusStore || fieldIds.length === 0) return;
+    const hostname = hostnameFromLocation();
+    if (!hostname) return;
+    await this.urlReviewStatusStore.save({
+      schemaVersion: 1,
+      hostname,
+      pageUrl: this.parsedFieldStatePageUrl(),
+      sourceUrl,
+      status,
+      fieldIds,
+      activeFieldId: this.state.activeFieldId,
+      reason,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   private async tryReloadCurrent(): Promise<boolean> {
@@ -2178,6 +2229,27 @@ export class ImageTrailPanel {
     this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
   }
 
+  private async exportUrlReviewStatus(): Promise<void> {
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const hostname = hostnameFromLocation();
+    const records = hostname && this.urlReviewStatusStore ? await this.urlReviewStatusStore.list(hostname) : [];
+    const result = exportUrlReviewStatusFile({ records });
+    this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
+  }
+
+  private async clearUrlReviewStatus(): Promise<void> {
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const hostname = hostnameFromLocation();
+    const deletedCount = hostname && this.urlReviewStatusStore ? await this.urlReviewStatusStore.clear(hostname) : 0;
+    this.state = reducePanelAction(this.state, {
+      name: 'import-export/complete',
+      message: `Cleared ${deletedCount} URL review status record${deletedCount === 1 ? '' : 's'} for this site.`,
+    });
+    this.render();
+  }
+
   private finishExport(fileContent: string | undefined, fileName: string | undefined, message: string, ok: boolean): void {
     if (!ok || !fileContent || !fileName) {
       this.state = reducePanelAction(this.state, { name: 'import-export/error', message });
@@ -2474,6 +2546,23 @@ export class ImageTrailPanel {
       message: `${result.status.message}${result.plaintext ? ' Plaintext import was encrypted into bookmark storage.' : ''}`,
     });
     this.renderPanelAndRefreshRecall();
+  }
+
+  private async importUrlReviewStatus(fileContent: string): Promise<void> {
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+    const result = importUrlReviewStatusFile(fileContent);
+    if (!result.status.ok) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.status.message });
+      this.render();
+      return;
+    }
+    const importedCount = await this.urlReviewStatusStore?.importMany(result.records);
+    this.state = reducePanelAction(this.state, {
+      name: 'import-export/complete',
+      message: `${result.status.message} ${importedCount ?? 0} saved to extension state.`,
+    });
+    this.render();
   }
 
   private async importBookmarklet(fileContent: string): Promise<void> {

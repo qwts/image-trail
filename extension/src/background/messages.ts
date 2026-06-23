@@ -73,6 +73,14 @@ export const MessageType = {
   LoadParsedFieldStateBySourceResult: 'imageTrail.loadParsedFieldStateBySourceResult',
   SaveParsedFieldState: 'imageTrail.saveParsedFieldState',
   SaveParsedFieldStateResult: 'imageTrail.saveParsedFieldStateResult',
+  ListUrlReviewStatus: 'imageTrail.listUrlReviewStatus',
+  ListUrlReviewStatusResult: 'imageTrail.listUrlReviewStatusResult',
+  SaveUrlReviewStatus: 'imageTrail.saveUrlReviewStatus',
+  SaveUrlReviewStatusResult: 'imageTrail.saveUrlReviewStatusResult',
+  ImportUrlReviewStatus: 'imageTrail.importUrlReviewStatus',
+  ImportUrlReviewStatusResult: 'imageTrail.importUrlReviewStatusResult',
+  ClearUrlReviewStatus: 'imageTrail.clearUrlReviewStatus',
+  ClearUrlReviewStatusResult: 'imageTrail.clearUrlReviewStatusResult',
   LoadLocalSettings: 'imageTrail.loadLocalSettings',
   LoadLocalSettingsResult: 'imageTrail.loadLocalSettingsResult',
   SaveLocalSettings: 'imageTrail.saveLocalSettings',
@@ -633,6 +641,56 @@ export interface SaveParsedFieldStateResultMessage {
   readonly payload: { readonly ok: boolean };
 }
 
+export interface ListUrlReviewStatusMessage {
+  readonly type: typeof MessageType.ListUrlReviewStatus;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly hostname: string };
+}
+
+export interface ListUrlReviewStatusResultMessage {
+  readonly type: typeof MessageType.ListUrlReviewStatusResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly records: readonly import('../core/types.js').UrlReviewStatusRecord[] }
+    | { readonly ok: false; readonly message: string };
+}
+
+export interface SaveUrlReviewStatusMessage {
+  readonly type: typeof MessageType.SaveUrlReviewStatus;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly record: import('../core/types.js').UrlReviewStatusRecord };
+}
+
+export interface SaveUrlReviewStatusResultMessage {
+  readonly type: typeof MessageType.SaveUrlReviewStatusResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: boolean };
+}
+
+export interface ImportUrlReviewStatusMessage {
+  readonly type: typeof MessageType.ImportUrlReviewStatus;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly records: readonly import('../core/types.js').UrlReviewStatusRecord[] };
+}
+
+export interface ImportUrlReviewStatusResultMessage {
+  readonly type: typeof MessageType.ImportUrlReviewStatusResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: true; readonly importedCount: number } | { readonly ok: false; readonly message: string };
+}
+
+export interface ClearUrlReviewStatusMessage {
+  readonly type: typeof MessageType.ClearUrlReviewStatus;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly hostname: string };
+}
+
+export interface ClearUrlReviewStatusResultMessage {
+  readonly type: typeof MessageType.ClearUrlReviewStatusResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly ok: true; readonly deletedCount: number } | { readonly ok: false; readonly message: string };
+}
+
 export interface LoadLocalSettingsMessage {
   readonly type: typeof MessageType.LoadLocalSettings;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -774,6 +832,10 @@ export type ExtensionRequest =
   | LoadParsedFieldStateMessage
   | LoadParsedFieldStateBySourceMessage
   | SaveParsedFieldStateMessage
+  | ListUrlReviewStatusMessage
+  | SaveUrlReviewStatusMessage
+  | ImportUrlReviewStatusMessage
+  | ClearUrlReviewStatusMessage
   | LoadLocalSettingsMessage
   | SaveLocalSettingsMessage
   | ListUrlTemplatesMessage
@@ -817,6 +879,10 @@ export type ExtensionResponse =
   | LoadParsedFieldStateResultMessage
   | LoadParsedFieldStateBySourceResultMessage
   | SaveParsedFieldStateResultMessage
+  | ListUrlReviewStatusResultMessage
+  | SaveUrlReviewStatusResultMessage
+  | ImportUrlReviewStatusResultMessage
+  | ClearUrlReviewStatusResultMessage
   | LoadLocalSettingsResultMessage
   | SaveLocalSettingsResultMessage
   | ListUrlTemplatesResultMessage
@@ -1167,6 +1233,48 @@ export function createSaveParsedFieldStateResultMessage(
   return { type: MessageType.SaveParsedFieldStateResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
+export function createListUrlReviewStatusMessage(hostname: string): ListUrlReviewStatusMessage {
+  return { type: MessageType.ListUrlReviewStatus, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
+}
+
+export function createListUrlReviewStatusResultMessage(
+  payload: ListUrlReviewStatusResultMessage['payload'],
+): ListUrlReviewStatusResultMessage {
+  return { type: MessageType.ListUrlReviewStatusResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createSaveUrlReviewStatusMessage(record: import('../core/types.js').UrlReviewStatusRecord): SaveUrlReviewStatusMessage {
+  return { type: MessageType.SaveUrlReviewStatus, version: MESSAGE_PROTOCOL_VERSION, payload: { record } };
+}
+
+export function createSaveUrlReviewStatusResultMessage(
+  payload: SaveUrlReviewStatusResultMessage['payload'],
+): SaveUrlReviewStatusResultMessage {
+  return { type: MessageType.SaveUrlReviewStatusResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createImportUrlReviewStatusMessage(
+  records: readonly import('../core/types.js').UrlReviewStatusRecord[],
+): ImportUrlReviewStatusMessage {
+  return { type: MessageType.ImportUrlReviewStatus, version: MESSAGE_PROTOCOL_VERSION, payload: { records } };
+}
+
+export function createImportUrlReviewStatusResultMessage(
+  payload: ImportUrlReviewStatusResultMessage['payload'],
+): ImportUrlReviewStatusResultMessage {
+  return { type: MessageType.ImportUrlReviewStatusResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createClearUrlReviewStatusMessage(hostname: string): ClearUrlReviewStatusMessage {
+  return { type: MessageType.ClearUrlReviewStatus, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
+}
+
+export function createClearUrlReviewStatusResultMessage(
+  payload: ClearUrlReviewStatusResultMessage['payload'],
+): ClearUrlReviewStatusResultMessage {
+  return { type: MessageType.ClearUrlReviewStatusResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 export function createLoadLocalSettingsMessage(): LoadLocalSettingsMessage {
   return { type: MessageType.LoadLocalSettings, version: MESSAGE_PROTOCOL_VERSION, payload: { requestedAt: Date.now() } };
 }
@@ -1288,6 +1396,10 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.LoadParsedFieldState ||
     value.type === MessageType.LoadParsedFieldStateBySource ||
     value.type === MessageType.SaveParsedFieldState ||
+    value.type === MessageType.ListUrlReviewStatus ||
+    value.type === MessageType.SaveUrlReviewStatus ||
+    value.type === MessageType.ImportUrlReviewStatus ||
+    value.type === MessageType.ClearUrlReviewStatus ||
     value.type === MessageType.LoadLocalSettings ||
     value.type === MessageType.SaveLocalSettings ||
     value.type === MessageType.ListUrlTemplates ||
@@ -1336,6 +1448,10 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.LoadParsedFieldStateResult ||
     value.type === MessageType.LoadParsedFieldStateBySourceResult ||
     value.type === MessageType.SaveParsedFieldStateResult ||
+    value.type === MessageType.ListUrlReviewStatusResult ||
+    value.type === MessageType.SaveUrlReviewStatusResult ||
+    value.type === MessageType.ImportUrlReviewStatusResult ||
+    value.type === MessageType.ClearUrlReviewStatusResult ||
     value.type === MessageType.LoadLocalSettingsResult ||
     value.type === MessageType.SaveLocalSettingsResult ||
     value.type === MessageType.ListUrlTemplatesResult ||
@@ -1495,6 +1611,26 @@ export function isLoadParsedFieldStateBySourceResultMessage(value: unknown): val
 export function isSaveParsedFieldStateResultMessage(value: unknown): value is SaveParsedFieldStateResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.SaveParsedFieldStateResult;
+}
+
+export function isListUrlReviewStatusResultMessage(value: unknown): value is ListUrlReviewStatusResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ListUrlReviewStatusResult;
+}
+
+export function isSaveUrlReviewStatusResultMessage(value: unknown): value is SaveUrlReviewStatusResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.SaveUrlReviewStatusResult;
+}
+
+export function isImportUrlReviewStatusResultMessage(value: unknown): value is ImportUrlReviewStatusResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ImportUrlReviewStatusResult;
+}
+
+export function isClearUrlReviewStatusResultMessage(value: unknown): value is ClearUrlReviewStatusResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ClearUrlReviewStatusResult;
 }
 
 export function isLoadLocalSettingsResultMessage(value: unknown): value is LoadLocalSettingsResultMessage {

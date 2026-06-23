@@ -9,4 +9,5 @@ export { exportEncryptedBookmarks, exportPlainBookmarks } from '../data/import-e
 export { importBookmarks } from '../data/import-export/bookmarks-import.js';
 export { exportEncryptedHistory, exportPlainHistory } from '../data/import-export/history-export.js';
 export { importEncryptedHistory } from '../data/import-export/history-import.js';
+export { exportUrlReviewStatus, importUrlReviewStatus } from '../data/import-export/url-review-status.js';
 export type { DurableBookmarkPayloadV1, DurableHistoryPayloadV1 } from '../data/types.js';

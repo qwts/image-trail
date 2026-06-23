@@ -2,7 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyFieldLoadFailureToState, reducePanelAction } from '../extension/src/core/actions.js';
 import { createInitialPanelState, setTargetState } from '../extension/src/core/state.js';
-import { isLockedPrivatePin, nextParsedFieldStatePageKey, shouldRestoreParsedFieldState } from '../extension/src/ui/panel.js';
+import {
+  isLockedPrivatePin,
+  nextParsedFieldStatePageKey,
+  shouldRestoreParsedFieldState,
+  urlReviewStatusForLoadResult,
+} from '../extension/src/ui/panel.js';
 import {
   PRIVACY_RECORD_META,
   PRIVACY_RECORD_NAME,
@@ -63,6 +68,13 @@ test('target changes clear failed field markers', () => {
   assert.deepEqual(next.manuallyExcludedFieldIds, []);
   assert.deepEqual(next.fieldSplitSpecs, []);
   assert.equal(next.currentImageFingerprint, null);
+});
+
+test('URL review status requires a definitive image fingerprint comparison', () => {
+  assert.equal(urlReviewStatusForLoadResult('b'.repeat(64), 'a'.repeat(64)), 'passed');
+  assert.equal(urlReviewStatusForLoadResult('a'.repeat(64), 'a'.repeat(64)), 'unchanged');
+  assert.equal(urlReviewStatusForLoadResult(null, 'a'.repeat(64)), null);
+  assert.equal(urlReviewStatusForLoadResult('a'.repeat(64), null), null);
 });
 
 test('same target load snapshots preserve learned field markers', () => {

@@ -4,10 +4,13 @@ export type ImportExportAction =
   | { readonly name: 'selection/select-visible' }
   | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
+  | { readonly name: 'export/url-review-status' }
+  | { readonly name: 'clear/url-review-status' }
   | { readonly name: 'export/image'; readonly saveAs?: boolean }
   | { readonly name: 'export/encrypted-image' }
   | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string }
+  | { readonly name: 'import/url-review-status'; readonly fileContent: string }
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
   | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
   | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] };
@@ -109,14 +112,28 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
     updateExportControls();
   });
 
+  const urlReviewStatusBtn = document.createElement('button');
+  urlReviewStatusBtn.type = 'button';
+  urlReviewStatusBtn.textContent = 'Export URL review status';
+  urlReviewStatusBtn.disabled = state.busy;
+  urlReviewStatusBtn.addEventListener('click', () => dispatch({ name: 'export/url-review-status' }));
+
+  const clearUrlReviewStatusBtn = document.createElement('button');
+  clearUrlReviewStatusBtn.type = 'button';
+  clearUrlReviewStatusBtn.textContent = 'Clear URL review status';
+  clearUrlReviewStatusBtn.disabled = state.busy;
+  clearUrlReviewStatusBtn.addEventListener('click', () => dispatch({ name: 'clear/url-review-status' }));
+
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__actions';
-  actions.append(historyBtn, bookmarksBtn);
+  actions.append(historyBtn, bookmarksBtn, urlReviewStatusBtn, clearUrlReviewStatusBtn);
 
   const updateExportControls = (): void => {
     const locked = state.busy || (!plaintext.input.checked && passwordInput.value.length < 4);
     historyBtn.disabled = locked;
     bookmarksBtn.disabled = locked;
+    urlReviewStatusBtn.disabled = state.busy;
+    clearUrlReviewStatusBtn.disabled = state.busy;
     passwordInput.disabled = plaintext.input.checked || state.busy;
   };
   passwordInput.addEventListener('input', updateExportControls);
@@ -250,13 +267,23 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
     });
   });
 
+  const urlReviewStatusBtn = document.createElement('button');
+  urlReviewStatusBtn.type = 'button';
+  urlReviewStatusBtn.textContent = 'Import URL review status';
+  urlReviewStatusBtn.disabled = state.busy;
+  urlReviewStatusBtn.addEventListener('click', () => {
+    readFileInput(fileInput, (content) => {
+      dispatch({ name: 'import/url-review-status', fileContent: content });
+    });
+  });
+
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__control-stack';
   controls.append(filePicker, passwordInput);
 
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__actions';
-  actions.append(historyBtn, bookmarksBtn, bookmarkletBtn);
+  actions.append(historyBtn, bookmarksBtn, urlReviewStatusBtn, bookmarkletBtn);
 
   group.append(controls, actions);
   return group;

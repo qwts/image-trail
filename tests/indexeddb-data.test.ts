@@ -13,6 +13,7 @@ import { DownloadsRepository } from '../extension/src/data/repositories/download
 import { EncryptedPinsRepository } from '../extension/src/data/repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from '../extension/src/data/repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from '../extension/src/data/repositories/keys-repository.js';
+import { UrlReviewStatusRepository } from '../extension/src/data/repositories/url-review-status-repository.js';
 import type { StoredKeyRecord } from '../extension/src/data/crypto/types.js';
 import { createAndActivateWrappedBlobKey, lockBlobKey, type ActiveBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
 import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
@@ -1560,6 +1561,82 @@ test('ParsedFieldStateRepository finds resume state by selected image source', a
   );
   assert.deepEqual(await repository.getForSource('external-content.duckduckgo.com', originalPageRecord.pageUrl), originalPageRecord);
   assert.equal(await repository.getForSource('other.test', originalPageRecord.sourceUrl), null);
+});
+
+test('UrlReviewStatusRepository saves, lists, and imports URL review state per hostname', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const repository = new UrlReviewStatusRepository(db);
+  const passed = {
+    schemaVersion: 1 as const,
+    hostname: 'example.test',
+    pageUrl: 'https://example.test/gallery',
+    sourceUrl: 'https://example.test/image-0002.jpg',
+    status: 'passed' as const,
+    fieldIds: ['path:0:0'],
+    activeFieldId: 'path:0:0',
+    updatedAt: '2026-06-23T00:00:02.000Z',
+  };
+  const failed = {
+    ...passed,
+    sourceUrl: 'https://example.test/image-0003.jpg',
+    status: 'failed' as const,
+    reason: 'Image failed to load: HTTP 404',
+    updatedAt: '2026-06-23T00:00:03.000Z',
+  };
+  const otherHost = {
+    ...passed,
+    hostname: 'other.test',
+    sourceUrl: 'https://other.test/image-0002.jpg',
+    updatedAt: '2026-06-23T00:00:04.000Z',
+  };
+
+  await repository.put(passed);
+  await repository.put(failed);
+  await repository.put(otherHost);
+
+  assert.deepEqual(await repository.listByHostname('example.test'), [failed, passed]);
+  assert.deepEqual(await repository.listByHostname('other.test'), [otherHost]);
+
+  const stale = { ...failed, status: 'passed' as const, updatedAt: '2026-06-23T00:00:01.000Z' };
+  const unchanged = {
+    ...failed,
+    status: 'unchanged' as const,
+    reason: 'Image loaded but did not change.',
+    updatedAt: '2026-06-23T00:00:05.000Z',
+  };
+  assert.equal(await repository.putMany([stale, unchanged]), 1);
+  assert.deepEqual(await repository.listByHostname('example.test'), [unchanged, passed]);
+
+  assert.equal(await repository.clearHostname('example.test'), 2);
+  assert.deepEqual(await repository.listByHostname('example.test'), []);
+  assert.deepEqual(await repository.listByHostname('other.test'), [otherHost]);
+});
+
+test('UrlReviewStatusRepository caps URL review state per hostname', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const repository = new UrlReviewStatusRepository(db);
+  const records = Array.from({ length: 5001 }, (_, index) => ({
+    schemaVersion: 1 as const,
+    hostname: 'example.test',
+    pageUrl: 'https://example.test/gallery',
+    sourceUrl: `https://example.test/image-${String(index).padStart(4, '0')}.jpg`,
+    status: 'passed' as const,
+    fieldIds: ['path:0:0'],
+    activeFieldId: 'path:0:0',
+    updatedAt: new Date(Date.UTC(2026, 5, 23, 0, 0, index)).toISOString(),
+  }));
+
+  assert.equal(await repository.putMany(records), 5001);
+  const stored = await repository.listByHostname('example.test');
+
+  assert.equal(stored.length, 5000);
+  assert.equal(
+    stored.some((record) => record.sourceUrl.endsWith('image-0000.jpg')),
+    false,
+  );
+  assert.equal(stored[0]?.sourceUrl.endsWith('image-5000.jpg'), true);
 });
 
 test('UrlTemplateRepository saves templates per hostname', async (t) => {

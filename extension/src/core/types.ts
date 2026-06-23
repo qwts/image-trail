@@ -86,6 +86,27 @@ export interface ParsedFieldStateStore {
   save(record: ParsedFieldStateRecord): Promise<void>;
 }
 
+export type UrlReviewStatus = 'passed' | 'failed' | 'unchanged';
+
+export interface UrlReviewStatusRecord {
+  readonly schemaVersion: 1;
+  readonly hostname: string;
+  readonly pageUrl: string;
+  readonly sourceUrl: string;
+  readonly status: UrlReviewStatus;
+  readonly fieldIds: readonly string[];
+  readonly activeFieldId: string | null;
+  readonly reason?: string;
+  readonly updatedAt: string;
+}
+
+export interface UrlReviewStatusStore {
+  list(hostname: string): Promise<readonly UrlReviewStatusRecord[]>;
+  save(record: UrlReviewStatusRecord): Promise<void>;
+  importMany(records: readonly UrlReviewStatusRecord[]): Promise<number>;
+  clear(hostname: string): Promise<number>;
+}
+
 export interface RecallCandidate extends ImageDisplayRecord {
   readonly envelopeCreatedAt: string;
 }
@@ -405,9 +426,12 @@ export type PanelAction =
   | { readonly name: 'import-export/complete'; readonly message: string }
   | { readonly name: 'import-export/error'; readonly message: string }
   | { readonly name: 'export/history' | 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
+  | { readonly name: 'export/url-review-status' }
+  | { readonly name: 'clear/url-review-status' }
   | { readonly name: 'export/image'; readonly saveAs?: boolean }
   | { readonly name: 'export/encrypted-image' }
   | { readonly name: 'import/history' | 'import/bookmarks'; readonly fileContent: string; readonly password: string }
+  | { readonly name: 'import/url-review-status'; readonly fileContent: string }
   | { readonly name: 'import/bookmarklet'; readonly fileContent: string }
   | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
   | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] }
