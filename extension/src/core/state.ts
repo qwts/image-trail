@@ -45,6 +45,8 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     target: EMPTY_TARGET_STATE,
     draftUrl: null,
     history: [],
+    recentHistoryLimit: 30,
+    recentHistoryOverflowBehavior: 'drop-oldest',
     bookmarks: [],
     bookmarkOffset: 0,
     bookmarkLimit: 30,

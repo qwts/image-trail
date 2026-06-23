@@ -48,6 +48,52 @@ test('history/add-loaded preserves session thumbnail for matching visible record
   assert.equal(state.history[0]?.thumbnail, 'data:image/jpeg;base64,abc');
 });
 
+test('history/add-loaded uses the configured visible recent limit', () => {
+  let state = reducePanelAction(createInitialPanelState(0), {
+    name: 'settings/update-recent-history-retention',
+    limit: 2,
+    overflowBehavior: 'drop-oldest',
+  });
+  for (let index = 0; index < 3; index += 1) {
+    state = reducePanelAction(state, {
+      name: 'history/add-loaded',
+      url: `https://example.test/${index}.jpg`,
+      timestamp: `2026-06-19T00:00:0${index}.000Z`,
+    });
+  }
+
+  assert.deepEqual(
+    state.history.map((item) => item.url),
+    ['https://example.test/2.jpg', 'https://example.test/1.jpg'],
+  );
+});
+
+test('recent retention setting prunes visible rows and stale selections', () => {
+  const state = {
+    ...createInitialPanelState(0),
+    history: [
+      { id: 'history-1', url: 'https://example.test/1.jpg', timestamp: '2026-06-19T00:00:00.000Z', source: 'history' as const },
+      { id: 'history-2', url: 'https://example.test/2.jpg', timestamp: '2026-06-19T00:00:01.000Z', source: 'history' as const },
+      { id: 'history-3', url: 'https://example.test/3.jpg', timestamp: '2026-06-19T00:00:02.000Z', source: 'history' as const },
+    ],
+    selectedHistoryIds: ['history-1', 'history-3'],
+  };
+
+  const updated = reducePanelAction(state, {
+    name: 'settings/update-recent-history-retention',
+    limit: 2,
+    overflowBehavior: 'keep-session',
+  });
+
+  assert.deepEqual(
+    updated.history.map((item) => item.id),
+    ['history-1', 'history-2'],
+  );
+  assert.deepEqual(updated.selectedHistoryIds, ['history-1']);
+  assert.equal(updated.recentHistoryLimit, 2);
+  assert.equal(updated.recentHistoryOverflowBehavior, 'keep-session');
+});
+
 test('bookmark thumbnail refresh action is a reducer no-op', () => {
   const state = createInitialPanelState(0);
   assert.equal(reducePanelAction(state, { name: 'bookmarks/refresh-thumbnails' }), state);

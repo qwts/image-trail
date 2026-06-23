@@ -7,6 +7,7 @@ import type { UrlFieldSplitSpec } from './url/types.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
+export type RecentHistoryOverflowBehavior = 'drop-oldest' | 'keep-session';
 
 export interface TargetState {
   readonly mode: 'auto' | 'manual' | 'none';
@@ -135,6 +136,8 @@ export interface PanelState {
   readonly target: TargetState;
   readonly draftUrl: string | null;
   readonly history: readonly ImageDisplayRecord[];
+  readonly recentHistoryLimit: number;
+  readonly recentHistoryOverflowBehavior: RecentHistoryOverflowBehavior;
   readonly bookmarks: readonly ImageDisplayRecord[];
   readonly bookmarkOffset: number;
   readonly bookmarkLimit: number;
@@ -217,6 +220,7 @@ export type PanelActionName =
   | 'bookmarks/refresh-thumbnails'
   | 'settings/toggle'
   | 'settings/update-visible-bookmark-soft-max'
+  | 'settings/update-recent-history-retention'
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
   | 'settings/reset-panel-position'
@@ -305,6 +309,7 @@ export type PanelAction =
         | 'bookmark-selection/clear'
         | 'bookmarks/page-loaded'
         | 'settings/update-visible-bookmark-soft-max'
+        | 'settings/update-recent-history-retention'
         | 'settings/update-pin-save-storage-preference'
         | 'settings/update-privacy-mode'
         | 'url-templates/load'
@@ -381,6 +386,11 @@ export type PanelAction =
     }
   | { readonly name: 'history/load' | 'history/download' }
   | { readonly name: 'settings/update-visible-bookmark-soft-max'; readonly value: number }
+  | {
+      readonly name: 'settings/update-recent-history-retention';
+      readonly limit: number;
+      readonly overflowBehavior: RecentHistoryOverflowBehavior;
+    }
   | { readonly name: 'settings/update-pin-save-storage-preference'; readonly value: PinSaveStoragePreference }
   | { readonly name: 'settings/update-privacy-mode'; readonly enabled: boolean }
   | { readonly name: 'url-templates/load'; readonly templates: readonly UrlTemplateRecord[]; readonly activeTemplateId?: string | null }

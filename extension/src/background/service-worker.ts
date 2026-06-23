@@ -7,6 +7,7 @@ import { IndexedDbParsedFieldStateStore } from '../data/parsed-field-state-contr
 import { IndexedDbUrlTemplateStore } from '../data/url-template-controller.js';
 import { IndexedDbUrlReviewStatusStore } from '../data/url-review-status-controller.js';
 import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, migrateLocalSettings } from '../data/local-settings.js';
+import type { PlaintextLocalSettings } from '../data/local-settings.js';
 import { getActiveBlobKey, lockBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
@@ -137,8 +138,8 @@ const panelPositionStore = new IndexedDbPanelPositionStore();
 const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
 const urlReviewStatusStore = new IndexedDbUrlReviewStatusStore();
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
-const recentHistoryBySite = new Map<string, import('../core/display-records.js').ImageDisplayRecord[]>();
-const MAX_RECENT_HISTORY_ITEMS = 30;
+const recentHistoryBySite = new Map<string, readonly import('../core/display-records.js').ImageDisplayRecord[]>();
+const MAX_RECENT_HISTORY_ITEMS = 200;
 
 async function requestStatus(tabId: number): Promise<boolean> {
   try {
@@ -701,32 +702,63 @@ async function loadLocalSettings(): Promise<typeof DEFAULT_LOCAL_SETTINGS> {
 async function handleSaveLocalSettings(
   message: SaveLocalSettingsMessage,
 ): Promise<import('./messages.js').SaveLocalSettingsResultMessage['payload']> {
-  await chrome.storage.local.set({ [LOCAL_SETTINGS_KEY]: migrateLocalSettings(message.payload.settings) });
+  const settings = migrateLocalSettings(message.payload.settings);
+  await chrome.storage.local.set({ [LOCAL_SETTINGS_KEY]: settings });
+  pruneRecentHistoryForSettings(settings);
   return { ok: true };
 }
 
-function handleLoadRecentHistory(message: LoadRecentHistoryMessage): import('./messages.js').LoadRecentHistoryResultMessage['payload'] {
-  return { items: recentHistoryBySite.get(recentHistoryKey(message.payload.pageUrl)) ?? [] };
+async function handleLoadRecentHistory(
+  message: LoadRecentHistoryMessage,
+): Promise<import('./messages.js').LoadRecentHistoryResultMessage['payload']> {
+  const settings = await loadLocalSettings();
+  return { items: visibleRecentHistory(recentHistoryBySite.get(recentHistoryKey(message.payload.pageUrl)) ?? [], settings) };
 }
 
-function handleAddRecentHistory(message: AddRecentHistoryMessage): import('./messages.js').AddRecentHistoryResultMessage['payload'] {
+async function handleAddRecentHistory(
+  message: AddRecentHistoryMessage,
+): Promise<import('./messages.js').AddRecentHistoryResultMessage['payload']> {
+  const settings = await loadLocalSettings();
   const key = recentHistoryKey(message.payload.pageUrl);
   const item = message.payload.item;
-  const next = [item, ...(recentHistoryBySite.get(key) ?? []).filter((entry) => entry.url !== item.url && entry.id !== item.id)].slice(
-    0,
-    MAX_RECENT_HISTORY_ITEMS,
+  const next = retainedRecentHistory(
+    [item, ...(recentHistoryBySite.get(key) ?? []).filter((entry) => entry.url !== item.url && entry.id !== item.id)],
+    settings,
   );
   recentHistoryBySite.set(key, next);
-  return { items: next };
+  return { items: visibleRecentHistory(next, settings) };
 }
 
-function handleRemoveRecentHistory(
+async function handleRemoveRecentHistory(
   message: RemoveRecentHistoryMessage,
-): import('./messages.js').RemoveRecentHistoryResultMessage['payload'] {
+): Promise<import('./messages.js').RemoveRecentHistoryResultMessage['payload']> {
+  const settings = await loadLocalSettings();
   const key = recentHistoryKey(message.payload.pageUrl);
   const next = (recentHistoryBySite.get(key) ?? []).filter((entry) => entry.id !== message.payload.id);
   recentHistoryBySite.set(key, next);
-  return { items: next };
+  return { items: visibleRecentHistory(next, settings) };
+}
+
+function retainedRecentHistory(
+  items: readonly import('../core/display-records.js').ImageDisplayRecord[],
+  settings: PlaintextLocalSettings,
+): readonly import('../core/display-records.js').ImageDisplayRecord[] {
+  const limit = settings.recentHistoryOverflowBehavior === 'drop-oldest' ? settings.recentHistoryLimit : MAX_RECENT_HISTORY_ITEMS;
+  return items.slice(0, limit);
+}
+
+function visibleRecentHistory(
+  items: readonly import('../core/display-records.js').ImageDisplayRecord[],
+  settings: PlaintextLocalSettings,
+): readonly import('../core/display-records.js').ImageDisplayRecord[] {
+  return items.slice(0, settings.recentHistoryLimit);
+}
+
+function pruneRecentHistoryForSettings(settings: PlaintextLocalSettings): void {
+  if (settings.recentHistoryOverflowBehavior !== 'drop-oldest') return;
+  for (const [key, items] of recentHistoryBySite) {
+    recentHistoryBySite.set(key, retainedRecentHistory(items, settings));
+  }
 }
 
 async function handleLoadRecallCandidates(
@@ -1093,8 +1125,10 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       return true;
 
     case MessageType.LoadRecentHistory:
-      sendResponse(createLoadRecentHistoryResultMessage(handleLoadRecentHistory(message).items));
-      return false;
+      handleLoadRecentHistory(message)
+        .then((result) => sendResponse(createLoadRecentHistoryResultMessage(result.items)))
+        .catch(() => sendResponse(createLoadRecentHistoryResultMessage([])));
+      return true;
 
     case MessageType.LoadBookmarksByIds:
       handleLoadBookmarksByIds(message)
@@ -1103,12 +1137,16 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       return true;
 
     case MessageType.AddRecentHistory:
-      sendResponse(createAddRecentHistoryResultMessage(handleAddRecentHistory(message).items));
-      return false;
+      handleAddRecentHistory(message)
+        .then((result) => sendResponse(createAddRecentHistoryResultMessage(result.items)))
+        .catch(() => sendResponse(createAddRecentHistoryResultMessage([message.payload.item])));
+      return true;
 
     case MessageType.RemoveRecentHistory:
-      sendResponse(createRemoveRecentHistoryResultMessage(handleRemoveRecentHistory(message).items));
-      return false;
+      handleRemoveRecentHistory(message)
+        .then((result) => sendResponse(createRemoveRecentHistoryResultMessage(result.items)))
+        .catch(() => sendResponse(createRemoveRecentHistoryResultMessage([])));
+      return true;
 
     case MessageType.LoadRecallCandidates:
       handleLoadRecallCandidates(message)
