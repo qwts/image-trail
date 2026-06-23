@@ -20,7 +20,7 @@ This milestone ports target image detection, manual picking, image application h
 - Auto-select exactly one qualifying image when appropriate.
 - Add manual target-pick mode with visible hover/selection indication.
 - Track the selected target image through a page adapter.
-- Apply preview styling when the single-image case allows it.
+- Apply lightweight selected styling on auto-select and reserve full preview styling for an explicit host-image `Fill screen` control.
 - Restore original image/page styles on close or target change.
 - Observe late-loaded images during target-pick mode.
 - Preserve previous target state enough to recover from failed operations.
@@ -62,6 +62,7 @@ This milestone ports target image detection, manual picking, image application h
 ## Acceptance Scenarios
 
 - Exactly one qualifying visible image is selected automatically at injection time; zero or multiple candidates require manual pick.
+- Single-image auto-select does not rewrite the page backdrop or selected image box; the user must explicitly turn on `Fill screen`.
 - Candidate selection honors bookmarklet URL precedence (`currentSrc`, `src` attr, `src`, `data-src`, `data-original`) and visibility/score rules.
 - Pick mode shows crosshair/hover/selected indicators, suppresses accidental link navigation, and exits after a successful pick.
 - Switching targets restores previous target styles/listeners before marking the new target.
@@ -88,7 +89,7 @@ This milestone ports target image detection, manual picking, image application h
 
 ## Test Notes
 
-- Manual page with one image: auto-selected and status names target URL.
+- Manual page with one image: auto-selected and status names target URL without flashing the page backdrop or resizing the image box; `Fill screen` can be toggled intentionally.
 - Manual page with multiple images: pick target and verify only that image changes indicator.
 - Add an image dynamically during pick mode and verify it can be selected.
 - Close panel and verify styles/listeners/attributes are removed.

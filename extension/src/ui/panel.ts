@@ -111,6 +111,7 @@ function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
     selectedUrl: selectedUrl?.startsWith('data:') ? 'data:' : selectedUrl,
     selectedHandleId: snapshot.selected?.handleId ?? null,
     selectedDimensions: snapshot.selected ? `${snapshot.selected.width}×${snapshot.selected.height}` : null,
+    fillScreen: snapshot.fillScreen,
     message: snapshot.message,
   };
 }
@@ -137,6 +138,8 @@ export class ImageTrailPanel {
   private panelPositionRestorePromise: Promise<void> | null = null;
   private panelPositionRestoreAttempt = 0;
   private restoredPanelPosition: PanelPosition | null = null;
+  private panelStylesReady = false;
+  private panelStylesReadyPromise: Promise<void> | null = null;
   private recallOpeningUntil = 0;
   private recallMessageClearTimer: number | null = null;
   private readonly layoutState: PanelLayoutState = {
@@ -235,6 +238,8 @@ export class ImageTrailPanel {
     this.panelPositionRestored = false;
     this.panelPositionRestorePromise = null;
     this.restoredPanelPosition = null;
+    this.panelStylesReady = false;
+    this.panelStylesReadyPromise = null;
     this.clearRecallMessageTimer();
   }
 
@@ -672,6 +677,13 @@ export class ImageTrailPanel {
 
     if (action.name === 'target/release') {
       const snapshot = this.pageAdapter.releaseSelectedTarget();
+      this.state = setTargetState(this.state, toTargetState(snapshot));
+      this.render();
+      return;
+    }
+
+    if (action.name === 'target/fill-screen') {
+      const snapshot = this.pageAdapter.setSelectedFillScreen(action.enabled);
       this.state = setTargetState(this.state, toTargetState(snapshot));
       this.render();
       return;
@@ -2341,16 +2353,42 @@ export class ImageTrailPanel {
     if (!this.root) {
       const host = document.getElementById(ROOT_ID) ?? document.createElement('div');
       host.id = ROOT_ID;
+      Object.assign(host.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '0',
+        height: '0',
+        overflow: 'visible',
+        zIndex: '2147483647',
+      });
       const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
       const link = document.createElement('link');
       link.rel = 'stylesheet';
       link.href = chrome.runtime.getURL(STYLE_PATH);
       this.root = document.createElement('aside');
       this.root.className = 'image-trail-panel-root image-trail-panel';
+      this.root.style.visibility = 'hidden';
       this.root.setAttribute('role', 'dialog');
       this.root.setAttribute('aria-label', 'Image Trail panel');
       this.recallRoot = document.createElement('div');
       this.recallRoot.className = 'image-trail-panel-recall-root';
+      this.panelStylesReady = false;
+      this.panelStylesReadyPromise = new Promise<void>((resolve) => {
+        const reveal = (): void => {
+          if (this.panelStylesReady) return;
+          this.panelStylesReady = true;
+          if (this.root) this.root.style.visibility = '';
+          resolve();
+          if (this.state.visible && !this.state.minimized) {
+            this.queuePanelPositionRestore();
+            this.applyRestoredPanelPosition();
+          }
+        };
+        link.addEventListener('load', reveal, { once: true });
+        link.addEventListener('error', reveal, { once: true });
+        window.setTimeout(reveal, 300);
+      });
       shadow.replaceChildren(link, this.root, this.recallRoot);
       (document.body ?? document.documentElement).append(host);
     }
@@ -2370,7 +2408,7 @@ export class ImageTrailPanel {
         this.state,
         { renderRecall: options.includeRecall !== false },
       );
-      if (!this.state.minimized) {
+      if (!this.state.minimized && this.panelStylesReady) {
         this.queuePanelPositionRestore();
         this.applyRestoredPanelPosition();
       }
@@ -2432,6 +2470,7 @@ export class ImageTrailPanel {
   }
 
   private async waitForPanelLayout(): Promise<void> {
+    await this.panelStylesReadyPromise;
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }

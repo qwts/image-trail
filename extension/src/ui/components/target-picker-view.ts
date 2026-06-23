@@ -56,6 +56,18 @@ export function createTargetPickerView(
     targetButton.addEventListener('click', () => dispatch({ name: 'start-target-picker' }));
   }
   actions.append(targetButton);
+  if (target.selectedUrl) {
+    const fillButton = document.createElement('button');
+    fillButton.type = 'button';
+    fillButton.textContent = target.fillScreen ? 'Fit in page' : 'Fill screen';
+    fillButton.className = target.fillScreen ? 'is-active' : '';
+    fillButton.setAttribute('aria-pressed', target.fillScreen ? 'true' : 'false');
+    fillButton.title = target.fillScreen
+      ? 'Restore the host image to the page layout while keeping it selected.'
+      : 'Resize the selected host image to fill the page preview area.';
+    fillButton.addEventListener('click', () => dispatch({ name: 'target/fill-screen', enabled: !target.fillScreen }));
+    actions.append(fillButton);
+  }
   const grabButton = document.createElement('button');
   grabButton.type = 'button';
   grabButton.textContent = target.grabModeActive ? 'Stop Grab Mode' : 'Grab Mode';

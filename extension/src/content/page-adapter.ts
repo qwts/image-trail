@@ -41,6 +41,7 @@ export interface TargetSelectionSnapshot {
   readonly grabModeActive: boolean;
   readonly candidateCount: number;
   readonly selected: TargetImageInfo | null;
+  readonly fillScreen: boolean;
   readonly message: string;
 }
 
@@ -104,17 +105,17 @@ export class PageAdapter {
   private detectedCandidateCount = 0;
   private picking = false;
   private mode: TargetSelectionMode = 'none';
+  private pendingLoadTarget: HTMLImageElement | null = null;
+  private selectedOriginalUrl: string | null = null;
+  private selectedOriginalSnapshot: ImageNavigationSnapshot | null = null;
+  private selectedActiveUrl: string | null = null;
+  private selectedFillScreen = false;
   private lastSnapshot: TargetSelectionSnapshot = this.createSnapshot('No target selected.');
   private readonly observer = new DomObserver(() => this.refreshPickCandidates());
   private readonly listeners = new Set<TargetSelectionListener>();
   private readonly loadListeners = new Set<TargetLoadListener>();
   private readonly bookmarkRequestListeners = new Set<TargetBookmarkRequestListener>();
   private readonly grabSourcePatternRequestListeners = new Set<TargetGrabSourcePatternRequestListener>();
-  private pendingLoadTarget: HTMLImageElement | null = null;
-  private selectedOriginalUrl: string | null = null;
-  private selectedOriginalSnapshot: ImageNavigationSnapshot | null = null;
-  private selectedActiveUrl: string | null = null;
-  private selectedLockBox = false;
   private bookmarkShortcutActive = false;
   private grabModeActive = false;
   private grabSourcePatterns: readonly GrabSourcePattern[] = [];
@@ -252,10 +253,17 @@ export class PageAdapter {
     }
 
     applyImageUrl(this.selected, displayUrl);
-    markSelectedTarget(this.selected, { lockBox: this.selectedLockBox });
+    markSelectedTarget(this.selected, { lockBox: this.selectedFillScreen });
     this.selectedActiveUrl = url;
     this.watchSelectedLoad(this.selected);
     return this.emit(`Applied ${url}`);
+  }
+
+  setSelectedFillScreen(enabled: boolean): TargetSelectionSnapshot {
+    if (!this.selected) return this.emit('No host image selected.');
+    this.selectedFillScreen = enabled;
+    markSelectedTarget(this.selected, { lockBox: this.selectedFillScreen });
+    return this.emit(enabled ? 'Host image fills the page.' : 'Host image restored to page layout.');
   }
 
   releaseSelectedTarget(): TargetSelectionSnapshot {
@@ -562,11 +570,11 @@ export class PageAdapter {
     this.selectedOriginalUrl = originalUrl;
     this.selectedOriginalSnapshot = originalSnapshot;
     this.selectedActiveUrl = originalUrl;
-    this.selectedLockBox = this.detectedCandidateCount === 1;
+    this.selectedFillScreen = false;
     this.mode = mode;
     const handleId = createTargetImageInfo(image)?.handleId;
     if (handleId) image.setAttribute('data-image-trail-handle', handleId);
-    markSelectedTarget(image, { lockBox: this.selectedLockBox });
+    markSelectedTarget(image, { lockBox: this.selectedFillScreen });
     this.watchSelectedLoad(image);
   }
 
@@ -585,7 +593,7 @@ export class PageAdapter {
     this.selectedOriginalUrl = null;
     this.selectedOriginalSnapshot = null;
     this.selectedActiveUrl = null;
-    this.selectedLockBox = false;
+    this.selectedFillScreen = false;
   }
 
   private watchSelectedLoad(image: HTMLImageElement): void {
@@ -620,7 +628,7 @@ export class PageAdapter {
   };
 
   private async emitSuccessfulLoad(image: HTMLImageElement): Promise<void> {
-    if (image === this.selected) markSelectedTarget(image, { lockBox: this.selectedLockBox });
+    if (image === this.selected) markSelectedTarget(image, { lockBox: this.selectedFillScreen });
     const target = createTargetImageInfo(image);
     if (!target) return;
     const reportedTarget = image === this.selected && this.selectedActiveUrl ? { ...target, url: this.selectedActiveUrl } : target;
@@ -649,6 +657,7 @@ export class PageAdapter {
       grabModeActive: this.grabModeActive,
       candidateCount: this.picking ? this.candidates.size : this.detectedCandidateCount,
       selected: selected && this.selectedActiveUrl ? { ...selected, url: this.selectedActiveUrl } : selected,
+      fillScreen: this.selectedFillScreen,
       message,
     };
   }

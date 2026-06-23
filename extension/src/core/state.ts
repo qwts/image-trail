@@ -8,6 +8,7 @@ export const EMPTY_TARGET_STATE: TargetState = {
   selectedUrl: null,
   selectedHandleId: null,
   selectedDimensions: null,
+  fillScreen: false,
   message: 'No target selected.',
 };
 

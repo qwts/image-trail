@@ -266,7 +266,7 @@ extension/dist/
 - Injects/toggles the panel.
 - Finds and binds target images.
 - Applies image URLs to DOM elements.
-- Handles immediate preview styling when exactly one image exists on injection.
+- Handles immediate single-image auto-selection and explicit full preview styling when the user turns on host-image `Fill screen`.
 - Observes DOM changes for late-loaded images and target-pick mode.
 - Handles keyboard shortcuts and routes actions through the core controller.
 - Enforces request throttling for both automation and rapid manual navigation.

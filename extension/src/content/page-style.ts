@@ -69,6 +69,7 @@ export function restoreGrabPreviewTarget(element: HTMLElement): void {
 }
 
 export function markSelectedTarget(element: HTMLElement, options: SelectedTargetOptions = {}): void {
+  if (!options.lockBox && element.dataset.imageTrailLockBox) restoreElementStyles(element);
   snapshot(element);
   element.dataset.imageTrailSelected = 'true';
   if (options.lockBox) {
