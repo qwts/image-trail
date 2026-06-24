@@ -36,7 +36,11 @@ export function closeCommentForPullRequest(prNumber, baseRef) {
 }
 
 function gh(args, options = {}) {
-  return execFileSync('gh', args, { encoding: 'utf8', stdio: options.stdio ?? ['ignore', 'pipe', 'inherit'] }).trim();
+  const output = execFileSync('gh', args, {
+    encoding: 'utf8',
+    stdio: options.stdio ?? ['ignore', 'pipe', 'inherit'],
+  });
+  return typeof output === 'string' ? output.trim() : '';
 }
 
 async function eventPayload() {
