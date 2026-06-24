@@ -1,11 +1,13 @@
 import type { ImportedEncryptedImageFile, ImportedImageFile } from '../../core/types.js';
 
+type UrlReviewStatusClearScope = 'hostname' | 'page' | 'source' | 'all';
+
 export type ImportExportAction =
   | { readonly name: 'selection/select-visible' }
   | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/url-review-status' }
-  | { readonly name: 'clear/url-review-status'; readonly scope?: 'hostname' | 'page' | 'source' | 'all' }
+  | { readonly name: 'clear/url-review-status'; readonly scope?: UrlReviewStatusClearScope }
   | { readonly name: 'export/image'; readonly saveAs?: boolean }
   | { readonly name: 'export/encrypted-image' }
   | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string }
@@ -118,35 +120,24 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   urlReviewStatusBtn.disabled = state.busy;
   urlReviewStatusBtn.addEventListener('click', () => dispatch({ name: 'export/url-review-status' }));
 
-  const clearUrlReviewStatusScope = document.createElement('select');
-  clearUrlReviewStatusScope.setAttribute('aria-label', 'URL review status clear scope');
-  clearUrlReviewStatusScope.append(
-    createClearOption('hostname', 'Clear current site'),
-    createClearOption('page', 'Clear current page'),
-    createClearOption('source', 'Clear selected URL'),
-    createClearOption('all', 'Clear all review status'),
-  );
-  clearUrlReviewStatusScope.disabled = state.busy;
-
-  const clearUrlReviewStatusBtn = document.createElement('button');
-  clearUrlReviewStatusBtn.type = 'button';
-  clearUrlReviewStatusBtn.textContent = 'Clear URL review status';
-  clearUrlReviewStatusBtn.disabled = state.busy;
-  clearUrlReviewStatusBtn.addEventListener('click', () => {
-    dispatch({ name: 'clear/url-review-status', scope: clearUrlReviewStatusScope.value as 'hostname' | 'page' | 'source' | 'all' });
-  });
+  const clearSiteBtn = createUrlReviewClearButton('Clear current site', 'hostname', state, dispatch);
+  const clearPageBtn = createUrlReviewClearButton('Clear current page', 'page', state, dispatch);
+  const clearUrlBtn = createUrlReviewClearButton('Clear selected URL', 'source', state, dispatch);
+  const clearAllBtn = createUrlReviewClearButton('Clear all review status', 'all', state, dispatch);
 
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__actions';
-  actions.append(historyBtn, bookmarksBtn, urlReviewStatusBtn, clearUrlReviewStatusScope, clearUrlReviewStatusBtn);
+  actions.append(historyBtn, bookmarksBtn, urlReviewStatusBtn, clearSiteBtn, clearPageBtn, clearUrlBtn, clearAllBtn);
 
   const updateExportControls = (): void => {
     const locked = state.busy || (!plaintext.input.checked && passwordInput.value.length < 4);
     historyBtn.disabled = locked;
     bookmarksBtn.disabled = locked;
     urlReviewStatusBtn.disabled = state.busy;
-    clearUrlReviewStatusScope.disabled = state.busy;
-    clearUrlReviewStatusBtn.disabled = state.busy;
+    clearSiteBtn.disabled = state.busy;
+    clearPageBtn.disabled = state.busy;
+    clearUrlBtn.disabled = state.busy;
+    clearAllBtn.disabled = state.busy;
     passwordInput.disabled = plaintext.input.checked || state.busy;
   };
   passwordInput.addEventListener('input', updateExportControls);
@@ -157,11 +148,18 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   return group;
 }
 
-function createClearOption(value: 'hostname' | 'page' | 'source' | 'all', label: string): HTMLOptionElement {
-  const option = document.createElement('option');
-  option.value = value;
-  option.textContent = label;
-  return option;
+function createUrlReviewClearButton(
+  label: string,
+  scope: UrlReviewStatusClearScope,
+  state: ImportExportViewState,
+  dispatch: (action: ImportExportAction) => void,
+): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = label;
+  button.disabled = state.busy;
+  button.addEventListener('click', () => dispatch({ name: 'clear/url-review-status', scope }));
+  return button;
 }
 
 function createImageGroup(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {

@@ -29,7 +29,7 @@
 11. Open Settings and change `Max records per site`; verify the value persists after panel close/reopen.
 12. Enable `Clear current-site review status after export`, export URL review status again, and verify the export downloads before the current-site records are cleared.
 13. Re-import the exported JSON.
-14. Use the URL review status clear scope dropdown to clear the selected URL, current page, current site, and all records in separate passes.
+14. Use the URL review status clear buttons to clear the selected URL, current page, current site, and all records in separate passes.
 15. Export URL review status after each clear pass and verify only records in the chosen scope were removed.
 16. Verify Recents, bookmarks/pins, Recall, thumbnails, downloads, and encrypted originals are unchanged by every import/export/clear flow.
 
