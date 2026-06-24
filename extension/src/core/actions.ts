@@ -32,6 +32,52 @@ function updateRecordCapture(
   );
 }
 
+function updateRecordPinned(
+  records: readonly ImageDisplayRecord[],
+  sourceRecordId: string,
+  pinnedAt: string,
+  pinnedRecordId: string,
+): readonly ImageDisplayRecord[] {
+  return records.map((record) => (record.id === sourceRecordId ? { ...record, pinnedAt, pinnedRecordId } : record));
+}
+
+function syncHistoryWithBookmarks(
+  history: readonly ImageDisplayRecord[],
+  bookmarks: readonly ImageDisplayRecord[],
+): readonly ImageDisplayRecord[] {
+  if (history.length === 0 || bookmarks.length === 0) return history;
+  const bookmarksById = new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark]));
+  const bookmarksByUrl = new Map(bookmarks.map((bookmark) => [bookmark.url, bookmark]));
+  return history.map((record) => {
+    const linkedBookmark = record.pinnedRecordId ? bookmarksById.get(record.pinnedRecordId) : undefined;
+    const urlBookmark = linkedBookmark ?? bookmarksByUrl.get(record.url);
+    if (!urlBookmark) return record;
+    const pinnedAt = record.pinnedAt ?? urlBookmark.timestamp;
+    const pinnedRecordId = record.pinnedRecordId ?? urlBookmark.id;
+    if (linkedBookmark) {
+      return {
+        ...record,
+        pinnedAt,
+        pinnedRecordId,
+        captureStatus: linkedBookmark.captureStatus,
+        blobId: linkedBookmark.blobId,
+        capturedAt: linkedBookmark.capturedAt,
+        storedOriginal: linkedBookmark.storedOriginal,
+      };
+    }
+    if (urlBookmark.captureStatus !== 'captured') return { ...record, pinnedAt, pinnedRecordId };
+    return {
+      ...record,
+      pinnedAt,
+      pinnedRecordId,
+      captureStatus: urlBookmark.captureStatus,
+      blobId: urlBookmark.blobId,
+      capturedAt: urlBookmark.capturedAt,
+      storedOriginal: urlBookmark.storedOriginal,
+    };
+  });
+}
+
 function clearRecordCapture(records: readonly ImageDisplayRecord[], id: string): readonly ImageDisplayRecord[] {
   return records.map((r) => (r.id === id ? { ...r, captureStatus: undefined, blobId: undefined, storedOriginal: undefined } : r));
 }
@@ -171,13 +217,15 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
     case 'target/release':
       return state;
     case 'history/add-loaded': {
+      const existing = state.history.find((entry) => entry.url === action.url);
       const item = createDisplayRecord({
+        ...existing,
         url: action.url,
-        title: action.title,
+        title: action.title ?? existing?.title,
         timestamp: action.timestamp,
-        thumbnail: action.thumbnail,
-        width: action.width,
-        height: action.height,
+        thumbnail: action.thumbnail ?? existing?.thumbnail,
+        width: action.width ?? existing?.width,
+        height: action.height ?? existing?.height,
         source: 'history',
       });
       const history = visibleRecentHistory(
@@ -203,6 +251,12 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       };
     case 'history/pin':
       return state;
+    case 'history/mark-pinned':
+      return {
+        ...state,
+        history: updateRecordPinned(state.history, action.id, action.pinnedAt, action.pinnedRecordId),
+        lastUpdatedAt: Date.now(),
+      };
     case 'history/delete-all':
       return {
         ...state,
@@ -425,6 +479,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return {
         ...state,
         bookmarks: action.bookmarks,
+        history: syncHistoryWithBookmarks(state.history, action.bookmarks),
         selectedBookmarkIds: keepItems(
           state.selectedBookmarkIds,
           action.bookmarks.map((bookmark) => bookmark.id),

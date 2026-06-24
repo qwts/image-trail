@@ -74,6 +74,8 @@ export function createHistoryView(
     const keyMissing = options?.blobKeyAvailable === false;
     const lockedEncrypted = isLockedEncryptedRecord(item, blobKeyUnlocked);
     const previewableEncrypted = isPreviewableEncryptedRecord(item, blobKeyUnlocked);
+    const pinned = isPinnedRecord(item);
+    const statusText = recentStatusText(item);
     const selected = selectedIds.includes(item.id);
     const entry = document.createElement('li');
     entry.className = 'image-trail-panel__history-item';
@@ -135,7 +137,13 @@ export function createHistoryView(
     if (options?.privacyMode && item.privacyStatus !== 'locked') {
       const meta = document.createElement('span');
       meta.className = 'image-trail-panel__record-row-meta';
-      meta.textContent = PRIVACY_RECORD_META;
+      meta.textContent = statusText ? `${PRIVACY_RECORD_META} / ${statusText}` : PRIVACY_RECORD_META;
+      meta.title = meta.textContent;
+      link.append(document.createElement('br'), meta);
+    } else if (statusText) {
+      const meta = document.createElement('span');
+      meta.className = 'image-trail-panel__record-row-meta';
+      meta.textContent = statusText;
       meta.title = meta.textContent;
       link.append(document.createElement('br'), meta);
     }
@@ -144,7 +152,7 @@ export function createHistoryView(
     actions.className = 'image-trail-panel__item-actions';
     actions.addEventListener('keydown', (event) => event.stopPropagation());
 
-    if (!keyUnavailable && !lockedEncrypted) {
+    if (!keyUnavailable && !lockedEncrypted && !pinned) {
       const pin = document.createElement('button');
       pin.type = 'button';
       pin.textContent = 'Pin';
@@ -214,6 +222,17 @@ function isEncryptedRecord(item: ImageDisplayRecord): boolean {
 
 function isPreviewableEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked: boolean): boolean {
   return !!encryptedBlobIdForRecord(item) && blobKeyUnlocked;
+}
+
+function isPinnedRecord(item: ImageDisplayRecord): boolean {
+  return !!item.pinnedAt || !!item.pinnedRecordId;
+}
+
+function recentStatusText(item: ImageDisplayRecord): string | null {
+  const status = [];
+  if (isPinnedRecord(item)) status.push('Pinned to queue');
+  if (item.captureStatus === 'captured') status.push('Captured original');
+  return status.length > 0 ? status.join(' / ') : null;
 }
 
 function createRecordVisual(item: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
