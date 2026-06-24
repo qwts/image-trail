@@ -5,6 +5,7 @@ import { selectedRangeIds } from './selection-ranges.js';
 type BookmarkAction =
   | { readonly name: 'bookmark/current' }
   | { readonly name: 'bookmark/load'; readonly id: string }
+  | { readonly name: 'bookmark/remove'; readonly id: string }
   | { readonly name: 'bookmark/clear'; readonly id: string }
   | { readonly name: 'bookmark-selection/toggle'; readonly id: string }
   | { readonly name: 'bookmark-selection/single'; readonly id: string }
@@ -274,9 +275,14 @@ export function createBookmarksView(
     if (!keyMissing || item.captureStatus === 'captured') {
       const clear = document.createElement('button');
       clear.type = 'button';
-      clear.textContent = 'Clear';
-      clear.title = 'Hide this queue row until bookmarks are reloaded.';
-      clear.addEventListener('click', () => dispatch({ name: 'bookmark/clear', id: item.id }));
+      updateBookmarkClearButton(clear, false);
+      clear.addEventListener('mouseenter', (event) => updateBookmarkClearButton(clear, isDeleteModifierEvent(event)));
+      clear.addEventListener('mousemove', (event) => updateBookmarkClearButton(clear, isDeleteModifierEvent(event)));
+      clear.addEventListener('mouseleave', () => updateBookmarkClearButton(clear, false));
+      clear.addEventListener('focus', () => updateBookmarkClearButton(clear, false));
+      clear.addEventListener('keydown', (event) => updateBookmarkClearButton(clear, isDeleteModifierEvent(event)));
+      clear.addEventListener('keyup', (event) => updateBookmarkClearButton(clear, isDeleteModifierEvent(event)));
+      clear.addEventListener('click', (event) => dispatch({ name: bookmarkRowClearActionForModifier(event), id: item.id }));
       actions.append(clear);
     }
     entry.append(visual, bookmarkLabel, actions);
@@ -355,6 +361,28 @@ function isPreviewableEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked:
 
 function isSelectionClick(event: MouseEvent): boolean {
   return event.metaKey || event.ctrlKey || event.shiftKey;
+}
+
+export function bookmarkRowClearActionForModifier(
+  event: Pick<MouseEvent | KeyboardEvent, 'metaKey' | 'ctrlKey'>,
+): 'bookmark/clear' | 'bookmark/remove' {
+  return isDeleteModifierEvent(event) ? 'bookmark/remove' : 'bookmark/clear';
+}
+
+export function bookmarkRowClearLabelForModifier(event: Pick<MouseEvent | KeyboardEvent, 'metaKey' | 'ctrlKey'>): 'Clear' | 'Delete' {
+  return isDeleteModifierEvent(event) ? 'Delete' : 'Clear';
+}
+
+function updateBookmarkClearButton(button: HTMLButtonElement, destructive: boolean): void {
+  button.textContent = destructive ? 'Delete' : 'Clear';
+  button.title = destructive
+    ? 'Delete this durable queue row and any linked original.'
+    : 'Hide this queue row until bookmarks are reloaded. Cmd/Ctrl-click to delete permanently.';
+  button.classList.toggle('is-danger', destructive);
+}
+
+function isDeleteModifierEvent(event: Pick<MouseEvent | KeyboardEvent, 'metaKey' | 'ctrlKey'>): boolean {
+  return event.metaKey || event.ctrlKey;
 }
 
 function isBookmarkRecord(item: ImageDisplayRecord): boolean {
