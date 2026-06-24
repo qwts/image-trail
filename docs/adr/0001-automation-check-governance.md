@@ -45,6 +45,20 @@ treated as optional cleanup after approval.
 | CodeQL                 | Catch security and dependency-analysis findings before merge.                              | Security posture, ignored findings, or required query coverage changes.           |
 | CODEOWNERS review      | Keep governance files and broad repo changes under owner review.                           | Ownership rules, protected branches, or required reviewer policy changes.         |
 
+## Issue Close-Out Automation
+
+GitHub only auto-closes issues from closing keywords when a PR lands on the
+repository default branch. Image Trail's active integration branch is
+`codex/dev`, so PRs that correctly include `Closes #<issue>` can still leave
+issues open after merge.
+
+The `Close linked issues` workflow treats merged PRs into `codex/dev` as issue
+close-out events for this repository. It parses the merged PR body for standard
+closing keywords, closes same-repo referenced issues, comments with the merged
+PR number and target branch, and removes stale leading `[WIP]` issue-title
+markers. PR authors must keep explicit closing keywords in PR bodies because
+the workflow uses them as the source of truth.
+
 ## Consequences
 
 - PRs should be blocked from merge when docs are stale for the behavior being
