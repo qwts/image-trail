@@ -275,14 +275,7 @@ export function createBookmarksView(
     if (!keyMissing || item.captureStatus === 'captured') {
       const clear = document.createElement('button');
       clear.type = 'button';
-      updateBookmarkClearButton(clear, false);
-      clear.addEventListener('mouseenter', (event) => updateBookmarkClearButton(clear, isDeleteModifierEvent(event)));
-      clear.addEventListener('mousemove', (event) => updateBookmarkClearButton(clear, isDeleteModifierEvent(event)));
-      clear.addEventListener('mouseleave', () => updateBookmarkClearButton(clear, false));
-      clear.addEventListener('focus', () => updateBookmarkClearButton(clear, false));
-      clear.addEventListener('keydown', (event) => updateBookmarkClearButton(clear, isDeleteModifierEvent(event)));
-      clear.addEventListener('keyup', (event) => updateBookmarkClearButton(clear, isDeleteModifierEvent(event)));
-      clear.addEventListener('click', (event) => dispatch({ name: bookmarkRowClearActionForModifier(event), id: item.id }));
+      bindBookmarkClearButton(clear, item.id, dispatch);
       actions.append(clear);
     }
     entry.append(visual, bookmarkLabel, actions);
@@ -376,13 +369,77 @@ export function bookmarkRowClearLabelForModifier(event: Pick<MouseEvent | Keyboa
 function updateBookmarkClearButton(button: HTMLButtonElement, destructive: boolean): void {
   button.textContent = destructive ? 'Delete' : 'Clear';
   button.title = destructive
-    ? 'Delete this durable queue row and any linked original.'
+    ? 'Delete this durable queue row. Linked originals follow reference-count cleanup rules.'
     : 'Hide this queue row until bookmarks are reloaded. Cmd/Ctrl-click to delete permanently.';
   button.classList.toggle('is-danger', destructive);
 }
 
 function isDeleteModifierEvent(event: Pick<MouseEvent | KeyboardEvent, 'metaKey' | 'ctrlKey'>): boolean {
   return event.metaKey || event.ctrlKey;
+}
+
+function bindBookmarkClearButton(button: HTMLButtonElement, id: string, dispatch: (action: BookmarkAction) => void): void {
+  let pointerInside = false;
+  let focused = false;
+  let controller: AbortController | null = null;
+
+  const update = (destructive: boolean) => updateBookmarkClearButton(button, destructive);
+  const stopTrackingIfIdle = () => {
+    if (pointerInside || focused) return;
+    controller?.abort();
+    controller = null;
+    update(false);
+  };
+  const stopTracking = () => {
+    pointerInside = false;
+    focused = false;
+    controller?.abort();
+    controller = null;
+  };
+  const startTracking = () => {
+    if (controller) return;
+    controller = new AbortController();
+    window.addEventListener('keydown', (event) => update(isDeleteModifierEvent(event)), { signal: controller.signal });
+    window.addEventListener('keyup', (event) => update(isDeleteModifierEvent(event)), { signal: controller.signal });
+    window.addEventListener(
+      'blur',
+      () => {
+        controller?.abort();
+        controller = null;
+        update(false);
+      },
+      { signal: controller.signal },
+    );
+  };
+
+  update(false);
+  button.addEventListener('mouseenter', (event) => {
+    pointerInside = true;
+    startTracking();
+    update(isDeleteModifierEvent(event));
+  });
+  button.addEventListener('mousemove', (event) => update(isDeleteModifierEvent(event)));
+  button.addEventListener('mousedown', (event) => update(isDeleteModifierEvent(event)));
+  button.addEventListener('mouseleave', () => {
+    pointerInside = false;
+    stopTrackingIfIdle();
+  });
+  button.addEventListener('focus', () => {
+    focused = true;
+    startTracking();
+  });
+  button.addEventListener('blur', () => {
+    focused = false;
+    stopTrackingIfIdle();
+  });
+  button.addEventListener('keydown', (event) => update(isDeleteModifierEvent(event)));
+  button.addEventListener('keyup', (event) => update(isDeleteModifierEvent(event)));
+  button.addEventListener('click', (event) => {
+    const destructive = isDeleteModifierEvent(event);
+    update(destructive);
+    dispatch({ name: destructive ? 'bookmark/remove' : 'bookmark/clear', id });
+    stopTracking();
+  });
 }
 
 function isBookmarkRecord(item: ImageDisplayRecord): boolean {

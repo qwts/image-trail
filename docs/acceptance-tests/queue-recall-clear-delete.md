@@ -6,7 +6,7 @@
 - Delete recents removes transient recent history rows and any linked captured originals because recents are not recoverable durable memory.
 - Queue and Recall clear actions are non-destructive presentation actions. They must not delete durable pin/bookmark records or original blobs.
 - Queue row `Clear` is undoable/presentation-only; Cmd/Ctrl-clicking the same row action changes it to destructive `Delete` and removes the durable pin/bookmark.
-- Destructive queue and Recall delete actions live in Settings and delete through the durable pin/bookmark relationship row.
+- Bulk destructive queue and Recall delete actions live in Settings and delete through the durable pin/bookmark relationship row.
 - Protected pins may render as locked private placeholders. Delete must still work from the safe relationship/linkage fields without decrypting protected metadata.
 - Deleting a protected pin removes the relationship row, encrypted pin metadata, encrypted pin thumbnail, and any linked original through the existing original delete/reference-count path.
 - Encrypted pin thumbnails are not original-photo blobs. Do not bulk-delete original blobs as thumbnail cleanup.
