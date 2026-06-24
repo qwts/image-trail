@@ -1,4 +1,5 @@
-import type { UrlReviewStatusRecord } from '../../core/types.js';
+import { DEFAULT_URL_REVIEW_STATUS_LIMIT } from '../../core/settings.js';
+import type { UrlReviewStatusClearFilter, UrlReviewStatusRecord } from '../../core/types.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore } from '../schema.js';
 
@@ -8,8 +9,6 @@ interface UrlReviewStatusMetadataRecord extends UrlReviewStatusRecord {
 }
 
 const URL_REVIEW_STATUS_KEY_PREFIX = 'url-review-status:';
-const MAX_URL_REVIEW_STATUS_RECORDS_PER_HOST = 5_000;
-
 export class UrlReviewStatusRepository {
   constructor(private readonly db: IDBDatabase) {}
 
@@ -25,7 +24,7 @@ export class UrlReviewStatusRepository {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  async put(record: UrlReviewStatusRecord): Promise<void> {
+  async put(record: UrlReviewStatusRecord, options: { readonly maxRecordsPerHost?: number } = {}): Promise<void> {
     const transaction = this.db.transaction(DataStore.Metadata, 'readwrite');
     const store = transaction.objectStore(DataStore.Metadata);
     const key = urlReviewStatusKey(record.hostname, record.sourceUrl);
@@ -35,11 +34,11 @@ export class UrlReviewStatusRepository {
       return;
     }
     store.put({ ...record, key, kind: 'urlReviewStatus' } satisfies UrlReviewStatusMetadataRecord);
-    await trimHostRecords(store, record.hostname);
+    await trimHostRecords(store, record.hostname, normalizeLimit(options.maxRecordsPerHost));
     await transactionDone(transaction);
   }
 
-  async putMany(records: readonly UrlReviewStatusRecord[]): Promise<number> {
+  async putMany(records: readonly UrlReviewStatusRecord[], options: { readonly maxRecordsPerHost?: number } = {}): Promise<number> {
     if (records.length === 0) return 0;
     const transaction = this.db.transaction(DataStore.Metadata, 'readwrite');
     const store = transaction.objectStore(DataStore.Metadata);
@@ -51,18 +50,22 @@ export class UrlReviewStatusRepository {
       store.put({ ...record, key, kind: 'urlReviewStatus' } satisfies UrlReviewStatusMetadataRecord);
       imported += 1;
     }
-    await trimHostRecordsForRecords(store, records);
+    await trimHostRecordsForRecords(store, records, normalizeLimit(options.maxRecordsPerHost));
     await transactionDone(transaction);
     return imported;
   }
 
-  async clearHostname(hostname: string): Promise<number> {
+  async clear(filter: UrlReviewStatusClearFilter): Promise<number> {
     const transaction = this.db.transaction(DataStore.Metadata, 'readwrite');
     const store = transaction.objectStore(DataStore.Metadata);
-    const records = await recordsForHost(store, hostname);
+    const records = await recordsForFilter(store, filter);
     for (const record of records) store.delete(record.key);
     await transactionDone(transaction);
     return records.length;
+  }
+
+  async clearHostname(hostname: string): Promise<number> {
+    return this.clear({ scope: 'hostname', hostname });
   }
 }
 
@@ -85,14 +88,35 @@ async function recordsForHost(store: IDBObjectStore, hostname: string): Promise<
   return records.filter((record) => record.kind === 'urlReviewStatus');
 }
 
-async function trimHostRecordsForRecords(store: IDBObjectStore, records: readonly UrlReviewStatusRecord[]): Promise<void> {
-  const hostnames = new Set(records.map((record) => record.hostname));
-  for (const hostname of hostnames) await trimHostRecords(store, hostname);
+async function recordsForFilter(store: IDBObjectStore, filter: UrlReviewStatusClearFilter): Promise<UrlReviewStatusMetadataRecord[]> {
+  if (filter.scope === 'all') {
+    const records = await requestToPromise<UrlReviewStatusMetadataRecord[]>(
+      store.getAll(IDBKeyRange.bound(URL_REVIEW_STATUS_KEY_PREFIX, `${URL_REVIEW_STATUS_KEY_PREFIX}\uffff`)),
+    );
+    return records.filter((record) => record.kind === 'urlReviewStatus');
+  }
+  const records = await recordsForHost(store, filter.hostname);
+  if (filter.scope === 'hostname') return records;
+  if (filter.scope === 'page') return records.filter((record) => record.pageUrl === filter.pageUrl);
+  return records.filter((record) => record.sourceUrl === filter.sourceUrl);
 }
 
-async function trimHostRecords(store: IDBObjectStore, hostname: string): Promise<void> {
+async function trimHostRecordsForRecords(
+  store: IDBObjectStore,
+  records: readonly UrlReviewStatusRecord[],
+  maxRecordsPerHost: number,
+): Promise<void> {
+  const hostnames = new Set(records.map((record) => record.hostname));
+  for (const hostname of hostnames) await trimHostRecords(store, hostname, maxRecordsPerHost);
+}
+
+async function trimHostRecords(store: IDBObjectStore, hostname: string, maxRecordsPerHost: number): Promise<void> {
   const records = await recordsForHost(store, hostname);
-  if (records.length <= MAX_URL_REVIEW_STATUS_RECORDS_PER_HOST) return;
-  const staleRecords = records.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(MAX_URL_REVIEW_STATUS_RECORDS_PER_HOST);
+  if (records.length <= maxRecordsPerHost) return;
+  const staleRecords = records.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(maxRecordsPerHost);
   for (const record of staleRecords) store.delete(record.key);
+}
+
+function normalizeLimit(limit: number | undefined): number {
+  return typeof limit === 'number' && Number.isInteger(limit) && limit > 0 ? limit : DEFAULT_URL_REVIEW_STATUS_LIMIT;
 }

@@ -569,6 +569,29 @@ test('toggling privacy mode does not mutate rows or selections', () => {
   assert.deepEqual(updated.selectedBookmarkIds, ['bookmark-1']);
 });
 
+test('updating URL review status retention settings only changes review policy state', () => {
+  const state = {
+    ...createInitialPanelState(),
+    history: [
+      { id: 'history-1', url: 'https://example.test/history.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'history' as const },
+    ],
+    bookmarks: [
+      { id: 'bookmark-1', url: 'https://example.test/bookmark.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'bookmark' as const },
+    ],
+  };
+
+  const updated = reducePanelAction(state, {
+    name: 'settings/update-url-review-status-retention',
+    limit: 250,
+    clearAfterExport: true,
+  });
+
+  assert.equal(updated.urlReviewStatusLimit, 250);
+  assert.equal(updated.clearUrlReviewStatusAfterExport, true);
+  assert.equal(updated.history, state.history);
+  assert.equal(updated.bookmarks, state.bookmarks);
+});
+
 test('clearing visible bookmarks is presentation-only state', () => {
   const state = {
     ...createInitialPanelState(),

@@ -1,4 +1,5 @@
 import type { AutomationState, PanelState, RecallState, TargetState } from './types.js';
+import { DEFAULT_URL_REVIEW_STATUS_LIMIT } from './settings.js';
 
 export const EMPTY_TARGET_STATE: TargetState = {
   mode: 'none',
@@ -54,6 +55,8 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     bookmarkVisibilityScope: 'global',
     pinSaveStoragePreference: 'encrypted',
     privacyModeEnabled: false,
+    urlReviewStatusLimit: DEFAULT_URL_REVIEW_STATUS_LIMIT,
+    clearUrlReviewStatusAfterExport: false,
     hasOlderBookmarks: false,
     hasNewerBookmarks: false,
     captureInProgress: false,

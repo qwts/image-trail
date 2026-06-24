@@ -369,6 +369,10 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
               recallCount: recallDeleteCountForQueue(state),
               busy: state.importExportBusy || state.recall.busy,
             },
+            {
+              limit: state.urlReviewStatusLimit,
+              clearAfterExport: state.clearUrlReviewStatusAfterExport,
+            },
             target.dispatch,
           ),
         ]

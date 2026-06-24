@@ -102,11 +102,17 @@ export interface UrlReviewStatusRecord {
   readonly updatedAt: string;
 }
 
+export type UrlReviewStatusClearFilter =
+  | { readonly scope: 'hostname'; readonly hostname: string }
+  | { readonly scope: 'page'; readonly hostname: string; readonly pageUrl: string }
+  | { readonly scope: 'source'; readonly hostname: string; readonly sourceUrl: string }
+  | { readonly scope: 'all' };
+
 export interface UrlReviewStatusStore {
   list(hostname: string): Promise<readonly UrlReviewStatusRecord[]>;
-  save(record: UrlReviewStatusRecord): Promise<void>;
-  importMany(records: readonly UrlReviewStatusRecord[]): Promise<number>;
-  clear(hostname: string): Promise<number>;
+  save(record: UrlReviewStatusRecord, options?: { readonly maxRecordsPerHost?: number }): Promise<void>;
+  importMany(records: readonly UrlReviewStatusRecord[], options?: { readonly maxRecordsPerHost?: number }): Promise<number>;
+  clear(filter: UrlReviewStatusClearFilter): Promise<number>;
 }
 
 export interface RecallCandidate extends ImageDisplayRecord {
@@ -146,6 +152,8 @@ export interface PanelState {
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
+  readonly urlReviewStatusLimit: number;
+  readonly clearUrlReviewStatusAfterExport: boolean;
   readonly hasOlderBookmarks: boolean;
   readonly hasNewerBookmarks: boolean;
   readonly captureInProgress: boolean;
@@ -226,6 +234,7 @@ export type PanelActionName =
   | 'settings/update-recent-history-retention'
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
+  | 'settings/update-url-review-status-retention'
   | 'settings/reset-panel-position'
   | 'url-templates/load'
   | 'url-template/remove'
@@ -317,6 +326,7 @@ export type PanelAction =
         | 'settings/update-recent-history-retention'
         | 'settings/update-pin-save-storage-preference'
         | 'settings/update-privacy-mode'
+        | 'settings/update-url-review-status-retention'
         | 'url-templates/load'
         | 'url-template/remove'
         | 'url-template/update-settings'
@@ -399,6 +409,11 @@ export type PanelAction =
     }
   | { readonly name: 'settings/update-pin-save-storage-preference'; readonly value: PinSaveStoragePreference }
   | { readonly name: 'settings/update-privacy-mode'; readonly enabled: boolean }
+  | {
+      readonly name: 'settings/update-url-review-status-retention';
+      readonly limit: number;
+      readonly clearAfterExport: boolean;
+    }
   | { readonly name: 'url-templates/load'; readonly templates: readonly UrlTemplateRecord[]; readonly activeTemplateId?: string | null }
   | { readonly name: 'url-template/remove'; readonly id: string }
   | {
@@ -444,7 +459,7 @@ export type PanelAction =
   | { readonly name: 'import-export/error'; readonly message: string }
   | { readonly name: 'export/history' | 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/url-review-status' }
-  | { readonly name: 'clear/url-review-status' }
+  | { readonly name: 'clear/url-review-status'; readonly scope?: 'hostname' | 'page' | 'source' | 'all' }
   | { readonly name: 'export/image'; readonly saveAs?: boolean }
   | { readonly name: 'export/encrypted-image' }
   | { readonly name: 'import/history' | 'import/bookmarks'; readonly fileContent: string; readonly password: string }

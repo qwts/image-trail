@@ -1,4 +1,4 @@
-import type { UrlReviewStatusRecord, UrlReviewStatusStore } from '../core/types.js';
+import type { UrlReviewStatusClearFilter, UrlReviewStatusRecord, UrlReviewStatusStore } from '../core/types.js';
 import { openImageTrailDb } from './db.js';
 import { UrlReviewStatusRepository } from './repositories/url-review-status-repository.js';
 
@@ -13,19 +13,19 @@ export class IndexedDbUrlReviewStatusStore implements UrlReviewStatusStore {
     return context ? context.repository.listByHostname(hostname) : [];
   }
 
-  async save(record: UrlReviewStatusRecord): Promise<void> {
+  async save(record: UrlReviewStatusRecord, options: { readonly maxRecordsPerHost?: number } = {}): Promise<void> {
     const context = await this.openContext();
-    await context?.repository.put(record);
+    await context?.repository.put(record, options);
   }
 
-  async importMany(records: readonly UrlReviewStatusRecord[]): Promise<number> {
+  async importMany(records: readonly UrlReviewStatusRecord[], options: { readonly maxRecordsPerHost?: number } = {}): Promise<number> {
     const context = await this.openContext();
-    return context ? context.repository.putMany(records) : 0;
+    return context ? context.repository.putMany(records, options) : 0;
   }
 
-  async clear(hostname: string): Promise<number> {
+  async clear(filter: UrlReviewStatusClearFilter): Promise<number> {
     const context = await this.openContext();
-    return context ? context.repository.clearHostname(hostname) : 0;
+    return context ? context.repository.clear(filter) : 0;
   }
 
   async close(): Promise<void> {

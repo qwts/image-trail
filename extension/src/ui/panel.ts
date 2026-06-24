@@ -28,6 +28,7 @@ import type {
   ParsedFieldStateRecord,
   ParsedFieldStateStore,
   TargetState,
+  UrlReviewStatusClearFilter,
   UrlTemplateStore,
   UrlReviewStatus,
   UrlReviewStatusStore,
@@ -35,7 +36,7 @@ import type {
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
 import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
-import { RECENT_HISTORY_LIMITS, VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../core/settings.js';
+import { RECENT_HISTORY_LIMITS, URL_REVIEW_STATUS_LIMITS, VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../core/settings.js';
 import { applyFieldSplitSpecs, createFieldSplitSpec } from '../core/url/field-splits.js';
 import { applyFieldDigitWidthSpecs, normalizeFieldDigitWidth, upsertFieldDigitWidthSpec } from '../core/url/field-widths.js';
 import { parseUrl } from '../core/url/parse-url.js';
@@ -323,6 +324,8 @@ export class ImageTrailPanel {
       recentHistoryOverflowBehavior: this.localSettings.recentHistoryOverflowBehavior,
       pinSaveStoragePreference: this.localSettings.pinSaveStoragePreference,
       privacyModeEnabled: this.localSettings.privacyModeEnabled,
+      urlReviewStatusLimit: this.localSettings.urlReviewStatusLimit,
+      clearUrlReviewStatusAfterExport: this.localSettings.clearUrlReviewStatusAfterExport,
       lastUpdatedAt: Date.now(),
     };
     if (options.render !== false) this.render();
@@ -693,6 +696,28 @@ export class ImageTrailPanel {
     this.render();
   }
 
+  private async updateUrlReviewStatusRetention(limit: number, clearAfterExport: boolean): Promise<void> {
+    if (
+      !Number.isInteger(limit) ||
+      limit < URL_REVIEW_STATUS_LIMITS.min ||
+      limit > URL_REVIEW_STATUS_LIMITS.max ||
+      (limit === this.state.urlReviewStatusLimit && clearAfterExport === this.state.clearUrlReviewStatusAfterExport)
+    ) {
+      return;
+    }
+    this.state = reducePanelAction(this.state, {
+      name: 'settings/update-url-review-status-retention',
+      limit,
+      clearAfterExport,
+    });
+    await this.saveLocalSettingsAsync({
+      ...this.localSettings,
+      urlReviewStatusLimit: limit,
+      clearUrlReviewStatusAfterExport: clearAfterExport,
+    });
+    this.render();
+  }
+
   private loadRecentHistory = async (options: { readonly render?: boolean } = {}): Promise<void> => {
     if (!this.recentHistoryStore) return;
     const history = await this.recentHistoryStore.load(window.location.href);
@@ -961,6 +986,11 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'settings/update-url-review-status-retention') {
+      void this.updateUrlReviewStatusRetention(action.limit, action.clearAfterExport);
+      return;
+    }
+
     if (action.name === 'settings/reset-panel-position') {
       void this.resetPanelPosition();
       return;
@@ -1205,7 +1235,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'clear/url-review-status') {
-      void this.clearUrlReviewStatus();
+      void this.clearUrlReviewStatus(action.scope ?? 'hostname');
       return;
     }
 
@@ -1600,17 +1630,20 @@ export class ImageTrailPanel {
     if (!this.urlReviewStatusStore || fieldIds.length === 0) return;
     const hostname = hostnameFromLocation();
     if (!hostname) return;
-    await this.urlReviewStatusStore.save({
-      schemaVersion: 1,
-      hostname,
-      pageUrl: this.parsedFieldStatePageUrl(),
-      sourceUrl,
-      status,
-      fieldIds,
-      activeFieldId: this.state.activeFieldId,
-      reason,
-      updatedAt: new Date().toISOString(),
-    });
+    await this.urlReviewStatusStore.save(
+      {
+        schemaVersion: 1,
+        hostname,
+        pageUrl: this.parsedFieldStatePageUrl(),
+        sourceUrl,
+        status,
+        fieldIds,
+        activeFieldId: this.state.activeFieldId,
+        reason,
+        updatedAt: new Date().toISOString(),
+      },
+      { maxRecordsPerHost: this.localSettings.urlReviewStatusLimit },
+    );
   }
 
   private async tryReloadCurrent(): Promise<boolean> {
@@ -2326,19 +2359,40 @@ export class ImageTrailPanel {
     const hostname = hostnameFromLocation();
     const records = hostname && this.urlReviewStatusStore ? await this.urlReviewStatusStore.list(hostname) : [];
     const result = exportUrlReviewStatusFile({ records });
-    this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
+    if (!result.status.ok || !result.fileContent || !result.fileName) {
+      this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
+      return;
+    }
+    downloadTextFile(result.fileContent, result.fileName);
+    let message = result.status.message;
+    if (this.localSettings.clearUrlReviewStatusAfterExport && hostname && this.urlReviewStatusStore) {
+      const deletedCount = await this.urlReviewStatusStore.clear({ scope: 'hostname', hostname });
+      message = `${message} Cleared ${deletedCount} current-site record${deletedCount === 1 ? '' : 's'} after export.`;
+    }
+    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message });
+    this.render();
   }
 
-  private async clearUrlReviewStatus(): Promise<void> {
+  private async clearUrlReviewStatus(scope: 'hostname' | 'page' | 'source' | 'all'): Promise<void> {
     this.state = reducePanelAction(this.state, { name: 'import-export/start' });
     this.render();
-    const hostname = hostnameFromLocation();
-    const deletedCount = hostname && this.urlReviewStatusStore ? await this.urlReviewStatusStore.clear(hostname) : 0;
+    const filter = this.urlReviewStatusClearFilter(scope);
+    const deletedCount = filter && this.urlReviewStatusStore ? await this.urlReviewStatusStore.clear(filter) : 0;
     this.state = reducePanelAction(this.state, {
       name: 'import-export/complete',
-      message: `Cleared ${deletedCount} URL review status record${deletedCount === 1 ? '' : 's'} for this site.`,
+      message: `Cleared ${deletedCount} URL review status record${deletedCount === 1 ? '' : 's'} for ${urlReviewStatusClearScopeLabel(scope)}.`,
     });
     this.render();
+  }
+
+  private urlReviewStatusClearFilter(scope: 'hostname' | 'page' | 'source' | 'all'): UrlReviewStatusClearFilter | null {
+    if (scope === 'all') return { scope: 'all' };
+    const hostname = hostnameFromLocation();
+    if (!hostname) return null;
+    if (scope === 'hostname') return { scope: 'hostname', hostname };
+    if (scope === 'page') return { scope: 'page', hostname, pageUrl: this.parsedFieldStatePageUrl() };
+    const sourceUrl = this.state.draftUrl ?? this.state.target.selectedUrl;
+    return sourceUrl ? { scope: 'source', hostname, sourceUrl } : null;
   }
 
   private finishExport(fileContent: string | undefined, fileName: string | undefined, message: string, ok: boolean): void {
@@ -2648,7 +2702,9 @@ export class ImageTrailPanel {
       this.render();
       return;
     }
-    const importedCount = await this.urlReviewStatusStore?.importMany(result.records);
+    const importedCount = await this.urlReviewStatusStore?.importMany(result.records, {
+      maxRecordsPerHost: this.localSettings.urlReviewStatusLimit,
+    });
     this.state = reducePanelAction(this.state, {
       name: 'import-export/complete',
       message: `${result.status.message} ${importedCount ?? 0} saved to extension state.`,
@@ -3198,6 +3254,13 @@ function imageDownloadResultMessage(result: {
     return `Save As unavailable; started ${result.started === 1 ? '1 image download normally' : `${result.started} image downloads normally`}.`;
   }
   return result.started === 1 ? 'Image export started.' : `Started ${result.started} image downloads.`;
+}
+
+function urlReviewStatusClearScopeLabel(scope: 'hostname' | 'page' | 'source' | 'all'): string {
+  if (scope === 'all') return 'all sites';
+  if (scope === 'page') return 'this page';
+  if (scope === 'source') return 'the selected URL';
+  return 'this site';
 }
 
 function delay(ms: number): Promise<void> {

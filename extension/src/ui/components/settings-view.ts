@@ -8,7 +8,7 @@ import {
   type GrabStrategyKind,
 } from '../../core/url/grab-strategies.js';
 import type { UrlField } from '../../core/url/types.js';
-import { RECENT_HISTORY_LIMITS, VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../../core/settings.js';
+import { RECENT_HISTORY_LIMITS, URL_REVIEW_STATUS_LIMITS, VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../../core/settings.js';
 
 const MATCH_MODES: readonly { readonly value: UrlTemplateMatchMode; readonly label: string }[] = [
   { value: 'exact-page-shape', label: 'Exact page shape' },
@@ -40,6 +40,10 @@ export function createSettingsView(
     readonly visibleQueueCount: number;
     readonly recallCount: number;
     readonly busy: boolean;
+  },
+  urlReviewStatusState: {
+    readonly limit: number;
+    readonly clearAfterExport: boolean;
   },
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
@@ -87,12 +91,79 @@ export function createSettingsView(
     createRecentsSettingsView(recentHistoryState, dispatch),
     createPrivatePinSettingsView(privatePinState, dispatch),
     createPrivacySettingsView(privacyModeEnabled, dispatch),
+    createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),
     createPanelLayoutSettingsView(dispatch),
     createDestructiveSettingsView(destructiveState, dispatch),
     createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
     createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),
   );
   return section;
+}
+
+function createUrlReviewStatusSettingsView(
+  state: {
+    readonly limit: number;
+    readonly clearAfterExport: boolean;
+  },
+  dispatch: (action: PanelAction) => void,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'URL review status';
+
+  const form = document.createElement('form');
+  form.className = 'image-trail-panel__settings-form';
+
+  const limitLabel = document.createElement('label');
+  limitLabel.className = 'image-trail-panel__settings-field';
+  const limitText = document.createElement('span');
+  limitText.textContent = 'Max records per site';
+  const limitInput = document.createElement('input');
+  limitInput.className = 'image-trail-panel__settings-number-input';
+  limitInput.type = 'number';
+  limitInput.min = String(URL_REVIEW_STATUS_LIMITS.min);
+  limitInput.max = String(URL_REVIEW_STATUS_LIMITS.max);
+  limitInput.step = '1';
+  limitInput.value = String(state.limit);
+  limitInput.inputMode = 'numeric';
+  limitLabel.append(limitText, limitInput);
+
+  const clearLabel = document.createElement('label');
+  clearLabel.className = 'image-trail-panel__settings-checkbox';
+  const clearInput = document.createElement('input');
+  clearInput.type = 'checkbox';
+  clearInput.checked = state.clearAfterExport;
+  const clearText = document.createElement('span');
+  clearText.textContent = 'Clear current-site review status after export';
+  clearLabel.append(clearInput, clearText);
+
+  const apply = document.createElement('button');
+  apply.type = 'submit';
+  apply.textContent = 'Apply';
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const limit = Number(limitInput.value);
+    if (!Number.isInteger(limit)) return;
+    dispatch({ name: 'settings/update-url-review-status-retention', limit, clearAfterExport: clearInput.checked });
+  });
+
+  clearInput.addEventListener('change', () => {
+    const limit = Number(limitInput.value);
+    if (!Number.isInteger(limit)) return;
+    dispatch({ name: 'settings/update-url-review-status-retention', limit, clearAfterExport: clearInput.checked });
+  });
+
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__settings-empty';
+  meta.textContent =
+    'Oldest URL review records fall off per site when the cap is exceeded. This never clears recents, pins, Recall, downloads, thumbnails, or originals.';
+
+  form.append(limitLabel, clearLabel, apply);
+  wrapper.append(heading, form, meta);
+  return wrapper;
 }
 
 function createRecentsSettingsView(
