@@ -204,7 +204,7 @@ export function createFieldsView(
 
     const hasStepControls = field.field.tokenKind === 'int' || field.field.tokenKind === 'hex';
     const controls = document.createElement('span');
-    controls.className = `image-trail-panel__field-control${hasStepControls ? ' has-step-controls' : ''}${reservesTrailControlSlot ? ' has-trail-control-slot' : ''}${canUnlock ? ' has-trail-control' : ''}`;
+    controls.className = `image-trail-panel__field-control${hasStepControls ? ' has-step-controls' : ''}${reservesTrailControlSlot ? ' has-trail-control-slot' : ''}`;
     controls.append(value);
     let splitControls: HTMLSpanElement | null = null;
 
