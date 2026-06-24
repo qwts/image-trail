@@ -17,6 +17,7 @@
 - Parsed-field work-in-progress state is stored as extension-owned metadata for the current hostname/page and selected image context. It may restore active, successful, unchanged, failed, included/excluded, split-field, and draft URL state after panel close, extension reload, or page recovery.
 - Numeric parsed fields infer padding only from leading zeroes by default. For example, `001` increments to `002`, but `1000` decrements to `999`.
 - Users can set an explicit digit width for a parsed numeric field. Explicit widths are field-scoped parsed-field metadata, survive panel close/reopen for the same selected image context, and are not stored in Recents, pins/bookmarks, or originals.
+- Parsed query field step controls must not shift when a field becomes includable or included; repeated `-`/`+` clicks must not turn into an accidental Include/Exclude click.
 - Parsed-field resume state is not Recents, is not a pin/bookmark, and must not write to host-page `localStorage`.
 
 ## Manual Acceptance

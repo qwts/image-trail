@@ -1242,7 +1242,7 @@
   grid-template-columns: minmax(0, 1fr) 46px 26px 26px;
 }
 
-.image-trail-panel-root .image-trail-panel__field-control.has-step-controls.has-trail-control {
+.image-trail-panel-root .image-trail-panel__field-control.has-step-controls.has-trail-control-slot {
   grid-template-columns: minmax(0, 1fr) 46px 26px 26px minmax(58px, max-content);
 }
 

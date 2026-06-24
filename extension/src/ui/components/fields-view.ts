@@ -75,6 +75,10 @@ export function fieldDigitWidthInputDisplay(
   };
 }
 
+export function fieldReservesTrailControlSlot(field: UrlField): boolean {
+  return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
+}
+
 export function createFieldsView(
   fields: EditableField[],
   activeFieldId: string | null,
@@ -156,10 +160,8 @@ export function createFieldsView(
     const isIncludedInTrail = unlockedFieldIds.includes(field.field.id);
     const isSplitField = field.field.splitBaseId !== undefined;
     const digitWidth = fieldDigitWidthSpecs.find((spec) => spec.fieldId === field.field.id)?.width;
-    const canUnlock =
-      (isSuccessful || isIncludedInTrail) &&
-      field.field.location === 'query' &&
-      (field.field.tokenKind === 'int' || field.field.tokenKind === 'hex');
+    const reservesTrailControlSlot = fieldReservesTrailControlSlot(field.field);
+    const canUnlock = (isSuccessful || isIncludedInTrail) && reservesTrailControlSlot;
     const canSplit = !isSplitField && field.value.length > 1;
     const fieldLabel = options.privacyMode ? 'Private field' : field.field.label;
     container.className = `image-trail-panel__field-row${field.field.id === activeFieldId ? ' is-active' : ''}${isSuccessful ? ' is-success' : ''}${isUnchanged ? ' is-unchanged' : ''}${isFailed ? ' is-error' : ''}`;
@@ -202,7 +204,7 @@ export function createFieldsView(
 
     const hasStepControls = field.field.tokenKind === 'int' || field.field.tokenKind === 'hex';
     const controls = document.createElement('span');
-    controls.className = `image-trail-panel__field-control${hasStepControls ? ' has-step-controls' : ''}${canUnlock ? ' has-trail-control' : ''}`;
+    controls.className = `image-trail-panel__field-control${hasStepControls ? ' has-step-controls' : ''}${reservesTrailControlSlot ? ' has-trail-control-slot' : ''}${canUnlock ? ' has-trail-control' : ''}`;
     controls.append(value);
     let splitControls: HTMLSpanElement | null = null;
 
