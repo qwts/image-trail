@@ -682,7 +682,7 @@ export interface ImportUrlReviewStatusResultMessage {
 export interface ClearUrlReviewStatusMessage {
   readonly type: typeof MessageType.ClearUrlReviewStatus;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly hostname: string };
+  readonly payload: { readonly filter: import('../core/types.js').UrlReviewStatusClearFilter };
 }
 
 export interface ClearUrlReviewStatusResultMessage {
@@ -1265,8 +1265,10 @@ export function createImportUrlReviewStatusResultMessage(
   return { type: MessageType.ImportUrlReviewStatusResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-export function createClearUrlReviewStatusMessage(hostname: string): ClearUrlReviewStatusMessage {
-  return { type: MessageType.ClearUrlReviewStatus, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
+export function createClearUrlReviewStatusMessage(
+  filter: import('../core/types.js').UrlReviewStatusClearFilter,
+): ClearUrlReviewStatusMessage {
+  return { type: MessageType.ClearUrlReviewStatus, version: MESSAGE_PROTOCOL_VERSION, payload: { filter } };
 }
 
 export function createClearUrlReviewStatusResultMessage(

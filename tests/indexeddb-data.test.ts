@@ -1609,16 +1609,21 @@ test('UrlReviewStatusRepository saves, lists, and imports URL review state per h
   assert.equal(await repository.putMany([stale, unchanged]), 1);
   assert.deepEqual(await repository.listByHostname('example.test'), [unchanged, passed]);
 
-  assert.equal(await repository.clearHostname('example.test'), 2);
+  assert.equal(await repository.clear({ scope: 'page', hostname: 'example.test', pageUrl: 'https://example.test/missing' }), 0);
+  assert.equal(await repository.clear({ scope: 'source', hostname: 'example.test', sourceUrl: unchanged.sourceUrl }), 1);
+  assert.deepEqual(await repository.listByHostname('example.test'), [passed]);
+  assert.equal(await repository.clearHostname('example.test'), 1);
   assert.deepEqual(await repository.listByHostname('example.test'), []);
   assert.deepEqual(await repository.listByHostname('other.test'), [otherHost]);
+  assert.equal(await repository.clear({ scope: 'all' }), 1);
+  assert.deepEqual(await repository.listByHostname('other.test'), []);
 });
 
-test('UrlReviewStatusRepository caps URL review state per hostname', async (t) => {
+test('UrlReviewStatusRepository caps URL review state per hostname with configurable retention', async (t) => {
   const db = await openFreshImageTrailDb();
   t.after(() => db.close());
   const repository = new UrlReviewStatusRepository(db);
-  const records = Array.from({ length: 5001 }, (_, index) => ({
+  const records = Array.from({ length: 4 }, (_, index) => ({
     schemaVersion: 1 as const,
     hostname: 'example.test',
     pageUrl: 'https://example.test/gallery',
@@ -1629,15 +1634,15 @@ test('UrlReviewStatusRepository caps URL review state per hostname', async (t) =
     updatedAt: new Date(Date.UTC(2026, 5, 23, 0, 0, index)).toISOString(),
   }));
 
-  assert.equal(await repository.putMany(records), 5001);
+  assert.equal(await repository.putMany(records, { maxRecordsPerHost: 3 }), 4);
   const stored = await repository.listByHostname('example.test');
 
-  assert.equal(stored.length, 5000);
+  assert.equal(stored.length, 3);
   assert.equal(
     stored.some((record) => record.sourceUrl.endsWith('image-0000.jpg')),
     false,
   );
-  assert.equal(stored[0]?.sourceUrl.endsWith('image-5000.jpg'), true);
+  assert.equal(stored[0]?.sourceUrl.endsWith('image-0003.jpg'), true);
 });
 
 test('UrlTemplateRepository saves templates per hostname', async (t) => {

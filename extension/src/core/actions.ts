@@ -533,6 +533,13 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return { ...state, pinSaveStoragePreference: action.value, lastUpdatedAt: Date.now() };
     case 'settings/update-privacy-mode':
       return { ...state, privacyModeEnabled: action.enabled, lastUpdatedAt: Date.now() };
+    case 'settings/update-url-review-status-retention':
+      return {
+        ...state,
+        urlReviewStatusLimit: action.limit,
+        clearUrlReviewStatusAfterExport: action.clearAfterExport,
+        lastUpdatedAt: Date.now(),
+      };
     case 'url-templates/load': {
       const previousActiveTemplate = state.urlTemplates.find((template) => template.id === state.activeUrlTemplateId);
       const preservedFailedDraftTemplate =

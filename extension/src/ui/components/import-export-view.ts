@@ -5,7 +5,7 @@ export type ImportExportAction =
   | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/url-review-status' }
-  | { readonly name: 'clear/url-review-status' }
+  | { readonly name: 'clear/url-review-status'; readonly scope?: 'hostname' | 'page' | 'source' | 'all' }
   | { readonly name: 'export/image'; readonly saveAs?: boolean }
   | { readonly name: 'export/encrypted-image' }
   | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string }
@@ -118,21 +118,34 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   urlReviewStatusBtn.disabled = state.busy;
   urlReviewStatusBtn.addEventListener('click', () => dispatch({ name: 'export/url-review-status' }));
 
+  const clearUrlReviewStatusScope = document.createElement('select');
+  clearUrlReviewStatusScope.setAttribute('aria-label', 'URL review status clear scope');
+  clearUrlReviewStatusScope.append(
+    createClearOption('hostname', 'Clear current site'),
+    createClearOption('page', 'Clear current page'),
+    createClearOption('source', 'Clear selected URL'),
+    createClearOption('all', 'Clear all review status'),
+  );
+  clearUrlReviewStatusScope.disabled = state.busy;
+
   const clearUrlReviewStatusBtn = document.createElement('button');
   clearUrlReviewStatusBtn.type = 'button';
   clearUrlReviewStatusBtn.textContent = 'Clear URL review status';
   clearUrlReviewStatusBtn.disabled = state.busy;
-  clearUrlReviewStatusBtn.addEventListener('click', () => dispatch({ name: 'clear/url-review-status' }));
+  clearUrlReviewStatusBtn.addEventListener('click', () => {
+    dispatch({ name: 'clear/url-review-status', scope: clearUrlReviewStatusScope.value as 'hostname' | 'page' | 'source' | 'all' });
+  });
 
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__actions';
-  actions.append(historyBtn, bookmarksBtn, urlReviewStatusBtn, clearUrlReviewStatusBtn);
+  actions.append(historyBtn, bookmarksBtn, urlReviewStatusBtn, clearUrlReviewStatusScope, clearUrlReviewStatusBtn);
 
   const updateExportControls = (): void => {
     const locked = state.busy || (!plaintext.input.checked && passwordInput.value.length < 4);
     historyBtn.disabled = locked;
     bookmarksBtn.disabled = locked;
     urlReviewStatusBtn.disabled = state.busy;
+    clearUrlReviewStatusScope.disabled = state.busy;
     clearUrlReviewStatusBtn.disabled = state.busy;
     passwordInput.disabled = plaintext.input.checked || state.busy;
   };
@@ -142,6 +155,13 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
 
   group.append(controls, actions);
   return group;
+}
+
+function createClearOption(value: 'hostname' | 'page' | 'source' | 'all', label: string): HTMLOptionElement {
+  const option = document.createElement('option');
+  option.value = value;
+  option.textContent = label;
+  return option;
 }
 
 function createImageGroup(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {

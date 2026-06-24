@@ -20,7 +20,7 @@ import { EncryptedPinThumbnailsRepository } from '../data/repositories/encrypted
 import { KeysRepository } from '../data/repositories/keys-repository.js';
 import type { StoredBlobRecord } from '../data/types.js';
 import type { StoredKeyRecord } from '../data/crypto/types.js';
-import type { RecallCandidate } from '../core/types.js';
+import type { RecallCandidate, UrlReviewStatusClearFilter } from '../core/types.js';
 import { fetchImageBytes } from './fetch-image.js';
 import {
   MessageType,
@@ -606,7 +606,8 @@ async function handleSaveUrlReviewStatus(
 ): Promise<import('./messages.js').SaveUrlReviewStatusResultMessage['payload']> {
   const hostname = normalizeHostname(message.payload.record.hostname);
   if (!hostname) return { ok: false };
-  await urlReviewStatusStore.save({ ...message.payload.record, hostname });
+  const settings = await loadLocalSettings();
+  await urlReviewStatusStore.save({ ...message.payload.record, hostname }, { maxRecordsPerHost: settings.urlReviewStatusLimit });
   return { ok: true };
 }
 
@@ -619,15 +620,25 @@ async function handleImportUrlReviewStatus(
       return hostname ? { ...record, hostname } : null;
     })
     .filter((record): record is NonNullable<typeof record> => record !== null);
-  return { ok: true, importedCount: await urlReviewStatusStore.importMany(records) };
+  const settings = await loadLocalSettings();
+  return { ok: true, importedCount: await urlReviewStatusStore.importMany(records, { maxRecordsPerHost: settings.urlReviewStatusLimit }) };
 }
 
 async function handleClearUrlReviewStatus(
   message: ClearUrlReviewStatusMessage,
 ): Promise<import('./messages.js').ClearUrlReviewStatusResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.hostname);
-  if (!hostname) return { ok: false, message: 'URL review status hostname is invalid.' };
-  return { ok: true, deletedCount: await urlReviewStatusStore.clear(hostname) };
+  const filter = normalizeUrlReviewStatusClearFilter(message.payload.filter);
+  if (!filter) return { ok: false, message: 'URL review status clear scope is invalid.' };
+  return { ok: true, deletedCount: await urlReviewStatusStore.clear(filter) };
+}
+
+function normalizeUrlReviewStatusClearFilter(filter: UrlReviewStatusClearFilter): UrlReviewStatusClearFilter | null {
+  if (filter.scope === 'all') return filter;
+  const hostname = normalizeHostname(filter.hostname);
+  if (!hostname) return null;
+  if (filter.scope === 'hostname') return { scope: 'hostname', hostname };
+  if (filter.scope === 'page') return typeof filter.pageUrl === 'string' ? { scope: 'page', hostname, pageUrl: filter.pageUrl } : null;
+  return typeof filter.sourceUrl === 'string' ? { scope: 'source', hostname, sourceUrl: filter.sourceUrl } : null;
 }
 
 async function handleListUrlTemplates(

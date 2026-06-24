@@ -1,4 +1,9 @@
-import { RECENT_HISTORY_LIMITS, VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../core/settings.js';
+import {
+  DEFAULT_URL_REVIEW_STATUS_LIMIT,
+  RECENT_HISTORY_LIMITS,
+  URL_REVIEW_STATUS_LIMITS,
+  VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
+} from '../core/settings.js';
 import type { PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../core/types.js';
 
 export interface PlaintextLocalSettings {
@@ -12,6 +17,8 @@ export interface PlaintextLocalSettings {
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
+  readonly urlReviewStatusLimit: number;
+  readonly clearUrlReviewStatusAfterExport: boolean;
 }
 
 export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
@@ -25,6 +32,8 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   bookmarkVisibilityScope: 'global',
   pinSaveStoragePreference: 'encrypted',
   privacyModeEnabled: false,
+  urlReviewStatusLimit: DEFAULT_URL_REVIEW_STATUS_LIMIT,
+  clearUrlReviewStatusAfterExport: false,
 };
 
 export const LOCAL_SETTINGS_KEY = 'imageTrail.localSettings';
@@ -80,6 +89,10 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
       ? input.pinSaveStoragePreference
       : DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference,
     privacyModeEnabled: input.privacyModeEnabled === true,
+    urlReviewStatusLimit: isSafeUrlReviewStatusLimit(input.urlReviewStatusLimit)
+      ? input.urlReviewStatusLimit
+      : DEFAULT_LOCAL_SETTINGS.urlReviewStatusLimit,
+    clearUrlReviewStatusAfterExport: input.clearUrlReviewStatusAfterExport === true,
   };
 }
 
@@ -106,4 +119,10 @@ function isSafeVisibleBookmarkSoftMax(value: unknown): value is number {
 
 function isSafeRecentHistoryLimit(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= RECENT_HISTORY_LIMITS.min && value <= RECENT_HISTORY_LIMITS.max;
+}
+
+function isSafeUrlReviewStatusLimit(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isInteger(value) && value >= URL_REVIEW_STATUS_LIMITS.min && value <= URL_REVIEW_STATUS_LIMITS.max
+  );
 }

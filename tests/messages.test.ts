@@ -252,7 +252,7 @@ test('creates URL review status messages', () => {
   const saveResult = createSaveUrlReviewStatusResultMessage({ ok: true });
   const importRequest = createImportUrlReviewStatusMessage([record]);
   const importResult = createImportUrlReviewStatusResultMessage({ ok: true, importedCount: 1 });
-  const clear = createClearUrlReviewStatusMessage('example.test');
+  const clear = createClearUrlReviewStatusMessage({ scope: 'hostname', hostname: 'example.test' });
   const clearResult = createClearUrlReviewStatusResultMessage({ ok: true, deletedCount: 1 });
 
   assert.equal(list.type, MessageType.ListUrlReviewStatus);
@@ -271,7 +271,7 @@ test('creates URL review status messages', () => {
   assert.equal(isExtensionResponse(importResult), true);
   assert.equal(isImportUrlReviewStatusResultMessage(importResult), true);
   assert.equal(clear.type, MessageType.ClearUrlReviewStatus);
-  assert.equal(clear.payload.hostname, 'example.test');
+  assert.deepEqual(clear.payload.filter, { scope: 'hostname', hostname: 'example.test' });
   assert.equal(isExtensionRequest(clear), true);
   assert.equal(isExtensionResponse(clearResult), true);
   assert.equal(isClearUrlReviewStatusResultMessage(clearResult), true);

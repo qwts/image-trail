@@ -102,6 +102,8 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().bookmarkVisibilityScope, 'global');
   assert.equal(repository.load().pinSaveStoragePreference, 'encrypted');
   assert.equal(repository.load().privacyModeEnabled, false);
+  assert.equal(repository.load().urlReviewStatusLimit, 5000);
+  assert.equal(repository.load().clearUrlReviewStatusAfterExport, false);
   repository.save({ ...DEFAULT_LOCAL_SETTINGS, pinSaveStoragePreference: 'plaintext' });
   assert.equal(repository.load().pinSaveStoragePreference, 'plaintext');
 });
@@ -224,6 +226,31 @@ test('migrates privacy mode setting safely', () => {
 
   assert.equal(enabled.load().privacyModeEnabled, true);
   assert.equal(invalid.load().privacyModeEnabled, false);
+});
+
+test('migrates URL review status retention settings safely', () => {
+  const high = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ urlReviewStatusLimit: 20_001 }),
+    setItem: () => {},
+  });
+  const low = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ urlReviewStatusLimit: 9 }),
+    setItem: () => {},
+  });
+  const valid = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ urlReviewStatusLimit: 250, clearUrlReviewStatusAfterExport: true }),
+    setItem: () => {},
+  });
+  const invalidClear = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ clearUrlReviewStatusAfterExport: 'yes' }),
+    setItem: () => {},
+  });
+
+  assert.equal(high.load().urlReviewStatusLimit, DEFAULT_LOCAL_SETTINGS.urlReviewStatusLimit);
+  assert.equal(low.load().urlReviewStatusLimit, DEFAULT_LOCAL_SETTINGS.urlReviewStatusLimit);
+  assert.equal(valid.load().urlReviewStatusLimit, 250);
+  assert.equal(valid.load().clearUrlReviewStatusAfterExport, true);
+  assert.equal(invalidClear.load().clearUrlReviewStatusAfterExport, false);
 });
 
 test('tracks session unlock state without persisting key material', async () => {
