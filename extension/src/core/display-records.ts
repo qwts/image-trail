@@ -10,6 +10,8 @@ export interface ImageDisplayRecord {
   readonly height?: number;
   readonly timestamp: string;
   readonly queueUpdatedAt?: string;
+  readonly pinnedAt?: string;
+  readonly pinnedRecordId?: string;
   readonly downloadedAt?: string;
   readonly capturedAt?: string;
   readonly source?: 'history' | 'bookmark' | 'favorites';

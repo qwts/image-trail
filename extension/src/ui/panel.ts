@@ -1736,7 +1736,7 @@ export class ImageTrailPanel {
       this.render();
       return;
     }
-    await this.hideRecentHistoryRow(id);
+    await this.markRecentHistoryRowPinned(id, result.record);
     this.renderPanelAndRefreshRecall();
   }
 
@@ -1745,8 +1745,9 @@ export class ImageTrailPanel {
     options: { readonly timestamp?: string; readonly render?: boolean } = {},
   ): Promise<{ readonly ok: true; readonly record: ImageDisplayRecord } | { readonly ok: false; readonly message: string }> {
     const timestamp = options.timestamp ?? new Date().toISOString();
+    const recordForBookmark = withoutRecentPinState(record);
     const draft = createDisplayRecord({
-      ...record,
+      ...recordForBookmark,
       id: record.url.startsWith('data:image/') ? record.id : record.url,
       timestamp,
       source: 'bookmark',
@@ -1765,14 +1766,20 @@ export class ImageTrailPanel {
     return { ok: true, record: bookmark };
   }
 
-  private async hideRecentHistoryRow(id: string): Promise<void> {
-    const history = this.recentHistoryStore
-      ? await this.recentHistoryStore.remove(id, window.location.href)
-      : reducePanelAction(this.state, { name: 'history/remove', id }).history;
+  private async markRecentHistoryRowPinned(id: string, bookmark: ImageDisplayRecord): Promise<void> {
+    this.state = reducePanelAction(this.state, {
+      name: 'history/mark-pinned',
+      id,
+      pinnedAt: bookmark.timestamp,
+      pinnedRecordId: bookmark.id,
+    });
+    const updatedHistory = this.state.history.find((item) => item.id === id);
+    if (!updatedHistory) return;
+    const history = this.recentHistoryStore ? await this.recentHistoryStore.add(updatedHistory, window.location.href) : this.state.history;
     this.state = {
       ...this.state,
       history,
-      selectedHistoryIds: this.state.selectedHistoryIds.filter((selectedId) => selectedId !== id),
+      selectedHistoryIds: this.state.selectedHistoryIds.filter((selectedId) => history.some((item) => item.id === selectedId)),
       lastUpdatedAt: Date.now(),
     };
   }
@@ -1993,7 +2000,7 @@ export class ImageTrailPanel {
       if (updatedHistory) {
         const saved = await this.saveRecentRecordAsBookmark(updatedHistory, { render: false });
         if (saved.ok) {
-          await this.hideRecentHistoryRow(sourceRecordId);
+          await this.markRecentHistoryRowPinned(sourceRecordId, saved.record);
           this.state = {
             ...this.state,
             message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image. ${bookmarkSaveMessage(saved.record, saved.record.label)}`,
@@ -2978,6 +2985,13 @@ export class ImageTrailPanel {
     this.render();
     this.renderRecallOnly();
   }
+}
+
+function withoutRecentPinState(record: ImageDisplayRecord): ImageDisplayRecord {
+  const copy = { ...record };
+  delete copy.pinnedAt;
+  delete copy.pinnedRecordId;
+  return copy;
 }
 
 function historyRecordToExportEntry(record: ImageDisplayRecord): { readonly uuid: string; readonly payload: DurableHistoryPayloadV1 } {

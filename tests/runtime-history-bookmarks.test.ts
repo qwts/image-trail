@@ -48,6 +48,153 @@ test('history/add-loaded preserves session thumbnail for matching visible record
   assert.equal(state.history[0]?.thumbnail, 'data:image/jpeg;base64,abc');
 });
 
+test('history/mark-pinned records durable queue state on recent rows', () => {
+  let state = createInitialPanelState(0);
+  state = reducePanelAction(state, {
+    name: 'history/add-loaded',
+    url: 'https://example.test/pin.jpg',
+    timestamp: '2026-06-19T00:00:00.000Z',
+  });
+  const recordId = state.history[0].id;
+
+  state = reducePanelAction(state, {
+    name: 'history/mark-pinned',
+    id: recordId,
+    pinnedAt: '2026-06-19T00:00:01.000Z',
+    pinnedRecordId: 'bookmark-1',
+  });
+
+  assert.equal(state.history[0].pinnedAt, '2026-06-19T00:00:01.000Z');
+  assert.equal(state.history[0].pinnedRecordId, 'bookmark-1');
+});
+
+test('history/add-loaded preserves durable state for matching visible recents', () => {
+  let state = createInitialPanelState(0);
+  state = reducePanelAction(state, {
+    name: 'history/add-loaded',
+    url: 'https://example.test/preserved.jpg',
+    thumbnail: 'data:image/jpeg;base64,abc',
+    timestamp: '2026-06-19T00:00:00.000Z',
+  });
+  const recordId = state.history[0].id;
+  state = reducePanelAction(state, {
+    name: 'history/mark-pinned',
+    id: recordId,
+    pinnedAt: '2026-06-19T00:00:01.000Z',
+    pinnedRecordId: 'bookmark-1',
+  });
+  state = reducePanelAction(state, { name: 'capture/start' });
+  state = reducePanelAction(state, {
+    name: 'capture/complete',
+    result: { status: 'captured', blobId: 'blob-1', mimeType: 'image/jpeg', byteLength: 100 },
+    sourceRecordId: recordId,
+  });
+
+  state = reducePanelAction(state, {
+    name: 'history/add-loaded',
+    url: 'https://example.test/preserved.jpg',
+    timestamp: '2026-06-19T00:00:02.000Z',
+  });
+
+  assert.equal(state.history[0].id, recordId);
+  assert.equal(state.history[0].pinnedRecordId, 'bookmark-1');
+  assert.equal(state.history[0].captureStatus, 'captured');
+  assert.equal(state.history[0].blobId, 'blob-1');
+  assert.equal(state.history[0].thumbnail, 'data:image/jpeg;base64,abc');
+});
+
+test('bookmarks/page-loaded syncs captured original state to pinned recents', () => {
+  let state = createInitialPanelState(0);
+  state = reducePanelAction(state, {
+    name: 'history/add-loaded',
+    url: 'https://example.test/captured.jpg',
+    timestamp: '2026-06-19T00:00:00.000Z',
+  });
+  const recordId = state.history[0].id;
+  state = reducePanelAction(state, {
+    name: 'history/mark-pinned',
+    id: recordId,
+    pinnedAt: '2026-06-19T00:00:01.000Z',
+    pinnedRecordId: 'bookmark-1',
+  });
+
+  state = reducePanelAction(state, {
+    name: 'bookmarks/page-loaded',
+    bookmarks: [
+      {
+        id: 'bookmark-1',
+        url: 'https://example.test/captured.jpg',
+        title: 'Captured',
+        timestamp: '2026-06-19T00:00:01.000Z',
+        source: 'bookmark',
+        captureStatus: 'captured',
+        blobId: 'blob-1',
+        capturedAt: '2026-06-19T00:00:02.000Z',
+        storedOriginal: {
+          blobId: 'blob-1',
+          mimeType: 'image/jpeg',
+          byteLength: 100,
+          capturedAt: '2026-06-19T00:00:02.000Z',
+        },
+      },
+    ],
+    offset: 0,
+    limit: 30,
+    total: 1,
+    hasOlder: false,
+    hasNewer: false,
+  });
+
+  assert.equal(state.history[0].captureStatus, 'captured');
+  assert.equal(state.history[0].blobId, 'blob-1');
+  assert.equal(state.history[0].storedOriginal?.blobId, 'blob-1');
+});
+
+test('bookmarks/page-loaded clears captured original state from exact pinned recents when queue row clears it', () => {
+  let state = createInitialPanelState(0);
+  state = reducePanelAction(state, {
+    name: 'history/add-loaded',
+    url: 'https://example.test/cleared.jpg',
+    timestamp: '2026-06-19T00:00:00.000Z',
+  });
+  const recordId = state.history[0].id;
+  state = reducePanelAction(state, {
+    name: 'history/mark-pinned',
+    id: recordId,
+    pinnedAt: '2026-06-19T00:00:01.000Z',
+    pinnedRecordId: 'bookmark-1',
+  });
+  state = reducePanelAction(state, { name: 'capture/start' });
+  state = reducePanelAction(state, {
+    name: 'capture/complete',
+    result: { status: 'captured', blobId: 'blob-1', mimeType: 'image/jpeg', byteLength: 100 },
+    sourceRecordId: recordId,
+  });
+
+  state = reducePanelAction(state, {
+    name: 'bookmarks/page-loaded',
+    bookmarks: [
+      {
+        id: 'bookmark-1',
+        url: 'https://example.test/cleared.jpg',
+        title: 'Cleared',
+        timestamp: '2026-06-19T00:00:01.000Z',
+        source: 'bookmark',
+      },
+    ],
+    offset: 0,
+    limit: 30,
+    total: 1,
+    hasOlder: false,
+    hasNewer: false,
+  });
+
+  assert.equal(state.history[0].pinnedRecordId, 'bookmark-1');
+  assert.equal(state.history[0].captureStatus, undefined);
+  assert.equal(state.history[0].blobId, undefined);
+  assert.equal(state.history[0].storedOriginal, undefined);
+});
+
 test('history/add-loaded uses the configured visible recent limit', () => {
   let state = reducePanelAction(createInitialPanelState(0), {
     name: 'settings/update-recent-history-retention',

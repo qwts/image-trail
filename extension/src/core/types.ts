@@ -192,6 +192,7 @@ export type PanelActionName =
   | 'history/add-loaded'
   | 'history/remove'
   | 'history/pin'
+  | 'history/mark-pinned'
   | 'history/delete-all'
   | 'history/load'
   | 'history/download'
@@ -289,6 +290,7 @@ export type PanelAction =
         | 'history/add-loaded'
         | 'history/remove'
         | 'history/pin'
+        | 'history/mark-pinned'
         | 'history/delete-all'
         | 'history/select'
         | 'selection/select-visible'
@@ -369,6 +371,7 @@ export type PanelAction =
       readonly name: 'history/remove' | 'history/pin' | 'bookmark/load' | 'bookmark/remove' | 'bookmark/clear' | 'history/select';
       readonly id: string;
     }
+  | { readonly name: 'history/mark-pinned'; readonly id: string; readonly pinnedAt: string; readonly pinnedRecordId: string }
   | { readonly name: 'selection/select-visible' }
   | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle' | 'bookmark-selection/single'; readonly id: string }
   | {
