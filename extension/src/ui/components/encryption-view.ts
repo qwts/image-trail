@@ -1,6 +1,7 @@
 import type { PanelAction } from '../../core/types.js';
 
 let keyBackupFilePickerId = 0;
+let encryptedOriginalsOpen = true;
 
 type EncryptionAction = Extract<
   PanelAction,
@@ -27,7 +28,10 @@ export function createEncryptionView(
 ): HTMLElement {
   const section = document.createElement('details');
   section.className = 'image-trail-panel__section image-trail-panel__encryption';
-  section.open = true;
+  section.open = encryptedOriginalsOpen;
+  section.addEventListener('toggle', () => {
+    encryptedOriginalsOpen = section.open;
+  });
 
   const header = document.createElement('div');
   header.className = 'image-trail-panel__encryption-header';
