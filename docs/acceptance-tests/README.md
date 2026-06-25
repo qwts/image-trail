@@ -18,3 +18,4 @@ These scenarios define the first browser-level acceptance coverage for the Brave
 - [Grab Mode Strategies](grab-mode-strategies.md)
 - [URL Review Status Import/Export](url-review-status-import-export.md)
 - [Recents Retention Settings](recents-retention-settings.md)
+- [Settings Utility Layout](settings-utility-layout.md)

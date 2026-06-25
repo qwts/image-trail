@@ -5,7 +5,7 @@ import { createEncryptionView } from './components/encryption-view.js';
 import { createFieldsView, type EditableField } from './components/fields-view.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHistoryView } from './components/history-view.js';
-import { createImageTransferView, createImportExportView } from './components/import-export-view.js';
+import { createImageTransferView, createImportExportView, type ImportExportViewState } from './components/import-export-view.js';
 import { createRecallDrawerView, type RecallDrawerGeometry } from './components/recall-drawer-view.js';
 import { createSettingsView } from './components/settings-view.js';
 import { createStatusView } from './components/status-view.js';
@@ -343,6 +343,27 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     autoSection.append(makeButton('Stop all', { name: 'stop-all' }, target.dispatch));
   }
 
+  const importExportState: ImportExportViewState = {
+    busy: state.importExportBusy,
+    currentImageUrl: state.target.selectedUrl,
+    selectedHistoryCount: state.selectedHistoryIds.length,
+    selectedBookmarkCount: state.selectedBookmarkIds.length + state.recall.selectedIds.length,
+    selectedImageDownloadCount: selectedRecordCount(state),
+    visibleImageSelectionCount: visibleImageSelectionCount(state),
+    imageDownloadAvailable:
+      state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
+      !!state.target.selectedUrl ||
+      state.history.length > 0,
+    encryptedImageTransferAvailable:
+      state.blobKeyUnlocked &&
+      (state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
+        !!state.target.selectedUrl ||
+        state.history.length > 0),
+    blobKeyUnlocked: state.blobKeyUnlocked,
+    lastMessage: state.importExportMessage,
+    lastMessageIsError: state.importExportMessageIsError,
+  };
+
   target.root.append(
     createPanelHeader(state, target),
     createStatusView(state, target.dispatch, statusView),
@@ -375,6 +396,18 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
             },
             target.dispatch,
           ),
+          createEncryptionView(
+            {
+              unlocked: state.blobKeyUnlocked,
+              keyReference: state.blobKeyReference,
+              hasKey: state.blobKeyAvailable,
+              busy: state.importExportBusy,
+              abandonedOriginalCount: state.storageUsage?.orphanedBlobCount ?? 0,
+            },
+            target.dispatch,
+          ),
+          createImageTransferView(importExportState, target.dispatch),
+          createImportExportView(importExportState, target.dispatch),
         ]
       : []),
     createUrlEditorView(
@@ -386,62 +419,6 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
       },
     ),
     createTargetPickerView(state.target, target.dispatch, { privacyMode: state.privacyModeEnabled }),
-    createEncryptionView(
-      {
-        unlocked: state.blobKeyUnlocked,
-        keyReference: state.blobKeyReference,
-        hasKey: state.blobKeyAvailable,
-        busy: state.importExportBusy,
-        abandonedOriginalCount: state.storageUsage?.orphanedBlobCount ?? 0,
-      },
-      target.dispatch,
-    ),
-    createImageTransferView(
-      {
-        busy: state.importExportBusy,
-        currentImageUrl: state.target.selectedUrl,
-        selectedHistoryCount: state.selectedHistoryIds.length,
-        selectedBookmarkCount: state.selectedBookmarkIds.length,
-        selectedImageDownloadCount: selectedRecordCount(state),
-        visibleImageSelectionCount: visibleImageSelectionCount(state),
-        imageDownloadAvailable:
-          state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
-          !!state.target.selectedUrl ||
-          state.history.length > 0,
-        encryptedImageTransferAvailable:
-          state.blobKeyUnlocked &&
-          (state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
-            !!state.target.selectedUrl ||
-            state.history.length > 0),
-        blobKeyUnlocked: state.blobKeyUnlocked,
-        lastMessage: state.importExportMessage,
-        lastMessageIsError: state.importExportMessageIsError,
-      },
-      target.dispatch,
-    ),
-    createImportExportView(
-      {
-        busy: state.importExportBusy,
-        currentImageUrl: state.target.selectedUrl,
-        selectedHistoryCount: state.selectedHistoryIds.length,
-        selectedBookmarkCount: state.selectedBookmarkIds.length + state.recall.selectedIds.length,
-        selectedImageDownloadCount: selectedRecordCount(state),
-        visibleImageSelectionCount: visibleImageSelectionCount(state),
-        imageDownloadAvailable:
-          state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
-          !!state.target.selectedUrl ||
-          state.history.length > 0,
-        encryptedImageTransferAvailable:
-          state.blobKeyUnlocked &&
-          (state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
-            !!state.target.selectedUrl ||
-            state.history.length > 0),
-        blobKeyUnlocked: state.blobKeyUnlocked,
-        lastMessage: state.importExportMessage,
-        lastMessageIsError: state.importExportMessageIsError,
-      },
-      target.dispatch,
-    ),
     createFieldsView(
       editableFields,
       state.activeFieldId,

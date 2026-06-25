@@ -38,7 +38,7 @@ export function createImageTransferView(state: ImportExportViewState, dispatch: 
   section.className = 'image-trail-panel__section image-trail-panel__image-transfer';
 
   const heading = document.createElement('h3');
-  heading.textContent = 'Image';
+  heading.textContent = 'Image utilities';
   section.append(heading);
 
   if (state.lastMessage) {
