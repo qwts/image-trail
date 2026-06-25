@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   applyImageUrl,
   captureImageNavigationSnapshot,
+  imageResourceUrlsEqual,
   pushVisibleUrlWhenSameOrigin,
   restoreImageNavigationSnapshot,
 } from '../extension/src/core/image/image-navigation.js';
@@ -90,4 +91,12 @@ test('pushes visible URL only for same-origin updates', () => {
   assert.equal(pushVisibleUrlWhenSameOrigin('https://example.test/next.jpg', location, history), true);
   assert.equal(pushVisibleUrlWhenSameOrigin('https://other.test/next.jpg', location, history), false);
   assert.deepEqual(pushed, ['https://example.test/next.jpg']);
+});
+
+test('imageResourceUrlsEqual compares normalized image URLs without matching missing values', () => {
+  assert.equal(imageResourceUrlsEqual('/image.jpg', 'https://example.test/image.jpg', 'https://example.test/page'), true);
+  assert.equal(imageResourceUrlsEqual('https://example.test/image.jpg', 'https://example.test/image.jpg'), true);
+  assert.equal(imageResourceUrlsEqual('https://example.test/image.jpg', 'https://example.test/other.jpg'), false);
+  assert.equal(imageResourceUrlsEqual(null, 'https://example.test/image.jpg'), false);
+  assert.equal(imageResourceUrlsEqual('https://example.test/image.jpg', undefined), false);
 });

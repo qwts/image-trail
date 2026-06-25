@@ -68,7 +68,13 @@ function createController(): ImageTrailContentController {
   };
 
   chrome.runtime.onMessage.addListener(handleMessage);
-  window.addEventListener('pagehide', destroy, { once: true });
+  window.addEventListener('pagehide', (event) => {
+    if (event.persisted) {
+      panel.destroy();
+      return;
+    }
+    destroy();
+  });
 
   return { panel, destroy };
 }

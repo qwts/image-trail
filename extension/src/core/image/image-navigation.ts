@@ -64,6 +64,17 @@ export function applyImageUrl(image: HTMLImageElement, url: string): ImageNaviga
   return { status: 'applied', url, message: `Applied ${url}` };
 }
 
+export function imageResourceUrlsEqual(left: string | null | undefined, right: string | null | undefined, baseUrl?: string): boolean {
+  if (!left || !right) return false;
+  if (left === right) return true;
+  try {
+    const base = baseUrl ?? globalThis.location?.href;
+    return new URL(left, base).href === new URL(right, base).href;
+  } catch {
+    return false;
+  }
+}
+
 function setOptionalAttribute(element: Element, name: string, value: string | null): void {
   if (value === null) {
     element.removeAttribute(name);

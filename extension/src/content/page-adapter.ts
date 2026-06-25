@@ -9,6 +9,7 @@ import { parseUrl } from '../core/url/parse-url.js';
 import {
   applyImageUrl,
   captureImageNavigationSnapshot,
+  imageResourceUrlsEqual,
   restoreImageNavigationSnapshot,
   type ImageNavigationSnapshot,
 } from '../core/image/image-navigation.js';
@@ -108,9 +109,12 @@ export class PageAdapter {
   private picking = false;
   private mode: TargetSelectionMode = 'none';
   private pendingLoadTarget: HTMLImageElement | null = null;
+  private pendingLoadActiveUrl: string | null = null;
+  private pendingLoadDisplayUrl: string | null = null;
   private selectedOriginalUrl: string | null = null;
   private selectedOriginalSnapshot: ImageNavigationSnapshot | null = null;
   private selectedActiveUrl: string | null = null;
+  private selectedDisplayUrl: string | null = null;
   private selectedFillScreen = true;
   private selectedObjectFit: ObjectFitMode = DEFAULT_PREVIEW_OBJECT_FIT;
   private lastSnapshot: TargetSelectionSnapshot = this.createSnapshot('No target selected.');
@@ -270,6 +274,7 @@ export class PageAdapter {
     applyImageUrl(this.selected, displayUrl);
     markSelectedTarget(this.selected, { lockBox: this.selectedFillScreen, objectFit: this.selectedObjectFit });
     this.selectedActiveUrl = url;
+    this.selectedDisplayUrl = displayUrl;
     this.watchSelectedLoad(this.selected);
     return this.emit(`Applied ${url}`);
   }
@@ -603,6 +608,7 @@ export class PageAdapter {
     this.selectedOriginalUrl = originalUrl;
     this.selectedOriginalSnapshot = originalSnapshot;
     this.selectedActiveUrl = originalUrl;
+    this.selectedDisplayUrl = originalUrl;
     this.mode = mode;
     const handleId = createTargetImageInfo(image)?.handleId;
     if (handleId) image.setAttribute('data-image-trail-handle', handleId);
@@ -625,16 +631,21 @@ export class PageAdapter {
     this.selectedOriginalUrl = null;
     this.selectedOriginalSnapshot = null;
     this.selectedActiveUrl = null;
+    this.selectedDisplayUrl = null;
   }
 
   private watchSelectedLoad(image: HTMLImageElement): void {
     this.clearPendingLoadTarget();
+    const expectedActiveUrl = image === this.selected ? this.selectedActiveUrl : null;
+    const expectedDisplayUrl = image === this.selected ? this.selectedDisplayUrl : null;
     if (isSuccessfulImageLoad(image)) {
-      void this.emitSuccessfulLoad(image);
+      void this.emitSuccessfulLoad(image, expectedActiveUrl, expectedDisplayUrl);
       return;
     }
 
     this.pendingLoadTarget = image;
+    this.pendingLoadActiveUrl = expectedActiveUrl;
+    this.pendingLoadDisplayUrl = expectedDisplayUrl;
     image.addEventListener('load', this.onSelectedLoad, { once: true });
     image.addEventListener('error', this.onSelectedError, { once: true });
   }
@@ -644,21 +655,35 @@ export class PageAdapter {
     this.pendingLoadTarget.removeEventListener('load', this.onSelectedLoad);
     this.pendingLoadTarget.removeEventListener('error', this.onSelectedError);
     this.pendingLoadTarget = null;
+    this.pendingLoadActiveUrl = null;
+    this.pendingLoadDisplayUrl = null;
   }
 
   private onSelectedLoad = (event: Event): void => {
     const image = event.currentTarget;
     if (image instanceof HTMLImageElement && image === this.selected && isSuccessfulImageLoad(image)) {
-      void this.emitSuccessfulLoad(image);
+      void this.emitSuccessfulLoad(image, this.pendingLoadActiveUrl, this.pendingLoadDisplayUrl);
     }
     this.clearPendingLoadTarget();
   };
 
   private onSelectedError = (event: Event): void => {
-    if (event.currentTarget === this.pendingLoadTarget) this.clearPendingLoadTarget();
+    const image = event.currentTarget;
+    const failedActiveUrl = this.pendingLoadActiveUrl;
+    if (image === this.pendingLoadTarget) this.clearPendingLoadTarget();
+    if (image !== this.selected || !failedActiveUrl || failedActiveUrl !== this.selectedActiveUrl) return;
+    this.emit(failedActiveUrl.startsWith('data:') ? 'Failed to load data URL.' : `Failed to load ${failedActiveUrl}`);
   };
 
-  private async emitSuccessfulLoad(image: HTMLImageElement): Promise<void> {
+  private async emitSuccessfulLoad(
+    image: HTMLImageElement,
+    expectedActiveUrl: string | null = null,
+    expectedDisplayUrl: string | null = null,
+  ): Promise<void> {
+    if (image === this.selected && expectedActiveUrl !== this.selectedActiveUrl) return;
+    if (image === this.selected && expectedDisplayUrl) {
+      if (!imageLoadedUrlMatches(image, expectedDisplayUrl)) return;
+    }
     if (image === this.selected) markSelectedTarget(image, { lockBox: this.selectedFillScreen, objectFit: this.selectedObjectFit });
     const target = createTargetImageInfo(image);
     if (!target) return;
@@ -707,6 +732,10 @@ export class PageAdapter {
 
 function isSuccessfulImageLoad(image: HTMLImageElement): boolean {
   return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+}
+
+function imageLoadedUrlMatches(image: HTMLImageElement, expectedUrl: string): boolean {
+  return [image.currentSrc, image.src, image.getAttribute('src')].some((url) => imageResourceUrlsEqual(url, expectedUrl, document.baseURI));
 }
 
 function findImageFromShortcutTarget(target: Element): HTMLImageElement | null {

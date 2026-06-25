@@ -35,7 +35,7 @@ import type {
 } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
-import { pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
+import { imageResourceUrlsEqual, pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
 import { RECENT_HISTORY_LIMITS, URL_REVIEW_STATUS_LIMITS, VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../core/settings.js';
 import { applyFieldSplitSpecs, createFieldSplitSpec } from '../core/url/field-splits.js';
 import { applyFieldDigitWidthSpecs, normalizeFieldDigitWidth, upsertFieldDigitWidthSpec } from '../core/url/field-widths.js';
@@ -590,7 +590,7 @@ export class ImageTrailPanel {
     await this.parsedFieldStateSaveQueue;
   }
 
-  private async restoreParsedFieldState(): Promise<void> {
+  private async restoreParsedFieldState(options: { readonly projectSavedSource?: boolean } = {}): Promise<void> {
     if (this.parsedFieldStateRestoreInProgress) return;
     if (!this.parsedFieldStateStore) return;
     this.state = setTargetState(this.state, toTargetState(this.pageAdapter.getSnapshot()));
@@ -604,12 +604,12 @@ export class ImageTrailPanel {
         !!candidate && shouldRestoreParsedFieldState(candidate, currentSelectedUrl, this.state.target.selectedHandleId),
     );
     if (!record) return;
-    const sameSource = record.sourceUrl === currentSelectedUrl;
+    const sameSource = imageResourceUrlsEqual(record.sourceUrl, currentSelectedUrl, window.location.href);
     this.parsedFieldStateRestoreInProgress = true;
     try {
-      if (!sameSource) {
+      if (options.projectSavedSource && !sameSource) {
         const projected = await this.applySelectedUrl(record.sourceUrl);
-        if (!projected && record.sourceUrl !== this.currentRawUrl()) return;
+        if (!projected && !imageResourceUrlsEqual(record.sourceUrl, this.currentRawUrl(), window.location.href)) return;
       }
       this.state = reducePanelAction(this.state, {
         name: 'parsed-field-state/restore',
@@ -624,7 +624,7 @@ export class ImageTrailPanel {
   }
 
   private restoreParsedFieldStateForCurrentPanel(): void {
-    void this.loadGrabSettings({ render: false }).then(() => this.restoreParsedFieldState());
+    void this.loadGrabSettings({ render: false }).then(() => this.restoreParsedFieldState({ projectSavedSource: true }));
   }
 
   private filterParsedFieldStateForCurrentUrl(record: ParsedFieldStateRecord): ParsedFieldStateRecord {
@@ -2161,27 +2161,30 @@ export class ImageTrailPanel {
   }
 
   private async previewRecord(url: string, blobId?: string, scrollAnchorId?: string): Promise<void> {
-    this.projectionRevision++;
+    const revision = ++this.projectionRevision;
     this.previewScrollAnchorId = scrollAnchorId ?? null;
     try {
       if (!blobId) {
-        await this.previewUrl(url);
+        await this.previewUrl(url, revision);
         return;
       }
 
       if (!this.captureStore) {
-        await this.previewUrl(url);
+        await this.previewUrl(url, revision);
         return;
       }
       const retrieved = await this.captureStore.requestRetrieveBlob(blobId);
+      if (!this.isCurrentProjectionRevision(revision)) return;
       if (!retrieved.ok) {
         if (retrieved.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
+        if (!this.isCurrentProjectionRevision(revision)) return;
         this.state = { ...this.state, message: retrieved.message, status: 'error', lastUpdatedAt: Date.now() };
         this.render();
         return;
       }
 
-      if (await this.projectUrlToSelectedImage(retrieved.dataUrl)) {
+      if (await this.projectUrlToSelectedImage(retrieved.dataUrl, revision)) {
+        if (!this.isCurrentProjectionRevision(revision)) return;
         this.state = {
           ...this.state,
           message: `Projected encrypted original (${(retrieved.byteLength / 1024).toFixed(1)} KB).`,
@@ -2191,6 +2194,7 @@ export class ImageTrailPanel {
         return;
       }
 
+      if (!this.isCurrentProjectionRevision(revision)) return;
       this.state = {
         ...this.state,
         message: 'Select a host image before previewing encrypted originals.',
@@ -2199,12 +2203,13 @@ export class ImageTrailPanel {
       };
       this.render();
     } finally {
-      this.previewScrollAnchorId = null;
+      if (this.isCurrentProjectionRevision(revision)) this.previewScrollAnchorId = null;
     }
   }
 
-  private async previewUrl(url: string): Promise<void> {
+  private async previewUrl(url: string, revision: number): Promise<void> {
     if (!this.canProjectToSelectedImage()) {
+      if (!this.isCurrentProjectionRevision(revision)) return;
       this.state = {
         ...this.state,
         message: 'Select a host image before previewing an image.',
@@ -2215,7 +2220,19 @@ export class ImageTrailPanel {
       return;
     }
 
-    if (await this.projectUrlToSelectedImage(url)) {
+    if (this.isCurrentSelectedImageUrl(url)) {
+      this.state = {
+        ...this.state,
+        message: 'Recent image is already projected into the selected host element.',
+        status: 'ready',
+        lastUpdatedAt: Date.now(),
+      };
+      this.render();
+      return;
+    }
+
+    if (await this.projectUrlToSelectedImage(url, revision)) {
+      if (!this.isCurrentProjectionRevision(revision)) return;
       this.state = { ...this.state, message: 'Projected image into selected host element.', lastUpdatedAt: Date.now() };
       this.render();
       return;
@@ -2227,57 +2244,34 @@ export class ImageTrailPanel {
     return !!handleId && !!this.findSelectedImage(handleId);
   }
 
-  private async projectUrlToSelectedImage(url: string): Promise<boolean> {
+  private isCurrentSelectedImageUrl(url: string): boolean {
+    return imageResourceUrlsEqual(url, this.currentSelectedUrl(), window.location.href);
+  }
+
+  private isCurrentProjectionRevision(revision: number): boolean {
+    return revision === this.projectionRevision;
+  }
+
+  private async projectUrlToSelectedImage(url: string, revision: number): Promise<boolean> {
     const handleId = this.state.target.selectedHandleId;
     if (!handleId) return false;
     const image = this.findSelectedImage(handleId);
     if (!image) return false;
 
     const preload = await this.preloadImageUrl(url);
+    if (!this.isCurrentProjectionRevision(revision)) return false;
     if (!preload.ok) {
       this.state = { ...this.state, message: preload.message, status: 'error', lastUpdatedAt: Date.now() };
       this.render();
       return false;
     }
 
-    return new Promise<boolean>((resolve) => {
-      let settled = false;
-      const timeout = window.setTimeout(() => finish(false), 4_000);
-      const finish = (ok: boolean): void => {
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timeout);
-        image.removeEventListener('load', onLoad);
-        image.removeEventListener('error', onError);
-        if (ok) {
-          this.state = setTargetState(this.state, toTargetState(this.pageAdapter.getSnapshot()));
-          this.render();
-        } else {
-          this.state = {
-            ...this.state,
-            message: 'Image failed to load after preload succeeded.',
-            status: 'error',
-            lastUpdatedAt: Date.now(),
-          };
-          this.render();
-        }
-        resolve(ok);
-      };
-      const isProjectedUrlLoaded = (): boolean =>
-        image.naturalWidth > 0 && image.naturalHeight > 0 && (image.currentSrc === preload.displayUrl || image.src === preload.displayUrl);
-      const onLoad = (): void => finish(isProjectedUrlLoaded());
-      const onError = (): void => finish(false);
-
-      image.addEventListener('load', onLoad, { once: true });
-      image.addEventListener('error', onError, { once: true });
-      const snapshot = this.pageAdapter.applyUrlToSelected(url, preload.displayUrl);
-      this.state = setTargetState(this.state, toTargetState(snapshot));
-      this.render();
-      void this.loadGrabSettings();
-      if (image.complete && isProjectedUrlLoaded()) {
-        queueMicrotask(() => finish(true));
-      }
-    });
+    const snapshot = this.pageAdapter.applyUrlToSelected(url, preload.displayUrl);
+    if (!this.isCurrentProjectionRevision(revision)) return false;
+    this.state = setTargetState(this.state, toTargetState(snapshot));
+    this.render();
+    void this.loadGrabSettings();
+    return true;
   }
 
   private async setupBlobKey(password: string): Promise<void> {

@@ -1094,6 +1094,50 @@ test('parsed field state restore ignores stale draft URLs for same host image el
   assert.equal(shouldRestoreParsedFieldState(record, 'https://cdn.example.test/image-0002.jpg', 'target-1'), false);
 });
 
+test('parsed field state restore does not auto-project saved drafts onto normal page images', () => {
+  const record = {
+    schemaVersion: 1 as const,
+    hostname: 'example.test',
+    pageUrl: 'https://example.test/gallery',
+    sourceUrl: 'https://cdn.example.test/image-0002.jpg',
+    selectedUrl: 'https://cdn.example.test/image-0001.jpg',
+    selectedHandleId: 'target-1',
+    activeFieldId: 'q:0:0',
+    failedFieldId: null,
+    successfulFieldIds: ['q:0:0'],
+    unchangedFieldIds: [],
+    unlockedFieldIds: ['q:0:0'],
+    manuallyExcludedFieldIds: [],
+    fieldSplitSpecs: [],
+    activeUrlTemplateId: 'template-1',
+    updatedAt: '2026-06-22T00:00:00.000Z',
+  };
+
+  assert.equal(shouldRestoreParsedFieldState(record, 'https://cdn.example.test/image-0001.jpg', 'target-1'), true);
+});
+
+test('parsed field state restore ignores stale direct-image page keys on normal pages', () => {
+  const record = {
+    schemaVersion: 1 as const,
+    hostname: 'example.test',
+    pageUrl: 'https://cdn.example.test/image-0001.jpg',
+    sourceUrl: 'https://cdn.example.test/image-0002.jpg',
+    selectedUrl: 'https://cdn.example.test/image-0001.jpg',
+    selectedHandleId: 'target-1',
+    activeFieldId: 'q:0:0',
+    failedFieldId: null,
+    successfulFieldIds: ['q:0:0'],
+    unchangedFieldIds: [],
+    unlockedFieldIds: ['q:0:0'],
+    manuallyExcludedFieldIds: [],
+    fieldSplitSpecs: [],
+    activeUrlTemplateId: 'template-1',
+    updatedAt: '2026-06-22T00:00:00.000Z',
+  };
+
+  assert.equal(shouldRestoreParsedFieldState(record, 'https://cdn.example.test/image-0001.jpg', 'target-1'), true);
+});
+
 test('parsed field page key ignores extension projections but follows page navigation', () => {
   const originalPage = 'https://example.test/gallery/1';
   const projectedImage = 'https://example.test/images/2.jpg';
