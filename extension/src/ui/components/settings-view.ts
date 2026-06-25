@@ -201,6 +201,7 @@ function createRecentsSettingsView(
   const overflowText = document.createElement('span');
   overflowText.textContent = 'Overflow';
   const overflowSelect = document.createElement('select');
+  overflowSelect.className = 'image-trail-panel__settings-select';
   overflowSelect.append(
     createOption('drop-oldest', 'Drop oldest', state.overflowBehavior),
     createOption('keep-session', 'Keep hidden this session', state.overflowBehavior),
