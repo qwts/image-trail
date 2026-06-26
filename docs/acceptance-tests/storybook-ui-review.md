@@ -2,6 +2,8 @@
 
 Image Trail uses Storybook as a component-first review harness for existing plain TypeScript DOM components. Stories should exercise isolated UI components with static fixtures and mock dispatch callbacks.
 
+Storybook's own dev tooling may install React packages transitively for its manager UI. Image Trail stories and extension UI components must continue to use the existing plain TypeScript DOM render functions rather than React components.
+
 ## Commands
 
 - Run Storybook locally: `npm run storybook`
@@ -10,6 +12,7 @@ Image Trail uses Storybook as a component-first review harness for existing plai
 ## Story Scope
 
 - Prefer existing exported DOM render functions from `extension/src/ui/components`.
+- Do not add React components, JSX, or a React renderer for Image Trail stories in this first pass.
 - Use static fixtures from `extension/src/ui/stories`.
 - Keep stories free of service worker, IndexedDB, encryption runtime, content-script page DOM, and full panel boot dependencies.
 - Add stories for meaningful states: normal, selected, captured/original-linked, locked/private, loading, error, empty, long text, and narrow layout.
