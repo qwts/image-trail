@@ -1,5 +1,7 @@
 import type { ImageDisplayRecord } from '../../core/display-records.js';
 import type { RecallState } from '../../core/types.js';
+import type { UrlFieldDigitWidthSpec } from '../../core/url/types.js';
+import type { EditableField } from '../components/fields-view.js';
 
 const BASE_TIME = '2026-06-25T15:30:00.000Z';
 
@@ -125,3 +127,134 @@ export function recallState(overrides: Partial<RecallState> = {}): RecallState {
     ...overrides,
   };
 }
+
+export const parsedFieldFixtures: readonly EditableField[] = [
+  {
+    field: {
+      id: 'path-gallery-year',
+      location: 'path',
+      label: 'Path segment 2 token 1',
+      value: '2026',
+      tokenKind: 'int',
+      partIndex: 2,
+      tokenIndex: 0,
+      digitWidth: 4,
+    },
+    value: '2026',
+  },
+  {
+    field: {
+      id: 'path-frame',
+      location: 'path',
+      label: 'Path segment 4 token 1',
+      value: '0042',
+      tokenKind: 'int',
+      partIndex: 4,
+      tokenIndex: 0,
+      digitWidth: 4,
+    },
+    value: '0042',
+  },
+  {
+    field: {
+      id: 'query-page',
+      location: 'query',
+      label: 'page',
+      value: '17',
+      tokenKind: 'int',
+      queryIndex: 0,
+      tokenIndex: 0,
+      digitWidth: 2,
+    },
+    value: '17',
+  },
+  {
+    field: {
+      id: 'query-color',
+      location: 'query',
+      label: 'color',
+      value: '0x2a',
+      tokenKind: 'hex',
+      queryIndex: 1,
+      tokenIndex: 0,
+      digitWidth: 2,
+    },
+    value: '0x2a',
+  },
+  {
+    field: {
+      id: 'query-slug',
+      location: 'query',
+      label: 'slug',
+      value: 'quiet-ridge-final',
+      tokenKind: 'text',
+      queryIndex: 2,
+      tokenIndex: 0,
+    },
+    value: 'quiet-ridge-final',
+  },
+];
+
+export const splitParsedFieldFixtures: readonly EditableField[] = [
+  {
+    field: {
+      id: 'query-sequence-a',
+      location: 'query',
+      label: 'sequence part 1',
+      value: '2026',
+      tokenKind: 'int',
+      queryIndex: 0,
+      tokenIndex: 0,
+      splitBaseId: 'query-sequence',
+      splitPartIndex: 0,
+      splitPartCount: 3,
+    },
+    value: '2026',
+  },
+  {
+    field: {
+      id: 'query-sequence-b',
+      location: 'query',
+      label: 'sequence part 2',
+      value: '06',
+      tokenKind: 'int',
+      queryIndex: 0,
+      tokenIndex: 1,
+      splitBaseId: 'query-sequence',
+      splitPartIndex: 1,
+      splitPartCount: 3,
+      digitWidth: 2,
+    },
+    value: '06',
+  },
+  {
+    field: {
+      id: 'query-sequence-c',
+      location: 'query',
+      label: 'sequence part 3',
+      value: '0042',
+      tokenKind: 'int',
+      queryIndex: 0,
+      tokenIndex: 2,
+      splitBaseId: 'query-sequence',
+      splitPartIndex: 2,
+      splitPartCount: 3,
+      digitWidth: 4,
+    },
+    value: '0042',
+  },
+];
+
+export const parsedFieldDigitWidthSpecs: readonly UrlFieldDigitWidthSpec[] = [
+  { fieldId: 'query-page', width: 2 },
+  { fieldId: 'query-color', width: 4 },
+  { fieldId: 'query-sequence-c', width: 4 },
+];
+
+export const urlEditorFixtures = {
+  current: 'https://images.example.test/gallery/2026/quiet-ridge-0042.jpg?page=17&color=0x2a&slug=quiet-ridge-final',
+  draft: 'https://images.example.test/gallery/2026/quiet-ridge-0043.jpg?page=18&color=0x2b&slug=quiet-ridge-final',
+  invalidDraft: 'https://images.example.test/gallery/2026/quiet ridge broken.jpg?token=<review-me>',
+  dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB',
+  long: 'https://images.example.test/gallery/2026/06/25/camera-a/exports/very-long-gallery-name-with-color-pass-and-review-notes/quiet-ridge-final-frame-00000042-ultra-wide.jpg?session=screen-review&token=long-story-fixture&color=0x2a',
+} as const;
