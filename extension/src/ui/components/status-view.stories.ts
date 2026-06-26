@@ -40,6 +40,21 @@ export const CapturePermissionError: Story = {
     }),
 };
 
+export const PrivacyMaskedErrorToast: Story = {
+  render: () =>
+    statusStory({
+      status: 'error',
+      privacyModeEnabled: true,
+      message: 'Loaded bookmark: https://private.example.test/originals/private-image.jpg',
+      captureResult: {
+        status: 'failed',
+        reason: 'permission-needed',
+        message: '',
+        origin: 'https://private.example.test',
+      },
+    }),
+};
+
 export const RetryAndRateLimit: Story = {
   render: () =>
     statusStory({
@@ -98,7 +113,6 @@ function statusHeaderStory(state: PanelState): HTMLElement {
   status.textContent = statusSummaryText(state);
   status.title = state.message.trim() || status.textContent;
   if (isPanelWaiting(state)) status.classList.add('is-waiting');
-  if (hasPanelError(state)) status.setAttribute('role', 'alert');
 
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__header-actions';
@@ -119,6 +133,8 @@ function statusToastStory(state: PanelState): HTMLElement {
   toastRoot.className = `image-trail-panel-root image-trail-panel__toast-root ${statusToneClass(state)}`;
   toastRoot.classList.toggle('is-waiting', isPanelWaiting(state));
   toastRoot.classList.toggle('has-status-error', hasPanelError(state));
+  const toastMessage = toastMessageText(state);
+  if (!toastMessage) return toastRoot;
 
   const toast = document.createElement('aside');
   toast.className = 'image-trail-panel__toast';
@@ -131,7 +147,7 @@ function statusToastStory(state: PanelState): HTMLElement {
 
   const message = document.createElement('span');
   message.className = 'image-trail-panel__toast-message';
-  message.textContent = toastMessageText(state);
+  message.textContent = toastMessage;
   message.title = message.textContent;
 
   toast.append(label, message);
@@ -172,16 +188,27 @@ function statusSummaryText(state: PanelState): string {
 }
 
 function toastMessageText(state: PanelState): string {
+  const waitingMessage = waitingToastMessageText(state);
+  if (waitingMessage) return waitingMessage;
+  if (!hasPanelError(state)) return '';
+  if (state.privacyModeEnabled) return 'Image Trail needs attention. Open the panel for details.';
   if (state.captureResult?.status === 'failed' || state.captureResult?.status === 'remote-only') {
     return state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
   }
   if (state.importExportMessage) return state.importExportMessage;
   if (state.recall.message) return state.recall.message;
   if (state.message.trim()) return state.message.trim();
+  return '';
+}
+
+function waitingToastMessageText(state: PanelState): string {
   if (state.captureInProgress) return 'Capturing selected image original.';
   if (state.importExportBusy) return 'Import or export is running.';
   if (state.recall.busy) return 'Loading Recall records.';
-  return 'Image Trail is ready.';
+  if (state.automation.retryPhase === 'running') return 'Retrying failed image loads.';
+  if (state.automation.slideshowPhase === 'running') return 'Slideshow is advancing images.';
+  if (state.automation.governorStatus !== 'ready') return 'Waiting for the request limit window.';
+  return '';
 }
 
 function statusToneClass(state: PanelState): string {

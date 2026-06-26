@@ -112,7 +112,6 @@ function createPanelHeader(state: PanelState, target: PanelRenderTarget): HTMLEl
   status.textContent = statusSummaryText(state);
   status.title = state.message.trim() || status.textContent;
   if (isPanelWaiting(state)) status.classList.add('is-waiting');
-  if (hasPanelError(state)) status.setAttribute('role', 'alert');
 
   actions.append(settings, minimize, close);
   header.append(heading, status, actions);
@@ -565,15 +564,26 @@ function statusSummaryText(state: PanelState): string {
 }
 
 function toastMessageText(state: PanelState): string {
+  const waitingMessage = waitingToastMessageText(state);
+  if (waitingMessage) return waitingMessage;
+  if (!hasPanelError(state)) return '';
+  if (state.privacyModeEnabled) return 'Image Trail needs attention. Open the panel for details.';
   if (state.captureResult?.status === 'failed' || state.captureResult?.status === 'remote-only') {
     return state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
   }
   if (state.importExportMessage) return state.importExportMessage;
   if (state.recall.message) return state.recall.message;
   if (state.message.trim()) return state.message.trim();
+  return '';
+}
+
+function waitingToastMessageText(state: PanelState): string {
   if (state.captureInProgress) return 'Capturing selected image original.';
   if (state.importExportBusy) return 'Import or export is running.';
   if (state.recall.busy) return 'Loading Recall records.';
+  if (state.automation.retryPhase === 'running') return 'Retrying failed image loads.';
+  if (state.automation.slideshowPhase === 'running') return 'Slideshow is advancing images.';
+  if (state.automation.governorStatus !== 'ready') return 'Waiting for the request limit window.';
   return '';
 }
 
