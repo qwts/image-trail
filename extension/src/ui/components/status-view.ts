@@ -29,12 +29,14 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
     const progress = document.createElement('p');
     progress.className = 'image-trail-panel__capture-status';
     progress.textContent = 'Capturing image…';
+    progress.setAttribute('aria-live', 'polite');
     children.push(progress);
   }
 
   if (state.captureResult && isFailedResult(state.captureResult)) {
     const error = document.createElement('p');
     error.className = 'image-trail-panel__capture-error';
+    error.setAttribute('role', 'alert');
     error.textContent = state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
     const dismiss = document.createElement('button');
     dismiss.type = 'button';
@@ -55,6 +57,7 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
   if (auto.slideshowPhase !== 'idle') {
     const slideshow = document.createElement('p');
     slideshow.className = 'image-trail-panel__automation-status';
+    if (auto.slideshowPhase === 'running') slideshow.classList.add('is-waiting');
     slideshow.textContent = `Slideshow: ${auto.slideshowPhase} (${auto.slideshowCount} shown)`;
     children.push(slideshow);
   }
@@ -62,13 +65,14 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
   if (auto.retryPhase !== 'idle') {
     const retry = document.createElement('p');
     retry.className = 'image-trail-panel__automation-status';
+    if (auto.retryPhase === 'running') retry.classList.add('is-waiting');
     retry.textContent = `Retry: ${auto.retryPhase} (${auto.retriesUsed}/${auto.retriesMax})`;
     children.push(retry);
   }
 
   if (auto.governorStatus !== 'ready') {
     const governor = document.createElement('p');
-    governor.className = 'image-trail-panel__automation-status';
+    governor.className = 'image-trail-panel__automation-status is-waiting';
     governor.textContent = `Rate limit: ${auto.governorStatus} (${auto.requestsInWindow} in window)`;
     children.push(governor);
   }

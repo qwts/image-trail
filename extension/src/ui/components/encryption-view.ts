@@ -29,6 +29,7 @@ export function createEncryptionView(
 ): HTMLElement {
   const section = document.createElement('details');
   section.className = 'image-trail-panel__section image-trail-panel__encryption';
+  section.classList.toggle('is-waiting', state.busy);
   section.open = encryptedOriginalsOpen;
   section.addEventListener('toggle', () => {
     encryptedOriginalsOpen = section.open;
@@ -41,8 +42,8 @@ export function createEncryptionView(
   heading.textContent = 'Encrypted originals';
 
   const badge = document.createElement('span');
-  badge.className = `image-trail-panel__encryption-badge${state.unlocked ? ' is-unlocked' : ''}`;
-  badge.textContent = state.unlocked ? 'Unlocked' : 'AES-GCM';
+  badge.className = `image-trail-panel__encryption-badge${state.unlocked ? ' is-unlocked' : ''}${state.busy ? ' is-waiting' : ''}`;
+  badge.textContent = state.busy ? 'Working' : state.unlocked ? 'Unlocked' : 'AES-GCM';
 
   header.append(heading, badge);
 
@@ -65,8 +66,9 @@ export function createEncryptionView(
 
   const cleanup = document.createElement('button');
   cleanup.type = 'button';
-  cleanup.textContent = 'Clean up unused originals';
+  cleanup.textContent = state.busy ? 'Working...' : 'Clean up unused originals';
   cleanup.className = 'image-trail-panel__secondary-action';
+  cleanup.classList.toggle('is-waiting', state.busy);
   cleanup.disabled = state.busy;
   cleanup.addEventListener('click', () => dispatch({ name: 'capture/cleanup-orphans' }));
 
@@ -98,8 +100,9 @@ export function createEncryptionView(
 
   const setup = document.createElement('button');
   setup.type = 'button';
-  setup.textContent = 'Create first key';
+  setup.textContent = state.busy ? 'Creating key...' : 'Create first key';
   setup.className = 'image-trail-panel__secondary-action';
+  setup.classList.toggle('is-waiting', state.busy);
   setup.disabled = state.busy;
   setup.addEventListener('click', () => {
     dispatch({ name: 'blob-key/setup', password: password.value });
@@ -108,8 +111,9 @@ export function createEncryptionView(
 
   const unlock = document.createElement('button');
   unlock.type = 'button';
-  unlock.textContent = 'Unlock';
+  unlock.textContent = state.busy ? 'Unlocking...' : 'Unlock';
   unlock.className = 'image-trail-panel__primary-action';
+  unlock.classList.toggle('is-waiting', state.busy);
   unlock.disabled = state.busy;
   unlock.addEventListener('click', unlockWithPassword);
 
@@ -154,8 +158,9 @@ function createKeyBackupControls(
 
   const exportKey = document.createElement('button');
   exportKey.type = 'button';
-  exportKey.textContent = 'Export key backup';
+  exportKey.textContent = state.busy ? 'Working...' : 'Export key backup';
   exportKey.className = 'image-trail-panel__secondary-action';
+  exportKey.classList.toggle('is-waiting', state.busy);
   exportKey.disabled = state.busy;
   exportKey.addEventListener('click', () => {
     dispatch({ name: 'blob-key/export', password: password.value });
@@ -164,8 +169,9 @@ function createKeyBackupControls(
 
   const importKey = document.createElement('button');
   importKey.type = 'button';
-  importKey.textContent = 'Import key backup';
+  importKey.textContent = state.busy ? 'Working...' : 'Import key backup';
   importKey.className = 'image-trail-panel__secondary-action';
+  importKey.classList.toggle('is-waiting', state.busy);
   importKey.disabled = state.busy;
   importKey.addEventListener('click', () => {
     readFileInput(file, (fileContent) => {
@@ -213,9 +219,10 @@ function createLockControls(state: { readonly busy: boolean }, dispatch: (action
 
   const clear = document.createElement('button');
   clear.type = 'button';
-  clear.textContent = 'Clear key';
+  clear.textContent = state.busy ? 'Working...' : 'Clear key';
   clear.title = 'Removes the stored encrypted originals key. Export a key backup first.';
   clear.className = 'image-trail-panel__secondary-action';
+  clear.classList.toggle('is-waiting', state.busy);
   clear.disabled = state.busy;
   clear.addEventListener('click', () => {
     if (!confirming) {

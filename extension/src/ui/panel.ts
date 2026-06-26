@@ -188,6 +188,7 @@ export function nextParsedFieldStatePageKey(
 export class ImageTrailPanel {
   private root: HTMLElement | null = null;
   private recallRoot: HTMLElement | null = null;
+  private toastRoot: HTMLElement | null = null;
   private state: PanelState = createInitialPanelState();
   private unsubscribeFromTarget: (() => void) | null = null;
   private unsubscribeFromLoads: (() => void) | null = null;
@@ -328,6 +329,7 @@ export class ImageTrailPanel {
     document.getElementById(ROOT_ID)?.remove();
     this.root = null;
     this.recallRoot = null;
+    this.toastRoot = null;
     this.panelPositionRestoreAttempt += 1;
     this.panelPositionRestored = false;
     this.panelPositionRestorePromise = null;
@@ -3296,6 +3298,8 @@ export class ImageTrailPanel {
       this.root.setAttribute('aria-label', 'Image Trail panel');
       this.recallRoot = document.createElement('div');
       this.recallRoot.className = 'image-trail-panel-recall-root';
+      this.toastRoot = document.createElement('div');
+      this.toastRoot.className = 'image-trail-panel-root image-trail-panel__toast-root';
       this.panelStylesReady = false;
       this.panelStylesReadyPromise = new Promise<void>((resolve) => {
         const reveal = (): void => {
@@ -3312,7 +3316,7 @@ export class ImageTrailPanel {
         link.addEventListener('error', reveal, { once: true });
         window.setTimeout(reveal, 300);
       });
-      shadow.replaceChildren(link, this.root, this.recallRoot);
+      shadow.replaceChildren(link, this.root, this.recallRoot, this.toastRoot);
       (document.body ?? document.documentElement).append(host);
     }
   }
@@ -3324,6 +3328,7 @@ export class ImageTrailPanel {
         {
           root: this.root,
           recallRoot: this.recallRoot,
+          toastRoot: this.toastRoot,
           dispatch: this.dispatch,
           layoutState: this.layoutState,
           scrollAnchorId: this.previewScrollAnchorId,
@@ -3424,6 +3429,7 @@ export class ImageTrailPanel {
       {
         root: this.root,
         recallRoot: this.recallRoot,
+        toastRoot: this.toastRoot,
         dispatch: this.dispatch,
         layoutState: this.layoutState,
         scrollAnchorId: this.previewScrollAnchorId,

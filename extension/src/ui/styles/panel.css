@@ -84,6 +84,27 @@
   pointer-events: none;
 }
 
+.image-trail-panel-root.image-trail-panel.has-status-error {
+  border-color: rgb(255 78 78 / 84%);
+  animation: image-trail-error-frame-glow 950ms ease-out 3;
+}
+
+.image-trail-panel-root.image-trail-panel.has-status-error::before {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 88 88 / 80%),
+    0 0 0 2px rgb(255 64 64 / 28%),
+    0 0 24px rgb(255 36 36 / 54%);
+  animation: image-trail-error-frame-pulse 950ms ease-out 3;
+}
+
+.image-trail-panel-root.image-trail-panel.is-waiting:not(.has-status-error) {
+  border-color: rgb(139 246 220 / 44%);
+}
+
+.image-trail-panel-root.image-trail-panel.is-waiting:not(.has-status-error)::before {
+  box-shadow: inset 0 0 0 1px rgb(139 246 220 / 20%);
+}
+
 .image-trail-panel-root.image-trail-panel.is-minimized {
   top: 50% !important;
   right: 12px !important;
@@ -114,6 +135,40 @@
 
 .image-trail-panel-root.image-trail-panel.is-minimized::before {
   content: none;
+}
+
+@keyframes image-trail-error-frame-glow {
+  0%,
+  100% {
+    border-color: rgb(255 78 78 / 62%);
+  }
+
+  35% {
+    border-color: rgb(255 126 126 / 96%);
+  }
+}
+
+@keyframes image-trail-error-frame-pulse {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+
+  35% {
+    opacity: 1;
+  }
+}
+
+@keyframes image-trail-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .image-trail-panel-root .image-trail-panel__minimized {
@@ -198,7 +253,7 @@
   top: -10px;
   z-index: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) minmax(86px, max-content) max-content;
   align-items: center;
   gap: 8px;
   justify-self: start;
@@ -236,6 +291,143 @@
   display: flex;
   align-items: center;
   gap: 5px;
+}
+
+.image-trail-panel-root .image-trail-panel__header-status {
+  min-width: 0;
+  max-inline-size: 130px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 5px;
+  margin: 0;
+  background: rgb(255 255 255 / 5%);
+  color: #bbb;
+  padding: 3px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font:
+    700 10px/1.25 system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__header-status.is-ready {
+  border-color: rgb(139 246 220 / 28%);
+  color: rgb(208 255 244 / 90%);
+}
+
+.image-trail-panel-root .image-trail-panel__header-status.is-waiting {
+  border-color: rgb(139 246 220 / 58%);
+  background: linear-gradient(110deg, transparent 0 32%, rgb(139 246 220 / 18%) 38% 50%, transparent 58% 100%), rgb(15 36 33 / 86%);
+  background-size:
+    220% 100%,
+    auto;
+  color: rgb(232 255 249);
+  animation: image-trail-wait-sweep 1200ms linear infinite;
+}
+
+.image-trail-panel-root .image-trail-panel__header-status.is-error {
+  border-color: rgb(255 112 112 / 80%);
+  background: rgb(92 20 24 / 82%);
+  color: rgb(255 226 226);
+  box-shadow: 0 0 12px rgb(255 64 64 / 28%);
+}
+
+.image-trail-panel-root.image-trail-panel__toast-root {
+  all: initial;
+  position: fixed;
+  z-index: 2147483647;
+  inset-block-start: 12px;
+  inset-inline-end: 12px;
+  display: grid;
+  justify-items: end;
+  inline-size: min(360px, calc(100vw - 24px));
+  pointer-events: none;
+  font:
+    12px/1.35 system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__toast {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-block-size: 36px;
+  overflow: hidden;
+  border: 1px solid rgb(139 246 220 / 42%);
+  border-radius: 7px;
+  background: rgb(9 16 16 / 94%);
+  color: #fff;
+  padding: 8px 10px;
+  box-shadow:
+    0 10px 28px rgb(0 0 0 / 42%),
+    inset 0 1px 0 rgb(255 255 255 / 9%);
+  animation: image-trail-toast-enter 170ms ease-out;
+}
+
+.image-trail-panel-root.image-trail-panel__toast-root.is-waiting .image-trail-panel__toast {
+  border-color: rgb(139 246 220 / 64%);
+  background: linear-gradient(110deg, transparent 0 34%, rgb(139 246 220 / 12%) 40% 52%, transparent 60% 100%), rgb(8 30 28 / 95%);
+  background-size:
+    240% 100%,
+    auto;
+  animation:
+    image-trail-toast-enter 170ms ease-out,
+    image-trail-wait-sweep 1200ms linear infinite;
+}
+
+.image-trail-panel-root.image-trail-panel__toast-root.has-status-error .image-trail-panel__toast {
+  border-color: rgb(255 98 98 / 88%);
+  background: rgb(66 12 16 / 96%);
+  box-shadow:
+    0 10px 28px rgb(0 0 0 / 46%),
+    0 0 24px rgb(255 36 36 / 42%),
+    inset 0 1px 0 rgb(255 255 255 / 10%);
+  animation:
+    image-trail-toast-enter 170ms ease-out,
+    image-trail-error-frame-pulse 950ms ease-out 3;
+}
+
+.image-trail-panel-root .image-trail-panel__toast-label {
+  display: inline-grid;
+  place-items: center;
+  min-block-size: 22px;
+  max-inline-size: 86px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: rgb(139 246 220 / 14%);
+  color: rgb(218 255 246);
+  padding: 3px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font:
+    800 10px/1.2 system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  text-transform: uppercase;
+}
+
+.image-trail-panel-root.image-trail-panel__toast-root.has-status-error .image-trail-panel__toast-label {
+  background: rgb(255 98 98 / 20%);
+  color: rgb(255 226 226);
+}
+
+.image-trail-panel-root .image-trail-panel__toast-message {
+  min-width: 0;
+  overflow: hidden;
+  color: rgb(241 241 241);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .image-trail-panel-root h3 {
@@ -322,6 +514,26 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__capture-status,
+.image-trail-panel-root .image-trail-panel__automation-status.is-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgb(193 255 240 / 92%);
+}
+
+.image-trail-panel-root .image-trail-panel__capture-status::before,
+.image-trail-panel-root .image-trail-panel__automation-status.is-waiting::before {
+  content: '';
+  flex: none;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 999px;
+  background: rgb(139 246 220);
+  box-shadow: 0 0 10px rgb(139 246 220 / 72%);
+  animation: image-trail-wait-dot 900ms ease-in-out infinite;
 }
 
 .image-trail-panel-root .image-trail-panel__section {
@@ -512,6 +724,12 @@
   gap: 8px;
 }
 
+.image-trail-panel-root .image-trail-panel__section.is-waiting,
+.image-trail-panel-root .image-trail-panel__image-transfer:has(button.is-waiting),
+.image-trail-panel-root .image-trail-panel__import-export:has(button.is-waiting) {
+  border-color: rgb(139 246 220 / 24%);
+}
+
 .image-trail-panel-root .image-trail-panel__encryption-summary {
   list-style: none;
 }
@@ -551,6 +769,13 @@
   border-color: rgb(89 255 178 / 48%);
   background: rgb(89 255 178 / 14%);
   box-shadow: 0 0 12px rgb(89 255 178 / 18%);
+}
+
+.image-trail-panel-root .image-trail-panel__encryption-badge.is-waiting {
+  border-color: rgb(139 246 220 / 62%);
+  background: rgb(139 246 220 / 14%);
+  color: rgb(230 255 249);
+  animation: image-trail-wait-badge 1050ms ease-in-out infinite;
 }
 
 .image-trail-panel-root .image-trail-panel__encryption-body {
@@ -657,7 +882,9 @@
 
 .image-trail-panel-root button {
   appearance: none;
+  position: relative;
   max-width: 100%;
+  overflow: hidden;
   border: 1px solid #555;
   border-radius: 4px;
   background: #222;
@@ -685,6 +912,31 @@
 .image-trail-panel-root button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.image-trail-panel-root button.is-waiting,
+.image-trail-panel-root button.is-waiting:disabled {
+  opacity: 0.86;
+  border-color: rgb(139 246 220 / 46%);
+  background: linear-gradient(110deg, transparent 0 28%, rgb(139 246 220 / 18%) 34% 46%, transparent 54% 100%), #1d2b29;
+  background-size:
+    220% 100%,
+    auto;
+  color: rgb(232 255 249);
+  cursor: progress;
+  animation: image-trail-wait-sweep 1200ms linear infinite;
+}
+
+.image-trail-panel-root .image-trail-panel__file-input:disabled + .image-trail-panel__file-picker-button {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.image-trail-panel-root .image-trail-panel__section.is-waiting button:disabled:not(.is-waiting),
+.image-trail-panel-root .image-trail-panel__image-transfer:has(button.is-waiting) button:disabled:not(.is-waiting),
+.image-trail-panel-root .image-trail-panel__import-export:has(button.is-waiting) button:disabled:not(.is-waiting) {
+  opacity: 0.64;
+  cursor: progress;
 }
 
 .image-trail-panel-root .image-trail-panel__queue-menu {
@@ -1081,11 +1333,6 @@
   background: rgb(110 24 28 / 72%);
 }
 
-.image-trail-panel-root .image-trail-panel__file-input:disabled + .image-trail-panel__file-picker-button {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .image-trail-panel-root .image-trail-panel__file-picker-name {
   min-width: 0;
   overflow: hidden;
@@ -1098,6 +1345,44 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+}
+
+@keyframes image-trail-wait-dot {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.78);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes image-trail-wait-badge {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgb(139 246 220 / 18%);
+  }
+
+  50% {
+    box-shadow: 0 0 16px rgb(139 246 220 / 42%);
+  }
+}
+
+@keyframes image-trail-wait-sweep {
+  from {
+    background-position:
+      120% 0,
+      0 0;
+  }
+
+  to {
+    background-position:
+      -120% 0,
+      0 0;
+  }
 }
 
 .image-trail-panel-root .image-trail-panel__target-url,
