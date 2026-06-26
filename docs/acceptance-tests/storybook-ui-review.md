@@ -29,6 +29,21 @@ Review each new story for:
 - Privacy-safe masked states that still explain what is hidden.
 - Long text, narrow layout, and overflow behavior without clipped controls or shifting hit targets.
 
+## Review Matrix
+
+Use the stories as a checklist, not only as visual examples:
+
+- Parsed fields: `ActiveField`, `IncludedAndExcluded`, `FailedLoad`, `PrivacyMasked`, `Collapsed`, and `Narrow` cover field focus, successful/failed navigation feedback, included/excluded controls, privacy masking, keyboard-reachable step buttons, and compact layout.
+- URL editor: `Empty`, `ReviewNeededUrl`, `DataUrl`, `PrivacyMasked`, `LongOverflow`, and `Narrow` cover disabled data-URL editing, review-needed text, empty state, privacy-safe URLs, and overflow.
+- Status and async cues: `Capturing`, `CapturePermissionError`, `RetryAndRateLimit`, and `StorageUsage` cover loading, permission/network-style capture failure, retry/rate-limit status, storage status, the sticky header status pill, the viewport-edge toast, and the panel-level waiting/error frame cues.
+- Host target: `NeedsSelection`, `Picking`, `GrabMode`, `FillScreenActive`, `PrivacyMasked`, `LongOverflow`, and `Narrow` cover target selection, grab-mode state, pressed controls, privacy masking, long URL overflow, and compact layout.
+- Recent history and bookmarks queue: `Empty`, `Selected`, `PinnedAndCaptured`, `LockedPrivate`, `LongOverflow`, `Narrow`, plus queue paging/selection stories cover transient recents, durable queue state, stored-original indicators, locked/private rows, and overflow.
+- Recall drawer: `Loading`, `Error`, `Selected`, `HasMore`, and `Narrow` cover async loading, decrypt failure, disabled selection actions, pagination, and drawer sizing.
+- Encrypted originals: `SetupRequired`, `LockedWithBackup`, `Busy`, `Unlocked`, `MaintenanceNeeded`, and `Narrow` cover lock/setup state, disabled busy controls, backup controls, waiting cues, and maintenance cues.
+- Import and export: `Busy`, `Error`, `ImageUtilitiesReady`, `ImageUtilitiesLocked`, `ImageUtilitiesError`, and `Narrow` cover import/export disabled state, error messages, image-transfer availability, encrypted-transfer lock state, waiting cues, and file-picker layout.
+
+If a reviewer expects a cue that is missing from this matrix and the production component API cannot render it, open a focused follow-up issue instead of adding story-only fake state. Follow-up #191 tracks explicit accessible labels/help text for password and file-picker controls surfaced by the Encrypted originals and Import and export stories.
+
 ## Adding Stories
 
 1. Put component stories next to the component as `*.stories.ts`.

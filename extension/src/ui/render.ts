@@ -1,4 +1,5 @@
 import type { PanelAction, PanelState } from '../core/types.js';
+import { captureFailureMessage } from '../core/image/capture-result.js';
 import { createBookmarksView } from './components/bookmarks-view.js';
 import { createControlsView } from './components/controls-view.js';
 import { createEncryptionView } from './components/encryption-view.js';
@@ -20,6 +21,7 @@ import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
 export interface PanelRenderTarget {
   readonly root: HTMLElement;
   readonly recallRoot?: HTMLElement | null;
+  readonly toastRoot?: HTMLElement | null;
   readonly dispatch: (action: PanelAction) => void;
   readonly layoutState: PanelLayoutState;
   readonly scrollAnchorId?: string | null;
@@ -105,8 +107,15 @@ function createPanelHeader(state: PanelState, target: PanelRenderTarget): HTMLEl
   close.setAttribute('aria-label', 'Close panel');
   close.title = 'Close panel';
 
+  const status = document.createElement('p');
+  status.className = `image-trail-panel__header-status ${statusToneClass(state)}`;
+  status.textContent = statusSummaryText(state);
+  status.title = state.message.trim() || status.textContent;
+  if (isPanelWaiting(state)) status.classList.add('is-waiting');
+  if (hasPanelError(state)) status.setAttribute('role', 'alert');
+
   actions.append(settings, minimize, close);
-  header.append(heading, actions);
+  header.append(heading, status, actions);
   return header;
 }
 
@@ -220,6 +229,9 @@ function restoreScrollAnchor(container: HTMLElement, anchor: ScrollSnapshot['anc
 
 export function renderPanel(target: PanelRenderTarget, state: PanelState, options: PanelRenderOptions = {}): void {
   target.root.classList.toggle('is-minimized', state.minimized);
+  target.root.classList.toggle('is-waiting', isPanelWaiting(state));
+  target.root.classList.toggle('has-status-error', hasPanelError(state));
+  renderStatusToast(target.toastRoot, state);
   if (state.minimized) {
     target.root.replaceChildren(createMinimizedPanel(state, target));
     if (target.recallRoot && options.renderRecall !== false) target.recallRoot.replaceChildren();
@@ -511,6 +523,84 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
   restoreScrollSnapshots(target.root, scrollPositions);
   restoreFocusedTextControl(target.root, focusedTextControl);
   if (options.renderRecall !== false) renderRecallDrawer(target, state);
+}
+
+function renderStatusToast(toastRoot: HTMLElement | null | undefined, state: PanelState): void {
+  if (!toastRoot) return;
+  const message = toastMessageText(state);
+  toastRoot.replaceChildren();
+  toastRoot.className = `image-trail-panel-root image-trail-panel__toast-root ${statusToneClass(state)}`;
+  toastRoot.classList.toggle('is-waiting', isPanelWaiting(state));
+  toastRoot.classList.toggle('has-status-error', hasPanelError(state));
+  if (!state.visible || state.status === 'closed' || !message) return;
+
+  const toast = document.createElement('aside');
+  toast.className = 'image-trail-panel__toast';
+  toast.setAttribute('role', hasPanelError(state) ? 'alert' : 'status');
+  toast.setAttribute('aria-live', hasPanelError(state) ? 'assertive' : 'polite');
+
+  const label = document.createElement('span');
+  label.className = 'image-trail-panel__toast-label';
+  label.textContent = hasPanelError(state) ? 'Error' : isPanelWaiting(state) ? 'Working' : statusSummaryText(state);
+
+  const copy = document.createElement('span');
+  copy.className = 'image-trail-panel__toast-message';
+  copy.textContent = message;
+  copy.title = message;
+
+  toast.append(label, copy);
+  toastRoot.append(toast);
+}
+
+function statusSummaryText(state: PanelState): string {
+  if (hasPanelError(state)) return 'Needs attention';
+  if (state.captureInProgress) return 'Capturing';
+  if (state.importExportBusy) return 'Import/export';
+  if (state.recall.busy) return 'Recall loading';
+  if (state.automation.retryPhase === 'running') return 'Retrying';
+  if (state.automation.slideshowPhase === 'running') return 'Slideshow';
+  if (state.automation.governorStatus !== 'ready') return 'Rate limited';
+  if (state.status === 'picking') return 'Picking';
+  return 'Ready';
+}
+
+function toastMessageText(state: PanelState): string {
+  if (state.captureResult?.status === 'failed' || state.captureResult?.status === 'remote-only') {
+    return state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
+  }
+  if (state.importExportMessage) return state.importExportMessage;
+  if (state.recall.message) return state.recall.message;
+  if (state.message.trim()) return state.message.trim();
+  if (state.captureInProgress) return 'Capturing selected image original.';
+  if (state.importExportBusy) return 'Import or export is running.';
+  if (state.recall.busy) return 'Loading Recall records.';
+  return '';
+}
+
+function statusToneClass(state: PanelState): string {
+  if (hasPanelError(state)) return 'is-error';
+  if (isPanelWaiting(state)) return 'is-waiting';
+  return 'is-ready';
+}
+
+function isPanelWaiting(state: PanelState): boolean {
+  return (
+    state.captureInProgress ||
+    state.importExportBusy ||
+    state.recall.busy ||
+    state.automation.slideshowPhase === 'running' ||
+    state.automation.retryPhase === 'running' ||
+    state.automation.governorStatus !== 'ready'
+  );
+}
+
+function hasPanelError(state: PanelState): boolean {
+  return (
+    state.status === 'error' ||
+    state.importExportMessageIsError === true ||
+    state.recall.messageIsError === true ||
+    (state.captureResult !== null && state.captureResult.status !== 'captured')
+  );
 }
 
 export function renderRecallDrawer(target: PanelRenderTarget, state: PanelState): void {

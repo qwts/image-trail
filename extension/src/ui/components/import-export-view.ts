@@ -45,6 +45,7 @@ export function createImageTransferView(state: ImportExportViewState, dispatch: 
   if (state.lastMessage) {
     const msg = document.createElement('p');
     msg.className = state.lastMessageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
+    if (state.lastMessageIsError) msg.setAttribute('role', 'alert');
     msg.textContent = state.lastMessage;
     section.append(msg);
   }
@@ -65,6 +66,7 @@ export function createImportExportView(state: ImportExportViewState, dispatch: (
   if (state.lastMessage) {
     const msg = document.createElement('p');
     msg.className = state.lastMessageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
+    if (state.lastMessageIsError) msg.setAttribute('role', 'alert');
     msg.textContent = state.lastMessage;
     section.append(msg);
   }
@@ -97,6 +99,7 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   const historyBtn = document.createElement('button');
   historyBtn.type = 'button';
   historyBtn.textContent = state.selectedHistoryCount > 0 ? `Export selected history (${state.selectedHistoryCount})` : 'Export history';
+  historyBtn.classList.toggle('is-waiting', state.busy);
   historyBtn.disabled = state.busy;
   historyBtn.addEventListener('click', () => {
     dispatch({ name: 'export/history', password: passwordInput.value, plaintext: plaintext.input.checked });
@@ -108,6 +111,7 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   bookmarksBtn.type = 'button';
   bookmarksBtn.textContent =
     state.selectedBookmarkCount > 0 ? `Export selected bookmarks (${state.selectedBookmarkCount})` : 'Export bookmarks';
+  bookmarksBtn.classList.toggle('is-waiting', state.busy);
   bookmarksBtn.disabled = state.busy;
   bookmarksBtn.addEventListener('click', () => {
     dispatch({ name: 'export/bookmarks', password: passwordInput.value, plaintext: plaintext.input.checked });
@@ -118,6 +122,7 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   const urlReviewStatusBtn = document.createElement('button');
   urlReviewStatusBtn.type = 'button';
   urlReviewStatusBtn.textContent = 'Export URL review status';
+  urlReviewStatusBtn.classList.toggle('is-waiting', state.busy);
   urlReviewStatusBtn.disabled = state.busy;
   urlReviewStatusBtn.addEventListener('click', () => dispatch({ name: 'export/url-review-status' }));
 
@@ -194,6 +199,7 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
   importBtn.textContent = 'Import selected';
+  importBtn.classList.toggle('is-waiting', state.busy);
   importBtn.disabled = state.busy;
   importBtn.addEventListener('click', () => {
     readImageFiles(imageInput, (files) => dispatch({ name: 'import/image', files }));
@@ -202,6 +208,7 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const importEncryptedBtn = document.createElement('button');
   importEncryptedBtn.type = 'button';
   importEncryptedBtn.textContent = 'Import encrypted';
+  importEncryptedBtn.classList.toggle('is-waiting', state.busy);
   importEncryptedBtn.disabled = state.busy || !state.blobKeyUnlocked;
   importEncryptedBtn.addEventListener('click', () => {
     readEncryptedImageFiles(encryptedImageInput, (files) => dispatch({ name: 'import/encrypted-image', files }));
@@ -210,12 +217,14 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const selectEverythingBtn = document.createElement('button');
   selectEverythingBtn.type = 'button';
   selectEverythingBtn.textContent = 'Select everything shown';
+  selectEverythingBtn.classList.toggle('is-waiting', state.busy);
   selectEverythingBtn.disabled = state.busy || state.visibleImageSelectionCount === 0;
   selectEverythingBtn.addEventListener('click', () => dispatch({ name: 'selection/select-visible' }));
 
   const exportBtn = document.createElement('button');
   exportBtn.type = 'button';
   exportBtn.textContent = state.selectedImageDownloadCount > 0 ? `Export images (${state.selectedImageDownloadCount})` : 'Export images';
+  exportBtn.classList.toggle('is-waiting', state.busy);
   exportBtn.disabled = state.busy || !state.imageDownloadAvailable;
   exportBtn.addEventListener('click', (event) => {
     dispatch({ name: 'export/image', saveAs: event.shiftKey });
@@ -225,6 +234,7 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   exportEncryptedBtn.type = 'button';
   exportEncryptedBtn.textContent =
     state.selectedImageDownloadCount > 0 ? `Export encrypted (${state.selectedImageDownloadCount})` : 'Export encrypted';
+  exportEncryptedBtn.classList.toggle('is-waiting', state.busy);
   exportEncryptedBtn.disabled = state.busy || !state.encryptedImageTransferAvailable;
   exportEncryptedBtn.addEventListener('click', () => {
     dispatch({ name: 'export/encrypted-image' });
@@ -264,6 +274,7 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   const historyBtn = document.createElement('button');
   historyBtn.type = 'button';
   historyBtn.textContent = 'Import history';
+  historyBtn.classList.toggle('is-waiting', state.busy);
   historyBtn.disabled = state.busy;
   historyBtn.addEventListener('click', () => {
     readFileInput(fileInput, (content) => {
@@ -275,6 +286,7 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   const bookmarksBtn = document.createElement('button');
   bookmarksBtn.type = 'button';
   bookmarksBtn.textContent = 'Import bookmarks';
+  bookmarksBtn.classList.toggle('is-waiting', state.busy);
   bookmarksBtn.disabled = state.busy;
   bookmarksBtn.addEventListener('click', () => {
     readFileInput(fileInput, (content) => {
@@ -286,6 +298,7 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   const urlReviewStatusBtn = document.createElement('button');
   urlReviewStatusBtn.type = 'button';
   urlReviewStatusBtn.textContent = 'Import URL review status';
+  urlReviewStatusBtn.classList.toggle('is-waiting', state.busy);
   urlReviewStatusBtn.disabled = state.busy;
   urlReviewStatusBtn.addEventListener('click', () => {
     readFileInput(fileInput, (content) => {
@@ -297,6 +310,7 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   bookmarkletBtn.type = 'button';
   bookmarkletBtn.textContent = 'Import legacy bookmarklet JSON';
   bookmarkletBtn.className = 'image-trail-panel__secondary-action';
+  bookmarkletBtn.classList.toggle('is-waiting', state.busy);
   bookmarkletBtn.disabled = state.busy;
   bookmarkletBtn.addEventListener('click', () => {
     readFileInput(fileInput, (content) => {

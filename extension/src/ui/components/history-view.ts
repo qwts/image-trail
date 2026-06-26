@@ -175,8 +175,9 @@ export function createHistoryView(
     } else if (blobKeyUnlocked) {
       const capture = document.createElement('button');
       capture.type = 'button';
-      capture.textContent = 'Capture';
+      capture.textContent = captureInProgress ? 'Capturing...' : 'Capture';
       capture.disabled = captureInProgress;
+      capture.classList.toggle('is-waiting', captureInProgress);
       capture.addEventListener('click', (event) => {
         event.stopPropagation();
         dispatch({ name: 'capture/request', url: item.url, sourceType: 'history', sourceRecordId: item.id });
