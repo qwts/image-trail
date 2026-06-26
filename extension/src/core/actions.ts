@@ -540,6 +540,14 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         clearUrlReviewStatusAfterExport: action.clearAfterExport,
         lastUpdatedAt: Date.now(),
       };
+    case 'settings/update-neighbor-preload':
+      return {
+        ...state,
+        neighborPreloadEnabled: action.enabled,
+        neighborPreloadRadius: action.radius,
+        neighborPreloadCacheLimit: action.cacheLimit,
+        lastUpdatedAt: Date.now(),
+      };
     case 'url-templates/load': {
       const previousActiveTemplate = state.urlTemplates.find((template) => template.id === state.activeUrlTemplateId);
       const preservedFailedDraftTemplate =

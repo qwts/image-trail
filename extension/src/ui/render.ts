@@ -394,6 +394,11 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
               limit: state.urlReviewStatusLimit,
               clearAfterExport: state.clearUrlReviewStatusAfterExport,
             },
+            {
+              enabled: state.neighborPreloadEnabled,
+              radius: state.neighborPreloadRadius,
+              cacheLimit: state.neighborPreloadCacheLimit,
+            },
             target.dispatch,
           ),
           createEncryptionView(

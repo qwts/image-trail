@@ -8,7 +8,13 @@ import {
   type GrabStrategyKind,
 } from '../../core/url/grab-strategies.js';
 import type { UrlField } from '../../core/url/types.js';
-import { RECENT_HISTORY_LIMITS, URL_REVIEW_STATUS_LIMITS, VISIBLE_BOOKMARK_SOFT_MAX_LIMITS } from '../../core/settings.js';
+import {
+  NEIGHBOR_PRELOAD_CACHE_LIMITS,
+  NEIGHBOR_PRELOAD_RADIUS_LIMITS,
+  RECENT_HISTORY_LIMITS,
+  URL_REVIEW_STATUS_LIMITS,
+  VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
+} from '../../core/settings.js';
 
 const MATCH_MODES: readonly { readonly value: UrlTemplateMatchMode; readonly label: string }[] = [
   { value: 'exact-page-shape', label: 'Exact page shape' },
@@ -44,6 +50,11 @@ export function createSettingsView(
   urlReviewStatusState: {
     readonly limit: number;
     readonly clearAfterExport: boolean;
+  },
+  neighborPreloadState: {
+    readonly enabled: boolean;
+    readonly radius: number;
+    readonly cacheLimit: number;
   },
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
@@ -91,6 +102,7 @@ export function createSettingsView(
     createRecentsSettingsView(recentHistoryState, dispatch),
     createPrivatePinSettingsView(privatePinState, dispatch),
     createPrivacySettingsView(privacyModeEnabled, dispatch),
+    createNeighborPreloadSettingsView(neighborPreloadState, dispatch),
     createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),
     createPanelLayoutSettingsView(dispatch),
     createDestructiveSettingsView(destructiveState, dispatch),
@@ -98,6 +110,110 @@ export function createSettingsView(
     createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),
   );
   return section;
+}
+
+function createNeighborPreloadSettingsView(
+  state: {
+    readonly enabled: boolean;
+    readonly radius: number;
+    readonly cacheLimit: number;
+  },
+  dispatch: (action: PanelAction) => void,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'Preload';
+
+  const form = document.createElement('form');
+  form.className = 'image-trail-panel__settings-form';
+
+  const enabledLabel = document.createElement('label');
+  enabledLabel.className = 'image-trail-panel__settings-checkbox';
+  const enabledInput = document.createElement('input');
+  enabledInput.type = 'checkbox';
+  enabledInput.checked = state.enabled;
+  const enabledText = document.createElement('span');
+  enabledText.textContent = 'Warm adjacent parsed-field images';
+  enabledLabel.append(enabledInput, enabledText);
+
+  const radiusLabel = document.createElement('label');
+  radiusLabel.className = 'image-trail-panel__settings-field';
+  const radiusText = document.createElement('span');
+  radiusText.textContent = 'Radius';
+  const radiusInput = document.createElement('input');
+  radiusInput.className = 'image-trail-panel__settings-number-input';
+  radiusInput.type = 'number';
+  radiusInput.min = String(NEIGHBOR_PRELOAD_RADIUS_LIMITS.min);
+  radiusInput.max = String(NEIGHBOR_PRELOAD_RADIUS_LIMITS.max);
+  radiusInput.step = '1';
+  radiusInput.value = String(state.radius);
+  radiusInput.inputMode = 'numeric';
+  radiusLabel.append(radiusText, radiusInput);
+
+  const cacheLimitLabel = document.createElement('label');
+  cacheLimitLabel.className = 'image-trail-panel__settings-field';
+  const cacheLimitText = document.createElement('span');
+  cacheLimitText.textContent = 'Cache';
+  const cacheLimitInput = document.createElement('input');
+  cacheLimitInput.className = 'image-trail-panel__settings-number-input';
+  cacheLimitInput.type = 'number';
+  cacheLimitInput.min = String(NEIGHBOR_PRELOAD_CACHE_LIMITS.min);
+  cacheLimitInput.max = String(NEIGHBOR_PRELOAD_CACHE_LIMITS.max);
+  cacheLimitInput.step = '1';
+  cacheLimitInput.value = String(state.cacheLimit);
+  cacheLimitInput.inputMode = 'numeric';
+  cacheLimitLabel.append(cacheLimitText, cacheLimitInput);
+
+  const apply = document.createElement('button');
+  apply.type = 'submit';
+  apply.textContent = 'Apply';
+
+  const parsedRadius = (): number | null => {
+    const radius = Number(radiusInput.value);
+    if (!Number.isInteger(radius) || radius < NEIGHBOR_PRELOAD_RADIUS_LIMITS.min || radius > NEIGHBOR_PRELOAD_RADIUS_LIMITS.max) {
+      return null;
+    }
+    return radius;
+  };
+
+  const parsedCacheLimit = (): number | null => {
+    const cacheLimit = Number(cacheLimitInput.value);
+    if (!Number.isInteger(cacheLimit) || cacheLimit < NEIGHBOR_PRELOAD_CACHE_LIMITS.min || cacheLimit > NEIGHBOR_PRELOAD_CACHE_LIMITS.max) {
+      return null;
+    }
+    return cacheLimit;
+  };
+
+  const dispatchCurrent = (): void => {
+    const radius = parsedRadius();
+    const cacheLimit = parsedCacheLimit();
+    if (radius === null || cacheLimit === null) return;
+    dispatch({ name: 'settings/update-neighbor-preload', enabled: enabledInput.checked, radius, cacheLimit });
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    dispatchCurrent();
+  });
+  enabledInput.addEventListener('change', () => {
+    dispatch({
+      name: 'settings/update-neighbor-preload',
+      enabled: enabledInput.checked,
+      radius: parsedRadius() ?? state.radius,
+      cacheLimit: parsedCacheLimit() ?? state.cacheLimit,
+    });
+  });
+
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__settings-empty';
+  meta.textContent =
+    'Speculative loads stay in this page session only and never add Recents, URL review records, panel messages, pins, or Recall entries. Cache 0 keeps all entries without eviction.';
+
+  form.append(enabledLabel, radiusLabel, cacheLimitLabel, apply);
+  wrapper.append(heading, form, meta);
+  return wrapper;
 }
 
 function createUrlReviewStatusSettingsView(

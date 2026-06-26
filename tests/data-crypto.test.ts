@@ -106,6 +106,9 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().previewFillScreen, true);
   assert.equal(repository.load().urlReviewStatusLimit, 5000);
   assert.equal(repository.load().clearUrlReviewStatusAfterExport, false);
+  assert.equal(repository.load().neighborPreloadEnabled, false);
+  assert.equal(repository.load().neighborPreloadRadius, 1);
+  assert.equal(repository.load().neighborPreloadCacheLimit, 24);
   repository.save({ ...DEFAULT_LOCAL_SETTINGS, pinSaveStoragePreference: 'plaintext' });
   assert.equal(repository.load().pinSaveStoragePreference, 'plaintext');
 });
@@ -269,6 +272,34 @@ test('migrates URL review status retention settings safely', () => {
   assert.equal(valid.load().urlReviewStatusLimit, 250);
   assert.equal(valid.load().clearUrlReviewStatusAfterExport, true);
   assert.equal(invalidClear.load().clearUrlReviewStatusAfterExport, false);
+});
+
+test('migrates neighbor preload settings safely', () => {
+  const high = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ neighborPreloadEnabled: true, neighborPreloadRadius: 6, neighborPreloadCacheLimit: 501 }),
+    setItem: () => {},
+  });
+  const low = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ neighborPreloadEnabled: true, neighborPreloadRadius: -1, neighborPreloadCacheLimit: -1 }),
+    setItem: () => {},
+  });
+  const valid = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ neighborPreloadEnabled: true, neighborPreloadRadius: 3, neighborPreloadCacheLimit: 0 }),
+    setItem: () => {},
+  });
+  const invalidEnabled = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ neighborPreloadEnabled: 'yes', neighborPreloadRadius: 2 }),
+    setItem: () => {},
+  });
+
+  assert.equal(high.load().neighborPreloadRadius, DEFAULT_LOCAL_SETTINGS.neighborPreloadRadius);
+  assert.equal(high.load().neighborPreloadCacheLimit, DEFAULT_LOCAL_SETTINGS.neighborPreloadCacheLimit);
+  assert.equal(low.load().neighborPreloadRadius, DEFAULT_LOCAL_SETTINGS.neighborPreloadRadius);
+  assert.equal(low.load().neighborPreloadCacheLimit, DEFAULT_LOCAL_SETTINGS.neighborPreloadCacheLimit);
+  assert.equal(valid.load().neighborPreloadEnabled, true);
+  assert.equal(valid.load().neighborPreloadRadius, 3);
+  assert.equal(valid.load().neighborPreloadCacheLimit, 0);
+  assert.equal(invalidEnabled.load().neighborPreloadEnabled, false);
 });
 
 test('tracks session unlock state without persisting key material', async () => {

@@ -156,6 +156,9 @@ export interface PanelState {
   readonly privacyModeEnabled: boolean;
   readonly urlReviewStatusLimit: number;
   readonly clearUrlReviewStatusAfterExport: boolean;
+  readonly neighborPreloadEnabled: boolean;
+  readonly neighborPreloadRadius: number;
+  readonly neighborPreloadCacheLimit: number;
   readonly hasOlderBookmarks: boolean;
   readonly hasNewerBookmarks: boolean;
   readonly captureInProgress: boolean;
@@ -238,6 +241,7 @@ export type PanelActionName =
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
   | 'settings/update-url-review-status-retention'
+  | 'settings/update-neighbor-preload'
   | 'settings/reset-panel-position'
   | 'url-templates/load'
   | 'url-template/remove'
@@ -331,6 +335,7 @@ export type PanelAction =
         | 'settings/update-pin-save-storage-preference'
         | 'settings/update-privacy-mode'
         | 'settings/update-url-review-status-retention'
+        | 'settings/update-neighbor-preload'
         | 'url-templates/load'
         | 'url-template/remove'
         | 'url-template/update-settings'
@@ -417,6 +422,12 @@ export type PanelAction =
       readonly name: 'settings/update-url-review-status-retention';
       readonly limit: number;
       readonly clearAfterExport: boolean;
+    }
+  | {
+      readonly name: 'settings/update-neighbor-preload';
+      readonly enabled: boolean;
+      readonly radius: number;
+      readonly cacheLimit: number;
     }
   | { readonly name: 'url-templates/load'; readonly templates: readonly UrlTemplateRecord[]; readonly activeTemplateId?: string | null }
   | { readonly name: 'url-template/remove'; readonly id: string }

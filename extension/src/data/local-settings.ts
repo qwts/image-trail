@@ -1,5 +1,9 @@
 import {
+  DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
+  DEFAULT_NEIGHBOR_PRELOAD_RADIUS,
   DEFAULT_URL_REVIEW_STATUS_LIMIT,
+  NEIGHBOR_PRELOAD_CACHE_LIMITS,
+  NEIGHBOR_PRELOAD_RADIUS_LIMITS,
   RECENT_HISTORY_LIMITS,
   URL_REVIEW_STATUS_LIMITS,
   VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
@@ -22,6 +26,9 @@ export interface PlaintextLocalSettings {
   readonly previewFillScreen: boolean;
   readonly urlReviewStatusLimit: number;
   readonly clearUrlReviewStatusAfterExport: boolean;
+  readonly neighborPreloadEnabled: boolean;
+  readonly neighborPreloadRadius: number;
+  readonly neighborPreloadCacheLimit: number;
 }
 
 export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
@@ -39,6 +46,9 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   previewFillScreen: true,
   urlReviewStatusLimit: DEFAULT_URL_REVIEW_STATUS_LIMIT,
   clearUrlReviewStatusAfterExport: false,
+  neighborPreloadEnabled: false,
+  neighborPreloadRadius: DEFAULT_NEIGHBOR_PRELOAD_RADIUS,
+  neighborPreloadCacheLimit: DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
 };
 
 export const LOCAL_SETTINGS_KEY = 'imageTrail.localSettings';
@@ -100,6 +110,13 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
       ? input.urlReviewStatusLimit
       : DEFAULT_LOCAL_SETTINGS.urlReviewStatusLimit,
     clearUrlReviewStatusAfterExport: input.clearUrlReviewStatusAfterExport === true,
+    neighborPreloadEnabled: input.neighborPreloadEnabled === true,
+    neighborPreloadRadius: isSafeNeighborPreloadRadius(input.neighborPreloadRadius)
+      ? input.neighborPreloadRadius
+      : DEFAULT_LOCAL_SETTINGS.neighborPreloadRadius,
+    neighborPreloadCacheLimit: isSafeNeighborPreloadCacheLimit(input.neighborPreloadCacheLimit)
+      ? input.neighborPreloadCacheLimit
+      : DEFAULT_LOCAL_SETTINGS.neighborPreloadCacheLimit,
   };
 }
 
@@ -131,5 +148,23 @@ function isSafeRecentHistoryLimit(value: unknown): value is number {
 function isSafeUrlReviewStatusLimit(value: unknown): value is number {
   return (
     typeof value === 'number' && Number.isInteger(value) && value >= URL_REVIEW_STATUS_LIMITS.min && value <= URL_REVIEW_STATUS_LIMITS.max
+  );
+}
+
+function isSafeNeighborPreloadRadius(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= NEIGHBOR_PRELOAD_RADIUS_LIMITS.min &&
+    value <= NEIGHBOR_PRELOAD_RADIUS_LIMITS.max
+  );
+}
+
+function isSafeNeighborPreloadCacheLimit(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= NEIGHBOR_PRELOAD_CACHE_LIMITS.min &&
+    value <= NEIGHBOR_PRELOAD_CACHE_LIMITS.max
   );
 }

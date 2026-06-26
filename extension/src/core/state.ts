@@ -1,5 +1,5 @@
 import type { AutomationState, PanelState, RecallState, TargetState } from './types.js';
-import { DEFAULT_URL_REVIEW_STATUS_LIMIT } from './settings.js';
+import { DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT, DEFAULT_NEIGHBOR_PRELOAD_RADIUS, DEFAULT_URL_REVIEW_STATUS_LIMIT } from './settings.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT } from './preview-style.js';
 
 export const EMPTY_TARGET_STATE: TargetState = {
@@ -59,6 +59,9 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     privacyModeEnabled: false,
     urlReviewStatusLimit: DEFAULT_URL_REVIEW_STATUS_LIMIT,
     clearUrlReviewStatusAfterExport: false,
+    neighborPreloadEnabled: false,
+    neighborPreloadRadius: DEFAULT_NEIGHBOR_PRELOAD_RADIUS,
+    neighborPreloadCacheLimit: DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
     hasOlderBookmarks: false,
     hasNewerBookmarks: false,
     captureInProgress: false,
