@@ -42,6 +42,7 @@ export const ImageUtilitiesLocked: Story = {
       blobKeyUnlocked: false,
       encryptedImageTransferAvailable: false,
       lastMessage: 'Unlock encrypted originals before importing encrypted image files.',
+      lastMessageIsError: true,
     }),
 };
 
@@ -68,7 +69,7 @@ function imageTransferStory(overrides: Partial<ImportExportStoryState> = {}, sto
 function importExportState(overrides: Partial<ImportExportStoryState> = {}): ImportExportStoryState {
   return {
     busy: false,
-    currentImageUrl: 'https://images.example.test/gallery/current.jpg',
+    currentImageUrl: 'https://images.example.test/gallery/quiet-ridge.jpg',
     selectedHistoryCount: 2,
     selectedBookmarkCount: 1,
     selectedImageDownloadCount: 3,

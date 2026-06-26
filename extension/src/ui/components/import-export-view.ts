@@ -1,5 +1,6 @@
 import type { ImportedEncryptedImageFile, ImportedImageFile } from '../../core/types.js';
 import { createActionGroup } from './action-group.js';
+import { createFilePickerField, createPasswordField } from './form-controls.js';
 
 type UrlReviewStatusClearScope = 'hostname' | 'page' | 'source' | 'all';
 
@@ -31,8 +32,6 @@ export interface ImportExportViewState {
   readonly lastMessage?: string;
   readonly lastMessageIsError?: boolean;
 }
-
-let filePickerId = 0;
 
 export function createImageTransferView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
   const section = document.createElement('section');
@@ -84,17 +83,20 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   label.textContent = 'Export';
   group.append(label);
 
-  const passwordInput = document.createElement('input');
-  passwordInput.type = 'password';
-  passwordInput.placeholder = 'Export password';
-  passwordInput.autocomplete = 'new-password';
-  passwordInput.className = 'image-trail-panel__password-input';
+  const passwordControl = createPasswordField({
+    label: 'Encrypted export password',
+    description: 'Protects exported history and bookmark JSON files unless plaintext export is enabled.',
+    placeholder: 'Export password',
+    autocomplete: 'new-password',
+    disabled: state.busy,
+  });
+  const passwordInput = passwordControl.input;
 
   const plaintext = createToggle('Plaintext');
 
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__control-stack';
-  controls.append(passwordInput, plaintext.label);
+  controls.append(passwordControl.field, plaintext.label);
 
   const historyBtn = document.createElement('button');
   historyBtn.type = 'button';
@@ -176,25 +178,31 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const group = document.createElement('div');
   group.className = 'image-trail-panel__subsection';
 
-  const imageInput = document.createElement('input');
-  imageInput.type = 'file';
-  imageInput.accept = 'image/*';
-  imageInput.multiple = true;
-  imageInput.className = 'image-trail-panel__file-input';
-  imageInput.disabled = state.busy;
-  const imagePicker = createFilePicker(imageInput, 'Choose images');
+  const imageControl = createFilePickerField({
+    label: 'Image files',
+    description: 'Choose one or more local image files to import into the active session.',
+    buttonText: 'Choose images',
+    noFileText: 'No file selected',
+    accept: 'image/*',
+    multiple: true,
+    disabled: state.busy,
+  });
+  const imageInput = imageControl.input;
 
-  const encryptedImageInput = document.createElement('input');
-  encryptedImageInput.type = 'file';
-  encryptedImageInput.accept = '.json,.image-trail-encrypted.json';
-  encryptedImageInput.multiple = true;
-  encryptedImageInput.className = 'image-trail-panel__file-input';
-  encryptedImageInput.disabled = state.busy || !state.blobKeyUnlocked;
-  const encryptedImagePicker = createFilePicker(encryptedImageInput, 'Choose encrypted');
+  const encryptedImageControl = createFilePickerField({
+    label: 'Encrypted image files',
+    description: 'Choose Image Trail encrypted image JSON files to import after encrypted storage is unlocked.',
+    buttonText: 'Choose encrypted',
+    noFileText: 'No file selected',
+    accept: '.json,.image-trail-encrypted.json',
+    multiple: true,
+    disabled: state.busy || !state.blobKeyUnlocked,
+  });
+  const encryptedImageInput = encryptedImageControl.input;
 
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__control-stack';
-  controls.append(imagePicker, encryptedImagePicker);
+  controls.append(imageControl.field, encryptedImageControl.field);
 
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
@@ -259,17 +267,24 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   label.textContent = 'Import';
   group.append(label);
 
-  const passwordInput = document.createElement('input');
-  passwordInput.type = 'password';
-  passwordInput.placeholder = 'Import password';
-  passwordInput.autocomplete = 'current-password';
-  passwordInput.className = 'image-trail-panel__password-input';
+  const passwordControl = createPasswordField({
+    label: 'Encrypted import password',
+    description: 'Unlocks encrypted history or bookmark import files. Plain URL review and legacy imports ignore this password.',
+    placeholder: 'Import password',
+    autocomplete: 'current-password',
+    disabled: state.busy,
+  });
+  const passwordInput = passwordControl.input;
 
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = '.json';
-  fileInput.className = 'image-trail-panel__file-input';
-  const filePicker = createFilePicker(fileInput, 'Choose JSON');
+  const fileControl = createFilePickerField({
+    label: 'Import JSON file',
+    description: 'Choose an Image Trail history, bookmark, URL review status, or legacy bookmarklet JSON file.',
+    buttonText: 'Choose JSON',
+    noFileText: 'No file selected',
+    accept: '.json',
+    disabled: state.busy,
+  });
+  const fileInput = fileControl.input;
 
   const historyBtn = document.createElement('button');
   historyBtn.type = 'button';
@@ -320,7 +335,7 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
 
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__control-stack';
-  controls.append(filePicker, passwordInput);
+  controls.append(fileControl.field, passwordControl.field);
 
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__action-groups';
@@ -354,31 +369,6 @@ function createToggle(text: string): { readonly label: HTMLLabelElement; readonl
   copy.textContent = text;
   label.append(input, copy);
   return { label, input };
-}
-
-function createFilePicker(input: HTMLInputElement, text: string): HTMLElement {
-  const id = `image-trail-file-${(filePickerId += 1)}`;
-  input.id = id;
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'image-trail-panel__file-picker';
-
-  const label = document.createElement('label');
-  label.className = 'image-trail-panel__file-picker-button';
-  label.htmlFor = id;
-  label.textContent = text;
-
-  const name = document.createElement('span');
-  name.className = 'image-trail-panel__file-picker-name';
-  name.textContent = 'No file selected';
-
-  input.addEventListener('change', () => {
-    const files = Array.from(input.files ?? []);
-    name.textContent = files.length > 1 ? `${files.length} files selected` : (files[0]?.name ?? 'No file selected');
-  });
-
-  wrapper.append(input, label, name);
-  return wrapper;
 }
 
 function readImageFiles(input: HTMLInputElement, onRead: (files: readonly ImportedImageFile[]) => void): void {

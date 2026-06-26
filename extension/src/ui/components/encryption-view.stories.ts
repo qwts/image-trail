@@ -20,6 +20,7 @@ export const LockedWithBackup: Story = {
   render: () =>
     encryptionStory({
       hasKey: true,
+      keyReference: 'blob:demo-key',
     }),
 };
 
@@ -27,6 +28,7 @@ export const Busy: Story = {
   render: () =>
     encryptionStory({
       hasKey: true,
+      keyReference: 'blob:demo-key',
       busy: true,
     }),
 };
@@ -51,7 +53,7 @@ export const MaintenanceNeeded: Story = {
 };
 
 export const Narrow: Story = {
-  render: () => encryptionStory({}, { width: 300 }),
+  render: () => encryptionStory({ hasKey: true, keyReference: 'blob:demo-key' }, { width: 300 }),
 };
 
 function encryptionStory(overrides: Partial<EncryptionStoryState> = {}, storyOptions: { readonly width?: number } = {}): HTMLElement {

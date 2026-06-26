@@ -1061,6 +1061,33 @@
   min-width: 0;
 }
 
+.image-trail-panel-root .image-trail-panel__form-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__form-field-label {
+  color: #ddd;
+  font:
+    600 11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__form-field-help {
+  color: #999;
+  font:
+    10px/1.35 system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  margin: 0;
+}
+
 .image-trail-panel-root .image-trail-panel__action-groups {
   display: grid;
   gap: 8px;
@@ -1084,8 +1111,9 @@
   color: #aaa;
 }
 
-.image-trail-panel-root .image-trail-panel__action-group-title {
-  margin: 0;
+.image-trail-panel-root .image-trail-panel__action-group-title,
+.image-trail-panel-root .image-trail-panel__subsection h4.image-trail-panel__action-group-title {
+  margin: 2px 0 0;
   color: #aaa;
   font:
     600 10px/1.25 system-ui,

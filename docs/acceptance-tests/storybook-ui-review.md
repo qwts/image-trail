@@ -25,6 +25,7 @@ Storybook is the UI critique bench for Image Trail, not just a screenshot galler
 Review each new story for:
 
 - Accessible names, labels, titles, focus affordances, and keyboard-visible controls.
+- Password and file-picker controls must have durable labels or descriptions tied to the control; placeholders and visible picker button text are not enough by themselves.
 - Clear loading, network, retry, disabled, and error cues where the component represents async work.
 - Privacy-safe masked states that still explain what is hidden.
 - Long text, narrow layout, and overflow behavior without clipped controls or shifting hit targets.

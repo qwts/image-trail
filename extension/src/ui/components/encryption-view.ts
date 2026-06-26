@@ -1,7 +1,7 @@
 import type { PanelAction } from '../../core/types.js';
 import { createActionGroup } from './action-group.js';
+import { createFilePickerField, createPasswordField } from './form-controls.js';
 
-let keyBackupFilePickerId = 0;
 let encryptedOriginalsOpen = true;
 
 type EncryptionAction = Extract<
@@ -81,12 +81,16 @@ export function createEncryptionView(
     return section;
   }
 
-  const password = document.createElement('input');
-  password.type = 'password';
-  password.placeholder = 'Encryption password';
-  password.autocomplete = 'current-password';
-  password.className = 'image-trail-panel__password-input';
-  password.disabled = state.busy;
+  const passwordControl = createPasswordField({
+    label: state.hasKey ? 'Encrypted originals password' : 'New encrypted originals password',
+    description: state.hasKey
+      ? 'Unlocks encrypted original image storage for this browser session.'
+      : 'Creates the first key used to protect captured original image bytes.',
+    placeholder: 'Encryption password',
+    autocomplete: state.hasKey ? 'current-password' : 'new-password',
+    disabled: state.busy,
+  });
+  const password = passwordControl.input;
 
   const unlockWithPassword = (): void => {
     if (!state.hasKey) {
@@ -125,7 +129,7 @@ export function createEncryptionView(
   });
 
   body.append(
-    password,
+    passwordControl.field,
     createActionGroup(state.hasKey ? 'Unlock storage' : 'Setup', [state.hasKey ? unlock : setup]),
     createKeyBackupControls(state, dispatch),
   );
@@ -141,20 +145,29 @@ function createKeyBackupControls(
   group.className = 'image-trail-panel__subsection';
 
   const label = document.createElement('h4');
+  label.className = 'image-trail-panel__action-group-title';
   label.textContent = 'Key backup';
 
-  const password = document.createElement('input');
-  password.type = 'password';
-  password.placeholder = 'Backup password';
-  password.autocomplete = 'new-password';
-  password.className = 'image-trail-panel__password-input';
-  password.disabled = state.busy;
+  const passwordControl = createPasswordField({
+    label: 'Password',
+    description: state.hasKey
+      ? 'Protects the exported key backup file with a password.'
+      : 'Unlocks the selected key backup file before importing it.',
+    placeholder: 'Backup password',
+    autocomplete: state.hasKey ? 'new-password' : 'current-password',
+    disabled: state.busy,
+  });
+  const password = passwordControl.input;
 
-  const file = document.createElement('input');
-  file.type = 'file';
-  file.accept = '.json,application/json';
-  file.className = 'image-trail-panel__file-input';
-  file.disabled = state.busy;
+  const fileControl = createFilePickerField({
+    label: 'Key backup file',
+    description: 'Choose a previously exported Image Trail key backup JSON file.',
+    buttonText: 'Choose key backup',
+    noFileText: 'No key backup selected',
+    accept: '.json,application/json',
+    disabled: state.busy,
+  });
+  const file = fileControl.input;
 
   const exportKey = document.createElement('button');
   exportKey.type = 'button';
@@ -183,35 +196,11 @@ function createKeyBackupControls(
 
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__control-stack';
-  controls.append(password);
-  if (!state.hasKey) controls.append(createKeyBackupFilePicker(file));
+  controls.append(passwordControl.field);
+  if (!state.hasKey) controls.append(fileControl.field);
 
   group.append(label, controls, createActionGroup('Backup file', [state.hasKey ? exportKey : importKey]));
   return group;
-}
-
-function createKeyBackupFilePicker(input: HTMLInputElement): HTMLElement {
-  const id = `image-trail-key-backup-file-${(keyBackupFilePickerId += 1)}`;
-  input.id = id;
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'image-trail-panel__file-picker';
-
-  const label = document.createElement('label');
-  label.className = 'image-trail-panel__file-picker-button';
-  label.htmlFor = id;
-  label.textContent = 'Choose key backup';
-
-  const name = document.createElement('span');
-  name.className = 'image-trail-panel__file-picker-name';
-  name.textContent = 'No key backup selected';
-
-  input.addEventListener('change', () => {
-    name.textContent = input.files?.[0]?.name ?? 'No key backup selected';
-  });
-
-  wrapper.append(input, label, name);
-  return wrapper;
 }
 
 function createLockControls(state: { readonly busy: boolean }, dispatch: (action: EncryptionAction) => void): HTMLElement {
