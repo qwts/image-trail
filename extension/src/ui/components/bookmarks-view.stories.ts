@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/html-vite';
 
 import { createBookmarksView } from './bookmarks-view.js';
-import { bookmarkFixtures, capturedRecord, lockedPrivateRecord, longOverflowRecord, selectedRecord } from '../stories/fixtures.js';
+import { bookmarkFixtures, capturedRecord, lockedPrivateRecord, longOverflowRecord } from '../stories/fixtures.js';
 import { mockDispatch, panelStory } from '../stories/story-host.js';
 
 const meta = {
@@ -36,7 +36,7 @@ export const LongOverflow: Story = {
 };
 
 export const Narrow: Story = {
-  render: () => bookmarksStory(bookmarkFixtures, [selectedRecord.id], { width: 300 }),
+  render: () => bookmarksStory(bookmarkFixtures, ['queue-normal'], { width: 300 }),
 };
 
 function bookmarksStory(
