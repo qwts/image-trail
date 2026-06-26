@@ -1,7 +1,7 @@
+import { action } from 'storybook/actions';
+
 export function mockDispatch<Action>(label = 'story action'): (action: Action) => void {
-  return (action) => {
-    console.info(label, action);
-  };
+  return action(label);
 }
 
 export function panelStory(element: HTMLElement, options: { readonly width?: number } = {}): HTMLElement {
@@ -33,6 +33,6 @@ export function storyButton(label: string, options: { readonly primary?: boolean
   button.textContent = label;
   if (options.primary) button.classList.add('image-trail-panel__primary-action');
   if (options.danger) button.classList.add('is-danger');
-  button.addEventListener('click', () => console.info('story action', { label }));
+  button.addEventListener('click', () => action('story action')({ label }));
   return button;
 }
