@@ -16,6 +16,7 @@ Storybook's own dev tooling may install React packages transitively for its mana
 - Use static fixtures from `extension/src/ui/stories`.
 - Keep stories free of service worker, IndexedDB, encryption runtime, content-script page DOM, and full panel boot dependencies.
 - Add stories for meaningful states: normal, selected, captured/original-linked, locked/private, loading, error, empty, long text, and narrow layout.
+- Parsed fields and URL editor stories should cover active/editable, included/excluded, step controls, privacy masking, empty, long text, and disabled data-URL states supported by the current plain DOM component APIs.
 
 ## Adding Stories
 
