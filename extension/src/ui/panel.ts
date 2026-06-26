@@ -2236,7 +2236,7 @@ export class ImageTrailPanel {
     this.previewScrollAnchorId = scrollAnchorId ?? null;
     let session: ProjectionSession | null = null;
     try {
-      if (!blobId && this.isCurrentSelectedImageUrl(url)) {
+      if ((!blobId || !this.captureStore) && this.isCurrentSelectedImageUrl(url)) {
         this.applyAlreadyProjectedPreviewMessage();
         return;
       }
@@ -2298,12 +2298,6 @@ export class ImageTrailPanel {
         lastUpdatedAt: Date.now(),
       };
       this.render();
-      return;
-    }
-
-    if (this.isCurrentSelectedImageUrl(url)) {
-      this.projections.update(session, { status: 'loaded' });
-      this.applyAlreadyProjectedPreviewMessage();
       return;
     }
 
