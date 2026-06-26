@@ -5,6 +5,7 @@ import { createInitialPanelState, setTargetState } from '../extension/src/core/s
 import {
   isLockedPrivatePin,
   nextParsedFieldStatePageKey,
+  projectionSessionOwnsSelectedTarget,
   shouldRestoreParsedFieldState,
   urlReviewStatusForLoadResult,
 } from '../extension/src/ui/panel.js';
@@ -1173,4 +1174,20 @@ test('parsed field page key ignores extension projections but follows page navig
   assert.equal(nextParsedFieldStatePageKey(originalPage, originalPage, null), originalPage);
   assert.equal(nextParsedFieldStatePageKey(projectedImage, originalPage, projectedImage), originalPage);
   assert.equal(nextParsedFieldStatePageKey(spaRoute, originalPage, projectedImage), spaRoute);
+});
+
+test('projection sessions only own their original selected target handle', () => {
+  const session = {
+    id: 'projection-1',
+    reason: 'record-preview' as const,
+    sourceUrl: 'https://example.test/image-2.jpg',
+    displayUrl: null,
+    selectedHandleId: 'target-1',
+    originalSourceUrl: 'https://example.test/image-1.jpg',
+    status: 'preloading' as const,
+  };
+
+  assert.equal(projectionSessionOwnsSelectedTarget(session, 'target-1'), true);
+  assert.equal(projectionSessionOwnsSelectedTarget(session, 'target-2'), false);
+  assert.equal(projectionSessionOwnsSelectedTarget(session, null), false);
 });

@@ -145,6 +145,10 @@ export function shouldRestoreParsedFieldState(
   return !!record.selectedUrl && record.selectedUrl === currentSelectedUrl;
 }
 
+export function projectionSessionOwnsSelectedTarget(session: ProjectionSession, selectedHandleId: string | null): boolean {
+  return session.selectedHandleId === selectedHandleId;
+}
+
 export function nextParsedFieldStatePageKey(
   currentPageUrl: string,
   storedPageKey: string,
@@ -1623,7 +1627,7 @@ export class ImageTrailPanel {
   }
 
   private isCurrentProjectionSession(session: ProjectionSession): boolean {
-    return this.projections.isActive(session);
+    return this.projections.isActive(session) && projectionSessionOwnsSelectedTarget(session, this.state.target.selectedHandleId);
   }
 
   private applyProjectionToSelectedImage(session: ProjectionSession, displayUrl: string): TargetSelectionSnapshot | null {
@@ -2229,10 +2233,15 @@ export class ImageTrailPanel {
   }
 
   private async previewRecord(url: string, blobId?: string, scrollAnchorId?: string): Promise<void> {
-    const session = this.beginProjectionSession('record-preview', url);
-    if (!session) return;
     this.previewScrollAnchorId = scrollAnchorId ?? null;
+    let session: ProjectionSession | null = null;
     try {
+      if (!blobId && this.isCurrentSelectedImageUrl(url)) {
+        this.applyAlreadyProjectedPreviewMessage();
+        return;
+      }
+      session = this.beginProjectionSession('record-preview', url);
+      if (!session) return;
       if (!blobId) {
         await this.previewUrl(url, session);
         return;
@@ -2274,7 +2283,7 @@ export class ImageTrailPanel {
       };
       this.render();
     } finally {
-      if (this.isCurrentProjectionSession(session)) this.previewScrollAnchorId = null;
+      if (!session || this.isCurrentProjectionSession(session)) this.previewScrollAnchorId = null;
     }
   }
 
@@ -2294,13 +2303,7 @@ export class ImageTrailPanel {
 
     if (this.isCurrentSelectedImageUrl(url)) {
       this.projections.update(session, { status: 'loaded' });
-      this.state = {
-        ...this.state,
-        message: 'Recent image is already projected into the selected host element.',
-        status: 'ready',
-        lastUpdatedAt: Date.now(),
-      };
-      this.render();
+      this.applyAlreadyProjectedPreviewMessage();
       return;
     }
 
@@ -2319,6 +2322,16 @@ export class ImageTrailPanel {
 
   private isCurrentSelectedImageUrl(url: string): boolean {
     return imageResourceUrlsEqual(url, this.currentSelectedUrl(), window.location.href);
+  }
+
+  private applyAlreadyProjectedPreviewMessage(): void {
+    this.state = {
+      ...this.state,
+      message: 'Recent image is already projected into the selected host element.',
+      status: 'ready',
+      lastUpdatedAt: Date.now(),
+    };
+    this.render();
   }
 
   private async projectUrlToSelectedImage(url: string, session: ProjectionSession): Promise<boolean> {
