@@ -28,11 +28,12 @@ export function drawerStory(drawer: HTMLElement): HTMLElement {
 }
 
 export function storyButton(label: string, options: { readonly primary?: boolean; readonly danger?: boolean } = {}): HTMLButtonElement {
+  const dispatch = action('story action');
   const button = document.createElement('button');
   button.type = 'button';
   button.textContent = label;
   if (options.primary) button.classList.add('image-trail-panel__primary-action');
   if (options.danger) button.classList.add('is-danger');
-  button.addEventListener('click', () => action('story action')({ label }));
+  button.addEventListener('click', () => dispatch({ label }));
   return button;
 }

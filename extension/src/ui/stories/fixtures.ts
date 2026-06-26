@@ -128,7 +128,7 @@ export function recallState(overrides: Partial<RecallState> = {}): RecallState {
   };
 }
 
-export const parsedFieldFixtures: readonly EditableField[] = [
+export const parsedFieldFixtures: EditableField[] = [
   {
     field: {
       id: 'path-gallery-year',
@@ -195,7 +195,7 @@ export const parsedFieldFixtures: readonly EditableField[] = [
   },
 ];
 
-export const splitParsedFieldFixtures: readonly EditableField[] = [
+export const splitParsedFieldFixtures: EditableField[] = [
   {
     field: {
       id: 'query-sequence-a',
@@ -247,7 +247,7 @@ export const splitParsedFieldFixtures: readonly EditableField[] = [
 
 export const parsedFieldDigitWidthSpecs: readonly UrlFieldDigitWidthSpec[] = [
   { fieldId: 'query-page', width: 2 },
-  { fieldId: 'query-color', width: 4 },
+  { fieldId: 'query-color', width: 2 },
   { fieldId: 'query-sequence-c', width: 4 },
 ];
 
