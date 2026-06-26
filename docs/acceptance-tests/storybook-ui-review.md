@@ -18,6 +18,17 @@ Storybook's own dev tooling may install React packages transitively for its mana
 - Add stories for meaningful states: normal, selected, captured/original-linked, locked/private, loading, error, empty, long text, and narrow layout.
 - Parsed fields and URL editor stories should cover active/editable, included/excluded, step controls, privacy masking, empty, long text, and disabled data-URL states supported by the current plain DOM component APIs.
 
+## Review Intent
+
+Storybook is the UI critique bench for Image Trail, not just a screenshot gallery. Stories should make accessibility gaps and quality-of-life cues easy to spot before they are buried in full extension flows. When a component has loading, network, retry, disabled, empty, error, privacy, or permission states, add stories that show those states directly. When the current component API cannot represent an expected cue, do not fake product behavior in the story; capture the missing state as follow-up work.
+
+Review each new story for:
+
+- Accessible names, labels, titles, focus affordances, and keyboard-visible controls.
+- Clear loading, network, retry, disabled, and error cues where the component represents async work.
+- Privacy-safe masked states that still explain what is hidden.
+- Long text, narrow layout, and overflow behavior without clipped controls or shifting hit targets.
+
 ## Adding Stories
 
 1. Put component stories next to the component as `*.stories.ts`.
