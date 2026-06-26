@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   ensureFilenameExtension,
   extensionFromUrl,
+  filenameFromImageRecord,
   filenameFromUrl,
   findDownloadDuplicate,
   normalizeAbsoluteUrl,
@@ -21,8 +22,21 @@ test('sanitizeFilename removes unsafe filesystem characters', () => {
 test('download filename helpers keep or infer safe image extensions', () => {
   assert.equal(extensionFromUrl('https://example.test/path/photo.PNG?size=large'), 'png');
   assert.equal(extensionFromUrl('https://example.test/path/no-extension'), 'jpg');
+  assert.equal(extensionFromUrl('data:image/jpeg;base64,abc'), 'jpg');
   assert.equal(ensureFilenameExtension('custom name', 'https://example.test/source.webp'), 'custom name.webp');
   assert.equal(filenameFromUrl('https://example.test/images/cat%20photo.jpeg?x=1'), 'cat photo.jpeg');
+});
+
+test('download filenames use image names instead of proxy URL fragments', () => {
+  const source = 'https://cdn.example.test/images/korn-live-1999.jpg';
+  const proxy = `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(source)}&f=1&nofb=1`;
+  const pngSource = 'https://cdn.example.test/images/korn-live-1999.png';
+  const pngProxy = `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(pngSource)}&f=1&nofb=1`;
+
+  assert.equal(filenameFromUrl(proxy), 'korn-live-1999.jpg');
+  assert.equal(filenameFromImageRecord({ url: source, label: 'Korn live at Woodstock' }), 'Korn live at Woodstock.jpg');
+  assert.equal(filenameFromImageRecord({ url: pngProxy, label: 'Korn live at Woodstock' }), 'Korn live at Woodstock.png');
+  assert.equal(filenameFromImageRecord({ url: 'data:image/png;base64,abc', title: 'local capture' }), 'local capture.png');
 });
 
 test('normalizeAbsoluteUrl resolves relative URLs only when a base is supplied', () => {

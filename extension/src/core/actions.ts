@@ -540,6 +540,14 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         clearUrlReviewStatusAfterExport: action.clearAfterExport,
         lastUpdatedAt: Date.now(),
       };
+    case 'settings/update-request-throttle':
+      return {
+        ...state,
+        requestThrottleMs: action.minimumIntervalMs,
+        requestThrottleMaxRequests: action.maxRequests,
+        requestThrottleWindowMs: action.windowMs,
+        lastUpdatedAt: Date.now(),
+      };
     case 'settings/update-neighbor-preload':
       return {
         ...state,

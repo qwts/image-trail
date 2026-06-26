@@ -5,9 +5,13 @@ import {
   NEIGHBOR_PRELOAD_CACHE_LIMITS,
   NEIGHBOR_PRELOAD_RADIUS_LIMITS,
   RECENT_HISTORY_LIMITS,
+  REQUEST_THROTTLE_MAX_REQUESTS_LIMITS,
+  REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS,
+  REQUEST_THROTTLE_WINDOW_LIMITS,
   URL_REVIEW_STATUS_LIMITS,
   VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
 } from '../core/settings.js';
+import { DEFAULT_GOVERNOR_CONFIG } from '../core/automation/types.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT, isObjectFitMode, type ObjectFitMode } from '../core/preview-style.js';
 import type { PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../core/types.js';
 
@@ -15,6 +19,8 @@ export interface PlaintextLocalSettings {
   readonly schemaVersion: 1;
   readonly showHistoryThumbnails: boolean;
   readonly requestThrottleMs: number;
+  readonly requestThrottleMaxRequests: number;
+  readonly requestThrottleWindowMs: number;
   readonly panelDock: 'right' | 'left';
   readonly visibleBookmarkSoftMax: number;
   readonly recentHistoryLimit: number;
@@ -34,7 +40,9 @@ export interface PlaintextLocalSettings {
 export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   schemaVersion: 1,
   showHistoryThumbnails: false,
-  requestThrottleMs: 250,
+  requestThrottleMs: DEFAULT_GOVERNOR_CONFIG.minimumIntervalMs,
+  requestThrottleMaxRequests: DEFAULT_GOVERNOR_CONFIG.maxRequests,
+  requestThrottleWindowMs: DEFAULT_GOVERNOR_CONFIG.windowMs,
   panelDock: 'right',
   visibleBookmarkSoftMax: 30,
   recentHistoryLimit: 30,
@@ -52,8 +60,6 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
 };
 
 export const LOCAL_SETTINGS_KEY = 'imageTrail.localSettings';
-const MIN_REQUEST_THROTTLE_MS = 0;
-const MAX_REQUEST_THROTTLE_MS = 60_000;
 
 export interface StringStorage {
   getItem(key: string): string | null;
@@ -89,6 +95,12 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
     schemaVersion: 1,
     showHistoryThumbnails: input.showHistoryThumbnails === true,
     requestThrottleMs: isSafeThrottle(input.requestThrottleMs) ? input.requestThrottleMs : DEFAULT_LOCAL_SETTINGS.requestThrottleMs,
+    requestThrottleMaxRequests: isSafeThrottleMaxRequests(input.requestThrottleMaxRequests)
+      ? input.requestThrottleMaxRequests
+      : DEFAULT_LOCAL_SETTINGS.requestThrottleMaxRequests,
+    requestThrottleWindowMs: isSafeThrottleWindow(input.requestThrottleWindowMs)
+      ? input.requestThrottleWindowMs
+      : DEFAULT_LOCAL_SETTINGS.requestThrottleWindowMs,
     panelDock: input.panelDock === 'left' ? 'left' : 'right',
     visibleBookmarkSoftMax: isSafeVisibleBookmarkSoftMax(input.visibleBookmarkSoftMax)
       ? input.visibleBookmarkSoftMax
@@ -129,7 +141,31 @@ export function isRecentHistoryOverflowBehavior(value: unknown): value is Recent
 }
 
 function isSafeThrottle(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= MIN_REQUEST_THROTTLE_MS && value <= MAX_REQUEST_THROTTLE_MS;
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value >= REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS.min &&
+    value <= REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS.max
+  );
+}
+
+function isSafeThrottleMaxRequests(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= REQUEST_THROTTLE_MAX_REQUESTS_LIMITS.min &&
+    value <= REQUEST_THROTTLE_MAX_REQUESTS_LIMITS.max
+  );
+}
+
+function isSafeThrottleWindow(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= REQUEST_THROTTLE_WINDOW_LIMITS.min &&
+    value <= REQUEST_THROTTLE_WINDOW_LIMITS.max
+  );
 }
 
 function isSafeVisibleBookmarkSoftMax(value: unknown): value is number {

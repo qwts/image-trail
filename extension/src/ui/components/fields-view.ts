@@ -243,6 +243,10 @@ export function createFieldsView(
       decrement.textContent = '-';
       decrement.title = options.privacyMode ? 'Decrement private field' : `Decrement ${field.field.label}`;
       decrement.setAttribute('aria-label', decrement.title);
+      decrement.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+      });
       decrement.addEventListener('click', () => callbacks.onStep(field.field.id, -1));
 
       const increment = document.createElement('button');
@@ -251,6 +255,10 @@ export function createFieldsView(
       increment.textContent = '+';
       increment.title = options.privacyMode ? 'Increment private field' : `Increment ${field.field.label}`;
       increment.setAttribute('aria-label', increment.title);
+      increment.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+      });
       increment.addEventListener('click', () => callbacks.onStep(field.field.id, 1));
 
       controls.append(digitWidthInput, decrement, increment);

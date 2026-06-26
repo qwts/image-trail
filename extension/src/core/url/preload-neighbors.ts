@@ -39,6 +39,24 @@ export function selectWarmedNeighborCandidate(
   return ordered.find((candidate) => statusForUrl(candidate.url) === 'loaded') ?? null;
 }
 
+export function selectActiveNavigationNeighborCandidate(
+  candidates: readonly AdjacentParsedFieldUrlCandidate[],
+  direction: NeighborPreloadDirection,
+  statusForUrl: (url: string) => 'loaded' | 'failed' | 'unknown',
+): AdjacentParsedFieldUrlCandidate | null {
+  let skippedFailed = false;
+  const ordered = candidates.filter((candidate) => candidate.direction === direction).sort((a, b) => a.distance - b.distance);
+  for (const candidate of ordered) {
+    const status = statusForUrl(candidate.url);
+    if (status === 'failed') {
+      skippedFailed = true;
+      continue;
+    }
+    if (status === 'loaded' || skippedFailed) return candidate;
+  }
+  return null;
+}
+
 export function adjacentParsedFieldUrlCandidates(
   model: ParsedUrlModel,
   fields: readonly UrlField[],
@@ -47,18 +65,17 @@ export function adjacentParsedFieldUrlCandidates(
   if (!Number.isInteger(radius) || radius <= 0 || fields.length === 0) return [];
   const candidates: AdjacentParsedFieldUrlCandidate[] = [];
   const seen = new Set<string>();
-  for (let offset = -radius; offset <= radius; offset += 1) {
-    if (offset === 0) continue;
-    const direction: NeighborPreloadDirection = offset > 0 ? 1 : -1;
-    const distance = Math.abs(offset);
-    let nextModel = model;
-    for (let step = 0; step < distance; step += 1) {
-      nextModel = fields.reduce<ParsedUrlModel>((current, field) => bumpUrlField(current, field, direction), nextModel);
+  for (let distance = 1; distance <= radius; distance += 1) {
+    for (const direction of [-1, 1] as const) {
+      let nextModel = model;
+      for (let step = 0; step < distance; step += 1) {
+        nextModel = fields.reduce<ParsedUrlModel>((current, field) => bumpUrlField(current, field, direction), nextModel);
+      }
+      const url = rebuildUrl(nextModel);
+      if (seen.has(url)) continue;
+      seen.add(url);
+      candidates.push({ url, direction, distance });
     }
-    const url = rebuildUrl(nextModel);
-    if (seen.has(url)) continue;
-    seen.add(url);
-    candidates.push({ url, direction, distance });
   }
   return candidates;
 }

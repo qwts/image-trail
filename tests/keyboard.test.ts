@@ -68,6 +68,8 @@ test('default keyboard bindings map d to download and shifted shortcuts to save-
 test('keyboard shortcuts route from panel controls but not typing targets', () => {
   assert.equal(shouldRouteKeyboardShortcut('typing', 'download'), false);
   assert.equal(shouldRouteKeyboardShortcut('button', 'slideshow-toggle'), false);
+  assert.equal(shouldRouteKeyboardShortcut('button', 'next'), true);
+  assert.equal(shouldRouteKeyboardShortcut('button', 'previous'), true);
   assert.equal(shouldRouteKeyboardShortcut('button', 'download'), true);
   assert.equal(shouldRouteKeyboardShortcut('button', 'download-save-as'), true);
   assert.equal(shouldRouteKeyboardShortcut('button', 'grab-mode-toggle'), true);

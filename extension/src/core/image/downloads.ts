@@ -1,3 +1,5 @@
+import { normalizeDisplayLabel, sourceImageUrlFrom } from '../display-records.js';
+
 const SAFE_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp']);
 
 export interface DownloadDuplicateCandidate {
@@ -13,6 +15,12 @@ export interface DownloadDuplicateRecord {
 export interface ImageDownloadRecord {
   readonly id: string;
   readonly url: string;
+}
+
+export interface ImageDownloadNameRecord {
+  readonly url: string;
+  readonly title?: string;
+  readonly label?: string;
 }
 
 export interface SelectImageDownloadUrlsInput {
@@ -37,6 +45,11 @@ export function sanitizeFilename(input: string, fallback = 'image'): string {
 }
 
 export function extensionFromUrl(url: string): string {
+  const dataImageType = /^data:image\/([a-z0-9.+-]+)[;,]/iu.exec(url)?.[1]?.toLowerCase();
+  if (dataImageType) {
+    const normalized = dataImageType === 'jpeg' ? 'jpg' : dataImageType;
+    return SAFE_IMAGE_EXTENSIONS.has(normalized) ? normalized : 'jpg';
+  }
   try {
     const parsed = new URL(url);
     const filename = parsed.pathname.split('/').filter(Boolean).at(-1) ?? '';
@@ -54,12 +67,17 @@ export function ensureFilenameExtension(baseName: string, sourceUrl: string): st
 
 export function filenameFromUrl(url: string): string {
   try {
-    const parsed = new URL(url);
+    const parsed = sourceImageUrlFrom(url);
     const name = decodeURIComponent(parsed.pathname.split('/').filter(Boolean).at(-1) ?? '');
-    return ensureFilenameExtension(name || parsed.hostname || 'image', url);
+    return ensureFilenameExtension(name || parsed.hostname || 'image', parsed.href);
   } catch {
     return 'image.jpg';
   }
+}
+
+export function filenameFromImageRecord(record: ImageDownloadNameRecord): string {
+  const sourceUrl = sourceImageUrlFrom(record.url).href;
+  return ensureFilenameExtension(normalizeDisplayLabel(record), sourceUrl);
 }
 
 export function normalizeAbsoluteUrl(url: string, baseUrl?: string): string {

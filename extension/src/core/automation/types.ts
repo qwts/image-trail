@@ -21,7 +21,8 @@ export interface RetryConfig {
 
 export interface RequestGovernorConfig {
   readonly minimumIntervalMs: number;
-  readonly maxRequestsPerMinute: number;
+  readonly maxRequests: number;
+  readonly windowMs: number;
 }
 
 export const DEFAULT_SLIDESHOW_CONFIG: SlideshowConfig = {
@@ -37,7 +38,8 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 
 export const DEFAULT_GOVERNOR_CONFIG: RequestGovernorConfig = {
   minimumIntervalMs: 250,
-  maxRequestsPerMinute: 60,
+  maxRequests: 60,
+  windowMs: 60_000,
 };
 
 export type AutomationCommand = 'start' | 'stop' | 'pause' | 'resume';

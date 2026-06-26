@@ -47,7 +47,11 @@ function isPanelHost(node: unknown): boolean {
 export function shouldRouteKeyboardShortcut(target: KeyTarget, action: string): boolean {
   if (target === 'typing') return false;
   // Keep native button activation intact; only explicit global shortcuts route from focused panel controls.
-  if (target === 'button') return action === 'download' || action === 'download-save-as' || action === 'grab-mode-toggle';
+  if (target === 'button') {
+    return (
+      action === 'next' || action === 'previous' || action === 'download' || action === 'download-save-as' || action === 'grab-mode-toggle'
+    );
+  }
   return true;
 }
 

@@ -69,7 +69,7 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
   if (auto.governorStatus !== 'ready') {
     const governor = document.createElement('p');
     governor.className = 'image-trail-panel__automation-status';
-    governor.textContent = `Rate limit: ${auto.governorStatus} (${auto.requestsInLastMinute} req/min)`;
+    governor.textContent = `Rate limit: ${auto.governorStatus} (${auto.requestsInWindow} in window)`;
     children.push(governor);
   }
 

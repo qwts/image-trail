@@ -140,16 +140,47 @@ test('falls back to plaintext local setting defaults when storage is corrupt', (
 
 test('rejects out-of-range request throttle setting migrations', () => {
   const high = new LocalSettingsRepository({
-    getItem: () => JSON.stringify({ requestThrottleMs: 60_001 }),
+    getItem: () =>
+      JSON.stringify({
+        requestThrottleMs: 60_001,
+        requestThrottleMaxRequests: 1_001,
+        requestThrottleWindowMs: 300_001,
+      }),
     setItem: () => {},
   });
   const negative = new LocalSettingsRepository({
-    getItem: () => JSON.stringify({ requestThrottleMs: -1 }),
+    getItem: () =>
+      JSON.stringify({
+        requestThrottleMs: -1,
+        requestThrottleMaxRequests: 0,
+        requestThrottleWindowMs: 999,
+      }),
+    setItem: () => {},
+  });
+  const valid = new LocalSettingsRepository({
+    getItem: () =>
+      JSON.stringify({
+        requestThrottleMs: 100,
+        requestThrottleMaxRequests: 12,
+        requestThrottleWindowMs: 5_000,
+      }),
+    setItem: () => {},
+  });
+  const fractionalMinimum = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ requestThrottleMs: 100.5 }),
     setItem: () => {},
   });
 
   assert.equal(high.load().requestThrottleMs, DEFAULT_LOCAL_SETTINGS.requestThrottleMs);
+  assert.equal(high.load().requestThrottleMaxRequests, DEFAULT_LOCAL_SETTINGS.requestThrottleMaxRequests);
+  assert.equal(high.load().requestThrottleWindowMs, DEFAULT_LOCAL_SETTINGS.requestThrottleWindowMs);
   assert.equal(negative.load().requestThrottleMs, DEFAULT_LOCAL_SETTINGS.requestThrottleMs);
+  assert.equal(negative.load().requestThrottleMaxRequests, DEFAULT_LOCAL_SETTINGS.requestThrottleMaxRequests);
+  assert.equal(negative.load().requestThrottleWindowMs, DEFAULT_LOCAL_SETTINGS.requestThrottleWindowMs);
+  assert.equal(fractionalMinimum.load().requestThrottleMs, DEFAULT_LOCAL_SETTINGS.requestThrottleMs);
+  assert.equal(valid.load().requestThrottleMs, 100);
+  assert.equal(valid.load().requestThrottleMaxRequests, 12);
+  assert.equal(valid.load().requestThrottleWindowMs, 5_000);
 });
 
 test('rejects out-of-range bookmark soft max setting migrations', () => {

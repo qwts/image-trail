@@ -395,6 +395,11 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
               clearAfterExport: state.clearUrlReviewStatusAfterExport,
             },
             {
+              minimumIntervalMs: state.requestThrottleMs,
+              maxRequests: state.requestThrottleMaxRequests,
+              windowMs: state.requestThrottleWindowMs,
+            },
+            {
               enabled: state.neighborPreloadEnabled,
               radius: state.neighborPreloadRadius,
               cacheLimit: state.neighborPreloadCacheLimit,

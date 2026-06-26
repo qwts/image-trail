@@ -12,6 +12,9 @@ import {
   NEIGHBOR_PRELOAD_CACHE_LIMITS,
   NEIGHBOR_PRELOAD_RADIUS_LIMITS,
   RECENT_HISTORY_LIMITS,
+  REQUEST_THROTTLE_MAX_REQUESTS_LIMITS,
+  REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS,
+  REQUEST_THROTTLE_WINDOW_LIMITS,
   URL_REVIEW_STATUS_LIMITS,
   VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
 } from '../../core/settings.js';
@@ -50,6 +53,11 @@ export function createSettingsView(
   urlReviewStatusState: {
     readonly limit: number;
     readonly clearAfterExport: boolean;
+  },
+  requestThrottleState: {
+    readonly minimumIntervalMs: number;
+    readonly maxRequests: number;
+    readonly windowMs: number;
   },
   neighborPreloadState: {
     readonly enabled: boolean;
@@ -102,6 +110,7 @@ export function createSettingsView(
     createRecentsSettingsView(recentHistoryState, dispatch),
     createPrivatePinSettingsView(privatePinState, dispatch),
     createPrivacySettingsView(privacyModeEnabled, dispatch),
+    createRequestThrottleSettingsView(requestThrottleState, dispatch),
     createNeighborPreloadSettingsView(neighborPreloadState, dispatch),
     createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),
     createPanelLayoutSettingsView(dispatch),
@@ -110,6 +119,109 @@ export function createSettingsView(
     createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),
   );
   return section;
+}
+
+function createRequestThrottleSettingsView(
+  state: {
+    readonly minimumIntervalMs: number;
+    readonly maxRequests: number;
+    readonly windowMs: number;
+  },
+  dispatch: (action: PanelAction) => void,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'Request throttle';
+
+  const form = document.createElement('form');
+  form.className = 'image-trail-panel__settings-form';
+
+  const minimumInterval = createNumberSettingField(
+    'Min interval',
+    state.minimumIntervalMs,
+    REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS.min,
+    REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS.max,
+  );
+  const maxRequests = createNumberSettingField(
+    'Max requests',
+    state.maxRequests,
+    REQUEST_THROTTLE_MAX_REQUESTS_LIMITS.min,
+    REQUEST_THROTTLE_MAX_REQUESTS_LIMITS.max,
+  );
+  const windowMs = createNumberSettingField(
+    'Window ms',
+    state.windowMs,
+    REQUEST_THROTTLE_WINDOW_LIMITS.min,
+    REQUEST_THROTTLE_WINDOW_LIMITS.max,
+  );
+
+  const apply = document.createElement('button');
+  apply.type = 'submit';
+  apply.textContent = 'Apply';
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const minimumIntervalMs = parseBoundedInteger(
+      minimumInterval.input.value,
+      REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS.min,
+      REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS.max,
+    );
+    const parsedMaxRequests = parseBoundedInteger(
+      maxRequests.input.value,
+      REQUEST_THROTTLE_MAX_REQUESTS_LIMITS.min,
+      REQUEST_THROTTLE_MAX_REQUESTS_LIMITS.max,
+    );
+    const parsedWindowMs = parseBoundedInteger(
+      windowMs.input.value,
+      REQUEST_THROTTLE_WINDOW_LIMITS.min,
+      REQUEST_THROTTLE_WINDOW_LIMITS.max,
+    );
+    if (minimumIntervalMs === null || parsedMaxRequests === null || parsedWindowMs === null) return;
+    dispatch({
+      name: 'settings/update-request-throttle',
+      minimumIntervalMs,
+      maxRequests: parsedMaxRequests,
+      windowMs: parsedWindowMs,
+    });
+  });
+
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__settings-empty';
+  meta.textContent = 'Active image loads are gated by both the minimum interval and the total request count in the configured window.';
+
+  form.append(minimumInterval.label, maxRequests.label, windowMs.label, apply);
+  wrapper.append(heading, form, meta);
+  return wrapper;
+}
+
+function createNumberSettingField(
+  labelText: string,
+  value: number,
+  min: number,
+  max: number,
+): { readonly label: HTMLLabelElement; readonly input: HTMLInputElement } {
+  const label = document.createElement('label');
+  label.className = 'image-trail-panel__settings-field';
+  const text = document.createElement('span');
+  text.textContent = labelText;
+  const input = document.createElement('input');
+  input.className = 'image-trail-panel__settings-number-input';
+  input.type = 'number';
+  input.min = String(min);
+  input.max = String(max);
+  input.step = '1';
+  input.value = String(value);
+  input.inputMode = 'numeric';
+  label.append(text, input);
+  return { label, input };
+}
+
+function parseBoundedInteger(value: string, min: number, max: number): number | null {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) return null;
+  return parsed;
 }
 
 function createNeighborPreloadSettingsView(
@@ -141,7 +253,7 @@ function createNeighborPreloadSettingsView(
   const radiusLabel = document.createElement('label');
   radiusLabel.className = 'image-trail-panel__settings-field';
   const radiusText = document.createElement('span');
-  radiusText.textContent = 'Radius';
+  radiusText.textContent = 'Ahead/behind';
   const radiusInput = document.createElement('input');
   radiusInput.className = 'image-trail-panel__settings-number-input';
   radiusInput.type = 'number';
@@ -169,6 +281,10 @@ function createNeighborPreloadSettingsView(
   const apply = document.createElement('button');
   apply.type = 'submit';
   apply.textContent = 'Apply';
+
+  const manual = document.createElement('button');
+  manual.type = 'button';
+  manual.textContent = 'Preload more';
 
   const parsedRadius = (): number | null => {
     const radius = Number(radiusInput.value);
@@ -205,13 +321,21 @@ function createNeighborPreloadSettingsView(
       cacheLimit: parsedCacheLimit() ?? state.cacheLimit,
     });
   });
+  manual.addEventListener('click', () => {
+    const radius = parsedRadius();
+    const cacheLimit = parsedCacheLimit();
+    if (radius === null || cacheLimit === null) return;
+    enabledInput.checked = true;
+    dispatch({ name: 'settings/update-neighbor-preload', enabled: true, radius, cacheLimit });
+    dispatch({ name: 'neighbor-preload/manual', radius, cacheLimit });
+  });
 
   const meta = document.createElement('p');
   meta.className = 'image-trail-panel__settings-empty';
   meta.textContent =
-    'Speculative loads stay in this page session only and never add Recents, URL review records, panel messages, pins, or Recall entries. Cache 0 keeps all entries without eviction.';
+    'Warms this many parsed-field URLs ahead and behind. Speculative loads stay in this page session only and never add Recents, URL review records, panel messages, pins, or Recall entries. Cache 0 keeps all entries without eviction.';
 
-  form.append(enabledLabel, radiusLabel, cacheLimitLabel, apply);
+  form.append(enabledLabel, radiusLabel, cacheLimitLabel, apply, manual);
   wrapper.append(heading, form, meta);
   return wrapper;
 }

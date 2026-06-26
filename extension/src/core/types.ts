@@ -40,7 +40,7 @@ export interface AutomationState {
   readonly retriesUsed: number;
   readonly retriesMax: number;
   readonly governorStatus: 'ready' | 'throttled' | 'capped';
-  readonly requestsInLastMinute: number;
+  readonly requestsInWindow: number;
 }
 
 export type RecallDrawerSide = 'left' | 'right';
@@ -156,6 +156,9 @@ export interface PanelState {
   readonly privacyModeEnabled: boolean;
   readonly urlReviewStatusLimit: number;
   readonly clearUrlReviewStatusAfterExport: boolean;
+  readonly requestThrottleMs: number;
+  readonly requestThrottleMaxRequests: number;
+  readonly requestThrottleWindowMs: number;
   readonly neighborPreloadEnabled: boolean;
   readonly neighborPreloadRadius: number;
   readonly neighborPreloadCacheLimit: number;
@@ -241,7 +244,9 @@ export type PanelActionName =
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
   | 'settings/update-url-review-status-retention'
+  | 'settings/update-request-throttle'
   | 'settings/update-neighbor-preload'
+  | 'neighbor-preload/manual'
   | 'settings/reset-panel-position'
   | 'url-templates/load'
   | 'url-template/remove'
@@ -335,7 +340,9 @@ export type PanelAction =
         | 'settings/update-pin-save-storage-preference'
         | 'settings/update-privacy-mode'
         | 'settings/update-url-review-status-retention'
+        | 'settings/update-request-throttle'
         | 'settings/update-neighbor-preload'
+        | 'neighbor-preload/manual'
         | 'url-templates/load'
         | 'url-template/remove'
         | 'url-template/update-settings'
@@ -424,11 +431,18 @@ export type PanelAction =
       readonly clearAfterExport: boolean;
     }
   | {
+      readonly name: 'settings/update-request-throttle';
+      readonly minimumIntervalMs: number;
+      readonly maxRequests: number;
+      readonly windowMs: number;
+    }
+  | {
       readonly name: 'settings/update-neighbor-preload';
       readonly enabled: boolean;
       readonly radius: number;
       readonly cacheLimit: number;
     }
+  | { readonly name: 'neighbor-preload/manual'; readonly radius: number; readonly cacheLimit: number }
   | { readonly name: 'url-templates/load'; readonly templates: readonly UrlTemplateRecord[]; readonly activeTemplateId?: string | null }
   | { readonly name: 'url-template/remove'; readonly id: string }
   | {

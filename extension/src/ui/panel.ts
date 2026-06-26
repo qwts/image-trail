@@ -34,12 +34,15 @@ import type {
   UrlReviewStatusStore,
 } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
-import { filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
+import { filenameFromImageRecord, filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
 import { imageResourceUrlsEqual, pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
 import {
   NEIGHBOR_PRELOAD_CACHE_LIMITS,
   NEIGHBOR_PRELOAD_RADIUS_LIMITS,
   RECENT_HISTORY_LIMITS,
+  REQUEST_THROTTLE_MAX_REQUESTS_LIMITS,
+  REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS,
+  REQUEST_THROTTLE_WINDOW_LIMITS,
   URL_REVIEW_STATUS_LIMITS,
   VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
 } from '../core/settings.js';
@@ -49,12 +52,12 @@ import { parseUrl } from '../core/url/parse-url.js';
 import {
   adjacentParsedFieldUrlCandidates,
   fieldsById,
-  selectWarmedNeighborCandidate,
+  selectActiveNavigationNeighborCandidate,
   type AdjacentParsedFieldUrlCandidate,
   type NeighborPreloadDirection,
 } from '../core/url/preload-neighbors.js';
 import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../core/url/rebuild-url.js';
-import { collectUrlFields, selectDefaultField } from '../core/url/tokenize-fields.js';
+import { collectUrlFields } from '../core/url/tokenize-fields.js';
 import { ProjectionSessionController, type ProjectionReason, type ProjectionSession } from '../core/projection-session.js';
 import {
   createUrlTemplateRecord,
@@ -114,6 +117,10 @@ type NeighborPreloadCacheEntry =
 
 const NEIGHBOR_PRELOAD_MINIMUM_INTERVAL_MS = 250;
 const MAX_NEIGHBOR_PRELOAD_REQUESTS_PER_MINUTE = 20;
+const NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT = 50;
+const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
+
+type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
 
 function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {
   const match = value?.match(/^\s*(\d+)\s*[x×]\s*(\d+)\s*$/iu);
@@ -190,7 +197,8 @@ export class ImageTrailPanel {
   private readonly governor = new RequestGovernor();
   private readonly neighborPreloadGovernor = new RequestGovernor({
     minimumIntervalMs: NEIGHBOR_PRELOAD_MINIMUM_INTERVAL_MS,
-    maxRequestsPerMinute: MAX_NEIGHBOR_PRELOAD_REQUESTS_PER_MINUTE,
+    maxRequests: MAX_NEIGHBOR_PRELOAD_REQUESTS_PER_MINUTE,
+    windowMs: 60_000,
   });
   private readonly neighborPreloadCache = new Map<string, NeighborPreloadCacheEntry>();
   private readonly neighborPreloadInflight = new Map<string, Promise<boolean>>();
@@ -216,6 +224,8 @@ export class ImageTrailPanel {
   private parsedFieldStatePageKey = window.location.href;
   private extensionProjectedPageUrl: string | null = null;
   private neighborPreloadRunId = 0;
+  private queuedParsedNavigationDelta = 0;
+  private parsedNavigationQueueRunning = false;
   private readonly layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
     fieldsPanelBlockSize: null,
@@ -365,11 +375,19 @@ export class ImageTrailPanel {
       privacyModeEnabled: this.localSettings.privacyModeEnabled,
       urlReviewStatusLimit: this.localSettings.urlReviewStatusLimit,
       clearUrlReviewStatusAfterExport: this.localSettings.clearUrlReviewStatusAfterExport,
+      requestThrottleMs: this.localSettings.requestThrottleMs,
+      requestThrottleMaxRequests: this.localSettings.requestThrottleMaxRequests,
+      requestThrottleWindowMs: this.localSettings.requestThrottleWindowMs,
       neighborPreloadEnabled: this.localSettings.neighborPreloadEnabled,
       neighborPreloadRadius: this.localSettings.neighborPreloadRadius,
       neighborPreloadCacheLimit: this.localSettings.neighborPreloadCacheLimit,
       lastUpdatedAt: Date.now(),
     };
+    this.governor.updateConfig({
+      minimumIntervalMs: this.localSettings.requestThrottleMs,
+      maxRequests: this.localSettings.requestThrottleMaxRequests,
+      windowMs: this.localSettings.requestThrottleWindowMs,
+    });
     const snapshot = this.pageAdapter.setPreviewPreferences({
       fillScreen: this.localSettings.previewFillScreen,
       objectFit: this.localSettings.previewObjectFit,
@@ -766,6 +784,34 @@ export class ImageTrailPanel {
     this.render();
   }
 
+  private updateRequestThrottle(minimumIntervalMs: number, maxRequests: number, windowMs: number): void {
+    if (
+      !Number.isInteger(minimumIntervalMs) ||
+      minimumIntervalMs < REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS.min ||
+      minimumIntervalMs > REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS.max ||
+      !Number.isInteger(maxRequests) ||
+      maxRequests < REQUEST_THROTTLE_MAX_REQUESTS_LIMITS.min ||
+      maxRequests > REQUEST_THROTTLE_MAX_REQUESTS_LIMITS.max ||
+      !Number.isInteger(windowMs) ||
+      windowMs < REQUEST_THROTTLE_WINDOW_LIMITS.min ||
+      windowMs > REQUEST_THROTTLE_WINDOW_LIMITS.max ||
+      (minimumIntervalMs === this.state.requestThrottleMs &&
+        maxRequests === this.state.requestThrottleMaxRequests &&
+        windowMs === this.state.requestThrottleWindowMs)
+    ) {
+      return;
+    }
+    this.state = reducePanelAction(this.state, { name: 'settings/update-request-throttle', minimumIntervalMs, maxRequests, windowMs });
+    this.governor.updateConfig({ minimumIntervalMs, maxRequests, windowMs });
+    this.saveLocalSettings({
+      ...this.localSettings,
+      requestThrottleMs: minimumIntervalMs,
+      requestThrottleMaxRequests: maxRequests,
+      requestThrottleWindowMs: windowMs,
+    });
+    this.render();
+  }
+
   private updateNeighborPreload(enabled: boolean, radius: number, cacheLimit: number): void {
     if (
       !Number.isInteger(radius) ||
@@ -1077,8 +1123,18 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'settings/update-request-throttle') {
+      this.updateRequestThrottle(action.minimumIntervalMs, action.maxRequests, action.windowMs);
+      return;
+    }
+
     if (action.name === 'settings/update-neighbor-preload') {
       this.updateNeighborPreload(action.enabled, action.radius, action.cacheLimit);
+      return;
+    }
+
+    if (action.name === 'neighbor-preload/manual') {
+      this.preloadMoreNeighbors(action.radius, action.cacheLimit);
       return;
     }
 
@@ -1479,7 +1535,15 @@ export class ImageTrailPanel {
   }
 
   private currentUrlModel(): ParsedUrlModel {
-    return this.applyCurrentFieldDigitWidthSpecs(applyFieldSplitSpecs(parseUrl(this.currentRawUrl()), this.state.fieldSplitSpecs));
+    return this.urlModelFromRawUrl(this.currentRawUrl());
+  }
+
+  private currentNavigationBaseModel(): ParsedUrlModel {
+    return this.urlModelFromRawUrl(this.currentNavigationBaseRawUrl());
+  }
+
+  private urlModelFromRawUrl(url: string): ParsedUrlModel {
+    return this.applyCurrentFieldDigitWidthSpecs(applyFieldSplitSpecs(parseUrl(url), this.state.fieldSplitSpecs));
   }
 
   private applyCurrentFieldDigitWidthSpecs(model: ParsedUrlModel): ParsedUrlModel {
@@ -1488,6 +1552,10 @@ export class ImageTrailPanel {
 
   private currentRawUrl(): string {
     return this.draftUrl() ?? this.projectedSourceUrl() ?? this.pageUrl();
+  }
+
+  private currentNavigationBaseRawUrl(): string {
+    return this.state.failedFieldId && this.state.target.selectedUrl ? this.state.target.selectedUrl : this.currentRawUrl();
   }
 
   private projectedSourceUrl(): string | null {
@@ -1535,46 +1603,112 @@ export class ImageTrailPanel {
   }
 
   private navigateBy(delta: 1 | -1): void {
-    const result = this.governor.request(() => {
-      const snapshot = this.pageAdapter.getSnapshot();
-      if (!snapshot.selected) return false;
-      const currentUrl = snapshot.selected.url;
-      if (!currentUrl) return false;
-      const model = this.currentUrlModel();
-      const fields = collectUrlFields(model);
-      const unlockedFields = fields.filter((field) => this.isUnlockedNavigableField(field));
-      const fallback = selectDefaultField(fields);
-      const navigableFields = unlockedFields.length ? unlockedFields : fallback ? [fallback] : [];
-      if (navigableFields.length === 0) return false;
-      const bumped = navigableFields.reduce<ParsedUrlModel>((nextModel, field) => bumpUrlField(nextModel, field, delta), model);
-      const warmedUrl = this.nextWarmedNavigationUrl(model, navigableFields, delta);
-      if (this.isNeighborPreloadActive() && this.localSettings.neighborPreloadRadius > 1 && !warmedUrl) return false;
-      const nextUrl = warmedUrl ?? rebuildUrl(bumped);
-      void this.applySelectedUrl(
-        nextUrl,
-        navigableFields.map((field) => field.id),
-      ).then((loaded) => {
-        if (loaded) void this.saveUrlTemplateFromCurrentFields();
-      });
-      return true;
-    });
+    this.queuedParsedNavigationDelta += delta;
+    void this.drainQueuedParsedNavigation();
+  }
+
+  private async drainQueuedParsedNavigation(): Promise<void> {
+    if (this.parsedNavigationQueueRunning) return;
+    this.parsedNavigationQueueRunning = true;
+    try {
+      while (this.queuedParsedNavigationDelta !== 0) {
+        const delta = this.queuedParsedNavigationDelta > 0 ? 1 : -1;
+        const result = await this.runQueuedParsedNavigationStep(delta);
+        if (result === 'blocked') {
+          this.queuedParsedNavigationDelta = 0;
+          break;
+        }
+        if (result === 'wait') {
+          const delayMs = Math.max(PARSED_NAVIGATION_RETRY_MIN_DELAY_MS, this.governor.nextReadyDelayMs());
+          await delay(delayMs);
+          continue;
+        }
+        if (result === 'retry') {
+          await delay(PARSED_NAVIGATION_RETRY_MIN_DELAY_MS);
+          continue;
+        }
+        if (result === 'loaded') this.queuedParsedNavigationDelta -= delta;
+      }
+    } finally {
+      this.parsedNavigationQueueRunning = false;
+      if (this.queuedParsedNavigationDelta !== 0) void this.drainQueuedParsedNavigation();
+    }
+  }
+
+  private async runQueuedParsedNavigationStep(delta: 1 | -1): Promise<QueuedParsedNavigationStepResult> {
+    const snapshot = this.pageAdapter.getSnapshot();
+    if (!snapshot.selected?.url) return 'blocked';
+    const model = this.currentNavigationBaseModel();
+    const fields = collectUrlFields(model);
+    const navigableFields = this.includedNavigationFields(fields);
+    if (navigableFields.length === 0) return 'blocked';
+    const warmedUrl = this.nextWarmedNavigationUrl(model, navigableFields, delta);
+    const bumped = navigableFields.reduce<ParsedUrlModel>((nextModel, field) => bumpUrlField(nextModel, field, delta), model);
+    const nextUrl = warmedUrl ?? rebuildUrl(bumped);
+    const cachedPreload = this.isNeighborPreloadActive() ? this.neighborPreloadCache.get(nextUrl) : undefined;
+    if (cachedPreload?.status === 'failed') {
+      this.state = {
+        ...this.state,
+        status: 'ready',
+        message: 'No non-failed parsed-field neighbor candidate found in that direction.',
+        lastUpdatedAt: Date.now(),
+      };
+      this.render();
+      return 'blocked';
+    }
+    const shouldStartNetworkRequest = !cachedPreload && !nextUrl.startsWith('data:image/');
+    if (shouldStartNetworkRequest) {
+      const request = this.governor.request(() => undefined);
+      if (request.status !== 'ok') {
+        this.state = setAutomationState(this.state, {
+          governorStatus: request.status,
+          requestsInWindow: this.governor.requestsInWindow(),
+        });
+        this.render();
+        return 'wait';
+      }
+    }
+
+    const loaded = await this.applySelectedUrl(
+      nextUrl,
+      navigableFields.map((field) => field.id),
+      { preloadDirection: delta },
+    );
+    if (loaded) void this.saveUrlTemplateFromCurrentFields();
 
     this.state = setAutomationState(this.state, {
-      governorStatus: result.status === 'ok' ? 'ready' : result.status,
-      requestsInLastMinute: this.governor.requestsInLastMinute(),
+      governorStatus: 'ready',
+      requestsInWindow: this.governor.requestsInWindow(),
     });
     this.render();
+    const failedPreload = this.isNeighborPreloadActive() ? this.neighborPreloadCache.get(nextUrl)?.status === 'failed' : false;
+    return loaded || !failedPreload ? 'loaded' : 'retry';
+  }
+
+  private mostRecentSuccessfulNavigableField(fields: readonly UrlField[]): UrlField | null {
+    for (let index = this.state.successfulFieldIds.length - 1; index >= 0; index -= 1) {
+      const field = fields.find((candidate) => candidate.id === this.state.successfulFieldIds[index]);
+      if (field && this.isNavigableQueryField(field)) return field;
+    }
+    return null;
+  }
+
+  private includedNavigationFields(fields: readonly UrlField[]): readonly UrlField[] {
+    const includedFields = fields.filter((field) => this.isUnlockedNavigableField(field));
+    if (includedFields.length === 0) return [];
+    const mostRecentSuccessfulIncluded = this.mostRecentSuccessfulNavigableField(includedFields);
+    return mostRecentSuccessfulIncluded ? [mostRecentSuccessfulIncluded] : includedFields;
   }
 
   private nextWarmedNavigationUrl(model: ParsedUrlModel, fields: readonly UrlField[], direction: NeighborPreloadDirection): string | null {
-    if (!this.localSettings.neighborPreloadEnabled || this.localSettings.neighborPreloadRadius <= 1) return null;
-    const candidates = adjacentParsedFieldUrlCandidates(model, fields, this.localSettings.neighborPreloadRadius);
-    const warmedCandidate = selectWarmedNeighborCandidate(
+    if (!this.isNeighborPreloadActive()) return null;
+    const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT);
+    const navigationCandidate = selectActiveNavigationNeighborCandidate(
       candidates,
       direction,
       (url) => this.neighborPreloadCache.get(url)?.status ?? 'unknown',
     );
-    return warmedCandidate?.url ?? null;
+    return navigationCandidate?.url ?? null;
   }
 
   private async updateFieldValue(fieldId: string, nextValue: string): Promise<void> {
@@ -1631,7 +1765,11 @@ export class ImageTrailPanel {
   private async applySelectedUrl(
     nextUrl: string,
     attemptedFieldIds: readonly string[] = [],
-    options: { readonly pushVisibleUrl?: boolean; readonly reason?: ProjectionReason } = {},
+    options: {
+      readonly pushVisibleUrl?: boolean;
+      readonly reason?: ProjectionReason;
+      readonly preloadDirection?: NeighborPreloadDirection;
+    } = {},
   ): Promise<boolean> {
     const session = this.beginProjectionSession(options.reason ?? this.applySelectedUrlReason(attemptedFieldIds), nextUrl);
     if (!session) return false;
@@ -1648,6 +1786,8 @@ export class ImageTrailPanel {
       void this.saveUrlReviewStatus('failed', nextUrl, attemptedFieldIds, preload.message);
       void this.saveParsedFieldState();
       this.render();
+      if (session.reason === 'parsed-field-navigation')
+        this.scheduleNeighborPreloads(attemptedFieldIds, { direction: options.preloadDirection });
       return false;
     }
 
@@ -1738,30 +1878,122 @@ export class ImageTrailPanel {
     return { ok: true, ...loaded };
   }
 
-  private scheduleNeighborPreloads(attemptedFieldIds: readonly string[]): void {
+  private scheduleNeighborPreloads(
+    attemptedFieldIds: readonly string[],
+    options: { readonly direction?: NeighborPreloadDirection } = {},
+  ): void {
     if (!this.isNeighborPreloadActive() || attemptedFieldIds.length === 0) return;
     let model: ParsedUrlModel;
     try {
-      model = this.currentUrlModel();
+      model = this.currentNavigationBaseModel();
     } catch {
       return;
     }
     const fields = fieldsById(collectUrlFields(model), attemptedFieldIds).filter((field) => this.isNavigableQueryField(field));
-    const candidates = adjacentParsedFieldUrlCandidates(model, fields, this.localSettings.neighborPreloadRadius).filter(
-      (candidate) => !imageResourceUrlsEqual(candidate.url, this.currentRawUrl(), window.location.href),
-    );
+    const directions = options.direction === undefined ? ([-1, 1] as const) : ([options.direction] as const);
+    const candidates = directions.flatMap((direction) => this.neighborPreloadFillCandidates(model, fields, direction));
     if (candidates.length === 0) return;
     const runId = ++this.neighborPreloadRunId;
-    void this.runNeighborPreloadBatch(candidates, runId);
+    void this.runNeighborPreloadBatch(candidates, runId, attemptedFieldIds);
   }
 
-  private async runNeighborPreloadBatch(candidates: readonly AdjacentParsedFieldUrlCandidate[], runId: number): Promise<void> {
+  private neighborPreloadFillCandidates(
+    model: ParsedUrlModel,
+    fields: readonly UrlField[],
+    direction: NeighborPreloadDirection,
+  ): readonly AdjacentParsedFieldUrlCandidate[] {
+    const targetCount = this.localSettings.neighborPreloadRadius;
+    if (targetCount <= 0 || fields.length === 0) return [];
+    const baseUrl = this.currentNavigationBaseRawUrl();
+    const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT)
+      .filter((candidate) => candidate.direction === direction)
+      .sort((a, b) => a.distance - b.distance);
+    const selected: AdjacentParsedFieldUrlCandidate[] = [];
+    let buffered = 0;
+    for (const candidate of candidates) {
+      if (imageResourceUrlsEqual(candidate.url, baseUrl, window.location.href)) continue;
+      const cached = this.neighborPreloadCache.get(candidate.url);
+      if (cached?.status === 'failed') continue;
+      if (cached?.status === 'loaded' || this.neighborPreloadInflight.has(candidate.url)) {
+        buffered += 1;
+      } else {
+        selected.push(candidate);
+        buffered += 1;
+      }
+      if (buffered >= targetCount) break;
+    }
+    return selected;
+  }
+
+  private preloadMoreNeighbors(radius: number, cacheLimit: number): void {
+    this.updateNeighborPreload(true, radius, cacheLimit);
+    if (!this.isNeighborPreloadActive()) return;
+    let model: ParsedUrlModel;
+    try {
+      model = this.currentNavigationBaseModel();
+    } catch {
+      return;
+    }
+    const fields = this.includedNavigationFields(collectUrlFields(model));
+    if (fields.length === 0) return;
+    const candidates = ([-1, 1] as const).flatMap((direction) => this.neighborPreloadAdditionalCandidates(model, fields, direction));
+    if (candidates.length === 0) {
+      this.state = {
+        ...this.state,
+        status: 'ready',
+        message: 'No additional parsed-field preload candidates found.',
+        lastUpdatedAt: Date.now(),
+      };
+      this.render();
+      return;
+    }
+    const runId = this.neighborPreloadRunId;
+    this.state = {
+      ...this.state,
+      status: 'ready',
+      message: `Preloading ${candidates.length} more parsed-field neighbor image(s)...`,
+      lastUpdatedAt: Date.now(),
+    };
+    this.render();
+    void this.runNeighborPreloadBatch(
+      candidates,
+      runId,
+      fields.map((field) => field.id),
+    );
+  }
+
+  private neighborPreloadAdditionalCandidates(
+    model: ParsedUrlModel,
+    fields: readonly UrlField[],
+    direction: NeighborPreloadDirection,
+  ): readonly AdjacentParsedFieldUrlCandidate[] {
+    const targetCount = this.localSettings.neighborPreloadRadius;
+    if (targetCount <= 0 || fields.length === 0) return [];
+    const baseUrl = this.currentNavigationBaseRawUrl();
+    const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT)
+      .filter((candidate) => candidate.direction === direction)
+      .sort((a, b) => a.distance - b.distance);
+    const selected: AdjacentParsedFieldUrlCandidate[] = [];
+    for (const candidate of candidates) {
+      if (imageResourceUrlsEqual(candidate.url, baseUrl, window.location.href)) continue;
+      if (this.neighborPreloadCache.has(candidate.url) || this.neighborPreloadInflight.has(candidate.url)) continue;
+      selected.push(candidate);
+      if (selected.length >= targetCount) break;
+    }
+    return selected;
+  }
+
+  private async runNeighborPreloadBatch(
+    candidates: readonly AdjacentParsedFieldUrlCandidate[],
+    runId: number,
+    attemptedFieldIds: readonly string[],
+  ): Promise<void> {
     const tasks: Promise<boolean>[] = [];
     preloadCandidates: for (const candidate of candidates) {
       if (runId !== this.neighborPreloadRunId || !this.isNeighborPreloadActive()) break;
       if (this.neighborPreloadCache.has(candidate.url) || this.neighborPreloadInflight.has(candidate.url)) continue;
       while (runId === this.neighborPreloadRunId && this.isNeighborPreloadActive()) {
-        const result = this.neighborPreloadGovernor.request(() => this.loadNeighborPreload(candidate.url, runId));
+        const result = this.neighborPreloadGovernor.request(() => this.loadNeighborPreload(candidate, runId, attemptedFieldIds));
         if (result.status === 'ok') {
           tasks.push(result.value);
           continue preloadCandidates;
@@ -1774,30 +2006,55 @@ export class ImageTrailPanel {
     await Promise.allSettled(tasks);
   }
 
-  private async loadNeighborPreload(url: string, runId: number): Promise<boolean> {
-    const promise = this.preloadImageUrl(url, { readCache: false, writeCache: false })
+  private topUpNeighborPreloads(attemptedFieldIds: readonly string[], direction: NeighborPreloadDirection, runId: number): void {
+    if (runId !== this.neighborPreloadRunId || !this.isNeighborPreloadActive()) return;
+    let model: ParsedUrlModel;
+    try {
+      model = this.currentNavigationBaseModel();
+    } catch {
+      return;
+    }
+    const fields = fieldsById(collectUrlFields(model), attemptedFieldIds).filter((field) => this.isNavigableQueryField(field));
+    const candidates = this.neighborPreloadFillCandidates(model, fields, direction);
+    if (candidates.length === 0) return;
+    void this.runNeighborPreloadBatch(candidates, runId, attemptedFieldIds);
+  }
+
+  private async loadNeighborPreload(
+    candidate: AdjacentParsedFieldUrlCandidate,
+    runId: number,
+    attemptedFieldIds: readonly string[],
+  ): Promise<boolean> {
+    const promise = this.preloadImageUrl(candidate.url, { readCache: false, writeCache: false })
       .then((result) => {
         if (runId !== this.neighborPreloadRunId || !this.isNeighborPreloadActive() || !result.ok) {
           if (runId === this.neighborPreloadRunId && this.isNeighborPreloadActive() && !result.ok) {
-            this.rememberNeighborPreloadFailure(url, result.message);
+            this.rememberNeighborPreloadFailure(candidate.url, result.message);
+            this.neighborPreloadInflight.delete(candidate.url);
+            this.topUpNeighborPreloads(attemptedFieldIds, candidate.direction, runId);
           }
           return false;
         }
         if (result.ok) {
-          this.rememberNeighborPreload(url, { displayUrl: result.displayUrl, sha256: result.sha256 });
+          this.rememberNeighborPreload(candidate.url, { displayUrl: result.displayUrl, sha256: result.sha256 });
         }
         return true;
       })
       .catch((error: unknown) => {
         if (runId === this.neighborPreloadRunId && this.isNeighborPreloadActive()) {
-          this.rememberNeighborPreloadFailure(url, imageLoadFailureMessage(error instanceof Error ? error.message : 'unknown error'));
+          this.rememberNeighborPreloadFailure(
+            candidate.url,
+            imageLoadFailureMessage(error instanceof Error ? error.message : 'unknown error'),
+          );
+          this.neighborPreloadInflight.delete(candidate.url);
+          this.topUpNeighborPreloads(attemptedFieldIds, candidate.direction, runId);
         }
         return false;
       })
       .finally(() => {
-        this.neighborPreloadInflight.delete(url);
+        this.neighborPreloadInflight.delete(candidate.url);
       });
-    this.neighborPreloadInflight.set(url, promise);
+    this.neighborPreloadInflight.set(candidate.url, promise);
     return await promise;
   }
 
@@ -2752,7 +3009,7 @@ export class ImageTrailPanel {
     for (const record of records) {
       downloads.push({
         url: await this.recordImageDownloadUrl(record),
-        fileName: filenameForExportedImage(record.url),
+        fileName: filenameForExportedImageRecord(record),
       });
     }
     return downloads;
@@ -2813,7 +3070,7 @@ export class ImageTrailPanel {
     if (selected.length > 0) {
       return selected.map((record) => ({
         url: record.url,
-        fileName: filenameForExportedImage(record.url),
+        fileName: filenameForExportedImageRecord(record),
         blobId: encryptedBlobIdForRecord(record),
       }));
     }
@@ -3549,6 +3806,10 @@ function filenameForExportedImage(url: string): string {
   const extension = /^data:image\/([a-z0-9.+-]+);/iu.exec(url)?.[1]?.toLowerCase();
   const normalized = extension === 'jpeg' ? 'jpg' : extension;
   return `image-trail-image.${normalized && /^[a-z0-9]+$/u.test(normalized) ? normalized : 'png'}`;
+}
+
+function filenameForExportedImageRecord(record: Pick<ImageDisplayRecord, 'url' | 'title' | 'label'>): string {
+  return filenameFromImageRecord(record);
 }
 
 function downloadUrl(url: string, fileName: string): void {

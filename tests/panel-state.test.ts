@@ -625,6 +625,31 @@ test('updating neighbor preload settings only changes preload policy state', () 
   assert.equal(updated.bookmarks, state.bookmarks);
 });
 
+test('updating request throttle settings only changes throttle policy state', () => {
+  const state = {
+    ...createInitialPanelState(),
+    history: [
+      { id: 'history-1', url: 'https://example.test/history.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'history' as const },
+    ],
+    bookmarks: [
+      { id: 'bookmark-1', url: 'https://example.test/bookmark.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'bookmark' as const },
+    ],
+  };
+
+  const updated = reducePanelAction(state, {
+    name: 'settings/update-request-throttle',
+    minimumIntervalMs: 100,
+    maxRequests: 12,
+    windowMs: 5_000,
+  });
+
+  assert.equal(updated.requestThrottleMs, 100);
+  assert.equal(updated.requestThrottleMaxRequests, 12);
+  assert.equal(updated.requestThrottleWindowMs, 5_000);
+  assert.equal(updated.history, state.history);
+  assert.equal(updated.bookmarks, state.bookmarks);
+});
+
 test('clearing visible bookmarks is presentation-only state', () => {
   const state = {
     ...createInitialPanelState(),
