@@ -391,6 +391,17 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     lastBackupSize:
       state.pcloudBackup.lastBackupSizeBytes === undefined ? undefined : formatCloudBackupBytes(state.pcloudBackup.lastBackupSizeBytes),
     lastBackupSha256: state.pcloudBackup.lastBackupSha256,
+    restoreCandidates: state.pcloudBackup.restoreCandidates?.map((candidate) => ({
+      fileId: candidate.fileId,
+      fileName: candidate.fileName,
+      size: formatCloudBackupBytes(candidate.sizeBytes),
+      modifiedAt: candidate.modifiedAt,
+    })),
+    restoreCandidateName: state.pcloudBackup.lastRestoreFileName,
+    restoreCandidateSize:
+      state.pcloudBackup.lastRestoreSizeBytes === undefined ? undefined : formatCloudBackupBytes(state.pcloudBackup.lastRestoreSizeBytes),
+    restoreCandidateSha256: state.pcloudBackup.lastRestoreSha256,
+    restoreDownloadedAt: state.pcloudBackup.lastRestoreDownloadedAt,
     pendingOperation: state.pcloudBackup.pendingOperation,
     message: state.pcloudBackup.message,
     messageIsError: state.pcloudBackup.messageIsError,

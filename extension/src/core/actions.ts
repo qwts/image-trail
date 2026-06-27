@@ -821,6 +821,68 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         status: 'error',
         lastUpdatedAt: Date.now(),
       };
+    case 'pcloud-backup/restore-candidates-loaded':
+      return {
+        ...state,
+        pcloudBackup: {
+          ...state.pcloudBackup,
+          connectionState: 'connected',
+          pendingOperation: undefined,
+          apiHost: action.apiHost,
+          restoreCandidates: action.candidates,
+          message: action.message,
+          messageIsError: false,
+        },
+        message: action.message,
+        status: 'ready',
+        lastUpdatedAt: Date.now(),
+      };
+    case 'pcloud-backup/restore-downloaded':
+      return {
+        ...state,
+        pcloudBackup: {
+          ...state.pcloudBackup,
+          connectionState: 'connected',
+          pendingOperation: undefined,
+          apiHost: action.apiHost,
+          lastRestoreFileName: action.fileName,
+          lastRestoreSizeBytes: action.sizeBytes,
+          lastRestoreSha256: action.sha256,
+          lastRestoreDownloadedAt: action.downloadedAt,
+          message: action.message,
+          messageIsError: false,
+        },
+        message: action.message,
+        status: 'ready',
+        lastUpdatedAt: Date.now(),
+      };
+    case 'pcloud-backup/restore-error':
+      return {
+        ...state,
+        pcloudBackup: {
+          ...state.pcloudBackup,
+          connectionState: action.status
+            ? action.status.connected
+              ? 'connected'
+              : 'disconnected'
+            : state.pcloudBackup.apiHost
+              ? 'connected'
+              : state.pcloudBackup.connectionState === 'busy'
+                ? 'connected'
+                : state.pcloudBackup.connectionState,
+          pendingOperation: undefined,
+          apiHost: action.status ? action.status.apiHost : state.pcloudBackup.apiHost,
+          connectedAt: action.status ? action.status.connectedAt : state.pcloudBackup.connectedAt,
+          accountPremium: action.status ? action.status.accountPremium : state.pcloudBackup.accountPremium,
+          quotaBytes: action.status ? action.status.quotaBytes : state.pcloudBackup.quotaBytes,
+          usedQuotaBytes: action.status ? action.status.usedQuotaBytes : state.pcloudBackup.usedQuotaBytes,
+          message: action.message,
+          messageIsError: true,
+        },
+        message: action.message,
+        status: 'error',
+        lastUpdatedAt: Date.now(),
+      };
     case 'pcloud-backup/error':
       return {
         ...state,

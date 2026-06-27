@@ -1,6 +1,10 @@
 import {
   normalizePCloudApiHost,
   parsePCloudOAuthRedirect,
+  type PCloudBackupDownloadInput,
+  type PCloudBackupDownloadResult,
+  type PCloudBackupListResult,
+  type PCloudBackupRestoreCandidate,
   type PCloudBackupUploadInput,
   type PCloudBackupUploadResult,
   type PCloudApiHost,
@@ -188,6 +192,32 @@ function uploadMetadataFromResponse(data: Record<string, unknown>): Record<strin
   return metadata;
 }
 
+function backupCandidateFromMetadata(value: unknown): PCloudBackupRestoreCandidate | null {
+  const metadata = recordOrNull(value);
+  if (!metadata || metadata.isfolder === true) return null;
+  const fileId = numberOrUndefined(metadata.fileid);
+  const fileName = stringOrUndefined(metadata.name);
+  const sizeBytes = numberOrUndefined(metadata.size);
+  if (fileId === undefined || !fileName || sizeBytes === undefined) return null;
+  if (!fileName.endsWith('.image-trail-encrypted.json')) return null;
+  return {
+    fileId,
+    fileName,
+    sizeBytes,
+    modifiedAt: stringOrUndefined(metadata.modified),
+    sha1: stringOrUndefined(metadata.sha1)?.toLowerCase(),
+  };
+}
+
+function sortRestoreCandidates(candidates: readonly PCloudBackupRestoreCandidate[]): readonly PCloudBackupRestoreCandidate[] {
+  return [...candidates].sort((left, right) => {
+    const rightTime = Date.parse(right.modifiedAt ?? '');
+    const leftTime = Date.parse(left.modifiedAt ?? '');
+    if (Number.isFinite(rightTime) && Number.isFinite(leftTime) && rightTime !== leftTime) return rightTime - leftTime;
+    return right.fileId - left.fileId;
+  });
+}
+
 function arrayBufferFromBytes(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
@@ -317,6 +347,24 @@ function failedUploadResult(
   };
 }
 
+function failedListResult(record: PCloudConnectionRecord | null, reason: string, message: string): PCloudBackupListResult {
+  return {
+    ok: false,
+    status: { ...pcloudStatusFromRecord(record), message, messageIsError: true },
+    reason,
+    message,
+  };
+}
+
+function failedDownloadResult(record: PCloudConnectionRecord | null, reason: string, message: string): PCloudBackupDownloadResult {
+  return {
+    ok: false,
+    status: { ...pcloudStatusFromRecord(record), message, messageIsError: true },
+    reason,
+    message,
+  };
+}
+
 async function failVerifiedUpload(
   record: PCloudConnectionRecord,
   fileId: number,
@@ -422,5 +470,74 @@ export async function uploadPCloudBackup(input: PCloudBackupUploadInput): Promis
     };
   } catch (error) {
     return failedUploadResult(record, 'upload-failed', sanitizeError(error));
+  }
+}
+
+export async function listPCloudBackups(): Promise<PCloudBackupListResult> {
+  const record = await loadConnectionRecord();
+  if (!record) return failedListResult(null, 'not-connected', 'Connect pCloud before choosing a restore file.');
+
+  try {
+    const rootFolderId = await ensureFolder(record, 0, PCLOUD_ROOT_FOLDER_NAME);
+    const backupFolderId = await ensureFolder(record, rootFolderId, PCLOUD_BACKUP_FOLDER_NAME);
+    const data = await fetchPCloudJson(record.apiHost, 'listfolder', record.accessToken, {
+      folderid: String(backupFolderId),
+      noshares: '1',
+    });
+    const metadata = recordOrNull(data.metadata);
+    const contents = Array.isArray(metadata?.contents) ? metadata.contents : [];
+    const candidates = sortRestoreCandidates(
+      contents.map(backupCandidateFromMetadata).filter((item): item is PCloudBackupRestoreCandidate => !!item),
+    );
+    const message =
+      candidates.length === 0
+        ? 'No encrypted pCloud backups were found in /Image Trail/backups.'
+        : `Found ${candidates.length} encrypted pCloud backup${candidates.length === 1 ? '' : 's'}.`;
+    return {
+      ok: true,
+      status: pcloudStatusFromRecord(record, message),
+      folderPath: PCLOUD_BACKUP_FOLDER_PATH,
+      apiHost: record.apiHost,
+      candidates,
+      message,
+    };
+  } catch (error) {
+    return failedListResult(record, 'list-failed', sanitizeError(error));
+  }
+}
+
+export async function downloadPCloudBackup(input: PCloudBackupDownloadInput): Promise<PCloudBackupDownloadResult> {
+  const fileName = input.fileName.trim();
+  if (!fileName || !fileName.endsWith('.image-trail-encrypted.json')) {
+    return failedDownloadResult(null, 'invalid-input', 'Choose an Image Trail encrypted backup file before restoring.');
+  }
+  if (!Number.isFinite(input.fileId) || input.fileId <= 0) {
+    return failedDownloadResult(null, 'invalid-input', 'Choose a valid pCloud backup file before restoring.');
+  }
+
+  const record = await loadConnectionRecord();
+  if (!record) return failedDownloadResult(null, 'not-connected', 'Connect pCloud before restoring.');
+
+  try {
+    const bytes = await downloadPCloudFile(record, input.fileId);
+    const fileContent = new TextDecoder().decode(bytes);
+    const sha256 = await digestHex('SHA-256', bytes);
+    const downloadedAt = new Date().toISOString();
+    const message = `Downloaded ${fileName}. Review the restore preview before importing.`;
+    return {
+      ok: true,
+      status: pcloudStatusFromRecord(record, message),
+      folderPath: PCLOUD_BACKUP_FOLDER_PATH,
+      apiHost: record.apiHost,
+      fileId: input.fileId,
+      fileName,
+      fileContent,
+      sizeBytes: bytes.byteLength,
+      sha256,
+      downloadedAt,
+      message,
+    };
+  } catch (error) {
+    return failedDownloadResult(record, 'download-failed', sanitizeError(error));
   }
 }

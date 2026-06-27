@@ -32,6 +32,10 @@ import {
   createConnectPCloudProviderResultMessage,
   createDisconnectPCloudProviderMessage,
   createDisconnectPCloudProviderResultMessage,
+  createDownloadPCloudBackupMessage,
+  createDownloadPCloudBackupResultMessage,
+  createListPCloudBackupsMessage,
+  createListPCloudBackupsResultMessage,
   createUploadPCloudBackupMessage,
   createUploadPCloudBackupResultMessage,
   createLoadBookmarksMessage,
@@ -111,6 +115,8 @@ import {
   isDeletePanelPositionResultMessage,
   isConnectPCloudProviderResultMessage,
   isDisconnectPCloudProviderResultMessage,
+  isDownloadPCloudBackupResultMessage,
+  isListPCloudBackupsResultMessage,
   isUploadPCloudBackupResultMessage,
   isLoadBookmarksResultMessage,
   isLoadBookmarksByIdsResultMessage,
@@ -241,6 +247,40 @@ test('creates pCloud provider messages without token fields', () => {
     uploadedAt: '2026-06-27T00:00:00.000Z',
     message: 'Uploaded and verified backup.',
   });
+  const list = createListPCloudBackupsMessage();
+  const listResult = createListPCloudBackupsResultMessage({
+    ok: true,
+    status: statusResult.payload,
+    apiHost: 'api.pcloud.com',
+    folderPath: '/Image Trail/backups',
+    candidates: [
+      {
+        fileId: 43,
+        fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
+        sizeBytes: 256,
+        modifiedAt: 'Sat, 27 Jun 2026 00:00:00 +0000',
+        sha1: 'b'.repeat(40),
+      },
+    ],
+    message: 'Found 1 encrypted pCloud backup.',
+  });
+  const download = createDownloadPCloudBackupMessage({
+    fileId: 43,
+    fileName: listResult.payload.ok ? listResult.payload.candidates[0]!.fileName : 'backup.json',
+  });
+  const downloadResult = createDownloadPCloudBackupResultMessage({
+    ok: true,
+    status: statusResult.payload,
+    apiHost: 'api.pcloud.com',
+    folderPath: '/Image Trail/backups',
+    fileId: download.payload.fileId,
+    fileName: download.payload.fileName,
+    fileContent: '{"encrypted":true}',
+    sizeBytes: 18,
+    sha256: 'c'.repeat(64),
+    downloadedAt: '2026-06-27T00:00:01.000Z',
+    message: 'Downloaded backup.',
+  });
 
   assert.equal(status.type, MessageType.PCloudProviderStatus);
   assert.equal(isExtensionRequest(status), true);
@@ -261,6 +301,17 @@ test('creates pCloud provider messages without token fields', () => {
   assert.equal(isUploadPCloudBackupResultMessage(uploadResult), true);
   assert.equal(JSON.stringify(upload).includes('accessToken'), false);
   assert.equal(JSON.stringify(uploadResult).includes('accessToken'), false);
+  assert.equal(list.type, MessageType.ListPCloudBackups);
+  assert.equal(isExtensionRequest(list), true);
+  assert.equal(isExtensionResponse(listResult), true);
+  assert.equal(isListPCloudBackupsResultMessage(listResult), true);
+  assert.equal(download.type, MessageType.DownloadPCloudBackup);
+  assert.equal(isExtensionRequest(download), true);
+  assert.equal(isExtensionResponse(downloadResult), true);
+  assert.equal(isDownloadPCloudBackupResultMessage(downloadResult), true);
+  assert.equal(JSON.stringify(listResult).includes('accessToken'), false);
+  assert.equal(JSON.stringify(download).includes('accessToken'), false);
+  assert.equal(JSON.stringify(downloadResult).includes('accessToken'), false);
 });
 
 test('creates parsed field state messages', () => {

@@ -6,6 +6,8 @@ import { ExtensionBookmarkStore } from '../extension/src/content/extension-bookm
 import {
   connectPCloudProvider,
   disconnectPCloudProvider,
+  downloadPCloudBackup,
+  listPCloudBackups,
   loadPCloudProviderStatus,
   uploadPCloudBackup,
 } from '../extension/src/content/pcloud-provider-client.js';
@@ -65,6 +67,8 @@ test('pCloud provider client treats runtime failures as unavailable status', asy
     const connect = await connectPCloudProvider();
     const disconnect = await disconnectPCloudProvider();
     const upload = await uploadPCloudBackup({ fileName: 'backup.json', fileContent: '{}' });
+    const list = await listPCloudBackups();
+    const download = await downloadPCloudBackup({ fileId: 42, fileName: 'backup.image-trail-encrypted.json' });
 
     assert.equal(status.connected, false);
     assert.equal(connect.ok, false);
@@ -73,6 +77,10 @@ test('pCloud provider client treats runtime failures as unavailable status', asy
     assert.equal(disconnect.status.connected, false);
     assert.equal(upload.ok, false);
     assert.equal(upload.status.connected, false);
+    assert.equal(list.ok, false);
+    assert.equal(list.status.connected, false);
+    assert.equal(download.ok, false);
+    assert.equal(download.status.connected, false);
   } finally {
     globalThis.chrome = originalChrome;
   }

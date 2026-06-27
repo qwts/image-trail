@@ -22,6 +22,19 @@ export interface PCloudBackupUploadInput {
   readonly fileContent: string;
 }
 
+export interface PCloudBackupRestoreCandidate {
+  readonly fileId: number;
+  readonly fileName: string;
+  readonly sizeBytes: number;
+  readonly modifiedAt?: string;
+  readonly sha1?: string;
+}
+
+export interface PCloudBackupDownloadInput {
+  readonly fileId: number;
+  readonly fileName: string;
+}
+
 export type PCloudBackupUploadResult =
   | {
       readonly ok: true;
@@ -42,6 +55,43 @@ export type PCloudBackupUploadResult =
       readonly message: string;
       readonly cleanupFileId?: number;
       readonly cleanupNeeded?: boolean;
+    };
+
+export type PCloudBackupListResult =
+  | {
+      readonly ok: true;
+      readonly status: PCloudProviderStatus;
+      readonly folderPath: string;
+      readonly apiHost: PCloudApiHost;
+      readonly candidates: readonly PCloudBackupRestoreCandidate[];
+      readonly message: string;
+    }
+  | {
+      readonly ok: false;
+      readonly status: PCloudProviderStatus;
+      readonly reason: string;
+      readonly message: string;
+    };
+
+export type PCloudBackupDownloadResult =
+  | {
+      readonly ok: true;
+      readonly status: PCloudProviderStatus;
+      readonly folderPath: string;
+      readonly apiHost: PCloudApiHost;
+      readonly fileId: number;
+      readonly fileName: string;
+      readonly fileContent: string;
+      readonly sizeBytes: number;
+      readonly sha256: string;
+      readonly downloadedAt: string;
+      readonly message: string;
+    }
+  | {
+      readonly ok: false;
+      readonly status: PCloudProviderStatus;
+      readonly reason: string;
+      readonly message: string;
     };
 
 export interface ParsedPCloudOAuthRedirect {

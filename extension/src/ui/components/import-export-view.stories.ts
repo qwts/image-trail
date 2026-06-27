@@ -213,9 +213,21 @@ export const CloudBackupRestoreAvailable: Story = {
       connectionState: 'connected',
       apiHost: 'api.pcloud.com',
       folderPath: '/Image Trail/backups',
-      restoreCandidateName: 'image-trail-backup-2026-06-27.image-trail-encrypted.json',
-      restoreCandidateSize: '428 KB',
-      message: 'Restore preview is tracked separately and will run before import.',
+      restoreCandidates: [
+        {
+          fileId: 402,
+          fileName: 'image-trail-pcloud-backup-2026-06-27T16-24-00Z.image-trail-encrypted.json',
+          size: '428 KB',
+          modifiedAt: 'Sat, 27 Jun 2026 16:24:00 +0000',
+        },
+        {
+          fileId: 401,
+          fileName: 'image-trail-pcloud-backup-2026-06-26T15-10-00Z.image-trail-encrypted.json',
+          size: '392 KB',
+          modifiedAt: 'Fri, 26 Jun 2026 15:10:00 +0000',
+        },
+      ],
+      message: 'Found 2 encrypted pCloud backups.',
     }),
 };
 

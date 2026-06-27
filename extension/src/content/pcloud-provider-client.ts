@@ -1,14 +1,21 @@
 import {
   createConnectPCloudProviderMessage,
   createDisconnectPCloudProviderMessage,
+  createDownloadPCloudBackupMessage,
+  createListPCloudBackupsMessage,
   createPCloudProviderStatusMessage,
   createUploadPCloudBackupMessage,
   isConnectPCloudProviderResultMessage,
   isDisconnectPCloudProviderResultMessage,
+  isDownloadPCloudBackupResultMessage,
+  isListPCloudBackupsResultMessage,
   isPCloudProviderStatusResultMessage,
   isUploadPCloudBackupResultMessage,
 } from '../background/messages.js';
 import type {
+  PCloudBackupDownloadInput,
+  PCloudBackupDownloadResult,
+  PCloudBackupListResult,
   PCloudBackupUploadInput,
   PCloudBackupUploadResult,
   PCloudProviderResult,
@@ -80,4 +87,36 @@ export async function uploadPCloudBackup(input: PCloudBackupUploadInput): Promis
   }
   const message = 'pCloud backup upload failed.';
   return { ok: false, status: { connected: false, message, messageIsError: true }, reason: 'upload-failed', message };
+}
+
+export async function listPCloudBackups(): Promise<PCloudBackupListResult> {
+  if (!hasRuntimeMessaging()) {
+    const message = 'pCloud restore listing is only available in the extension runtime.';
+    return { ok: false, status: { connected: false, message, messageIsError: true }, reason: 'runtime-unavailable', message };
+  }
+  try {
+    const response = await sendRuntimeMessage(createListPCloudBackupsMessage());
+    if (isListPCloudBackupsResultMessage(response)) return response.payload;
+  } catch {
+    const message = 'pCloud restore listing failed.';
+    return { ok: false, status: { connected: false, message, messageIsError: true }, reason: 'list-failed', message };
+  }
+  const message = 'pCloud restore listing failed.';
+  return { ok: false, status: { connected: false, message, messageIsError: true }, reason: 'list-failed', message };
+}
+
+export async function downloadPCloudBackup(input: PCloudBackupDownloadInput): Promise<PCloudBackupDownloadResult> {
+  if (!hasRuntimeMessaging()) {
+    const message = 'pCloud restore download is only available in the extension runtime.';
+    return { ok: false, status: { connected: false, message, messageIsError: true }, reason: 'runtime-unavailable', message };
+  }
+  try {
+    const response = await sendRuntimeMessage(createDownloadPCloudBackupMessage(input));
+    if (isDownloadPCloudBackupResultMessage(response)) return response.payload;
+  } catch {
+    const message = 'pCloud restore download failed.';
+    return { ok: false, status: { connected: false, message, messageIsError: true }, reason: 'download-failed', message };
+  }
+  const message = 'pCloud restore download failed.';
+  return { ok: false, status: { connected: false, message, messageIsError: true }, reason: 'download-failed', message };
 }
