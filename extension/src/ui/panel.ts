@@ -2,6 +2,7 @@ import type { CaptureStore } from '../content/capture-controller.js';
 import { requestEncryptedImageExport, requestEncryptedImageImport, requestImageDownload } from '../content/download-controller.js';
 import type { RecallStore } from '../content/recall-store.js';
 import type { RecentHistoryStore } from '../content/recent-history-store.js';
+import { connectPCloudProvider, disconnectPCloudProvider, loadPCloudProviderStatus } from '../content/pcloud-provider-client.js';
 import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
 import type { PageAdapter, TargetSelectionSnapshot } from '../content/page-adapter.js';
@@ -308,6 +309,7 @@ export class ImageTrailPanel {
     void this.loadGrabSettings().then(() => this.restoreParsedFieldState());
     void this.refreshStorageUsage();
     void this.refreshBlobKeyStatus();
+    void this.refreshPCloudProviderStatus({ render: false });
 
     this.keyboard = new KeyboardRouter((action) => this.handleKeyAction(action));
 
@@ -1414,6 +1416,26 @@ export class ImageTrailPanel {
 
     if (action.name === 'blob-key/import') {
       void this.importBlobKeyBackup(action.fileContent, action.password);
+      return;
+    }
+
+    if (action.name === 'cloud-backup/connect' || action.name === 'cloud-backup/retry') {
+      void this.connectPCloudBackup();
+      return;
+    }
+
+    if (action.name === 'cloud-backup/disconnect') {
+      void this.disconnectPCloudBackup();
+      return;
+    }
+
+    if (action.name === 'cloud-backup/backup-now') {
+      this.showPCloudBackupPlaceholder('backup');
+      return;
+    }
+
+    if (action.name === 'cloud-backup/choose-restore') {
+      this.showPCloudBackupPlaceholder('restore');
       return;
     }
 
@@ -3275,6 +3297,51 @@ export class ImageTrailPanel {
       keyReference: result.keyReference,
       hasKey: result.hasKey,
     });
+    this.render();
+  }
+
+  private async refreshPCloudProviderStatus(options: { readonly render?: boolean } = {}): Promise<void> {
+    const status = await loadPCloudProviderStatus();
+    this.state = reducePanelAction(this.state, { name: 'pcloud-backup/status', status });
+    if (options.render !== false) this.render();
+  }
+
+  private async connectPCloudBackup(): Promise<void> {
+    this.state = reducePanelAction(this.state, {
+      name: 'pcloud-backup/busy',
+      pendingOperation: 'connecting',
+      message: 'Opening pCloud authorization...',
+    });
+    this.render();
+    const result = await connectPCloudProvider();
+    this.state = reducePanelAction(this.state, { name: 'pcloud-backup/status', status: result.status });
+    if (!result.ok) {
+      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/error', message: result.message });
+    }
+    this.render();
+  }
+
+  private async disconnectPCloudBackup(): Promise<void> {
+    this.state = reducePanelAction(this.state, {
+      name: 'pcloud-backup/busy',
+      pendingOperation: 'disconnecting',
+      message: 'Disconnecting pCloud...',
+    });
+    this.render();
+    const result = await disconnectPCloudProvider();
+    this.state = reducePanelAction(this.state, { name: 'pcloud-backup/status', status: result.status });
+    if (!result.ok) {
+      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/error', message: result.message });
+    }
+    this.render();
+  }
+
+  private showPCloudBackupPlaceholder(kind: 'backup' | 'restore'): void {
+    const message =
+      kind === 'backup'
+        ? 'pCloud is connected. Backup upload is the next implementation slice.'
+        : 'pCloud is connected. Restore file selection is the next implementation slice.';
+    this.state = reducePanelAction(this.state, { name: 'pcloud-backup/message', message });
     this.render();
   }
 

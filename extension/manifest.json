@@ -17,7 +17,7 @@
       "run_at": "document_idle"
     }
   ],
-  "permissions": ["activeTab", "scripting", "downloads", "storage"],
+  "permissions": ["activeTab", "scripting", "downloads", "identity", "storage"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "web_accessible_resources": [
     {

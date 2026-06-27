@@ -708,6 +708,59 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         status: 'error',
         lastUpdatedAt: Date.now(),
       };
+    case 'pcloud-backup/status':
+      return {
+        ...state,
+        pcloudBackup: {
+          connectionState: action.status.connected ? 'connected' : 'disconnected',
+          apiHost: action.status.apiHost,
+          connectedAt: action.status.connectedAt,
+          accountPremium: action.status.accountPremium,
+          quotaBytes: action.status.quotaBytes,
+          usedQuotaBytes: action.status.usedQuotaBytes,
+          message: action.status.message,
+          messageIsError: action.status.messageIsError === true,
+        },
+        lastUpdatedAt: Date.now(),
+      };
+    case 'pcloud-backup/busy':
+      return {
+        ...state,
+        pcloudBackup: {
+          ...state.pcloudBackup,
+          connectionState: 'busy',
+          pendingOperation: action.pendingOperation,
+          message: action.message,
+          messageIsError: false,
+        },
+        lastUpdatedAt: Date.now(),
+      };
+    case 'pcloud-backup/message':
+      return {
+        ...state,
+        pcloudBackup: {
+          ...state.pcloudBackup,
+          message: action.message,
+          messageIsError: false,
+        },
+        message: action.message,
+        status: 'ready',
+        lastUpdatedAt: Date.now(),
+      };
+    case 'pcloud-backup/error':
+      return {
+        ...state,
+        pcloudBackup: {
+          ...state.pcloudBackup,
+          connectionState: 'error',
+          pendingOperation: undefined,
+          message: action.message,
+          messageIsError: true,
+        },
+        message: action.message,
+        status: 'error',
+        lastUpdatedAt: Date.now(),
+      };
     case 'storage/update':
       return { ...state, storageUsage: action.usage, lastUpdatedAt: Date.now() };
     case 'undo-last':

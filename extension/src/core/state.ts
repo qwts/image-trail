@@ -75,6 +75,9 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     blobKeyAvailable: false,
     blobKeyReference: null,
     importExportBusy: false,
+    pcloudBackup: {
+      connectionState: 'disconnected',
+    },
     settingsOpen: false,
     automation: EMPTY_AUTOMATION_STATE,
     recall: EMPTY_RECALL_STATE,

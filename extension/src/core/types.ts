@@ -136,6 +136,20 @@ export interface RecallState {
   readonly messageIsError?: boolean;
 }
 
+export type PCloudBackupConnectionState = 'disconnected' | 'connected' | 'busy' | 'error';
+
+export interface PCloudBackupState {
+  readonly connectionState: PCloudBackupConnectionState;
+  readonly apiHost?: string;
+  readonly connectedAt?: string;
+  readonly accountPremium?: boolean;
+  readonly quotaBytes?: number;
+  readonly usedQuotaBytes?: number;
+  readonly pendingOperation?: 'connecting' | 'disconnecting';
+  readonly message?: string;
+  readonly messageIsError?: boolean;
+}
+
 export interface PanelState {
   readonly visible: boolean;
   readonly minimized: boolean;
@@ -173,6 +187,7 @@ export interface PanelState {
   readonly importExportBusy: boolean;
   readonly importExportMessage?: string;
   readonly importExportMessageIsError?: boolean;
+  readonly pcloudBackup: PCloudBackupState;
   readonly settingsOpen: boolean;
   readonly automation: AutomationState;
   readonly recall: RecallState;
@@ -272,6 +287,15 @@ export type PanelActionName =
   | 'import-export/start'
   | 'import-export/complete'
   | 'import-export/error'
+  | 'pcloud-backup/status'
+  | 'pcloud-backup/busy'
+  | 'pcloud-backup/message'
+  | 'pcloud-backup/error'
+  | 'cloud-backup/connect'
+  | 'cloud-backup/backup-now'
+  | 'cloud-backup/choose-restore'
+  | 'cloud-backup/retry'
+  | 'cloud-backup/disconnect'
   | 'export/history'
   | 'export/bookmarks'
   | 'export/image'
@@ -366,6 +390,15 @@ export type PanelAction =
         | 'blob-key/status'
         | 'import-export/complete'
         | 'import-export/error'
+        | 'pcloud-backup/status'
+        | 'pcloud-backup/busy'
+        | 'pcloud-backup/message'
+        | 'pcloud-backup/error'
+        | 'cloud-backup/connect'
+        | 'cloud-backup/backup-now'
+        | 'cloud-backup/choose-restore'
+        | 'cloud-backup/retry'
+        | 'cloud-backup/disconnect'
         | 'export/history'
         | 'export/bookmarks'
         | 'export/image'
@@ -487,6 +520,19 @@ export type PanelAction =
   | { readonly name: 'blob-key/status'; readonly unlocked: boolean; readonly keyReference?: string | null; readonly hasKey?: boolean }
   | { readonly name: 'import-export/complete'; readonly message: string }
   | { readonly name: 'import-export/error'; readonly message: string }
+  | { readonly name: 'pcloud-backup/status'; readonly status: import('./cloud/pcloud-provider.js').PCloudProviderStatus }
+  | { readonly name: 'pcloud-backup/busy'; readonly pendingOperation: 'connecting' | 'disconnecting'; readonly message: string }
+  | { readonly name: 'pcloud-backup/message'; readonly message: string }
+  | { readonly name: 'pcloud-backup/error'; readonly message: string }
+  | {
+      readonly name:
+        | 'cloud-backup/connect'
+        | 'cloud-backup/backup-now'
+        | 'cloud-backup/choose-restore'
+        | 'cloud-backup/retry'
+        | 'cloud-backup/disconnect';
+      readonly provider: 'pcloud';
+    }
   | { readonly name: 'export/history' | 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/url-review-status' }
   | { readonly name: 'clear/url-review-status'; readonly scope?: 'hostname' | 'page' | 'source' | 'all' }

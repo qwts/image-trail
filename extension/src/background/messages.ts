@@ -89,6 +89,12 @@ export const MessageType = {
   LoadLocalSettingsResult: 'imageTrail.loadLocalSettingsResult',
   SaveLocalSettings: 'imageTrail.saveLocalSettings',
   SaveLocalSettingsResult: 'imageTrail.saveLocalSettingsResult',
+  PCloudProviderStatus: 'imageTrail.pcloudProviderStatus',
+  PCloudProviderStatusResult: 'imageTrail.pcloudProviderStatusResult',
+  ConnectPCloudProvider: 'imageTrail.connectPCloudProvider',
+  ConnectPCloudProviderResult: 'imageTrail.connectPCloudProviderResult',
+  DisconnectPCloudProvider: 'imageTrail.disconnectPCloudProvider',
+  DisconnectPCloudProviderResult: 'imageTrail.disconnectPCloudProviderResult',
   ListUrlTemplates: 'imageTrail.listUrlTemplates',
   ListUrlTemplatesResult: 'imageTrail.listUrlTemplatesResult',
   SaveUrlTemplate: 'imageTrail.saveUrlTemplate',
@@ -749,6 +755,42 @@ export interface SaveLocalSettingsResultMessage {
   readonly payload: { readonly ok: boolean };
 }
 
+export interface PCloudProviderStatusMessage {
+  readonly type: typeof MessageType.PCloudProviderStatus;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: Record<string, never>;
+}
+
+export interface PCloudProviderStatusResultMessage {
+  readonly type: typeof MessageType.PCloudProviderStatusResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: import('../core/cloud/pcloud-provider.js').PCloudProviderStatus;
+}
+
+export interface ConnectPCloudProviderMessage {
+  readonly type: typeof MessageType.ConnectPCloudProvider;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: Record<string, never>;
+}
+
+export interface ConnectPCloudProviderResultMessage {
+  readonly type: typeof MessageType.ConnectPCloudProviderResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: import('../core/cloud/pcloud-provider.js').PCloudProviderResult;
+}
+
+export interface DisconnectPCloudProviderMessage {
+  readonly type: typeof MessageType.DisconnectPCloudProvider;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: Record<string, never>;
+}
+
+export interface DisconnectPCloudProviderResultMessage {
+  readonly type: typeof MessageType.DisconnectPCloudProviderResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: import('../core/cloud/pcloud-provider.js').PCloudProviderResult;
+}
+
 export interface ListUrlTemplatesMessage {
   readonly type: typeof MessageType.ListUrlTemplates;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -872,6 +914,9 @@ export type ExtensionRequest =
   | ClearUrlReviewStatusMessage
   | LoadLocalSettingsMessage
   | SaveLocalSettingsMessage
+  | PCloudProviderStatusMessage
+  | ConnectPCloudProviderMessage
+  | DisconnectPCloudProviderMessage
   | ListUrlTemplatesMessage
   | SaveUrlTemplateMessage
   | DeleteUrlTemplateMessage
@@ -921,6 +966,9 @@ export type ExtensionResponse =
   | ClearUrlReviewStatusResultMessage
   | LoadLocalSettingsResultMessage
   | SaveLocalSettingsResultMessage
+  | PCloudProviderStatusResultMessage
+  | ConnectPCloudProviderResultMessage
+  | DisconnectPCloudProviderResultMessage
   | ListUrlTemplatesResultMessage
   | SaveUrlTemplateResultMessage
   | DeleteUrlTemplateResultMessage
@@ -1349,6 +1397,36 @@ export function createSaveLocalSettingsResultMessage(payload: SaveLocalSettingsR
   return { type: MessageType.SaveLocalSettingsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
+export function createPCloudProviderStatusMessage(): PCloudProviderStatusMessage {
+  return { type: MessageType.PCloudProviderStatus, version: MESSAGE_PROTOCOL_VERSION, payload: {} };
+}
+
+export function createPCloudProviderStatusResultMessage(
+  payload: PCloudProviderStatusResultMessage['payload'],
+): PCloudProviderStatusResultMessage {
+  return { type: MessageType.PCloudProviderStatusResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createConnectPCloudProviderMessage(): ConnectPCloudProviderMessage {
+  return { type: MessageType.ConnectPCloudProvider, version: MESSAGE_PROTOCOL_VERSION, payload: {} };
+}
+
+export function createConnectPCloudProviderResultMessage(
+  payload: ConnectPCloudProviderResultMessage['payload'],
+): ConnectPCloudProviderResultMessage {
+  return { type: MessageType.ConnectPCloudProviderResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createDisconnectPCloudProviderMessage(): DisconnectPCloudProviderMessage {
+  return { type: MessageType.DisconnectPCloudProvider, version: MESSAGE_PROTOCOL_VERSION, payload: {} };
+}
+
+export function createDisconnectPCloudProviderResultMessage(
+  payload: DisconnectPCloudProviderResultMessage['payload'],
+): DisconnectPCloudProviderResultMessage {
+  return { type: MessageType.DisconnectPCloudProviderResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
 export function createListUrlTemplatesMessage(hostname: string): ListUrlTemplatesMessage {
   return { type: MessageType.ListUrlTemplates, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
 }
@@ -1460,6 +1538,9 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.ClearUrlReviewStatus ||
     value.type === MessageType.LoadLocalSettings ||
     value.type === MessageType.SaveLocalSettings ||
+    value.type === MessageType.PCloudProviderStatus ||
+    value.type === MessageType.ConnectPCloudProvider ||
+    value.type === MessageType.DisconnectPCloudProvider ||
     value.type === MessageType.ListUrlTemplates ||
     value.type === MessageType.SaveUrlTemplate ||
     value.type === MessageType.DeleteUrlTemplate ||
@@ -1514,6 +1595,9 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.ClearUrlReviewStatusResult ||
     value.type === MessageType.LoadLocalSettingsResult ||
     value.type === MessageType.SaveLocalSettingsResult ||
+    value.type === MessageType.PCloudProviderStatusResult ||
+    value.type === MessageType.ConnectPCloudProviderResult ||
+    value.type === MessageType.DisconnectPCloudProviderResult ||
     value.type === MessageType.ListUrlTemplatesResult ||
     value.type === MessageType.SaveUrlTemplateResult ||
     value.type === MessageType.DeleteUrlTemplateResult ||
@@ -1711,6 +1795,21 @@ export function isLoadLocalSettingsResultMessage(value: unknown): value is LoadL
 export function isSaveLocalSettingsResultMessage(value: unknown): value is SaveLocalSettingsResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.SaveLocalSettingsResult;
+}
+
+export function isPCloudProviderStatusResultMessage(value: unknown): value is PCloudProviderStatusResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.PCloudProviderStatusResult;
+}
+
+export function isConnectPCloudProviderResultMessage(value: unknown): value is ConnectPCloudProviderResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ConnectPCloudProviderResult;
+}
+
+export function isDisconnectPCloudProviderResultMessage(value: unknown): value is DisconnectPCloudProviderResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.DisconnectPCloudProviderResult;
 }
 
 export function isListUrlTemplatesResultMessage(value: unknown): value is ListUrlTemplatesResultMessage {

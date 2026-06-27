@@ -6,7 +6,13 @@ import { createEncryptionView } from './components/encryption-view.js';
 import { createFieldsView, type EditableField } from './components/fields-view.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHistoryView } from './components/history-view.js';
-import { createImageTransferView, createImportExportView, type ImportExportViewState } from './components/import-export-view.js';
+import {
+  createCloudBackupView,
+  createImageTransferView,
+  createImportExportView,
+  type CloudBackupProviderState,
+  type ImportExportViewState,
+} from './components/import-export-view.js';
 import { createRecallDrawerView, type RecallDrawerGeometry } from './components/recall-drawer-view.js';
 import { createSettingsView } from './components/settings-view.js';
 import { createStatusView } from './components/status-view.js';
@@ -374,6 +380,15 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     lastMessage: state.importExportMessage,
     lastMessageIsError: state.importExportMessageIsError,
   };
+  const cloudBackupState: CloudBackupProviderState = {
+    provider: 'pcloud',
+    connectionState: state.pcloudBackup.connectionState,
+    apiHost: state.pcloudBackup.apiHost,
+    folderPath: '/Image Trail/backups',
+    pendingOperation: state.pcloudBackup.pendingOperation === 'connecting' ? 'connecting' : undefined,
+    message: state.pcloudBackup.message,
+    messageIsError: state.pcloudBackup.messageIsError,
+  };
 
   target.root.append(
     createPanelHeader(state, target),
@@ -427,6 +442,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
                 target.dispatch,
               ),
               createImageTransferView(importExportState, target.dispatch),
+              createCloudBackupView(cloudBackupState, target.dispatch),
               createImportExportView(importExportState, target.dispatch),
             ],
             target.dispatch,
@@ -557,6 +573,7 @@ function statusSummaryText(state: PanelState): string {
   if (hasPanelError(state)) return 'Needs attention';
   if (state.captureInProgress) return 'Capturing';
   if (state.importExportBusy) return 'Import/export';
+  if (state.pcloudBackup.connectionState === 'busy') return 'pCloud';
   if (state.recall.busy) return 'Recall loading';
   if (state.automation.retryPhase === 'running') return 'Retrying';
   if (state.automation.slideshowPhase === 'running') return 'Slideshow';
@@ -582,6 +599,7 @@ function toastMessageText(state: PanelState): string {
 function waitingToastMessageText(state: PanelState): string {
   if (state.captureInProgress) return 'Capturing selected image original.';
   if (state.importExportBusy) return 'Import or export is running.';
+  if (state.pcloudBackup.connectionState === 'busy') return state.pcloudBackup.message ?? 'pCloud is working.';
   if (state.recall.busy) return 'Loading Recall records.';
   if (state.automation.retryPhase === 'running') return 'Retrying failed image loads.';
   if (state.automation.slideshowPhase === 'running') return 'Slideshow is advancing images.';
@@ -599,6 +617,7 @@ function isPanelWaiting(state: PanelState): boolean {
   return (
     state.captureInProgress ||
     state.importExportBusy ||
+    state.pcloudBackup.connectionState === 'busy' ||
     state.recall.busy ||
     state.automation.slideshowPhase === 'running' ||
     state.automation.retryPhase === 'running' ||

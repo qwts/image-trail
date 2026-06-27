@@ -28,6 +28,10 @@ import {
   createImportUrlReviewStatusResultMessage,
   createDeletePanelPositionMessage,
   createDeletePanelPositionResultMessage,
+  createConnectPCloudProviderMessage,
+  createConnectPCloudProviderResultMessage,
+  createDisconnectPCloudProviderMessage,
+  createDisconnectPCloudProviderResultMessage,
   createLoadBookmarksMessage,
   createLoadBookmarksByIdsMessage,
   createLoadBookmarksByIdsResultMessage,
@@ -53,6 +57,8 @@ import {
   createLoadRecentHistoryMessage,
   createLoadRecentHistoryResultMessage,
   createPingMessage,
+  createPCloudProviderStatusMessage,
+  createPCloudProviderStatusResultMessage,
   createRemoveBookmarkMessage,
   createRemoveBookmarkResultMessage,
   createRemoveBookmarksMessage,
@@ -101,6 +107,8 @@ import {
   isImportEncryptedImageResultMessage,
   isImportUrlReviewStatusResultMessage,
   isDeletePanelPositionResultMessage,
+  isConnectPCloudProviderResultMessage,
+  isDisconnectPCloudProviderResultMessage,
   isLoadBookmarksResultMessage,
   isLoadBookmarksByIdsResultMessage,
   isLoadLocalSettingsResultMessage,
@@ -129,6 +137,7 @@ import {
   isDeleteGrabSourcePatternResultMessage,
   isDeleteUrlTemplateResultMessage,
   isStatusMessage,
+  isPCloudProviderStatusResultMessage,
 } from '../extension/src/background/messages.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
 
@@ -188,6 +197,45 @@ test('creates panel position messages', () => {
   assert.equal(isExtensionRequest(remove), true);
   assert.equal(isExtensionResponse(removeResult), true);
   assert.equal(isDeletePanelPositionResultMessage(removeResult), true);
+});
+
+test('creates pCloud provider messages without token fields', () => {
+  const status = createPCloudProviderStatusMessage();
+  const statusResult = createPCloudProviderStatusResultMessage({
+    connected: true,
+    apiHost: 'api.pcloud.com',
+    connectedAt: '2026-06-27T00:00:00.000Z',
+    accountPremium: true,
+    quotaBytes: 1024,
+    usedQuotaBytes: 128,
+    message: 'pCloud is connected.',
+  });
+  const connect = createConnectPCloudProviderMessage();
+  const connectResult = createConnectPCloudProviderResultMessage({
+    ok: true,
+    status: statusResult.payload,
+    message: 'pCloud is connected.',
+  });
+  const disconnect = createDisconnectPCloudProviderMessage();
+  const disconnectResult = createDisconnectPCloudProviderResultMessage({
+    ok: true,
+    status: { connected: false, message: 'pCloud disconnected.' },
+    message: 'pCloud disconnected.',
+  });
+
+  assert.equal(status.type, MessageType.PCloudProviderStatus);
+  assert.equal(isExtensionRequest(status), true);
+  assert.equal(isExtensionResponse(statusResult), true);
+  assert.equal(isPCloudProviderStatusResultMessage(statusResult), true);
+  assert.equal(JSON.stringify(statusResult).includes('accessToken'), false);
+  assert.equal(connect.type, MessageType.ConnectPCloudProvider);
+  assert.equal(isExtensionRequest(connect), true);
+  assert.equal(isExtensionResponse(connectResult), true);
+  assert.equal(isConnectPCloudProviderResultMessage(connectResult), true);
+  assert.equal(disconnect.type, MessageType.DisconnectPCloudProvider);
+  assert.equal(isExtensionRequest(disconnect), true);
+  assert.equal(isExtensionResponse(disconnectResult), true);
+  assert.equal(isDisconnectPCloudProviderResultMessage(disconnectResult), true);
 });
 
 test('creates parsed field state messages', () => {
