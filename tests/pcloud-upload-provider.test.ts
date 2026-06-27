@@ -8,6 +8,7 @@ const CONNECTION_KEY = 'imageTrail.pcloudConnection';
 
 interface FetchCall {
   readonly url: string;
+  readonly init?: RequestInit;
   readonly body?: BodyInit | null;
 }
 
@@ -74,7 +75,7 @@ test('uploadPCloudBackup creates folders, uploads, retries listfolder, and verif
 
   globalThis.fetch = async (input, init) => {
     const url = String(input);
-    calls.push({ url, body: init?.body });
+    calls.push({ url, init, body: init?.body });
 
     if (url.endsWith('/createfolderifnotexists')) {
       return jsonResponse({
@@ -143,7 +144,7 @@ test('uploadPCloudBackup deletes unverified files after verification mismatch', 
 
   globalThis.fetch = async (input, init) => {
     const url = String(input);
-    calls.push({ url, body: init?.body });
+    calls.push({ url, init, body: init?.body });
 
     if (url.endsWith('/createfolderifnotexists')) {
       return jsonResponse({ result: 0, metadata: { isfolder: true, folderid: mockedFolderId(init) } });
@@ -196,7 +197,7 @@ test('uploadPCloudBackup falls back to checksum verification when pCloud rejects
 
   globalThis.fetch = async (input, init) => {
     const url = String(input);
-    calls.push({ url, body: init?.body });
+    calls.push({ url, init, body: init?.body });
 
     if (url.endsWith('/createfolderifnotexists')) {
       return jsonResponse({ result: 0, metadata: { isfolder: true, folderid: mockedFolderId(init) } });
@@ -330,14 +331,18 @@ test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 wi
   const originalFetch = globalThis.fetch;
   const fileContent = '{"encrypted":true,"payload":"restore"}';
 
+  const calls: FetchCall[] = [];
+
   globalThis.fetch = async (input, init) => {
     const url = String(input);
+    calls.push({ url, init, body: init?.body });
     if (url.endsWith('/getfilelink')) {
       const params = init?.body as URLSearchParams;
       assert.equal(params.get('fileid'), '402');
       return jsonResponse({ result: 0, hosts: ['c123.pcloud.com'], path: '/restore-backup' });
     }
     if (url === 'https://c123.pcloud.com/restore-backup') {
+      assert.equal(init?.referrerPolicy, 'no-referrer');
       return new Response(fileContent);
     }
     throw new Error(`Unexpected fetch ${url}`);
@@ -356,6 +361,57 @@ test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 wi
       assert.equal(result.sha256, sha256(fileContent));
       assert.equal(result.folderPath, '/Image Trail/backups');
     }
+    assert.equal(JSON.stringify(result).includes('token-secret'), false);
+    assert.equal(
+      calls.some((call) => call.url === 'https://c123.pcloud.com/restore-backup' && call.init?.referrerPolicy === 'no-referrer'),
+      true,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreChrome();
+  }
+});
+
+test('downloadPCloudBackup retries alternate pCloud hosts after direct-link referrer rejection', async () => {
+  const restoreChrome = installPCloudConnection();
+  const originalFetch = globalThis.fetch;
+  const fileContent = '{"encrypted":true,"payload":"restore"}';
+  const calls: FetchCall[] = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    calls.push({ url, init, body: init?.body });
+    if (url.endsWith('/getfilelink')) {
+      const params = init?.body as URLSearchParams;
+      assert.equal(params.get('fileid'), '402');
+      return jsonResponse({ result: 0, hosts: ['blocked.pcloud.com', 'c123.pcloud.com'], path: '/restore-backup' });
+    }
+    if (url === 'https://blocked.pcloud.com/restore-backup') {
+      assert.equal(init?.referrerPolicy, 'no-referrer');
+      return new Response('Invalid link referer.', { status: 400 });
+    }
+    if (url === 'https://c123.pcloud.com/restore-backup') {
+      assert.equal(init?.referrerPolicy, 'no-referrer');
+      return new Response(fileContent);
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+
+  try {
+    const result = await downloadPCloudBackup({
+      fileId: 402,
+      fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.fileContent, fileContent);
+      assert.equal(result.sha256, sha256(fileContent));
+    }
+    assert.deepEqual(
+      calls.filter((call) => !isApiPCloudCall(call)).map((call) => call.url),
+      ['https://blocked.pcloud.com/restore-backup', 'https://c123.pcloud.com/restore-backup'],
+    );
     assert.equal(JSON.stringify(result).includes('token-secret'), false);
   } finally {
     globalThis.fetch = originalFetch;

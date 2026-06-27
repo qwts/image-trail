@@ -279,15 +279,19 @@ async function downloadPCloudFile(record: PCloudConnectionRecord, fileId: number
     skipfilename: '1',
   });
   const hosts = Array.isArray(data.hosts) ? data.hosts : [];
-  const host = stringOrUndefined(hosts[0]);
   const path = stringOrUndefined(data.path);
-  if (!host || !path) throw new Error('pCloud did not return a download link.');
-  const response = await fetch(`https://${validateDownloadHost(host)}${path}`);
-  if (!response.ok) {
+  if (hosts.length === 0 || !path) throw new Error('pCloud did not return a download link.');
+
+  let lastError = 'pCloud backup download failed.';
+  for (const hostValue of hosts) {
+    const host = stringOrUndefined(hostValue);
+    if (!host) continue;
+    const response = await fetch(`https://${validateDownloadHost(host)}${path}`, { referrerPolicy: 'no-referrer' });
+    if (response.ok) return new Uint8Array(await response.arrayBuffer());
     const text = await response.text();
-    throw new Error(text.trim() || 'pCloud backup download verification failed.');
+    lastError = text.trim() || lastError;
   }
-  return new Uint8Array(await response.arrayBuffer());
+  throw new Error(lastError);
 }
 
 async function digestHex(algorithm: 'SHA-1' | 'SHA-256', bytes: Uint8Array): Promise<string> {
