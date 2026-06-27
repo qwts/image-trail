@@ -40,6 +40,7 @@ Use the stories as a checklist, not only as visual examples:
 - Host target: `NeedsSelection`, `Picking`, `GrabMode`, `FillScreenActive`, `PrivacyMasked`, `LongOverflow`, and `Narrow` cover target selection, grab-mode state, pressed controls, privacy masking, long URL overflow, and compact layout.
 - Recent history and bookmarks queue: `Empty`, `Selected`, `PinnedAndCaptured`, `LockedPrivate`, `LongOverflow`, `Narrow`, plus queue paging/selection stories cover transient recents, durable queue state, stored-original indicators, locked/private rows, and overflow.
 - Recall drawer: `Loading`, `Error`, `Selected`, `HasMore`, and `Narrow` cover async loading, decrypt failure, disabled selection actions, pagination, and drawer sizing.
+- Drawer stories should render inside a compact relative stage that includes only the drawer geometry and a small gutter, so fullscreen Storybook layout does not hide spacing issues behind a full-width backdrop.
 - Encrypted originals: `SetupRequired`, `LockedWithBackup`, `Busy`, `Unlocked`, `MaintenanceNeeded`, and `Narrow` cover lock/setup state, disabled busy controls, backup controls, waiting cues, and maintenance cues.
 - Import and export: `Busy`, `Error`, `ImageUtilitiesReady`, `ImageUtilitiesLocked`, `ImageUtilitiesError`, and `Narrow` cover import/export disabled state, error messages, image-transfer availability, encrypted-transfer lock state, waiting cues, and file-picker layout.
 

@@ -127,7 +127,7 @@ export function createRecallDrawerView(
   clearResults.title = 'Hide loaded Recall results until Recall is reopened or reloaded.';
   clearResults.addEventListener('click', () => dispatch({ name: 'recall/clear-results' }));
 
-  actions.append(recall, selectAll, selectPins, selectBookmarks, clear, clearResults);
+  actions.append(selectAll, selectPins, selectBookmarks, clearResults, recall, clear);
   if (state.hasMore) {
     const more = document.createElement('button');
     more.type = 'button';

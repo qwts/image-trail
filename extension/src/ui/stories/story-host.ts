@@ -19,12 +19,27 @@ export function panelStory(element: HTMLElement, options: { readonly width?: num
 }
 
 export function drawerStory(drawer: HTMLElement): HTMLElement {
+  const inlineStart = pxNumber(drawer.style.left);
+  const blockStart = pxNumber(drawer.style.top);
+  const inlineSize = pxNumber(drawer.style.width, 340);
+  const blockSize = pxNumber(drawer.style.height, 480);
+  const gutter = 16;
+
   const host = document.createElement('div');
-  host.style.minBlockSize = '520px';
-  host.style.background = '#101010';
-  host.style.padding = '16px';
+  host.style.position = 'relative';
+  host.style.inlineSize = `${inlineStart + inlineSize + gutter}px`;
+  host.style.minBlockSize = `${blockStart + blockSize + gutter}px`;
+  host.style.background = 'transparent';
+  host.style.overflow = 'hidden';
+
+  drawer.style.position = 'absolute';
   host.append(drawer);
   return host;
+}
+
+function pxNumber(value: string, fallback = 0): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 export function storyButton(label: string, options: { readonly primary?: boolean; readonly danger?: boolean } = {}): HTMLButtonElement {

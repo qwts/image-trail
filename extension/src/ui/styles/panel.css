@@ -2043,8 +2043,15 @@
 }
 
 .image-trail-panel-root .image-trail-panel__recall-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
   padding-top: 8px;
   border-top: 1px solid rgb(255 255 255 / 12%);
+}
+
+.image-trail-panel-root .image-trail-panel__recall-actions button {
+  inline-size: 100%;
 }
 
 .image-trail-panel-root .image-trail-panel__record-list li.is-captured {
