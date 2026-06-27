@@ -17,8 +17,30 @@ import {
 } from '../extension/src/ui/components/record-metadata.js';
 import { selectedRangeIds } from '../extension/src/ui/components/selection-ranges.js';
 import { recallDeleteCountForQueue } from '../extension/src/ui/render.js';
+import type { ImportRestorePreviewState } from '../extension/src/core/types.js';
 import type { UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from '../extension/src/core/url/types.js';
 import type { GrabSourcePattern, UrlTemplateRecord } from '../extension/src/core/url/templates.js';
+
+function restorePreviewFixture(overrides: Partial<ImportRestorePreviewState> = {}): ImportRestorePreviewState {
+  return {
+    fileName: 'image-trail-bookmarks-2026-06-27.json',
+    payloadLabel: 'Bookmarks',
+    recordCount: 2,
+    capturedOriginalCount: 1,
+    skippedCount: 0,
+    unsupportedCount: 0,
+    plaintext: false,
+    message: 'Preview loaded.',
+    samples: [
+      {
+        label: 'sample.jpg',
+        url: 'https://example.test/sample.jpg',
+        detail: 'Bookmark metadata with original reference',
+      },
+    ],
+    ...overrides,
+  };
+}
 
 test('switching active fields clears a previous failed field marker', () => {
   const failed = { ...createInitialPanelState(), activeFieldId: 'query-src-0', failedFieldId: 'query-src-0' };
@@ -710,6 +732,45 @@ test('updating pin save storage preference only changes future save preference s
   assert.equal(updated.pinSaveStoragePreference, 'plaintext');
   assert.equal(updated.bookmarkOffset, state.bookmarkOffset);
   assert.deepEqual(updated.bookmarks, state.bookmarks);
+});
+
+test('import restore preview ready stores preview and status message', () => {
+  const preview = restorePreviewFixture({ message: 'Preview loaded. Import has not changed local records yet.' });
+
+  const next = reducePanelAction(createInitialPanelState(), { name: 'import/restore-preview-ready', preview });
+
+  assert.equal(next.importExportBusy, false);
+  assert.equal(next.importExportMessage, preview.message);
+  assert.equal(next.importExportMessageIsError, false);
+  assert.equal(next.importRestorePreview, preview);
+  assert.equal(next.message, preview.message);
+  assert.equal(next.status, 'ready');
+});
+
+test('import restore preview ready preserves error review state', () => {
+  const preview = restorePreviewFixture({ message: 'Some sections cannot be imported by this version.', messageIsError: true });
+
+  const next = reducePanelAction(createInitialPanelState(), { name: 'import/restore-preview-ready', preview });
+
+  assert.equal(next.importExportMessageIsError, true);
+  assert.equal(next.importRestorePreview, preview);
+  assert.equal(next.message, preview.message);
+  assert.equal(next.status, 'error');
+});
+
+test('import restore preview clears on cancel and new import start', () => {
+  const preview = restorePreviewFixture({ message: 'Preview loaded. Import has not changed local records yet.' });
+  const ready = reducePanelAction(createInitialPanelState(), { name: 'import/restore-preview-ready', preview });
+
+  const canceled = reducePanelAction(ready, { name: 'import/cancel-restore-preview' });
+  assert.equal(canceled.importRestorePreview, undefined);
+  assert.equal(canceled.importExportMessage, 'Restore preview canceled.');
+  assert.equal(canceled.status, 'ready');
+
+  const restarted = reducePanelAction(ready, { name: 'import-export/start' });
+  assert.equal(restarted.importRestorePreview, undefined);
+  assert.equal(restarted.importExportBusy, true);
+  assert.equal(restarted.importExportMessage, 'Import/export is running...');
 });
 
 test('record selection prunes removed and unloaded rows', () => {
