@@ -115,7 +115,7 @@ export function createImportExportView(state: ImportExportViewState, dispatch: (
   return section;
 }
 
-export function createCloudBackupView(state: CloudBackupProviderState, dispatch: (action: CloudBackupAction) => void): HTMLElement {
+export function createCloudBackupView(state: CloudBackupProviderState, dispatch: (action: CloudBackupAction) => void): HTMLDetailsElement {
   const { section, body, header } = createCollapsibleImportExportSection(
     'image-trail-panel__cloud-backup',
     'pCloud',
