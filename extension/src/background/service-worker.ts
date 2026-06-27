@@ -42,6 +42,7 @@ import {
   createLoadBookmarksResultMessage,
   createAddRecentHistoryResultMessage,
   createDeletePanelPositionResultMessage,
+  createConnectPCloudProviderResultMessage,
   createLoadRecentHistoryResultMessage,
   createLoadRecallCandidatesResultMessage,
   createLoadPanelPositionResultMessage,
@@ -64,11 +65,13 @@ import {
   createSaveUrlTemplateResultMessage,
   createDeleteGrabSourcePatternResultMessage,
   createDeleteUrlTemplateResultMessage,
+  createDisconnectPCloudProviderResultMessage,
   createBlobKeyStatusResultMessage,
   createExportBlobKeyBackupResultMessage,
   createFetchBufferedImageSourceResultMessage,
   createImportBlobKeyBackupResultMessage,
   createPingMessage,
+  createPCloudProviderStatusResultMessage,
   createProbeImageSourceResultMessage,
   createRetrieveBlobResultMessage,
   createStorageUsageResponseMessage,
@@ -122,6 +125,7 @@ import type { SetupBlobKeyMessage, UnlockBlobKeyMessage, BlobKeyResultMessage } 
 import type { ExportBlobKeyBackupMessage, ImportBlobKeyBackupMessage } from './messages.js';
 import type { ImportEncryptedImageMessage } from './messages.js';
 import { extractOrigin, hasOriginPermission, requestOriginPermission } from './permissions.js';
+import { connectPCloudProvider, disconnectPCloudProvider, loadPCloudProviderStatus } from './pcloud-provider.js';
 
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
@@ -1395,6 +1399,42 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleSaveLocalSettings(message)
         .then((result) => sendResponse(createSaveLocalSettingsResultMessage(result)))
         .catch(() => sendResponse(createSaveLocalSettingsResultMessage({ ok: false })));
+      return true;
+
+    case MessageType.PCloudProviderStatus:
+      loadPCloudProviderStatus()
+        .then((result) => sendResponse(createPCloudProviderStatusResultMessage(result)))
+        .catch(() =>
+          sendResponse(createPCloudProviderStatusResultMessage({ connected: false, message: 'pCloud status could not be loaded.' })),
+        );
+      return true;
+
+    case MessageType.ConnectPCloudProvider:
+      connectPCloudProvider()
+        .then((result) => sendResponse(createConnectPCloudProviderResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createConnectPCloudProviderResultMessage({
+              ok: false,
+              status: { connected: false, message: 'pCloud connection failed.' },
+              message: 'pCloud connection failed.',
+            }),
+          ),
+        );
+      return true;
+
+    case MessageType.DisconnectPCloudProvider:
+      disconnectPCloudProvider()
+        .then((result) => sendResponse(createDisconnectPCloudProviderResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createDisconnectPCloudProviderResultMessage({
+              ok: false,
+              status: { connected: false, message: 'pCloud disconnect failed.' },
+              message: 'pCloud disconnect failed.',
+            }),
+          ),
+        );
       return true;
 
     case MessageType.DeleteBlob:
