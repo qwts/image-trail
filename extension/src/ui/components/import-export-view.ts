@@ -24,6 +24,13 @@ export type CloudBackupAction =
   | { readonly name: 'cloud-backup/connect'; readonly provider: 'pcloud' }
   | { readonly name: 'cloud-backup/backup-now'; readonly provider: 'pcloud'; readonly password: string }
   | { readonly name: 'cloud-backup/choose-restore'; readonly provider: 'pcloud' }
+  | {
+      readonly name: 'cloud-backup/preview-restore';
+      readonly provider: 'pcloud';
+      readonly fileId: number;
+      readonly fileName: string;
+      readonly password: string;
+    }
   | { readonly name: 'cloud-backup/retry'; readonly provider: 'pcloud' }
   | { readonly name: 'cloud-backup/disconnect'; readonly provider: 'pcloud' };
 
@@ -39,8 +46,16 @@ export interface CloudBackupProviderState {
   readonly lastBackupSize?: string;
   readonly lastBackupSha256?: string;
   readonly pendingOperation?: 'connecting' | 'disconnecting' | 'backing-up' | 'restoring';
+  readonly restoreCandidates?: readonly {
+    readonly fileId: number;
+    readonly fileName: string;
+    readonly size: string;
+    readonly modifiedAt?: string;
+  }[];
   readonly restoreCandidateName?: string;
   readonly restoreCandidateSize?: string;
+  readonly restoreCandidateSha256?: string;
+  readonly restoreDownloadedAt?: string;
   readonly message?: string;
   readonly messageIsError?: boolean;
 }
@@ -175,6 +190,8 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
   );
   restoreBtn.disabled = state.connectionState !== 'connected';
 
+  const restoreCandidateControls = createRestoreCandidateControls(state, dispatch, passwordInput);
+
   const retryBtn = createCloudBackupButton('Retry pCloud', state, () => dispatch({ name: 'cloud-backup/retry', provider: 'pcloud' }));
   retryBtn.disabled = state.connectionState !== 'error';
 
@@ -200,8 +217,67 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
   updateBackupControls();
 
   group.append(actions);
+  if (restoreCandidateControls) group.append(restoreCandidateControls);
   body.append(group);
   return section;
+}
+
+function createRestoreCandidateControls(
+  state: CloudBackupProviderState,
+  dispatch: (action: CloudBackupAction) => void,
+  passwordInput: HTMLInputElement,
+): HTMLElement | null {
+  const candidates = state.restoreCandidates ?? [];
+  if (candidates.length === 0) return null;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__control-stack image-trail-panel__cloud-restore-picker';
+
+  const label = document.createElement('label');
+  label.className = 'image-trail-panel__field';
+  const labelText = document.createElement('span');
+  labelText.className = 'image-trail-panel__field-label';
+  labelText.textContent = 'Restore backup';
+
+  const select = document.createElement('select');
+  select.disabled = state.connectionState !== 'connected';
+  for (const candidate of candidates) {
+    const option = document.createElement('option');
+    option.value = String(candidate.fileId);
+    option.textContent = restoreCandidateLabel(candidate);
+    option.dataset.fileName = candidate.fileName;
+    select.append(option);
+  }
+
+  label.append(labelText, select);
+
+  const preview = createCloudBackupButton('Preview selected restore', state, () => {
+    const selected = select.selectedOptions.item(0);
+    if (!selected) return;
+    dispatch({
+      name: 'cloud-backup/preview-restore',
+      provider: 'pcloud',
+      fileId: Number(selected.value),
+      fileName: selected.dataset.fileName ?? selected.textContent ?? 'pCloud backup',
+      password: passwordInput.value,
+    });
+    passwordInput.value = '';
+    updatePreviewControls();
+  });
+  preview.classList.add('image-trail-panel__primary-action');
+  function updatePreviewControls(): void {
+    preview.disabled = state.connectionState !== 'connected' || passwordInput.value.length < 4;
+  }
+
+  passwordInput.addEventListener('input', updatePreviewControls);
+  updatePreviewControls();
+  wrapper.append(label, createActionGroup('Restore preview', [preview]));
+  return wrapper;
+}
+
+function restoreCandidateLabel(candidate: NonNullable<CloudBackupProviderState['restoreCandidates']>[number]): string {
+  const modified = candidate.modifiedAt ? `, ${candidate.modifiedAt}` : '';
+  return `${candidate.fileName} (${candidate.size}${modified})`;
 }
 
 function createCollapsibleImportExportSection(
@@ -668,6 +744,8 @@ function cloudBackupMetadata(state: CloudBackupProviderState): ReadonlyArray<rea
   if (state.lastBackupSha256) rows.push(['SHA-256', state.lastBackupSha256]);
   if (state.restoreCandidateName) rows.push(['Restore file', state.restoreCandidateName]);
   if (state.restoreCandidateSize) rows.push(['Restore size', state.restoreCandidateSize]);
+  if (state.restoreDownloadedAt) rows.push(['Restore downloaded', state.restoreDownloadedAt]);
+  if (state.restoreCandidateSha256) rows.push(['Restore SHA-256', state.restoreCandidateSha256]);
   return rows;
 }
 

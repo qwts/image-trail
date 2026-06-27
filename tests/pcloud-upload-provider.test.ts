@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 
-import { uploadPCloudBackup } from '../extension/src/background/pcloud-provider.js';
+import { downloadPCloudBackup, listPCloudBackups, uploadPCloudBackup } from '../extension/src/background/pcloud-provider.js';
 
 const CONNECTION_KEY = 'imageTrail.pcloudConnection';
 
@@ -24,6 +24,10 @@ function isApiPCloudCall(call: FetchCall): boolean {
 
 function sha1(input: string): string {
   return createHash('sha1').update(input).digest('hex');
+}
+
+function sha256(input: string): string {
+  return createHash('sha256').update(input).digest('hex');
 }
 
 function mockedFolderId(init: RequestInit | undefined): number {
@@ -261,6 +265,98 @@ test('uploadPCloudBackup reports cleanup needed when deleting an unverified file
     assert.equal(result.cleanupFileId, 302);
     assert.equal(result.cleanupNeeded, true);
     assert.match(result.message, /Cleanup needed: delete pCloud fileid 302/u);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreChrome();
+  }
+});
+
+test('listPCloudBackups returns encrypted backup candidates newest first without tokens', async () => {
+  const restoreChrome = installPCloudConnection();
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith('/createfolderifnotexists')) {
+      return jsonResponse({ result: 0, metadata: { isfolder: true, folderid: mockedFolderId(init) } });
+    }
+    if (url.endsWith('/listfolder')) {
+      return jsonResponse({
+        result: 0,
+        metadata: {
+          contents: [
+            { fileid: 400, name: 'notes.txt', size: 12, modified: 'Sat, 27 Jun 2026 00:00:00 +0000' },
+            {
+              fileid: 401,
+              name: 'image-trail-pcloud-backup-2026-06-26T00-00-00Z.image-trail-encrypted.json',
+              size: 128,
+              modified: 'Fri, 26 Jun 2026 00:00:00 +0000',
+              sha1: 'a'.repeat(40),
+            },
+            {
+              fileid: 402,
+              name: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
+              size: 256,
+              modified: 'Sat, 27 Jun 2026 00:00:00 +0000',
+              sha1: 'b'.repeat(40),
+            },
+          ],
+        },
+      });
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+
+  try {
+    const result = await listPCloudBackups();
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.folderPath, '/Image Trail/backups');
+      assert.equal(result.candidates.length, 2);
+      assert.equal(result.candidates[0]?.fileId, 402);
+      assert.equal(result.candidates[1]?.fileId, 401);
+      assert.match(result.message, /Found 2 encrypted pCloud backups/u);
+    }
+    assert.equal(JSON.stringify(result).includes('token-secret'), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreChrome();
+  }
+});
+
+test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 without tokens', async () => {
+  const restoreChrome = installPCloudConnection();
+  const originalFetch = globalThis.fetch;
+  const fileContent = '{"encrypted":true,"payload":"restore"}';
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith('/getfilelink')) {
+      const params = init?.body as URLSearchParams;
+      assert.equal(params.get('fileid'), '402');
+      return jsonResponse({ result: 0, hosts: ['c123.pcloud.com'], path: '/restore-backup' });
+    }
+    if (url === 'https://c123.pcloud.com/restore-backup') {
+      return new Response(fileContent);
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+
+  try {
+    const result = await downloadPCloudBackup({
+      fileId: 402,
+      fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.fileContent, fileContent);
+      assert.equal(result.sizeBytes, fileContent.length);
+      assert.equal(result.sha256, sha256(fileContent));
+      assert.equal(result.folderPath, '/Image Trail/backups');
+    }
+    assert.equal(JSON.stringify(result).includes('token-secret'), false);
   } finally {
     globalThis.fetch = originalFetch;
     restoreChrome();

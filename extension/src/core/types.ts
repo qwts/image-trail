@@ -145,11 +145,16 @@ export interface PCloudBackupState {
   readonly accountPremium?: boolean;
   readonly quotaBytes?: number;
   readonly usedQuotaBytes?: number;
-  readonly pendingOperation?: 'connecting' | 'disconnecting' | 'backing-up';
+  readonly pendingOperation?: 'connecting' | 'disconnecting' | 'backing-up' | 'restoring';
   readonly lastBackupAt?: string;
   readonly lastBackupFileName?: string;
   readonly lastBackupSizeBytes?: number;
   readonly lastBackupSha256?: string;
+  readonly restoreCandidates?: readonly import('./cloud/pcloud-provider.js').PCloudBackupRestoreCandidate[];
+  readonly lastRestoreFileName?: string;
+  readonly lastRestoreSizeBytes?: number;
+  readonly lastRestoreSha256?: string;
+  readonly lastRestoreDownloadedAt?: string;
   readonly message?: string;
   readonly messageIsError?: boolean;
 }
@@ -562,7 +567,7 @@ export type PanelAction =
   | { readonly name: 'pcloud-backup/status'; readonly status: import('./cloud/pcloud-provider.js').PCloudProviderStatus }
   | {
       readonly name: 'pcloud-backup/busy';
-      readonly pendingOperation: 'connecting' | 'disconnecting' | 'backing-up';
+      readonly pendingOperation: 'connecting' | 'disconnecting' | 'backing-up' | 'restoring';
       readonly message: string;
     }
   | { readonly name: 'pcloud-backup/message'; readonly message: string }
@@ -581,10 +586,39 @@ export type PanelAction =
       readonly message: string;
       readonly status?: import('./cloud/pcloud-provider.js').PCloudProviderStatus;
     }
+  | {
+      readonly name: 'pcloud-backup/restore-candidates-loaded';
+      readonly candidates: readonly import('./cloud/pcloud-provider.js').PCloudBackupRestoreCandidate[];
+      readonly folderPath: string;
+      readonly apiHost: string;
+      readonly message: string;
+    }
+  | {
+      readonly name: 'pcloud-backup/restore-downloaded';
+      readonly fileName: string;
+      readonly folderPath: string;
+      readonly apiHost: string;
+      readonly sizeBytes: number;
+      readonly sha256: string;
+      readonly downloadedAt: string;
+      readonly message: string;
+    }
+  | {
+      readonly name: 'pcloud-backup/restore-error';
+      readonly message: string;
+      readonly status?: import('./cloud/pcloud-provider.js').PCloudProviderStatus;
+    }
   | { readonly name: 'pcloud-backup/error'; readonly message: string }
   | { readonly name: 'cloud-backup/connect'; readonly provider: 'pcloud' }
   | { readonly name: 'cloud-backup/backup-now'; readonly provider: 'pcloud'; readonly password: string }
   | { readonly name: 'cloud-backup/choose-restore'; readonly provider: 'pcloud' }
+  | {
+      readonly name: 'cloud-backup/preview-restore';
+      readonly provider: 'pcloud';
+      readonly fileId: number;
+      readonly fileName: string;
+      readonly password: string;
+    }
   | { readonly name: 'cloud-backup/retry'; readonly provider: 'pcloud' }
   | { readonly name: 'cloud-backup/disconnect'; readonly provider: 'pcloud' }
   | { readonly name: 'export/history' | 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }

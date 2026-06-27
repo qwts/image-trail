@@ -5,6 +5,8 @@ import type { RecentHistoryStore } from '../content/recent-history-store.js';
 import {
   connectPCloudProvider,
   disconnectPCloudProvider,
+  downloadPCloudBackup,
+  listPCloudBackups,
   loadPCloudProviderStatus,
   uploadPCloudBackup,
 } from '../content/pcloud-provider-client.js';
@@ -1462,7 +1464,12 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'cloud-backup/choose-restore') {
-      this.showPCloudBackupPlaceholder('restore');
+      void this.choosePCloudRestoreFile();
+      return;
+    }
+
+    if (action.name === 'cloud-backup/preview-restore') {
+      void this.previewPCloudRestoreFile(action.fileId, action.fileName, action.password);
       return;
     }
 
@@ -3438,6 +3445,79 @@ export class ImageTrailPanel {
       uploadedAt: upload.uploadedAt,
       message: upload.message,
     });
+    this.render();
+  }
+
+  private async choosePCloudRestoreFile(): Promise<void> {
+    if (this.state.pcloudBackup.connectionState === 'busy') return;
+    this.state = reducePanelAction(this.state, {
+      name: 'pcloud-backup/busy',
+      pendingOperation: 'restoring',
+      message: 'Checking pCloud backups...',
+    });
+    this.render();
+
+    const result = await listPCloudBackups();
+    if (!result.ok) {
+      this.state = reducePanelAction(this.state, {
+        name: 'pcloud-backup/restore-error',
+        message: result.message,
+        status: result.status,
+      });
+      this.render();
+      return;
+    }
+
+    this.state = reducePanelAction(this.state, {
+      name: 'pcloud-backup/restore-candidates-loaded',
+      candidates: result.candidates,
+      folderPath: result.folderPath,
+      apiHost: result.apiHost,
+      message: result.message,
+    });
+    this.render();
+  }
+
+  private async previewPCloudRestoreFile(fileId: number, fileName: string, password: string): Promise<void> {
+    if (this.state.pcloudBackup.connectionState === 'busy') return;
+    if (password.length < 4) {
+      this.state = reducePanelAction(this.state, {
+        name: 'pcloud-backup/restore-error',
+        message: 'Enter the cloud backup password before previewing this restore file.',
+      });
+      this.render();
+      return;
+    }
+
+    this.state = reducePanelAction(this.state, {
+      name: 'pcloud-backup/busy',
+      pendingOperation: 'restoring',
+      message: 'Downloading encrypted pCloud backup...',
+    });
+    this.render();
+
+    const result = await downloadPCloudBackup({ fileId, fileName });
+    if (!result.ok) {
+      this.state = reducePanelAction(this.state, {
+        name: 'pcloud-backup/restore-error',
+        message: result.message,
+        status: result.status,
+      });
+      this.render();
+      return;
+    }
+
+    this.state = reducePanelAction(this.state, {
+      name: 'pcloud-backup/restore-downloaded',
+      fileName: result.fileName,
+      folderPath: result.folderPath,
+      apiHost: result.apiHost,
+      sizeBytes: result.sizeBytes,
+      sha256: result.sha256,
+      downloadedAt: result.downloadedAt,
+      message: result.message,
+    });
+    await this.previewBookmarksImport(result.fileContent, password, result.fileName);
     this.render();
   }
 

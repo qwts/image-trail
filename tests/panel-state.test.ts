@@ -1394,3 +1394,57 @@ test('pCloud upload errors apply disconnected provider status for reconnect reco
   assert.equal(failed.pcloudBackup.messageIsError, true);
   assert.match(failed.pcloudBackup.message ?? '', /Connect pCloud/u);
 });
+
+test('pCloud restore reducer tracks candidates and downloaded metadata', () => {
+  const connected = reducePanelAction(createInitialPanelState(), {
+    name: 'pcloud-backup/status',
+    status: {
+      connected: true,
+      apiHost: 'api.pcloud.com',
+      message: 'pCloud is connected.',
+    },
+  });
+  const restoring = reducePanelAction(connected, {
+    name: 'pcloud-backup/busy',
+    pendingOperation: 'restoring',
+    message: 'Checking pCloud backups...',
+  });
+
+  assert.equal(restoring.pcloudBackup.connectionState, 'busy');
+  assert.equal(restoring.pcloudBackup.pendingOperation, 'restoring');
+
+  const candidates = reducePanelAction(restoring, {
+    name: 'pcloud-backup/restore-candidates-loaded',
+    apiHost: 'api.pcloud.com',
+    folderPath: '/Image Trail/backups',
+    candidates: [
+      {
+        fileId: 402,
+        fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
+        sizeBytes: 512,
+        modifiedAt: 'Sat, 27 Jun 2026 00:00:00 +0000',
+      },
+    ],
+    message: 'Found 1 encrypted pCloud backup.',
+  });
+
+  assert.equal(candidates.pcloudBackup.connectionState, 'connected');
+  assert.equal(candidates.pcloudBackup.pendingOperation, undefined);
+  assert.equal(candidates.pcloudBackup.restoreCandidates?.[0]?.fileId, 402);
+
+  const downloaded = reducePanelAction(candidates, {
+    name: 'pcloud-backup/restore-downloaded',
+    apiHost: 'api.pcloud.com',
+    folderPath: '/Image Trail/backups',
+    fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
+    sizeBytes: 512,
+    sha256: 'c'.repeat(64),
+    downloadedAt: '2026-06-27T00:00:01.000Z',
+    message: 'Downloaded backup.',
+  });
+
+  assert.equal(downloaded.pcloudBackup.lastRestoreFileName, 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json');
+  assert.equal(downloaded.pcloudBackup.lastRestoreSizeBytes, 512);
+  assert.equal(downloaded.pcloudBackup.lastRestoreSha256, 'c'.repeat(64));
+  assert.equal(downloaded.pcloudBackup.lastRestoreDownloadedAt, '2026-06-27T00:00:01.000Z');
+});

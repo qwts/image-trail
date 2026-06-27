@@ -32,6 +32,7 @@ import {
   createCreateBlobPreviewResultMessage,
   createDeleteBlobResultMessage,
   createDownloadImageResultMessage,
+  createDownloadPCloudBackupResultMessage,
   createExportEncryptedImageResultMessage,
   createFetchLinkedPageResultMessage,
   createFetchThumbnailSourceResultMessage,
@@ -49,6 +50,7 @@ import {
   createLoadParsedFieldStateResultMessage,
   createLoadLocalSettingsResultMessage,
   createListGrabSourcePatternsResultMessage,
+  createListPCloudBackupsResultMessage,
   createListUrlTemplatesResultMessage,
   createListUrlReviewStatusResultMessage,
   createRemoveBookmarkResultMessage,
@@ -125,9 +127,16 @@ import type { CreateBlobPreviewMessage } from './messages.js';
 import type { SetupBlobKeyMessage, UnlockBlobKeyMessage, BlobKeyResultMessage } from './messages.js';
 import type { ExportBlobKeyBackupMessage, ImportBlobKeyBackupMessage } from './messages.js';
 import type { ImportEncryptedImageMessage } from './messages.js';
-import type { UploadPCloudBackupMessage } from './messages.js';
+import type { DownloadPCloudBackupMessage, UploadPCloudBackupMessage } from './messages.js';
 import { extractOrigin, hasOriginPermission, requestOriginPermission } from './permissions.js';
-import { connectPCloudProvider, disconnectPCloudProvider, loadPCloudProviderStatus, uploadPCloudBackup } from './pcloud-provider.js';
+import {
+  connectPCloudProvider,
+  disconnectPCloudProvider,
+  downloadPCloudBackup,
+  listPCloudBackups,
+  loadPCloudProviderStatus,
+  uploadPCloudBackup,
+} from './pcloud-provider.js';
 
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
@@ -1450,6 +1459,36 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
               status: { connected: false, message: 'pCloud backup upload failed.', messageIsError: true },
               reason: 'upload-failed',
               message: 'pCloud backup upload failed.',
+            }),
+          ),
+        );
+      return true;
+
+    case MessageType.ListPCloudBackups:
+      listPCloudBackups()
+        .then((result) => sendResponse(createListPCloudBackupsResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createListPCloudBackupsResultMessage({
+              ok: false,
+              status: { connected: false, message: 'pCloud backups could not be listed.', messageIsError: true },
+              reason: 'list-failed',
+              message: 'pCloud backups could not be listed.',
+            }),
+          ),
+        );
+      return true;
+
+    case MessageType.DownloadPCloudBackup:
+      downloadPCloudBackup((message as DownloadPCloudBackupMessage).payload)
+        .then((result) => sendResponse(createDownloadPCloudBackupResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createDownloadPCloudBackupResultMessage({
+              ok: false,
+              status: { connected: false, message: 'pCloud backup could not be downloaded.', messageIsError: true },
+              reason: 'download-failed',
+              message: 'pCloud backup could not be downloaded.',
             }),
           ),
         );
