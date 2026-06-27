@@ -127,15 +127,17 @@ export function createRecallDrawerView(
   clearResults.title = 'Hide loaded Recall results until Recall is reopened or reloaded.';
   clearResults.addEventListener('click', () => dispatch({ name: 'recall/clear-results' }));
 
-  actions.append(selectAll, selectPins, selectBookmarks, clearResults, recall, clear);
+  actions.append(selectAll, selectPins, selectBookmarks, clearResults);
   if (state.hasMore) {
     const more = document.createElement('button');
     more.type = 'button';
+    more.className = 'image-trail-panel__recall-load-more';
     more.textContent = state.busy ? 'Loading...' : 'Load more';
     more.disabled = state.busy;
     more.addEventListener('click', () => dispatch({ name: 'recall/load-more' }));
     actions.append(more);
   }
+  actions.append(recall, clear);
   drawer.append(header, message, content, actions);
   return drawer;
 }

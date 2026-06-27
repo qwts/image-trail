@@ -2054,6 +2054,10 @@
   inline-size: 100%;
 }
 
+.image-trail-panel-root .image-trail-panel__recall-load-more {
+  grid-column: 1 / -1;
+}
+
 .image-trail-panel-root .image-trail-panel__record-list li.is-captured {
   border-top-color: rgb(255 255 255 / 12%);
 }
