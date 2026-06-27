@@ -415,20 +415,22 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
               radius: state.neighborPreloadRadius,
               cacheLimit: state.neighborPreloadCacheLimit,
             },
+            [
+              createEncryptionView(
+                {
+                  unlocked: state.blobKeyUnlocked,
+                  keyReference: state.blobKeyReference,
+                  hasKey: state.blobKeyAvailable,
+                  busy: state.importExportBusy,
+                  abandonedOriginalCount: state.storageUsage?.orphanedBlobCount ?? 0,
+                },
+                target.dispatch,
+              ),
+              createImageTransferView(importExportState, target.dispatch),
+              createImportExportView(importExportState, target.dispatch),
+            ],
             target.dispatch,
           ),
-          createEncryptionView(
-            {
-              unlocked: state.blobKeyUnlocked,
-              keyReference: state.blobKeyReference,
-              hasKey: state.blobKeyAvailable,
-              busy: state.importExportBusy,
-              abandonedOriginalCount: state.storageUsage?.orphanedBlobCount ?? 0,
-            },
-            target.dispatch,
-          ),
-          createImageTransferView(importExportState, target.dispatch),
-          createImportExportView(importExportState, target.dispatch),
         ]
       : []),
     createUrlEditorView(

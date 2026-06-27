@@ -2,7 +2,7 @@ import type { PanelAction } from '../../core/types.js';
 import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
 
-let encryptedOriginalsOpen = true;
+let encryptedOriginalsOpen = false;
 
 type EncryptionAction = Extract<
   PanelAction,
@@ -28,7 +28,7 @@ export function createEncryptionView(
   dispatch: (action: EncryptionAction) => void,
 ): HTMLElement {
   const section = document.createElement('details');
-  section.className = 'image-trail-panel__section image-trail-panel__encryption';
+  section.className = 'image-trail-panel__settings-templates image-trail-panel__encryption';
   section.classList.toggle('is-waiting', state.busy);
   section.open = encryptedOriginalsOpen;
   section.addEventListener('toggle', () => {
@@ -38,7 +38,7 @@ export function createEncryptionView(
   const header = document.createElement('div');
   header.className = 'image-trail-panel__encryption-header';
 
-  const heading = document.createElement('h3');
+  const heading = document.createElement('h4');
   heading.textContent = 'Encrypted originals';
 
   const badge = document.createElement('span');

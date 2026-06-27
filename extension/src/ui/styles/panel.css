@@ -626,6 +626,10 @@
   box-shadow: 0 0 0 1px rgb(88 166 255 / 70%);
 }
 
+.image-trail-panel-root .image-trail-panel__settings-section > h3 {
+  color: #fff;
+}
+
 .image-trail-panel-root .image-trail-panel__target-summary {
   display: flex;
   align-items: center;
@@ -799,6 +803,64 @@
 
 .image-trail-panel-root .image-trail-panel__encryption {
   gap: 8px;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-summary::-webkit-details-marker {
+  display: none;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-header h4 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-header::after {
+  content: 'Show';
+  margin-left: auto;
+  color: #999;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-section[open] .image-trail-panel__settings-utility-header::after {
+  content: 'Hide';
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-block-start: 7px;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-body > .image-trail-panel__settings-templates {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.image-trail-panel-root
+  .image-trail-panel__settings-utility-body
+  > .image-trail-panel__settings-templates
+  + .image-trail-panel__settings-templates {
+  padding-top: 7px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
 }
 
 .image-trail-panel-root .image-trail-panel__section.is-waiting,

@@ -33,46 +33,83 @@ export interface ImportExportViewState {
   readonly lastMessageIsError?: boolean;
 }
 
+let imageUtilitiesOpen = false;
+let importExportOpen = false;
 export function createImageTransferView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'image-trail-panel__section image-trail-panel__image-transfer';
-
-  const heading = document.createElement('h3');
-  heading.textContent = 'Image utilities';
-  section.append(heading);
+  const { section, body } = createCollapsibleImportExportSection(
+    'image-trail-panel__image-transfer',
+    'Image utilities',
+    imageUtilitiesOpen,
+    (open) => {
+      imageUtilitiesOpen = open;
+    },
+  );
 
   if (state.lastMessage) {
     const msg = document.createElement('p');
     msg.className = state.lastMessageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
     if (state.lastMessageIsError) msg.setAttribute('role', 'alert');
     msg.textContent = state.lastMessage;
-    section.append(msg);
+    body.append(msg);
   }
 
-  section.append(createImageGroup(state, dispatch));
+  body.append(createImageGroup(state, dispatch));
 
   return section;
 }
 
 export function createImportExportView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'image-trail-panel__section image-trail-panel__import-export';
-
-  const heading = document.createElement('h3');
-  heading.textContent = 'Import / Export';
-  section.append(heading);
+  const { section, body } = createCollapsibleImportExportSection(
+    'image-trail-panel__import-export',
+    'Import / Export',
+    importExportOpen,
+    (open) => {
+      importExportOpen = open;
+    },
+  );
 
   if (state.lastMessage) {
     const msg = document.createElement('p');
     msg.className = state.lastMessageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
     if (state.lastMessageIsError) msg.setAttribute('role', 'alert');
     msg.textContent = state.lastMessage;
-    section.append(msg);
+    body.append(msg);
   }
 
-  section.append(createExportGroup(state, dispatch), createImportGroup(state, dispatch));
+  body.append(createExportGroup(state, dispatch), createImportGroup(state, dispatch));
 
   return section;
+}
+
+function createCollapsibleImportExportSection(
+  className: string,
+  title: string,
+  open: boolean,
+  onToggle: (open: boolean) => void,
+): { readonly section: HTMLDetailsElement; readonly body: HTMLDivElement } {
+  const section = document.createElement('details');
+  section.className = `image-trail-panel__settings-templates image-trail-panel__settings-utility-section ${className}`;
+  section.open = open;
+  section.addEventListener('toggle', () => {
+    onToggle(section.open);
+  });
+
+  const heading = document.createElement('h4');
+  heading.textContent = title;
+
+  const header = document.createElement('div');
+  header.className = 'image-trail-panel__settings-utility-header';
+  header.append(heading);
+
+  const summary = document.createElement('summary');
+  summary.className = 'image-trail-panel__settings-utility-summary';
+  summary.append(header);
+
+  const body = document.createElement('div');
+  body.className = 'image-trail-panel__settings-utility-body';
+
+  section.append(summary, body);
+  return { section, body };
 }
 
 function createExportGroup(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {

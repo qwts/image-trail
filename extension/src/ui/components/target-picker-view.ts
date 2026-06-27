@@ -2,14 +2,24 @@ import type { PanelAction, TargetState } from '../../core/types.js';
 import { OBJECT_FIT_MODES, isObjectFitMode } from '../../core/preview-style.js';
 import { PRIVACY_URL_TEXT } from './record-metadata.js';
 
+let targetUtilityOpen: boolean | null = null;
+
 export function createTargetPickerView(
   target: TargetState,
   dispatch: (action: PanelAction) => void,
   options: { readonly privacyMode?: boolean } = {},
 ): HTMLElement {
+  const targetNeedsAttention = target.picking || target.grabModeActive || target.mode !== 'auto' || target.candidateCount !== 1;
   const wrapper = document.createElement('details');
   wrapper.className = 'image-trail-panel__section image-trail-panel__target-utility';
-  wrapper.open = target.picking || target.grabModeActive || target.mode !== 'auto' || target.candidateCount !== 1;
+  wrapper.open = targetNeedsAttention || (targetUtilityOpen ?? false);
+  wrapper.addEventListener('toggle', () => {
+    if (targetNeedsAttention) {
+      if (!wrapper.open) wrapper.open = true;
+      return;
+    }
+    targetUtilityOpen = wrapper.open;
+  });
 
   const heading = document.createElement('summary');
   heading.className = 'image-trail-panel__target-summary';

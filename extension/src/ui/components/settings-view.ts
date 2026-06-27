@@ -25,6 +25,8 @@ const MATCH_MODES: readonly { readonly value: UrlTemplateMatchMode; readonly lab
   { value: 'broad-site', label: 'Broad site match' },
 ];
 
+const settingsGroupsOpen = new Map<string, boolean>();
+
 function matchModeLabel(mode: UrlTemplateMatchMode): string {
   return MATCH_MODES.find((option) => option.value === mode)?.label ?? mode;
 }
@@ -64,6 +66,7 @@ export function createSettingsView(
     readonly radius: number;
     readonly cacheLimit: number;
   },
+  utilityChildren: readonly HTMLElement[],
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
@@ -71,6 +74,68 @@ export function createSettingsView(
 
   const heading = document.createElement('h3');
   heading.textContent = 'Settings';
+
+  section.append(
+    heading,
+    createSettingsGroup('Display', 'display', [
+      createVisiblePinsSettingsView(visibleBookmarkSoftMax, dispatch),
+      createRecentsSettingsView(recentHistoryState, dispatch),
+    ]),
+    createSettingsGroup('Privacy', 'privacy', [
+      createPrivatePinSettingsView(privatePinState, dispatch),
+      createPrivacySettingsView(privacyModeEnabled, dispatch),
+    ]),
+    createSettingsGroup('Automation', 'automation', [
+      createRequestThrottleSettingsView(requestThrottleState, dispatch),
+      createNeighborPreloadSettingsView(neighborPreloadState, dispatch),
+      createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),
+    ]),
+    createSettingsGroup('Maintenance', 'maintenance', [
+      createPanelLayoutSettingsView(dispatch),
+      createDestructiveSettingsView(destructiveState, dispatch),
+    ]),
+    createSettingsGroup('URL learning', 'url-learning', [
+      createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
+      createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),
+    ]),
+    ...utilityChildren,
+  );
+  return section;
+}
+
+function createSettingsGroup(title: string, id: string, children: readonly HTMLElement[]): HTMLElement {
+  const group = document.createElement('details');
+  group.className = 'image-trail-panel__settings-templates image-trail-panel__settings-utility-section';
+  group.open = settingsGroupsOpen.get(id) ?? false;
+  group.addEventListener('toggle', () => {
+    settingsGroupsOpen.set(id, group.open);
+  });
+
+  const heading = document.createElement('h4');
+  heading.textContent = title;
+
+  const header = document.createElement('div');
+  header.className = 'image-trail-panel__settings-utility-header';
+  header.append(heading);
+
+  const summary = document.createElement('summary');
+  summary.className = 'image-trail-panel__settings-utility-summary';
+  summary.append(header);
+
+  const body = document.createElement('div');
+  body.className = 'image-trail-panel__settings-utility-body';
+  body.append(...children);
+
+  group.append(summary, body);
+  return group;
+}
+
+function createVisiblePinsSettingsView(visibleBookmarkSoftMax: number, dispatch: (action: PanelAction) => void): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'Pins';
 
   const form = document.createElement('form');
   form.className = 'image-trail-panel__settings-form';
@@ -104,21 +169,8 @@ export function createSettingsView(
   });
 
   form.append(label, apply);
-  section.append(
-    heading,
-    form,
-    createRecentsSettingsView(recentHistoryState, dispatch),
-    createPrivatePinSettingsView(privatePinState, dispatch),
-    createPrivacySettingsView(privacyModeEnabled, dispatch),
-    createRequestThrottleSettingsView(requestThrottleState, dispatch),
-    createNeighborPreloadSettingsView(neighborPreloadState, dispatch),
-    createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),
-    createPanelLayoutSettingsView(dispatch),
-    createDestructiveSettingsView(destructiveState, dispatch),
-    createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
-    createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),
-  );
-  return section;
+  wrapper.append(heading, form);
+  return wrapper;
 }
 
 function createRequestThrottleSettingsView(
