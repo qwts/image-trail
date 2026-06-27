@@ -261,8 +261,16 @@ function cloudBackupStory(
   storyOptions: { readonly width?: number; readonly collapsed?: boolean } = {},
 ): HTMLElement {
   const view = createCloudBackupView(cloudBackupState(overrides), mockDispatch('cloud backup story action'));
-  if (storyOptions.collapsed) view.open = false;
+  setUtilityDetailsOpen(view, !storyOptions.collapsed);
   return panelStory(view, storyOptions);
+}
+
+function setUtilityDetailsOpen(view: HTMLDetailsElement, open: boolean): void {
+  view.open = open;
+  const summary = view.querySelector<HTMLElement>('.image-trail-panel__settings-utility-summary');
+  const body = view.querySelector<HTMLElement>('.image-trail-panel__settings-utility-body');
+  summary?.setAttribute('aria-expanded', String(open));
+  if (body) body.hidden = !open;
 }
 
 function importExportState(overrides: Partial<ImportExportStoryState> = {}): ImportExportStoryState {
