@@ -166,7 +166,8 @@ export function createHistoryView(
     if (item.captureStatus === 'captured' && item.blobId && !keyMissing) {
       const deleteCapture = document.createElement('button');
       deleteCapture.type = 'button';
-      deleteCapture.textContent = 'Delete original';
+      deleteCapture.textContent = 'Remove';
+      deleteCapture.title = 'Remove the stored original from this row.';
       deleteCapture.addEventListener('click', (event) => {
         event.stopPropagation();
         dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! });

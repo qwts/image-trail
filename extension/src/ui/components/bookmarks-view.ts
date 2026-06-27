@@ -181,6 +181,7 @@ export function createBookmarksView(
     const previewableEncrypted = isPreviewableEncryptedRecord(item, blobKeyUnlocked);
     const selected = selectedIds.includes(item.id);
     const entry = document.createElement('li');
+    entry.className = 'image-trail-panel__bookmark-item';
     entry.dataset.imageTrailScrollAnchor = `bookmark:${item.id}`;
     if (options.privacyMode && !privatePlaceholder) entry.classList.add('is-privacy-masked');
     if (previewableEncrypted) entry.classList.add('is-captured');
@@ -258,7 +259,8 @@ export function createBookmarksView(
     if (item.captureStatus === 'captured' && item.blobId && !keyMissing) {
       const deleteCapture = document.createElement('button');
       deleteCapture.type = 'button';
-      deleteCapture.textContent = 'Delete original';
+      deleteCapture.textContent = 'Remove';
+      deleteCapture.title = 'Remove the stored original from this row.';
       deleteCapture.addEventListener('click', () => dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! }));
       actions.append(deleteCapture);
     } else if (blobKeyUnlocked) {

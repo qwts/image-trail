@@ -21,5 +21,6 @@ These scenarios define the first browser-level acceptance coverage for the Brave
 - [Settings Utility Layout](settings-utility-layout.md)
 - [Form Control Consistency](form-control-consistency.md)
 - [Settings Action Hierarchy](settings-action-hierarchy.md)
+- [Row And List Visual System](row-list-visual-system.md)
 - [Host Image Projection Ownership](host-image-projection-ownership.md)
 - [Bounded Neighbor Preloading](bounded-neighbor-preloading.md)

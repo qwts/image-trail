@@ -1918,16 +1918,28 @@
     sans-serif;
 }
 
-.image-trail-panel-root .image-trail-panel__record-list li {
+.image-trail-panel-root .image-trail-panel__record-list li,
+.image-trail-panel-root .image-trail-panel__recall-list li {
+  --image-trail-row-radius: 6px;
+  --image-trail-row-border: rgb(255 255 255 / 13%);
+  --image-trail-row-background: rgb(255 255 255 / 3%);
+  --image-trail-row-hover-border: rgb(255 255 255 / 28%);
+  --image-trail-row-hover-background: rgb(255 255 255 / 6%);
+  --image-trail-row-selected-border: rgb(124 255 168 / 45%);
+  --image-trail-row-selected-background: linear-gradient(135deg, rgb(124 255 168 / 8%), transparent 50%), rgb(10 35 20 / 28%);
+
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  gap: 6px;
-  align-items: start;
   min-width: 0;
+  border: 1px solid var(--image-trail-row-border);
+  border-radius: var(--image-trail-row-radius);
+  background: var(--image-trail-row-background);
+}
+
+.image-trail-panel-root .image-trail-panel__record-list li {
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 7px;
   padding: 6px;
-  border: 1px solid transparent;
-  border-top-color: rgb(255 255 255 / 12%);
-  border-radius: 7px;
 }
 
 .image-trail-panel-root .image-trail-panel__recall-list {
@@ -1945,15 +1957,10 @@
 }
 
 .image-trail-panel-root .image-trail-panel__recall-list li {
-  display: grid;
   grid-template-columns: 16px 34px minmax(0, 1fr);
   align-items: center;
   gap: 7px;
-  min-width: 0;
   padding: 5px;
-  border: 1px solid transparent;
-  border-top-color: rgb(255 255 255 / 11%);
-  border-radius: 5px;
 }
 
 .image-trail-panel-root .image-trail-panel__recall-list li[role='button'] {
@@ -1961,8 +1968,8 @@
 }
 
 .image-trail-panel-root .image-trail-panel__recall-list li[role='button']:hover {
-  border-color: rgb(255 255 255 / 28%);
-  background: rgb(255 255 255 / 6%);
+  border-color: var(--image-trail-row-hover-border);
+  background: var(--image-trail-row-hover-background);
 }
 
 .image-trail-panel-root .image-trail-panel__recall-list li[role='button']:focus-visible {
@@ -1970,9 +1977,13 @@
   outline-offset: 2px;
 }
 
-.image-trail-panel-root .image-trail-panel__recall-list li.is-selected {
-  border-color: rgb(124 255 168 / 45%);
-  background: rgb(10 35 20 / 30%);
+.image-trail-panel-root .image-trail-panel__recall-list li.is-selected,
+.image-trail-panel-root .image-trail-panel__recall-list li.is-selected[role='button']:hover {
+  border-color: var(--image-trail-row-selected-border);
+  background: var(--image-trail-row-selected-background);
+  box-shadow:
+    0 0 0 1px rgb(124 255 168 / 14%),
+    0 0 12px rgb(124 255 168 / 16%);
 }
 
 .image-trail-panel-root .image-trail-panel__recall-list input[type='checkbox'] {
@@ -2059,12 +2070,13 @@
 }
 
 .image-trail-panel-root .image-trail-panel__record-list li.is-captured {
-  border-top-color: rgb(255 255 255 / 12%);
+  border-color: var(--image-trail-row-border);
 }
 
-.image-trail-panel-root .image-trail-panel__record-list li.is-selected {
-  border-color: rgb(124 255 168 / 45%);
-  background: linear-gradient(135deg, rgb(124 255 168 / 8%), transparent 50%), rgb(10 35 20 / 28%);
+.image-trail-panel-root .image-trail-panel__record-list li.is-selected,
+.image-trail-panel-root .image-trail-panel__record-list li.is-selected[role='button']:hover {
+  border-color: var(--image-trail-row-selected-border);
+  background: var(--image-trail-row-selected-background);
   box-shadow:
     0 0 0 1px rgb(124 255 168 / 14%),
     0 0 12px rgb(124 255 168 / 16%);
@@ -2127,8 +2139,8 @@
 }
 
 .image-trail-panel-root .image-trail-panel__record-list li[role='button']:hover {
-  border-color: rgb(255 255 255 / 28%);
-  background: rgb(255 255 255 / 6%);
+  border-color: var(--image-trail-row-hover-border);
+  background: var(--image-trail-row-hover-background);
 }
 
 .image-trail-panel-root .image-trail-panel__record-list li[role='button']:focus-visible {
@@ -2137,12 +2149,25 @@
 }
 
 .image-trail-panel-root .image-trail-panel__history-item {
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 44px minmax(0, 1fr) minmax(104px, auto);
 }
 
-.image-trail-panel-root .image-trail-panel__history-item .image-trail-panel__item-actions {
-  grid-column: 1 / -1;
-  justify-content: flex-start;
+.image-trail-panel-root .image-trail-panel__bookmark-item {
+  position: relative;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  min-block-size: 64px;
+  overflow: hidden;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-item > .image-trail-panel__record-thumbnail {
+  position: absolute;
+  inset: 6px auto 6px 6px;
+  z-index: 0;
+  inline-size: 132px;
+  block-size: calc(100% - 12px);
+  max-inline-size: none;
+  mask-image: linear-gradient(to right, #000 0%, #000 42%, rgb(0 0 0 / 68%) 66%, transparent 100%);
 }
 
 .image-trail-panel-root .image-trail-panel__record-thumbnail {
@@ -2209,26 +2234,33 @@
 }
 
 .image-trail-panel-root .image-trail-panel__record-list button {
-  min-width: 0;
+  min-width: 88px;
+  min-height: 28px;
   max-width: 100%;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
-  text-align: left;
+  text-align: center;
 }
 
 .image-trail-panel-root .image-trail-panel__bookmark-label {
+  position: relative;
+  z-index: 1;
+  grid-column: 2;
+  align-self: center;
   display: grid;
   grid-template-columns: minmax(0, auto) minmax(0, 1fr);
   align-items: center;
   gap: 7px;
   min-width: 0;
   max-width: 100%;
-  padding: 4px 0;
+  padding: 4px 0 4px 44px;
 }
 
 .image-trail-panel-root .image-trail-panel__record-extension-wrap {
   display: grid;
+  grid-row: 1 / span 2;
+  align-self: center;
   place-items: center;
   gap: 3px;
   min-width: 0;
@@ -2247,6 +2279,7 @@
   letter-spacing: 0;
   text-overflow: ellipsis;
   text-shadow:
+    0 0 2px #000,
     0 0 4px rgb(255 255 255 / 70%),
     0 0 12px rgb(143 255 221 / 45%);
   text-transform: uppercase;
@@ -2266,6 +2299,7 @@
 .image-trail-panel-root .image-trail-panel__bookmark-name {
   min-width: 0;
   overflow: hidden;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 90%);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2275,6 +2309,7 @@
   min-width: 0;
   overflow: hidden;
   color: #999;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 90%);
   font:
     10px system-ui,
     -apple-system,
@@ -2314,6 +2349,16 @@
 }
 
 .image-trail-panel-root .image-trail-panel__item-actions {
-  justify-content: flex-end;
-  align-self: start;
+  position: relative;
+  z-index: 1;
+  grid-column: 3;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, max-content));
+  grid-auto-rows: 28px;
+  justify-content: end;
+  align-self: end;
+}
+
+.image-trail-panel-root .image-trail-panel__item-actions button {
+  block-size: 100%;
 }
