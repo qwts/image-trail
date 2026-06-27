@@ -5,7 +5,7 @@ import { bookmarkFixtures, capturedRecord, lockedPrivateRecord, longOverflowReco
 import { mockDispatch, panelStory } from '../stories/story-host.js';
 
 const meta = {
-  title: 'Extension UI/Bookmarks queue',
+  title: 'Extension UI/Queue',
   render: () => bookmarksStory(bookmarkFixtures, []),
 } satisfies Meta;
 

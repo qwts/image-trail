@@ -240,6 +240,7 @@ export type PanelActionName =
   | 'field-value-change'
   | 'field-value-bump'
   | 'selected-url/apply'
+  | 'pin/current'
   | 'bookmark/current'
   | 'bookmark/load'
   | 'bookmark/remove'

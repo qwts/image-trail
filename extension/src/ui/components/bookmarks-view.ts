@@ -3,6 +3,7 @@ import { createPrivacyThumbnail, recordDisplayName, recordExtensionLabel, record
 import { selectedRangeIds } from './selection-ranges.js';
 
 type BookmarkAction =
+  | { readonly name: 'pin/current' }
   | { readonly name: 'bookmark/current' }
   | { readonly name: 'bookmark/load'; readonly id: string }
   | { readonly name: 'bookmark/remove'; readonly id: string }
@@ -45,20 +46,21 @@ export function createBookmarksView(
   section.className = 'image-trail-panel__section image-trail-panel__bookmarks-section';
 
   const heading = document.createElement('h3');
-  heading.textContent = 'Bookmarks';
+  heading.textContent = 'Queue';
 
   const add = document.createElement('button');
   add.type = 'button';
-  add.textContent = 'Bookmark current';
+  add.textContent = 'Pin current';
+  add.title = 'Save the current image URL and thumbnail to the durable queue without capturing original bytes.';
   add.disabled = currentUrl === null;
-  add.addEventListener('click', () => dispatch({ name: 'bookmark/current' }));
+  add.addEventListener('click', () => dispatch({ name: 'pin/current' }));
 
   const recallButton = document.createElement('button');
   recallButton.type = 'button';
   recallButton.textContent = recall.recallOpen ? 'Close Recall' : 'Recall';
   recallButton.className = 'image-trail-panel__primary-action';
   recallButton.disabled = page.total === 0;
-  recallButton.title = 'Browse offloaded bookmark queue records and recall selected rows into the visible queue.';
+  recallButton.title = 'Browse offloaded queue records and recall selected rows into the visible queue.';
   recallButton.addEventListener('click', () => dispatch({ name: 'recall/open', side: 'right' }));
 
   const queueMenu = document.createElement('details');
@@ -84,7 +86,7 @@ export function createBookmarksView(
   const scope = document.createElement('button');
   scope.type = 'button';
   scope.textContent = visibilityScope === 'global' ? 'Showing all sites' : 'Showing this site';
-  scope.title = visibilityScope === 'global' ? 'Showing saved bookmarks from every site.' : 'Showing saved bookmarks for this site only.';
+  scope.title = visibilityScope === 'global' ? 'Showing saved queue rows from every site.' : 'Showing saved queue rows for this site only.';
   scope.addEventListener('click', () => {
     queueMenu.open = false;
     dispatch({ name: 'bookmarks/toggle-scope' });
@@ -92,8 +94,8 @@ export function createBookmarksView(
 
   const reload = document.createElement('button');
   reload.type = 'button';
-  reload.textContent = 'Reload bookmarks';
-  reload.title = 'Reload saved bookmarks from encrypted storage.';
+  reload.textContent = 'Reload queue';
+  reload.title = 'Reload saved queue rows from storage.';
   reload.addEventListener('click', () => {
     queueMenu.open = false;
     dispatch({ name: 'bookmarks/reload' });
@@ -108,7 +110,7 @@ export function createBookmarksView(
     dispatch({ name: 'bookmark-selection/select', ids: items.map((item) => item.id) });
   });
 
-  const queuePins = items.filter((item) => !isBookmarkRecord(item));
+  const queuePins = items.filter((item) => !isCapturedOriginalRecord(item));
   const selectPins = document.createElement('button');
   selectPins.type = 'button';
   selectPins.textContent = 'Select queue pins';
@@ -118,10 +120,10 @@ export function createBookmarksView(
     dispatch({ name: 'bookmark-selection/select', ids: queuePins.map((item) => item.id) });
   });
 
-  const queueBookmarks = items.filter(isBookmarkRecord);
+  const queueBookmarks = items.filter(isCapturedOriginalRecord);
   const selectBookmarks = document.createElement('button');
   selectBookmarks.type = 'button';
-  selectBookmarks.textContent = 'Select queue bookmarks';
+  selectBookmarks.textContent = 'Select captured bookmarks';
   selectBookmarks.disabled = queueBookmarks.length === 0;
   selectBookmarks.addEventListener('click', () => {
     queueMenu.open = false;
@@ -149,7 +151,7 @@ export function createBookmarksView(
   pageMeta.className = 'image-trail-panel__meta';
   const pageStart = page.total === 0 ? 0 : page.offset + 1;
   const pageEnd = Math.min(page.offset + page.limit, page.total);
-  pageMeta.textContent = `Bookmarks ${pageStart}-${pageEnd} of ${page.total} (${visibilityScope === 'global' ? 'all sites' : 'this site'})`;
+  pageMeta.textContent = `Queue ${pageStart}-${pageEnd} of ${page.total} (${visibilityScope === 'global' ? 'all sites' : 'this site'})`;
 
   const statusRow = document.createElement('div');
   statusRow.className = 'image-trail-panel__bookmark-status-row';
@@ -301,14 +303,14 @@ export function createBookmarksView(
   empty.className = 'image-trail-panel__meta';
   empty.textContent =
     visibilityScope === 'global'
-      ? 'No saved bookmarks loaded from encrypted storage.'
-      : 'No saved bookmarks match this site. Switch to All sites to show every saved bookmark.';
+      ? 'No saved queue rows loaded from storage.'
+      : 'No saved queue rows match this site. Switch to All sites to show every saved queue row.';
   const selectionMeta = document.createElement('p');
   selectionMeta.className = 'image-trail-panel__meta';
   selectionMeta.textContent =
     selectedIds.length > 0
-      ? `${selectedIds.length} bookmark(s) selected for export.`
-      : 'Cmd/Ctrl-click rows to select bookmarks for export. Shift-click selects a range.';
+      ? `${selectedIds.length} queue row(s) selected for export.`
+      : 'Cmd/Ctrl-click rows to select queue rows for export. Shift-click selects a range.';
   section.append(heading, toolbar, statusRow, items.length ? selectionMeta : empty);
   if (items.length) section.append(list);
   return section;
@@ -457,6 +459,10 @@ function bindBookmarkClearButton(button: HTMLButtonElement, id: string, dispatch
   });
 }
 
-function isBookmarkRecord(item: ImageDisplayRecord): boolean {
+export function isCapturedOriginalRecord(item: ImageDisplayRecord): boolean {
   return item.captureStatus === 'captured' || !!item.storedOriginal || item.protectedPin?.hasStoredOriginal === true;
+}
+
+export function queueRecordKindLabel(item: ImageDisplayRecord): 'Pin' | 'Captured bookmark' {
+  return isCapturedOriginalRecord(item) ? 'Captured bookmark' : 'Pin';
 }

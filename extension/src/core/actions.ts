@@ -413,6 +413,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return state;
     case 'field-split/clear':
       return clearFieldSplitSpecFromState(state, action.baseFieldId);
+    case 'pin/current':
     case 'bookmark/current':
       if (!state.target.selectedUrl) return state;
       {

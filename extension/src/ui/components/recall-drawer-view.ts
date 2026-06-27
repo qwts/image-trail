@@ -1,6 +1,6 @@
 import { imageExtensionFromUrl, type ImageDisplayRecord } from '../../core/display-records.js';
 import type { PanelAction, RecallDrawerSide, RecallState } from '../../core/types.js';
-import { createExtensionIndicator } from './bookmarks-view.js';
+import { createExtensionIndicator, isCapturedOriginalRecord } from './bookmarks-view.js';
 import { createPrivacyThumbnail, recordDisplayName, recordMetadataText, recordTitle } from './record-metadata.js';
 import { selectedRangeIds } from './selection-ranges.js';
 
@@ -102,7 +102,7 @@ export function createRecallDrawerView(
     dispatch({ name: 'recall-selection/select', ids: state.candidates.map((candidate) => candidate.id) }),
   );
 
-  const recallPins = state.candidates.filter((candidate) => !isBookmarkRecord(candidate));
+  const recallPins = state.candidates.filter((candidate) => !isCapturedOriginalRecord(candidate));
   const selectPins = document.createElement('button');
   selectPins.type = 'button';
   selectPins.textContent = 'Select Recall pins';
@@ -111,10 +111,10 @@ export function createRecallDrawerView(
     dispatch({ name: 'recall-selection/select', ids: recallPins.map((candidate) => candidate.id) }),
   );
 
-  const recallBookmarks = state.candidates.filter(isBookmarkRecord);
+  const recallBookmarks = state.candidates.filter(isCapturedOriginalRecord);
   const selectBookmarks = document.createElement('button');
   selectBookmarks.type = 'button';
-  selectBookmarks.textContent = 'Select Recall bookmarks';
+  selectBookmarks.textContent = 'Select Recall captured bookmarks';
   selectBookmarks.disabled = state.busy || recallBookmarks.length === 0;
   selectBookmarks.addEventListener('click', () =>
     dispatch({ name: 'recall-selection/select', ids: recallBookmarks.map((candidate) => candidate.id) }),
@@ -229,8 +229,4 @@ function recallMetaText(state: RecallState): string {
   const unavailable = state.failedCount > 0 ? ` - ${state.failedCount} unavailable` : '';
   const more = state.hasMore ? ' - more available' : '';
   return `${visible} shown of ${state.total}${more}${unavailable}`;
-}
-
-function isBookmarkRecord(item: ImageDisplayRecord): boolean {
-  return item.captureStatus === 'captured' || !!item.storedOriginal || item.protectedPin?.hasStoredOriginal === true;
 }

@@ -1107,7 +1107,7 @@ export class ImageTrailPanel {
       return;
     }
 
-    if (action.name === 'bookmark/current') {
+    if (action.name === 'pin/current' || action.name === 'bookmark/current') {
       void this.bookmarkCurrentImage();
       return;
     }

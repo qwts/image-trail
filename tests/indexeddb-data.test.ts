@@ -975,6 +975,7 @@ test('IndexedDbBookmarkStore falls back to plaintext when encrypted pin saves ar
         id: 'https://secret.example.test/locked-fallback.jpg',
         url: 'https://secret.example.test/locked-fallback.jpg',
         label: 'locked-fallback.jpg',
+        thumbnail: 'data:image/png;base64,bG9ja2VkLXRodW1i',
         timestamp: '2026-06-21T00:00:01.000Z',
         source: 'bookmark',
       }),
@@ -984,6 +985,7 @@ test('IndexedDbBookmarkStore falls back to plaintext when encrypted pin saves ar
     assert.equal(saved.protectedPin, undefined);
     const page = await store.loadPage({ offset: 0, limit: 30 });
     assert.equal(page.items[0]?.url, 'https://secret.example.test/locked-fallback.jpg');
+    assert.equal(page.items[0]?.thumbnail, 'data:image/png;base64,bG9ja2VkLXRodW1i');
     assert.equal(page.items[0]?.privacyStatus, undefined);
   } finally {
     await store.close();

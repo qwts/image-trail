@@ -4,6 +4,8 @@ import {
   bookmarkRowClearActionForModifier,
   bookmarkRowClearLabelForModifier,
   extensionLabelFor,
+  isCapturedOriginalRecord,
+  queueRecordKindLabel,
 } from '../extension/src/ui/components/bookmarks-view.js';
 
 test('bookmark extension label uses image filename extensions', () => {
@@ -53,6 +55,43 @@ test('bookmark row clear action becomes destructive delete with platform modifie
   assert.equal(bookmarkRowClearActionForModifier({ metaKey: true, ctrlKey: false }), 'bookmark/remove');
   assert.equal(bookmarkRowClearLabelForModifier({ metaKey: false, ctrlKey: true }), 'Delete');
   assert.equal(bookmarkRowClearActionForModifier({ metaKey: false, ctrlKey: true }), 'bookmark/remove');
+});
+
+test('queue record kind distinguishes pins from captured bookmarks', () => {
+  const pin = record('https://example.test/pin.jpg');
+  const captured = {
+    ...record('https://example.test/captured.jpg'),
+    captureStatus: 'captured' as const,
+    blobId: 'blob-1',
+    storedOriginal: {
+      blobId: 'blob-1',
+      mimeType: 'image/jpeg',
+      byteLength: 128,
+      capturedAt: '2026-06-20T00:00:00.000Z',
+    },
+  };
+
+  assert.equal(isCapturedOriginalRecord(pin), false);
+  assert.equal(queueRecordKindLabel(pin), 'Pin');
+  assert.equal(isCapturedOriginalRecord(captured), true);
+  assert.equal(queueRecordKindLabel(captured), 'Captured bookmark');
+});
+
+test('queue record kind treats protected pins with stored originals as captured bookmarks', () => {
+  const protectedCaptured = {
+    ...record('image-trail-private:pin-1'),
+    protectedPin: {
+      plainPinId: 'pin-1',
+      encryptedPinId: 'encrypted-pin-1',
+      storedOriginalBlobId: 'blob-1',
+      hasEncryptedMetadata: true,
+      hasEncryptedThumbnail: false,
+      hasStoredOriginal: true,
+    },
+  };
+
+  assert.equal(isCapturedOriginalRecord(protectedCaptured), true);
+  assert.equal(queueRecordKindLabel(protectedCaptured), 'Captured bookmark');
 });
 
 function record(url: string) {
