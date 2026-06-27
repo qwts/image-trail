@@ -48,7 +48,7 @@ export const RestorePreviewReady: Story = {
           {
             label: 'quiet-ridge.jpg',
             url: 'https://images.example.test/gallery/quiet-ridge.jpg',
-            detail: '1280 x 854, captured original included',
+            detail: '1280 x 854, captured original metadata reference',
           },
           {
             label: 'night-market-frame-042.webp',
@@ -58,7 +58,7 @@ export const RestorePreviewReady: Story = {
           {
             label: 'archive scan 17.png',
             url: 'https://archive.example.test/scans/collection/17.png',
-            detail: '900 x 1200, captured original included',
+            detail: '900 x 1200, captured original metadata reference',
           },
         ],
       },

@@ -541,7 +541,7 @@ function createRestorePreview(
     ['Payload', preview.payloadLabel],
     ['Records', String(preview.recordCount)],
   ];
-  if (preview.capturedOriginalCount !== undefined) metadata.push(['Originals', String(preview.capturedOriginalCount)]);
+  if (preview.capturedOriginalCount !== undefined) metadata.push(['Original refs', String(preview.capturedOriginalCount)]);
   if (preview.skippedCount !== undefined) metadata.push(['Skipped', String(preview.skippedCount)]);
   if (preview.unsupportedCount !== undefined) metadata.push(['Unsupported', String(preview.unsupportedCount)]);
   metadata.push(['Protection', preview.plaintext ? 'Plaintext JSON' : 'Encrypted export']);

@@ -687,6 +687,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         importExportBusy: true,
         importExportMessage: 'Import/export is running...',
         importExportMessageIsError: false,
+        importRestorePreview: undefined,
         lastUpdatedAt: Date.now(),
       };
     case 'import-export/complete':
