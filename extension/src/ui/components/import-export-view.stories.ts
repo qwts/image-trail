@@ -41,9 +41,10 @@ export const RestorePreviewReady: Story = {
         payloadLabel: 'Bookmarks',
         recordCount: 12,
         capturedOriginalCount: 8,
+        duplicateCount: 1,
         skippedCount: 0,
         unsupportedCount: 0,
-        message: 'Preview loaded. Import has not changed local records yet.',
+        message: 'Preview loaded. Import has not changed local records yet. 1 duplicate record will be skipped on confirm.',
         samples: [
           {
             label: 'quiet-ridge.jpg',
@@ -53,7 +54,7 @@ export const RestorePreviewReady: Story = {
           {
             label: 'night-market-frame-042.webp',
             url: 'https://cdn.example.test/sets/night-market/frame-042.webp',
-            detail: '1920 x 1080, pin metadata only',
+            detail: '1920 x 1080, pin metadata only; Duplicate URL, skipped on confirm',
           },
           {
             label: 'archive scan 17.png',

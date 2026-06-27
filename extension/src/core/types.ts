@@ -219,6 +219,7 @@ export interface ImportRestorePreviewState {
   readonly payloadLabel: string;
   readonly recordCount: number;
   readonly capturedOriginalCount?: number;
+  readonly duplicateCount?: number;
   readonly skippedCount?: number;
   readonly unsupportedCount?: number;
   readonly plaintext?: boolean;

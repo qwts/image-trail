@@ -42,6 +42,12 @@ import type {
 } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromImageRecord, filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
+import {
+  classifyRestoreDuplicates,
+  type RestoreDuplicateCandidate,
+  type RestoreDuplicateMatch,
+  type RestoreDuplicateRecord,
+} from '../core/import/restore-duplicates.js';
 import { imageResourceUrlsEqual, pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
 import {
   NEIGHBOR_PRELOAD_CACHE_LIMITS,
@@ -141,9 +147,19 @@ const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
 type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
 
 type PendingRestoreImport =
-  | { readonly kind: 'history'; readonly result: Awaited<ReturnType<typeof importEncryptedHistory>> }
-  | { readonly kind: 'bookmarks'; readonly result: Awaited<ReturnType<typeof importBookmarkRecords>> }
+  | { readonly kind: 'history'; readonly result: Awaited<ReturnType<typeof importEncryptedHistory>>; readonly duplicateCount: number }
+  | { readonly kind: 'bookmarks'; readonly result: Awaited<ReturnType<typeof importBookmarkRecords>>; readonly duplicateCount: number }
   | { readonly kind: 'url-review-status'; readonly result: ReturnType<typeof importUrlReviewStatusFile> };
+
+type HistoryImportResult = Awaited<ReturnType<typeof importEncryptedHistory>>;
+type BookmarkImportResult = Awaited<ReturnType<typeof importBookmarkRecords>>;
+type RestoreImageImportEntry = HistoryImportResult['entries'][number] | BookmarkImportResult['entries'][number];
+
+interface RestoreDuplicateSummary<TEntry extends RestoreImageImportEntry> {
+  readonly uniqueEntries: readonly TEntry[];
+  readonly duplicateCount: number;
+  readonly matchesByUuid: ReadonlyMap<string, RestoreDuplicateMatch>;
+}
 
 function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {
   const match = value?.match(/^\s*(\d+)\s*[x×]\s*(\d+)\s*$/iu);
@@ -3774,23 +3790,37 @@ export class ImageTrailPanel {
       this.render();
       return;
     }
-    this.pendingRestoreImport = { kind: 'history', result };
+    const duplicateSummary = createRestoreDuplicateSummary(result.entries, this.state.history);
+    this.pendingRestoreImport = {
+      kind: 'history',
+      result: { ...result, entries: duplicateSummary.uniqueEntries },
+      duplicateCount: duplicateSummary.duplicateCount,
+    };
     this.state = reducePanelAction(this.state, {
       name: 'import/restore-preview-ready',
-      preview: createHistoryRestorePreview(result, fileName),
+      preview: createHistoryRestorePreview(result, fileName, duplicateSummary),
     });
     this.render();
   }
 
-  private async importHistory(result: Awaited<ReturnType<typeof importEncryptedHistory>>): Promise<void> {
+  private async importHistory(result: HistoryImportResult, duplicateCount: number): Promise<void> {
+    let importedCount = 0;
     for (const entry of result.entries) {
       const record = historyPayloadToDisplayRecord(entry.uuid, entry.payload);
       await this.recentHistoryStore?.add(record, window.location.href);
+      importedCount += 1;
     }
     await this.loadRecentHistory();
     this.state = reducePanelAction(this.state, {
       name: 'import-export/complete',
-      message: `${result.status.message}${result.plaintext ? ' Plaintext import was reloaded into extension state.' : ''}`,
+      message: restoreImportCompleteMessage(
+        'record',
+        importedCount,
+        duplicateCount,
+        result.skipped.length,
+        result.plaintext,
+        'reloaded into extension state',
+      ),
     });
     this.render();
   }
@@ -3805,22 +3835,36 @@ export class ImageTrailPanel {
       this.render();
       return;
     }
-    this.pendingRestoreImport = { kind: 'bookmarks', result };
+    const duplicateSummary = createRestoreDuplicateSummary(result.entries, await this.loadAllBookmarksForExport());
+    this.pendingRestoreImport = {
+      kind: 'bookmarks',
+      result: { ...result, entries: duplicateSummary.uniqueEntries },
+      duplicateCount: duplicateSummary.duplicateCount,
+    };
     this.state = reducePanelAction(this.state, {
       name: 'import/restore-preview-ready',
-      preview: createBookmarksRestorePreview(result, fileName),
+      preview: createBookmarksRestorePreview(result, fileName, duplicateSummary),
     });
     this.render();
   }
 
-  private async importBookmarks(result: Awaited<ReturnType<typeof importBookmarkRecords>>): Promise<void> {
+  private async importBookmarks(result: BookmarkImportResult, duplicateCount: number): Promise<void> {
+    let importedCount = 0;
     for (const entry of result.entries) {
       await this.bookmarkStore?.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
+      importedCount += 1;
     }
     await this.loadBookmarkPage(0, { render: false });
     this.state = reducePanelAction(this.state, {
       name: 'import-export/complete',
-      message: `${result.status.message}${result.plaintext ? ' Plaintext import was encrypted into bookmark storage.' : ''}`,
+      message: restoreImportCompleteMessage(
+        'bookmark',
+        importedCount,
+        duplicateCount,
+        result.skipped.length,
+        result.plaintext,
+        'encrypted into bookmark storage',
+      ),
     });
     this.renderPanelAndRefreshRecall();
   }
@@ -3868,10 +3912,10 @@ export class ImageTrailPanel {
 
     switch (pending.kind) {
       case 'history':
-        await this.importHistory(pending.result);
+        await this.importHistory(pending.result, pending.duplicateCount);
         break;
       case 'bookmarks':
-        await this.importBookmarks(pending.result);
+        await this.importBookmarks(pending.result, pending.duplicateCount);
         break;
       case 'url-review-status':
         await this.importUrlReviewStatus(pending.result);
@@ -4276,9 +4320,98 @@ function withoutRecentPinState(record: ImageDisplayRecord): ImageDisplayRecord {
   return copy;
 }
 
+function createRestoreDuplicateSummary<TEntry extends RestoreImageImportEntry>(
+  entries: readonly TEntry[],
+  existingRecords: readonly ImageDisplayRecord[],
+): RestoreDuplicateSummary<TEntry> {
+  const candidates = entries.map((entry): RestoreDuplicateCandidate & { readonly entry: TEntry } => ({
+    id: entry.uuid,
+    url: entry.payload.url,
+    sha256: restoreSha256FromUnknown(entry.payload),
+    entry,
+  }));
+  const existing = existingRecords.map(
+    (record): RestoreDuplicateRecord => ({
+      id: record.id,
+      url: record.url,
+      sha256: restoreSha256FromUnknown(record),
+    }),
+  );
+  const classifications = classifyRestoreDuplicates(candidates, existing);
+  const matchesByUuid = new Map<string, RestoreDuplicateMatch>();
+  const uniqueEntries: TEntry[] = [];
+
+  for (const classification of classifications) {
+    if (classification.duplicate) {
+      matchesByUuid.set(classification.candidate.entry.uuid, classification.duplicate.matchedBy);
+    } else {
+      uniqueEntries.push(classification.candidate.entry);
+    }
+  }
+
+  return {
+    uniqueEntries,
+    duplicateCount: matchesByUuid.size,
+    matchesByUuid,
+  };
+}
+
+function emptyRestoreDuplicateSummary<TEntry extends RestoreImageImportEntry>(): RestoreDuplicateSummary<TEntry> {
+  return {
+    uniqueEntries: [],
+    duplicateCount: 0,
+    matchesByUuid: new Map<string, RestoreDuplicateMatch>(),
+  };
+}
+
+function restorePreviewMessage(duplicateCount: number, extra?: string): string {
+  const duplicateMessage =
+    duplicateCount > 0 ? `${duplicateCount} duplicate record${duplicateCount === 1 ? '' : 's'} will be skipped on confirm.` : undefined;
+  return ['Preview loaded. Import has not changed local records yet.', duplicateMessage, extra].filter(Boolean).join(' ');
+}
+
+function restorePreviewSampleDetail(detail: string | undefined, duplicateMatch: RestoreDuplicateMatch | undefined): string | undefined {
+  if (!duplicateMatch) return detail;
+  const duplicateDetail = duplicateMatch === 'sha256' ? 'Duplicate SHA-256, skipped on confirm' : 'Duplicate URL, skipped on confirm';
+  return [detail, duplicateDetail].filter((part): part is string => !!part).join('; ');
+}
+
+function restoreImportCompleteMessage(
+  noun: string,
+  importedCount: number,
+  duplicateCount: number,
+  skippedCount: number,
+  plaintext: boolean,
+  plaintextDetail: string,
+): string {
+  const imported = `Imported ${importedCount} ${noun}${importedCount === 1 ? '' : 's'}.`;
+  const skipped = skippedCount > 0 ? `Skipped ${skippedCount} invalid ${noun}${skippedCount === 1 ? '' : 's'}.` : undefined;
+  const duplicates = duplicateCount > 0 ? `Skipped ${duplicateCount} duplicate ${noun}${duplicateCount === 1 ? '' : 's'}.` : undefined;
+  const plaintextMessage = plaintext ? `Plaintext import was ${plaintextDetail}.` : undefined;
+  return [imported, skipped, duplicates, plaintextMessage].filter(Boolean).join(' ');
+}
+
+function restoreSha256FromUnknown(value: unknown): string | undefined {
+  const object = recordObject(value);
+  if (!object) return undefined;
+  const direct = stringField(object, 'sha256') ?? stringField(object, 'fingerprint');
+  if (direct) return direct;
+  return restoreSha256FromUnknown(object.storedOriginal);
+}
+
+function recordObject(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+}
+
+function stringField(object: Record<string, unknown>, key: string): string | undefined {
+  const value = object[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
 function createHistoryRestorePreview(
-  result: Awaited<ReturnType<typeof importEncryptedHistory>>,
+  result: HistoryImportResult,
   fileName = 'Selected JSON file',
+  duplicateSummary: RestoreDuplicateSummary<HistoryImportResult['entries'][number]> = emptyRestoreDuplicateSummary(),
 ): ImportRestorePreviewState {
   const originalReferenceCount = result.entries.filter((entry) => entry.payload.storedOriginal).length;
   return {
@@ -4286,15 +4419,22 @@ function createHistoryRestorePreview(
     payloadLabel: 'History',
     recordCount: result.entries.length,
     capturedOriginalCount: originalReferenceCount,
+    duplicateCount: duplicateSummary.duplicateCount,
     skippedCount: result.skipped.length,
     unsupportedCount: originalReferenceCount > 0 ? 1 : 0,
     plaintext: result.plaintext,
-    message: `Preview loaded. Import has not changed local records yet.${result.plaintext ? ' Plaintext history will be reloaded into extension state after confirmation.' : ''}`,
+    message: restorePreviewMessage(
+      duplicateSummary.duplicateCount,
+      result.plaintext ? 'Plaintext history will be reloaded into extension state after confirmation.' : undefined,
+    ),
     samples: result.entries.slice(0, 3).map((entry) =>
       imagePayloadPreviewSample(entry.payload.url, {
         label: entry.payload.label,
         title: entry.payload.title,
-        detail: entry.payload.storedOriginal ? `${entry.payload.captureStatus}, original metadata reference` : entry.payload.captureStatus,
+        detail: restorePreviewSampleDetail(
+          entry.payload.storedOriginal ? `${entry.payload.captureStatus}, original metadata reference` : entry.payload.captureStatus,
+          duplicateSummary.matchesByUuid.get(entry.uuid),
+        ),
       }),
     ),
     unsupportedSections:
@@ -4310,23 +4450,28 @@ function createHistoryRestorePreview(
 }
 
 function createBookmarksRestorePreview(
-  result: Awaited<ReturnType<typeof importBookmarkRecords>>,
+  result: BookmarkImportResult,
   fileName = 'Selected JSON file',
+  duplicateSummary: RestoreDuplicateSummary<BookmarkImportResult['entries'][number]> = emptyRestoreDuplicateSummary(),
 ): ImportRestorePreviewState {
   return {
     fileName,
     payloadLabel: 'Bookmarks',
     recordCount: result.entries.length,
     capturedOriginalCount: result.externalOriginalCount,
+    duplicateCount: duplicateSummary.duplicateCount,
     skippedCount: result.skipped.length,
     unsupportedCount: result.externalOriginalCount > 0 ? 1 : 0,
     plaintext: result.plaintext,
-    message: `Preview loaded. Import has not changed local records yet.${result.plaintext ? ' Plaintext bookmarks will be encrypted into bookmark storage after confirmation.' : ''}`,
+    message: restorePreviewMessage(
+      duplicateSummary.duplicateCount,
+      result.plaintext ? 'Plaintext bookmarks will be encrypted into bookmark storage after confirmation.' : undefined,
+    ),
     samples: result.entries.slice(0, 3).map((entry) =>
       imagePayloadPreviewSample(entry.payload.url, {
         label: entry.payload.label,
         title: entry.payload.title,
-        detail: bookmarkPayloadPreviewDetail(entry.payload),
+        detail: restorePreviewSampleDetail(bookmarkPayloadPreviewDetail(entry.payload), duplicateSummary.matchesByUuid.get(entry.uuid)),
       }),
     ),
     unsupportedSections:
