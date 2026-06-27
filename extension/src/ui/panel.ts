@@ -3790,7 +3790,7 @@ export class ImageTrailPanel {
       this.render();
       return;
     }
-    const duplicateSummary = createRestoreDuplicateSummary(result.entries, this.state.history);
+    const duplicateSummary = createRestoreDuplicateSummary(result.entries, await this.loadRetainedRecentHistoryForRestoreDuplicateCheck());
     this.pendingRestoreImport = {
       kind: 'history',
       result: { ...result, entries: duplicateSummary.uniqueEntries },
@@ -3804,10 +3804,18 @@ export class ImageTrailPanel {
   }
 
   private async importHistory(result: HistoryImportResult, duplicateCount: number): Promise<void> {
+    if (!this.recentHistoryStore) {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/error',
+        message: 'Recent history storage is unavailable; no records were imported.',
+      });
+      this.render();
+      return;
+    }
     let importedCount = 0;
     for (const entry of result.entries) {
       const record = historyPayloadToDisplayRecord(entry.uuid, entry.payload);
-      await this.recentHistoryStore?.add(record, window.location.href);
+      await this.recentHistoryStore.add(record, window.location.href);
       importedCount += 1;
     }
     await this.loadRecentHistory();
@@ -3849,9 +3857,17 @@ export class ImageTrailPanel {
   }
 
   private async importBookmarks(result: BookmarkImportResult, duplicateCount: number): Promise<void> {
+    if (!this.bookmarkStore) {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/error',
+        message: 'Bookmark storage is unavailable; no bookmarks were imported.',
+      });
+      this.render();
+      return;
+    }
     let importedCount = 0;
     for (const entry of result.entries) {
-      await this.bookmarkStore?.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
+      await this.bookmarkStore.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
       importedCount += 1;
     }
     await this.loadBookmarkPage(0, { render: false });
@@ -3941,6 +3957,11 @@ export class ImageTrailPanel {
       if (!page.hasOlder) return all;
       offset = page.offset + page.limit;
     }
+  }
+
+  private async loadRetainedRecentHistoryForRestoreDuplicateCheck(): Promise<readonly ImageDisplayRecord[]> {
+    if (!this.recentHistoryStore) return this.state.history;
+    return this.recentHistoryStore.load(window.location.href, { includeRetained: true });
   }
 
   private async refreshStorageUsage(): Promise<void> {

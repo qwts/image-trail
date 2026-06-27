@@ -521,7 +521,7 @@ export interface RemoveRecallBookmarksResultMessage {
 export interface LoadRecentHistoryMessage {
   readonly type: typeof MessageType.LoadRecentHistory;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly pageUrl: string };
+  readonly payload: { readonly pageUrl: string; readonly includeRetained?: boolean };
 }
 
 export interface LoadRecentHistoryResultMessage {
@@ -1236,8 +1236,11 @@ export function createRemoveRecallBookmarksResultMessage(
   return { type: MessageType.RemoveRecallBookmarksResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-export function createLoadRecentHistoryMessage(pageUrl: string): LoadRecentHistoryMessage {
-  return { type: MessageType.LoadRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl } };
+export function createLoadRecentHistoryMessage(
+  pageUrl: string,
+  options: { readonly includeRetained?: boolean } = {},
+): LoadRecentHistoryMessage {
+  return { type: MessageType.LoadRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl, ...options } };
 }
 
 export function createLoadRecentHistoryResultMessage(

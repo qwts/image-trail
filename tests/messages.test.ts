@@ -694,6 +694,7 @@ test('creates transient recent history messages', () => {
     source: 'history' as const,
   };
   const load = createLoadRecentHistoryMessage('https://external-content.duckduckgo.com/');
+  const loadRetained = createLoadRecentHistoryMessage('https://external-content.duckduckgo.com/', { includeRetained: true });
   const loadResult = createLoadRecentHistoryResultMessage([record]);
   const add = createAddRecentHistoryMessage('https://external-content.duckduckgo.com/', record);
   const addResult = createAddRecentHistoryResultMessage([record]);
@@ -701,6 +702,8 @@ test('creates transient recent history messages', () => {
   const removeResult = createRemoveRecentHistoryResultMessage([]);
 
   assert.equal(isExtensionRequest(load), true);
+  assert.equal(loadRetained.payload.includeRetained, true);
+  assert.equal(isExtensionRequest(loadRetained), true);
   assert.equal(isExtensionResponse(loadResult), true);
   assert.equal(isLoadRecentHistoryResultMessage(loadResult), true);
   assert.equal(isExtensionRequest(add), true);

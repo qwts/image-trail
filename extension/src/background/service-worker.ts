@@ -803,7 +803,8 @@ async function handleLoadRecentHistory(
   message: LoadRecentHistoryMessage,
 ): Promise<import('./messages.js').LoadRecentHistoryResultMessage['payload']> {
   const settings = await loadLocalSettings();
-  return { items: visibleRecentHistory(recentHistoryBySite.get(recentHistoryKey(message.payload.pageUrl)) ?? [], settings) };
+  const retained = recentHistoryBySite.get(recentHistoryKey(message.payload.pageUrl)) ?? [];
+  return { items: message.payload.includeRetained ? retained : visibleRecentHistory(retained, settings) };
 }
 
 async function handleAddRecentHistory(

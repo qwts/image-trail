@@ -10,8 +10,8 @@ import type { ImageDisplayRecord } from '../core/display-records.js';
 import { sendRuntimeMessage } from './runtime-message.js';
 
 export class RecentHistoryStore {
-  async load(pageUrl = window.location.href): Promise<readonly ImageDisplayRecord[]> {
-    const response = await sendRuntimeMessage(createLoadRecentHistoryMessage(pageUrl));
+  async load(pageUrl = window.location.href, options: { readonly includeRetained?: boolean } = {}): Promise<readonly ImageDisplayRecord[]> {
+    const response = await sendRuntimeMessage(createLoadRecentHistoryMessage(pageUrl, options));
     return isLoadRecentHistoryResultMessage(response) ? response.payload.items : [];
   }
 
