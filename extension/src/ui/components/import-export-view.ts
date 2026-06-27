@@ -1,4 +1,4 @@
-import type { ImportedEncryptedImageFile, ImportedImageFile } from '../../core/types.js';
+import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePreviewState } from '../../core/types.js';
 import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
 
@@ -12,11 +12,13 @@ export type ImportExportAction =
   | { readonly name: 'clear/url-review-status'; readonly scope?: UrlReviewStatusClearScope }
   | { readonly name: 'export/image'; readonly saveAs?: boolean }
   | { readonly name: 'export/encrypted-image' }
-  | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string }
-  | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string }
-  | { readonly name: 'import/url-review-status'; readonly fileContent: string }
+  | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string; readonly fileName?: string }
+  | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string; readonly fileName?: string }
+  | { readonly name: 'import/url-review-status'; readonly fileContent: string; readonly fileName?: string }
   | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
-  | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] };
+  | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] }
+  | { readonly name: 'import/confirm-restore-preview' }
+  | { readonly name: 'import/cancel-restore-preview' };
 
 export type CloudBackupAction =
   | { readonly name: 'cloud-backup/connect'; readonly provider: 'pcloud' }
@@ -55,6 +57,7 @@ export interface ImportExportViewState {
   readonly blobKeyUnlocked: boolean;
   readonly lastMessage?: string;
   readonly lastMessageIsError?: boolean;
+  readonly restorePreview?: ImportRestorePreviewState;
 }
 
 let imageUtilitiesOpen = false;
@@ -101,7 +104,13 @@ export function createImportExportView(state: ImportExportViewState, dispatch: (
     body.append(msg);
   }
 
-  body.append(createExportGroup(state, dispatch), createImportGroup(state, dispatch));
+  const exportGroup = createExportGroup(state, dispatch);
+  const importGroup = createImportGroup(state, dispatch);
+  if (state.restorePreview) {
+    body.append(importGroup, exportGroup);
+  } else {
+    body.append(exportGroup, importGroup);
+  }
 
   return section;
 }
@@ -451,8 +460,8 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   historyBtn.classList.toggle('is-waiting', state.busy);
   historyBtn.disabled = state.busy;
   historyBtn.addEventListener('click', () => {
-    readFileInput(fileInput, (content) => {
-      dispatch({ name: 'import/history', fileContent: content, password: passwordInput.value });
+    readFileInput(fileInput, (content, fileName) => {
+      dispatch({ name: 'import/history', fileContent: content, password: passwordInput.value, fileName });
       passwordInput.value = '';
     });
   });
@@ -463,8 +472,8 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   bookmarksBtn.classList.toggle('is-waiting', state.busy);
   bookmarksBtn.disabled = state.busy;
   bookmarksBtn.addEventListener('click', () => {
-    readFileInput(fileInput, (content) => {
-      dispatch({ name: 'import/bookmarks', fileContent: content, password: passwordInput.value });
+    readFileInput(fileInput, (content, fileName) => {
+      dispatch({ name: 'import/bookmarks', fileContent: content, password: passwordInput.value, fileName });
       passwordInput.value = '';
     });
   });
@@ -475,8 +484,8 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   urlReviewStatusBtn.classList.toggle('is-waiting', state.busy);
   urlReviewStatusBtn.disabled = state.busy;
   urlReviewStatusBtn.addEventListener('click', () => {
-    readFileInput(fileInput, (content) => {
-      dispatch({ name: 'import/url-review-status', fileContent: content });
+    readFileInput(fileInput, (content, fileName) => {
+      dispatch({ name: 'import/url-review-status', fileContent: content, fileName });
     });
   });
 
@@ -484,12 +493,140 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   controls.className = 'image-trail-panel__control-stack';
   controls.append(fileControl.field, passwordControl.field);
 
+  if (state.restorePreview) {
+    group.append(createRestorePreview(state.restorePreview, state, dispatch));
+  }
+
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__action-groups';
   actions.append(createActionGroup('Import records', [historyBtn, bookmarksBtn, urlReviewStatusBtn]));
 
   group.append(controls, actions);
   return group;
+}
+
+function createRestorePreview(
+  preview: ImportRestorePreviewState,
+  state: ImportExportViewState,
+  dispatch: (action: ImportExportAction) => void,
+): HTMLElement {
+  const panel = document.createElement('div');
+  panel.className = 'image-trail-panel__restore-preview';
+
+  const heading = document.createElement('div');
+  heading.className = 'image-trail-panel__restore-preview-heading';
+
+  const title = document.createElement('h4');
+  title.textContent = 'Restore preview';
+
+  const status = document.createElement('span');
+  status.className = preview.messageIsError
+    ? 'image-trail-panel__restore-preview-status is-error'
+    : 'image-trail-panel__restore-preview-status';
+  status.textContent = preview.messageIsError ? 'Needs review' : 'Ready';
+
+  heading.append(title, status);
+  panel.append(heading);
+
+  if (preview.message) {
+    const message = document.createElement('p');
+    message.className = preview.messageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
+    if (preview.messageIsError) message.setAttribute('role', 'alert');
+    message.textContent = preview.message;
+    panel.append(message);
+  }
+
+  const metadata: Array<readonly [string, string]> = [
+    ['File', preview.fileName],
+    ['Payload', preview.payloadLabel],
+    ['Records', String(preview.recordCount)],
+  ];
+  if (preview.capturedOriginalCount !== undefined) metadata.push(['Originals', String(preview.capturedOriginalCount)]);
+  if (preview.skippedCount !== undefined) metadata.push(['Skipped', String(preview.skippedCount)]);
+  if (preview.unsupportedCount !== undefined) metadata.push(['Unsupported', String(preview.unsupportedCount)]);
+  metadata.push(['Protection', preview.plaintext ? 'Plaintext JSON' : 'Encrypted export']);
+  panel.append(createRestorePreviewMetadata(metadata));
+
+  const actions = document.createElement('div');
+  actions.className = 'image-trail-panel__restore-preview-actions';
+
+  const confirm = document.createElement('button');
+  confirm.type = 'button';
+  confirm.textContent = 'Confirm import';
+  confirm.className = 'image-trail-panel__primary-action';
+  confirm.disabled = state.busy || preview.messageIsError === true;
+  confirm.addEventListener('click', () => dispatch({ name: 'import/confirm-restore-preview' }));
+
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.textContent = 'Cancel';
+  cancel.className = 'image-trail-panel__secondary-action';
+  cancel.disabled = state.busy;
+  cancel.addEventListener('click', () => dispatch({ name: 'import/cancel-restore-preview' }));
+
+  actions.append(confirm, cancel);
+  panel.append(actions);
+
+  if (preview.samples.length > 0) {
+    const list = document.createElement('ul');
+    list.className = 'image-trail-panel__restore-preview-list';
+    for (const sample of preview.samples) {
+      const item = document.createElement('li');
+      const label = document.createElement('span');
+      label.className = 'image-trail-panel__restore-preview-sample-label';
+      label.textContent = sample.label;
+      item.append(label);
+
+      if (sample.url) {
+        const url = document.createElement('span');
+        url.className = 'image-trail-panel__restore-preview-sample-url';
+        url.textContent = sample.url;
+        url.title = sample.url;
+        item.append(url);
+      }
+
+      if (sample.detail) {
+        const detail = document.createElement('span');
+        detail.className = 'image-trail-panel__restore-preview-sample-detail';
+        detail.textContent = sample.detail;
+        item.append(detail);
+      }
+
+      list.append(item);
+    }
+    panel.append(list);
+  }
+
+  if (preview.unsupportedSections && preview.unsupportedSections.length > 0) {
+    const unsupported = document.createElement('ul');
+    unsupported.className = 'image-trail-panel__restore-preview-unsupported';
+    for (const section of preview.unsupportedSections) {
+      const item = document.createElement('li');
+      const label = document.createElement('span');
+      label.textContent = section.label;
+      const detail = document.createElement('span');
+      detail.textContent = section.detail;
+      item.append(label, detail);
+      unsupported.append(item);
+    }
+    panel.append(unsupported);
+  }
+
+  return panel;
+}
+
+function createRestorePreviewMetadata(rows: ReadonlyArray<readonly [string, string]>): HTMLElement {
+  const list = document.createElement('dl');
+  list.className = 'image-trail-panel__restore-preview-metadata';
+  for (const [label, value] of rows) {
+    const term = document.createElement('dt');
+    term.textContent = label;
+    const detail = document.createElement('dd');
+    detail.textContent = value;
+    detail.title = value;
+    list.append(term, detail);
+  }
+  return list;
 }
 
 function createCloudBackupButton(label: string, state: CloudBackupProviderState, onClick: () => void): HTMLButtonElement {
@@ -602,12 +739,16 @@ function readEncryptedImageFiles(input: HTMLInputElement, onRead: (files: readon
   });
 }
 
-function readFileInput(input: HTMLInputElement, onRead: (content: string) => void, mode: 'text' | 'data-url' = 'text'): void {
+function readFileInput(
+  input: HTMLInputElement,
+  onRead: (content: string, fileName: string) => void,
+  mode: 'text' | 'data-url' = 'text',
+): void {
   const file = input.files?.[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    if (typeof reader.result === 'string') onRead(reader.result);
+    if (typeof reader.result === 'string') onRead(reader.result, file.name);
   };
   if (mode === 'data-url') {
     reader.readAsDataURL(file);

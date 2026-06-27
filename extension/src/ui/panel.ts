@@ -27,6 +27,7 @@ import type {
   BookmarkStore,
   ImportedEncryptedImageFile,
   ImportedImageFile,
+  ImportRestorePreviewState,
   PanelAction,
   PanelPosition,
   PanelPositionStore,
@@ -139,6 +140,11 @@ const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
 
 type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
 
+type PendingRestoreImport =
+  | { readonly kind: 'history'; readonly result: Awaited<ReturnType<typeof importEncryptedHistory>> }
+  | { readonly kind: 'bookmarks'; readonly result: Awaited<ReturnType<typeof importBookmarkRecords>> }
+  | { readonly kind: 'url-review-status'; readonly result: ReturnType<typeof importUrlReviewStatusFile> };
+
 function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {
   const match = value?.match(/^\s*(\d+)\s*[x×]\s*(\d+)\s*$/iu);
   if (!match) return {};
@@ -237,6 +243,7 @@ export class ImageTrailPanel {
   private recallOpeningUntil = 0;
   private recallMessageClearTimer: number | null = null;
   private finiteCaptureErrorTimer: number | null = null;
+  private pendingRestoreImport: PendingRestoreImport | null = null;
   private parsedFieldStateRestoreInProgress = false;
   private parsedFieldStateUpdatedAtMs = 0;
   private parsedFieldStateSaveQueue: Promise<void> = Promise.resolve();
@@ -1474,17 +1481,27 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'import/history') {
-      void this.importHistory(action.fileContent, action.password);
+      void this.previewHistoryImport(action.fileContent, action.password, action.fileName);
       return;
     }
 
     if (action.name === 'import/bookmarks') {
-      void this.importBookmarks(action.fileContent, action.password);
+      void this.previewBookmarksImport(action.fileContent, action.password, action.fileName);
       return;
     }
 
     if (action.name === 'import/url-review-status') {
-      void this.importUrlReviewStatus(action.fileContent);
+      this.previewUrlReviewStatusImport(action.fileContent, action.fileName);
+      return;
+    }
+
+    if (action.name === 'import/confirm-restore-preview') {
+      void this.confirmRestorePreview();
+      return;
+    }
+
+    if (action.name === 'import/cancel-restore-preview') {
+      this.cancelRestorePreview();
       return;
     }
 
@@ -3747,15 +3764,25 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private async importHistory(fileContent: string, password: string): Promise<void> {
+  private async previewHistoryImport(fileContent: string, password: string, fileName?: string): Promise<void> {
     this.state = reducePanelAction(this.state, { name: 'import-export/start' });
     this.render();
     const result = await importEncryptedHistory(fileContent, password);
     if (!result.status.ok) {
+      this.pendingRestoreImport = null;
       this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.status.message });
       this.render();
       return;
     }
+    this.pendingRestoreImport = { kind: 'history', result };
+    this.state = reducePanelAction(this.state, {
+      name: 'import/restore-preview-ready',
+      preview: createHistoryRestorePreview(result, fileName),
+    });
+    this.render();
+  }
+
+  private async importHistory(result: Awaited<ReturnType<typeof importEncryptedHistory>>): Promise<void> {
     for (const entry of result.entries) {
       const record = historyPayloadToDisplayRecord(entry.uuid, entry.payload);
       await this.recentHistoryStore?.add(record, window.location.href);
@@ -3768,15 +3795,25 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private async importBookmarks(fileContent: string, password: string): Promise<void> {
+  private async previewBookmarksImport(fileContent: string, password: string, fileName?: string): Promise<void> {
     this.state = reducePanelAction(this.state, { name: 'import-export/start' });
     this.render();
     const result = await importBookmarkRecords(fileContent, password);
     if (!result.status.ok) {
+      this.pendingRestoreImport = null;
       this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.status.message });
       this.render();
       return;
     }
+    this.pendingRestoreImport = { kind: 'bookmarks', result };
+    this.state = reducePanelAction(this.state, {
+      name: 'import/restore-preview-ready',
+      preview: createBookmarksRestorePreview(result, fileName),
+    });
+    this.render();
+  }
+
+  private async importBookmarks(result: Awaited<ReturnType<typeof importBookmarkRecords>>): Promise<void> {
     for (const entry of result.entries) {
       await this.bookmarkStore?.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
     }
@@ -3788,15 +3825,23 @@ export class ImageTrailPanel {
     this.renderPanelAndRefreshRecall();
   }
 
-  private async importUrlReviewStatus(fileContent: string): Promise<void> {
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
+  private previewUrlReviewStatusImport(fileContent: string, fileName?: string): void {
     const result = importUrlReviewStatusFile(fileContent);
     if (!result.status.ok) {
+      this.pendingRestoreImport = null;
       this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.status.message });
       this.render();
       return;
     }
+    this.pendingRestoreImport = { kind: 'url-review-status', result };
+    this.state = reducePanelAction(this.state, {
+      name: 'import/restore-preview-ready',
+      preview: createUrlReviewStatusRestorePreview(result, fileName),
+    });
+    this.render();
+  }
+
+  private async importUrlReviewStatus(result: ReturnType<typeof importUrlReviewStatusFile>): Promise<void> {
     const importedCount = await this.urlReviewStatusStore?.importMany(result.records, {
       maxRecordsPerHost: this.localSettings.urlReviewStatusLimit,
     });
@@ -3804,6 +3849,40 @@ export class ImageTrailPanel {
       name: 'import-export/complete',
       message: `${result.status.message} ${importedCount ?? 0} saved to extension state.`,
     });
+    this.render();
+  }
+
+  private async confirmRestorePreview(): Promise<void> {
+    const pending = this.pendingRestoreImport;
+    if (!pending) {
+      this.state = reducePanelAction(this.state, {
+        name: 'import-export/error',
+        message: 'Choose an import file before confirming restore.',
+      });
+      this.render();
+      return;
+    }
+
+    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
+    this.render();
+
+    switch (pending.kind) {
+      case 'history':
+        await this.importHistory(pending.result);
+        break;
+      case 'bookmarks':
+        await this.importBookmarks(pending.result);
+        break;
+      case 'url-review-status':
+        await this.importUrlReviewStatus(pending.result);
+        break;
+    }
+    this.pendingRestoreImport = null;
+  }
+
+  private cancelRestorePreview(): void {
+    this.pendingRestoreImport = null;
+    this.state = reducePanelAction(this.state, { name: 'import/cancel-restore-preview' });
     this.render();
   }
 
@@ -4195,6 +4274,108 @@ function withoutRecentPinState(record: ImageDisplayRecord): ImageDisplayRecord {
   delete copy.pinnedAt;
   delete copy.pinnedRecordId;
   return copy;
+}
+
+function createHistoryRestorePreview(
+  result: Awaited<ReturnType<typeof importEncryptedHistory>>,
+  fileName = 'Selected JSON file',
+): ImportRestorePreviewState {
+  const originalReferenceCount = result.entries.filter((entry) => entry.payload.storedOriginal).length;
+  return {
+    fileName,
+    payloadLabel: 'History',
+    recordCount: result.entries.length,
+    capturedOriginalCount: originalReferenceCount,
+    skippedCount: result.skipped.length,
+    unsupportedCount: originalReferenceCount > 0 ? 1 : 0,
+    plaintext: result.plaintext,
+    message: `Preview loaded. Import has not changed local records yet.${result.plaintext ? ' Plaintext history will be reloaded into extension state after confirmation.' : ''}`,
+    samples: result.entries.slice(0, 3).map((entry) =>
+      imagePayloadPreviewSample(entry.payload.url, {
+        label: entry.payload.label,
+        title: entry.payload.title,
+        detail: entry.payload.storedOriginal ? `${entry.payload.captureStatus}, original metadata reference` : entry.payload.captureStatus,
+      }),
+    ),
+    unsupportedSections:
+      originalReferenceCount > 0
+        ? [
+            {
+              label: 'Captured original bytes',
+              detail: 'Record imports restore metadata; original bytes must already exist or be restored by an encrypted-original flow.',
+            },
+          ]
+        : undefined,
+  };
+}
+
+function createBookmarksRestorePreview(
+  result: Awaited<ReturnType<typeof importBookmarkRecords>>,
+  fileName = 'Selected JSON file',
+): ImportRestorePreviewState {
+  return {
+    fileName,
+    payloadLabel: 'Bookmarks',
+    recordCount: result.entries.length,
+    capturedOriginalCount: result.externalOriginalCount,
+    skippedCount: result.skipped.length,
+    unsupportedCount: result.externalOriginalCount > 0 ? 1 : 0,
+    plaintext: result.plaintext,
+    message: `Preview loaded. Import has not changed local records yet.${result.plaintext ? ' Plaintext bookmarks will be encrypted into bookmark storage after confirmation.' : ''}`,
+    samples: result.entries.slice(0, 3).map((entry) =>
+      imagePayloadPreviewSample(entry.payload.url, {
+        label: entry.payload.label,
+        title: entry.payload.title,
+        detail: bookmarkPayloadPreviewDetail(entry.payload),
+      }),
+    ),
+    unsupportedSections:
+      result.externalOriginalCount > 0
+        ? [
+            {
+              label: 'External original references',
+              detail: 'Bookmark imports strip external blob references; original bytes are not imported from record JSON.',
+            },
+          ]
+        : undefined,
+  };
+}
+
+function createUrlReviewStatusRestorePreview(
+  result: ReturnType<typeof importUrlReviewStatusFile>,
+  fileName = 'Selected JSON file',
+): ImportRestorePreviewState {
+  return {
+    fileName,
+    payloadLabel: 'URL review status',
+    recordCount: result.records.length,
+    skippedCount: result.skipped.length,
+    unsupportedCount: 0,
+    plaintext: true,
+    message: 'Preview loaded. Import has not changed local records yet.',
+    samples: result.records.slice(0, 3).map((record) => ({
+      label: `${record.status} · ${record.hostname}`,
+      url: record.sourceUrl,
+      detail: `${record.fieldIds.length} field${record.fieldIds.length === 1 ? '' : 's'}, updated ${record.updatedAt}`,
+    })),
+  };
+}
+
+function imagePayloadPreviewSample(
+  url: string,
+  options: { readonly label?: string; readonly title?: string; readonly detail?: string } = {},
+): NonNullable<ImportRestorePreviewState['samples']>[number] {
+  return {
+    label: options.label ?? options.title ?? filenameFromUrl(url),
+    url,
+    detail: options.detail,
+  };
+}
+
+function bookmarkPayloadPreviewDetail(payload: DurableBookmarkPayloadV1): string | undefined {
+  const dimensions = payload.width && payload.height ? `${payload.width} x ${payload.height}` : undefined;
+  const source = payload.sourceCompatibility === 'favorites' ? 'Legacy favorite' : undefined;
+  return [dimensions, source].filter((part): part is string => !!part).join(', ') || undefined;
 }
 
 function historyRecordToExportEntry(record: ImageDisplayRecord): { readonly uuid: string; readonly payload: DurableHistoryPayloadV1 } {

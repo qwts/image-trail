@@ -191,6 +191,7 @@ export interface PanelState {
   readonly importExportBusy: boolean;
   readonly importExportMessage?: string;
   readonly importExportMessageIsError?: boolean;
+  readonly importRestorePreview?: ImportRestorePreviewState;
   readonly pcloudBackup: PCloudBackupState;
   readonly settingsOpen: boolean;
   readonly automation: AutomationState;
@@ -212,6 +213,31 @@ export interface PanelState {
 }
 
 export type CaptureSourceType = 'target' | 'history' | 'bookmark';
+
+export interface ImportRestorePreviewState {
+  readonly fileName: string;
+  readonly payloadLabel: string;
+  readonly recordCount: number;
+  readonly capturedOriginalCount?: number;
+  readonly skippedCount?: number;
+  readonly unsupportedCount?: number;
+  readonly plaintext?: boolean;
+  readonly message?: string;
+  readonly messageIsError?: boolean;
+  readonly samples: readonly ImportRestorePreviewSample[];
+  readonly unsupportedSections?: readonly ImportRestorePreviewUnsupportedSection[];
+}
+
+export interface ImportRestorePreviewSample {
+  readonly label: string;
+  readonly url?: string;
+  readonly detail?: string;
+}
+
+export interface ImportRestorePreviewUnsupportedSection {
+  readonly label: string;
+  readonly detail: string;
+}
 
 export type PanelActionName =
   | 'toggle-panel'
@@ -292,6 +318,7 @@ export type PanelActionName =
   | 'import-export/start'
   | 'import-export/complete'
   | 'import-export/error'
+  | 'import/restore-preview-ready'
   | 'pcloud-backup/status'
   | 'pcloud-backup/busy'
   | 'pcloud-backup/message'
@@ -311,6 +338,8 @@ export type PanelActionName =
   | 'import/bookmarks'
   | 'import/image'
   | 'import/encrypted-image'
+  | 'import/confirm-restore-preview'
+  | 'import/cancel-restore-preview'
   | 'recall/open'
   | 'recall/close'
   | 'recall/load-start'
@@ -396,6 +425,7 @@ export type PanelAction =
         | 'blob-key/status'
         | 'import-export/complete'
         | 'import-export/error'
+        | 'import/restore-preview-ready'
         | 'pcloud-backup/status'
         | 'pcloud-backup/busy'
         | 'pcloud-backup/message'
@@ -527,6 +557,7 @@ export type PanelAction =
   | { readonly name: 'blob-key/status'; readonly unlocked: boolean; readonly keyReference?: string | null; readonly hasKey?: boolean }
   | { readonly name: 'import-export/complete'; readonly message: string }
   | { readonly name: 'import-export/error'; readonly message: string }
+  | { readonly name: 'import/restore-preview-ready'; readonly preview: ImportRestorePreviewState }
   | { readonly name: 'pcloud-backup/status'; readonly status: import('./cloud/pcloud-provider.js').PCloudProviderStatus }
   | {
       readonly name: 'pcloud-backup/busy';
@@ -560,10 +591,16 @@ export type PanelAction =
   | { readonly name: 'clear/url-review-status'; readonly scope?: 'hostname' | 'page' | 'source' | 'all' }
   | { readonly name: 'export/image'; readonly saveAs?: boolean }
   | { readonly name: 'export/encrypted-image' }
-  | { readonly name: 'import/history' | 'import/bookmarks'; readonly fileContent: string; readonly password: string }
-  | { readonly name: 'import/url-review-status'; readonly fileContent: string }
+  | {
+      readonly name: 'import/history' | 'import/bookmarks';
+      readonly fileContent: string;
+      readonly password: string;
+      readonly fileName?: string;
+    }
+  | { readonly name: 'import/url-review-status'; readonly fileContent: string; readonly fileName?: string }
   | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
   | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] }
+  | { readonly name: 'import/confirm-restore-preview' | 'import/cancel-restore-preview' }
   | { readonly name: 'recall/open'; readonly side: RecallDrawerSide }
   | {
       readonly name: 'recall/load-complete';

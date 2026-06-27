@@ -33,6 +33,77 @@ export const Error: Story = {
     }),
 };
 
+export const RestorePreviewReady: Story = {
+  render: () =>
+    importExportStory({
+      restorePreview: {
+        fileName: 'image-trail-bookmarks-2026-06-27.json',
+        payloadLabel: 'Bookmarks',
+        recordCount: 12,
+        capturedOriginalCount: 8,
+        skippedCount: 0,
+        unsupportedCount: 0,
+        message: 'Preview loaded. Import has not changed local records yet.',
+        samples: [
+          {
+            label: 'quiet-ridge.jpg',
+            url: 'https://images.example.test/gallery/quiet-ridge.jpg',
+            detail: '1280 x 854, captured original included',
+          },
+          {
+            label: 'night-market-frame-042.webp',
+            url: 'https://cdn.example.test/sets/night-market/frame-042.webp',
+            detail: '1920 x 1080, pin metadata only',
+          },
+          {
+            label: 'archive scan 17.png',
+            url: 'https://archive.example.test/scans/collection/17.png',
+            detail: '900 x 1200, captured original included',
+          },
+        ],
+      },
+    }),
+};
+
+export const RestorePreviewNeedsReview: Story = {
+  render: () =>
+    importExportStory({
+      restorePreview: {
+        fileName: 'mixed-image-trail-restore.json',
+        payloadLabel: 'Mixed restore payload',
+        recordCount: 21,
+        capturedOriginalCount: 14,
+        skippedCount: 3,
+        unsupportedCount: 2,
+        plaintext: true,
+        message: 'Some sections cannot be imported by this version.',
+        messageIsError: true,
+        samples: [
+          {
+            label: 'gallery-cover.avif',
+            url: 'https://images.example.test/gallery/cover.avif',
+            detail: 'Bookmark metadata with encrypted original reference',
+          },
+          {
+            label: 'old history entry',
+            url: 'https://legacy.example.test/path/photo-009.jpg',
+            detail: 'History record, URL review status present',
+          },
+        ],
+        unsupportedSections: [
+          {
+            label: 'automation presets',
+            detail: 'Payload section is newer than this build.',
+          },
+          {
+            label: 'duplicate originals',
+            detail: 'Two blob entries have the same fingerprint.',
+          },
+        ],
+      },
+    }),
+};
+
 export const ImageUtilitiesReady: Story = {
   render: () => imageTransferStory(),
 };
@@ -57,6 +128,30 @@ export const ImageUtilitiesError: Story = {
 
 export const Narrow: Story = {
   render: () => importExportStory({}, { width: 300 }),
+};
+
+export const RestorePreviewNarrow: Story = {
+  render: () =>
+    importExportStory(
+      {
+        restorePreview: {
+          fileName: 'image-trail-very-long-restore-file-name-2026-06-27.json',
+          payloadLabel: 'Bookmarks',
+          recordCount: 7,
+          capturedOriginalCount: 4,
+          skippedCount: 1,
+          message: 'Preview loaded. Import has not changed local records yet.',
+          samples: [
+            {
+              label: 'very-long-descriptive-filename-with-edition-and-source-marker.jpg',
+              url: 'https://images.example.test/gallery/very-long-descriptive-filename-with-edition-and-source-marker.jpg',
+              detail: '2048 x 1536, captured original included',
+            },
+          ],
+        },
+      },
+      { width: 300 },
+    ),
 };
 
 export const CloudBackupDisconnected: Story = {
@@ -138,7 +233,9 @@ export const CloudBackupNarrow: Story = {
 };
 
 function importExportStory(overrides: Partial<ImportExportStoryState> = {}, storyOptions: { readonly width?: number } = {}): HTMLElement {
-  return panelStory(createImportExportView(importExportState(overrides), mockDispatch('import export story action')), storyOptions);
+  const view = createImportExportView(importExportState(overrides), mockDispatch('import export story action'));
+  view.open = true;
+  return panelStory(view, storyOptions);
 }
 
 function imageTransferStory(overrides: Partial<ImportExportStoryState> = {}, storyOptions: { readonly width?: number } = {}): HTMLElement {

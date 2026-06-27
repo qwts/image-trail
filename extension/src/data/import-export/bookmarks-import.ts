@@ -14,6 +14,7 @@ export interface BookmarksImportResult {
   readonly entries: readonly BookmarksImportEntry[];
   readonly skipped: readonly string[];
   readonly plaintext: boolean;
+  readonly externalOriginalCount: number;
 }
 
 export async function importBookmarks(fileContent: string, password: string): Promise<BookmarksImportResult> {
@@ -25,6 +26,7 @@ export async function importBookmarks(fileContent: string, password: string): Pr
     entries: [],
     skipped: [],
     plaintext: false,
+    externalOriginalCount: 0,
   });
 
   let envelope;
@@ -65,13 +67,16 @@ function parseBookmarkEntries(parsed: unknown): Omit<BookmarksImportResult, 'pla
     status: { ok: false, code: 'decryption-failed', message },
     entries: [],
     skipped: [],
+    externalOriginalCount: 0,
   });
   if (!Array.isArray(parsed)) return fail('Bookmark payload is not an array.');
 
   const entries: BookmarksImportEntry[] = [];
   const skipped: string[] = [];
+  let externalOriginalCount = 0;
   for (const item of parsed) {
     if (isValidBookmarkEntry(item)) {
+      if (item.payload.storedOriginal) externalOriginalCount += 1;
       entries.push(stripExternalBlobReference(item));
     } else {
       skipped.push(typeof item === 'object' && item !== null && 'uuid' in item ? String(item.uuid) : 'unknown');
@@ -85,6 +90,7 @@ function parseBookmarkEntries(parsed: unknown): Omit<BookmarksImportResult, 'pla
     },
     entries,
     skipped,
+    externalOriginalCount,
   };
 }
 

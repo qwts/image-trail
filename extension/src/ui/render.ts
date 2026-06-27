@@ -379,6 +379,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     blobKeyUnlocked: state.blobKeyUnlocked,
     lastMessage: state.importExportMessage,
     lastMessageIsError: state.importExportMessageIsError,
+    restorePreview: state.importRestorePreview,
   };
   const cloudBackupState: CloudBackupProviderState = {
     provider: 'pcloud',

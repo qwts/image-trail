@@ -695,6 +695,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         importExportBusy: false,
         importExportMessage: action.message,
         importExportMessageIsError: false,
+        importRestorePreview: undefined,
         message: action.message,
         status: 'ready',
         lastUpdatedAt: Date.now(),
@@ -705,8 +706,31 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         importExportBusy: false,
         importExportMessage: action.message,
         importExportMessageIsError: true,
+        importRestorePreview: undefined,
         message: action.message,
         status: 'error',
+        lastUpdatedAt: Date.now(),
+      };
+    case 'import/restore-preview-ready':
+      return {
+        ...state,
+        importExportBusy: false,
+        importExportMessage: action.preview.message,
+        importExportMessageIsError: action.preview.messageIsError === true,
+        importRestorePreview: action.preview,
+        message: action.preview.message ?? 'Restore preview loaded.',
+        status: action.preview.messageIsError ? 'error' : 'ready',
+        lastUpdatedAt: Date.now(),
+      };
+    case 'import/cancel-restore-preview':
+      return {
+        ...state,
+        importExportBusy: false,
+        importRestorePreview: undefined,
+        importExportMessage: 'Restore preview canceled.',
+        importExportMessageIsError: false,
+        message: 'Restore preview canceled.',
+        status: 'ready',
         lastUpdatedAt: Date.now(),
       };
     case 'pcloud-backup/status':
