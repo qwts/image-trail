@@ -43,6 +43,7 @@ Use the stories as a checklist, not only as visual examples:
 - Drawer stories should render inside a compact relative stage that includes only the drawer geometry and a small gutter, so fullscreen Storybook layout does not hide spacing issues behind a full-width backdrop.
 - Encrypted originals: `SetupRequired`, `LockedWithBackup`, `Busy`, `Unlocked`, `MaintenanceNeeded`, and `Narrow` cover lock/setup state, disabled busy controls, backup controls, waiting cues, and maintenance cues.
 - Import and export: `Busy`, `Error`, `ImageUtilitiesReady`, `ImageUtilitiesLocked`, `ImageUtilitiesError`, and `Narrow` cover import/export disabled state, error messages, image-transfer availability, encrypted-transfer lock state, waiting cues, and file-picker layout.
+- Cloud backup mockup: `CloudBackupDisconnected`, `CloudBackupConnected`, `CloudBackupBackingUp`, `CloudBackupVerified`, `CloudBackupRestoreAvailable`, `CloudBackupError`, and `CloudBackupNarrow` cover pCloud connection status, manual backup actions, restore entry point, verification metadata, provider errors, and compact layout before real provider wiring.
 
 If a reviewer expects a cue that is missing from this matrix and the production component API cannot render it, open a focused follow-up issue instead of adding story-only fake state. Follow-up #191 tracks explicit accessible labels/help text for password and file-picker controls surfaced by the Encrypted originals and Import and export stories.
 

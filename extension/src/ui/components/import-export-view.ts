@@ -19,6 +19,30 @@ export type ImportExportAction =
   | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
   | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] };
 
+export type CloudBackupAction =
+  | { readonly name: 'cloud-backup/connect'; readonly provider: 'pcloud' }
+  | { readonly name: 'cloud-backup/backup-now'; readonly provider: 'pcloud' }
+  | { readonly name: 'cloud-backup/choose-restore'; readonly provider: 'pcloud' }
+  | { readonly name: 'cloud-backup/retry'; readonly provider: 'pcloud' }
+  | { readonly name: 'cloud-backup/disconnect'; readonly provider: 'pcloud' };
+
+export type CloudBackupConnectionState = 'disconnected' | 'connected' | 'busy' | 'error';
+
+export interface CloudBackupProviderState {
+  readonly provider: 'pcloud';
+  readonly connectionState: CloudBackupConnectionState;
+  readonly apiHost?: string;
+  readonly folderPath?: string;
+  readonly lastBackupAt?: string;
+  readonly lastBackupSize?: string;
+  readonly lastBackupSha256?: string;
+  readonly pendingOperation?: 'connecting' | 'backing-up' | 'restoring';
+  readonly restoreCandidateName?: string;
+  readonly restoreCandidateSize?: string;
+  readonly message?: string;
+  readonly messageIsError?: boolean;
+}
+
 export interface ImportExportViewState {
   readonly busy: boolean;
   readonly currentImageUrl: string | null;
@@ -35,6 +59,7 @@ export interface ImportExportViewState {
 
 let imageUtilitiesOpen = false;
 let importExportOpen = false;
+let cloudBackupOpen = true;
 export function createImageTransferView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
   const { section, body } = createCollapsibleImportExportSection(
     'image-trail-panel__image-transfer',
@@ -78,6 +103,83 @@ export function createImportExportView(state: ImportExportViewState, dispatch: (
 
   body.append(createExportGroup(state, dispatch), createImportGroup(state, dispatch));
 
+  return section;
+}
+
+export function createCloudBackupView(state: CloudBackupProviderState, dispatch: (action: CloudBackupAction) => void): HTMLElement {
+  const { section, body } = createCollapsibleImportExportSection(
+    'image-trail-panel__cloud-backup',
+    'Cloud backup',
+    cloudBackupOpen,
+    (open) => {
+      cloudBackupOpen = open;
+    },
+  );
+
+  const group = document.createElement('div');
+  group.className = 'image-trail-panel__subsection image-trail-panel__cloud-provider';
+
+  const heading = document.createElement('div');
+  heading.className = 'image-trail-panel__cloud-provider-heading';
+
+  const title = document.createElement('h4');
+  title.textContent = 'pCloud';
+
+  const status = document.createElement('span');
+  status.className = `image-trail-panel__cloud-provider-status is-${state.connectionState}`;
+  status.textContent = cloudConnectionLabel(state);
+  status.title = status.textContent;
+
+  heading.append(title, status);
+  group.append(heading);
+
+  const description = document.createElement('p');
+  description.className = 'image-trail-panel__meta';
+  description.textContent = 'Manual encrypted backups use Image Trail export files stored in pCloud.';
+  group.append(description);
+
+  if (state.message) {
+    const message = document.createElement('p');
+    message.className = state.messageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
+    if (state.messageIsError) message.setAttribute('role', 'alert');
+    message.textContent = state.message;
+    group.append(message);
+  }
+
+  const metadata = cloudBackupMetadata(state);
+  if (metadata.length > 0) group.append(createCloudBackupMetadata(metadata));
+
+  const connectBtn = createCloudBackupButton('Connect pCloud', state, () => dispatch({ name: 'cloud-backup/connect', provider: 'pcloud' }));
+  connectBtn.disabled = state.connectionState !== 'disconnected';
+
+  const backupBtn = createCloudBackupButton('Back up now', state, () => dispatch({ name: 'cloud-backup/backup-now', provider: 'pcloud' }));
+  backupBtn.classList.add('image-trail-panel__primary-action');
+  backupBtn.disabled = state.connectionState !== 'connected';
+
+  const restoreBtn = createCloudBackupButton('Choose restore file', state, () =>
+    dispatch({ name: 'cloud-backup/choose-restore', provider: 'pcloud' }),
+  );
+  restoreBtn.disabled = state.connectionState !== 'connected';
+
+  const retryBtn = createCloudBackupButton('Retry pCloud', state, () => dispatch({ name: 'cloud-backup/retry', provider: 'pcloud' }));
+  retryBtn.disabled = state.connectionState !== 'error';
+
+  const disconnectBtn = createCloudBackupButton('Disconnect', state, () =>
+    dispatch({ name: 'cloud-backup/disconnect', provider: 'pcloud' }),
+  );
+  disconnectBtn.classList.add('image-trail-panel__secondary-action');
+  disconnectBtn.disabled = state.connectionState !== 'connected';
+
+  const actions = document.createElement('div');
+  actions.className = 'image-trail-panel__action-groups';
+  actions.append(
+    createActionGroup('Provider', [connectBtn, retryBtn]),
+    createActionGroup('Manual backup', [backupBtn, restoreBtn]),
+    createActionGroup('Account', [disconnectBtn], { secondary: true }),
+  );
+
+  group.append(actions);
+  body.append(group);
   return section;
 }
 
@@ -395,6 +497,58 @@ function createAdvancedActionGroup(label: string, content: HTMLElement): HTMLEle
 
   details.append(summary, content);
   return details;
+}
+
+function createCloudBackupButton(label: string, state: CloudBackupProviderState, onClick: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = state.pendingOperation ? cloudPendingLabel(label, state.pendingOperation) : label;
+  button.classList.toggle('is-waiting', state.connectionState === 'busy');
+  button.disabled = state.connectionState === 'busy';
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function cloudConnectionLabel(state: CloudBackupProviderState): string {
+  if (state.connectionState === 'busy' && state.pendingOperation === 'connecting') return 'Connecting';
+  if (state.connectionState === 'busy' && state.pendingOperation === 'backing-up') return 'Backing up';
+  if (state.connectionState === 'busy' && state.pendingOperation === 'restoring') return 'Checking restore';
+  if (state.connectionState === 'connected') return 'Connected';
+  if (state.connectionState === 'error') return 'Needs attention';
+  return 'Not connected';
+}
+
+function cloudPendingLabel(label: string, operation: NonNullable<CloudBackupProviderState['pendingOperation']>): string {
+  if (operation === 'connecting' && label === 'Connect pCloud') return 'Connecting...';
+  if (operation === 'backing-up' && label === 'Back up now') return 'Backing up...';
+  if (operation === 'restoring' && label === 'Choose restore file') return 'Checking restore...';
+  return label;
+}
+
+function cloudBackupMetadata(state: CloudBackupProviderState): ReadonlyArray<readonly [string, string]> {
+  const rows: Array<readonly [string, string]> = [];
+  if (state.apiHost) rows.push(['API host', state.apiHost]);
+  if (state.folderPath) rows.push(['Folder', state.folderPath]);
+  if (state.lastBackupAt) rows.push(['Last backup', state.lastBackupAt]);
+  if (state.lastBackupSize) rows.push(['Size', state.lastBackupSize]);
+  if (state.lastBackupSha256) rows.push(['SHA-256', state.lastBackupSha256]);
+  if (state.restoreCandidateName) rows.push(['Restore file', state.restoreCandidateName]);
+  if (state.restoreCandidateSize) rows.push(['Restore size', state.restoreCandidateSize]);
+  return rows;
+}
+
+function createCloudBackupMetadata(rows: ReadonlyArray<readonly [string, string]>): HTMLElement {
+  const list = document.createElement('dl');
+  list.className = 'image-trail-panel__cloud-provider-metadata';
+  for (const [label, value] of rows) {
+    const term = document.createElement('dt');
+    term.textContent = label;
+    const detail = document.createElement('dd');
+    detail.textContent = value;
+    detail.title = value;
+    list.append(term, detail);
+  }
+  return list;
 }
 
 function createToggle(text: string): { readonly label: HTMLLabelElement; readonly input: HTMLInputElement } {

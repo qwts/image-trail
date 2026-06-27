@@ -1198,7 +1198,8 @@
 }
 
 .image-trail-panel-root .image-trail-panel__image-transfer,
-.image-trail-panel-root .image-trail-panel__import-export {
+.image-trail-panel-root .image-trail-panel__import-export,
+.image-trail-panel-root .image-trail-panel__cloud-backup {
   display: grid;
   gap: 8px;
 }
@@ -1218,6 +1219,84 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__cloud-provider-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__cloud-provider-status {
+  flex: 0 1 auto;
+  max-inline-size: 145px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 6px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 6px;
+  color: #bbb;
+  background: rgb(255 255 255 / 7%);
+  font:
+    600 10px/1.2 system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__cloud-provider-status.is-connected {
+  border-color: rgb(123 190 138 / 45%);
+  color: #cbe7d1;
+  background: rgb(123 190 138 / 13%);
+}
+
+.image-trail-panel-root .image-trail-panel__cloud-provider-status.is-busy {
+  border-color: rgb(226 188 103 / 48%);
+  color: #ead8ac;
+  background: rgb(226 188 103 / 13%);
+}
+
+.image-trail-panel-root .image-trail-panel__cloud-provider-status.is-error {
+  border-color: rgb(224 118 118 / 50%);
+  color: #f0bebe;
+  background: rgb(224 118 118 / 13%);
+}
+
+.image-trail-panel-root .image-trail-panel__cloud-provider-metadata {
+  display: grid;
+  grid-template-columns: minmax(70px, max-content) minmax(0, 1fr);
+  gap: 4px 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 7px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 4%);
+}
+
+.image-trail-panel-root .image-trail-panel__cloud-provider-metadata dt,
+.image-trail-panel-root .image-trail-panel__cloud-provider-metadata dd {
+  min-width: 0;
+  margin: 0;
+  font:
+    10px/1.35 system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__cloud-provider-metadata dt {
+  color: #999;
+}
+
+.image-trail-panel-root .image-trail-panel__cloud-provider-metadata dd {
+  overflow-wrap: anywhere;
+  color: #ddd;
 }
 
 .image-trail-panel-root .image-trail-panel__control-stack {
