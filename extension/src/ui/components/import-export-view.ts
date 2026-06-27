@@ -221,9 +221,6 @@ function createCollapsibleImportExportSection(
   const section = document.createElement('details');
   section.className = `image-trail-panel__settings-templates image-trail-panel__settings-utility-section ${className}`;
   section.open = open;
-  section.addEventListener('toggle', () => {
-    onToggle(section.open);
-  });
 
   const heading = document.createElement('h4');
   heading.textContent = title;
@@ -238,6 +235,17 @@ function createCollapsibleImportExportSection(
 
   const body = document.createElement('div');
   body.className = 'image-trail-panel__settings-utility-body';
+
+  const syncCollapsedState = (): void => {
+    summary.setAttribute('aria-expanded', String(section.open));
+    body.hidden = !section.open;
+  };
+
+  section.addEventListener('toggle', () => {
+    syncCollapsedState();
+    onToggle(section.open);
+  });
+  syncCollapsedState();
 
   section.append(summary, body);
   return { section, body };
