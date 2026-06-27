@@ -171,14 +171,14 @@ export function createHistoryView(
       const deleteCapture = document.createElement('button');
       deleteCapture.type = 'button';
       deleteCapture.className = 'image-trail-panel__delete-original';
-      deleteCapture.textContent = 'Delete';
-      deleteCapture.title = 'Delete Original + Pin';
+      deleteCapture.textContent = 'Delete original';
+      deleteCapture.title = 'Delete original from encrypted storage.';
       deleteCapture.addEventListener('click', (event) => {
         event.stopPropagation();
         if (deleteCapture.dataset.confirming !== 'true') {
           deleteCapture.dataset.confirming = 'true';
-          deleteCapture.textContent = 'Confirm Delete';
-          deleteCapture.title = 'Click again to Delete Original + Pin';
+          deleteCapture.textContent = 'Confirm delete original';
+          deleteCapture.title = 'Click again to delete original from encrypted storage.';
           return;
         }
         dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! });

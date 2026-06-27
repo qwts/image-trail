@@ -269,19 +269,20 @@ export function createBookmarksView(
     }
 
     {
+      const deletesOriginal = item.captureStatus === 'captured' && item.blobId && !keyMissing;
       const deleteCapture = document.createElement('button');
       deleteCapture.type = 'button';
       deleteCapture.className = 'image-trail-panel__delete-original';
-      deleteCapture.textContent = 'Delete';
-      deleteCapture.title = 'Delete Original + Pin';
+      deleteCapture.textContent = deletesOriginal ? 'Delete original' : 'Delete';
+      deleteCapture.title = deletesOriginal ? 'Delete original from encrypted storage.' : 'Delete Pin';
       deleteCapture.addEventListener('click', () => {
         if (deleteCapture.dataset.confirming !== 'true') {
           deleteCapture.dataset.confirming = 'true';
-          deleteCapture.textContent = 'Confirm Delete';
-          deleteCapture.title = 'Click again to Delete Original + Pin';
+          deleteCapture.textContent = deletesOriginal ? 'Confirm delete original' : 'Confirm Delete';
+          deleteCapture.title = deletesOriginal ? 'Click again to delete original from encrypted storage.' : 'Click again to delete Pin';
           return;
         }
-        if (item.captureStatus === 'captured' && item.blobId && !keyMissing) {
+        if (deletesOriginal) {
           dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId });
           return;
         }
