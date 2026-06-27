@@ -101,6 +101,7 @@
 }
 
 .image-trail-panel-root.image-trail-panel.has-buffered-skip-pulse::before {
+  content: '';
   box-shadow:
     inset 0 0 0 1px rgb(255 88 88 / 70%),
     0 0 18px rgb(255 36 36 / 38%);
