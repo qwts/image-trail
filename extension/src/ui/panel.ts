@@ -1014,10 +1014,10 @@ export class ImageTrailPanel {
       if (this.state.lastUpdatedAt !== updatedAt) return;
       if (mode === 'status') {
         if (this.state.status !== 'error') return;
-        this.state = { ...this.state, status: 'ready', lastUpdatedAt: Date.now() };
+        this.state = { ...this.state, status: 'ready', message: 'Image Trail is ready.', lastUpdatedAt: Date.now() };
       } else {
         if (this.state.captureResult === null || this.state.captureResult.status === 'captured') return;
-        this.state = reducePanelAction(this.state, { name: 'capture/clear' });
+        this.state = { ...reducePanelAction(this.state, { name: 'capture/clear' }), message: 'Image Trail is ready.' };
       }
       this.render();
     }, FINITE_CAPTURE_ERROR_MS);
