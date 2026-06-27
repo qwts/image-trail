@@ -36,7 +36,7 @@ export interface CloudBackupProviderState {
   readonly lastBackupAt?: string;
   readonly lastBackupSize?: string;
   readonly lastBackupSha256?: string;
-  readonly pendingOperation?: 'connecting' | 'backing-up' | 'restoring';
+  readonly pendingOperation?: 'connecting' | 'disconnecting' | 'backing-up' | 'restoring';
   readonly restoreCandidateName?: string;
   readonly restoreCandidateSize?: string;
   readonly message?: string;
@@ -511,6 +511,7 @@ function createCloudBackupButton(label: string, state: CloudBackupProviderState,
 
 function cloudConnectionLabel(state: CloudBackupProviderState): string {
   if (state.connectionState === 'busy' && state.pendingOperation === 'connecting') return 'Connecting';
+  if (state.connectionState === 'busy' && state.pendingOperation === 'disconnecting') return 'Disconnecting';
   if (state.connectionState === 'busy' && state.pendingOperation === 'backing-up') return 'Backing up';
   if (state.connectionState === 'busy' && state.pendingOperation === 'restoring') return 'Checking restore';
   if (state.connectionState === 'connected') return 'Connected';
@@ -520,6 +521,7 @@ function cloudConnectionLabel(state: CloudBackupProviderState): string {
 
 function cloudPendingLabel(label: string, operation: NonNullable<CloudBackupProviderState['pendingOperation']>): string {
   if (operation === 'connecting' && label === 'Connect pCloud') return 'Connecting...';
+  if (operation === 'disconnecting' && label === 'Disconnect') return 'Disconnecting...';
   if (operation === 'backing-up' && label === 'Back up now') return 'Backing up...';
   if (operation === 'restoring' && label === 'Choose restore file') return 'Checking restore...';
   return label;

@@ -53,30 +53,59 @@ function numberOrUndefined(value: unknown): number | undefined {
   return Number.isFinite(numberValue) ? numberValue : undefined;
 }
 
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function booleanOrUndefined(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function recordOrNull(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+async function restrictStorageToTrustedContexts(): Promise<void> {
+  if (!hasChromeStorage()) throw new Error('Extension storage is unavailable.');
+  const setAccessLevel = chrome.storage.local.setAccessLevel;
+  if (typeof setAccessLevel !== 'function') throw new Error('Trusted extension storage is unavailable.');
+  await setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+}
+
 async function loadConnectionRecord(): Promise<PCloudConnectionRecord | null> {
   if (!hasChromeStorage()) return null;
+  await restrictStorageToTrustedContexts();
   const value = await chrome.storage.local.get(PCLOUD_CONNECTION_KEY);
-  const candidate = value[PCLOUD_CONNECTION_KEY] as Partial<PCloudConnectionRecord> | undefined;
-  if (!candidate || candidate.schemaVersion !== 1 || candidate.provider !== 'pcloud' || !candidate.accessToken) return null;
+  const candidate = recordOrNull(value[PCLOUD_CONNECTION_KEY]);
+  if (!candidate || candidate.schemaVersion !== 1 || candidate.provider !== 'pcloud') return null;
+  const accessToken = stringOrUndefined(candidate.accessToken);
+  if (!accessToken) return null;
+  let apiHost: PCloudApiHost;
+  try {
+    apiHost = normalizePCloudApiHost(stringOrUndefined(candidate.apiHost));
+  } catch {
+    return null;
+  }
   return {
     schemaVersion: 1,
     provider: 'pcloud',
-    accessToken: candidate.accessToken,
-    apiHost: normalizePCloudApiHost(candidate.apiHost),
-    connectedAt: candidate.connectedAt || new Date(0).toISOString(),
-    accountPremium: candidate.accountPremium,
-    quotaBytes: candidate.quotaBytes,
-    usedQuotaBytes: candidate.usedQuotaBytes,
+    accessToken,
+    apiHost,
+    connectedAt: stringOrUndefined(candidate.connectedAt) ?? new Date(0).toISOString(),
+    accountPremium: booleanOrUndefined(candidate.accountPremium),
+    quotaBytes: numberOrUndefined(candidate.quotaBytes),
+    usedQuotaBytes: numberOrUndefined(candidate.usedQuotaBytes),
   };
 }
 
 async function saveConnectionRecord(record: PCloudConnectionRecord): Promise<void> {
-  if (!hasChromeStorage()) throw new Error('Extension storage is unavailable.');
+  await restrictStorageToTrustedContexts();
   await chrome.storage.local.set({ [PCLOUD_CONNECTION_KEY]: record });
 }
 
 async function clearConnectionRecord(): Promise<void> {
   if (!hasChromeStorage()) return;
+  await restrictStorageToTrustedContexts();
   await chrome.storage.local.remove(PCLOUD_CONNECTION_KEY);
 }
 
@@ -102,7 +131,8 @@ async function fetchPCloudJson(apiHost: PCloudApiHost, method: string, accessTok
   const body = new URLSearchParams({ access_token: accessToken });
   const response = await fetch(`https://${apiHost}/${method}`, { method: 'POST', body });
   const data = (await response.json()) as Record<string, unknown>;
-  if (!response.ok || data.result !== 0) {
+  const resultCode = numberOrUndefined(data.result);
+  if (!response.ok || resultCode !== 0) {
     const error = typeof data.error === 'string' ? data.error : `pCloud ${method} failed.`;
     throw new Error(error);
   }

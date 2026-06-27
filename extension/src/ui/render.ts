@@ -385,7 +385,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     connectionState: state.pcloudBackup.connectionState,
     apiHost: state.pcloudBackup.apiHost,
     folderPath: '/Image Trail/backups',
-    pendingOperation: state.pcloudBackup.pendingOperation === 'connecting' ? 'connecting' : undefined,
+    pendingOperation: state.pcloudBackup.pendingOperation,
     message: state.pcloudBackup.message,
     messageIsError: state.pcloudBackup.messageIsError,
   };

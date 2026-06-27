@@ -3,6 +3,11 @@ import test from 'node:test';
 
 import { createSaveBookmarkResultMessage } from '../extension/src/background/messages.js';
 import { ExtensionBookmarkStore } from '../extension/src/content/extension-bookmark-store.js';
+import {
+  connectPCloudProvider,
+  disconnectPCloudProvider,
+  loadPCloudProviderStatus,
+} from '../extension/src/content/pcloud-provider-client.js';
 import { sendRuntimeMessage } from '../extension/src/content/runtime-message.js';
 import { createDisplayRecord } from '../extension/src/core/display-records.js';
 
@@ -38,6 +43,32 @@ test('sendRuntimeMessage rethrows unexpected runtime errors', async () => {
 
   try {
     await assert.rejects(() => sendRuntimeMessage({ type: 'imageTrail.cleanupOrphanedBlobs' }), /Background exploded/);
+  } finally {
+    globalThis.chrome = originalChrome;
+  }
+});
+
+test('pCloud provider client treats runtime failures as unavailable status', async () => {
+  const originalChrome = globalThis.chrome;
+  globalThis.chrome = {
+    runtime: {
+      id: 'test-extension',
+      sendMessage: async () => {
+        throw new Error('Background exploded.');
+      },
+    },
+  } as unknown as typeof chrome;
+
+  try {
+    const status = await loadPCloudProviderStatus();
+    const connect = await connectPCloudProvider();
+    const disconnect = await disconnectPCloudProvider();
+
+    assert.equal(status.connected, false);
+    assert.equal(connect.ok, false);
+    assert.equal(connect.status.connected, false);
+    assert.equal(disconnect.ok, false);
+    assert.equal(disconnect.status.connected, false);
   } finally {
     globalThis.chrome = originalChrome;
   }
