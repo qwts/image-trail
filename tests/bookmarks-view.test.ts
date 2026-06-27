@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  bookmarkRowClearActionForModifier,
-  bookmarkRowClearLabelForModifier,
+  bookmarkRowClearAction,
+  bookmarkRowClearLabel,
   extensionLabelFor,
   isCapturedOriginalRecord,
   queueRecordKindLabel,
@@ -44,17 +44,8 @@ test('bookmark extension label uses thumbnail data type before generic labels', 
 });
 
 test('bookmark row clear action stays undoable without modifiers', () => {
-  const event = { metaKey: false, ctrlKey: false };
-
-  assert.equal(bookmarkRowClearLabelForModifier(event), 'Clear');
-  assert.equal(bookmarkRowClearActionForModifier(event), 'bookmark/clear');
-});
-
-test('bookmark row clear action becomes destructive delete with platform modifier', () => {
-  assert.equal(bookmarkRowClearLabelForModifier({ metaKey: true, ctrlKey: false }), 'Delete');
-  assert.equal(bookmarkRowClearActionForModifier({ metaKey: true, ctrlKey: false }), 'bookmark/remove');
-  assert.equal(bookmarkRowClearLabelForModifier({ metaKey: false, ctrlKey: true }), 'Delete');
-  assert.equal(bookmarkRowClearActionForModifier({ metaKey: false, ctrlKey: true }), 'bookmark/remove');
+  assert.equal(bookmarkRowClearLabel(), 'Clear');
+  assert.equal(bookmarkRowClearAction(), 'bookmark/clear');
 });
 
 test('queue record kind distinguishes pins from captured bookmarks', () => {

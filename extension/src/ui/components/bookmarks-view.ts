@@ -290,6 +290,14 @@ export function createBookmarksView(
     }
 
     if (!keyMissing || item.captureStatus === 'captured') {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Delete';
+      remove.title = 'Delete this durable queue row. Linked originals follow reference-count cleanup rules.';
+      remove.className = 'is-danger';
+      remove.addEventListener('click', () => dispatch({ name: 'bookmark/remove', id: item.id }));
+      actions.append(remove);
+
       const clear = document.createElement('button');
       clear.type = 'button';
       bindBookmarkClearButton(clear, item.id, dispatch);
@@ -373,89 +381,24 @@ function isSelectionClick(event: MouseEvent): boolean {
   return event.metaKey || event.ctrlKey || event.shiftKey;
 }
 
-export function bookmarkRowClearActionForModifier(
-  event: Pick<MouseEvent | KeyboardEvent, 'metaKey' | 'ctrlKey'>,
-): 'bookmark/clear' | 'bookmark/remove' {
-  return isDeleteModifierEvent(event) ? 'bookmark/remove' : 'bookmark/clear';
+export function bookmarkRowClearAction(): 'bookmark/clear' {
+  return 'bookmark/clear';
 }
 
-export function bookmarkRowClearLabelForModifier(event: Pick<MouseEvent | KeyboardEvent, 'metaKey' | 'ctrlKey'>): 'Clear' | 'Delete' {
-  return isDeleteModifierEvent(event) ? 'Delete' : 'Clear';
+export function bookmarkRowClearLabel(): 'Clear' {
+  return 'Clear';
 }
 
-function updateBookmarkClearButton(button: HTMLButtonElement, destructive: boolean): void {
-  button.textContent = destructive ? 'Delete' : 'Clear';
-  button.title = destructive
-    ? 'Delete this durable queue row. Linked originals follow reference-count cleanup rules.'
-    : 'Hide this queue row until bookmarks are reloaded. Cmd/Ctrl-click to delete permanently.';
-  button.classList.toggle('is-danger', destructive);
-}
-
-function isDeleteModifierEvent(event: Pick<MouseEvent | KeyboardEvent, 'metaKey' | 'ctrlKey'>): boolean {
-  return event.metaKey || event.ctrlKey;
+function updateBookmarkClearButton(button: HTMLButtonElement): void {
+  button.textContent = 'Clear';
+  button.title = 'Hide this queue row until bookmarks are reloaded.';
+  button.classList.remove('is-danger');
 }
 
 function bindBookmarkClearButton(button: HTMLButtonElement, id: string, dispatch: (action: BookmarkAction) => void): void {
-  let pointerInside = false;
-  let focused = false;
-  let controller: AbortController | null = null;
-
-  const update = (destructive: boolean) => updateBookmarkClearButton(button, destructive);
-  const stopTrackingIfIdle = () => {
-    if (pointerInside || focused) return;
-    controller?.abort();
-    controller = null;
-    update(false);
-  };
-  const stopTracking = () => {
-    pointerInside = false;
-    focused = false;
-    controller?.abort();
-    controller = null;
-  };
-  const startTracking = () => {
-    if (controller) return;
-    controller = new AbortController();
-    window.addEventListener('keydown', (event) => update(isDeleteModifierEvent(event)), { signal: controller.signal });
-    window.addEventListener('keyup', (event) => update(isDeleteModifierEvent(event)), { signal: controller.signal });
-    window.addEventListener(
-      'blur',
-      () => {
-        controller?.abort();
-        controller = null;
-        update(false);
-      },
-      { signal: controller.signal },
-    );
-  };
-
-  update(false);
-  button.addEventListener('mouseenter', (event) => {
-    pointerInside = true;
-    startTracking();
-    update(isDeleteModifierEvent(event));
-  });
-  button.addEventListener('mousemove', (event) => update(isDeleteModifierEvent(event)));
-  button.addEventListener('mousedown', (event) => update(isDeleteModifierEvent(event)));
-  button.addEventListener('mouseleave', () => {
-    pointerInside = false;
-    stopTrackingIfIdle();
-  });
-  button.addEventListener('focus', () => {
-    focused = true;
-    startTracking();
-  });
-  button.addEventListener('blur', () => {
-    focused = false;
-    stopTrackingIfIdle();
-  });
-  button.addEventListener('keydown', (event) => update(isDeleteModifierEvent(event)));
-  button.addEventListener('keyup', (event) => update(isDeleteModifierEvent(event)));
-  button.addEventListener('click', (event) => {
-    const destructive = isDeleteModifierEvent(event);
-    update(destructive);
-    dispatch({ name: destructive ? 'bookmark/remove' : 'bookmark/clear', id });
-    stopTracking();
+  updateBookmarkClearButton(button);
+  button.addEventListener('click', () => {
+    dispatch({ name: 'bookmark/clear', id });
   });
 }
 
