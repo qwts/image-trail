@@ -16,7 +16,7 @@ export const DEFAULT_BINDINGS: KeyBinding[] = [
   { key: 'ArrowDown', action: 'download' },
   { key: ' ', action: 'slideshow-toggle' },
   { key: 'Escape', action: 'stop' },
-  { key: 's', action: 'slideshow-toggle' },
+  { key: 's', action: 'buffer-debug-toggle' },
   { key: 'p', action: 'panel-toggle' },
   { key: 'd', action: 'download' },
   { key: 'D', shift: true, action: 'download-save-as' },

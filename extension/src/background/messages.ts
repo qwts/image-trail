@@ -26,6 +26,10 @@ export const MessageType = {
   CreateBlobPreviewResult: 'imageTrail.createBlobPreviewResult',
   FetchThumbnailSource: 'imageTrail.fetchThumbnailSource',
   FetchThumbnailSourceResult: 'imageTrail.fetchThumbnailSourceResult',
+  ProbeImageSource: 'imageTrail.probeImageSource',
+  ProbeImageSourceResult: 'imageTrail.probeImageSourceResult',
+  FetchBufferedImageSource: 'imageTrail.fetchBufferedImageSource',
+  FetchBufferedImageSourceResult: 'imageTrail.fetchBufferedImageSourceResult',
   FetchLinkedPage: 'imageTrail.fetchLinkedPage',
   FetchLinkedPageResult: 'imageTrail.fetchLinkedPageResult',
   GrantPermissionAndCapture: 'imageTrail.grantPermissionAndCapture',
@@ -287,6 +291,34 @@ export interface FetchThumbnailSourceResultMessage {
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload:
     | { readonly ok: true; readonly dataUrl: string; readonly mimeType: string; readonly byteLength: number; readonly sha256?: string }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
+export interface ProbeImageSourceMessage {
+  readonly type: typeof MessageType.ProbeImageSource;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly url: string; readonly referrer?: string; readonly timeoutMs: number };
+}
+
+export interface ProbeImageSourceResultMessage {
+  readonly type: typeof MessageType.ProbeImageSourceResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly status: number; readonly finalUrl: string }
+    | { readonly ok: false; readonly status?: number; readonly reason: string; readonly message: string };
+}
+
+export interface FetchBufferedImageSourceMessage {
+  readonly type: typeof MessageType.FetchBufferedImageSource;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly url: string; readonly referrer?: string };
+}
+
+export interface FetchBufferedImageSourceResultMessage {
+  readonly type: typeof MessageType.FetchBufferedImageSourceResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly bytes: ArrayBuffer; readonly mimeType: string; readonly byteLength: number; readonly sha256?: string }
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 
@@ -807,6 +839,8 @@ export type ExtensionRequest =
   | CreateBlobPreviewMessage
   | CreateDataUrlPreviewMessage
   | FetchThumbnailSourceMessage
+  | ProbeImageSourceMessage
+  | FetchBufferedImageSourceMessage
   | FetchLinkedPageMessage
   | GrantPermissionAndCaptureMessage
   | BlobKeyStatusMessage
@@ -857,6 +891,8 @@ export type ExtensionResponse =
   | RetrieveBlobResultMessage
   | CreateBlobPreviewResultMessage
   | FetchThumbnailSourceResultMessage
+  | ProbeImageSourceResultMessage
+  | FetchBufferedImageSourceResultMessage
   | FetchLinkedPageResultMessage
   | BlobKeyStatusResultMessage
   | BlobKeyResultMessage
@@ -979,6 +1015,14 @@ export function createFetchThumbnailSourceMessage(url: string, referrer?: string
   return { type: MessageType.FetchThumbnailSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer } };
 }
 
+export function createProbeImageSourceMessage(url: string, referrer: string | undefined, timeoutMs: number): ProbeImageSourceMessage {
+  return { type: MessageType.ProbeImageSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer, timeoutMs } };
+}
+
+export function createFetchBufferedImageSourceMessage(url: string, referrer?: string): FetchBufferedImageSourceMessage {
+  return { type: MessageType.FetchBufferedImageSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer } };
+}
+
 export function createFetchLinkedPageMessage(url: string, maxBytes: number, timeoutMs: number): FetchLinkedPageMessage {
   return { type: MessageType.FetchLinkedPage, version: MESSAGE_PROTOCOL_VERSION, payload: { url, maxBytes, timeoutMs } };
 }
@@ -995,6 +1039,16 @@ export function createFetchThumbnailSourceResultMessage(
   payload: FetchThumbnailSourceResultMessage['payload'],
 ): FetchThumbnailSourceResultMessage {
   return { type: MessageType.FetchThumbnailSourceResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createProbeImageSourceResultMessage(payload: ProbeImageSourceResultMessage['payload']): ProbeImageSourceResultMessage {
+  return { type: MessageType.ProbeImageSourceResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createFetchBufferedImageSourceResultMessage(
+  payload: FetchBufferedImageSourceResultMessage['payload'],
+): FetchBufferedImageSourceResultMessage {
+  return { type: MessageType.FetchBufferedImageSourceResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createFetchLinkedPageResultMessage(payload: FetchLinkedPageResultMessage['payload']): FetchLinkedPageResultMessage {
@@ -1373,6 +1427,8 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.CreateBlobPreview ||
     value.type === MessageType.CreateDataUrlPreview ||
     value.type === MessageType.FetchThumbnailSource ||
+    value.type === MessageType.ProbeImageSource ||
+    value.type === MessageType.FetchBufferedImageSource ||
     value.type === MessageType.FetchLinkedPage ||
     value.type === MessageType.GrantPermissionAndCapture ||
     value.type === MessageType.BlobKeyStatus ||
@@ -1428,6 +1484,8 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.RetrieveBlobResult ||
     value.type === MessageType.CreateBlobPreviewResult ||
     value.type === MessageType.FetchThumbnailSourceResult ||
+    value.type === MessageType.ProbeImageSourceResult ||
+    value.type === MessageType.FetchBufferedImageSourceResult ||
     value.type === MessageType.FetchLinkedPageResult ||
     value.type === MessageType.BlobKeyStatusResult ||
     value.type === MessageType.BlobKeyResult ||
@@ -1503,6 +1561,16 @@ export function isCreateBlobPreviewResultMessage(value: unknown): value is Creat
 export function isFetchThumbnailSourceResultMessage(value: unknown): value is FetchThumbnailSourceResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.FetchThumbnailSourceResult;
+}
+
+export function isProbeImageSourceResultMessage(value: unknown): value is ProbeImageSourceResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ProbeImageSourceResult;
+}
+
+export function isFetchBufferedImageSourceResultMessage(value: unknown): value is FetchBufferedImageSourceResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.FetchBufferedImageSourceResult;
 }
 
 export function isFetchLinkedPageResultMessage(value: unknown): value is FetchLinkedPageResultMessage {

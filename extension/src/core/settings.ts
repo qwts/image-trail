@@ -16,11 +16,11 @@ export const URL_REVIEW_STATUS_LIMITS = {
 export const DEFAULT_URL_REVIEW_STATUS_LIMIT = 5_000;
 
 export const NEIGHBOR_PRELOAD_RADIUS_LIMITS = {
-  min: 0,
+  min: 1,
   max: 5,
 } as const;
 
-export const DEFAULT_NEIGHBOR_PRELOAD_RADIUS = 1;
+export const DEFAULT_NEIGHBOR_PRELOAD_RADIUS = 3;
 
 export const NEIGHBOR_PRELOAD_CACHE_LIMITS = {
   min: 0,

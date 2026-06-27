@@ -66,8 +66,10 @@ import {
   createDeleteUrlTemplateResultMessage,
   createBlobKeyStatusResultMessage,
   createExportBlobKeyBackupResultMessage,
+  createFetchBufferedImageSourceResultMessage,
   createImportBlobKeyBackupResultMessage,
   createPingMessage,
+  createProbeImageSourceResultMessage,
   createRetrieveBlobResultMessage,
   createStorageUsageResponseMessage,
   createTogglePanelMessage,
@@ -109,7 +111,12 @@ import type {
   SaveUrlTemplateMessage,
 } from './messages.js';
 import type { SaveLocalSettingsMessage } from './messages.js';
-import type { FetchLinkedPageMessage, FetchThumbnailSourceMessage } from './messages.js';
+import type {
+  FetchBufferedImageSourceMessage,
+  FetchLinkedPageMessage,
+  FetchThumbnailSourceMessage,
+  ProbeImageSourceMessage,
+} from './messages.js';
 import type { CreateBlobPreviewMessage } from './messages.js';
 import type { SetupBlobKeyMessage, UnlockBlobKeyMessage, BlobKeyResultMessage } from './messages.js';
 import type { ExportBlobKeyBackupMessage, ImportBlobKeyBackupMessage } from './messages.js';
@@ -120,6 +127,7 @@ const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
 const PREVIEW_TTL_MS = 60_000;
 const MAX_THUMBNAIL_SOURCE_BYTES = 5 * 1024 * 1024;
+const MAX_BUFFERED_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_LINKED_PAGE_BYTES = 2 * 1024 * 1024;
 const MAX_LINKED_PAGE_TIMEOUT_MS = 15_000;
 
@@ -424,6 +432,72 @@ async function handleFetchThumbnailSource(
     byteLength: fetchResult.byteLength,
     sha256: await computeSha256(fetchResult.bytes),
   };
+}
+
+async function handleProbeImageSource(
+  message: ProbeImageSourceMessage,
+): Promise<import('./messages.js').ProbeImageSourceResultMessage['payload']> {
+  const timeoutMs = Math.min(15_000, Math.max(1000, message.payload.timeoutMs));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const url = new URL(message.payload.url);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return { ok: false, reason: 'unsupported-url', message: 'Image URL must use HTTP or HTTPS.' };
+    }
+    console.info('Image Trail buffered HEAD probe started in service worker.', { url: url.href });
+    const response = await fetch(url.href, {
+      cache: 'no-store',
+      credentials: credentialsForBufferedImageRequest(url.href, message.payload.referrer),
+      method: 'HEAD',
+      signal: controller.signal,
+    });
+    console.info('Image Trail buffered HEAD probe completed in service worker.', { url: url.href, status: response.status });
+    if (!response.ok) {
+      console.error('Image Trail buffered HEAD probe returned a non-OK status in service worker.', {
+        url: url.href,
+        status: response.status,
+      });
+      return { ok: false, status: response.status, reason: 'http-error', message: `Image probe returned ${response.status}.` };
+    }
+    return { ok: true, status: response.status, finalUrl: response.url };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      console.error('Image Trail buffered HEAD probe timed out in service worker.', { url: message.payload.url });
+      return { ok: false, reason: 'timeout', message: 'Image probe timed out.' };
+    }
+    console.error('Image Trail buffered HEAD probe failed in service worker.', { url: message.payload.url, error });
+    return { ok: false, reason: 'network-error', message: 'Image probe failed.' };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function handleFetchBufferedImageSource(
+  message: FetchBufferedImageSourceMessage,
+): Promise<import('./messages.js').FetchBufferedImageSourceResultMessage['payload']> {
+  const fetchResult = await fetchImageBytes(message.payload.url, MAX_BUFFERED_IMAGE_BYTES, {
+    referrer: message.payload.referrer,
+  });
+  if (!fetchResult.ok) {
+    return { ok: false, reason: fetchResult.reason, message: fetchResult.message };
+  }
+  return {
+    ok: true,
+    bytes: fetchResult.bytes,
+    mimeType: fetchResult.mimeType,
+    byteLength: fetchResult.byteLength,
+    sha256: await computeSha256(fetchResult.bytes),
+  };
+}
+
+function credentialsForBufferedImageRequest(url: string, referrer: string | undefined): RequestCredentials {
+  if (!referrer) return 'omit';
+  try {
+    return new URL(url).origin === new URL(referrer).origin ? 'include' : 'omit';
+  } catch {
+    return 'omit';
+  }
 }
 
 async function handleFetchLinkedPage(
@@ -1363,6 +1437,22 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
         .catch(() =>
           sendResponse(
             createFetchThumbnailSourceResultMessage({ ok: false, reason: 'unknown', message: 'Thumbnail source fetch failed.' }),
+          ),
+        );
+      return true;
+
+    case MessageType.ProbeImageSource:
+      handleProbeImageSource(message)
+        .then((result) => sendResponse(createProbeImageSourceResultMessage(result)))
+        .catch(() => sendResponse(createProbeImageSourceResultMessage({ ok: false, reason: 'unknown', message: 'Image probe failed.' })));
+      return true;
+
+    case MessageType.FetchBufferedImageSource:
+      handleFetchBufferedImageSource(message)
+        .then((result) => sendResponse(createFetchBufferedImageSourceResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createFetchBufferedImageSourceResultMessage({ ok: false, reason: 'unknown', message: 'Buffered image fetch failed.' }),
           ),
         );
       return true;

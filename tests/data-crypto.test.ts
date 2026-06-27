@@ -107,7 +107,7 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().urlReviewStatusLimit, 5000);
   assert.equal(repository.load().clearUrlReviewStatusAfterExport, false);
   assert.equal(repository.load().neighborPreloadEnabled, false);
-  assert.equal(repository.load().neighborPreloadRadius, 1);
+  assert.equal(repository.load().neighborPreloadRadius, 3);
   assert.equal(repository.load().neighborPreloadCacheLimit, 24);
   repository.save({ ...DEFAULT_LOCAL_SETTINGS, pinSaveStoragePreference: 'plaintext' });
   assert.equal(repository.load().pinSaveStoragePreference, 'plaintext');
