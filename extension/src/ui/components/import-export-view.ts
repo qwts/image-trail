@@ -62,7 +62,7 @@ export interface ImportExportViewState {
 
 let imageUtilitiesOpen = false;
 let importExportOpen = false;
-let cloudBackupOpen = true;
+let cloudBackupOpen = false;
 export function createImageTransferView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
   const { section, body } = createCollapsibleImportExportSection(
     'image-trail-panel__image-transfer',
