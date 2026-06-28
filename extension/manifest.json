@@ -21,7 +21,7 @@
   "host_permissions": ["http://*/*", "https://*/*"],
   "web_accessible_resources": [
     {
-      "resources": ["src/ui/styles/panel.css"],
+      "resources": ["src/ui/styles/panel.css", "build-info.json"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ]

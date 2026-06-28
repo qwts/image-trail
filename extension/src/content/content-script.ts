@@ -1,4 +1,5 @@
 import { createStatusMessage, createUnknownMessageResponse, isExtensionRequest, MessageType } from '../background/messages.js';
+import { isBuildIdentity, type BuildIdentity } from '../core/build-info.js';
 import { PageAdapter } from './page-adapter.js';
 import { ExtensionBookmarkStore } from './extension-bookmark-store.js';
 import { CaptureController } from './capture-controller.js';
@@ -26,6 +27,17 @@ function hasRuntimeMessaging(): boolean {
   return typeof chrome !== 'undefined' && !!chrome.runtime?.onMessage && typeof chrome.runtime.getURL === 'function';
 }
 
+async function loadBuildIdentity(): Promise<BuildIdentity | null> {
+  try {
+    const response = await fetch(chrome.runtime.getURL('build-info.json'), { cache: 'no-store' });
+    if (!response.ok) return null;
+    const payload: unknown = await response.json();
+    return isBuildIdentity(payload) ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
 function createController(): ImageTrailContentController {
   const pageAdapter = new PageAdapter();
   const panel = new ImageTrailPanel(
@@ -40,6 +52,9 @@ function createController(): ImageTrailContentController {
     new ExtensionParsedFieldStateStore(),
     new ExtensionUrlReviewStatusStore(),
   );
+  void loadBuildIdentity().then((identity) => {
+    if (identity) panel.setBuildIdentity(identity);
+  });
 
   const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
     if (!isExtensionRequest(message)) {
