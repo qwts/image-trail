@@ -207,6 +207,20 @@ test('validates build identity result payloads before exposing them to the panel
     }),
     false,
   );
+  assert.equal(
+    isLoadBuildIdentityResultMessage({
+      ...valid,
+      payload: { ok: 1, identity: valid.payload.identity },
+    }),
+    false,
+  );
+  assert.equal(
+    isLoadBuildIdentityResultMessage({
+      ...failure,
+      payload: { ok: 0, identity: null, message: 'Build identity could not be loaded.' },
+    }),
+    false,
+  );
 });
 
 test('creates capture image request messages with correct structure', () => {

@@ -2056,6 +2056,8 @@ export function isStatusMessage(value: unknown): value is StatusMessage {
 
 export function isLoadBuildIdentityResultMessage(value: unknown): value is LoadBuildIdentityResultMessage {
   if (!isExtensionResponse(value) || value.type !== MessageType.LoadBuildIdentityResult) return false;
-  if (value.payload.ok) return isBuildIdentity(value.payload.identity);
-  return value.payload.identity === null && typeof value.payload.message === 'string';
+  const payload = value.payload as { ok?: unknown; identity?: unknown; message?: unknown };
+  if (payload.ok === true) return isBuildIdentity(payload.identity);
+  if (payload.ok === false) return payload.identity === null && typeof payload.message === 'string';
+  return false;
 }
