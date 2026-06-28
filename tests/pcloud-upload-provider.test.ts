@@ -355,8 +355,17 @@ test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 wi
     calls.push({ url, init, body: init?.body });
     if (url.endsWith('/getfilelink')) {
       const params = init?.body as URLSearchParams;
+      const headers = init?.headers as Record<string, string> | undefined;
       assert.equal(params.get('fileid'), '402');
-      assert.equal((init?.headers as Record<string, string> | undefined)?.Referer, 'https://my.pcloud.com/');
+      assert.equal(headers?.accept, '*/*');
+      assert.equal(headers?.['content-type'], 'application/x-www-form-urlencoded;charset=UTF-8');
+      assert.equal(headers?.['sec-fetch-site'], 'none');
+      assert.equal(headers?.['sec-fetch-storage-access'], 'active');
+      assert.equal(headers?.['sec-gpc'], '1');
+      assert.equal(headers?.origin, 'https://my.pcloud.com/');
+      assert.equal(headers?.referer, 'https://my.pcloud.com/');
+      assert.equal(init?.mode, 'cors');
+      assert.equal(init?.credentials, 'include');
       assert.equal(JSON.stringify(dnrCalls).includes('getfilelink'), true);
       return jsonResponse({ result: 0, hosts: ['c123.pcloud.com'], path: '/restore-backup' });
     }
@@ -406,8 +415,17 @@ test('downloadPCloudBackup retries alternate pCloud hosts after direct-link refe
     calls.push({ url, init, body: init?.body });
     if (url.endsWith('/getfilelink')) {
       const params = init?.body as URLSearchParams;
+      const headers = init?.headers as Record<string, string> | undefined;
       assert.equal(params.get('fileid'), '402');
-      assert.equal((init?.headers as Record<string, string> | undefined)?.Referer, 'https://my.pcloud.com/');
+      assert.equal(headers?.accept, '*/*');
+      assert.equal(headers?.['content-type'], 'application/x-www-form-urlencoded;charset=UTF-8');
+      assert.equal(headers?.['sec-fetch-site'], 'none');
+      assert.equal(headers?.['sec-fetch-storage-access'], 'active');
+      assert.equal(headers?.['sec-gpc'], '1');
+      assert.equal(headers?.origin, 'https://my.pcloud.com/');
+      assert.equal(headers?.referer, 'https://my.pcloud.com/');
+      assert.equal(init?.mode, 'cors');
+      assert.equal(init?.credentials, 'include');
       assert.equal(JSON.stringify(dnrCalls).includes('getfilelink'), true);
       return jsonResponse({ result: 0, hosts: ['blocked.pcloud.com', 'c123.pcloud.com'], path: '/restore-backup' });
     }

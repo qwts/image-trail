@@ -140,11 +140,30 @@ function launchWebAuthFlow(url: string): Promise<string> {
 }
 
 async function requestPCloudJson(apiHost: PCloudApiHost, method: string, body: BodyInit): Promise<Record<string, unknown>> {
+  const isUrlEncodedBody = body instanceof URLSearchParams;
   const response = await fetch(`https://${apiHost}/${method}`, {
     method: 'POST',
-    headers: {
-      Referer: PCLOUD_DOWNLOAD_REFERRER,
-    },
+    mode: isUrlEncodedBody ? 'cors' : undefined,
+    credentials: isUrlEncodedBody ? 'include' : undefined,
+    headers: isUrlEncodedBody
+      ? {
+          accept: '*/*',
+          'accept-language': 'en-US,en;q=0.9',
+          'cache-control': 'no-cache',
+          'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          pragma: 'no-cache',
+          'sec-fetch-dest': 'empty',
+          'sec-fetch-mode': 'cors',
+          'sec-fetch-site': 'none',
+          'sec-fetch-storage-access': 'active',
+          'sec-gpc': '1',
+          origin: PCLOUD_DOWNLOAD_REFERRER,
+          referer: PCLOUD_DOWNLOAD_REFERRER,
+        }
+      : {
+          origin: PCLOUD_DOWNLOAD_REFERRER,
+          referer: PCLOUD_DOWNLOAD_REFERRER,
+        },
     body,
   });
   const data = (await response.json()) as Record<string, unknown>;
