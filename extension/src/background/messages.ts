@@ -1,4 +1,4 @@
-import type { BuildIdentity } from '../core/build-info.js';
+import { isBuildIdentity, type BuildIdentity } from '../core/build-info.js';
 
 export const MESSAGE_PROTOCOL_VERSION = 1;
 
@@ -2056,6 +2056,6 @@ export function isStatusMessage(value: unknown): value is StatusMessage {
 
 export function isLoadBuildIdentityResultMessage(value: unknown): value is LoadBuildIdentityResultMessage {
   if (!isExtensionResponse(value) || value.type !== MessageType.LoadBuildIdentityResult) return false;
-  if (value.payload.ok) return value.payload.identity !== null;
+  if (value.payload.ok) return isBuildIdentity(value.payload.identity);
   return value.payload.identity === null && typeof value.payload.message === 'string';
 }

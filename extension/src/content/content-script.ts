@@ -36,8 +36,12 @@ function hasRuntimeMessaging(): boolean {
 }
 
 async function loadBuildIdentity(): Promise<BuildIdentity | null> {
-  const response = await sendRuntimeMessage(createLoadBuildIdentityMessage());
-  return isLoadBuildIdentityResultMessage(response) && response.payload.ok ? response.payload.identity : null;
+  try {
+    const response = await sendRuntimeMessage(createLoadBuildIdentityMessage());
+    return isLoadBuildIdentityResultMessage(response) && response.payload.ok ? response.payload.identity : null;
+  } catch {
+    return null;
+  }
 }
 
 function createController(): ImageTrailContentController {
