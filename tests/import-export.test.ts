@@ -21,6 +21,11 @@ import { exportEncryptedHistory, exportPlainHistory } from '../extension/src/dat
 import { importEncryptedHistory } from '../extension/src/data/import-export/history-import.js';
 import { exportEncryptedBookmarks, exportPlainBookmarks } from '../extension/src/data/import-export/bookmarks-export.js';
 import { importBookmarks } from '../extension/src/data/import-export/bookmarks-import.js';
+import {
+  exportEncryptedFullBackup,
+  storedBlobRecordFromPortable,
+  portableStoredBlobRecord,
+} from '../extension/src/data/import-export/full-backup.js';
 import { recallEncryptedRecord, recallSelectedRecords } from '../extension/src/data/import-export/recall.js';
 import { exportKeyWithPassword } from '../extension/src/data/import-export/key-export.js';
 import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../extension/src/data/import-export/key-backup.js';
@@ -34,7 +39,7 @@ import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../extension/src/data/crypto/binary-envelope.js';
 import { sealJsonEnvelope } from '../extension/src/data/crypto/envelope.js';
-import type { DurableHistoryPayloadV1 } from '../extension/src/data/types.js';
+import type { DurableHistoryPayloadV1, StoredBlobRecord } from '../extension/src/data/types.js';
 import type { StoredKeyRecord } from '../extension/src/data/crypto/types.js';
 
 function requireBlobKeyRecord(record: StoredKeyRecord | undefined): StoredKeyRecord<'blob'> {
@@ -515,6 +520,61 @@ test('key-backup: imported blob key decrypts payloads created before export', as
 
   assert.equal(opened.metadata.sourceUrl, 'https://example.test/original.png');
   assert.deepEqual(Array.from(new Uint8Array(opened.bytes)), [5, 10, 15, 20]);
+});
+
+test('full-backup: exports bookmarks with encrypted original blob records', async () => {
+  const keyReference = createKeyReference('blob', 'full-backup-key');
+  const blobRecord: StoredBlobRecord = {
+    id: 'blob-full-backup',
+    kind: 'original',
+    schemaVersion: 1,
+    algorithm: 'AES-GCM',
+    iv: 'iv-value',
+    ciphertext: Uint8Array.from([1, 2, 3, 4]).buffer,
+    encryptedByteLength: 4,
+    createdAt: '2026-06-28T00:00:00.000Z',
+    key: keyReference,
+    referenceCount: 1,
+  };
+  const exported = await exportEncryptedFullBackup({
+    bookmarks: [
+      {
+        uuid: 'bookmark-full-backup',
+        payload: {
+          url: 'https://example.test/full.jpg',
+          bookmarkedAt: '2026-06-28T00:00:00.000Z',
+          storedOriginal: {
+            blobId: 'blob-full-backup',
+            mimeType: 'image/jpeg',
+            byteLength: 123,
+            capturedAt: '2026-06-28T00:00:00.000Z',
+          },
+        },
+      },
+    ],
+    originalBlobs: [blobRecord],
+    blobKeyBackups: [{ keyReference: 'blob:full-backup-key', fileContent: '{"header":{"payloadType":"keys"}}' }],
+    password: 'backup-password',
+    now: '2026-06-28T00:00:00.000Z',
+  });
+
+  assert.ok(exported.status.ok, exported.status.message);
+  assert.equal(exported.originalBlobCount, 1);
+  const envelope = parseExportFile(exported.fileContent!);
+  assert.equal(envelope.header.payloadType, 'mixed');
+  assert.equal(envelope.header.recordCount, 1);
+
+  const importedBookmarks = await importBookmarks(exported.fileContent!, 'backup-password');
+  assert.ok(importedBookmarks.status.ok, importedBookmarks.status.message);
+  assert.equal(importedBookmarks.entries.length, 1);
+  assert.equal(importedBookmarks.externalOriginalCount, 1);
+  assert.equal(importedBookmarks.entries[0]?.payload.storedOriginal, undefined);
+
+  const portable = portableStoredBlobRecord(blobRecord);
+  const restored = storedBlobRecordFromPortable(portable);
+  assert.equal(restored.id, blobRecord.id);
+  assert.equal(restored.key.reference, 'blob:full-backup-key');
+  assert.deepEqual(Array.from(new Uint8Array(restored.ciphertext)), [1, 2, 3, 4]);
 });
 
 test('encrypted-image: exports and imports bytes with the blob key', async () => {

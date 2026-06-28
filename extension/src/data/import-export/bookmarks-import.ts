@@ -2,6 +2,7 @@ import { decryptAesGcm } from '../crypto/webcrypto.js';
 import { deriveEncryptionKey } from '../crypto/password-wrap.js';
 import type { DurableBookmarkPayloadV1, RecoverableDataStatus } from '../types.js';
 import { fromBase64, parseExportFile } from './encrypted-file-format.js';
+import { bookmarksFromFullBackupPayload } from './full-backup.js';
 import { parsePlainRecordsExport } from './plain-records-format.js';
 
 export interface BookmarksImportEntry {
@@ -46,7 +47,8 @@ export async function importBookmarks(fileContent: string, password: string): Pr
     const ciphertext = fromBase64(envelope.payload);
     const encryptionKey = await deriveEncryptionKey(password, { salt, iterations: envelope.header.iterations });
     const plaintext = await decryptAesGcm(encryptionKey, ciphertext, iv);
-    return { ...parseBookmarkEntries(JSON.parse(new TextDecoder().decode(plaintext))), plaintext: false };
+    const parsed = JSON.parse(new TextDecoder().decode(plaintext)) as unknown;
+    return { ...parseBookmarkEntries(bookmarksFromFullBackupPayload(parsed) ?? parsed), plaintext: false };
   } catch {
     return fail('Decryption failed. Wrong password or corrupted file.');
   }
