@@ -71,6 +71,7 @@ import {
   createBlobKeyStatusResultMessage,
   createExportBlobKeyBackupResultMessage,
   createFetchBufferedImageSourceResultMessage,
+  createExportOriginalBlobsResultMessage,
   createImportBlobKeyBackupResultMessage,
   createPingMessage,
   createPCloudProviderStatusResultMessage,
@@ -87,6 +88,7 @@ import type {
   DeleteBlobMessage,
   DownloadImageMessage,
   ExportEncryptedImageMessage,
+  ExportOriginalBlobsMessage,
   RetrieveBlobMessage,
   GrantPermissionAndCaptureMessage,
 } from './messages.js';
@@ -363,6 +365,25 @@ async function handleCleanupOrphanedBlobs(): Promise<import('./messages.js').Cle
   const deletedCount = await blobs.deleteMany(orphanedBlobIds);
 
   return { deletedCount, usage: await handleStorageUsage() };
+}
+
+async function handleExportOriginalBlobs(
+  message: ExportOriginalBlobsMessage,
+): Promise<import('./messages.js').ExportOriginalBlobsResultMessage['payload']> {
+  const db = await getDb();
+  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
+  const blobs = new BlobsRepository(db);
+  const records: StoredBlobRecord[] = [];
+  const missingBlobIds: string[] = [];
+  for (const blobId of [...new Set(message.payload.blobIds)]) {
+    const record = await blobs.get(blobId);
+    if (record?.kind === 'original') {
+      records.push(record);
+    } else {
+      missingBlobIds.push(blobId);
+    }
+  }
+  return { ok: true, records, missingBlobIds };
 }
 
 async function handleBlobKeyStatus(): Promise<import('./messages.js').BlobKeyStatusResultMessage['payload']> {
@@ -1520,6 +1541,16 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       handleRetrieveBlob(message)
         .then((result) => sendResponse(createRetrieveBlobResultMessage(result)))
         .catch(() => sendResponse(createRetrieveBlobResultMessage({ ok: false, reason: 'unknown', message: 'Blob retrieval failed.' })));
+      return true;
+
+    case MessageType.ExportOriginalBlobs:
+      handleExportOriginalBlobs(message)
+        .then((result) => sendResponse(createExportOriginalBlobsResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createExportOriginalBlobsResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted originals export failed.' }),
+          ),
+        );
       return true;
 
     case MessageType.CreateBlobPreview:

@@ -21,6 +21,8 @@ export const MessageType = {
   CleanupOrphanedBlobsResult: 'imageTrail.cleanupOrphanedBlobsResult',
   RetrieveBlob: 'imageTrail.retrieveBlob',
   RetrieveBlobResult: 'imageTrail.retrieveBlobResult',
+  ExportOriginalBlobs: 'imageTrail.exportOriginalBlobs',
+  ExportOriginalBlobsResult: 'imageTrail.exportOriginalBlobsResult',
   CreateBlobPreview: 'imageTrail.createBlobPreview',
   CreateDataUrlPreview: 'imageTrail.createDataUrlPreview',
   CreateBlobPreviewResult: 'imageTrail.createBlobPreviewResult',
@@ -268,6 +270,24 @@ export interface RetrieveBlobResultMessage {
         readonly mimeType: string;
         readonly byteLength: number;
         readonly capturedAt: string;
+      }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
+export interface ExportOriginalBlobsMessage {
+  readonly type: typeof MessageType.ExportOriginalBlobs;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly blobIds: readonly string[] };
+}
+
+export interface ExportOriginalBlobsResultMessage {
+  readonly type: typeof MessageType.ExportOriginalBlobsResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | {
+        readonly ok: true;
+        readonly records: readonly import('../data/types.js').StoredBlobRecord[];
+        readonly missingBlobIds: readonly string[];
       }
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }
@@ -920,6 +940,7 @@ export type ExtensionRequest =
   | DeleteBlobMessage
   | CleanupOrphanedBlobsMessage
   | RetrieveBlobMessage
+  | ExportOriginalBlobsMessage
   | CreateBlobPreviewMessage
   | CreateDataUrlPreviewMessage
   | FetchThumbnailSourceMessage
@@ -979,6 +1000,7 @@ export type ExtensionResponse =
   | DeleteBlobResultMessage
   | CleanupOrphanedBlobsResultMessage
   | RetrieveBlobResultMessage
+  | ExportOriginalBlobsResultMessage
   | CreateBlobPreviewResultMessage
   | FetchThumbnailSourceResultMessage
   | ProbeImageSourceResultMessage
@@ -1097,6 +1119,16 @@ export function createCleanupOrphanedBlobsMessage(): CleanupOrphanedBlobsMessage
 
 export function createRetrieveBlobMessage(blobId: string): RetrieveBlobMessage {
   return { type: MessageType.RetrieveBlob, version: MESSAGE_PROTOCOL_VERSION, payload: { blobId } };
+}
+
+export function createExportOriginalBlobsMessage(blobIds: readonly string[]): ExportOriginalBlobsMessage {
+  return { type: MessageType.ExportOriginalBlobs, version: MESSAGE_PROTOCOL_VERSION, payload: { blobIds } };
+}
+
+export function createExportOriginalBlobsResultMessage(
+  payload: ExportOriginalBlobsResultMessage['payload'],
+): ExportOriginalBlobsResultMessage {
+  return { type: MessageType.ExportOriginalBlobsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createCreateBlobPreviewMessage(blobId: string): CreateBlobPreviewMessage {
@@ -1581,6 +1613,7 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.DeleteBlob ||
     value.type === MessageType.CleanupOrphanedBlobs ||
     value.type === MessageType.RetrieveBlob ||
+    value.type === MessageType.ExportOriginalBlobs ||
     value.type === MessageType.CreateBlobPreview ||
     value.type === MessageType.CreateDataUrlPreview ||
     value.type === MessageType.FetchThumbnailSource ||
@@ -1645,6 +1678,7 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.DeleteBlobResult ||
     value.type === MessageType.CleanupOrphanedBlobsResult ||
     value.type === MessageType.RetrieveBlobResult ||
+    value.type === MessageType.ExportOriginalBlobsResult ||
     value.type === MessageType.CreateBlobPreviewResult ||
     value.type === MessageType.FetchThumbnailSourceResult ||
     value.type === MessageType.ProbeImageSourceResult ||
@@ -1715,6 +1749,11 @@ export function isBlobKeyStatusResultMessage(value: unknown): value is BlobKeySt
 export function isRetrieveBlobResultMessage(value: unknown): value is RetrieveBlobResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.RetrieveBlobResult;
+}
+
+export function isExportOriginalBlobsResultMessage(value: unknown): value is ExportOriginalBlobsResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ExportOriginalBlobsResult;
 }
 
 export function isCleanupOrphanedBlobsResultMessage(value: unknown): value is CleanupOrphanedBlobsResultMessage {

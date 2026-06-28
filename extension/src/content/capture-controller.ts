@@ -5,6 +5,7 @@ import {
   createCreateDataUrlPreviewMessage,
   createCreateBlobPreviewMessage,
   createDeleteBlobMessage,
+  createExportOriginalBlobsMessage,
   createRetrieveBlobMessage,
   createBlobKeyStatusMessage,
   createClearBlobKeyMessage,
@@ -20,6 +21,7 @@ import {
   isCleanupOrphanedBlobsResultMessage,
   isCreateBlobPreviewResultMessage,
   isExportBlobKeyBackupResultMessage,
+  isExportOriginalBlobsResultMessage,
   isImportBlobKeyBackupResultMessage,
   isRetrieveBlobResultMessage,
 } from '../background/messages.js';
@@ -39,6 +41,9 @@ export interface CaptureStore {
   readonly requestDeleteBlob: (blobId: string) => Promise<{ deleted: boolean; usage: StorageUsageSummary }>;
   readonly requestCleanupOrphanedBlobs: () => Promise<{ deletedCount: number; usage: StorageUsageSummary }>;
   readonly requestRetrieveBlob: (blobId: string) => Promise<RetrieveBlobResultMessage['payload']>;
+  readonly requestOriginalBlobRecords: (
+    blobIds: readonly string[],
+  ) => Promise<import('../background/messages.js').ExportOriginalBlobsResultMessage['payload']>;
   readonly requestBlobPreview: (blobId: string) => Promise<CreateBlobPreviewResultMessage['payload']>;
   readonly requestDataUrlPreview: (dataUrl: string) => Promise<CreateBlobPreviewResultMessage['payload']>;
   readonly requestStorageUsage: () => Promise<StorageUsageSummary>;
@@ -85,6 +90,14 @@ export class CaptureController implements CaptureStore {
   async requestRetrieveBlob(blobId: string): Promise<RetrieveBlobResultMessage['payload']> {
     const response = await sendRuntimeMessage(createRetrieveBlobMessage(blobId));
     if (isRetrieveBlobResultMessage(response)) return response.payload;
+    return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
+  }
+
+  async requestOriginalBlobRecords(
+    blobIds: readonly string[],
+  ): Promise<import('../background/messages.js').ExportOriginalBlobsResultMessage['payload']> {
+    const response = await sendRuntimeMessage(createExportOriginalBlobsMessage(blobIds));
+    if (isExportOriginalBlobsResultMessage(response)) return response.payload;
     return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
   }
 

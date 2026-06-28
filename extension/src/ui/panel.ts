@@ -103,6 +103,7 @@ import { fetchDecodedBufferedImageSource, probeBufferedImageSource } from '../co
 import {
   DEFAULT_LOCAL_SETTINGS,
   exportEncryptedBookmarks,
+  exportEncryptedFullBackup,
   exportEncryptedHistory,
   exportPlainBookmarks,
   exportPlainHistory,
@@ -3424,8 +3425,43 @@ export class ImageTrailPanel {
       return;
     }
 
+    const originalBlobIds = originalBlobIdsForFullBackup(bookmarks);
+    const originalBlobResult =
+      originalBlobIds.length > 0 && this.captureStore
+        ? await this.captureStore.requestOriginalBlobRecords(originalBlobIds)
+        : { ok: true as const, records: [], missingBlobIds: originalBlobIds };
+    if (!originalBlobResult.ok) {
+      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/upload-error', message: originalBlobResult.message });
+      this.render();
+      return;
+    }
+    if (originalBlobResult.missingBlobIds.length > 0) {
+      this.state = reducePanelAction(this.state, {
+        name: 'pcloud-backup/upload-error',
+        message: `Full backup could not find ${originalBlobResult.missingBlobIds.length} encrypted original(s).`,
+      });
+      this.render();
+      return;
+    }
+
+    const blobKeyBackup =
+      originalBlobResult.records.length > 0 && this.captureStore
+        ? await this.captureStore.exportBlobKeyBackup(password, this.state.blobKeyReference ?? undefined)
+        : null;
+    if (blobKeyBackup && !blobKeyBackup.ok) {
+      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/upload-error', message: blobKeyBackup.message });
+      this.render();
+      return;
+    }
+
     const now = new Date().toISOString();
-    const exportResult = await exportEncryptedBookmarks({ entries: bookmarks.map(bookmarkRecordToExportEntry), password, now });
+    const exportResult = await exportEncryptedFullBackup({
+      bookmarks: bookmarks.map(bookmarkRecordToExportEntry),
+      originalBlobs: originalBlobResult.records,
+      blobKeyBackups: blobKeyBackup?.ok ? [{ keyReference: blobKeyBackup.keyReference, fileContent: blobKeyBackup.fileContent }] : [],
+      password,
+      now,
+    });
     if (!exportResult.status.ok || !exportResult.fileContent) {
       this.state = reducePanelAction(this.state, { name: 'pcloud-backup/upload-error', message: exportResult.status.message });
       this.render();
@@ -4680,6 +4716,15 @@ function selectedRecords(records: readonly ImageDisplayRecord[], selectedIds: re
   if (selectedIds.length === 0) return records;
   const selected = new Set(selectedIds);
   return records.filter((record) => selected.has(record.id));
+}
+
+function originalBlobIdsForFullBackup(records: readonly ImageDisplayRecord[]): readonly string[] {
+  const blobIds = new Set<string>();
+  for (const record of records) {
+    if (record.storedOriginal?.blobId) blobIds.add(record.storedOriginal.blobId);
+    if (record.protectedPin?.storedOriginalBlobId) blobIds.add(record.protectedPin.storedOriginalBlobId);
+  }
+  return [...blobIds];
 }
 
 export function isLockedPrivatePin(record: ImageDisplayRecord): boolean {

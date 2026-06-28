@@ -16,6 +16,8 @@ import {
   createExportEncryptedImageResultMessage,
   createExportBlobKeyBackupMessage,
   createExportBlobKeyBackupResultMessage,
+  createExportOriginalBlobsMessage,
+  createExportOriginalBlobsResultMessage,
   createFetchLinkedPageMessage,
   createFetchLinkedPageResultMessage,
   createFetchThumbnailSourceMessage,
@@ -107,6 +109,7 @@ import {
   isExtensionRequest,
   isExtensionResponse,
   isExportBlobKeyBackupResultMessage,
+  isExportOriginalBlobsResultMessage,
   isFetchLinkedPageResultMessage,
   isFetchThumbnailSourceResultMessage,
   isImportBlobKeyBackupResultMessage,
@@ -553,6 +556,22 @@ test('creates blob key backup import and export messages', () => {
   assert.equal(importResult.type, MessageType.ImportBlobKeyBackupResult);
   assert.equal(isExtensionResponse(importResult), true);
   assert.equal(isImportBlobKeyBackupResultMessage(importResult), true);
+});
+
+test('creates encrypted original blob export messages', () => {
+  const request = createExportOriginalBlobsMessage(['blob-1', 'blob-2']);
+  assert.equal(request.type, MessageType.ExportOriginalBlobs);
+  assert.deepEqual(request.payload.blobIds, ['blob-1', 'blob-2']);
+  assert.equal(isExtensionRequest(request), true);
+
+  const result = createExportOriginalBlobsResultMessage({
+    ok: true,
+    records: [],
+    missingBlobIds: ['blob-2'],
+  });
+  assert.equal(result.type, MessageType.ExportOriginalBlobsResult);
+  assert.equal(isExtensionResponse(result), true);
+  assert.equal(isExportOriginalBlobsResultMessage(result), true);
 });
 
 test('creates image download messages with save-as intent', () => {
