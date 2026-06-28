@@ -16,7 +16,7 @@ export function setUrlFieldValue(model: ParsedUrlModel, field: UrlField, nextVal
   return setUrlFieldToken(model, field, (token) => setTokenValue(token, normalized));
 }
 
-function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token: UrlToken) => UrlToken): ParsedUrlModel {
+export function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token: UrlToken) => UrlToken): ParsedUrlModel {
   if (field.location === 'path' && field.partIndex !== undefined) {
     return {
       ...model,
@@ -49,7 +49,7 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
   return model;
 }
 
-function bumpToken(token: UrlToken, delta: number): UrlToken {
+export function bumpToken(token: UrlToken, delta: number): UrlToken {
   if (token.kind === 'text') return token;
   const radix = token.kind === 'hex' ? 16 : 10;
   const current = BigInt(radix === 16 ? `0x${token.value}` : token.value);
@@ -99,7 +99,7 @@ function nextTokenWidth(previousWidth: number | undefined, digits: string): numb
   return digits.length > 1 && digits.startsWith('0') ? digits.length : undefined;
 }
 
-function padTokenValue(value: string, width: number | undefined): string {
+export function padTokenValue(value: string, width: number | undefined): string {
   return width === undefined ? value : value.padStart(width, '0');
 }
 
