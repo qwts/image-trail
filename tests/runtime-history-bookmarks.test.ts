@@ -492,6 +492,79 @@ test('bookmark/remove unlinks pinned recent rows and clears stale original state
   assert.equal(updated.history[0].storedOriginal, undefined);
 });
 
+test('bookmark/clear hides the visible queue row without unlinking durable paired state', () => {
+  const storedOriginal = {
+    blobId: 'blob-clear-linked',
+    mimeType: 'image/png',
+    byteLength: 1024,
+    capturedAt: '2026-06-28T01:00:02.000Z',
+  };
+  const state: PanelState = {
+    ...createInitialPanelState(0),
+    history: [
+      {
+        id: 'recent-clear-linked',
+        url: 'https://example.test/clear-linked.jpg',
+        timestamp: '2026-06-28T01:00:00.000Z',
+        source: 'history',
+        pinnedAt: '2026-06-28T01:00:01.000Z',
+        pinnedRecordId: 'bookmark-clear-linked',
+        captureStatus: 'captured',
+        blobId: storedOriginal.blobId,
+        capturedAt: storedOriginal.capturedAt,
+        storedOriginal,
+      },
+    ],
+    bookmarks: [
+      {
+        id: 'bookmark-clear-linked',
+        url: 'https://example.test/clear-linked.jpg',
+        title: 'Clear linked',
+        timestamp: '2026-06-28T01:00:01.000Z',
+        source: 'bookmark',
+        captureStatus: 'captured',
+        blobId: storedOriginal.blobId,
+        capturedAt: storedOriginal.capturedAt,
+        storedOriginal,
+      },
+    ],
+    selectedBookmarkIds: ['bookmark-clear-linked'],
+    recall: {
+      ...createInitialPanelState(0).recall,
+      open: true,
+      candidates: [
+        {
+          id: 'bookmark-clear-linked',
+          url: 'https://example.test/clear-linked.jpg',
+          title: 'Clear linked',
+          timestamp: '2026-06-28T01:00:01.000Z',
+          source: 'bookmark',
+          captureStatus: 'captured',
+          blobId: storedOriginal.blobId,
+          capturedAt: storedOriginal.capturedAt,
+          storedOriginal,
+          envelopeCreatedAt: '2026-06-28T00:59:00.000Z',
+        },
+      ],
+      selectedIds: ['bookmark-clear-linked'],
+      total: 1,
+      nextOffset: 1,
+    },
+  };
+
+  const updated = reducePanelAction(state, { name: 'bookmark/clear', id: 'bookmark-clear-linked' });
+
+  assert.deepEqual(updated.bookmarks, []);
+  assert.deepEqual(updated.selectedBookmarkIds, []);
+  assert.equal(updated.history[0].pinnedRecordId, 'bookmark-clear-linked');
+  assert.equal(updated.history[0].captureStatus, 'captured');
+  assert.equal(updated.history[0].blobId, storedOriginal.blobId);
+  assert.deepEqual(updated.history[0].storedOriginal, storedOriginal);
+  assert.equal(updated.recall.candidates[0]?.id, 'bookmark-clear-linked');
+  assert.deepEqual(updated.recall.selectedIds, ['bookmark-clear-linked']);
+  assert.equal(updated.recall.candidates[0]?.storedOriginal?.blobId, storedOriginal.blobId);
+});
+
 test('storage/update sets storage usage summary on panel state', () => {
   let state = createInitialPanelState(0);
   assert.equal(state.storageUsage, null);

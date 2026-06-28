@@ -507,8 +507,6 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return {
         ...state,
         bookmarks: state.bookmarks.filter((item) => item.id !== action.id),
-        history: unlinkHistoryFromBookmark(state.history, action.id),
-        recall: removeRecallCandidate(state.recall, action.id),
         selectedBookmarkIds: removeItem(state.selectedBookmarkIds, action.id),
         lastUpdatedAt: Date.now(),
       };

@@ -3169,7 +3169,7 @@ export class ImageTrailPanel {
       const history = await this.recentHistoryStore.add(updatedHistory, window.location.href);
       this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
     }
-    const updatedBookmark = this.state.bookmarks.find((b) => b.id === recordId);
+    const updatedBookmark = this.state.bookmarks.find((bookmark) => bookmark.id === recordId || recordHasBlobId(bookmark, blobId));
     let queueChanged = false;
     if (updatedBookmark && this.bookmarkStore) {
       await this.bookmarkStore.save(updatedBookmark);
@@ -5011,6 +5011,10 @@ function delay(ms: number): Promise<void> {
 
 function imageLoadFailureMessage(message: string): string {
   return message.startsWith('Image failed to load: ') ? message : `Image failed to load: ${message}`;
+}
+
+function recordHasBlobId(record: Pick<ImageDisplayRecord, 'blobId' | 'storedOriginal' | 'protectedPin'>, blobId: string): boolean {
+  return record.blobId === blobId || record.storedOriginal?.blobId === blobId || record.protectedPin?.storedOriginalBlobId === blobId;
 }
 
 function isFocusablePanelControl(
