@@ -72,9 +72,10 @@ contributor guide it links: https://github.com/qwtm/image-trail/wiki/Contributin
 - Wiki-first: long-lived docs, SOP, ADRs, acceptance tests, and agent pitfalls
   belong in the wiki. Other repo markdown (except `AGENTS.md`, `CONTRIBUTING.md`,
   root `README.md`) should be pointer stubs.
-- After code changes and before claiming done, run `npm run lint`,
-  `npm run format:check`, `npm test`, and `npm run build`. Do not report a build
-  you did not run; do not break the build.
+- Before claiming done on any change (code, docs, or config), run `npm run lint`,
+  `npm run format:check`, `npm test`, and `npm run build`. CI runs the same
+  gates; do not skip them locally. Do not report a build you did not run; do
+  not break the build.
 - In change summaries, report Settings **Build identity** from
   `extension/dist/build-info.json` (commit, **Built local** time, worktree when
   present).
