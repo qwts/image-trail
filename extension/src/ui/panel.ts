@@ -216,6 +216,12 @@ function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
   };
 }
 
+export function toProjectedTargetState(snapshot: TargetSelectionSnapshot, session: ProjectionSession): TargetState {
+  const target = toTargetState(snapshot);
+  if (session.sourceUrl.startsWith('data:')) return target;
+  return { ...target, selectedUrl: session.sourceUrl };
+}
+
 export function shouldRestoreParsedFieldState(
   record: ParsedFieldStateRecord,
   currentSelectedUrl: string | null,
@@ -2269,7 +2275,7 @@ export class ImageTrailPanel {
       const nextSnapshot = this.applyProjectionToSelectedImage(session, displayUrl);
       if (!nextSnapshot) return false;
       if (!this.isCurrentProjectionSession(session)) return false;
-      this.state = { ...setTargetState(this.state, toTargetState(nextSnapshot)), draftUrl: null };
+      this.state = { ...setTargetState(this.state, toProjectedTargetState(nextSnapshot, session)), draftUrl: null };
     }
     this.state = this.applyFieldLoadResult(this.state, attemptedFieldIds, sha256, baselineFingerprint);
     if (reviewStatus === 'passed') void this.saveUrlReviewStatus(reviewStatus, nextUrl, attemptedFieldIds);
@@ -2357,7 +2363,7 @@ export class ImageTrailPanel {
       const nextSnapshot = this.applyProjectionToSelectedImage(session, preload.displayUrl);
       if (!nextSnapshot) return false;
       if (!this.isCurrentProjectionSession(session)) return false;
-      this.state = { ...setTargetState(this.state, toTargetState(nextSnapshot)), draftUrl: null };
+      this.state = { ...setTargetState(this.state, toProjectedTargetState(nextSnapshot, session)), draftUrl: null };
     }
     this.state = this.applyFieldLoadResult(this.state, attemptedFieldIds, preload.sha256, baselineFingerprint);
     if (reviewStatus === 'passed') void this.saveUrlReviewStatus(reviewStatus, nextUrl, attemptedFieldIds);
@@ -3359,7 +3365,7 @@ export class ImageTrailPanel {
     const snapshot = this.applyProjectionToSelectedImage(session, preload.displayUrl);
     if (!snapshot) return false;
     if (!this.isCurrentProjectionSession(session)) return false;
-    this.state = setTargetState(this.state, toTargetState(snapshot));
+    this.state = setTargetState(this.state, toProjectedTargetState(snapshot, session));
     this.render();
     void this.loadGrabSettings();
     return true;
