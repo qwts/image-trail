@@ -1,15 +1,21 @@
 # Agent Instructions
 
-This file is the compact repo-local agent orientation layer. Read
-`CONTRIBUTING.md` first, then the canonical GitHub wiki contributor guide it
-links:
+Repo-local agent orientation. Read `CONTRIBUTING.md` first, then the wiki
+contributor guide it links: https://github.com/qwtm/image-trail/wiki/Contributing
 
-- https://github.com/qwtm/image-trail/wiki/Contributing
+## Communication
 
-Documentation is wiki-first. Existing repo markdown docs are pointer stubs
-unless this file explicitly says otherwise. Keep detailed workflow, SOP, and
-project documentation in the wiki. Keep this file under roughly 100 lines and
-use references instead of duplicating long procedures.
+- Be brief: minimum words, bullets over paragraphs, no preamble, recap, or filler.
+- Fix the problem; no sycophancy, apologies, or narrating past mistakes unless
+  required for the fix.
+- On correction: one-sentence restatement of updated requirements, then proceed.
+- Disagree plainly when mistaken; cite code or docs.
+
+## Before Changing Code
+
+Before editing, state in order (one short line each): problem, likely fix, why
+it may not work, confidence (low/medium/high), possible regressions. Then
+implement.
 
 ## Product Model
 
@@ -54,15 +60,16 @@ use references instead of duplicating long procedures.
 
 ## Documentation And Validation
 
-- Long-lived docs, planning, acceptance tests, ADRs, workflow/SOP rules, and project guidance belong in the GitHub wiki.
-- Repo markdown docs other than `AGENTS.md`, `CONTRIBUTING.md`, and root `README.md` should be pointer stubs to wiki pages.
-- When implementation reveals recurring agent pitfalls, update the relevant wiki guidance or leave a linked issue/PR comment; do not leave lessons only in chat.
+- Wiki-first: long-lived docs, SOP, ADRs, acceptance tests, and agent pitfalls
+  belong in the wiki. Other repo markdown (except `AGENTS.md`, `CONTRIBUTING.md`,
+  root `README.md`) should be pointer stubs.
+- After code changes and before claiming done, run `npm run lint`,
+  `npm run format:check`, `npm test`, and `npm run build`. Do not report a build
+  you did not run; do not break the build.
+- In change summaries, report Settings **Build identity** from
+  `extension/dist/build-info.json` (commit, **Built local** time, worktree when
+  present).
 - After the first implementation stretch, provide a manual test run before asking for final signoff or PR approval.
-- Before claiming done, run:
-  - `npm run lint`
-  - `npm run format:check`
-  - `npm test`
-  - `npm run build`
 
 ## Tool Paths
 
