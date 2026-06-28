@@ -38,7 +38,10 @@ function hasRuntimeMessaging(): boolean {
 async function loadBuildIdentity(): Promise<BuildIdentity | null> {
   try {
     const response = await sendRuntimeMessage(createLoadBuildIdentityMessage());
-    return isLoadBuildIdentityResultMessage(response) && response.payload.ok ? response.payload.identity : null;
+    if (!isLoadBuildIdentityResultMessage(response)) return null;
+    if (response.payload.ok) return response.payload.identity;
+    console.warn('Image Trail build identity could not be loaded.', response.payload.message);
+    return null;
   } catch {
     return null;
   }
