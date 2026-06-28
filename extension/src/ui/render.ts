@@ -97,9 +97,8 @@ function createSecondaryControlsGroup(
   const heading = document.createElement('h3');
   heading.textContent = 'Manual controls';
   summary.append(heading);
-  summary.addEventListener('click', (event) => {
-    event.preventDefault();
-    target.dispatch({ name: 'panel/secondary-controls-open', open: !group.open });
+  group.addEventListener('toggle', () => {
+    target.dispatch({ name: 'panel/secondary-controls-open', open: group.open });
   });
 
   const body = document.createElement('div');
