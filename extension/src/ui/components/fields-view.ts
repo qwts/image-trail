@@ -79,7 +79,7 @@ export function fieldReservesTrailControlSlot(field: UrlField): boolean {
   return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
 }
 
-function commitFocusedValueBeforeStep(input: HTMLInputElement, currentValue: string, privacyMode: boolean, commit: () => void): void {
+function commitAndBlurFocusedValue(input: HTMLInputElement, currentValue: string, privacyMode: boolean, commit: () => void): void {
   if (privacyMode || document.activeElement !== input) return;
   if (input.value !== currentValue) commit();
   input.blur();
@@ -182,6 +182,13 @@ export function createFieldsView(
     value.title = options.privacyMode ? 'Privacy mode is hiding this URL field for screen sharing.' : field.value;
     value.setAttribute('aria-label', options.privacyMode ? 'Private URL field' : `Edit ${field.field.label}`);
     value.dataset.fieldId = field.field.id;
+    let suppressedValueChange: string | null = null;
+    const commitValueChange = (): void => {
+      if (value.value === field.value) return;
+      if (suppressedValueChange === value.value) return;
+      suppressedValueChange = value.value;
+      callbacks.onValueChange(field.field.id, value.value);
+    };
     value.addEventListener('focus', () => {
       if (field.field.id !== activeFieldId) callbacks.onActivate(field.field.id);
     });
@@ -238,6 +245,7 @@ export function createFieldsView(
           event.preventDefault();
           if (options.privacyMode) return;
           callbacks.onDigitWidthChange(field.field.id, digitWidthInput.value);
+          digitWidthInput.blur();
         }
       });
 
@@ -252,9 +260,7 @@ export function createFieldsView(
         event.preventDefault();
       });
       decrement.addEventListener('click', () => {
-        commitFocusedValueBeforeStep(value, field.value, options.privacyMode === true, () =>
-          callbacks.onValueChange(field.field.id, value.value),
-        );
+        commitAndBlurFocusedValue(value, field.value, options.privacyMode === true, commitValueChange);
         callbacks.onStep(field.field.id, -1);
       });
 
@@ -269,9 +275,7 @@ export function createFieldsView(
         event.preventDefault();
       });
       increment.addEventListener('click', () => {
-        commitFocusedValueBeforeStep(value, field.value, options.privacyMode === true, () =>
-          callbacks.onValueChange(field.field.id, value.value),
-        );
+        commitAndBlurFocusedValue(value, field.value, options.privacyMode === true, commitValueChange);
         callbacks.onStep(field.field.id, 1);
       });
 
@@ -293,6 +297,7 @@ export function createFieldsView(
         event.preventDefault();
       });
       trail.addEventListener('click', () => {
+        commitAndBlurFocusedValue(value, field.value, options.privacyMode === true, commitValueChange);
         const nextIncluded = !trail.classList.contains('is-included');
         trail.classList.toggle('is-included', nextIncluded);
         trail.textContent = nextIncluded ? 'Exclude' : 'Include';
@@ -328,11 +333,15 @@ export function createFieldsView(
         applySplit.textContent = 'Split';
         applySplit.title = options.privacyMode ? 'Split private field' : `Split ${field.field.label}`;
         applySplit.setAttribute('aria-label', applySplit.title);
-        applySplit.addEventListener('click', () => callbacks.onApplySplit(field.field.id, splitPattern.value));
+        applySplit.addEventListener('click', () => {
+          commitAndBlurFocusedValue(value, field.value, options.privacyMode === true, commitValueChange);
+          callbacks.onApplySplit(field.field.id, splitPattern.value);
+        });
         splitPattern.addEventListener('keydown', (event) => {
           if (event.key === 'Enter') {
             event.preventDefault();
             callbacks.onApplySplit(field.field.id, splitPattern.value);
+            splitPattern.blur();
           }
         });
         splitControls.append(splitPattern, applySplit);
@@ -347,20 +356,28 @@ export function createFieldsView(
           ? 'Collapse private field back into one field'
           : `Collapse ${field.field.label} back into one field`;
         clearSplit.setAttribute('aria-label', clearSplit.title);
-        clearSplit.addEventListener('click', () => callbacks.onClearSplit(field.field.splitBaseId ?? field.field.id));
+        clearSplit.addEventListener('click', () => {
+          commitAndBlurFocusedValue(value, field.value, options.privacyMode === true, commitValueChange);
+          callbacks.onClearSplit(field.field.splitBaseId ?? field.field.id);
+        });
         splitControls.append(clearSplit);
       }
     }
 
     value.addEventListener('change', () => {
       if (options.privacyMode) return;
+      if (suppressedValueChange === value.value) {
+        suppressedValueChange = null;
+        return;
+      }
       callbacks.onValueChange(field.field.id, value.value);
     });
     value.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
         if (options.privacyMode) return;
-        callbacks.onValueChange(field.field.id, value.value);
+        commitValueChange();
+        value.blur();
       }
     });
 
