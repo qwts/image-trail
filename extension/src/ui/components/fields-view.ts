@@ -79,6 +79,12 @@ export function fieldReservesTrailControlSlot(field: UrlField): boolean {
   return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
 }
 
+function commitFocusedValueBeforeStep(input: HTMLInputElement, currentValue: string, privacyMode: boolean, commit: () => void): void {
+  if (privacyMode || document.activeElement !== input) return;
+  if (input.value !== currentValue) commit();
+  input.blur();
+}
+
 export function createFieldsView(
   fields: EditableField[],
   activeFieldId: string | null,
@@ -245,7 +251,12 @@ export function createFieldsView(
         if (event.button !== 0) return;
         event.preventDefault();
       });
-      decrement.addEventListener('click', () => callbacks.onStep(field.field.id, -1));
+      decrement.addEventListener('click', () => {
+        commitFocusedValueBeforeStep(value, field.value, options.privacyMode === true, () =>
+          callbacks.onValueChange(field.field.id, value.value),
+        );
+        callbacks.onStep(field.field.id, -1);
+      });
 
       const increment = document.createElement('button');
       increment.type = 'button';
@@ -257,7 +268,12 @@ export function createFieldsView(
         if (event.button !== 0) return;
         event.preventDefault();
       });
-      increment.addEventListener('click', () => callbacks.onStep(field.field.id, 1));
+      increment.addEventListener('click', () => {
+        commitFocusedValueBeforeStep(value, field.value, options.privacyMode === true, () =>
+          callbacks.onValueChange(field.field.id, value.value),
+        );
+        callbacks.onStep(field.field.id, 1);
+      });
 
       controls.append(digitWidthInput, decrement, increment);
     }
