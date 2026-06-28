@@ -45,12 +45,12 @@ use references instead of duplicating long procedures.
 
 - Base work on latest `codex/dev`; do not use `main` as the base.
 - Check `git status` before changing anything and preserve unrelated user work.
-- For issue work, follow the wiki claim flow before implementation.
+- For issue work, follow the wiki branch-link/claim-comment flow before implementation; do not add agent identity labels unless the user explicitly asks.
 - Link the working branch/PR through the issue's GitHub Development sidebar; text comments alone do not power automatic issue close-out.
 - Open PRs with explicit close/fix references when the PR should complete an issue.
 - Review/issue feedback must get a visible reply before it is resolved or left open: say what commit/code fixed it, why no action was needed, or what linked follow-up owns it.
 - Do not resolve GitHub review threads silently. If no code change is needed, reply with the rationale first.
-- Do not commit, push, open PRs, close issues, resolve threads, or update broad project state unless the user has asked for that step.
+- Commit intentional, scoped slices regularly after validating them; do not push, open PRs, close issues, resolve threads, or update broad project state unless the user has asked for that step.
 
 ## Documentation And Validation
 
