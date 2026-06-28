@@ -173,6 +173,12 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
   const metadata = cloudBackupMetadata(state);
   if (metadata.length > 0) group.append(createCloudBackupMetadata(metadata));
 
+  if (state.restorePreview) {
+    group.append(
+      createRestorePreview(state.restorePreview, { ...emptyImportExportState(), busy: state.connectionState === 'busy' }, dispatch),
+    );
+  }
+
   const passwordControl = createPasswordField({
     label: 'Cloud backup password',
     description: 'Protects encrypted pCloud backup files. This password is not stored.',
@@ -226,11 +232,6 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
 
   group.append(actions);
   if (restoreCandidateControls) group.append(restoreCandidateControls);
-  if (state.restorePreview) {
-    group.append(
-      createRestorePreview(state.restorePreview, { ...emptyImportExportState(), busy: state.connectionState === 'busy' }, dispatch),
-    );
-  }
   body.append(group);
   return section;
 }
