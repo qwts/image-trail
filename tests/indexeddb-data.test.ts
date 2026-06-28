@@ -469,12 +469,25 @@ test('BookmarksRepository reports durable queue storage usage', async (t) => {
   const db = await openFreshImageTrailDb();
   t.after(() => db.close());
   const repository = new BookmarksRepository(db);
+  const session = await createSessionKey('bookmark', 'bookmark-usage-key', '2026-06-20T00:00:00.000Z');
+  const thumbnail = 'data:image/png;base64,dGh1bWJuYWls';
 
-  await repository.putEncrypted(bookmarkRecord('bookmark-usage'));
+  await repository.sealAndPut(
+    'bookmark-usage',
+    {
+      url: 'https://example.test/usage.jpg',
+      thumbnail,
+      bookmarkedAt: '2026-06-20T00:00:00.000Z',
+      sourceCompatibility: 'favorites',
+    },
+    session.key,
+    session.reference,
+  );
 
-  const usage = await repository.getStorageUsage();
+  const usage = await repository.getStorageUsage(session.key);
   assert.equal(usage.blobCount, 1);
   assert.ok(usage.totalBytes > 0);
+  assert.deepEqual(usage.thumbnails, { count: 1, totalBytes: new TextEncoder().encode(thumbnail).byteLength });
 });
 
 test('BookmarksRepository exposes one older page after the bookmark soft max is exceeded', async (t) => {

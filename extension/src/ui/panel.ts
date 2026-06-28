@@ -2717,6 +2717,7 @@ export class ImageTrailPanel {
     this.state = { ...this.state, message: bookmarkSaveMessage(bookmark), lastUpdatedAt: Date.now() };
     await this.loadBookmarkPage(0, { render: false });
     this.renderPanelAndRefreshRecall();
+    void this.refreshStorageUsage({ render: true });
     return true;
   }
 
@@ -2745,6 +2746,7 @@ export class ImageTrailPanel {
     };
     await this.loadBookmarkPage(0, { render: false });
     this.renderPanelAndRefreshRecall();
+    void this.refreshStorageUsage({ render: true });
     return true;
   }
 
@@ -2807,6 +2809,7 @@ export class ImageTrailPanel {
     this.state = { ...this.state, message: bookmarkSaveMessage(bookmark, bookmark.label), lastUpdatedAt: Date.now() };
     await this.loadBookmarkPage(0, { render: false });
     if (options.render !== false) this.renderPanelAndRefreshRecall();
+    void this.refreshStorageUsage({ render: options.render !== false });
     return { ok: true, record: bookmark };
   }
 

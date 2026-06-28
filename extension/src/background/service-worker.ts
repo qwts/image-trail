@@ -15,7 +15,6 @@ import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFi
 import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../data/import-export/key-backup.js';
 import { openImageTrailDb } from '../data/db.js';
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
-import { BookmarksRepository } from '../data/repositories/bookmarks-repository.js';
 import { EncryptedPinsRepository } from '../data/repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from '../data/repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from '../data/repositories/keys-repository.js';
@@ -580,25 +579,29 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
   const db = await getDb();
   if (!db) return { totalBytes: 0, blobCount: 0 };
   const blobs = new BlobsRepository(db);
-  const bookmarks = new BookmarksRepository(db);
   const pins = new EncryptedPinsRepository(db);
   const thumbnails = new EncryptedPinThumbnailsRepository(db);
   const [usage, bookmarkUsage, pinUsage, thumbnailUsage, referenced] = await Promise.all([
     blobs.getStorageUsage(),
-    bookmarks.getStorageUsage(),
+    bookmarkStore.getStorageUsage(),
     pins.getStorageUsage(),
     thumbnails.getStorageUsage(),
     referencedBlobIds(),
   ]);
   const all = await blobs.list();
-  const queueMetadataBytes = bookmarkUsage.totalBytes + pinUsage.totalBytes;
+  const inlineThumbnailUsage = bookmarkUsage.thumbnails ?? { count: 0, totalBytes: 0 };
+  const combinedThumbnailUsage = {
+    count: inlineThumbnailUsage.count + thumbnailUsage.blobCount,
+    totalBytes: inlineThumbnailUsage.totalBytes + thumbnailUsage.totalBytes,
+  };
+  const queueMetadataBytes = Math.max(0, bookmarkUsage.totalBytes - inlineThumbnailUsage.totalBytes) + pinUsage.totalBytes;
   return {
-    totalBytes: usage.totalBytes + queueMetadataBytes + thumbnailUsage.totalBytes,
+    totalBytes: usage.totalBytes + bookmarkUsage.totalBytes + pinUsage.totalBytes + thumbnailUsage.totalBytes,
     blobCount: usage.blobCount + bookmarkUsage.blobCount + thumbnailUsage.blobCount,
     orphanedBlobCount: all.filter((blob) => !referenced.has(blob.id)).length,
     originals: { count: usage.blobCount, totalBytes: usage.totalBytes },
     queueRecords: { count: bookmarkUsage.blobCount, totalBytes: queueMetadataBytes },
-    thumbnails: { count: thumbnailUsage.blobCount, totalBytes: thumbnailUsage.totalBytes },
+    thumbnails: combinedThumbnailUsage,
   };
 }
 

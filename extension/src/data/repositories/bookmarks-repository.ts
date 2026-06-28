@@ -42,11 +42,12 @@ export class BookmarksRepository {
     return result;
   }
 
-  async getStorageUsage(): Promise<StorageUsageSummary> {
+  async getStorageUsage(key?: CryptoKey): Promise<StorageUsageSummary> {
     const transaction = this.db.transaction(DataStore.Bookmarks, 'readonly');
     const request = transaction.objectStore(DataStore.Bookmarks).openCursor();
     let totalBytes = 0;
     let blobCount = 0;
+    const envelopes: Array<EncryptedBookmarkRecord['envelope']> = [];
 
     await new Promise<void>((resolve, reject) => {
       request.onsuccess = () => {
@@ -58,13 +59,29 @@ export class BookmarksRepository {
         const record = cursor.value as EncryptedBookmarkRecord;
         totalBytes += new TextEncoder().encode(JSON.stringify(record.envelope)).byteLength;
         blobCount += 1;
+        if (key) envelopes.push(record.envelope);
         cursor.continue();
       };
       request.onerror = () => reject(request.error);
     });
 
     await transactionDone(transaction);
-    return { totalBytes, blobCount };
+    let thumbnailCount = 0;
+    let thumbnailBytes = 0;
+    if (key) {
+      for (const envelope of envelopes) {
+        try {
+          const payload = await openJsonEnvelope<DurableBookmarkPayloadV1>(envelope, key);
+          if (payload.thumbnail) {
+            thumbnailCount += 1;
+            thumbnailBytes += new TextEncoder().encode(payload.thumbnail).byteLength;
+          }
+        } catch {
+          // Unreadable rows still count as queue metadata, but their inline thumbnail size is unknown.
+        }
+      }
+    }
+    return { totalBytes, blobCount, thumbnails: { count: thumbnailCount, totalBytes: thumbnailBytes } };
   }
 
   async listEncryptedPage(input: { readonly offset: number; readonly limit: number }): Promise<readonly EncryptedBookmarkRecord[]> {

@@ -1,5 +1,6 @@
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { createDisplayRecord } from '../core/display-records.js';
+import type { StorageUsageSummary } from '../core/image/capture-result.js';
 import { computeSha256 } from '../core/image/fingerprints.js';
 import type { BookmarkStore, PinSaveStoragePreference } from '../core/types.js';
 import type { ActiveBlobKey } from './crypto/blob-keyring.js';
@@ -71,6 +72,12 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
 
   async load(): Promise<readonly ImageDisplayRecord[]> {
     return (await this.loadPage({ offset: 0, limit: DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax })).items;
+  }
+
+  async getStorageUsage(): Promise<StorageUsageSummary> {
+    const context = await this.openContext();
+    if (!context) return { totalBytes: 0, blobCount: 0, thumbnails: { count: 0, totalBytes: 0 } };
+    return context.repository.getStorageUsage(context.bookmarkKey.key);
   }
 
   async loadOriginalBlobIds(): Promise<ReadonlySet<string>> {
