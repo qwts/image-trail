@@ -105,7 +105,10 @@ function toCamelCase(name: string): string {
   return name.replace(/-([a-z])/gu, (_, letter: string) => letter.toUpperCase());
 }
 
-function installFakeDom(image: FakeImageElement): () => void {
+function installFakeDom(
+  image: FakeImageElement,
+  options: { readonly bodyChildElementCount?: number; readonly contentType?: string } = {},
+): () => void {
   const originalDocument = globalThis.document;
   const originalHtmlImageElement = globalThis.HTMLImageElement;
   const originalWindow = globalThis.window;
@@ -115,7 +118,8 @@ function installFakeDom(image: FakeImageElement): () => void {
   globalThis.HTMLImageElement = TestHtmlImageElement as unknown as typeof HTMLImageElement;
   globalThis.document = {
     baseURI: 'https://example.test/page',
-    body: { style: createPageStyle() },
+    body: { childElementCount: options.bodyChildElementCount ?? 1, style: createPageStyle() },
+    contentType: options.contentType ?? 'image/jpeg',
     documentElement: { style: createPageStyle() },
     createElement() {
       return { getContext: () => null };
@@ -145,7 +149,7 @@ test('standalone image backdrop is prepared before selection or resize styling',
   const image = new FakeImageElement();
   image.style.background = 'rgb(230, 230, 230)';
   image.style.backgroundColor = 'rgb(230, 230, 230)';
-  const restoreDom = installFakeDom(image);
+  const restoreDom = installFakeDom(image, { contentType: 'image/jpeg' });
   const adapter = new PageAdapter();
 
   try {
@@ -157,6 +161,23 @@ test('standalone image backdrop is prepared before selection or resize styling',
     assert.equal(image.style.height, '');
     assert.equal(image.style.width, '');
     assert.equal(image.style.position, '');
+  } finally {
+    restoreDom();
+  }
+});
+
+test('normal one-image pages are not repainted by standalone backdrop prep', () => {
+  const image = new FakeImageElement();
+  image.style.background = 'transparent';
+  image.style.backgroundColor = 'transparent';
+  const restoreDom = installFakeDom(image, { bodyChildElementCount: 2, contentType: 'text/html' });
+  const adapter = new PageAdapter();
+
+  try {
+    adapter.prepareStandaloneImageBackdrop();
+
+    assert.equal(image.style.background, 'transparent');
+    assert.equal(image.style.backgroundColor, 'transparent');
   } finally {
     restoreDom();
   }
