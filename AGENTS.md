@@ -6,6 +6,10 @@ contributor guide it links: https://github.com/qwtm/image-trail/wiki/Contributin
 Keep this file compact; use references instead of duplicating long procedures.
 Detailed workflow, SOP, and project documentation belong in the wiki.
 
+Codex loads this file (and `~/.codex/AGENTS.md`) at session start. If behavior
+drifts, verify the active checkout — Codex worktrees under `~/.codex/worktrees/`
+can carry a stale copy until rebased or restarted from the main repo.
+
 ## Communication
 
 - Be brief: minimum words, bullets over paragraphs, no preamble, recap, or filler.
@@ -13,6 +17,14 @@ Detailed workflow, SOP, and project documentation belong in the wiki.
   required for the fix.
 - On correction: one-sentence restatement of updated requirements, then proceed.
 - Disagree plainly when mistaken; cite code or docs.
+- Do not narrate intent or process. No play-by-play ("I'm going back into the
+  code", "I'll make the cache do X"), no partial-completion confessions ("I fixed
+  A but not B"), no argumentative or defensive tone. Either do the work silently
+  or report finished results.
+- Do not announce next steps. If more work is needed, do it or ask one direct
+  question; do not describe what you will try.
+- Status updates belong in issue comments during issue work, not in chat unless
+  the user asked for progress.
 
 ## Before Changing Code
 
@@ -79,9 +91,12 @@ Detailed workflow, SOP, and project documentation belong in the wiki.
   `npm run format:check`, `npm test`, and `npm run build`. CI runs the same
   gates; do not skip them locally. Do not report a build you did not run; do
   not break the build.
-- In change summaries, report Settings **Build identity** from
-  `extension/dist/build-info.json` (commit, **Built local** time, worktree when
-  present).
+- Every change summary (chat reply, issue comment, PR body) must end with:
+  - **Working path:** output of `pwd` — the directory actually edited (Codex
+    worktrees are often under `~/.codex/worktrees/`, not the main checkout).
+  - **Build identity:** read `extension/dist/build-info.json` after `npm run
+    build` and paste commit, branch, **Built local** time, and worktree when
+    present. Do not omit this block; do not paraphrase from memory.
 - After the first implementation stretch, provide a manual test run before asking for final signoff or PR approval.
 
 ## Tool Paths
