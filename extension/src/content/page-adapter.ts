@@ -620,7 +620,6 @@ export class PageAdapter {
   }
 
   private selectTarget(image: HTMLImageElement, mode: TargetSelectionMode): void {
-    keepSelectedTargetBackdropBlack(image);
     const originalUrl = createTargetImageInfo(image)?.url ?? null;
     const originalSnapshot = captureImageNavigationSnapshot(image);
     this.restoreSelectedTarget();
