@@ -79,6 +79,19 @@ export const Narrow: Story = {
     ),
 };
 
+export const AutoDigitWidthNarrow: Story = {
+  render: () =>
+    fieldsStory(
+      {
+        fields: splitParsedFieldFixtures,
+        activeFieldId: 'query-sequence-a',
+        successfulFieldIds: ['query-sequence-a'],
+        unlockedFieldIds: ['query-sequence-a'],
+      },
+      { width: 300 },
+    ),
+};
+
 function fieldsStory(
   overrides: {
     readonly fields?: Parameters<typeof createFieldsView>[0];

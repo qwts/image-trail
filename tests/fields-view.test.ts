@@ -56,6 +56,21 @@ test('fieldDigitWidthInputDisplay masks digit width in privacy mode', () => {
   assert.deepEqual(fieldDigitWidthInputDisplay(field, 5, true), { value: '', placeholder: '' });
 });
 
+test('fieldDigitWidthInputDisplay shows auto when no natural width is available', () => {
+  const field = {
+    id: 'q:0:0',
+    location: 'query' as const,
+    label: 'query page',
+    value: '7',
+    tokenKind: 'int' as const,
+    queryIndex: 0,
+    tokenIndex: 0,
+  };
+
+  assert.deepEqual(fieldDigitWidthInputDisplay(field, undefined, false), { value: '', placeholder: 'auto' });
+  assert.deepEqual(fieldDigitWidthInputDisplay(field, undefined, true), { value: '', placeholder: '' });
+});
+
 test('fieldReservesTrailControlSlot reserves space only for query step fields', () => {
   assert.equal(
     fieldReservesTrailControlSlot({

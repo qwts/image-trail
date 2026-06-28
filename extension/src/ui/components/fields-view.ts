@@ -211,11 +211,9 @@ export function createFieldsView(
     if (hasStepControls) {
       const digitWidthDisplay = fieldDigitWidthInputDisplay(field.field, digitWidth, options.privacyMode === true);
       const digitWidthInput = document.createElement('input');
-      digitWidthInput.type = 'number';
-      digitWidthInput.min = '1';
-      digitWidthInput.max = '64';
-      digitWidthInput.step = '1';
+      digitWidthInput.type = 'text';
       digitWidthInput.inputMode = 'numeric';
+      digitWidthInput.pattern = '[0-9]*';
       digitWidthInput.value = digitWidthDisplay.value;
       digitWidthInput.placeholder = digitWidthDisplay.placeholder;
       digitWidthInput.className = 'image-trail-panel__field-width-input';
