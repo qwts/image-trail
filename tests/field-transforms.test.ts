@@ -1,0 +1,86 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  FIELD_TRANSFORM_REGISTRY,
+  applyFieldDigitWidthTransform,
+  applyFieldSplitTransform,
+  applySetFieldValueTransform,
+  applyStepFieldValueTransform,
+  clearFieldSplitTransform,
+  fieldTransformDefinition,
+} from '../extension/src/core/url/field-transforms.js';
+import { parseUrl } from '../extension/src/core/url/parse-url.js';
+import { collectUrlFields } from '../extension/src/core/url/tokenize-fields.js';
+
+test('field transform registry defines current parsed-field behaviors', () => {
+  assert.deepEqual(
+    FIELD_TRANSFORM_REGISTRY.map((definition) => definition.id),
+    ['set-value', 'step', 'digit-width', 'split-apply', 'split-clear'],
+  );
+  assert.equal(fieldTransformDefinition('set-value').kind, 'url');
+  assert.equal(fieldTransformDefinition('split-clear').kind, 'state');
+});
+
+test('set-value transform preserves URL rebuild behavior', () => {
+  const model = parseUrl('https://example.test/images/image-001.jpg?size=320');
+  const field = collectUrlFields(model).find((candidate) => candidate.value === '001');
+  assert.ok(field);
+
+  const result = applySetFieldValueTransform(model, field, '010');
+
+  assert.equal(result.ok, true);
+  assert.equal(result.id, 'set-value');
+  assert.deepEqual(result.attemptedFieldIds, [field.id]);
+  assert.equal(result.url, 'https://example.test/images/image-010.jpg?size=320');
+});
+
+test('step transform preserves numeric padding and clamping', () => {
+  const model = parseUrl('https://example.test/images/image-000.jpg');
+  const field = collectUrlFields(model).find((candidate) => candidate.value === '000');
+  assert.ok(field);
+
+  const incremented = applyStepFieldValueTransform(model, field, 1);
+  const clamped = applyStepFieldValueTransform(model, field, -1);
+
+  assert.equal(incremented.id, 'step');
+  assert.equal(incremented.url, 'https://example.test/images/image-001.jpg');
+  assert.equal(clamped.url, 'https://example.test/images/image-000.jpg');
+});
+
+test('digit-width transform validates and updates width specs with rebuilt URL', () => {
+  const model = parseUrl('https://example.test/images/image-9.jpg');
+  const field = collectUrlFields(model).find((candidate) => candidate.value === '9');
+  assert.ok(field);
+
+  const invalid = applyFieldDigitWidthTransform(model, field.id, '99', []);
+  assert.deepEqual(invalid, { ok: false, message: 'Digit width must be between 1 and 64.' });
+
+  const applied = applyFieldDigitWidthTransform(model, field.id, '4', []);
+  assert.equal(applied.ok, true);
+  assert.equal(applied.id, 'digit-width');
+  assert.deepEqual(applied.fieldDigitWidthSpecs, [{ fieldId: field.id, width: 4 }]);
+  assert.equal(applied.url, 'https://example.test/images/image-0009.jpg');
+
+  const cleared = applyFieldDigitWidthTransform(model, field.id, '', applied.fieldDigitWidthSpecs);
+  assert.equal(cleared.ok, true);
+  assert.deepEqual(cleared.fieldDigitWidthSpecs, []);
+  assert.equal(cleared.url, 'https://example.test/images/image-9.jpg');
+});
+
+test('split transforms adapt current split apply and clear behavior', () => {
+  const model = parseUrl('https://example.test/image?date=01012001');
+  const field = collectUrlFields(model).find((candidate) => candidate.label === 'query date');
+  assert.ok(field);
+
+  const split = applyFieldSplitTransform(field, '2-2-4');
+  assert.ok(!('ok' in split));
+  assert.equal(split.baseFieldId, field.id);
+  assert.deepEqual(split.lengths, [2, 2, 4]);
+  assert.equal(split.pattern, '2-2-4');
+
+  assert.deepEqual(applyFieldSplitTransform(field, '2-2'), {
+    ok: false,
+    message: 'Split pattern totals 4, but the field is 8 characters.',
+  });
+  assert.deepEqual(clearFieldSplitTransform(field.id), { baseFieldId: field.id });
+});
