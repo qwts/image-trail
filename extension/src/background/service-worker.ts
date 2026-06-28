@@ -597,10 +597,10 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
   const queueMetadataBytes = Math.max(0, bookmarkUsage.totalBytes - inlineThumbnailUsage.totalBytes) + pinUsage.totalBytes;
   return {
     totalBytes: usage.totalBytes + bookmarkUsage.totalBytes + pinUsage.totalBytes + thumbnailUsage.totalBytes,
-    blobCount: usage.blobCount + bookmarkUsage.blobCount + thumbnailUsage.blobCount,
+    blobCount: usage.blobCount,
     orphanedBlobCount: all.filter((blob) => !referenced.has(blob.id)).length,
     originals: { count: usage.blobCount, totalBytes: usage.totalBytes },
-    queueRecords: { count: bookmarkUsage.blobCount, totalBytes: queueMetadataBytes },
+    queueRecords: { count: bookmarkUsage.blobCount + pinUsage.blobCount, totalBytes: queueMetadataBytes },
     thumbnails: combinedThumbnailUsage,
   };
 }

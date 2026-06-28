@@ -654,7 +654,7 @@ export function createStorageHealthSettingsView(storageUsage: StorageUsageSummar
 
   const meta = document.createElement('p');
   meta.className = 'image-trail-panel__settings-empty';
-  meta.textContent = 'Approximate encrypted IndexedDB usage; browser storage overhead is not included.';
+  meta.textContent = 'Approximate IndexedDB usage; inline thumbnail bytes are estimated and browser storage overhead is not included.';
 
   if (!storageUsage) {
     const empty = document.createElement('p');
@@ -697,11 +697,15 @@ export function storageHealthRows(
   const queueRecords = storageUsage.queueRecords ?? { count: 0, totalBytes: 0 };
   const thumbnails = storageUsage.thumbnails ?? { count: 0, totalBytes: 0 };
   const originals = storageUsage.originals ?? { count: storageUsage.blobCount, totalBytes: storageUsage.totalBytes };
+  const totalCount =
+    storageUsage.queueRecords || storageUsage.thumbnails || storageUsage.originals
+      ? queueRecords.count + thumbnails.count + originals.count
+      : storageUsage.blobCount;
   const rows: { readonly label: string; readonly count: number; readonly bytes: number | null }[] = [
     { label: 'Queue metadata', count: queueRecords.count, bytes: queueRecords.totalBytes },
     { label: 'Thumbnails', count: thumbnails.count, bytes: thumbnails.totalBytes },
     { label: 'Encrypted originals', count: originals.count, bytes: originals.totalBytes },
-    { label: 'Total tracked storage', count: storageUsage.blobCount, bytes: storageUsage.totalBytes },
+    { label: 'Total tracked storage', count: totalCount, bytes: storageUsage.totalBytes },
   ];
 
   if ((storageUsage.orphanedBlobCount ?? 0) > 0) {

@@ -5,7 +5,7 @@ import { formatStorageHealthBytes, storageHealthRows } from '../extension/src/ui
 
 test('storage health rows separate queue metadata, thumbnails, and originals', () => {
   const rows = storageHealthRows({
-    blobCount: 6,
+    blobCount: 2,
     totalBytes: 37_888,
     orphanedBlobCount: 2,
     originals: { count: 2, totalBytes: 30_720 },
