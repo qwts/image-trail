@@ -49,6 +49,7 @@ async function loadBuildIdentity(): Promise<BuildIdentity | null> {
 
 function createController(): ImageTrailContentController {
   const pageAdapter = new PageAdapter();
+  pageAdapter.prepareStandaloneImageBackdrop({ requireBodyOnlyImage: true });
   const panel = new ImageTrailPanel(
     pageAdapter,
     new ExtensionBookmarkStore(),
