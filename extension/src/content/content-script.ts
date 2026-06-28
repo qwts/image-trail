@@ -71,12 +71,11 @@ function createController(): ImageTrailContentController {
   const buildOverlay = new BuildIdentityOverlay();
   let buildIdentity: BuildIdentity | null = null;
   let buildIdentityLoaded = false;
-  const buildIdentityRequest = loadBuildIdentity().then((identity) => {
+  void loadBuildIdentity().then((identity) => {
     buildIdentity = identity;
     buildIdentityLoaded = true;
     if (identity) panel.setBuildIdentity(identity);
     buildOverlay.show(identity);
-    return identity;
   });
 
   const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
@@ -102,12 +101,10 @@ function createController(): ImageTrailContentController {
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (!isBuildIdentityOverlayShortcut(event)) return;
     if (!shouldRouteKeyboardShortcut(classifyTarget(event), 'build-data-overlay-toggle')) return;
-    if (buildIdentityLoaded && !isNonProductionBuildIdentity(buildIdentity)) return;
+    if (!buildIdentityLoaded || !isNonProductionBuildIdentity(buildIdentity)) return;
     event.preventDefault();
     event.stopPropagation();
-    void buildIdentityRequest.then((identity) => {
-      buildOverlay.toggle(identity ?? buildIdentity);
-    });
+    buildOverlay.toggle(buildIdentity);
   };
 
   const destroy = (): void => {

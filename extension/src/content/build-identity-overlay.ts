@@ -46,7 +46,8 @@ export class BuildIdentityOverlay {
 
     const shadow = host.attachShadow({ mode: 'open' });
     shadow.append(createStyles(), createOverlayContent(buildIdentity));
-    document.body.append(host);
+    const container = document.body ?? document.documentElement;
+    container.append(host);
     this.host = host;
   }
 }
