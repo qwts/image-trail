@@ -78,7 +78,7 @@ export const RestorePreviewValidationReport: Story = {
         skippedCount: 4,
         unsupportedCount: 0,
         message:
-          'Preview loaded. Import has not changed local records yet. 1 duplicate record will be skipped on confirm. 4 rejected records listed by reason; sensitive URLs are not shown.',
+          'Preview loaded. Import has not changed local records yet. 1 duplicate record will be skipped on confirm. 4 rejected records summarized by reason; sensitive URLs are not shown.',
         samples: [
           {
             label: 'accepted-ridge.jpg',

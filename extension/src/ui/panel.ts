@@ -4580,7 +4580,7 @@ function restorePreviewMessage(duplicateCount: number, skippedCount: number, ext
     duplicateCount > 0 ? `${duplicateCount} duplicate record${duplicateCount === 1 ? '' : 's'} will be skipped on confirm.` : undefined;
   const skippedMessage =
     skippedCount > 0
-      ? `${skippedCount} rejected record${skippedCount === 1 ? '' : 's'} listed by reason; sensitive URLs are not shown.`
+      ? `${skippedCount} rejected record${skippedCount === 1 ? '' : 's'} summarized by reason; sensitive URLs are not shown.`
       : undefined;
   return ['Preview loaded. Import has not changed local records yet.', duplicateMessage, skippedMessage, extra].filter(Boolean).join(' ');
 }

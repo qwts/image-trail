@@ -106,7 +106,7 @@ function urlReviewStatusRejectionReason(value: unknown): string | null {
   if (typeof record.pageUrl !== 'string') return 'Missing page URL';
   if (typeof record.sourceUrl !== 'string') return 'Missing source URL';
   if (record.status !== 'passed' && record.status !== 'failed' && record.status !== 'unchanged') return 'Invalid review status';
-  if (!Array.isArray(record.fieldIds) || !record.fieldIds.every((fieldId) => typeof fieldId === 'string')) return 'Invalid field ids';
+  if (!Array.isArray(record.fieldIds) || !record.fieldIds.every((fieldId) => typeof fieldId === 'string')) return 'Invalid field IDs';
   if (typeof record.activeFieldId !== 'string' && record.activeFieldId !== null) return 'Invalid active field';
   if (typeof record.reason !== 'string' && record.reason !== undefined) return 'Invalid review reason';
   if (typeof record.updatedAt !== 'string') return 'Missing update timestamp';
