@@ -1235,6 +1235,7 @@ export class ImageTrailPanel {
     if (action.name === 'settings/toggle') {
       this.state = reducePanelAction(this.state, action);
       this.render();
+      if (this.state.settingsOpen) void this.refreshStorageUsage({ render: true });
       return;
     }
 
@@ -4058,7 +4059,7 @@ export class ImageTrailPanel {
       const usage = await this.captureStore.requestStorageUsage();
       if (requestId !== this.storageUsageRequestId) return;
       this.applyStorageUsage(usage, { preserveRequestId: true });
-      if (options.render) this.render();
+      if (options.render || this.state.settingsOpen) this.render();
     } catch {
       // Storage health is informational; it must not break row actions.
     }
