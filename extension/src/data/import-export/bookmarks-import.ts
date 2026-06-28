@@ -2,7 +2,7 @@ import { decryptAesGcm } from '../crypto/webcrypto.js';
 import { deriveEncryptionKey } from '../crypto/password-wrap.js';
 import type { DurableBookmarkPayloadV1, RecoverableDataStatus } from '../types.js';
 import { fromBase64, parseExportFile } from './encrypted-file-format.js';
-import { bookmarksFromFullBackupPayload } from './full-backup.js';
+import { fullBackupPayloadFromUnknown, type FullBackupBlobKeyBackup, type PortableStoredBlobRecord } from './full-backup.js';
 import { parsePlainRecordsExport } from './plain-records-format.js';
 
 export interface BookmarksImportEntry {
@@ -16,7 +16,13 @@ export interface BookmarksImportResult {
   readonly skipped: readonly string[];
   readonly plaintext: boolean;
   readonly externalOriginalCount: number;
+  readonly fullBackup: boolean;
+  readonly originalBlobs: readonly PortableStoredBlobRecord[];
+  readonly blobKeyBackups: readonly FullBackupBlobKeyBackup[];
+  readonly missingOriginalBlobIds: readonly string[];
 }
+
+type BasicBookmarksImportResult = Pick<BookmarksImportResult, 'status' | 'entries' | 'skipped' | 'externalOriginalCount'>;
 
 export async function importBookmarks(fileContent: string, password: string): Promise<BookmarksImportResult> {
   const plain = tryImportPlainBookmarks(fileContent);
@@ -28,6 +34,10 @@ export async function importBookmarks(fileContent: string, password: string): Pr
     skipped: [],
     plaintext: false,
     externalOriginalCount: 0,
+    fullBackup: false,
+    originalBlobs: [],
+    blobKeyBackups: [],
+    missingOriginalBlobIds: [],
   });
 
   let envelope;
@@ -48,7 +58,25 @@ export async function importBookmarks(fileContent: string, password: string): Pr
     const encryptionKey = await deriveEncryptionKey(password, { salt, iterations: envelope.header.iterations });
     const plaintext = await decryptAesGcm(encryptionKey, ciphertext, iv);
     const parsed = JSON.parse(new TextDecoder().decode(plaintext)) as unknown;
-    return { ...parseBookmarkEntries(bookmarksFromFullBackupPayload(parsed) ?? parsed), plaintext: false };
+    const fullBackup = fullBackupPayloadFromUnknown(parsed);
+    if (fullBackup) {
+      return {
+        ...parseBookmarkEntries(fullBackup.bookmarks, { preserveOriginalReferences: true }),
+        plaintext: false,
+        fullBackup: true,
+        originalBlobs: fullBackup.originalBlobs,
+        blobKeyBackups: fullBackup.blobKeyBackups,
+        missingOriginalBlobIds: fullBackup.missingOriginalBlobIds,
+      };
+    }
+    return {
+      ...parseBookmarkEntries(parsed, { preserveOriginalReferences: false }),
+      plaintext: false,
+      fullBackup: false,
+      originalBlobs: [],
+      blobKeyBackups: [],
+      missingOriginalBlobIds: [],
+    };
   } catch {
     return fail('Decryption failed. Wrong password or corrupted file.');
   }
@@ -58,14 +86,20 @@ function tryImportPlainBookmarks(fileContent: string): Omit<BookmarksImportResul
   try {
     const envelope = parsePlainRecordsExport(fileContent);
     if (envelope.payloadType !== 'bookmarks') return null;
-    return parseBookmarkEntries(envelope.entries);
+    return {
+      ...parseBookmarkEntries(envelope.entries, { preserveOriginalReferences: false }),
+      fullBackup: false,
+      originalBlobs: [],
+      blobKeyBackups: [],
+      missingOriginalBlobIds: [],
+    };
   } catch {
     return null;
   }
 }
 
-function parseBookmarkEntries(parsed: unknown): Omit<BookmarksImportResult, 'plaintext'> {
-  const fail = (message: string): Omit<BookmarksImportResult, 'plaintext'> => ({
+function parseBookmarkEntries(parsed: unknown, options: { readonly preserveOriginalReferences: boolean }): BasicBookmarksImportResult {
+  const fail = (message: string): BasicBookmarksImportResult => ({
     status: { ok: false, code: 'decryption-failed', message },
     entries: [],
     skipped: [],
@@ -79,7 +113,7 @@ function parseBookmarkEntries(parsed: unknown): Omit<BookmarksImportResult, 'pla
   for (const item of parsed) {
     if (isValidBookmarkEntry(item)) {
       if (item.payload.storedOriginal) externalOriginalCount += 1;
-      entries.push(stripExternalBlobReference(item));
+      entries.push(options.preserveOriginalReferences ? item : stripExternalBlobReference(item));
     } else {
       skipped.push(typeof item === 'object' && item !== null && 'uuid' in item ? String(item.uuid) : 'unknown');
     }

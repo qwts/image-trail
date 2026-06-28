@@ -18,6 +18,8 @@ import {
   createExportBlobKeyBackupResultMessage,
   createExportOriginalBlobsMessage,
   createExportOriginalBlobsResultMessage,
+  createImportOriginalBlobsMessage,
+  createImportOriginalBlobsResultMessage,
   createFetchLinkedPageMessage,
   createFetchLinkedPageResultMessage,
   createFetchThumbnailSourceMessage,
@@ -110,6 +112,7 @@ import {
   isExtensionResponse,
   isExportBlobKeyBackupResultMessage,
   isExportOriginalBlobsResultMessage,
+  isImportOriginalBlobsResultMessage,
   isFetchLinkedPageResultMessage,
   isFetchThumbnailSourceResultMessage,
   isImportBlobKeyBackupResultMessage,
@@ -587,6 +590,31 @@ test('creates encrypted original blob export messages', () => {
   assert.equal(JSON.parse(JSON.stringify(result)).payload.records[0].ciphertext, 'AQIDBA==');
   assert.equal(isExtensionResponse(result), true);
   assert.equal(isExportOriginalBlobsResultMessage(result), true);
+});
+
+test('creates encrypted original blob import messages', () => {
+  const request = createImportOriginalBlobsMessage([
+    {
+      id: 'blob-1',
+      kind: 'original',
+      schemaVersion: 1,
+      algorithm: 'AES-GCM',
+      iv: 'iv-value',
+      ciphertext: 'AQIDBA==',
+      encryptedByteLength: 4,
+      createdAt: '2026-06-28T00:00:00.000Z',
+      key: { kind: 'blob', uuid: 'key-1', reference: 'blob:key-1' },
+      referenceCount: 1,
+    },
+  ]);
+  assert.equal(request.type, MessageType.ImportOriginalBlobs);
+  assert.equal(request.payload.records[0]?.ciphertext, 'AQIDBA==');
+  assert.equal(isExtensionRequest(request), true);
+
+  const result = createImportOriginalBlobsResultMessage({ ok: true, importedCount: 1 });
+  assert.equal(result.type, MessageType.ImportOriginalBlobsResult);
+  assert.equal(isExtensionResponse(result), true);
+  assert.equal(isImportOriginalBlobsResultMessage(result), true);
 });
 
 test('creates image download messages with save-as intent', () => {

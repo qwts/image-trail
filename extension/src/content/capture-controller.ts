@@ -6,6 +6,7 @@ import {
   createCreateBlobPreviewMessage,
   createDeleteBlobMessage,
   createExportOriginalBlobsMessage,
+  createImportOriginalBlobsMessage,
   createRetrieveBlobMessage,
   createBlobKeyStatusMessage,
   createClearBlobKeyMessage,
@@ -22,6 +23,7 @@ import {
   isCreateBlobPreviewResultMessage,
   isExportBlobKeyBackupResultMessage,
   isExportOriginalBlobsResultMessage,
+  isImportOriginalBlobsResultMessage,
   isImportBlobKeyBackupResultMessage,
   isRetrieveBlobResultMessage,
 } from '../background/messages.js';
@@ -44,6 +46,9 @@ export interface CaptureStore {
   readonly requestOriginalBlobRecords: (
     blobIds: readonly string[],
   ) => Promise<import('../background/messages.js').ExportOriginalBlobsResultMessage['payload']>;
+  readonly importOriginalBlobRecords: (
+    records: readonly import('../data/import-export/full-backup.js').PortableStoredBlobRecord[],
+  ) => Promise<import('../background/messages.js').ImportOriginalBlobsResultMessage['payload']>;
   readonly requestBlobPreview: (blobId: string) => Promise<CreateBlobPreviewResultMessage['payload']>;
   readonly requestDataUrlPreview: (dataUrl: string) => Promise<CreateBlobPreviewResultMessage['payload']>;
   readonly requestStorageUsage: () => Promise<StorageUsageSummary>;
@@ -98,6 +103,14 @@ export class CaptureController implements CaptureStore {
   ): Promise<import('../background/messages.js').ExportOriginalBlobsResultMessage['payload']> {
     const response = await sendRuntimeMessage(createExportOriginalBlobsMessage(blobIds));
     if (isExportOriginalBlobsResultMessage(response)) return response.payload;
+    return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
+  }
+
+  async importOriginalBlobRecords(
+    records: readonly import('../data/import-export/full-backup.js').PortableStoredBlobRecord[],
+  ): Promise<import('../background/messages.js').ImportOriginalBlobsResultMessage['payload']> {
+    const response = await sendRuntimeMessage(createImportOriginalBlobsMessage(records));
+    if (isImportOriginalBlobsResultMessage(response)) return response.payload;
     return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
   }
 

@@ -568,9 +568,12 @@ test('full-backup: exports bookmarks with encrypted original blob records', asyn
 
   const importedBookmarks = await importBookmarks(exported.fileContent!, 'backup-password');
   assert.ok(importedBookmarks.status.ok, importedBookmarks.status.message);
+  assert.equal(importedBookmarks.fullBackup, true);
   assert.equal(importedBookmarks.entries.length, 1);
   assert.equal(importedBookmarks.externalOriginalCount, 1);
-  assert.equal(importedBookmarks.entries[0]?.payload.storedOriginal, undefined);
+  assert.equal(importedBookmarks.originalBlobs.length, 1);
+  assert.equal(importedBookmarks.blobKeyBackups.length, 1);
+  assert.equal(importedBookmarks.entries[0]?.payload.storedOriginal?.blobId, 'blob-full-backup');
 
   const portable = portableStoredBlobRecord(blobRecord);
   const restored = storedBlobRecordFromPortable(portable);

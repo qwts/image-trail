@@ -23,6 +23,8 @@ export const MessageType = {
   RetrieveBlobResult: 'imageTrail.retrieveBlobResult',
   ExportOriginalBlobs: 'imageTrail.exportOriginalBlobs',
   ExportOriginalBlobsResult: 'imageTrail.exportOriginalBlobsResult',
+  ImportOriginalBlobs: 'imageTrail.importOriginalBlobs',
+  ImportOriginalBlobsResult: 'imageTrail.importOriginalBlobsResult',
   CreateBlobPreview: 'imageTrail.createBlobPreview',
   CreateDataUrlPreview: 'imageTrail.createDataUrlPreview',
   CreateBlobPreviewResult: 'imageTrail.createBlobPreviewResult',
@@ -289,6 +291,20 @@ export interface ExportOriginalBlobsResultMessage {
         readonly records: readonly import('../data/import-export/full-backup.js').PortableStoredBlobRecord[];
         readonly missingBlobIds: readonly string[];
       }
+    | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
+export interface ImportOriginalBlobsMessage {
+  readonly type: typeof MessageType.ImportOriginalBlobs;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly records: readonly import('../data/import-export/full-backup.js').PortableStoredBlobRecord[] };
+}
+
+export interface ImportOriginalBlobsResultMessage {
+  readonly type: typeof MessageType.ImportOriginalBlobsResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly importedCount: number }
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 
@@ -941,6 +957,7 @@ export type ExtensionRequest =
   | CleanupOrphanedBlobsMessage
   | RetrieveBlobMessage
   | ExportOriginalBlobsMessage
+  | ImportOriginalBlobsMessage
   | CreateBlobPreviewMessage
   | CreateDataUrlPreviewMessage
   | FetchThumbnailSourceMessage
@@ -1001,6 +1018,7 @@ export type ExtensionResponse =
   | CleanupOrphanedBlobsResultMessage
   | RetrieveBlobResultMessage
   | ExportOriginalBlobsResultMessage
+  | ImportOriginalBlobsResultMessage
   | CreateBlobPreviewResultMessage
   | FetchThumbnailSourceResultMessage
   | ProbeImageSourceResultMessage
@@ -1129,6 +1147,18 @@ export function createExportOriginalBlobsResultMessage(
   payload: ExportOriginalBlobsResultMessage['payload'],
 ): ExportOriginalBlobsResultMessage {
   return { type: MessageType.ExportOriginalBlobsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createImportOriginalBlobsMessage(
+  records: readonly import('../data/import-export/full-backup.js').PortableStoredBlobRecord[],
+): ImportOriginalBlobsMessage {
+  return { type: MessageType.ImportOriginalBlobs, version: MESSAGE_PROTOCOL_VERSION, payload: { records } };
+}
+
+export function createImportOriginalBlobsResultMessage(
+  payload: ImportOriginalBlobsResultMessage['payload'],
+): ImportOriginalBlobsResultMessage {
+  return { type: MessageType.ImportOriginalBlobsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createCreateBlobPreviewMessage(blobId: string): CreateBlobPreviewMessage {
@@ -1614,6 +1644,7 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.CleanupOrphanedBlobs ||
     value.type === MessageType.RetrieveBlob ||
     value.type === MessageType.ExportOriginalBlobs ||
+    value.type === MessageType.ImportOriginalBlobs ||
     value.type === MessageType.CreateBlobPreview ||
     value.type === MessageType.CreateDataUrlPreview ||
     value.type === MessageType.FetchThumbnailSource ||
@@ -1679,6 +1710,7 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.CleanupOrphanedBlobsResult ||
     value.type === MessageType.RetrieveBlobResult ||
     value.type === MessageType.ExportOriginalBlobsResult ||
+    value.type === MessageType.ImportOriginalBlobsResult ||
     value.type === MessageType.CreateBlobPreviewResult ||
     value.type === MessageType.FetchThumbnailSourceResult ||
     value.type === MessageType.ProbeImageSourceResult ||
@@ -1754,6 +1786,11 @@ export function isRetrieveBlobResultMessage(value: unknown): value is RetrieveBl
 export function isExportOriginalBlobsResultMessage(value: unknown): value is ExportOriginalBlobsResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.ExportOriginalBlobsResult;
+}
+
+export function isImportOriginalBlobsResultMessage(value: unknown): value is ImportOriginalBlobsResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.ImportOriginalBlobsResult;
 }
 
 export function isCleanupOrphanedBlobsResultMessage(value: unknown): value is CleanupOrphanedBlobsResultMessage {

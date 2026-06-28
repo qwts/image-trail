@@ -154,8 +154,21 @@ function storedBlobCiphertextBytes(record: StoredBlobRecord): Uint8Array {
 }
 
 export function bookmarksFromFullBackupPayload(value: unknown): readonly FullBackupBookmarkEntry[] | null {
+  return fullBackupPayloadFromUnknown(value)?.bookmarks ?? null;
+}
+
+export function fullBackupPayloadFromUnknown(value: unknown): FullBackupPayloadV1 | null {
   if (!value || typeof value !== 'object') return null;
-  const payload = value as { schemaVersion?: unknown; bookmarks?: unknown };
+  const payload = value as { schemaVersion?: unknown; bookmarks?: unknown; originalBlobs?: unknown; blobKeyBackups?: unknown };
   if (payload.schemaVersion !== 1 || !Array.isArray(payload.bookmarks)) return null;
-  return payload.bookmarks as readonly FullBackupBookmarkEntry[];
+  if (!Array.isArray(payload.originalBlobs) || !Array.isArray(payload.blobKeyBackups)) return null;
+  return {
+    schemaVersion: 1,
+    bookmarks: payload.bookmarks as readonly FullBackupBookmarkEntry[],
+    originalBlobs: payload.originalBlobs as readonly PortableStoredBlobRecord[],
+    blobKeyBackups: payload.blobKeyBackups as readonly FullBackupBlobKeyBackup[],
+    missingOriginalBlobIds: Array.isArray((value as { missingOriginalBlobIds?: unknown }).missingOriginalBlobIds)
+      ? ((value as { missingOriginalBlobIds: readonly string[] }).missingOriginalBlobIds as readonly string[])
+      : [],
+  };
 }

@@ -152,7 +152,12 @@ type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
 
 type PendingRestoreImport =
   | { readonly kind: 'history'; readonly result: Awaited<ReturnType<typeof importEncryptedHistory>>; readonly duplicateCount: number }
-  | { readonly kind: 'bookmarks'; readonly result: Awaited<ReturnType<typeof importBookmarkRecords>>; readonly duplicateCount: number }
+  | {
+      readonly kind: 'bookmarks';
+      readonly result: Awaited<ReturnType<typeof importBookmarkRecords>>;
+      readonly duplicateCount: number;
+      readonly password: string;
+    }
   | { readonly kind: 'url-review-status'; readonly result: ReturnType<typeof importUrlReviewStatusFile> };
 
 type HistoryImportResult = Awaited<ReturnType<typeof importEncryptedHistory>>;
@@ -3979,8 +3984,13 @@ export class ImageTrailPanel {
     const duplicateSummary = createRestoreDuplicateSummary(result.entries, await this.loadAllBookmarksForExport());
     this.pendingRestoreImport = {
       kind: 'bookmarks',
-      result: { ...result, entries: duplicateSummary.uniqueEntries },
+      result: {
+        ...result,
+        entries: duplicateSummary.uniqueEntries,
+        externalOriginalCount: bookmarkEntriesOriginalReferenceCount(duplicateSummary.uniqueEntries),
+      },
       duplicateCount: duplicateSummary.duplicateCount,
+      password,
     };
     this.state = reducePanelAction(this.state, {
       name: 'import/restore-preview-ready',
@@ -3989,12 +3999,18 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private async importBookmarks(result: BookmarkImportResult, duplicateCount: number): Promise<void> {
+  private async importBookmarks(result: BookmarkImportResult, duplicateCount: number, password: string): Promise<void> {
     if (!this.bookmarkStore) {
       this.state = reducePanelAction(this.state, {
         name: 'import-export/error',
         message: 'Bookmark storage is unavailable; no bookmarks were imported.',
       });
+      this.render();
+      return;
+    }
+    const fullBackupOriginalRestore = await this.restoreFullBackupOriginals(result, password);
+    if (!fullBackupOriginalRestore.ok) {
+      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: fullBackupOriginalRestore.message });
       this.render();
       return;
     }
@@ -4012,10 +4028,29 @@ export class ImageTrailPanel {
         duplicateCount,
         result.skipped.length,
         result.plaintext,
-        'encrypted into bookmark storage',
+        result.fullBackup ? fullBackupRestoreDetail(fullBackupOriginalRestore.importedOriginalCount) : 'encrypted into bookmark storage',
       ),
     });
     this.renderPanelAndRefreshRecall();
+  }
+
+  private async restoreFullBackupOriginals(
+    result: BookmarkImportResult,
+    password: string,
+  ): Promise<{ readonly ok: true; readonly importedOriginalCount: number } | { readonly ok: false; readonly message: string }> {
+    if (!result.fullBackup || result.externalOriginalCount === 0) return { ok: true, importedOriginalCount: 0 };
+    if (!this.captureStore) {
+      return { ok: false, message: 'Encrypted original storage is unavailable; no bookmarks were imported.' };
+    }
+    for (const backup of result.blobKeyBackups) {
+      const imported = await this.captureStore.importBlobKeyBackup(backup.fileContent, password);
+      if (!imported.ok) return { ok: false, message: imported.message };
+    }
+    const blobImport = await this.captureStore.importOriginalBlobRecords(result.originalBlobs);
+    if (!blobImport.ok) return { ok: false, message: blobImport.message };
+    await this.refreshBlobKeyStatus();
+    await this.refreshStorageUsage();
+    return { ok: true, importedOriginalCount: blobImport.importedCount };
   }
 
   private previewUrlReviewStatusImport(fileContent: string, fileName?: string): void {
@@ -4064,7 +4099,7 @@ export class ImageTrailPanel {
         await this.importHistory(pending.result, pending.duplicateCount);
         break;
       case 'bookmarks':
-        await this.importBookmarks(pending.result, pending.duplicateCount);
+        await this.importBookmarks(pending.result, pending.duplicateCount, pending.password);
         break;
       case 'url-review-status':
         await this.importUrlReviewStatus(pending.result);
@@ -4550,6 +4585,10 @@ function restoreImportCompleteMessage(
   return [imported, skipped, duplicates, plaintextMessage].filter(Boolean).join(' ');
 }
 
+function fullBackupRestoreDetail(importedOriginalCount: number): string {
+  return `encrypted into bookmark storage with ${importedOriginalCount} encrypted original${importedOriginalCount === 1 ? '' : 's'} restored`;
+}
+
 function restoreSha256FromUnknown(value: unknown): string | undefined {
   const object = recordObject(value);
   if (!object) return undefined;
@@ -4613,6 +4652,8 @@ function createBookmarksRestorePreview(
   fileName = 'Selected JSON file',
   duplicateSummary: RestoreDuplicateSummary<BookmarkImportResult['entries'][number]> = emptyRestoreDuplicateSummary(),
 ): ImportRestorePreviewState {
+  const missingOriginalBackupCount = fullBackupMissingOriginalReferenceCount(result);
+  const unsupportedOriginalCount = result.fullBackup ? missingOriginalBackupCount : result.externalOriginalCount;
   return {
     fileName,
     payloadLabel: 'Bookmarks',
@@ -4620,7 +4661,7 @@ function createBookmarksRestorePreview(
     capturedOriginalCount: result.externalOriginalCount,
     duplicateCount: duplicateSummary.duplicateCount,
     skippedCount: result.skipped.length,
-    unsupportedCount: result.externalOriginalCount > 0 ? 1 : 0,
+    unsupportedCount: unsupportedOriginalCount > 0 ? 1 : 0,
     plaintext: result.plaintext,
     message: restorePreviewMessage(
       duplicateSummary.duplicateCount,
@@ -4634,15 +4675,32 @@ function createBookmarksRestorePreview(
       }),
     ),
     unsupportedSections:
-      result.externalOriginalCount > 0
+      unsupportedOriginalCount > 0
         ? [
             {
-              label: 'External original references',
-              detail: 'Bookmark imports strip external blob references; original bytes are not imported from record JSON.',
+              label: result.fullBackup ? 'Missing original backups' : 'External original references',
+              detail: result.fullBackup
+                ? `${missingOriginalBackupCount} original reference${missingOriginalBackupCount === 1 ? '' : 's'} did not have matching encrypted bytes in the backup.`
+                : 'Bookmark imports strip external blob references; original bytes are not imported from record JSON.',
             },
           ]
         : undefined,
   };
+}
+
+function fullBackupMissingOriginalReferenceCount(result: BookmarkImportResult): number {
+  if (!result.fullBackup) return result.externalOriginalCount;
+  const backedBlobIds = new Set(result.originalBlobs.map((record) => record.id));
+  let missing = result.missingOriginalBlobIds.length;
+  for (const entry of result.entries) {
+    const blobId = entry.payload.storedOriginal?.blobId ?? entry.payload.protectedPin?.storedOriginalBlobId;
+    if (blobId && !backedBlobIds.has(blobId)) missing += 1;
+  }
+  return missing;
+}
+
+function bookmarkEntriesOriginalReferenceCount(entries: readonly BookmarkImportResult['entries'][number][]): number {
+  return entries.filter((entry) => entry.payload.storedOriginal || entry.payload.protectedPin?.storedOriginalBlobId).length;
 }
 
 function createUrlReviewStatusRestorePreview(

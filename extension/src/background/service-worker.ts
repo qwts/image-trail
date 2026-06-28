@@ -12,7 +12,11 @@ import { getActiveBlobKey, lockBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
 import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFileHeader } from '../data/import-export/encrypted-image.js';
-import { portableStoredBlobRecord, type PortableStoredBlobRecord } from '../data/import-export/full-backup.js';
+import {
+  portableStoredBlobRecord,
+  storedBlobRecordFromPortable,
+  type PortableStoredBlobRecord,
+} from '../data/import-export/full-backup.js';
 import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../data/import-export/key-backup.js';
 import { openImageTrailDb } from '../data/db.js';
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
@@ -73,6 +77,7 @@ import {
   createExportBlobKeyBackupResultMessage,
   createFetchBufferedImageSourceResultMessage,
   createExportOriginalBlobsResultMessage,
+  createImportOriginalBlobsResultMessage,
   createImportBlobKeyBackupResultMessage,
   createPingMessage,
   createPCloudProviderStatusResultMessage,
@@ -90,6 +95,7 @@ import type {
   DownloadImageMessage,
   ExportEncryptedImageMessage,
   ExportOriginalBlobsMessage,
+  ImportOriginalBlobsMessage,
   RetrieveBlobMessage,
   GrantPermissionAndCaptureMessage,
 } from './messages.js';
@@ -385,6 +391,25 @@ async function handleExportOriginalBlobs(
     }
   }
   return { ok: true, records, missingBlobIds };
+}
+
+async function handleImportOriginalBlobs(
+  message: ImportOriginalBlobsMessage,
+): Promise<import('./messages.js').ImportOriginalBlobsResultMessage['payload']> {
+  const db = await getDb();
+  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
+  const blobs = new BlobsRepository(db);
+  let importedCount = 0;
+  try {
+    for (const record of message.payload.records) {
+      if (record.kind !== 'original') continue;
+      await blobs.put(storedBlobRecordFromPortable(record));
+      importedCount += 1;
+    }
+  } catch {
+    return { ok: false, reason: 'invalid-original', message: 'Encrypted original backup payload was invalid.' };
+  }
+  return { ok: true, importedCount };
 }
 
 async function handleBlobKeyStatus(): Promise<import('./messages.js').BlobKeyStatusResultMessage['payload']> {
@@ -1550,6 +1575,16 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
         .catch(() =>
           sendResponse(
             createExportOriginalBlobsResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted originals export failed.' }),
+          ),
+        );
+      return true;
+
+    case MessageType.ImportOriginalBlobs:
+      handleImportOriginalBlobs(message)
+        .then((result) => sendResponse(createImportOriginalBlobsResultMessage(result)))
+        .catch(() =>
+          sendResponse(
+            createImportOriginalBlobsResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted originals import failed.' }),
           ),
         );
       return true;
