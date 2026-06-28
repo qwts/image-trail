@@ -15,9 +15,21 @@ export function upsertFieldDigitWidthSpec(
   specs: readonly UrlFieldDigitWidthSpec[],
   fieldId: string,
   width: number | null,
+  sourceWidth?: number,
 ): readonly UrlFieldDigitWidthSpec[] {
+  const existing = specs.find((spec) => spec.fieldId === fieldId);
   const rest = specs.filter((spec) => spec.fieldId !== fieldId);
-  return width === null ? rest : [...rest, { fieldId, width }];
+  return width === null ? rest : [...rest, digitWidthSpec(fieldId, width, existing?.sourceWidth ?? sourceWidth)];
+}
+
+export function clearFieldDigitWidthSpec(model: ParsedUrlModel, spec: UrlFieldDigitWidthSpec | undefined, fieldId: string): ParsedUrlModel {
+  if (!spec) return model;
+
+  return {
+    ...model,
+    pathParts: model.pathParts.map((part, partIndex) => clearPathDigitWidthSpec(part, partIndex, fieldId, spec.sourceWidth)),
+    queryFields: model.queryFields.map((field) => clearQueryDigitWidthSpec(field, fieldId, spec.sourceWidth)),
+  };
 }
 
 export function applyFieldDigitWidthSpecs(model: ParsedUrlModel, specs: readonly UrlFieldDigitWidthSpec[]): ParsedUrlModel {
@@ -58,4 +70,40 @@ function applyTokenDigitWidth(token: UrlToken, width: number | undefined): UrlTo
   if (token.kind === 'text' || width === undefined) return token;
   const nextWidth = Math.max(width, token.value.length);
   return { ...token, value: token.value.padStart(nextWidth, '0'), width: nextWidth };
+}
+
+function digitWidthSpec(fieldId: string, width: number, sourceWidth: number | undefined): UrlFieldDigitWidthSpec {
+  return sourceWidth === undefined ? { fieldId, width } : { fieldId, width, sourceWidth };
+}
+
+function clearPathDigitWidthSpec(part: PathPart, partIndex: number, fieldId: string, sourceWidth: number | undefined): PathPart {
+  if (part.type !== 'segment') return part;
+  return {
+    ...part,
+    edited:
+      part.edited || part.tokens.some((token, tokenIndex) => shouldClearTokenDigitWidth(token, `p:${partIndex}:${tokenIndex}`, fieldId)),
+    tokens: part.tokens.map((token, tokenIndex) =>
+      `p:${partIndex}:${tokenIndex}` === fieldId ? clearTokenDigitWidth(token, sourceWidth) : token,
+    ),
+  };
+}
+
+function clearQueryDigitWidthSpec(field: QueryField, fieldId: string, sourceWidth: number | undefined): QueryField {
+  return {
+    ...field,
+    valueTokens: field.valueTokens.map((token, tokenIndex) =>
+      `q:${field.index}:${tokenIndex}` === fieldId ? clearTokenDigitWidth(token, sourceWidth) : token,
+    ),
+  };
+}
+
+function shouldClearTokenDigitWidth(token: UrlToken, candidateFieldId: string, fieldId: string): boolean {
+  return token.kind !== 'text' && candidateFieldId === fieldId;
+}
+
+function clearTokenDigitWidth(token: UrlToken, sourceWidth: number | undefined): UrlToken {
+  if (token.kind === 'text') return token;
+  const value = token.value.replace(/^0+(?=.)/u, '');
+  if (sourceWidth === undefined) return { ...token, value, width: undefined };
+  return { ...token, value: value.padStart(sourceWidth, '0'), width: sourceWidth };
 }

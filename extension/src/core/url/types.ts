@@ -76,4 +76,5 @@ export interface UrlFieldSplitSpec {
 export interface UrlFieldDigitWidthSpec {
   readonly fieldId: string;
   readonly width: number;
+  readonly sourceWidth?: number;
 }

@@ -1,7 +1,13 @@
-import { createFieldSplitSpec, type FieldSplitSpecResult } from './field-splits.js';
-import { applyFieldDigitWidthSpecs, normalizeFieldDigitWidth, upsertFieldDigitWidthSpec } from './field-widths.js';
+import { createFieldSplitSpec } from './field-splits.js';
+import {
+  applyFieldDigitWidthSpecs,
+  clearFieldDigitWidthSpec,
+  normalizeFieldDigitWidth,
+  upsertFieldDigitWidthSpec,
+} from './field-widths.js';
 import { bumpUrlField, rebuildUrl, setUrlFieldValue } from './rebuild-url.js';
-import type { ParsedUrlModel, UrlField, UrlFieldDigitWidthSpec } from './types.js';
+import { collectUrlFields } from './tokenize-fields.js';
+import type { ParsedUrlModel, UrlField, UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from './types.js';
 
 export type FieldTransformId = 'set-value' | 'step' | 'digit-width' | 'split-apply' | 'split-clear';
 
@@ -27,19 +33,41 @@ export function fieldTransformDefinition(id: FieldTransformId): FieldTransformDe
   return definition;
 }
 
-export interface FieldUrlTransformResult {
+export type FieldTransformSuccess<TPayload extends object = object> = {
   readonly ok: true;
   readonly id: FieldTransformId;
+  readonly kind: FieldTransformKind;
+} & TPayload;
+
+export interface FieldTransformFailure {
+  readonly ok: false;
+  readonly id: FieldTransformId;
+  readonly kind: FieldTransformKind;
+  readonly message: string;
+}
+
+export type FieldTransformResult<TPayload extends object = object> = FieldTransformSuccess<TPayload> | FieldTransformFailure;
+
+export type FieldUrlTransformResult = FieldTransformSuccess<{
   readonly model: ParsedUrlModel;
   readonly url: string;
   readonly attemptedFieldIds: readonly string[];
-}
+}>;
 
-export interface FieldDigitWidthTransformResult extends FieldUrlTransformResult {
+export type FieldDigitWidthTransformResult = FieldTransformResult<{
+  readonly model: ParsedUrlModel;
+  readonly url: string;
+  readonly attemptedFieldIds: readonly string[];
   readonly fieldDigitWidthSpecs: readonly UrlFieldDigitWidthSpec[];
-}
+}>;
 
-export type FieldTransformValidationResult = { readonly ok: false; readonly message: string };
+export type FieldSplitTransformResult = FieldTransformResult<{
+  readonly splitSpec: UrlFieldSplitSpec;
+}>;
+
+export type FieldSplitClearTransformResult = FieldTransformResult<{
+  readonly baseFieldId: string;
+}>;
 
 export function applySetFieldValueTransform(model: ParsedUrlModel, field: UrlField, nextValue: string): FieldUrlTransformResult {
   return toUrlTransformResult('set-value', setUrlFieldValue(model, field, nextValue), [field.id]);
@@ -54,32 +82,61 @@ export function applyFieldDigitWidthTransform(
   fieldId: string,
   value: string,
   specs: readonly UrlFieldDigitWidthSpec[],
-): FieldDigitWidthTransformResult | FieldTransformValidationResult {
+): FieldDigitWidthTransformResult {
   const normalized = normalizeFieldDigitWidth(value);
-  if (typeof normalized === 'object' && normalized !== null && 'ok' in normalized) return normalized;
+  if (typeof normalized === 'object' && normalized !== null && 'ok' in normalized) {
+    return toFieldTransformFailure('digit-width', normalized.message);
+  }
 
-  const fieldDigitWidthSpecs = upsertFieldDigitWidthSpec(specs, fieldId, normalized);
-  const nextModel = applyFieldDigitWidthSpecs(model, fieldDigitWidthSpecs);
+  const existingSpec = specs.find((spec) => spec.fieldId === fieldId);
+  const sourceWidth = existingSpec?.sourceWidth ?? collectUrlFields(model).find((field) => field.id === fieldId)?.digitWidth;
+  const fieldDigitWidthSpecs = upsertFieldDigitWidthSpec(specs, fieldId, normalized, sourceWidth);
+  const baseModel = normalized === null ? clearFieldDigitWidthSpec(model, existingSpec, fieldId) : model;
+  const nextModel = applyFieldDigitWidthSpecs(baseModel, fieldDigitWidthSpecs);
   return {
     ...toUrlTransformResult('digit-width', nextModel, [fieldId]),
     fieldDigitWidthSpecs,
   };
 }
 
-export function applyFieldSplitTransform(field: UrlField, pattern: string): FieldSplitSpecResult {
-  return createFieldSplitSpec(field, pattern);
+export function applyFieldSplitTransform(field: UrlField, pattern: string): FieldSplitTransformResult {
+  const splitSpec = createFieldSplitSpec(field, pattern);
+  if ('ok' in splitSpec) return toFieldTransformFailure('split-apply', splitSpec.message);
+  return {
+    ...toFieldTransformSuccess('split-apply'),
+    splitSpec,
+  };
 }
 
-export function clearFieldSplitTransform(baseFieldId: string): { readonly baseFieldId: string } {
-  return { baseFieldId };
+export function clearFieldSplitTransform(baseFieldId: string): FieldSplitClearTransformResult {
+  return {
+    ...toFieldTransformSuccess('split-clear'),
+    baseFieldId,
+  };
 }
 
 function toUrlTransformResult(id: FieldTransformId, model: ParsedUrlModel, attemptedFieldIds: readonly string[]): FieldUrlTransformResult {
   return {
-    ok: true,
-    id,
+    ...toFieldTransformSuccess(id),
     model,
     url: rebuildUrl(model),
     attemptedFieldIds,
+  };
+}
+
+function toFieldTransformSuccess(id: FieldTransformId): FieldTransformSuccess {
+  return {
+    ok: true,
+    id,
+    kind: fieldTransformDefinition(id).kind,
+  };
+}
+
+function toFieldTransformFailure(id: FieldTransformId, message: string): FieldTransformFailure {
+  return {
+    ok: false,
+    id,
+    kind: fieldTransformDefinition(id).kind,
+    message,
   };
 }

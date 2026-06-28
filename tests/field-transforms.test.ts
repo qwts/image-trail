@@ -53,7 +53,12 @@ test('digit-width transform validates and updates width specs with rebuilt URL',
   assert.ok(field);
 
   const invalid = applyFieldDigitWidthTransform(model, field.id, '99', []);
-  assert.deepEqual(invalid, { ok: false, message: 'Digit width must be between 1 and 64.' });
+  assert.deepEqual(invalid, {
+    ok: false,
+    id: 'digit-width',
+    kind: 'url',
+    message: 'Digit width must be between 1 and 64.',
+  });
 
   const applied = applyFieldDigitWidthTransform(model, field.id, '4', []);
   assert.equal(applied.ok, true);
@@ -61,10 +66,28 @@ test('digit-width transform validates and updates width specs with rebuilt URL',
   assert.deepEqual(applied.fieldDigitWidthSpecs, [{ fieldId: field.id, width: 4 }]);
   assert.equal(applied.url, 'https://example.test/images/image-0009.jpg');
 
-  const cleared = applyFieldDigitWidthTransform(model, field.id, '', applied.fieldDigitWidthSpecs);
+  const projectedModel = parseUrl(applied.url);
+  const cleared = applyFieldDigitWidthTransform(projectedModel, field.id, '', applied.fieldDigitWidthSpecs);
   assert.equal(cleared.ok, true);
   assert.deepEqual(cleared.fieldDigitWidthSpecs, []);
   assert.equal(cleared.url, 'https://example.test/images/image-9.jpg');
+});
+
+test('digit-width clear restores natural source padding after projection', () => {
+  const model = parseUrl('https://example.test/images/image-009.jpg');
+  const field = collectUrlFields(model).find((candidate) => candidate.value === '009');
+  assert.ok(field);
+
+  const applied = applyFieldDigitWidthTransform(model, field.id, '5', []);
+  assert.equal(applied.ok, true);
+  assert.deepEqual(applied.fieldDigitWidthSpecs, [{ fieldId: field.id, width: 5, sourceWidth: 3 }]);
+  assert.equal(applied.url, 'https://example.test/images/image-00009.jpg');
+
+  const projectedModel = parseUrl(applied.url);
+  const cleared = applyFieldDigitWidthTransform(projectedModel, field.id, '', applied.fieldDigitWidthSpecs);
+  assert.equal(cleared.ok, true);
+  assert.deepEqual(cleared.fieldDigitWidthSpecs, []);
+  assert.equal(cleared.url, 'https://example.test/images/image-009.jpg');
 });
 
 test('split transforms adapt current split apply and clear behavior', () => {
@@ -73,14 +96,22 @@ test('split transforms adapt current split apply and clear behavior', () => {
   assert.ok(field);
 
   const split = applyFieldSplitTransform(field, '2-2-4');
-  assert.ok(!('ok' in split));
-  assert.equal(split.baseFieldId, field.id);
-  assert.deepEqual(split.lengths, [2, 2, 4]);
-  assert.equal(split.pattern, '2-2-4');
+  assert.equal(split.ok, true);
+  assert.equal(split.kind, 'state');
+  assert.equal(split.splitSpec.baseFieldId, field.id);
+  assert.deepEqual(split.splitSpec.lengths, [2, 2, 4]);
+  assert.equal(split.splitSpec.pattern, '2-2-4');
 
   assert.deepEqual(applyFieldSplitTransform(field, '2-2'), {
     ok: false,
+    id: 'split-apply',
+    kind: 'state',
     message: 'Split pattern totals 4, but the field is 8 characters.',
   });
-  assert.deepEqual(clearFieldSplitTransform(field.id), { baseFieldId: field.id });
+  assert.deepEqual(clearFieldSplitTransform(field.id), {
+    ok: true,
+    id: 'split-clear',
+    kind: 'state',
+    baseFieldId: field.id,
+  });
 });

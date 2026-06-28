@@ -1750,14 +1750,14 @@ export class ImageTrailPanel {
     const field = collectUrlFields(model).find((item) => item.id === fieldId);
     if (!field) return;
 
-    const splitSpec = applyFieldSplitTransform(field, pattern);
-    if ('ok' in splitSpec) {
-      this.state = { ...this.state, status: 'error', message: splitSpec.message, lastUpdatedAt: Date.now() };
+    const transform = applyFieldSplitTransform(field, pattern);
+    if (!transform.ok) {
+      this.state = { ...this.state, status: 'error', message: transform.message, lastUpdatedAt: Date.now() };
       this.render();
       return;
     }
 
-    this.state = applyFieldSplitSpecToState(this.state, splitSpec);
+    this.state = applyFieldSplitSpecToState(this.state, transform.splitSpec);
     void this.saveParsedFieldState();
     this.render();
   }
