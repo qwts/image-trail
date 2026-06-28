@@ -5,10 +5,12 @@ import { createInitialPanelState, setTargetState } from '../extension/src/core/s
 import {
   isLockedPrivatePin,
   nextParsedFieldStatePageKey,
+  originalBlobIdsForFullBackup,
   projectionSessionOwnsSelectedTarget,
   shouldRestoreParsedFieldState,
   urlReviewStatusForLoadResult,
 } from '../extension/src/ui/panel.js';
+import { createDisplayRecord } from '../extension/src/core/display-records.js';
 import {
   PRIVACY_RECORD_META,
   PRIVACY_RECORD_NAME,
@@ -1339,6 +1341,31 @@ test('pCloud backup reducer tracks backing-up state and verified upload metadata
   assert.equal(uploaded.pcloudBackup.lastBackupSizeBytes, 512);
   assert.equal(uploaded.pcloudBackup.lastBackupSha256, 'b'.repeat(64));
   assert.equal(uploaded.pcloudBackup.messageIsError, false);
+});
+
+test('pCloud full backup collects captured blob ids from durable records', () => {
+  const records = [
+    createDisplayRecord({
+      id: 'captured',
+      url: 'https://example.test/captured.jpg',
+      timestamp: '2026-06-28T02:26:41.854Z',
+      captureStatus: 'captured',
+      blobId: 'captured-blob',
+    }),
+    createDisplayRecord({
+      id: 'stored',
+      url: 'https://example.test/stored.jpg',
+      timestamp: '2026-06-28T02:26:42.854Z',
+      storedOriginal: {
+        blobId: 'stored-blob',
+        mimeType: 'image/jpeg',
+        byteLength: 447304,
+        capturedAt: '2026-06-28T02:26:42.854Z',
+      },
+    }),
+  ];
+
+  assert.deepEqual([...originalBlobIdsForFullBackup(records)].sort(), ['captured-blob', 'stored-blob']);
 });
 
 test('pCloud upload errors keep connected provider state for retry', () => {

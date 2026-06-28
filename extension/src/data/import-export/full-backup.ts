@@ -26,6 +26,7 @@ export interface FullBackupPayloadV1 {
   readonly bookmarks: readonly FullBackupBookmarkEntry[];
   readonly originalBlobs: readonly PortableStoredBlobRecord[];
   readonly blobKeyBackups: readonly FullBackupBlobKeyBackup[];
+  readonly missingOriginalBlobIds: readonly string[];
 }
 
 export interface FullBackupBlobKeyBackup {
@@ -37,6 +38,7 @@ export interface FullBackupExportInput {
   readonly bookmarks: readonly FullBackupBookmarkEntry[];
   readonly originalBlobs: readonly StoredBlobRecord[];
   readonly blobKeyBackups?: readonly FullBackupBlobKeyBackup[];
+  readonly missingOriginalBlobIds?: readonly string[];
   readonly password: string;
   readonly now?: string;
 }
@@ -46,6 +48,7 @@ export interface FullBackupExportResult {
   readonly fileContent?: string;
   readonly fileName?: string;
   readonly originalBlobCount?: number;
+  readonly missingOriginalBlobCount?: number;
 }
 
 export async function exportEncryptedFullBackup(input: FullBackupExportInput): Promise<FullBackupExportResult> {
@@ -63,6 +66,7 @@ export async function exportEncryptedFullBackup(input: FullBackupExportInput): P
       bookmarks,
       originalBlobs: originalBlobs.map(portableStoredBlobRecord),
       blobKeyBackups: input.blobKeyBackups ?? [],
+      missingOriginalBlobIds: input.missingOriginalBlobIds ?? [],
     };
     const plaintext = new TextEncoder().encode(JSON.stringify(payload));
     const iv = createAesGcmIv();
@@ -85,11 +89,12 @@ export async function exportEncryptedFullBackup(input: FullBackupExportInput): P
       status: {
         ok: true,
         code: 'ok',
-        message: `Exported ${bookmarks.length} bookmark(s) and ${originalBlobs.length} encrypted original(s).`,
+        message: fullBackupExportMessage(bookmarks.length, originalBlobs.length, input.missingOriginalBlobIds?.length ?? 0),
       },
       fileContent,
       fileName: `image-trail-full-backup-${now.slice(0, 10)}.json`,
       originalBlobCount: originalBlobs.length,
+      missingOriginalBlobCount: input.missingOriginalBlobIds?.length ?? 0,
     };
   } catch (cause) {
     return {
@@ -101,6 +106,12 @@ export async function exportEncryptedFullBackup(input: FullBackupExportInput): P
       },
     };
   }
+}
+
+function fullBackupExportMessage(bookmarkCount: number, originalBlobCount: number, missingOriginalBlobCount: number): string {
+  const base = `Exported ${bookmarkCount} bookmark(s) and ${originalBlobCount} encrypted original(s).`;
+  if (missingOriginalBlobCount === 0) return base;
+  return `${base} ${missingOriginalBlobCount} referenced original(s) were missing and will restore as metadata-only.`;
 }
 
 export function portableStoredBlobRecord(record: StoredBlobRecord): PortableStoredBlobRecord {

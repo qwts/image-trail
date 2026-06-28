@@ -3435,14 +3435,6 @@ export class ImageTrailPanel {
       this.render();
       return;
     }
-    if (originalBlobResult.missingBlobIds.length > 0) {
-      this.state = reducePanelAction(this.state, {
-        name: 'pcloud-backup/upload-error',
-        message: `Full backup could not find ${originalBlobResult.missingBlobIds.length} encrypted original(s).`,
-      });
-      this.render();
-      return;
-    }
 
     const blobKeyBackup =
       originalBlobResult.records.length > 0 && this.captureStore
@@ -3459,6 +3451,7 @@ export class ImageTrailPanel {
       bookmarks: bookmarks.map(bookmarkRecordToExportEntry),
       originalBlobs: originalBlobResult.records,
       blobKeyBackups: blobKeyBackup?.ok ? [{ keyReference: blobKeyBackup.keyReference, fileContent: blobKeyBackup.fileContent }] : [],
+      missingOriginalBlobIds: originalBlobResult.missingBlobIds,
       password,
       now,
     });
@@ -4718,9 +4711,11 @@ function selectedRecords(records: readonly ImageDisplayRecord[], selectedIds: re
   return records.filter((record) => selected.has(record.id));
 }
 
-function originalBlobIdsForFullBackup(records: readonly ImageDisplayRecord[]): readonly string[] {
+export function originalBlobIdsForFullBackup(records: readonly ImageDisplayRecord[]): readonly string[] {
   const blobIds = new Set<string>();
   for (const record of records) {
+    const capturedBlobId = encryptedBlobIdForRecord(record);
+    if (capturedBlobId) blobIds.add(capturedBlobId);
     if (record.storedOriginal?.blobId) blobIds.add(record.storedOriginal.blobId);
     if (record.protectedPin?.storedOriginalBlobId) blobIds.add(record.protectedPin.storedOriginalBlobId);
   }
