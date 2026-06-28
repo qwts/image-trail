@@ -402,6 +402,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
       state.pcloudBackup.lastRestoreSizeBytes === undefined ? undefined : formatCloudBackupBytes(state.pcloudBackup.lastRestoreSizeBytes),
     restoreCandidateSha256: state.pcloudBackup.lastRestoreSha256,
     restoreDownloadedAt: state.pcloudBackup.lastRestoreDownloadedAt,
+    restorePreview: state.importRestorePreview,
     pendingOperation: state.pcloudBackup.pendingOperation,
     message: state.pcloudBackup.message,
     messageIsError: state.pcloudBackup.messageIsError,

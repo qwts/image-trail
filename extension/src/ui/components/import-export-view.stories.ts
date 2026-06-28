@@ -231,6 +231,46 @@ export const CloudBackupRestoreAvailable: Story = {
     }),
 };
 
+export const CloudBackupRestorePreviewReady: Story = {
+  render: () =>
+    cloudBackupStory({
+      connectionState: 'connected',
+      apiHost: 'api.pcloud.com',
+      folderPath: '/Image Trail/backups',
+      lastBackupName: 'image-trail-pcloud-backup-2026-06-28T00-51-15Z.image-trail-encrypted.json',
+      lastBackupAt: '2026-06-28T00:51:22.335Z',
+      lastBackupSize: '22.3 KB',
+      lastBackupSha256: 'c5ac3697b905ae544fb9d8987ec2fe71c4283bd3afab62fd4740aaccf5a53925',
+      restoreCandidateName: 'image-trail-pcloud-backup-2026-06-28T00-51-15Z.image-trail-encrypted.json',
+      restoreCandidateSize: '22.3 KB',
+      restoreDownloadedAt: '2026-06-28T00:51:50.135Z',
+      restoreCandidateSha256: 'c5ac3697b905ae544fb9d8987ec2fe71c4283bd3afab62fd4740aaccf5a53925',
+      restorePreview: {
+        fileName: 'image-trail-pcloud-backup-2026-06-28T00-51-15Z.image-trail-encrypted.json',
+        payloadLabel: 'Bookmarks',
+        recordCount: 9,
+        capturedOriginalCount: 4,
+        duplicateCount: 1,
+        skippedCount: 0,
+        unsupportedCount: 0,
+        message: 'Preview loaded. Import has not changed local records yet. 1 duplicate record will be skipped on confirm.',
+        samples: [
+          {
+            label: 'quiet-ridge.jpg',
+            url: 'https://images.example.test/gallery/quiet-ridge.jpg',
+            detail: '1280 x 854, captured original metadata reference',
+          },
+          {
+            label: 'frame-042.webp',
+            url: 'https://cdn.example.test/sets/night-market/frame-042.webp',
+            detail: 'Duplicate URL, skipped on confirm',
+          },
+        ],
+      },
+      message: 'Downloaded encrypted pCloud backup. Review the restore preview before importing.',
+    }),
+};
+
 export const CloudBackupError: Story = {
   render: () =>
     cloudBackupStory({

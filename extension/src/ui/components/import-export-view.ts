@@ -20,6 +20,11 @@ export type ImportExportAction =
   | { readonly name: 'import/confirm-restore-preview' }
   | { readonly name: 'import/cancel-restore-preview' };
 
+type RestorePreviewAction = Extract<
+  ImportExportAction,
+  { readonly name: 'import/confirm-restore-preview' } | { readonly name: 'import/cancel-restore-preview' }
+>;
+
 export type CloudBackupAction =
   | { readonly name: 'cloud-backup/connect'; readonly provider: 'pcloud' }
   | { readonly name: 'cloud-backup/backup-now'; readonly provider: 'pcloud'; readonly password: string }
@@ -32,7 +37,9 @@ export type CloudBackupAction =
       readonly password: string;
     }
   | { readonly name: 'cloud-backup/retry'; readonly provider: 'pcloud' }
-  | { readonly name: 'cloud-backup/disconnect'; readonly provider: 'pcloud' };
+  | { readonly name: 'cloud-backup/disconnect'; readonly provider: 'pcloud' }
+  | { readonly name: 'import/confirm-restore-preview' }
+  | { readonly name: 'import/cancel-restore-preview' };
 
 export type CloudBackupConnectionState = 'disconnected' | 'connected' | 'busy' | 'error';
 
@@ -56,6 +63,7 @@ export interface CloudBackupProviderState {
   readonly restoreCandidateSize?: string;
   readonly restoreCandidateSha256?: string;
   readonly restoreDownloadedAt?: string;
+  readonly restorePreview?: ImportRestorePreviewState;
   readonly message?: string;
   readonly messageIsError?: boolean;
 }
@@ -218,8 +226,27 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
 
   group.append(actions);
   if (restoreCandidateControls) group.append(restoreCandidateControls);
+  if (state.restorePreview) {
+    group.append(
+      createRestorePreview(state.restorePreview, { ...emptyImportExportState(), busy: state.connectionState === 'busy' }, dispatch),
+    );
+  }
   body.append(group);
   return section;
+}
+
+function emptyImportExportState(): ImportExportViewState {
+  return {
+    busy: false,
+    currentImageUrl: null,
+    selectedHistoryCount: 0,
+    selectedBookmarkCount: 0,
+    selectedImageDownloadCount: 0,
+    visibleImageSelectionCount: 0,
+    imageDownloadAvailable: false,
+    encryptedImageTransferAvailable: false,
+    blobKeyUnlocked: false,
+  };
 }
 
 function createRestoreCandidateControls(
@@ -605,7 +632,7 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
 function createRestorePreview(
   preview: ImportRestorePreviewState,
   state: ImportExportViewState,
-  dispatch: (action: ImportExportAction) => void,
+  dispatch: (action: RestorePreviewAction) => void,
 ): HTMLElement {
   const panel = document.createElement('div');
   panel.className = 'image-trail-panel__restore-preview';
