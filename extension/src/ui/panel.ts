@@ -62,8 +62,14 @@ import {
   URL_REVIEW_STATUS_LIMITS,
   VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
 } from '../core/settings.js';
-import { applyFieldSplitSpecs, createFieldSplitSpec } from '../core/url/field-splits.js';
-import { applyFieldDigitWidthSpecs, normalizeFieldDigitWidth, upsertFieldDigitWidthSpec } from '../core/url/field-widths.js';
+import { applyFieldSplitSpecs } from '../core/url/field-splits.js';
+import { applyFieldDigitWidthSpecs } from '../core/url/field-widths.js';
+import {
+  applyFieldDigitWidthTransform,
+  applyFieldSplitTransform,
+  applySetFieldValueTransform,
+  applyStepFieldValueTransform,
+} from '../core/url/field-transforms.js';
 import { parseUrl } from '../core/url/parse-url.js';
 import {
   ImageStatus,
@@ -80,7 +86,7 @@ import {
   type AdjacentParsedFieldUrlCandidate,
   type NeighborPreloadDirection,
 } from '../core/url/preload-neighbors.js';
-import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../core/url/rebuild-url.js';
+import { bumpUrlField, rebuildUrl } from '../core/url/rebuild-url.js';
 import { collectUrlFields } from '../core/url/tokenize-fields.js';
 import { ProjectionSessionController, type ProjectionReason, type ProjectionSession } from '../core/projection-session.js';
 import {
@@ -1688,6 +1694,10 @@ export class ImageTrailPanel {
     return this.urlModelFromRawUrl(this.currentRawUrl());
   }
 
+  private currentUrlModelWithoutDigitWidthSpecs(): ParsedUrlModel {
+    return applyFieldSplitSpecs(parseUrl(this.currentRawUrl()), this.state.fieldSplitSpecs);
+  }
+
   private currentNavigationBaseModel(): ParsedUrlModel {
     return this.urlModelFromRawUrl(this.currentNavigationBaseRawUrl());
   }
@@ -1740,7 +1750,7 @@ export class ImageTrailPanel {
     const field = collectUrlFields(model).find((item) => item.id === fieldId);
     if (!field) return;
 
-    const splitSpec = createFieldSplitSpec(field, pattern);
+    const splitSpec = applyFieldSplitTransform(field, pattern);
     if ('ok' in splitSpec) {
       this.state = { ...this.state, status: 'error', message: splitSpec.message, lastUpdatedAt: Date.now() };
       this.render();
@@ -2232,16 +2242,20 @@ export class ImageTrailPanel {
     const field = fields.find((item) => item.id === fieldId);
     if (!field) return;
 
-    const nextModel = setUrlFieldValue(model, field, nextValue);
-    const nextUrl = rebuildUrl(nextModel);
-    const loaded = await this.applySelectedUrl(nextUrl, [fieldId]);
+    const transform = applySetFieldValueTransform(model, field, nextValue);
+    const loaded = await this.applySelectedUrl(transform.url, transform.attemptedFieldIds);
     if (loaded && this.state.unlockedFieldIds.length > 0) await this.saveUrlTemplateFromCurrentFields();
   }
 
   private async updateFieldDigitWidth(fieldId: string, value: string): Promise<void> {
-    const normalized = normalizeFieldDigitWidth(value);
-    if (typeof normalized === 'object' && normalized !== null && 'ok' in normalized) {
-      this.state = { ...this.state, status: 'error', message: normalized.message, lastUpdatedAt: Date.now() };
+    const transform = applyFieldDigitWidthTransform(
+      this.currentUrlModelWithoutDigitWidthSpecs(),
+      fieldId,
+      value,
+      this.state.fieldDigitWidthSpecs,
+    );
+    if (!transform.ok) {
+      this.state = { ...this.state, status: 'error', message: transform.message, lastUpdatedAt: Date.now() };
       this.render();
       return;
     }
@@ -2249,18 +2263,18 @@ export class ImageTrailPanel {
     this.state = {
       ...this.state,
       activeFieldId: fieldId,
-      fieldDigitWidthSpecs: upsertFieldDigitWidthSpec(this.state.fieldDigitWidthSpecs, fieldId, normalized),
+      fieldDigitWidthSpecs: transform.fieldDigitWidthSpecs,
       lastUpdatedAt: Date.now(),
     };
 
-    const nextUrl = rebuildUrl(this.currentUrlModel());
+    const nextUrl = transform.url;
     if (nextUrl === this.currentRawUrl()) {
       void this.saveParsedFieldState();
       this.render();
       return;
     }
 
-    const loaded = await this.applySelectedUrl(nextUrl, [fieldId]);
+    const loaded = await this.applySelectedUrl(nextUrl, transform.attemptedFieldIds);
     if (loaded && this.state.unlockedFieldIds.length > 0) await this.saveUrlTemplateFromCurrentFields();
   }
 
@@ -2270,10 +2284,9 @@ export class ImageTrailPanel {
     const field = fields.find((item) => item.id === fieldId);
     if (!field) return;
 
-    const nextModel = bumpUrlField(model, field, delta);
-    const nextUrl = rebuildUrl(nextModel);
+    const transform = applyStepFieldValueTransform(model, field, delta);
     this.state = reducePanelAction(this.state, { name: 'active-field/set', id: fieldId });
-    const loaded = await this.applySelectedUrl(nextUrl, [fieldId]);
+    const loaded = await this.applySelectedUrl(transform.url, transform.attemptedFieldIds);
     if (loaded) await this.saveUrlTemplateFromCurrentFields();
   }
 
