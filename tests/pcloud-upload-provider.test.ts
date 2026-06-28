@@ -31,6 +31,13 @@ function sha256(input: string): string {
   return createHash('sha256').update(input).digest('hex');
 }
 
+function addedDnrRuleIds(calls: readonly unknown[]): number[] {
+  return calls.flatMap((call) => {
+    const addRules = (call as { readonly addRules?: readonly { readonly id?: unknown }[] }).addRules ?? [];
+    return addRules.flatMap((rule) => (typeof rule.id === 'number' ? [rule.id] : []));
+  });
+}
+
 function mockedFolderId(init: RequestInit | undefined): number {
   const params = init?.body as URLSearchParams;
   const parentFolderId = params.get('folderid');
@@ -359,13 +366,12 @@ test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 wi
       assert.equal(params.get('fileid'), '402');
       assert.equal(headers?.accept, '*/*');
       assert.equal(headers?.['content-type'], 'application/x-www-form-urlencoded;charset=UTF-8');
-      assert.equal(headers?.['sec-fetch-site'], 'none');
-      assert.equal(headers?.['sec-fetch-storage-access'], 'active');
-      assert.equal(headers?.['sec-gpc'], '1');
-      assert.equal(headers?.origin, 'https://my.pcloud.com/');
-      assert.equal(headers?.referer, 'https://my.pcloud.com/');
+      assert.equal(headers?.origin, undefined);
+      assert.equal(headers?.referer, undefined);
       assert.equal(init?.mode, 'cors');
       assert.equal(init?.credentials, 'include');
+      assert.equal(init?.referrer, 'https://my.pcloud.com/');
+      assert.equal(init?.referrerPolicy, 'origin');
       assert.equal(JSON.stringify(dnrCalls).includes('getfilelink'), true);
       return jsonResponse({ result: 0, hosts: ['c123.pcloud.com'], path: '/restore-backup' });
     }
@@ -396,7 +402,11 @@ test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 wi
       true,
     );
     assert.equal(JSON.stringify(dnrCalls).includes('"header":"Referer"'), true);
+    assert.equal(JSON.stringify(dnrCalls).includes('"header":"Origin"'), true);
     assert.equal(JSON.stringify(dnrCalls).includes('"value":"https://my.pcloud.com/"'), true);
+    const ruleIds = addedDnrRuleIds(dnrCalls);
+    assert.equal(ruleIds.length, 2);
+    assert.equal(new Set(ruleIds).size, ruleIds.length);
   } finally {
     globalThis.fetch = originalFetch;
     restoreChrome();
@@ -419,13 +429,12 @@ test('downloadPCloudBackup retries alternate pCloud hosts after direct-link refe
       assert.equal(params.get('fileid'), '402');
       assert.equal(headers?.accept, '*/*');
       assert.equal(headers?.['content-type'], 'application/x-www-form-urlencoded;charset=UTF-8');
-      assert.equal(headers?.['sec-fetch-site'], 'none');
-      assert.equal(headers?.['sec-fetch-storage-access'], 'active');
-      assert.equal(headers?.['sec-gpc'], '1');
-      assert.equal(headers?.origin, 'https://my.pcloud.com/');
-      assert.equal(headers?.referer, 'https://my.pcloud.com/');
+      assert.equal(headers?.origin, undefined);
+      assert.equal(headers?.referer, undefined);
       assert.equal(init?.mode, 'cors');
       assert.equal(init?.credentials, 'include');
+      assert.equal(init?.referrer, 'https://my.pcloud.com/');
+      assert.equal(init?.referrerPolicy, 'origin');
       assert.equal(JSON.stringify(dnrCalls).includes('getfilelink'), true);
       return jsonResponse({ result: 0, hosts: ['blocked.pcloud.com', 'c123.pcloud.com'], path: '/restore-backup' });
     }
@@ -459,7 +468,11 @@ test('downloadPCloudBackup retries alternate pCloud hosts after direct-link refe
     );
     assert.equal(JSON.stringify(result).includes('token-secret'), false);
     assert.equal(JSON.stringify(dnrCalls).includes('"header":"Referer"'), true);
+    assert.equal(JSON.stringify(dnrCalls).includes('"header":"Origin"'), true);
     assert.equal(JSON.stringify(dnrCalls).includes('"value":"https://my.pcloud.com/"'), true);
+    const ruleIds = addedDnrRuleIds(dnrCalls);
+    assert.equal(ruleIds.length, 3);
+    assert.equal(new Set(ruleIds).size, ruleIds.length);
   } finally {
     globalThis.fetch = originalFetch;
     restoreChrome();

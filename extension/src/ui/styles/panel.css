@@ -1310,6 +1310,13 @@
   display: grid;
   gap: 6px;
   min-width: 0;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.image-trail-panel-root .image-trail-panel__cloud-restore-item {
+  min-width: 0;
 }
 
 .image-trail-panel-root .image-trail-panel__cloud-restore-row {

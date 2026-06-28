@@ -27,13 +27,14 @@ const PCLOUD_CONNECTION_KEY = 'imageTrail.pcloudConnection';
 const PCLOUD_CLIENT_ID = '83ag1CIbJd7';
 const PCLOUD_AUTHORIZE_URL = 'https://my.pcloud.com/oauth2/authorize';
 const PCLOUD_DOWNLOAD_REFERRER = 'https://my.pcloud.com/';
-const PCLOUD_DOWNLOAD_REFERRER_RULE_ID = 900199;
+const PCLOUD_REQUEST_HEADER_RULE_ID_BASE = 900199;
 const DEFAULT_PCLOUD_API_HOST: PCloudApiHost = 'api.pcloud.com';
 const PCLOUD_ROOT_FOLDER_NAME = 'Image Trail';
 const PCLOUD_BACKUP_FOLDER_NAME = 'backups';
 const PCLOUD_BACKUP_FOLDER_PATH = '/Image Trail/backups';
 const PCLOUD_LIST_RETRY_ATTEMPTS = 5;
 const PCLOUD_LIST_RETRY_BASE_MS = 500;
+let pcloudRequestHeaderRuleId = PCLOUD_REQUEST_HEADER_RULE_ID_BASE;
 
 function hasChromeStorage(): boolean {
   return typeof chrome !== 'undefined' && !!chrome.storage?.local;
@@ -145,6 +146,8 @@ async function requestPCloudJson(apiHost: PCloudApiHost, method: string, body: B
     method: 'POST',
     mode: isUrlEncodedBody ? 'cors' : undefined,
     credentials: isUrlEncodedBody ? 'include' : undefined,
+    referrer: isUrlEncodedBody ? PCLOUD_DOWNLOAD_REFERRER : undefined,
+    referrerPolicy: isUrlEncodedBody ? 'origin' : undefined,
     headers: isUrlEncodedBody
       ? {
           accept: '*/*',
@@ -152,18 +155,8 @@ async function requestPCloudJson(apiHost: PCloudApiHost, method: string, body: B
           'cache-control': 'no-cache',
           'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
           pragma: 'no-cache',
-          'sec-fetch-dest': 'empty',
-          'sec-fetch-mode': 'cors',
-          'sec-fetch-site': 'none',
-          'sec-fetch-storage-access': 'active',
-          'sec-gpc': '1',
-          origin: PCLOUD_DOWNLOAD_REFERRER,
-          referer: PCLOUD_DOWNLOAD_REFERRER,
         }
-      : {
-          origin: PCLOUD_DOWNLOAD_REFERRER,
-          referer: PCLOUD_DOWNLOAD_REFERRER,
-        },
+      : undefined,
     body,
   });
   const data = (await response.json()) as Record<string, unknown>;
@@ -191,7 +184,7 @@ async function fetchPCloudJsonWithReferer(
   params: Record<string, string> = {},
 ): Promise<Record<string, unknown>> {
   const url = `https://${apiHost}/${method}`;
-  const removeRule = await installPCloudRefererRule(url);
+  const removeRule = await installPCloudRequestHeaderRule(url);
   try {
     return await requestPCloudJson(apiHost, method, new URLSearchParams({ access_token: accessToken, ...params }));
   } finally {
@@ -337,7 +330,7 @@ async function downloadPCloudFile(record: PCloudConnectionRecord, fileId: number
 }
 
 async function fetchPCloudDownloadUrl(url: string): Promise<Response> {
-  const removeRule = await installPCloudRefererRule(url);
+  const removeRule = await installPCloudRequestHeaderRule(url);
   try {
     return await fetch(url, {
       referrer: PCLOUD_DOWNLOAD_REFERRER,
@@ -348,20 +341,30 @@ async function fetchPCloudDownloadUrl(url: string): Promise<Response> {
   }
 }
 
-async function installPCloudRefererRule(url: string): Promise<() => Promise<void>> {
+function nextPCloudRequestHeaderRuleId(): number {
+  pcloudRequestHeaderRuleId += 1;
+  return pcloudRequestHeaderRuleId;
+}
+
+async function installPCloudRequestHeaderRule(url: string): Promise<() => Promise<void>> {
   if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest?.updateSessionRules) return async () => {};
+  const ruleId = nextPCloudRequestHeaderRuleId();
   const regexFilter = `^${escapeRegExp(url)}$`;
   await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [PCLOUD_DOWNLOAD_REFERRER_RULE_ID],
     addRules: [
       {
-        id: PCLOUD_DOWNLOAD_REFERRER_RULE_ID,
+        id: ruleId,
         priority: 1,
         action: {
           type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
           requestHeaders: [
             {
               header: 'Referer',
+              operation: chrome.declarativeNetRequest.HeaderOperation.SET,
+              value: PCLOUD_DOWNLOAD_REFERRER,
+            },
+            {
+              header: 'Origin',
               operation: chrome.declarativeNetRequest.HeaderOperation.SET,
               value: PCLOUD_DOWNLOAD_REFERRER,
             },
@@ -375,7 +378,7 @@ async function installPCloudRefererRule(url: string): Promise<() => Promise<void
     ],
   });
   return async () => {
-    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [PCLOUD_DOWNLOAD_REFERRER_RULE_ID] });
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [ruleId] });
   };
 }
 

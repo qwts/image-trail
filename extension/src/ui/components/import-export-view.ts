@@ -269,11 +269,13 @@ function createRestoreCandidateControls(
   hint.textContent =
     passwordInput.value.length < 4 ? 'Enter the backup password, then choose a pCloud backup to preview.' : 'Choose a backup to preview.';
 
-  const list = document.createElement('div');
+  const list = document.createElement('ul');
   list.className = 'image-trail-panel__cloud-restore-list';
-  list.setAttribute('role', 'list');
 
   for (const candidate of candidates) {
+    const item = document.createElement('li');
+    item.className = 'image-trail-panel__cloud-restore-item';
+
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'image-trail-panel__cloud-restore-row';
@@ -306,7 +308,8 @@ function createRestoreCandidateControls(
     meta.textContent = restoreCandidateMeta(candidate);
 
     row.append(name, meta);
-    list.append(row);
+    item.append(row);
+    list.append(item);
   }
 
   function updatePreviewControls(): void {
