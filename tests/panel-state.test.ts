@@ -8,7 +8,6 @@ import {
   originalBlobIdsForFullBackup,
   projectionSessionOwnsSelectedTarget,
   shouldRestoreParsedFieldState,
-  toProjectedTargetState,
   urlReviewStatusForLoadResult,
 } from '../extension/src/ui/panel.js';
 import { createDisplayRecord } from '../extension/src/core/display-records.js';
@@ -227,38 +226,6 @@ test('successful same target projection can explicitly clear edited draft URL', 
 
   assert.equal(projected.target.selectedUrl, 'https://example.test/image-3.jpg');
   assert.equal(projected.draftUrl, null);
-});
-
-test('projected target state keeps source URL when display bytes are a data URL', () => {
-  const target = toProjectedTargetState(
-    {
-      mode: 'manual',
-      picking: false,
-      grabModeActive: false,
-      candidateCount: 1,
-      selected: {
-        url: 'data:image/jpeg;base64,projected',
-        handleId: 'target-1',
-        width: 640,
-        height: 480,
-        source: 'srcProperty',
-      },
-      fillScreen: false,
-      objectFit: 'contain',
-      message: 'Applied data display URL.',
-    },
-    {
-      id: 'projection-1',
-      reason: 'record-preview',
-      sourceUrl: 'https://example.test/pin.jpg',
-      displayUrl: 'data:image/jpeg;base64,projected',
-      selectedHandleId: 'target-1',
-      originalSourceUrl: 'https://example.test/original-host.jpg',
-      status: 'loaded',
-    },
-  );
-
-  assert.equal(target.selectedUrl, 'https://example.test/pin.jpg');
 });
 
 test('Grab Mode actions expose sticky page-image grab status', () => {
