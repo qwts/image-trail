@@ -188,6 +188,7 @@ export interface PanelState {
   readonly neighborPreloadEnabled: boolean;
   readonly neighborPreloadRadius: number;
   readonly neighborPreloadCacheLimit: number;
+  readonly secondaryControlsOpen: boolean;
   readonly hasOlderBookmarks: boolean;
   readonly hasNewerBookmarks: boolean;
   readonly captureInProgress: boolean;
@@ -259,6 +260,7 @@ export type PanelActionName =
   | 'close-panel'
   | 'panel/minimize'
   | 'panel/expand'
+  | 'panel/secondary-controls-open'
   | 'start-target-picker'
   | 'stop-target-picker'
   | 'grab-mode/start'
@@ -397,6 +399,7 @@ export type PanelAction =
         | 'selected-url/apply'
         | 'target/fill-screen'
         | 'target/set-object-fit'
+        | 'panel/secondary-controls-open'
         | 'active-field/set'
         | 'field-unlock/toggle'
         | 'field-split/apply'
@@ -502,6 +505,7 @@ export type PanelAction =
       readonly hasNewer: boolean;
     }
   | { readonly name: 'history/load' | 'history/download' }
+  | { readonly name: 'panel/secondary-controls-open'; readonly open: boolean }
   | { readonly name: 'settings/update-visible-bookmark-soft-max'; readonly value: number }
   | {
       readonly name: 'settings/update-recent-history-retention';

@@ -83,6 +83,33 @@ function makeButton(label: string, action: PanelAction, dispatch: (action: Panel
   return button;
 }
 
+function createSecondaryControlsGroup(
+  state: Pick<PanelState, 'secondaryControlsOpen'>,
+  target: PanelRenderTarget,
+  controls: readonly HTMLElement[],
+): HTMLElement {
+  const group = document.createElement('details');
+  group.className = 'image-trail-panel__section image-trail-panel__secondary-controls';
+  group.open = state.secondaryControlsOpen;
+
+  const summary = document.createElement('summary');
+  summary.className = 'image-trail-panel__secondary-controls-summary';
+  const heading = document.createElement('h3');
+  heading.textContent = 'Manual controls';
+  summary.append(heading);
+  summary.addEventListener('click', (event) => {
+    event.preventDefault();
+    target.dispatch({ name: 'panel/secondary-controls-open', open: !group.open });
+  });
+
+  const body = document.createElement('div');
+  body.className = 'image-trail-panel__secondary-controls-body';
+  body.append(...controls);
+
+  group.append(summary, body);
+  return group;
+}
+
 function createPanelHeader(state: PanelState, target: PanelRenderTarget): HTMLElement {
   const header = document.createElement('header');
   header.className = 'image-trail-panel__header';
@@ -527,13 +554,15 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
         privacyMode: state.privacyModeEnabled,
       },
     ),
-    createControlsView({
-      onPrevious: () => dispatchActiveField(-1),
-      onNext: () => dispatchActiveField(1),
-    }),
-    captureSection,
-    navSection,
-    autoSection,
+    createSecondaryControlsGroup(state, target, [
+      createControlsView({
+        onPrevious: () => dispatchActiveField(-1),
+        onNext: () => dispatchActiveField(1),
+      }),
+      captureSection,
+      navSection,
+      autoSection,
+    ]),
     createHistoryView(state.history, state.selectedHistoryIds, state.captureInProgress, state.blobKeyUnlocked, target.dispatch, {
       blobKeyAvailable: state.blobKeyAvailable,
       listBlockSize: target.layoutState.historyListBlockSize,

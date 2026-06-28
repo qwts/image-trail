@@ -257,6 +257,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return { ...state, visible: true, minimized: true, lastUpdatedAt: Date.now() };
     case 'panel/expand':
       return { ...state, visible: true, minimized: false, lastUpdatedAt: Date.now() };
+    case 'panel/secondary-controls-open':
+      return { ...state, secondaryControlsOpen: action.open, lastUpdatedAt: Date.now() };
     case 'start-target-picker':
       return { ...state, status: 'picking', message: 'Pick mode is active. Click the intended image.', lastUpdatedAt: Date.now() };
     case 'stop-target-picker':

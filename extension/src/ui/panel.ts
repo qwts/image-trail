@@ -455,6 +455,7 @@ export class ImageTrailPanel {
       neighborPreloadEnabled: this.localSettings.neighborPreloadEnabled,
       neighborPreloadRadius: this.localSettings.neighborPreloadRadius,
       neighborPreloadCacheLimit: this.localSettings.neighborPreloadCacheLimit,
+      secondaryControlsOpen: this.localSettings.secondaryControlsOpen,
       lastUpdatedAt: Date.now(),
     };
     this.governor.updateConfig({
@@ -1140,6 +1141,13 @@ export class ImageTrailPanel {
       const snapshot = this.pageAdapter.setSelectedObjectFit(action.mode);
       this.state = setTargetState(this.state, toTargetState(snapshot));
       this.saveLocalSettings({ ...this.localSettings, previewObjectFit: snapshot.objectFit });
+      this.render();
+      return;
+    }
+
+    if (action.name === 'panel/secondary-controls-open') {
+      this.state = reducePanelAction(this.state, action);
+      this.saveLocalSettings({ ...this.localSettings, secondaryControlsOpen: action.open });
       this.render();
       return;
     }

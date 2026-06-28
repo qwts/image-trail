@@ -35,6 +35,7 @@ export interface PlaintextLocalSettings {
   readonly neighborPreloadEnabled: boolean;
   readonly neighborPreloadRadius: number;
   readonly neighborPreloadCacheLimit: number;
+  readonly secondaryControlsOpen: boolean;
 }
 
 export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
@@ -57,6 +58,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   neighborPreloadEnabled: false,
   neighborPreloadRadius: DEFAULT_NEIGHBOR_PRELOAD_RADIUS,
   neighborPreloadCacheLimit: DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
+  secondaryControlsOpen: false,
 };
 
 export const LOCAL_SETTINGS_KEY = 'imageTrail.localSettings';
@@ -129,6 +131,7 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
     neighborPreloadCacheLimit: isSafeNeighborPreloadCacheLimit(input.neighborPreloadCacheLimit)
       ? input.neighborPreloadCacheLimit
       : DEFAULT_LOCAL_SETTINGS.neighborPreloadCacheLimit,
+    secondaryControlsOpen: input.secondaryControlsOpen === true,
   };
 }
 

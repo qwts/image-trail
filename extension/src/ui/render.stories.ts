@@ -63,6 +63,14 @@ export const DeleteOriginalSynced: Story = {
     }),
 };
 
+export const SecondaryControlsCollapsed: Story = {
+  render: () => panelLayoutStory({ secondaryControlsOpen: false }),
+};
+
+export const SecondaryControlsExpanded: Story = {
+  render: () => panelLayoutStory({ secondaryControlsOpen: true }),
+};
+
 function panelLayoutStory(overrides: Partial<PanelState> = {}): HTMLElement {
   const host = document.createElement('div');
   host.className = 'image-trail-panel-root image-trail-panel';
@@ -129,6 +137,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     neighborPreloadEnabled: true,
     neighborPreloadRadius: 5,
     neighborPreloadCacheLimit: 20,
+    secondaryControlsOpen: false,
     hasOlderBookmarks: false,
     hasNewerBookmarks: false,
     captureInProgress: false,

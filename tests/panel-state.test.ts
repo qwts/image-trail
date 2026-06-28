@@ -53,6 +53,17 @@ test('switching active fields clears a previous failed field marker', () => {
   assert.equal(next.failedFieldId, null);
 });
 
+test('secondary manual controls disclosure state is panel state', () => {
+  const initial = createInitialPanelState();
+
+  const opened = reducePanelAction(initial, { name: 'panel/secondary-controls-open', open: true });
+  const closed = reducePanelAction(opened, { name: 'panel/secondary-controls-open', open: false });
+
+  assert.equal(initial.secondaryControlsOpen, false);
+  assert.equal(opened.secondaryControlsOpen, true);
+  assert.equal(closed.secondaryControlsOpen, false);
+});
+
 test('target changes clear failed field markers', () => {
   const failed = {
     ...createInitialPanelState(),
