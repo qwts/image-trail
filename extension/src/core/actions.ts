@@ -128,10 +128,13 @@ function unlinkHistoryFromBookmark(history: readonly ImageDisplayRecord[], bookm
 function removeRecallCandidate(state: PanelState['recall'], id: string): PanelState['recall'] {
   const candidates = state.candidates.filter((candidate) => candidate.id !== id);
   if (candidates.length === state.candidates.length) return state;
+  const removedCount = state.candidates.length - candidates.length;
   return {
     ...state,
     candidates,
     selectedIds: removeItem(state.selectedIds, id),
+    nextOffset: Math.max(0, state.nextOffset - removedCount),
+    total: Math.max(0, state.total - removedCount),
   };
 }
 

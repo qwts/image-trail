@@ -485,6 +485,8 @@ test('bookmark/remove unlinks pinned recent rows and clears stale original state
   assert.deepEqual(updated.selectedBookmarkIds, []);
   assert.deepEqual(updated.recall.candidates, []);
   assert.deepEqual(updated.recall.selectedIds, []);
+  assert.equal(updated.recall.nextOffset, 0);
+  assert.equal(updated.recall.total, 0);
   assert.equal(updated.history[0].pinnedAt, undefined);
   assert.equal(updated.history[0].pinnedRecordId, undefined);
   assert.equal(updated.history[0].captureStatus, undefined);
