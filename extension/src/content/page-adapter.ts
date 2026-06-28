@@ -178,10 +178,7 @@ export class PageAdapter {
 
   prepareStandaloneImageBackdrop(): void {
     const images = Array.from(document.images);
-    const body = document.body;
-    if (images.length === 1 && body?.childElementCount === 1 && body.firstElementChild === images[0]) {
-      keepSelectedTargetBackdropBlack(images[0]);
-    }
+    if (images.length === 1) keepSelectedTargetBackdropBlack(images[0]);
   }
 
   enableBookmarkShortcut(): void {
