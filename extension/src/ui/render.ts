@@ -503,7 +503,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
         ]
       : []),
     createUrlEditorView(
-      { url: activeUrl, privacyMode: state.privacyModeEnabled },
+      { url: activeUrl, isDataUrl: selectedIsDataUrl, privacyMode: state.privacyModeEnabled },
       {
         onApply: (url) => {
           target.dispatch({ name: 'selected-url/apply', url });
