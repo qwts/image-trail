@@ -28,10 +28,18 @@ export interface StoredOriginalReference {
   readonly capturedAt: string;
 }
 
+export interface StorageUsageBucketSummary {
+  readonly count: number;
+  readonly totalBytes: number;
+}
+
 export interface StorageUsageSummary {
   readonly blobCount: number;
   readonly totalBytes: number;
   readonly orphanedBlobCount?: number;
+  readonly originals?: StorageUsageBucketSummary;
+  readonly queueRecords?: StorageUsageBucketSummary;
+  readonly thumbnails?: StorageUsageBucketSummary;
 }
 
 export const DEFAULT_MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;

@@ -15,6 +15,7 @@ import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFi
 import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../data/import-export/key-backup.js';
 import { openImageTrailDb } from '../data/db.js';
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
+import { BookmarksRepository } from '../data/repositories/bookmarks-repository.js';
 import { EncryptedPinsRepository } from '../data/repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from '../data/repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from '../data/repositories/keys-repository.js';
@@ -348,7 +349,7 @@ async function handleDeleteBlob(message: DeleteBlobMessage): Promise<{ deleted: 
   }
   const blobs = new BlobsRepository(db);
   await blobs.remove(message.payload.blobId);
-  const usage = await blobs.getStorageUsage();
+  const usage = await handleStorageUsage();
   return { deleted: true, usage };
 }
 
@@ -362,7 +363,7 @@ async function handleCleanupOrphanedBlobs(): Promise<import('./messages.js').Cle
   const orphanedBlobIds = (await blobs.list()).filter((blob) => !referenced.has(blob.id)).map((blob) => blob.id);
   const deletedCount = await blobs.deleteMany(orphanedBlobIds);
 
-  return { deletedCount, usage: await blobs.getStorageUsage() };
+  return { deletedCount, usage: await handleStorageUsage() };
 }
 
 async function handleBlobKeyStatus(): Promise<import('./messages.js').BlobKeyStatusResultMessage['payload']> {
@@ -579,19 +580,25 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
   const db = await getDb();
   if (!db) return { totalBytes: 0, blobCount: 0 };
   const blobs = new BlobsRepository(db);
+  const bookmarks = new BookmarksRepository(db);
   const pins = new EncryptedPinsRepository(db);
   const thumbnails = new EncryptedPinThumbnailsRepository(db);
-  const [usage, pinUsage, thumbnailUsage, referenced] = await Promise.all([
+  const [usage, bookmarkUsage, pinUsage, thumbnailUsage, referenced] = await Promise.all([
     blobs.getStorageUsage(),
+    bookmarks.getStorageUsage(),
     pins.getStorageUsage(),
     thumbnails.getStorageUsage(),
     referencedBlobIds(),
   ]);
   const all = await blobs.list();
+  const queueMetadataBytes = bookmarkUsage.totalBytes + pinUsage.totalBytes;
   return {
-    totalBytes: usage.totalBytes + pinUsage.totalBytes + thumbnailUsage.totalBytes,
-    blobCount: usage.blobCount + pinUsage.blobCount + thumbnailUsage.blobCount,
+    totalBytes: usage.totalBytes + queueMetadataBytes + thumbnailUsage.totalBytes,
+    blobCount: usage.blobCount + bookmarkUsage.blobCount + thumbnailUsage.blobCount,
     orphanedBlobCount: all.filter((blob) => !referenced.has(blob.id)).length,
+    originals: { count: usage.blobCount, totalBytes: usage.totalBytes },
+    queueRecords: { count: bookmarkUsage.blobCount, totalBytes: queueMetadataBytes },
+    thumbnails: { count: thumbnailUsage.blobCount, totalBytes: thumbnailUsage.totalBytes },
   };
 }
 

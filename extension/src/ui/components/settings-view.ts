@@ -1,3 +1,4 @@
+import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import type { PanelAction, PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../../core/types.js';
 import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from '../../core/url/templates.js';
 import {
@@ -52,6 +53,7 @@ export function createSettingsView(
     readonly recallCount: number;
     readonly busy: boolean;
   },
+  storageUsage: StorageUsageSummary | null,
   urlReviewStatusState: {
     readonly limit: number;
     readonly clearAfterExport: boolean;
@@ -92,6 +94,7 @@ export function createSettingsView(
     ]),
     createSettingsGroup('Maintenance', 'maintenance', [
       createPanelLayoutSettingsView(dispatch),
+      createStorageHealthSettingsView(storageUsage),
       createDestructiveSettingsView(destructiveState, dispatch),
     ]),
     createSettingsGroup('URL learning', 'url-learning', [
@@ -640,6 +643,72 @@ function createPanelLayoutSettingsView(dispatch: (action: PanelAction) => void):
 
   wrapper.append(heading, reset, meta);
   return wrapper;
+}
+
+export function createStorageHealthSettingsView(storageUsage: StorageUsageSummary | null): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'Storage health';
+
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__settings-empty';
+  meta.textContent = 'Approximate encrypted IndexedDB usage; browser storage overhead is not included.';
+
+  if (!storageUsage) {
+    const empty = document.createElement('p');
+    empty.className = 'image-trail-panel__settings-empty';
+    empty.textContent = 'Storage usage has not loaded yet.';
+    wrapper.append(heading, empty);
+    return wrapper;
+  }
+
+  const list = document.createElement('dl');
+  list.className = 'image-trail-panel__storage-health';
+  for (const row of storageHealthRows(storageUsage)) {
+    appendStorageHealthRow(list, row.label, row.count, row.bytes);
+  }
+
+  wrapper.append(heading, meta, list);
+  return wrapper;
+}
+
+function appendStorageHealthRow(list: HTMLDListElement, label: string, count: number, bytes: number | null): void {
+  const term = document.createElement('dt');
+  term.textContent = label;
+
+  const value = document.createElement('dd');
+  const countLabel = count === 1 ? '1 record' : `${count} records`;
+  value.textContent = bytes === null ? countLabel : `${countLabel} · ${formatStorageHealthBytes(bytes)}`;
+
+  list.append(term, value);
+}
+
+export function formatStorageHealthBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function storageHealthRows(
+  storageUsage: StorageUsageSummary,
+): readonly { readonly label: string; readonly count: number; readonly bytes: number | null }[] {
+  const queueRecords = storageUsage.queueRecords ?? { count: 0, totalBytes: 0 };
+  const thumbnails = storageUsage.thumbnails ?? { count: 0, totalBytes: 0 };
+  const originals = storageUsage.originals ?? { count: storageUsage.blobCount, totalBytes: storageUsage.totalBytes };
+  const rows: { readonly label: string; readonly count: number; readonly bytes: number | null }[] = [
+    { label: 'Queue metadata', count: queueRecords.count, bytes: queueRecords.totalBytes },
+    { label: 'Thumbnails', count: thumbnails.count, bytes: thumbnails.totalBytes },
+    { label: 'Encrypted originals', count: originals.count, bytes: originals.totalBytes },
+    { label: 'Total tracked storage', count: storageUsage.blobCount, bytes: storageUsage.totalBytes },
+  ];
+
+  if ((storageUsage.orphanedBlobCount ?? 0) > 0) {
+    rows.push({ label: 'Unlinked originals', count: storageUsage.orphanedBlobCount ?? 0, bytes: null });
+  }
+
+  return rows;
 }
 
 function createDestructiveSettingsView(

@@ -445,8 +445,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         plainPinId,
         encryptedPinId,
         encryptedThumbnailId: thumbnail?.id ?? existingPlainPayload?.protectedPin?.encryptedThumbnailId,
-        storedOriginalBlobId:
-          bookmark.storedOriginal?.blobId ?? bookmark.blobId ?? existingPlainPayload?.protectedPin?.storedOriginalBlobId,
+        storedOriginalBlobId: bookmark.storedOriginal?.blobId ?? bookmark.blobId,
         queueUpdatedAt,
       });
       await context.repository.sealAndPut(

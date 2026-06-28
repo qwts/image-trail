@@ -2895,21 +2895,17 @@ export class ImageTrailPanel {
   private async removeRecentHistory(id: string): Promise<void> {
     const existing = this.state.history.find((item) => item.id === id);
     const blobId = existing ? encryptedBlobIdForRecord(existing) : undefined;
-    if (blobId) await this.removeCapturedBlobReference(blobId);
     const history = this.recentHistoryStore
       ? await this.recentHistoryStore.remove(id, window.location.href)
       : reducePanelAction(this.state, { name: 'history/remove', id }).history;
     this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
     this.render();
+    if (blobId) await this.removeCapturedBlobReference(blobId, { render: true });
   }
 
   private async deleteRecentHistory(): Promise<void> {
     const records = this.state.history;
     if (records.length === 0) return;
-    for (const record of records) {
-      const blobId = encryptedBlobIdForRecord(record);
-      if (blobId) await this.removeCapturedBlobReference(blobId);
-    }
     if (this.recentHistoryStore) {
       for (const record of records) {
         await this.recentHistoryStore.remove(record.id, window.location.href);
@@ -2917,6 +2913,10 @@ export class ImageTrailPanel {
     }
     this.state = reducePanelAction(this.state, { name: 'history/delete-all' });
     this.render();
+    for (const record of records) {
+      const blobId = encryptedBlobIdForRecord(record);
+      if (blobId) await this.removeCapturedBlobReference(blobId, { render: true });
+    }
   }
 
   private async loadBookmark(id: string): Promise<void> {
@@ -2929,10 +2929,10 @@ export class ImageTrailPanel {
     const bookmark = this.state.bookmarks.find((item) => item.id === id);
     if (!bookmark) return;
     await this.bookmarkStore?.remove(bookmark);
-    await this.refreshStorageUsage();
     this.state = reducePanelAction(this.state, { name: 'bookmark/remove', id });
     await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
     this.renderPanelAndRefreshRecall();
+    void this.refreshStorageUsage({ render: true });
   }
 
   private async deleteVisibleBookmarks(): Promise<void> {
@@ -2940,13 +2940,13 @@ export class ImageTrailPanel {
     this.state = reducePanelAction(this.state, { name: 'import-export/start' });
     this.render();
     const result = await this.bookmarkStore.removeMany(this.state.bookmarks.map((bookmark) => bookmark.id));
-    await this.refreshStorageUsage();
     await this.loadBookmarkPage(0, { render: false });
     this.state = reducePanelAction(this.state, {
       name: 'import-export/complete',
       message: `Deleted ${result.removedCount} queue item${result.removedCount === 1 ? '' : 's'}.`,
     });
     this.renderPanelAndRefreshRecall();
+    void this.refreshStorageUsage({ render: true });
   }
 
   private async deleteRecallBookmarks(): Promise<void> {
@@ -2958,19 +2958,24 @@ export class ImageTrailPanel {
       scope: this.state.bookmarkVisibilityScope,
       currentPageUrl: window.location.href,
     });
-    await this.refreshStorageUsage();
     await this.loadBookmarkPage(0, { render: false });
     this.state = reducePanelAction(this.state, {
       name: 'import-export/complete',
       message: `Deleted ${result.removedCount} Recall item${result.removedCount === 1 ? '' : 's'}.`,
     });
     this.renderPanelAndRefreshRecall();
+    void this.refreshStorageUsage({ render: true });
   }
 
-  private async removeCapturedBlobReference(blobId: string): Promise<void> {
+  private async removeCapturedBlobReference(blobId: string, options: { readonly render?: boolean } = {}): Promise<void> {
     if (!this.captureStore) return;
-    const { usage } = await this.captureStore.requestDeleteBlob(blobId);
-    this.applyStorageUsage(usage);
+    try {
+      const { usage } = await this.captureStore.requestDeleteBlob(blobId);
+      this.applyStorageUsage(usage);
+      if (options.render) this.render();
+    } catch {
+      void this.refreshStorageUsage({ render: options.render });
+    }
   }
 
   private async cleanupOrphanedBlobs(): Promise<void> {
@@ -3142,8 +3147,6 @@ export class ImageTrailPanel {
   private async deleteCapturedBlob(recordId: string, blobId: string): Promise<void> {
     if (!this.captureStore) return;
     this.state = reducePanelAction(this.state, { name: 'capture/delete', id: recordId, blobId });
-    const { usage } = await this.captureStore.requestDeleteBlob(blobId);
-    this.applyStorageUsage(usage);
     const updatedHistory = this.state.history.find((b) => b.id === recordId);
     if (updatedHistory && this.recentHistoryStore) {
       const history = await this.recentHistoryStore.add(updatedHistory, window.location.href);
@@ -3161,6 +3164,7 @@ export class ImageTrailPanel {
     } else {
       this.render();
     }
+    void this.removeCapturedBlobReference(blobId, { render: true });
   }
 
   private async previewRecord(url: string, blobId?: string, scrollAnchorId?: string): Promise<void> {
@@ -4044,12 +4048,17 @@ export class ImageTrailPanel {
     return this.recentHistoryStore.load(window.location.href, { includeRetained: true });
   }
 
-  private async refreshStorageUsage(): Promise<void> {
+  private async refreshStorageUsage(options: { readonly render?: boolean } = {}): Promise<void> {
     if (!this.captureStore) return;
     const requestId = (this.storageUsageRequestId += 1);
-    const usage = await this.captureStore.requestStorageUsage();
-    if (requestId !== this.storageUsageRequestId) return;
-    this.applyStorageUsage(usage, { preserveRequestId: true });
+    try {
+      const usage = await this.captureStore.requestStorageUsage();
+      if (requestId !== this.storageUsageRequestId) return;
+      this.applyStorageUsage(usage, { preserveRequestId: true });
+      if (options.render) this.render();
+    } catch {
+      // Storage health is informational; it must not break row actions.
+    }
   }
 
   private applyStorageUsage(usage: NonNullable<PanelState['storageUsage']>, options: { readonly preserveRequestId?: boolean } = {}): void {

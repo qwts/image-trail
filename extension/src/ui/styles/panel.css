@@ -1647,6 +1647,39 @@
     sans-serif;
 }
 
+.image-trail-panel-root .image-trail-panel__storage-health {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 7px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 3%);
+}
+
+.image-trail-panel-root .image-trail-panel__storage-health dt,
+.image-trail-panel-root .image-trail-panel__storage-health dd {
+  min-width: 0;
+  margin: 0;
+  color: #aaa;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__storage-health dt {
+  color: #ddd;
+}
+
+.image-trail-panel-root .image-trail-panel__storage-health dd {
+  text-align: right;
+}
+
 .image-trail-panel-root .image-trail-panel__settings-template-list {
   display: grid;
   gap: 6px;

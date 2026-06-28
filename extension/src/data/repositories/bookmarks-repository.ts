@@ -1,5 +1,6 @@
 import { openJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
 import type { EncryptedEnvelope } from '../crypto/types.js';
+import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore, SchemaIndex } from '../schema.js';
 import type { DurableBookmarkPayloadV1 } from '../types.js';
@@ -39,6 +40,31 @@ export class BookmarksRepository {
     const result = await requestToPromise<number>(transaction.objectStore(DataStore.Bookmarks).count());
     await transactionDone(transaction);
     return result;
+  }
+
+  async getStorageUsage(): Promise<StorageUsageSummary> {
+    const transaction = this.db.transaction(DataStore.Bookmarks, 'readonly');
+    const request = transaction.objectStore(DataStore.Bookmarks).openCursor();
+    let totalBytes = 0;
+    let blobCount = 0;
+
+    await new Promise<void>((resolve, reject) => {
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) {
+          resolve();
+          return;
+        }
+        const record = cursor.value as EncryptedBookmarkRecord;
+        totalBytes += new TextEncoder().encode(JSON.stringify(record.envelope)).byteLength;
+        blobCount += 1;
+        cursor.continue();
+      };
+      request.onerror = () => reject(request.error);
+    });
+
+    await transactionDone(transaction);
+    return { totalBytes, blobCount };
   }
 
   async listEncryptedPage(input: { readonly offset: number; readonly limit: number }): Promise<readonly EncryptedBookmarkRecord[]> {

@@ -805,10 +805,19 @@ test('recognizes capture result messages as extension responses', () => {
 });
 
 test('creates storage usage response messages', () => {
-  const msg = createStorageUsageResponseMessage({ totalBytes: 5000, blobCount: 3 });
+  const msg = createStorageUsageResponseMessage({
+    totalBytes: 5000,
+    blobCount: 3,
+    originals: { count: 1, totalBytes: 3000 },
+    queueRecords: { count: 1, totalBytes: 1500 },
+    thumbnails: { count: 1, totalBytes: 500 },
+  });
   assert.equal(msg.type, MessageType.StorageUsageResponse);
   assert.equal(msg.payload.totalBytes, 5000);
   assert.equal(msg.payload.blobCount, 3);
+  assert.equal(msg.payload.originals?.count, 1);
+  assert.equal(msg.payload.queueRecords?.totalBytes, 1500);
+  assert.equal(msg.payload.thumbnails?.totalBytes, 500);
   assert.equal(isExtensionResponse(msg), true);
 });
 

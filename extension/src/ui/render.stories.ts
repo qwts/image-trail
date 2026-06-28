@@ -15,7 +15,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const SettingsSectionOrder: Story = {
-  render: () => panelLayoutStory({ settingsOpen: true }),
+  render: () =>
+    panelLayoutStory({
+      settingsOpen: true,
+      storageUsage: {
+        blobCount: 14,
+        totalBytes: 867_328,
+        orphanedBlobCount: 1,
+        originals: { count: 3, totalBytes: 742_400 },
+        queueRecords: { count: 7, totalBytes: 86_016 },
+        thumbnails: { count: 4, totalBytes: 38_912 },
+      },
+    }),
 };
 
 export const ParsedFieldFailedLoad: Story = {

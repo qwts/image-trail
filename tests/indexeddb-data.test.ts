@@ -465,6 +465,18 @@ test('BookmarksRepository pages encrypted records newest first', async (t) => {
   );
 });
 
+test('BookmarksRepository reports durable queue storage usage', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const repository = new BookmarksRepository(db);
+
+  await repository.putEncrypted(bookmarkRecord('bookmark-usage'));
+
+  const usage = await repository.getStorageUsage();
+  assert.equal(usage.blobCount, 1);
+  assert.ok(usage.totalBytes > 0);
+});
+
 test('BookmarksRepository exposes one older page after the bookmark soft max is exceeded', async (t) => {
   const db = await openFreshImageTrailDb();
   t.after(() => db.close());
@@ -859,6 +871,70 @@ test('IndexedDbBookmarkStore batch removes locked protected backing rows without
     assert.equal(await new BlobsRepository(verifyResult.db).get('blob-batch-protected-original'), undefined);
   } finally {
     verifyResult.db.close();
+  }
+});
+
+test('IndexedDbBookmarkStore clears protected original relationship while keeping the pin', async () => {
+  await deleteImageTrailDb();
+  const active = (
+    await createAndActivateWrappedBlobKey({
+      password: 'pin-clear-original-password',
+      uuid: 'pin-clear-original-key',
+      now: '2026-06-21T00:00:00.000Z',
+    })
+  ).active;
+  const dbResult = await openImageTrailDb();
+  assert.ok(dbResult.db);
+  await new BlobsRepository(dbResult.db).put({
+    id: 'blob-clear-protected-original',
+    kind: 'original',
+    schemaVersion: 1,
+    algorithm: 'AES-GCM',
+    iv: 'iv',
+    ciphertext: new ArrayBuffer(4),
+    encryptedByteLength: 4,
+    createdAt: '2026-06-21T00:00:00.000Z',
+    key: active.reference,
+    referenceCount: 1,
+  });
+  dbResult.db.close();
+
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  try {
+    const saved = await store.save(
+      createDisplayRecord({
+        id: 'https://secret.example.test/clear-original.jpg',
+        url: 'https://secret.example.test/clear-original.jpg',
+        label: 'clear-original.jpg',
+        thumbnail: 'data:image/png;base64,dGh1bWJuYWls',
+        timestamp: '2026-06-21T00:00:01.000Z',
+        source: 'bookmark',
+        captureStatus: 'captured',
+        blobId: 'blob-clear-protected-original',
+        storedOriginal: {
+          blobId: 'blob-clear-protected-original',
+          mimeType: 'image/jpeg',
+          byteLength: 4,
+          capturedAt: '2026-06-21T00:00:00.000Z',
+        },
+      }),
+    );
+
+    await store.save({
+      ...saved,
+      captureStatus: undefined,
+      blobId: undefined,
+      storedOriginal: undefined,
+    });
+
+    const page = await store.loadPage({ offset: 0, limit: 30 });
+    assert.equal(page.items.length, 1);
+    assert.equal(page.items[0]?.captureStatus, undefined);
+    assert.equal(page.items[0]?.storedOriginal, undefined);
+    assert.equal(page.items[0]?.protectedPin?.hasStoredOriginal, false);
+  } finally {
+    await store.close();
+    lockBlobKey();
   }
 });
 
