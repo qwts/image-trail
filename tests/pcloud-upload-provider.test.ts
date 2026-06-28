@@ -356,12 +356,12 @@ test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 wi
     if (url.endsWith('/getfilelink')) {
       const params = init?.body as URLSearchParams;
       assert.equal(params.get('fileid'), '402');
-      assert.equal((init?.headers as Record<string, string> | undefined)?.Referer, 'https://pcloud.com/');
+      assert.equal((init?.headers as Record<string, string> | undefined)?.Referer, 'https://my.pcloud.com/');
       assert.equal(JSON.stringify(dnrCalls).includes('getfilelink'), true);
       return jsonResponse({ result: 0, hosts: ['c123.pcloud.com'], path: '/restore-backup' });
     }
     if (url === 'https://c123.pcloud.com/restore-backup') {
-      assert.equal(init?.referrer, 'https://pcloud.com/');
+      assert.equal(init?.referrer, 'https://my.pcloud.com/');
       assert.equal(init?.referrerPolicy, 'origin');
       return new Response(fileContent);
     }
@@ -387,7 +387,7 @@ test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 wi
       true,
     );
     assert.equal(JSON.stringify(dnrCalls).includes('"header":"Referer"'), true);
-    assert.equal(JSON.stringify(dnrCalls).includes('"value":"https://pcloud.com/"'), true);
+    assert.equal(JSON.stringify(dnrCalls).includes('"value":"https://my.pcloud.com/"'), true);
   } finally {
     globalThis.fetch = originalFetch;
     restoreChrome();
@@ -407,17 +407,17 @@ test('downloadPCloudBackup retries alternate pCloud hosts after direct-link refe
     if (url.endsWith('/getfilelink')) {
       const params = init?.body as URLSearchParams;
       assert.equal(params.get('fileid'), '402');
-      assert.equal((init?.headers as Record<string, string> | undefined)?.Referer, 'https://pcloud.com/');
+      assert.equal((init?.headers as Record<string, string> | undefined)?.Referer, 'https://my.pcloud.com/');
       assert.equal(JSON.stringify(dnrCalls).includes('getfilelink'), true);
       return jsonResponse({ result: 0, hosts: ['blocked.pcloud.com', 'c123.pcloud.com'], path: '/restore-backup' });
     }
     if (url === 'https://blocked.pcloud.com/restore-backup') {
-      assert.equal(init?.referrer, 'https://pcloud.com/');
+      assert.equal(init?.referrer, 'https://my.pcloud.com/');
       assert.equal(init?.referrerPolicy, 'origin');
       return new Response('Invalid link referer.', { status: 400 });
     }
     if (url === 'https://c123.pcloud.com/restore-backup') {
-      assert.equal(init?.referrer, 'https://pcloud.com/');
+      assert.equal(init?.referrer, 'https://my.pcloud.com/');
       assert.equal(init?.referrerPolicy, 'origin');
       return new Response(fileContent);
     }
@@ -441,7 +441,7 @@ test('downloadPCloudBackup retries alternate pCloud hosts after direct-link refe
     );
     assert.equal(JSON.stringify(result).includes('token-secret'), false);
     assert.equal(JSON.stringify(dnrCalls).includes('"header":"Referer"'), true);
-    assert.equal(JSON.stringify(dnrCalls).includes('"value":"https://pcloud.com/"'), true);
+    assert.equal(JSON.stringify(dnrCalls).includes('"value":"https://my.pcloud.com/"'), true);
   } finally {
     globalThis.fetch = originalFetch;
     restoreChrome();
