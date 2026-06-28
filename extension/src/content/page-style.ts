@@ -25,6 +25,10 @@ interface SelectedTargetOptions {
   readonly objectFit?: ObjectFitMode;
 }
 
+interface RestoreElementStyleOptions {
+  readonly preserveBackdropBlack?: boolean;
+}
+
 const snapshots = new WeakMap<HTMLElement, StyleSnapshot>();
 const grabPreviewSnapshots = new WeakMap<HTMLElement, GrabPreviewStyleSnapshot>();
 let pageBackdropSnapshot: { readonly body: PageBackdropSnapshot; readonly documentElement: PageBackdropSnapshot } | null = null;
@@ -49,9 +53,14 @@ function snapshot(element: HTMLElement): void {
   });
 }
 
-function keepSelectedBackdropBlack(element: HTMLElement): void {
+export function keepSelectedTargetBackdropBlack(element: HTMLElement): void {
   element.style.background = '#000';
   element.style.backgroundColor = '#000';
+}
+
+function restoreSelectedBackdrop(element: HTMLElement, original: Pick<StyleSnapshot, 'background' | 'backgroundColor'>): void {
+  element.style.background = original.background;
+  element.style.backgroundColor = original.backgroundColor;
 }
 
 function restoreLockBoxLayout(element: HTMLElement): void {
@@ -113,7 +122,7 @@ export function restoreGrabPreviewTarget(element: HTMLElement): void {
 
 export function markSelectedTarget(element: HTMLElement, options: SelectedTargetOptions = {}): void {
   snapshot(element);
-  keepSelectedBackdropBlack(element);
+  keepSelectedTargetBackdropBlack(element);
   if (!options.lockBox && element.dataset.imageTrailLockBox) restoreLockBoxLayout(element);
   element.dataset.imageTrailSelected = 'true';
   if (options.lockBox) {
@@ -136,11 +145,14 @@ export function markSelectedTarget(element: HTMLElement, options: SelectedTarget
   element.style.outlineOffset = '4px';
 }
 
-export function restoreElementStyles(element: HTMLElement): void {
+export function restoreElementStyles(element: HTMLElement, options: RestoreElementStyleOptions = {}): void {
   const original = snapshots.get(element);
   if (original) {
-    element.style.background = original.background;
-    element.style.backgroundColor = original.backgroundColor;
+    if (options.preserveBackdropBlack) {
+      keepSelectedTargetBackdropBlack(element);
+    } else {
+      restoreSelectedBackdrop(element, original);
+    }
     element.style.cursor = original.cursor;
     element.style.height = original.height;
     element.style.left = original.left;

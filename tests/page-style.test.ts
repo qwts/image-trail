@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  keepSelectedTargetBackdropBlack,
   markGrabPreviewTarget,
   markSelectedTarget,
   restoreElementStyles,
@@ -75,6 +76,31 @@ test('selected target lockBox constrains the host image box and restores origina
   assert.equal(element.style.background, '');
   assert.equal(element.style.backgroundColor, '');
   assert.equal(element.dataset.imageTrailSelected, undefined);
+});
+
+test('selected target backdrop can be forced black before navigation changes', () => {
+  const element = createImageElement();
+  element.style.background = 'rgb(230, 230, 230)';
+  element.style.backgroundColor = 'rgb(230, 230, 230)';
+
+  keepSelectedTargetBackdropBlack(element);
+
+  assert.equal(element.style.background, '#000');
+  assert.equal(element.style.backgroundColor, '#000');
+});
+
+test('selected target restore can preserve black hosted-image backdrop', () => {
+  const element = createImageElement();
+  element.style.background = 'rgb(230, 230, 230)';
+  element.style.backgroundColor = 'rgb(230, 230, 230)';
+
+  markSelectedTarget(element);
+  restoreElementStyles(element, { preserveBackdropBlack: true });
+
+  assert.equal(element.dataset.imageTrailSelected, undefined);
+  assert.equal(element.style.position, 'absolute');
+  assert.equal(element.style.background, '#000');
+  assert.equal(element.style.backgroundColor, '#000');
 });
 
 test('selected target lockBox accepts explicit preview object fit and restores it', () => {

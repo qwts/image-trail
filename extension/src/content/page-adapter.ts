@@ -27,6 +27,7 @@ import {
   markHoveredTarget,
   markPickModeCandidate,
   markSelectedTarget,
+  keepSelectedTargetBackdropBlack,
   restoreElementStyles,
   restoreGrabPreviewTarget,
 } from './page-style.js';
@@ -638,13 +639,14 @@ export class PageAdapter {
 
   private restoreSelectedTarget(): void {
     if (this.selected) {
+      keepSelectedTargetBackdropBlack(this.selected);
       if (this.selectedOriginalSnapshot) {
         restoreImageNavigationSnapshot(this.selectedOriginalSnapshot);
       } else if (this.selectedOriginalUrl && createTargetImageInfo(this.selected)?.url !== this.selectedOriginalUrl) {
         applyImageUrl(this.selected, this.selectedOriginalUrl);
       }
       this.selected.removeAttribute('data-image-trail-handle');
-      restoreElementStyles(this.selected);
+      restoreElementStyles(this.selected, { preserveBackdropBlack: true });
     }
     this.clearPendingLoadTarget();
     this.selected = null;
@@ -755,7 +757,7 @@ export class PageAdapter {
   }
 
   private restoreSelectedTargetStyles(): void {
-    if (this.selected) restoreElementStyles(this.selected);
+    if (this.selected) restoreElementStyles(this.selected, { preserveBackdropBlack: true });
   }
 
   private createSnapshot(message: string): TargetSelectionSnapshot {

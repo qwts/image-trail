@@ -58,6 +58,7 @@ class FakeImageElement extends EventTarget {
   readonly attrs = new Map<string, string>([['src', 'https://example.test/original.jpg']]);
   readonly removedAttrs: string[] = [];
   readonly style = {
+    background: '',
     backgroundColor: '',
     boxShadow: '',
     cursor: '',
@@ -287,6 +288,73 @@ test('selected image load ignores stale projection completion after newer projec
     await Promise.resolve();
 
     assert.deepEqual(loaded, [{ url: 'https://example.test/second.jpg', projectionId: 'projection-2' }]);
+  } finally {
+    restoreDom();
+  }
+});
+
+test('release keeps hosted image backdrop black after restoring original URL', () => {
+  const image = new FakeImageElement();
+  image.style.background = 'rgb(230, 230, 230)';
+  image.style.backgroundColor = 'rgb(230, 230, 230)';
+  const restoreDom = installFakeDom(image);
+  const adapter = new PageAdapter();
+
+  try {
+    adapter.autoSelectSingleImage();
+    assert.equal(image.style.background, '#000');
+    assert.equal(image.style.backgroundColor, '#000');
+
+    image.complete = false;
+    image.naturalHeight = 0;
+    image.naturalWidth = 0;
+    adapter.applyUrlToSelected('https://example.test/projected.jpg');
+    assert.equal(image.src, 'https://example.test/projected.jpg');
+    assert.equal(image.style.background, '#000');
+    assert.equal(image.style.backgroundColor, '#000');
+
+    adapter.releaseSelectedTarget();
+
+    assert.equal(image.src, 'https://example.test/original.jpg');
+    assert.equal(image.style.background, '#000');
+    assert.equal(image.style.backgroundColor, '#000');
+    assert.equal(image.dataset.imageTrailSelected, undefined);
+
+    image.complete = true;
+    image.naturalHeight = 480;
+    image.naturalWidth = 640;
+    image.dispatchEvent(new Event('load'));
+
+    assert.equal(image.style.background, '#000');
+    assert.equal(image.style.backgroundColor, '#000');
+  } finally {
+    restoreDom();
+  }
+});
+
+test('closing and reopening keeps standalone hosted image backdrop black', () => {
+  const image = new FakeImageElement();
+  image.style.background = 'rgb(230, 230, 230)';
+  image.style.backgroundColor = 'rgb(230, 230, 230)';
+  const restoreDom = installFakeDom(image);
+  const adapter = new PageAdapter();
+
+  try {
+    adapter.autoSelectSingleImage();
+    assert.equal(image.style.background, '#000');
+    assert.equal(image.style.backgroundColor, '#000');
+
+    adapter.suspend();
+
+    assert.equal(image.dataset.imageTrailSelected, undefined);
+    assert.equal(image.style.background, '#000');
+    assert.equal(image.style.backgroundColor, '#000');
+
+    adapter.autoSelectSingleImage();
+
+    assert.equal(image.dataset.imageTrailSelected, 'true');
+    assert.equal(image.style.background, '#000');
+    assert.equal(image.style.backgroundColor, '#000');
   } finally {
     restoreDom();
   }
