@@ -140,7 +140,13 @@ function launchWebAuthFlow(url: string): Promise<string> {
 }
 
 async function requestPCloudJson(apiHost: PCloudApiHost, method: string, body: BodyInit): Promise<Record<string, unknown>> {
-  const response = await fetch(`https://${apiHost}/${method}`, { method: 'POST', body });
+  const response = await fetch(`https://${apiHost}/${method}`, {
+    method: 'POST',
+    headers: {
+      Referer: PCLOUD_DOWNLOAD_REFERRER,
+    },
+    body,
+  });
   const data = (await response.json()) as Record<string, unknown>;
   const resultCode = numberOrUndefined(data.result);
   if (!response.ok || resultCode !== 0) {
