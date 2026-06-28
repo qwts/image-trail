@@ -38,8 +38,7 @@ async function gitValue(args) {
 function localWorktreeLabel(absolutePath) {
   const override = process.env.IMAGE_TRAIL_BUILD_LABEL?.trim();
   if (override) return sanitizeLabel(override);
-  const segments = absolutePath.split(path.sep).filter(Boolean);
-  return sanitizeLabel(segments.slice(-2).join('/'));
+  return sanitizeLabel(path.basename(absolutePath));
 }
 
 function sanitizeLabel(label) {

@@ -1,5 +1,12 @@
-import { createStatusMessage, createUnknownMessageResponse, isExtensionRequest, MessageType } from '../background/messages.js';
-import { isBuildIdentity, type BuildIdentity } from '../core/build-info.js';
+import {
+  createLoadBuildIdentityMessage,
+  isLoadBuildIdentityResultMessage,
+  createStatusMessage,
+  createUnknownMessageResponse,
+  isExtensionRequest,
+  MessageType,
+} from '../background/messages.js';
+import type { BuildIdentity } from '../core/build-info.js';
 import { PageAdapter } from './page-adapter.js';
 import { ExtensionBookmarkStore } from './extension-bookmark-store.js';
 import { CaptureController } from './capture-controller.js';
@@ -11,6 +18,7 @@ import { ExtensionLocalSettingsStore } from './local-settings-store.js';
 import { ExtensionUrlTemplateStore } from './url-template-store.js';
 import { ExtensionUrlReviewStatusStore } from './url-review-status-store.js';
 import { ImageTrailPanel } from '../ui/panel.js';
+import { sendRuntimeMessage } from './runtime-message.js';
 
 interface ImageTrailContentController {
   readonly panel: ImageTrailPanel;
@@ -28,14 +36,8 @@ function hasRuntimeMessaging(): boolean {
 }
 
 async function loadBuildIdentity(): Promise<BuildIdentity | null> {
-  try {
-    const response = await fetch(chrome.runtime.getURL('build-info.json'), { cache: 'no-store' });
-    if (!response.ok) return null;
-    const payload: unknown = await response.json();
-    return isBuildIdentity(payload) ? payload : null;
-  } catch {
-    return null;
-  }
+  const response = await sendRuntimeMessage(createLoadBuildIdentityMessage());
+  return isLoadBuildIdentityResultMessage(response) && response.payload.ok ? response.payload.identity : null;
 }
 
 function createController(): ImageTrailContentController {

@@ -1,4 +1,5 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
+import { isBuildIdentity } from '../core/build-info.js';
 import { computeSha256 } from '../core/image/fingerprints.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
@@ -46,6 +47,7 @@ import {
   createImportEncryptedImageResultMessage,
   createImportUrlReviewStatusResultMessage,
   createLoadBookmarksResultMessage,
+  createLoadBuildIdentityResultMessage,
   createAddRecentHistoryResultMessage,
   createDeletePanelPositionResultMessage,
   createConnectPCloudProviderResultMessage,
@@ -1223,10 +1225,34 @@ async function handleImportEncryptedImage(
   }
 }
 
+async function handleLoadBuildIdentity(): Promise<ReturnType<typeof createLoadBuildIdentityResultMessage>['payload']> {
+  try {
+    const response = await fetch(chrome.runtime.getURL('build-info.json'), { cache: 'no-store' });
+    if (!response.ok) {
+      return { ok: false, identity: null, message: 'Build identity could not be loaded.' };
+    }
+    const payload: unknown = await response.json();
+    if (!isBuildIdentity(payload)) {
+      return { ok: false, identity: null, message: 'Build identity payload was invalid.' };
+    }
+    return { ok: true, identity: payload };
+  } catch {
+    return { ok: false, identity: null, message: 'Build identity could not be loaded.' };
+  }
+}
+
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   if (!isExtensionRequest(message)) return false;
 
   switch (message.type) {
+    case MessageType.LoadBuildIdentity:
+      handleLoadBuildIdentity()
+        .then((result) => sendResponse(createLoadBuildIdentityResultMessage(result)))
+        .catch(() =>
+          sendResponse(createLoadBuildIdentityResultMessage({ ok: false, identity: null, message: 'Build identity could not be loaded.' })),
+        );
+      return true;
+
     case MessageType.CaptureImage:
       handleCaptureImage(message)
         .then((result) => sendResponse(createCaptureResultMessage(result)))

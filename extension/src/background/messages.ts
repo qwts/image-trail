@@ -1,8 +1,12 @@
+import type { BuildIdentity } from '../core/build-info.js';
+
 export const MESSAGE_PROTOCOL_VERSION = 1;
 
 export const MessageType = {
   TogglePanel: 'imageTrail.togglePanel',
   Ping: 'imageTrail.ping',
+  LoadBuildIdentity: 'imageTrail.loadBuildIdentity',
+  LoadBuildIdentityResult: 'imageTrail.loadBuildIdentityResult',
   Status: 'imageTrail.status',
   Unknown: 'imageTrail.unknown',
   CaptureImage: 'imageTrail.captureImage',
@@ -131,6 +135,20 @@ export interface PingMessage {
   readonly type: typeof MessageType.Ping;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload: { readonly sentAt: number };
+}
+
+export interface LoadBuildIdentityMessage {
+  readonly type: typeof MessageType.LoadBuildIdentity;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly requestedAt: number };
+}
+
+export interface LoadBuildIdentityResultMessage {
+  readonly type: typeof MessageType.LoadBuildIdentityResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly ok: true; readonly identity: BuildIdentity }
+    | { readonly ok: false; readonly identity: null; readonly message: string };
 }
 
 export interface StatusMessage {
@@ -948,6 +966,7 @@ export interface DeleteGrabSourcePatternResultMessage {
 export type ExtensionRequest =
   | TogglePanelMessage
   | PingMessage
+  | LoadBuildIdentityMessage
   | CaptureImageMessage
   | DownloadImageMessage
   | ExportEncryptedImageMessage
@@ -1009,6 +1028,7 @@ export type ExtensionRequest =
 export type ExtensionResponse =
   | StatusMessage
   | UnknownMessageResponse
+  | LoadBuildIdentityResultMessage
   | CaptureResultMessage
   | DownloadImageResultMessage
   | ExportEncryptedImageResultMessage
@@ -1071,6 +1091,14 @@ export function createTogglePanelMessage(): TogglePanelMessage {
 
 export function createPingMessage(): PingMessage {
   return { type: MessageType.Ping, version: MESSAGE_PROTOCOL_VERSION, payload: { sentAt: Date.now() } };
+}
+
+export function createLoadBuildIdentityMessage(): LoadBuildIdentityMessage {
+  return { type: MessageType.LoadBuildIdentity, version: MESSAGE_PROTOCOL_VERSION, payload: { requestedAt: Date.now() } };
+}
+
+export function createLoadBuildIdentityResultMessage(payload: LoadBuildIdentityResultMessage['payload']): LoadBuildIdentityResultMessage {
+  return { type: MessageType.LoadBuildIdentityResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createStatusMessage(panelVisible: boolean, status: string): StatusMessage {
@@ -1635,6 +1663,7 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
   return (
     value.type === MessageType.TogglePanel ||
     value.type === MessageType.Ping ||
+    value.type === MessageType.LoadBuildIdentity ||
     value.type === MessageType.CaptureImage ||
     value.type === MessageType.DownloadImage ||
     value.type === MessageType.ExportEncryptedImage ||
@@ -1701,6 +1730,7 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
   return (
     value.type === MessageType.Status ||
     value.type === MessageType.Unknown ||
+    value.type === MessageType.LoadBuildIdentityResult ||
     value.type === MessageType.CaptureResult ||
     value.type === MessageType.DownloadImageResult ||
     value.type === MessageType.ExportEncryptedImageResult ||
@@ -2022,4 +2052,10 @@ export function isStatusMessage(value: unknown): value is StatusMessage {
   if (!isExtensionResponse(value) || value.type !== MessageType.Status) return false;
   const payload = value.payload as { panelVisible?: unknown; status?: unknown };
   return typeof payload.panelVisible === 'boolean' && typeof payload.status === 'string';
+}
+
+export function isLoadBuildIdentityResultMessage(value: unknown): value is LoadBuildIdentityResultMessage {
+  if (!isExtensionResponse(value) || value.type !== MessageType.LoadBuildIdentityResult) return false;
+  if (value.payload.ok) return value.payload.identity !== null;
+  return value.payload.identity === null && typeof value.payload.message === 'string';
 }
