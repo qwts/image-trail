@@ -120,6 +120,7 @@ function installFakeDom(image: FakeImageElement): () => void {
     createElement() {
       return { getContext: () => null };
     },
+    images: [image],
     querySelectorAll(selector: string) {
       assert.equal(selector, 'img');
       return [image];
@@ -139,6 +140,27 @@ function installFakeDom(image: FakeImageElement): () => void {
 function createPageStyle(): CSSStyleDeclaration {
   return { background: '', backgroundColor: '' } as CSSStyleDeclaration;
 }
+
+test('standalone image backdrop is prepared before selection or resize styling', () => {
+  const image = new FakeImageElement();
+  image.style.background = 'rgb(230, 230, 230)';
+  image.style.backgroundColor = 'rgb(230, 230, 230)';
+  const restoreDom = installFakeDom(image);
+  const adapter = new PageAdapter();
+
+  try {
+    adapter.prepareStandaloneImageBackdrop();
+
+    assert.equal(image.style.background, '#000');
+    assert.equal(image.style.backgroundColor, '#000');
+    assert.equal(image.dataset.imageTrailSelected, undefined);
+    assert.equal(image.style.height, '');
+    assert.equal(image.style.width, '');
+    assert.equal(image.style.position, '');
+  } finally {
+    restoreDom();
+  }
+});
 
 test('selected image error emits failed projection snapshot', () => {
   const image = new FakeImageElement();

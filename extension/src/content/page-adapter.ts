@@ -176,6 +176,11 @@ export class PageAdapter {
     return () => this.grabSourcePatternRequestListeners.delete(listener);
   }
 
+  prepareStandaloneImageBackdrop(): void {
+    const images = Array.from(document.images);
+    if (images.length === 1) keepSelectedTargetBackdropBlack(images[0]);
+  }
+
   enableBookmarkShortcut(): void {
     if (this.bookmarkShortcutActive) return;
     this.bookmarkShortcutActive = true;
