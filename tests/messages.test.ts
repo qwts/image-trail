@@ -32,6 +32,8 @@ import {
   createImportUrlReviewStatusResultMessage,
   createDeletePanelPositionMessage,
   createDeletePanelPositionResultMessage,
+  createLoadBuildIdentityMessage,
+  createLoadBuildIdentityResultMessage,
   createConnectPCloudProviderMessage,
   createConnectPCloudProviderResultMessage,
   createDisconnectPCloudProviderMessage,
@@ -119,6 +121,7 @@ import {
   isImportEncryptedImageResultMessage,
   isImportUrlReviewStatusResultMessage,
   isDeletePanelPositionResultMessage,
+  isLoadBuildIdentityResultMessage,
   isConnectPCloudProviderResultMessage,
   isDisconnectPCloudProviderResultMessage,
   isDownloadPCloudBackupResultMessage,
@@ -174,6 +177,36 @@ test('recognizes status and unknown responses separately from requests', () => {
   assert.equal(isStatusMessage(status), true);
   assert.equal(isStatusMessage(unknown), false);
   assert.equal(isStatusMessage({ ...status, payload: { panelVisible: 'yes', status: 'ready' } }), false);
+});
+
+test('validates build identity result payloads before exposing them to the panel', () => {
+  const request = createLoadBuildIdentityMessage();
+  const valid = createLoadBuildIdentityResultMessage({
+    ok: true,
+    identity: {
+      schemaVersion: 1,
+      version: '0.1.0',
+      builtAt: '2026-06-28T03:30:00.000Z',
+      commit: 'abc123def456',
+      branch: 'codex/dev',
+      worktree: 'image-bookmarklet',
+      timezone: 'America/Chicago',
+      mode: 'local',
+    },
+  });
+  const failure = createLoadBuildIdentityResultMessage({ ok: false, identity: null, message: 'Build identity could not be loaded.' });
+
+  assert.equal(request.type, MessageType.LoadBuildIdentity);
+  assert.equal(isExtensionRequest(request), true);
+  assert.equal(isLoadBuildIdentityResultMessage(valid), true);
+  assert.equal(isLoadBuildIdentityResultMessage(failure), true);
+  assert.equal(
+    isLoadBuildIdentityResultMessage({
+      ...valid,
+      payload: { ok: true, identity: { version: '0.1.0' } },
+    }),
+    false,
+  );
 });
 
 test('creates capture image request messages with correct structure', () => {
