@@ -79,8 +79,13 @@ export function fieldReservesTrailControlSlot(field: UrlField): boolean {
   return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
 }
 
+function isFocusedWithinRoot(input: HTMLInputElement): boolean {
+  const root = input.getRootNode();
+  return 'activeElement' in root ? root.activeElement === input : document.activeElement === input;
+}
+
 function commitAndBlurFocusedValue(input: HTMLInputElement, currentValue: string, privacyMode: boolean, commit: () => void): void {
-  if (privacyMode || document.activeElement !== input) return;
+  if (privacyMode || !isFocusedWithinRoot(input)) return;
   if (input.value !== currentValue) commit();
   input.blur();
 }

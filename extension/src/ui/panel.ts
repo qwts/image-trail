@@ -1763,11 +1763,9 @@ export class ImageTrailPanel {
   }
 
   private enqueueFieldInteraction(run: () => Promise<void>): void {
-    this.fieldTransformQueue = this.fieldTransformQueue
-      .catch((error: unknown) => {
-        console.error('Image Trail field interaction failed.', error);
-      })
-      .then(run);
+    this.fieldTransformQueue = this.fieldTransformQueue.then(run).catch((error: unknown) => {
+      console.error('Image Trail field interaction failed.', error);
+    });
   }
 
   private async applyUrlEditorUrl(url: string): Promise<void> {
