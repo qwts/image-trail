@@ -508,6 +508,9 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
         onApply: (url) => {
           target.dispatch({ name: 'selected-url/apply', url });
         },
+        onRejectUnsupportedInput: () => {
+          target.dispatch({ name: 'selected-url/reject-unsupported-input' });
+        },
       },
     ),
     createTargetPickerView(state.target, target.dispatch, { privacyMode: state.privacyModeEnabled }),

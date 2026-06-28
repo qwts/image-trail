@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyFieldLoadFailureToState, reducePanelAction } from '../extension/src/core/actions.js';
 import { createInitialPanelState, setTargetState } from '../extension/src/core/state.js';
+import { isUnsupportedUrlEditorInput } from '../extension/src/ui/components/url-editor-view.js';
 import {
-  isUnsupportedUrlEditorInput,
   isLockedPrivatePin,
   nextParsedFieldStatePageKey,
   originalBlobIdsForFullBackup,

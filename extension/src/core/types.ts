@@ -287,6 +287,7 @@ export type PanelActionName =
   | 'field-unlock/toggle'
   | 'field/transform'
   | 'selected-url/apply'
+  | 'selected-url/reject-unsupported-input'
   | 'pin/current'
   | 'bookmark/current'
   | 'bookmark/load'

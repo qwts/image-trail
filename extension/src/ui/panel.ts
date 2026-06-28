@@ -127,6 +127,7 @@ import {
   type FullBackupBlobKeyBackup,
 } from '../content/panel-services.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
+import { isUnsupportedUrlEditorInput } from './components/url-editor-view.js';
 import { clampPanelPosition, hostnameFromLocation } from './panel-position.js';
 
 const ROOT_ID = 'image-trail-panel-root';
@@ -198,10 +199,6 @@ function removeItems(items: readonly string[], removedItems: readonly string[]):
 export function urlReviewStatusForLoadResult(nextFingerprint: string | null, previousFingerprint: string | null): UrlReviewStatus | null {
   if (!nextFingerprint || !previousFingerprint) return null;
   return nextFingerprint === previousFingerprint ? 'unchanged' : 'passed';
-}
-
-export function isUnsupportedUrlEditorInput(url: string): boolean {
-  return url.trim().toLowerCase().startsWith('data:');
 }
 
 function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
@@ -1412,6 +1409,11 @@ export class ImageTrailPanel {
       return;
     }
 
+    if (action.name === 'selected-url/reject-unsupported-input') {
+      this.rejectUrlEditorInput();
+      return;
+    }
+
     if (action.name === 'history/pin') {
       void this.pinRecentHistory(action.id);
       return;
@@ -1740,18 +1742,22 @@ export class ImageTrailPanel {
 
   private async applyUrlEditorUrl(url: string): Promise<void> {
     if (isUnsupportedUrlEditorInput(url)) {
-      this.state = {
-        ...this.state,
-        status: 'error',
-        message: 'URL editor cannot apply data URLs. Paste an http or https image URL.',
-        lastUpdatedAt: Date.now(),
-      };
-      this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'status');
-      this.render();
+      this.rejectUrlEditorInput();
       return;
     }
 
     await this.applySelectedUrl(url, [], { pushVisibleUrl: true, resetFieldState: url !== this.currentRawUrl() });
+  }
+
+  private rejectUrlEditorInput(): void {
+    this.state = {
+      ...this.state,
+      status: 'error',
+      message: 'URL editor cannot use data URLs. Paste an http or https image URL.',
+      lastUpdatedAt: Date.now(),
+    };
+    this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'status');
+    this.render();
   }
 
   private async applyFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): Promise<void> {

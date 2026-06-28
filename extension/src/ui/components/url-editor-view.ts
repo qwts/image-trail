@@ -8,9 +8,14 @@ export interface UrlEditorViewState {
 
 export interface UrlEditorViewCallbacks {
   readonly onApply: (url: string) => void;
+  readonly onRejectUnsupportedInput?: () => void;
 }
 
 const EMPTY_URL_MESSAGE = 'Select a target image to inspect its URL.';
+
+export function isUnsupportedUrlEditorInput(url: string): boolean {
+  return url.trim().toLowerCase().startsWith('data:');
+}
 
 export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEditorViewCallbacks): HTMLElement {
   const wrapper = document.createElement('section');
@@ -41,6 +46,14 @@ export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEdi
       event.preventDefault();
       applyUrl();
     }
+  });
+
+  value.addEventListener('paste', (event) => {
+    const pastedText = event.clipboardData?.getData('text/plain') ?? '';
+    if (!isUnsupportedUrlEditorInput(pastedText)) return;
+
+    event.preventDefault();
+    callbacks.onRejectUnsupportedInput?.();
   });
 
   wrapper.append(heading, value);
