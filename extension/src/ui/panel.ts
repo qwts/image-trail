@@ -1735,18 +1735,6 @@ export class ImageTrailPanel {
   }
 
   private async applyUrlEditorUrl(url: string): Promise<void> {
-    if (url.trim().startsWith('data:')) {
-      this.state = {
-        ...this.state,
-        status: 'error',
-        message: 'URL editor cannot apply data URLs. Paste an http or https image URL.',
-        lastUpdatedAt: Date.now(),
-      };
-      this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'status');
-      this.render();
-      return;
-    }
-
     await this.applySelectedUrl(url, [], { pushVisibleUrl: true, resetFieldState: url !== this.currentRawUrl() });
   }
 
