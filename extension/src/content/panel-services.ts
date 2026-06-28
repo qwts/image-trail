@@ -5,7 +5,11 @@ export {
   type PlaintextLocalSettings,
 } from '../data/local-settings.js';
 export { exportEncryptedBookmarks, exportPlainBookmarks } from '../data/import-export/bookmarks-export.js';
-export { exportEncryptedFullBackup, storedBlobRecordFromPortable } from '../data/import-export/full-backup.js';
+export {
+  exportEncryptedFullBackup,
+  storedBlobRecordFromPortable,
+  type FullBackupBlobKeyBackup,
+} from '../data/import-export/full-backup.js';
 export { importBookmarks } from '../data/import-export/bookmarks-import.js';
 export { exportEncryptedHistory, exportPlainHistory } from '../data/import-export/history-export.js';
 export { importEncryptedHistory } from '../data/import-export/history-import.js';

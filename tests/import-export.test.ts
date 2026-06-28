@@ -23,6 +23,7 @@ import { exportEncryptedBookmarks, exportPlainBookmarks } from '../extension/src
 import { importBookmarks } from '../extension/src/data/import-export/bookmarks-import.js';
 import {
   exportEncryptedFullBackup,
+  fullBackupPayloadFromUnknown,
   storedBlobRecordFromPortable,
   portableStoredBlobRecord,
 } from '../extension/src/data/import-export/full-backup.js';
@@ -581,6 +582,88 @@ test('full-backup: exports bookmarks with encrypted original blob records', asyn
   assert.equal(restored.key.reference, 'blob:full-backup-key');
   assert.equal(restored.ciphertext.byteLength, ciphertext.byteLength);
   assert.deepEqual(Array.from(new Uint8Array(restored.ciphertext).slice(0, 4)), [0, 1, 2, 3]);
+});
+
+test('full-backup: rejects malformed original and key backup entries', () => {
+  assert.equal(
+    fullBackupPayloadFromUnknown({
+      schemaVersion: 1,
+      bookmarks: [],
+      originalBlobs: [{ id: 'missing-fields' }],
+      blobKeyBackups: [],
+      missingOriginalBlobIds: ['missing-original'],
+    }),
+    null,
+  );
+  assert.equal(
+    fullBackupPayloadFromUnknown({
+      schemaVersion: 1,
+      bookmarks: [],
+      originalBlobs: [],
+      blobKeyBackups: [{ keyReference: 'blob:key-without-content' }],
+      missingOriginalBlobIds: ['missing-original'],
+    }),
+    null,
+  );
+});
+
+test('full-backup: filters malformed missing original ids while preserving valid payloads', () => {
+  const payload = fullBackupPayloadFromUnknown({
+    schemaVersion: 1,
+    bookmarks: [],
+    originalBlobs: [],
+    blobKeyBackups: [],
+    missingOriginalBlobIds: ['missing-original', 42, null, 'other-missing-original'],
+  });
+
+  assert.ok(payload);
+  assert.deepEqual(payload.missingOriginalBlobIds, ['missing-original', 'other-missing-original']);
+});
+
+test('full-backup: strips original references whose encrypted bytes are missing', async () => {
+  const exported = await exportEncryptedFullBackup({
+    bookmarks: [
+      {
+        uuid: 'bookmark-missing-original',
+        payload: {
+          url: 'https://example.test/missing.jpg',
+          bookmarkedAt: '2026-06-28T00:00:00.000Z',
+          capturedAt: '2026-06-28T00:00:00.000Z',
+          storedOriginal: {
+            blobId: 'missing-original',
+            mimeType: 'image/jpeg',
+            byteLength: 123,
+            capturedAt: '2026-06-28T00:00:00.000Z',
+          },
+          protectedPin: {
+            schemaVersion: 1,
+            plainPinId: 'plain-pin',
+            storedOriginalBlobId: 'missing-original',
+            queueUpdatedAt: '2026-06-28T00:00:00.000Z',
+            hasEncryptedMetadata: false,
+            hasEncryptedThumbnail: false,
+            hasStoredOriginal: true,
+          },
+        },
+      },
+    ],
+    originalBlobs: [],
+    missingOriginalBlobIds: ['missing-original', 'missing-original'],
+    password: 'backup-password',
+    now: '2026-06-28T00:00:00.000Z',
+  });
+
+  assert.ok(exported.status.ok, exported.status.message);
+  const imported = await importBookmarks(exported.fileContent!, 'backup-password');
+
+  assert.ok(imported.status.ok, imported.status.message);
+  assert.equal(imported.fullBackup, true);
+  assert.equal(imported.externalOriginalCount, 0);
+  assert.equal(imported.entries[0]?.payload.storedOriginal, undefined);
+  assert.equal(imported.entries[0]?.payload.capturedAt, undefined);
+  assert.equal(imported.entries[0]?.payload.protectedPin?.storedOriginalBlobId, undefined);
+  assert.equal(imported.entries[0]?.payload.protectedPin?.hasStoredOriginal, false);
+  assert.deepEqual(imported.missingOriginalBlobIds, ['missing-original', 'missing-original']);
 });
 
 test('encrypted-image: exports and imports bytes with the blob key', async () => {

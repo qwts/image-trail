@@ -116,6 +116,7 @@ import {
   type PlaintextLocalSettings,
   type DurableBookmarkPayloadV1,
   type DurableHistoryPayloadV1,
+  type FullBackupBlobKeyBackup,
 } from '../content/panel-services.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
 import { clampPanelPosition, hostnameFromLocation } from './panel-position.js';
@@ -3443,12 +3444,9 @@ export class ImageTrailPanel {
     }
     const originalBlobRecords = originalBlobResult.records.map(storedBlobRecordFromPortable);
 
-    const blobKeyBackup =
-      originalBlobRecords.length > 0 && this.captureStore
-        ? await this.captureStore.exportBlobKeyBackup(password, this.state.blobKeyReference ?? undefined)
-        : null;
-    if (blobKeyBackup && !blobKeyBackup.ok) {
-      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/upload-error', message: blobKeyBackup.message });
+    const blobKeyBackupResult = await this.exportBlobKeyBackupsForOriginalRecords(originalBlobRecords, password);
+    if (!blobKeyBackupResult.ok) {
+      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/upload-error', message: blobKeyBackupResult.message });
       this.render();
       return;
     }
@@ -3457,7 +3455,7 @@ export class ImageTrailPanel {
     const exportResult = await exportEncryptedFullBackup({
       bookmarks: bookmarks.map(bookmarkRecordToExportEntry),
       originalBlobs: originalBlobRecords,
-      blobKeyBackups: blobKeyBackup?.ok ? [{ keyReference: blobKeyBackup.keyReference, fileContent: blobKeyBackup.fileContent }] : [],
+      blobKeyBackups: blobKeyBackupResult.backups,
       missingOriginalBlobIds: originalBlobResult.missingBlobIds,
       password,
       now,
@@ -3504,6 +3502,25 @@ export class ImageTrailPanel {
       ),
     });
     this.render();
+  }
+
+  private async exportBlobKeyBackupsForOriginalRecords(
+    originalBlobRecords: readonly ReturnType<typeof storedBlobRecordFromPortable>[],
+    password: string,
+  ): Promise<
+    { readonly ok: true; readonly backups: readonly FullBackupBlobKeyBackup[] } | { readonly ok: false; readonly message: string }
+  > {
+    if (originalBlobRecords.length === 0) return { ok: true, backups: [] };
+    if (!this.captureStore) return { ok: false, message: 'Encrypted original storage is unavailable; no bookmarks were backed up.' };
+
+    const backups: FullBackupBlobKeyBackup[] = [];
+    const keyReferences = [...new Set(originalBlobRecords.map((record) => record.key.reference))].sort();
+    for (const keyReference of keyReferences) {
+      const backup = await this.captureStore.exportBlobKeyBackup(password, keyReference);
+      if (!backup.ok) return { ok: false, message: backup.message };
+      backups.push({ keyReference: backup.keyReference, fileContent: backup.fileContent });
+    }
+    return { ok: true, backups };
   }
 
   private async choosePCloudRestoreFile(): Promise<void> {
@@ -4691,12 +4708,12 @@ function createBookmarksRestorePreview(
 function fullBackupMissingOriginalReferenceCount(result: BookmarkImportResult): number {
   if (!result.fullBackup) return result.externalOriginalCount;
   const backedBlobIds = new Set(result.originalBlobs.map((record) => record.id));
-  let missing = result.missingOriginalBlobIds.length;
+  const missingBlobIds = new Set(result.missingOriginalBlobIds.filter((blobId) => !backedBlobIds.has(blobId)));
   for (const entry of result.entries) {
     const blobId = entry.payload.storedOriginal?.blobId ?? entry.payload.protectedPin?.storedOriginalBlobId;
-    if (blobId && !backedBlobIds.has(blobId)) missing += 1;
+    if (blobId && !backedBlobIds.has(blobId)) missingBlobIds.add(blobId);
   }
-  return missing;
+  return missingBlobIds.size;
 }
 
 function bookmarkEntriesOriginalReferenceCount(entries: readonly BookmarkImportResult['entries'][number][]): number {

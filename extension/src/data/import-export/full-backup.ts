@@ -1,6 +1,7 @@
 import { createAesGcmIv, encryptAesGcm } from '../crypto/webcrypto.js';
 import { createPasswordSalt, deriveEncryptionKey } from '../crypto/password-wrap.js';
 import type { DurableBookmarkPayloadV1, RecoverableDataStatus, StoredBlobRecord } from '../types.js';
+import type { KeyReference } from '../crypto/types.js';
 import { buildExportFileHeader, serializeExportFile, toBase64, fromBase64, type ExportFileEnvelope } from './encrypted-file-format.js';
 
 export interface FullBackupBookmarkEntry {
@@ -159,16 +160,62 @@ export function bookmarksFromFullBackupPayload(value: unknown): readonly FullBac
 
 export function fullBackupPayloadFromUnknown(value: unknown): FullBackupPayloadV1 | null {
   if (!value || typeof value !== 'object') return null;
-  const payload = value as { schemaVersion?: unknown; bookmarks?: unknown; originalBlobs?: unknown; blobKeyBackups?: unknown };
+  const payload = value as {
+    schemaVersion?: unknown;
+    bookmarks?: unknown;
+    originalBlobs?: unknown;
+    blobKeyBackups?: unknown;
+    missingOriginalBlobIds?: unknown;
+  };
   if (payload.schemaVersion !== 1 || !Array.isArray(payload.bookmarks)) return null;
   if (!Array.isArray(payload.originalBlobs) || !Array.isArray(payload.blobKeyBackups)) return null;
+  if (!payload.originalBlobs.every(isPortableStoredBlobRecord)) return null;
+  if (!payload.blobKeyBackups.every(isFullBackupBlobKeyBackup)) return null;
   return {
     schemaVersion: 1,
     bookmarks: payload.bookmarks as readonly FullBackupBookmarkEntry[],
-    originalBlobs: payload.originalBlobs as readonly PortableStoredBlobRecord[],
-    blobKeyBackups: payload.blobKeyBackups as readonly FullBackupBlobKeyBackup[],
-    missingOriginalBlobIds: Array.isArray((value as { missingOriginalBlobIds?: unknown }).missingOriginalBlobIds)
-      ? ((value as { missingOriginalBlobIds: readonly string[] }).missingOriginalBlobIds as readonly string[])
+    originalBlobs: payload.originalBlobs,
+    blobKeyBackups: payload.blobKeyBackups,
+    missingOriginalBlobIds: Array.isArray(payload.missingOriginalBlobIds)
+      ? payload.missingOriginalBlobIds.filter((blobId): blobId is string => typeof blobId === 'string')
       : [],
   };
+}
+
+function isPortableStoredBlobRecord(value: unknown): value is PortableStoredBlobRecord {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Partial<PortableStoredBlobRecord>;
+  return (
+    typeof record.id === 'string' &&
+    record.kind === 'original' &&
+    record.schemaVersion === 1 &&
+    record.algorithm === 'AES-GCM' &&
+    typeof record.iv === 'string' &&
+    typeof record.ciphertext === 'string' &&
+    typeof record.encryptedByteLength === 'number' &&
+    Number.isFinite(record.encryptedByteLength) &&
+    record.encryptedByteLength >= 0 &&
+    typeof record.createdAt === 'string' &&
+    isBlobKeyReference(record.key) &&
+    typeof record.referenceCount === 'number' &&
+    Number.isFinite(record.referenceCount) &&
+    record.referenceCount >= 0
+  );
+}
+
+function isBlobKeyReference(value: unknown): value is KeyReference<'blob'> {
+  if (!value || typeof value !== 'object') return false;
+  const reference = value as Partial<KeyReference<'blob'>>;
+  return (
+    reference.kind === 'blob' &&
+    typeof reference.uuid === 'string' &&
+    reference.uuid.length > 0 &&
+    reference.reference === `blob:${reference.uuid}`
+  );
+}
+
+function isFullBackupBlobKeyBackup(value: unknown): value is FullBackupBlobKeyBackup {
+  if (!value || typeof value !== 'object') return false;
+  const backup = value as Partial<FullBackupBlobKeyBackup>;
+  return typeof backup.keyReference === 'string' && backup.keyReference.startsWith('blob:') && typeof backup.fileContent === 'string';
 }

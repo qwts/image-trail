@@ -60,8 +60,13 @@ export async function importBookmarks(fileContent: string, password: string): Pr
     const parsed = JSON.parse(new TextDecoder().decode(plaintext)) as unknown;
     const fullBackup = fullBackupPayloadFromUnknown(parsed);
     if (fullBackup) {
+      const backedOriginalBlobIds = new Set(fullBackup.originalBlobs.map((record) => record.id));
+      const parsedBookmarks = parseBookmarkEntries(fullBackup.bookmarks, { preserveOriginalReferences: true });
+      const entries = parsedBookmarks.entries.map((entry) => stripMissingFullBackupOriginalReference(entry, backedOriginalBlobIds));
       return {
-        ...parseBookmarkEntries(fullBackup.bookmarks, { preserveOriginalReferences: true }),
+        ...parsedBookmarks,
+        entries,
+        externalOriginalCount: bookmarkEntriesOriginalReferenceCount(entries),
         plaintext: false,
         fullBackup: true,
         originalBlobs: fullBackup.originalBlobs,
@@ -142,4 +147,33 @@ function isValidBookmarkEntry(value: unknown): value is BookmarksImportEntry {
 function stripExternalBlobReference(entry: BookmarksImportEntry): BookmarksImportEntry {
   const { storedOriginal: _storedOriginal, capturedAt: _capturedAt, ...payload } = entry.payload;
   return { ...entry, payload };
+}
+
+function stripMissingFullBackupOriginalReference(
+  entry: BookmarksImportEntry,
+  backedOriginalBlobIds: ReadonlySet<string>,
+): BookmarksImportEntry {
+  const storedOriginalMissing = !!entry.payload.storedOriginal && !backedOriginalBlobIds.has(entry.payload.storedOriginal.blobId);
+  const protectedOriginalMissing =
+    !!entry.payload.protectedPin?.storedOriginalBlobId && !backedOriginalBlobIds.has(entry.payload.protectedPin.storedOriginalBlobId);
+  if (!storedOriginalMissing && !protectedOriginalMissing) return entry;
+
+  const { storedOriginal: _storedOriginal, capturedAt: _capturedAt, ...payloadWithoutStoredOriginal } = entry.payload;
+  if (!protectedOriginalMissing || !payloadWithoutStoredOriginal.protectedPin) return { ...entry, payload: payloadWithoutStoredOriginal };
+
+  const { storedOriginalBlobId: _storedOriginalBlobId, ...protectedPinWithoutStoredOriginal } = payloadWithoutStoredOriginal.protectedPin;
+  return {
+    ...entry,
+    payload: {
+      ...payloadWithoutStoredOriginal,
+      protectedPin: {
+        ...protectedPinWithoutStoredOriginal,
+        hasStoredOriginal: false,
+      },
+    },
+  };
+}
+
+function bookmarkEntriesOriginalReferenceCount(entries: readonly BookmarksImportEntry[]): number {
+  return entries.filter((entry) => entry.payload.storedOriginal || entry.payload.protectedPin?.storedOriginalBlobId).length;
 }
