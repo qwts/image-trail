@@ -1,7 +1,10 @@
 # Agent Instructions
 
-Repo-local agent orientation. Read `CONTRIBUTING.md` first, then the wiki
+Repo-local agent orientation layer. Read `CONTRIBUTING.md` first, then the wiki
 contributor guide it links: https://github.com/qwtm/image-trail/wiki/Contributing
+
+Keep this file compact; use references instead of duplicating long procedures.
+Detailed workflow, SOP, and project documentation belong in the wiki.
 
 ## Communication
 
