@@ -176,11 +176,9 @@ export class PageAdapter {
     return () => this.grabSourcePatternRequestListeners.delete(listener);
   }
 
-  prepareStandaloneImageBackdrop(options: { readonly allowHtmlDocument?: boolean } = {}): void {
+  prepareStandaloneImageBackdrop(): void {
     const images = Array.from(document.images);
-    if (images.length === 1 && (options.allowHtmlDocument || document.contentType.startsWith('image/'))) {
-      keepSelectedTargetBackdropBlack(images[0]);
-    }
+    if (images.length === 1) keepSelectedTargetBackdropBlack(images[0]);
   }
 
   enableBookmarkShortcut(): void {
