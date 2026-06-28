@@ -27,6 +27,7 @@ const PCLOUD_CONNECTION_KEY = 'imageTrail.pcloudConnection';
 const PCLOUD_CLIENT_ID = '83ag1CIbJd7';
 const PCLOUD_AUTHORIZE_URL = 'https://my.pcloud.com/oauth2/authorize';
 const PCLOUD_DOWNLOAD_REFERRER = 'https://my.pcloud.com/';
+const PCLOUD_DOWNLOAD_REFERRER_RULE_ID = 900199;
 const DEFAULT_PCLOUD_API_HOST: PCloudApiHost = 'api.pcloud.com';
 const PCLOUD_ROOT_FOLDER_NAME = 'Image Trail';
 const PCLOUD_BACKUP_FOLDER_NAME = 'backups';
@@ -287,15 +288,59 @@ async function downloadPCloudFile(record: PCloudConnectionRecord, fileId: number
   for (const hostValue of hosts) {
     const host = stringOrUndefined(hostValue);
     if (!host) continue;
-    const response = await fetch(`https://${validateDownloadHost(host)}${path}`, {
-      referrer: PCLOUD_DOWNLOAD_REFERRER,
-      referrerPolicy: 'origin',
-    });
+    const response = await fetchPCloudDownloadUrl(`https://${validateDownloadHost(host)}${path}`);
     if (response.ok) return new Uint8Array(await response.arrayBuffer());
     const text = await response.text();
     lastError = text.trim() || lastError;
   }
   throw new Error(lastError);
+}
+
+async function fetchPCloudDownloadUrl(url: string): Promise<Response> {
+  const removeRule = await installPCloudDownloadRefererRule(url);
+  try {
+    return await fetch(url, {
+      referrer: PCLOUD_DOWNLOAD_REFERRER,
+      referrerPolicy: 'origin',
+    });
+  } finally {
+    await removeRule();
+  }
+}
+
+async function installPCloudDownloadRefererRule(url: string): Promise<() => Promise<void>> {
+  if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest?.updateSessionRules) return async () => {};
+  const regexFilter = `^${escapeRegExp(url)}$`;
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [PCLOUD_DOWNLOAD_REFERRER_RULE_ID],
+    addRules: [
+      {
+        id: PCLOUD_DOWNLOAD_REFERRER_RULE_ID,
+        priority: 1,
+        action: {
+          type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
+          requestHeaders: [
+            {
+              header: 'Referer',
+              operation: chrome.declarativeNetRequest.HeaderOperation.SET,
+              value: PCLOUD_DOWNLOAD_REFERRER,
+            },
+          ],
+        },
+        condition: {
+          regexFilter,
+          resourceTypes: [chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST],
+        },
+      },
+    ],
+  });
+  return async () => {
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [PCLOUD_DOWNLOAD_REFERRER_RULE_ID] });
+  };
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 async function digestHex(algorithm: 'SHA-1' | 'SHA-256', bytes: Uint8Array): Promise<string> {

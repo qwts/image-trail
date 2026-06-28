@@ -40,7 +40,7 @@ function mockedFolderId(init: RequestInit | undefined): number {
   throw new Error(`Unexpected folder creation parent=${parentFolderId ?? ''} name=${name ?? ''}`);
 }
 
-function installPCloudConnection(): () => void {
+function installPCloudConnection(options: { readonly dnrCalls?: unknown[] } = {}): () => void {
   const originalChrome = globalThis.chrome;
   globalThis.chrome = {
     storage: {
@@ -59,6 +59,22 @@ function installPCloudConnection(): () => void {
         }),
       },
     },
+    declarativeNetRequest: options.dnrCalls
+      ? {
+          RuleActionType: {
+            MODIFY_HEADERS: 'modifyHeaders',
+          },
+          HeaderOperation: {
+            SET: 'set',
+          },
+          ResourceType: {
+            XMLHTTPREQUEST: 'xmlhttprequest',
+          },
+          updateSessionRules: async (input: unknown) => {
+            options.dnrCalls?.push(input);
+          },
+        }
+      : undefined,
   } as unknown as typeof chrome;
 
   return () => {
@@ -327,7 +343,8 @@ test('listPCloudBackups returns encrypted backup candidates newest first without
 });
 
 test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 without tokens', async () => {
-  const restoreChrome = installPCloudConnection();
+  const dnrCalls: unknown[] = [];
+  const restoreChrome = installPCloudConnection({ dnrCalls });
   const originalFetch = globalThis.fetch;
   const fileContent = '{"encrypted":true,"payload":"restore"}';
 
@@ -364,14 +381,11 @@ test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 wi
     }
     assert.equal(JSON.stringify(result).includes('token-secret'), false);
     assert.equal(
-      calls.some(
-        (call) =>
-          call.url === 'https://c123.pcloud.com/restore-backup' &&
-          call.init?.referrer === 'https://my.pcloud.com/' &&
-          call.init.referrerPolicy === 'origin',
-      ),
+      calls.some((call) => call.url === 'https://c123.pcloud.com/restore-backup'),
       true,
     );
+    assert.equal(JSON.stringify(dnrCalls).includes('"header":"Referer"'), true);
+    assert.equal(JSON.stringify(dnrCalls).includes('"value":"https://my.pcloud.com/"'), true);
   } finally {
     globalThis.fetch = originalFetch;
     restoreChrome();
@@ -379,7 +393,8 @@ test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 wi
 });
 
 test('downloadPCloudBackup retries alternate pCloud hosts after direct-link referrer rejection', async () => {
-  const restoreChrome = installPCloudConnection();
+  const dnrCalls: unknown[] = [];
+  const restoreChrome = installPCloudConnection({ dnrCalls });
   const originalFetch = globalThis.fetch;
   const fileContent = '{"encrypted":true,"payload":"restore"}';
   const calls: FetchCall[] = [];
@@ -421,6 +436,8 @@ test('downloadPCloudBackup retries alternate pCloud hosts after direct-link refe
       ['https://blocked.pcloud.com/restore-backup', 'https://c123.pcloud.com/restore-backup'],
     );
     assert.equal(JSON.stringify(result).includes('token-secret'), false);
+    assert.equal(JSON.stringify(dnrCalls).includes('"header":"Referer"'), true);
+    assert.equal(JSON.stringify(dnrCalls).includes('"value":"https://my.pcloud.com/"'), true);
   } finally {
     globalThis.fetch = originalFetch;
     restoreChrome();
