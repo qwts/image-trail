@@ -72,6 +72,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     captureInProgress: false,
     captureResult: null,
     storageUsage: null,
+    buildIdentity: null,
     blobKeyUnlocked: false,
     blobKeyAvailable: false,
     blobKeyReference: null,

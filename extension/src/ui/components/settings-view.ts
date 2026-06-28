@@ -1,4 +1,5 @@
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
+import type { BuildIdentity } from '../../core/build-info.js';
 import type { PanelAction, PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../../core/types.js';
 import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from '../../core/url/templates.js';
 import {
@@ -54,6 +55,7 @@ export function createSettingsView(
     readonly busy: boolean;
   },
   storageUsage: StorageUsageSummary | null,
+  buildIdentity: BuildIdentity | null,
   urlReviewStatusState: {
     readonly limit: number;
     readonly clearAfterExport: boolean;
@@ -94,6 +96,7 @@ export function createSettingsView(
     ]),
     createSettingsGroup('Maintenance', 'maintenance', [
       createPanelLayoutSettingsView(dispatch),
+      createBuildIdentitySettingsView(buildIdentity),
       createStorageHealthSettingsView(storageUsage),
       createDestructiveSettingsView(destructiveState, dispatch),
     ]),
@@ -645,6 +648,69 @@ function createPanelLayoutSettingsView(dispatch: (action: PanelAction) => void):
   return wrapper;
 }
 
+export function createBuildIdentitySettingsView(buildIdentity: BuildIdentity | null): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'Build identity';
+
+  if (!buildIdentity) {
+    const empty = document.createElement('p');
+    empty.className = 'image-trail-panel__settings-empty';
+    empty.textContent = 'Build identity has not loaded yet.';
+    wrapper.append(heading, empty);
+    return wrapper;
+  }
+
+  const list = document.createElement('dl');
+  list.className = 'image-trail-panel__build-identity';
+  for (const row of buildIdentityRows(buildIdentity)) {
+    appendKeyValueRow(list, row.label, row.value);
+  }
+
+  wrapper.append(heading, list);
+  return wrapper;
+}
+
+export function buildIdentityRows(buildIdentity: BuildIdentity): readonly { readonly label: string; readonly value: string }[] {
+  const rows: { readonly label: string; readonly value: string }[] = [{ label: 'Version', value: buildIdentity.version }];
+  if (buildIdentity.commit) rows.push({ label: 'Commit', value: buildIdentity.commit });
+  if (buildIdentity.branch) rows.push({ label: 'Branch', value: buildIdentity.branch });
+  if (buildIdentity.worktree) rows.push({ label: 'Worktree', value: buildIdentity.worktree });
+  rows.push({ label: 'Built local', value: formatBuildIdentityLocalTimestamp(buildIdentity.builtAt, buildIdentity.timezone) });
+  rows.push({ label: 'Built UTC', value: formatBuildIdentityTimestamp(buildIdentity.builtAt) });
+  return rows;
+}
+
+export function formatBuildIdentityLocalTimestamp(value: string, timezone?: string | null): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return value;
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone ?? undefined,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short',
+    }).format(new Date(timestamp));
+  } catch {
+    return value;
+  }
+}
+
+export function formatBuildIdentityTimestamp(value: string): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return value;
+  return new Date(timestamp)
+    .toISOString()
+    .replace('T', ' ')
+    .replace(/\.\d{3}Z$/u, ' UTC');
+}
+
 export function createStorageHealthSettingsView(storageUsage: StorageUsageSummary | null): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'image-trail-panel__settings-templates';
@@ -674,15 +740,19 @@ export function createStorageHealthSettingsView(storageUsage: StorageUsageSummar
   return wrapper;
 }
 
-function appendStorageHealthRow(list: HTMLDListElement, label: string, count: number, bytes: number | null): void {
+function appendKeyValueRow(list: HTMLDListElement, label: string, value: string): void {
   const term = document.createElement('dt');
   term.textContent = label;
 
-  const value = document.createElement('dd');
-  const countLabel = count === 1 ? '1 record' : `${count} records`;
-  value.textContent = bytes === null ? countLabel : `${countLabel} · ${formatStorageHealthBytes(bytes)}`;
+  const description = document.createElement('dd');
+  description.textContent = value;
 
-  list.append(term, value);
+  list.append(term, description);
+}
+
+function appendStorageHealthRow(list: HTMLDListElement, label: string, count: number, bytes: number | null): void {
+  const countLabel = count === 1 ? '1 record' : `${count} records`;
+  appendKeyValueRow(list, label, bytes === null ? countLabel : `${countLabel} · ${formatStorageHealthBytes(bytes)}`);
 }
 
 export function formatStorageHealthBytes(bytes: number): string {

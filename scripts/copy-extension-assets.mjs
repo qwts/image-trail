@@ -1,4 +1,5 @@
 import { cp, mkdir } from 'node:fs/promises';
+import './write-extension-build-info.mjs';
 
 await mkdir('extension/dist', { recursive: true });
 await cp('extension/manifest.json', 'extension/dist/manifest.json');

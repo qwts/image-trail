@@ -1691,7 +1691,8 @@
     sans-serif;
 }
 
-.image-trail-panel-root .image-trail-panel__storage-health {
+.image-trail-panel-root .image-trail-panel__storage-health,
+.image-trail-panel-root .image-trail-panel__build-identity {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 5px 10px;
@@ -1704,7 +1705,9 @@
 }
 
 .image-trail-panel-root .image-trail-panel__storage-health dt,
-.image-trail-panel-root .image-trail-panel__storage-health dd {
+.image-trail-panel-root .image-trail-panel__storage-health dd,
+.image-trail-panel-root .image-trail-panel__build-identity dt,
+.image-trail-panel-root .image-trail-panel__build-identity dd {
   min-width: 0;
   margin: 0;
   color: #aaa;
@@ -1716,12 +1719,18 @@
     sans-serif;
 }
 
-.image-trail-panel-root .image-trail-panel__storage-health dt {
+.image-trail-panel-root .image-trail-panel__storage-health dt,
+.image-trail-panel-root .image-trail-panel__build-identity dt {
   color: #ddd;
 }
 
-.image-trail-panel-root .image-trail-panel__storage-health dd {
+.image-trail-panel-root .image-trail-panel__storage-health dd,
+.image-trail-panel-root .image-trail-panel__build-identity dd {
   text-align: right;
+}
+
+.image-trail-panel-root .image-trail-panel__build-identity dd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .image-trail-panel-root .image-trail-panel__settings-template-list {

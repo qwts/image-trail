@@ -24,6 +24,7 @@ import type { ImageDisplayRecord } from '../core/display-records.js';
 import { applyFieldLoadFailureToState, applyFieldSplitSpecToState, reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
+import type { BuildIdentity } from '../core/build-info.js';
 import { createInitialPanelState, setAutomationState, setTargetState } from '../core/state.js';
 import type {
   BookmarkStore,
@@ -374,6 +375,11 @@ export class ImageTrailPanel {
 
   get statusMessage(): string {
     return this.state.message;
+  }
+
+  setBuildIdentity(buildIdentity: BuildIdentity | null): void {
+    this.state = { ...this.state, buildIdentity };
+    if (this.state.visible && this.state.settingsOpen) this.render();
   }
 
   toggle(): PanelState {

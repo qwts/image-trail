@@ -1,4 +1,5 @@
 import type { AutomationPhase } from './automation/types.js';
+import type { BuildIdentity } from './build-info.js';
 import type { CaptureResult, StorageUsageSummary } from './image/capture-result.js';
 import type { ImageDisplayRecord } from './display-records.js';
 import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from './url/templates.js';
@@ -194,6 +195,7 @@ export interface PanelState {
   readonly captureInProgress: boolean;
   readonly captureResult: CaptureResult | null;
   readonly storageUsage: StorageUsageSummary | null;
+  readonly buildIdentity: BuildIdentity | null;
   readonly blobKeyUnlocked: boolean;
   readonly blobKeyAvailable: boolean;
   readonly blobKeyReference: string | null;

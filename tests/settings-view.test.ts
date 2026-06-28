@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatStorageHealthBytes, storageHealthRows } from '../extension/src/ui/components/settings-view.js';
+import {
+  buildIdentityRows,
+  formatBuildIdentityLocalTimestamp,
+  formatBuildIdentityTimestamp,
+  formatStorageHealthBytes,
+  storageHealthRows,
+} from '../extension/src/ui/components/settings-view.js';
 
 test('storage health rows separate queue metadata, thumbnails, and originals', () => {
   const rows = storageHealthRows({
@@ -39,4 +45,32 @@ test('storage health bytes stay compact', () => {
   assert.equal(formatStorageHealthBytes(512), '512 B');
   assert.equal(formatStorageHealthBytes(1536), '1.5 KB');
   assert.equal(formatStorageHealthBytes(2 * 1024 * 1024), '2.0 MB');
+});
+
+test('build identity rows include only available local build fields', () => {
+  assert.deepEqual(
+    buildIdentityRows({
+      schemaVersion: 1,
+      version: '0.1.0',
+      builtAt: '2026-06-28T03:30:00.000Z',
+      commit: 'abc123def456',
+      branch: 'codex/dev',
+      worktree: '7bc4/image-bookmarklet',
+      timezone: 'America/Chicago',
+      mode: 'local',
+    }),
+    [
+      { label: 'Version', value: '0.1.0' },
+      { label: 'Commit', value: 'abc123def456' },
+      { label: 'Branch', value: 'codex/dev' },
+      { label: 'Worktree', value: '7bc4/image-bookmarklet' },
+      { label: 'Built local', value: '06/27/2026, 10:30:00 PM CDT' },
+      { label: 'Built UTC', value: '2026-06-28 03:30:00 UTC' },
+    ],
+  );
+});
+
+test('build identity timestamp falls back to source text when invalid', () => {
+  assert.equal(formatBuildIdentityTimestamp('not-a-date'), 'not-a-date');
+  assert.equal(formatBuildIdentityLocalTimestamp('not-a-date', 'America/Chicago'), 'not-a-date');
 });
