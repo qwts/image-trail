@@ -2,6 +2,7 @@ import { DEFAULT_PREVIEW_OBJECT_FIT, type ObjectFitMode } from '../core/preview-
 
 type StyleSnapshot = Pick<
   CSSStyleDeclaration,
+  | 'background'
   | 'backgroundColor'
   | 'cursor'
   | 'height'
@@ -32,6 +33,7 @@ function snapshot(element: HTMLElement): void {
   if (snapshots.has(element)) return;
   snapshots.set(element, {
     backgroundColor: element.style.backgroundColor,
+    background: element.style.background,
     cursor: element.style.cursor,
     height: element.style.height,
     left: element.style.left,
@@ -45,6 +47,27 @@ function snapshot(element: HTMLElement): void {
     top: element.style.top,
     width: element.style.width,
   });
+}
+
+function keepSelectedBackdropBlack(element: HTMLElement): void {
+  element.style.background = '#000';
+  element.style.backgroundColor = '#000';
+}
+
+function restoreLockBoxLayout(element: HTMLElement): void {
+  const original = snapshots.get(element);
+  if (original) {
+    element.style.height = original.height;
+    element.style.left = original.left;
+    element.style.maxHeight = original.maxHeight;
+    element.style.maxWidth = original.maxWidth;
+    element.style.objectFit = original.objectFit;
+    element.style.position = original.position;
+    element.style.top = original.top;
+    element.style.width = original.width;
+  }
+  if (element.dataset.imageTrailLockBox) restorePageBackdrop();
+  delete element.dataset.imageTrailLockBox;
 }
 
 export function markPickModeCandidate(element: HTMLElement): void {
@@ -89,13 +112,13 @@ export function restoreGrabPreviewTarget(element: HTMLElement): void {
 }
 
 export function markSelectedTarget(element: HTMLElement, options: SelectedTargetOptions = {}): void {
-  if (!options.lockBox && element.dataset.imageTrailLockBox) restoreElementStyles(element);
   snapshot(element);
+  keepSelectedBackdropBlack(element);
+  if (!options.lockBox && element.dataset.imageTrailLockBox) restoreLockBoxLayout(element);
   element.dataset.imageTrailSelected = 'true';
   if (options.lockBox) {
     element.dataset.imageTrailLockBox = 'true';
     markPageBackdropBlack();
-    element.style.backgroundColor = '#000';
     element.style.height = '100%';
     element.style.left = '0';
     element.style.maxHeight = 'none';
@@ -116,6 +139,7 @@ export function markSelectedTarget(element: HTMLElement, options: SelectedTarget
 export function restoreElementStyles(element: HTMLElement): void {
   const original = snapshots.get(element);
   if (original) {
+    element.style.background = original.background;
     element.style.backgroundColor = original.backgroundColor;
     element.style.cursor = original.cursor;
     element.style.height = original.height;

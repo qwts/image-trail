@@ -9,6 +9,7 @@ import {
 
 function createImageElement(): HTMLElement {
   const style = {
+    background: '',
     backgroundColor: '',
     boxShadow: '',
     cursor: '',
@@ -71,6 +72,7 @@ test('selected target lockBox constrains the host image box and restores origina
   assert.equal(element.style.maxHeight, '90vh');
   assert.equal(element.style.maxWidth, '90vw');
   assert.equal(element.style.width, '144px');
+  assert.equal(element.style.background, '');
   assert.equal(element.style.backgroundColor, '');
   assert.equal(element.dataset.imageTrailSelected, undefined);
 });
@@ -126,10 +128,13 @@ test('selected target without lockBox leaves inline sizing alone and defaults im
   assert.equal(element.style.height, '72px');
   assert.equal(element.style.objectFit, 'cover');
   assert.equal(element.style.width, '144px');
-  assert.equal(element.style.backgroundColor, '');
+  assert.equal(element.style.background, '#000');
+  assert.equal(element.style.backgroundColor, '#000');
 
   restoreElementStyles(element);
 
+  assert.equal(element.style.background, '');
+  assert.equal(element.style.backgroundColor, '');
   assert.equal(element.style.objectFit, 'contain');
 });
 
@@ -146,6 +151,8 @@ test('selected target can defer lockBox styling until preview replaces the image
     assert.equal(element.style.height, '72px');
     assert.equal(element.style.objectFit, 'cover');
     assert.equal(element.style.width, '144px');
+    assert.equal(element.style.background, '#000');
+    assert.equal(element.style.backgroundColor, '#000');
     assert.equal(body.style.background, 'white');
 
     markSelectedTarget(element, { lockBox: true });
@@ -160,6 +167,8 @@ test('selected target can defer lockBox styling until preview replaces the image
     assert.equal(element.style.height, '72px');
     assert.equal(element.style.objectFit, 'cover');
     assert.equal(element.style.width, '144px');
+    assert.equal(element.style.background, '#000');
+    assert.equal(element.style.backgroundColor, '#000');
     assert.equal(body.style.background, 'white');
     assert.equal(documentElement.style.background, 'lightgray');
     assert.equal(element.dataset.imageTrailSelected, 'true');
@@ -170,6 +179,8 @@ test('selected target can defer lockBox styling until preview replaces the image
     assert.equal(element.style.height, '72px');
     assert.equal(element.style.objectFit, 'cover');
     assert.equal(element.style.width, '144px');
+    assert.equal(element.style.background, '');
+    assert.equal(element.style.backgroundColor, '');
     assert.equal(body.style.background, 'white');
     assert.equal(documentElement.style.background, 'lightgray');
   } finally {

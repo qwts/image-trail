@@ -287,8 +287,8 @@ export class PageAdapter {
       return this.emit('Select a target image before loading a bookmark.');
     }
 
-    applyImageUrl(this.selected, displayUrl);
     markSelectedTarget(this.selected, { lockBox: this.selectedFillScreen, objectFit: this.selectedObjectFit });
+    applyImageUrl(this.selected, displayUrl);
     this.selectedActiveUrl = url;
     this.selectedDisplayUrl = displayUrl;
     this.selectedProjectionId = options.projectionId ?? null;
