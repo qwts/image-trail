@@ -2917,10 +2917,15 @@ export class ImageTrailPanel {
     }
     this.state = reducePanelAction(this.state, { name: 'history/delete-all' });
     this.render();
+    let removedCapturedBlob = false;
     for (const record of records) {
       const blobId = encryptedBlobIdForRecord(record);
-      if (blobId) await this.removeCapturedBlobReference(blobId, { render: true });
+      if (blobId) {
+        await this.removeCapturedBlobReference(blobId, { render: false });
+        removedCapturedBlob = true;
+      }
     }
+    if (removedCapturedBlob) await this.refreshStorageUsage({ render: true });
   }
 
   private async loadBookmark(id: string): Promise<void> {
