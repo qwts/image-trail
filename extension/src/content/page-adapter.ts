@@ -110,6 +110,11 @@ function closestImageTrailPanelRoot(node: unknown): boolean {
   return typeof closest === 'function' && closest.call(node, '#image-trail-panel-root') !== null;
 }
 
+function isBodyOnlyImageDocument(image: HTMLImageElement | undefined): boolean {
+  const body = document.body;
+  return !!image && !!body && body.childElementCount === 1 && body.firstElementChild === image;
+}
+
 export class PageAdapter {
   private selected: HTMLImageElement | null = null;
   private hovered: HTMLImageElement | null = null;
@@ -176,8 +181,9 @@ export class PageAdapter {
     return () => this.grabSourcePatternRequestListeners.delete(listener);
   }
 
-  prepareStandaloneImageBackdrop(): void {
+  prepareStandaloneImageBackdrop(options: { readonly requireBodyOnlyImage?: boolean } = {}): void {
     const images = Array.from(document.images);
+    if (options.requireBodyOnlyImage && !isBodyOnlyImageDocument(images[0])) return;
     if (images.length === 1) keepSelectedTargetBackdropBlack(images[0]);
   }
 
