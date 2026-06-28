@@ -52,6 +52,9 @@ export interface CloudBackupProviderState {
   readonly lastBackupName?: string;
   readonly lastBackupSize?: string;
   readonly lastBackupSha256?: string;
+  readonly lastBackupOriginalCount?: number;
+  readonly lastBackupOriginalBytes?: string;
+  readonly lastBackupMissingOriginalCount?: number;
   readonly pendingOperation?: 'connecting' | 'disconnecting' | 'backing-up' | 'restoring';
   readonly restoreCandidates?: readonly {
     readonly fileId: number;
@@ -793,6 +796,9 @@ function cloudBackupMetadata(state: CloudBackupProviderState): ReadonlyArray<rea
   if (state.lastBackupName) rows.push(['File', state.lastBackupName]);
   if (state.lastBackupAt) rows.push(['Last backup', state.lastBackupAt]);
   if (state.lastBackupSize) rows.push(['Size', state.lastBackupSize]);
+  if (state.lastBackupOriginalCount !== undefined) rows.push(['Encrypted originals', String(state.lastBackupOriginalCount)]);
+  if (state.lastBackupOriginalBytes) rows.push(['Original bytes', state.lastBackupOriginalBytes]);
+  if (state.lastBackupMissingOriginalCount !== undefined) rows.push(['Missing originals', String(state.lastBackupMissingOriginalCount)]);
   if (state.lastBackupSha256) rows.push(['SHA-256', state.lastBackupSha256]);
   if (state.restoreCandidateName) rows.push(['Restore file', state.restoreCandidateName]);
   if (state.restoreCandidateSize) rows.push(['Restore size', state.restoreCandidateSize]);

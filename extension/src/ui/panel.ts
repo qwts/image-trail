@@ -3477,6 +3477,7 @@ export class ImageTrailPanel {
       this.render();
       return;
     }
+    const originalBytes = originalBlobResult.records.reduce((total, record) => total + record.encryptedByteLength, 0);
     this.state = reducePanelAction(this.state, {
       name: 'pcloud-backup/upload-complete',
       fileName: upload.fileName,
@@ -3484,8 +3485,16 @@ export class ImageTrailPanel {
       apiHost: upload.apiHost,
       sizeBytes: upload.sizeBytes,
       sha256: upload.sha256,
+      originalCount: originalBlobResult.records.length,
+      originalBytes,
+      missingOriginalCount: originalBlobResult.missingBlobIds.length,
       uploadedAt: upload.uploadedAt,
-      message: upload.message,
+      message: pcloudBackupUploadMessage(
+        upload.message,
+        originalBlobResult.records.length,
+        originalBytes,
+        originalBlobResult.missingBlobIds.length,
+      ),
     });
     this.render();
   }
@@ -4729,6 +4738,23 @@ export function isLockedPrivatePin(record: ImageDisplayRecord): boolean {
 function pcloudBackupFileName(isoTimestamp: string): string {
   const timestamp = isoTimestamp.replaceAll(':', '-').replace(/\.\d{3}Z$/u, 'Z');
   return `image-trail-pcloud-backup-${timestamp}.image-trail-encrypted.json`;
+}
+
+function pcloudBackupUploadMessage(
+  uploadMessage: string,
+  originalCount: number,
+  originalBytes: number,
+  missingOriginalCount: number,
+): string {
+  const originalSummary = `${originalCount} encrypted original${originalCount === 1 ? '' : 's'} (${formatCloudBackupBytes(originalBytes)})`;
+  if (missingOriginalCount === 0) return `${uploadMessage} Included ${originalSummary}.`;
+  return `${uploadMessage} Included ${originalSummary}; ${missingOriginalCount} referenced original${missingOriginalCount === 1 ? '' : 's'} missing.`;
+}
+
+function formatCloudBackupBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} B`;
 }
 
 function bookmarkSaveMessage(record: ImageDisplayRecord, label = record.url): string {

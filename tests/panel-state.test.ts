@@ -1331,6 +1331,9 @@ test('pCloud backup reducer tracks backing-up state and verified upload metadata
     fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
     sizeBytes: 512,
     sha256: 'b'.repeat(64),
+    originalCount: 1,
+    originalBytes: 96937,
+    missingOriginalCount: 0,
     uploadedAt: '2026-06-27T00:00:01.000Z',
     message: 'Uploaded and verified backup.',
   });
@@ -1340,6 +1343,9 @@ test('pCloud backup reducer tracks backing-up state and verified upload metadata
   assert.equal(uploaded.pcloudBackup.lastBackupFileName, 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json');
   assert.equal(uploaded.pcloudBackup.lastBackupSizeBytes, 512);
   assert.equal(uploaded.pcloudBackup.lastBackupSha256, 'b'.repeat(64));
+  assert.equal(uploaded.pcloudBackup.lastBackupOriginalCount, 1);
+  assert.equal(uploaded.pcloudBackup.lastBackupOriginalBytes, 96937);
+  assert.equal(uploaded.pcloudBackup.lastBackupMissingOriginalCount, 0);
   assert.equal(uploaded.pcloudBackup.messageIsError, false);
 });
 

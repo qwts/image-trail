@@ -150,6 +150,9 @@ export interface PCloudBackupState {
   readonly lastBackupFileName?: string;
   readonly lastBackupSizeBytes?: number;
   readonly lastBackupSha256?: string;
+  readonly lastBackupOriginalCount?: number;
+  readonly lastBackupOriginalBytes?: number;
+  readonly lastBackupMissingOriginalCount?: number;
   readonly restoreCandidates?: readonly import('./cloud/pcloud-provider.js').PCloudBackupRestoreCandidate[];
   readonly lastRestoreFileName?: string;
   readonly lastRestoreSizeBytes?: number;
@@ -578,6 +581,9 @@ export type PanelAction =
       readonly apiHost: string;
       readonly sizeBytes: number;
       readonly sha256: string;
+      readonly originalCount?: number;
+      readonly originalBytes?: number;
+      readonly missingOriginalCount?: number;
       readonly uploadedAt: string;
       readonly message: string;
     }

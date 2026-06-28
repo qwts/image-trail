@@ -390,6 +390,12 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     lastBackupName: state.pcloudBackup.lastBackupFileName,
     lastBackupSize:
       state.pcloudBackup.lastBackupSizeBytes === undefined ? undefined : formatCloudBackupBytes(state.pcloudBackup.lastBackupSizeBytes),
+    lastBackupOriginalCount: state.pcloudBackup.lastBackupOriginalCount,
+    lastBackupOriginalBytes:
+      state.pcloudBackup.lastBackupOriginalBytes === undefined
+        ? undefined
+        : formatCloudBackupBytes(state.pcloudBackup.lastBackupOriginalBytes),
+    lastBackupMissingOriginalCount: state.pcloudBackup.lastBackupMissingOriginalCount,
     lastBackupSha256: state.pcloudBackup.lastBackupSha256,
     restoreCandidates: state.pcloudBackup.restoreCandidates?.map((candidate) => ({
       fileId: candidate.fileId,
