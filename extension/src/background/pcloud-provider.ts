@@ -26,7 +26,7 @@ interface PCloudConnectionRecord {
 const PCLOUD_CONNECTION_KEY = 'imageTrail.pcloudConnection';
 const PCLOUD_CLIENT_ID = '83ag1CIbJd7';
 const PCLOUD_AUTHORIZE_URL = 'https://my.pcloud.com/oauth2/authorize';
-const PCLOUD_DOWNLOAD_REFERRER = 'https://my.pcloud.com/';
+const PCLOUD_DOWNLOAD_REFERRER = 'https://pcloud.com/';
 const PCLOUD_DOWNLOAD_REFERRER_RULE_ID = 900199;
 const DEFAULT_PCLOUD_API_HOST: PCloudApiHost = 'api.pcloud.com';
 const PCLOUD_ROOT_FOLDER_NAME = 'Image Trail';
