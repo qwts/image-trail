@@ -40,7 +40,7 @@ import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../extension/src/data/crypto/binary-envelope.js';
 import { sealJsonEnvelope } from '../extension/src/data/crypto/envelope.js';
-import type { DurableHistoryPayloadV1, StoredBlobRecord } from '../extension/src/data/types.js';
+import type { DurableBookmarkPayloadV1, DurableHistoryPayloadV1, StoredBlobRecord } from '../extension/src/data/types.js';
 import type { StoredKeyRecord } from '../extension/src/data/crypto/types.js';
 
 function requireBlobKeyRecord(record: StoredKeyRecord | undefined): StoredKeyRecord<'blob'> {
@@ -759,6 +759,42 @@ test('history-import: skips entries with missing captureStatus', async () => {
   assert.equal(importResult.entries.length, 1);
   assert.equal(importResult.entries[0].uuid, 'valid-entry');
   assert.equal(importResult.skipped.length, 1);
+  assert.deepEqual(importResult.validationReport, {
+    rejectedCount: 1,
+    reasons: [{ reason: 'Invalid capture status', count: 1 }],
+  });
+});
+
+test('bookmarks-import: reports rejected records by privacy-safe reason', async () => {
+  const exportResult = await exportEncryptedBookmarks({
+    entries: [
+      {
+        uuid: 'valid-bookmark',
+        payload: { url: 'https://example.test/valid.jpg', bookmarkedAt: '2026-06-18T00:00:00.000Z' },
+      },
+      {
+        uuid: 'missing-url',
+        payload: { bookmarkedAt: '2026-06-18T00:00:00.000Z' } as DurableBookmarkPayloadV1,
+      },
+      {
+        uuid: 'missing-time',
+        payload: { url: 'https://example.test/missing-time.jpg' } as DurableBookmarkPayloadV1,
+      },
+    ],
+    password: 'test-pass',
+  });
+
+  const importResult = await importBookmarks(exportResult.fileContent!, 'test-pass');
+  assert.ok(importResult.status.ok);
+  assert.equal(importResult.entries.length, 1);
+  assert.deepEqual(importResult.skipped, ['missing-url', 'missing-time']);
+  assert.deepEqual(importResult.validationReport, {
+    rejectedCount: 2,
+    reasons: [
+      { reason: 'Missing image URL', count: 1 },
+      { reason: 'Missing bookmark timestamp', count: 1 },
+    ],
+  });
 });
 
 test('url-review-status: exports and imports reviewed URL state', () => {
@@ -830,7 +866,11 @@ test('url-review-status: skips invalid imported status records', () => {
   assert.ok(imported.status.ok, imported.status.message);
   assert.equal(imported.records.length, 1);
   assert.equal(imported.records[0]?.status, 'unchanged');
-  assert.deepEqual(imported.skipped, ['https://example.test/image-0003.jpg']);
+  assert.deepEqual(imported.skipped, ['redacted']);
+  assert.deepEqual(imported.validationReport, {
+    rejectedCount: 1,
+    reasons: [{ reason: 'Invalid review status', count: 1 }],
+  });
 });
 
 test('encrypted-file-format: header contains all required metadata fields', () => {

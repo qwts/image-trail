@@ -3,6 +3,7 @@ import { deriveEncryptionKey } from '../crypto/password-wrap.js';
 import type { DurableHistoryPayloadV1, RecoverableDataStatus } from '../types.js';
 import { fromBase64, parseExportFile } from './encrypted-file-format.js';
 import { parsePlainRecordsExport } from './plain-records-format.js';
+import { createImportValidationReport, type ImportValidationReport } from './validation-report.js';
 
 export interface HistoryImportEntry {
   readonly uuid: string;
@@ -13,6 +14,7 @@ export interface HistoryImportResult {
   readonly status: RecoverableDataStatus;
   readonly entries: readonly HistoryImportEntry[];
   readonly skipped: readonly string[];
+  readonly validationReport: ImportValidationReport;
   readonly plaintext: boolean;
 }
 
@@ -24,6 +26,7 @@ export async function importEncryptedHistory(fileContent: string, password: stri
     status: { ok: false, code: 'decryption-failed', message },
     entries: [],
     skipped: [],
+    validationReport: createImportValidationReport([]),
     plaintext: false,
   });
 
@@ -73,6 +76,7 @@ function parseHistoryEntries(parsed: unknown): Omit<HistoryImportResult, 'plaint
     status: { ok: false, code: 'decryption-failed', message },
     entries: [],
     skipped: [],
+    validationReport: createImportValidationReport([]),
   });
 
   if (!Array.isArray(parsed)) {
@@ -81,12 +85,15 @@ function parseHistoryEntries(parsed: unknown): Omit<HistoryImportResult, 'plaint
 
   const entries: HistoryImportEntry[] = [];
   const skipped: string[] = [];
+  const rejectionReasons: string[] = [];
 
   for (const item of parsed) {
-    if (isValidHistoryEntry(item)) {
-      entries.push(item);
+    const rejectionReason = historyEntryRejectionReason(item);
+    if (!rejectionReason) {
+      entries.push(item as HistoryImportEntry);
     } else {
       skipped.push(typeof item === 'object' && item !== null && 'uuid' in item ? String(item.uuid) : 'unknown');
+      rejectionReasons.push(rejectionReason);
     }
   }
 
@@ -98,18 +105,20 @@ function parseHistoryEntries(parsed: unknown): Omit<HistoryImportResult, 'plaint
     },
     entries,
     skipped,
+    validationReport: createImportValidationReport(rejectionReasons),
   };
 }
 
 const VALID_CAPTURE_STATUSES = new Set(['remote-only', 'downloaded', 'failed']);
 
-function isValidHistoryEntry(value: unknown): value is HistoryImportEntry {
-  if (typeof value !== 'object' || value === null) return false;
+function historyEntryRejectionReason(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null) return 'Entry is not an object';
   const obj = value as Record<string, unknown>;
-  if (typeof obj.uuid !== 'string') return false;
-  if (typeof obj.payload !== 'object' || obj.payload === null) return false;
+  if (typeof obj.uuid !== 'string') return 'Missing record id';
+  if (typeof obj.payload !== 'object' || obj.payload === null) return 'Missing payload';
   const payload = obj.payload as Record<string, unknown>;
-  return (
-    typeof payload.url === 'string' && typeof payload.capturedAt === 'string' && VALID_CAPTURE_STATUSES.has(payload.captureStatus as string)
-  );
+  if (typeof payload.url !== 'string') return 'Missing image URL';
+  if (typeof payload.capturedAt !== 'string') return 'Missing capture timestamp';
+  if (!VALID_CAPTURE_STATUSES.has(payload.captureStatus as string)) return 'Invalid capture status';
+  return null;
 }

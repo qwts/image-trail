@@ -729,6 +729,21 @@ function createRestorePreview(
     panel.append(list);
   }
 
+  if (preview.validationIssues && preview.validationIssues.length > 0) {
+    const issues = document.createElement('ul');
+    issues.className = 'image-trail-panel__restore-preview-unsupported';
+    for (const issue of preview.validationIssues) {
+      const item = document.createElement('li');
+      const label = document.createElement('span');
+      label.textContent = issue.reason;
+      const detail = document.createElement('span');
+      detail.textContent = `${issue.count} rejected record${issue.count === 1 ? '' : 's'}`;
+      item.append(label, detail);
+      issues.append(item);
+    }
+    panel.append(issues);
+  }
+
   if (preview.unsupportedSections && preview.unsupportedSections.length > 0) {
     const unsupported = document.createElement('ul');
     unsupported.className = 'image-trail-panel__restore-preview-unsupported';

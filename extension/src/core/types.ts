@@ -234,6 +234,7 @@ export interface ImportRestorePreviewState {
   readonly message?: string;
   readonly messageIsError?: boolean;
   readonly samples: readonly ImportRestorePreviewSample[];
+  readonly validationIssues?: readonly ImportRestorePreviewValidationIssue[];
   readonly unsupportedSections?: readonly ImportRestorePreviewUnsupportedSection[];
 }
 
@@ -246,6 +247,11 @@ export interface ImportRestorePreviewSample {
 export interface ImportRestorePreviewUnsupportedSection {
   readonly label: string;
   readonly detail: string;
+}
+
+export interface ImportRestorePreviewValidationIssue {
+  readonly reason: string;
+  readonly count: number;
 }
 
 export type PanelActionName =

@@ -1,5 +1,6 @@
 import type { UrlReviewStatusRecord } from '../../core/types.js';
 import type { RecoverableDataStatus } from '../types.js';
+import { createImportValidationReport, type ImportValidationReport } from './validation-report.js';
 
 export const URL_REVIEW_STATUS_EXPORT_FORMAT = 'image-trail.url-review-status';
 export const URL_REVIEW_STATUS_EXPORT_VERSION = 1;
@@ -22,6 +23,7 @@ export interface UrlReviewStatusImportResult {
   readonly status: RecoverableDataStatus;
   readonly records: readonly UrlReviewStatusRecord[];
   readonly skipped: readonly string[];
+  readonly validationReport: ImportValidationReport;
 }
 
 export function exportUrlReviewStatus(input: {
@@ -51,6 +53,7 @@ export function importUrlReviewStatus(fileContent: string): UrlReviewStatusImpor
     status: { ok: false, code: 'decryption-failed', message },
     records: [],
     skipped: [],
+    validationReport: createImportValidationReport([]),
   });
 
   let parsed: unknown;
@@ -72,11 +75,14 @@ export function importUrlReviewStatus(fileContent: string): UrlReviewStatusImpor
 
   const records: UrlReviewStatusRecord[] = [];
   const skipped: string[] = [];
+  const rejectionReasons: string[] = [];
   for (const item of envelope.records) {
-    if (isValidUrlReviewStatusRecord(item)) {
-      records.push(item);
+    const rejectionReason = urlReviewStatusRejectionReason(item);
+    if (!rejectionReason) {
+      records.push(item as UrlReviewStatusRecord);
     } else {
-      skipped.push(typeof item === 'object' && item !== null && 'sourceUrl' in item ? String(item.sourceUrl) : 'unknown');
+      skipped.push('redacted');
+      rejectionReasons.push(rejectionReason);
     }
   }
 
@@ -88,22 +94,21 @@ export function importUrlReviewStatus(fileContent: string): UrlReviewStatusImpor
     },
     records,
     skipped,
+    validationReport: createImportValidationReport(rejectionReasons),
   };
 }
 
-function isValidUrlReviewStatusRecord(value: unknown): value is UrlReviewStatusRecord {
-  if (typeof value !== 'object' || value === null) return false;
+function urlReviewStatusRejectionReason(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null) return 'Entry is not an object';
   const record = value as Record<string, unknown>;
-  return (
-    record.schemaVersion === 1 &&
-    typeof record.hostname === 'string' &&
-    typeof record.pageUrl === 'string' &&
-    typeof record.sourceUrl === 'string' &&
-    (record.status === 'passed' || record.status === 'failed' || record.status === 'unchanged') &&
-    Array.isArray(record.fieldIds) &&
-    record.fieldIds.every((fieldId) => typeof fieldId === 'string') &&
-    (typeof record.activeFieldId === 'string' || record.activeFieldId === null) &&
-    (typeof record.reason === 'string' || record.reason === undefined) &&
-    typeof record.updatedAt === 'string'
-  );
+  if (record.schemaVersion !== 1) return 'Invalid schema version';
+  if (typeof record.hostname !== 'string') return 'Missing hostname';
+  if (typeof record.pageUrl !== 'string') return 'Missing page URL';
+  if (typeof record.sourceUrl !== 'string') return 'Missing source URL';
+  if (record.status !== 'passed' && record.status !== 'failed' && record.status !== 'unchanged') return 'Invalid review status';
+  if (!Array.isArray(record.fieldIds) || !record.fieldIds.every((fieldId) => typeof fieldId === 'string')) return 'Invalid field ids';
+  if (typeof record.activeFieldId !== 'string' && record.activeFieldId !== null) return 'Invalid active field';
+  if (typeof record.reason !== 'string' && record.reason !== undefined) return 'Invalid review reason';
+  if (typeof record.updatedAt !== 'string') return 'Missing update timestamp';
+  return null;
 }

@@ -4,6 +4,7 @@ import type { DurableBookmarkPayloadV1, RecoverableDataStatus } from '../types.j
 import { fromBase64, parseExportFile } from './encrypted-file-format.js';
 import { fullBackupPayloadFromUnknown, type FullBackupBlobKeyBackup, type PortableStoredBlobRecord } from './full-backup.js';
 import { parsePlainRecordsExport } from './plain-records-format.js';
+import { createImportValidationReport, type ImportValidationReport } from './validation-report.js';
 
 export interface BookmarksImportEntry {
   readonly uuid: string;
@@ -14,6 +15,7 @@ export interface BookmarksImportResult {
   readonly status: RecoverableDataStatus;
   readonly entries: readonly BookmarksImportEntry[];
   readonly skipped: readonly string[];
+  readonly validationReport: ImportValidationReport;
   readonly plaintext: boolean;
   readonly externalOriginalCount: number;
   readonly fullBackup: boolean;
@@ -22,7 +24,10 @@ export interface BookmarksImportResult {
   readonly missingOriginalBlobIds: readonly string[];
 }
 
-type BasicBookmarksImportResult = Pick<BookmarksImportResult, 'status' | 'entries' | 'skipped' | 'externalOriginalCount'>;
+type BasicBookmarksImportResult = Pick<
+  BookmarksImportResult,
+  'status' | 'entries' | 'skipped' | 'validationReport' | 'externalOriginalCount'
+>;
 
 export async function importBookmarks(fileContent: string, password: string): Promise<BookmarksImportResult> {
   const plain = tryImportPlainBookmarks(fileContent);
@@ -32,6 +37,7 @@ export async function importBookmarks(fileContent: string, password: string): Pr
     status: { ok: false, code: 'decryption-failed', message },
     entries: [],
     skipped: [],
+    validationReport: createImportValidationReport([]),
     plaintext: false,
     externalOriginalCount: 0,
     fullBackup: false,
@@ -108,19 +114,24 @@ function parseBookmarkEntries(parsed: unknown, options: { readonly preserveOrigi
     status: { ok: false, code: 'decryption-failed', message },
     entries: [],
     skipped: [],
+    validationReport: createImportValidationReport([]),
     externalOriginalCount: 0,
   });
   if (!Array.isArray(parsed)) return fail('Bookmark payload is not an array.');
 
   const entries: BookmarksImportEntry[] = [];
   const skipped: string[] = [];
+  const rejectionReasons: string[] = [];
   let externalOriginalCount = 0;
   for (const item of parsed) {
-    if (isValidBookmarkEntry(item)) {
-      if (item.payload.storedOriginal) externalOriginalCount += 1;
-      entries.push(options.preserveOriginalReferences ? item : stripExternalBlobReference(item));
+    const rejectionReason = bookmarkEntryRejectionReason(item);
+    if (!rejectionReason) {
+      const entry = item as BookmarksImportEntry;
+      if (entry.payload.storedOriginal) externalOriginalCount += 1;
+      entries.push(options.preserveOriginalReferences ? entry : stripExternalBlobReference(entry));
     } else {
       skipped.push(typeof item === 'object' && item !== null && 'uuid' in item ? String(item.uuid) : 'unknown');
+      rejectionReasons.push(rejectionReason);
     }
   }
   return {
@@ -131,17 +142,20 @@ function parseBookmarkEntries(parsed: unknown, options: { readonly preserveOrigi
     },
     entries,
     skipped,
+    validationReport: createImportValidationReport(rejectionReasons),
     externalOriginalCount,
   };
 }
 
-function isValidBookmarkEntry(value: unknown): value is BookmarksImportEntry {
-  if (typeof value !== 'object' || value === null) return false;
+function bookmarkEntryRejectionReason(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null) return 'Entry is not an object';
   const obj = value as Record<string, unknown>;
-  if (typeof obj.uuid !== 'string') return false;
-  if (typeof obj.payload !== 'object' || obj.payload === null) return false;
+  if (typeof obj.uuid !== 'string') return 'Missing record id';
+  if (typeof obj.payload !== 'object' || obj.payload === null) return 'Missing payload';
   const payload = obj.payload as Record<string, unknown>;
-  return typeof payload.url === 'string' && typeof payload.bookmarkedAt === 'string';
+  if (typeof payload.url !== 'string') return 'Missing image URL';
+  if (typeof payload.bookmarkedAt !== 'string') return 'Missing bookmark timestamp';
+  return null;
 }
 
 function stripExternalBlobReference(entry: BookmarksImportEntry): BookmarksImportEntry {

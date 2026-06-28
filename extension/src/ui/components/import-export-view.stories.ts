@@ -66,6 +66,40 @@ export const RestorePreviewReady: Story = {
     }),
 };
 
+export const RestorePreviewValidationReport: Story = {
+  render: () =>
+    importExportStory({
+      restorePreview: {
+        fileName: 'image-trail-bookmarks-with-rejections-2026-06-27.json',
+        payloadLabel: 'Bookmarks',
+        recordCount: 9,
+        capturedOriginalCount: 3,
+        duplicateCount: 1,
+        skippedCount: 4,
+        unsupportedCount: 0,
+        message:
+          'Preview loaded. Import has not changed local records yet. 1 duplicate record will be skipped on confirm. 4 rejected records listed by reason; sensitive URLs are not shown.',
+        samples: [
+          {
+            label: 'accepted-ridge.jpg',
+            url: 'https://images.example.test/gallery/accepted-ridge.jpg',
+            detail: '1280 x 854',
+          },
+          {
+            label: 'accepted-frame.webp',
+            url: 'https://cdn.example.test/sets/night-market/frame-044.webp',
+            detail: 'Duplicate SHA-256, skipped on confirm',
+          },
+        ],
+        validationIssues: [
+          { reason: 'Missing image URL', count: 2 },
+          { reason: 'Missing bookmark timestamp', count: 1 },
+          { reason: 'Entry is not an object', count: 1 },
+        ],
+      },
+    }),
+};
+
 export const RestorePreviewNeedsReview: Story = {
   render: () =>
     importExportStory({

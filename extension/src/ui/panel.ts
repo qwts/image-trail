@@ -4575,10 +4575,14 @@ function emptyRestoreDuplicateSummary<TEntry extends RestoreImageImportEntry>():
   };
 }
 
-function restorePreviewMessage(duplicateCount: number, extra?: string): string {
+function restorePreviewMessage(duplicateCount: number, skippedCount: number, extra?: string): string {
   const duplicateMessage =
     duplicateCount > 0 ? `${duplicateCount} duplicate record${duplicateCount === 1 ? '' : 's'} will be skipped on confirm.` : undefined;
-  return ['Preview loaded. Import has not changed local records yet.', duplicateMessage, extra].filter(Boolean).join(' ');
+  const skippedMessage =
+    skippedCount > 0
+      ? `${skippedCount} rejected record${skippedCount === 1 ? '' : 's'} listed by reason; sensitive URLs are not shown.`
+      : undefined;
+  return ['Preview loaded. Import has not changed local records yet.', duplicateMessage, skippedMessage, extra].filter(Boolean).join(' ');
 }
 
 function restorePreviewSampleDetail(detail: string | undefined, duplicateMatch: RestoreDuplicateMatch | undefined): string | undefined {
@@ -4640,6 +4644,7 @@ function createHistoryRestorePreview(
     plaintext: result.plaintext,
     message: restorePreviewMessage(
       duplicateSummary.duplicateCount,
+      result.validationReport.rejectedCount,
       result.plaintext ? 'Plaintext history will be reloaded into extension state after confirmation.' : undefined,
     ),
     samples: result.entries.slice(0, 3).map((entry) =>
@@ -4652,6 +4657,7 @@ function createHistoryRestorePreview(
         ),
       }),
     ),
+    validationIssues: result.validationReport.reasons,
     unsupportedSections:
       originalReferenceCount > 0
         ? [
@@ -4682,6 +4688,7 @@ function createBookmarksRestorePreview(
     plaintext: result.plaintext,
     message: restorePreviewMessage(
       duplicateSummary.duplicateCount,
+      result.validationReport.rejectedCount,
       result.plaintext ? 'Plaintext bookmarks will be encrypted into bookmark storage after confirmation.' : undefined,
     ),
     samples: result.entries.slice(0, 3).map((entry) =>
@@ -4691,6 +4698,7 @@ function createBookmarksRestorePreview(
         detail: restorePreviewSampleDetail(bookmarkPayloadPreviewDetail(entry.payload), duplicateSummary.matchesByUuid.get(entry.uuid)),
       }),
     ),
+    validationIssues: result.validationReport.reasons,
     unsupportedSections:
       unsupportedOriginalCount > 0
         ? [
@@ -4731,12 +4739,13 @@ function createUrlReviewStatusRestorePreview(
     skippedCount: result.skipped.length,
     unsupportedCount: 0,
     plaintext: true,
-    message: 'Preview loaded. Import has not changed local records yet.',
+    message: restorePreviewMessage(0, result.validationReport.rejectedCount),
     samples: result.records.slice(0, 3).map((record) => ({
       label: `${record.status} · ${record.hostname}`,
       url: record.sourceUrl,
       detail: `${record.fieldIds.length} field${record.fieldIds.length === 1 ? '' : 's'}, updated ${record.updatedAt}`,
     })),
+    validationIssues: result.validationReport.reasons,
   };
 }
 
