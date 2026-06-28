@@ -89,9 +89,9 @@ export function applyFieldDigitWidthTransform(
   }
 
   const existingSpec = specs.find((spec) => spec.fieldId === fieldId);
-  const sourceWidth = existingSpec?.sourceWidth ?? collectUrlFields(model).find((field) => field.id === fieldId)?.digitWidth;
+  const sourceWidth = existingSpec ? existingSpec.sourceWidth : collectUrlFields(model).find((field) => field.id === fieldId)?.digitWidth;
   const fieldDigitWidthSpecs = upsertFieldDigitWidthSpec(specs, fieldId, normalized, sourceWidth);
-  const baseModel = normalized === null ? clearFieldDigitWidthSpec(model, existingSpec, fieldId) : model;
+  const baseModel = existingSpec ? clearFieldDigitWidthSpec(model, existingSpec, fieldId) : model;
   const nextModel = applyFieldDigitWidthSpecs(baseModel, fieldDigitWidthSpecs);
   return {
     ...toUrlTransformResult('digit-width', nextModel, [fieldId]),

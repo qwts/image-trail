@@ -281,6 +281,7 @@ export class ImageTrailPanel {
   private parsedFieldStateRestoreInProgress = false;
   private parsedFieldStateUpdatedAtMs = 0;
   private parsedFieldStateSaveQueue: Promise<void> = Promise.resolve();
+  private fieldTransformQueue: Promise<void> = Promise.resolve();
   private parsedFieldStatePageKey = window.location.href;
   private extensionProjectedPageUrl: string | null = null;
   private neighborPreloadRunId = 0;
@@ -1382,7 +1383,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'field/transform') {
-      void this.applyFieldTransform(action);
+      this.enqueueFieldTransform(action);
       return;
     }
 
@@ -1715,6 +1716,14 @@ export class ImageTrailPanel {
     const snapshot = this.pageAdapter.getSnapshot();
     const selectedUrl = snapshot.selected?.url ?? this.state.target.selectedUrl;
     return selectedUrl?.startsWith('data:') ? 'data:' : (selectedUrl ?? null);
+  }
+
+  private enqueueFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): void {
+    this.fieldTransformQueue = this.fieldTransformQueue
+      .catch((error: unknown) => {
+        console.error('Image Trail field transform failed.', error);
+      })
+      .then(() => this.applyFieldTransform(action));
   }
 
   private async applyFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): Promise<void> {

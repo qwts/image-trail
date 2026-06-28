@@ -90,6 +90,22 @@ test('digit-width clear restores natural source padding after projection', () =>
   assert.equal(cleared.url, 'https://example.test/images/image-009.jpg');
 });
 
+test('digit-width transform can shrink a previous width override after projection', () => {
+  const model = parseUrl('https://example.test/images/image-123.jpg');
+  const field = collectUrlFields(model).find((candidate) => candidate.value === '123');
+  assert.ok(field);
+
+  const widened = applyFieldDigitWidthTransform(model, field.id, '5', []);
+  assert.equal(widened.ok, true);
+  assert.equal(widened.url, 'https://example.test/images/image-00123.jpg');
+
+  const projectedModel = parseUrl(widened.url);
+  const shrunk = applyFieldDigitWidthTransform(projectedModel, field.id, '3', widened.fieldDigitWidthSpecs);
+  assert.equal(shrunk.ok, true);
+  assert.deepEqual(shrunk.fieldDigitWidthSpecs, [{ fieldId: field.id, width: 3 }]);
+  assert.equal(shrunk.url, 'https://example.test/images/image-123.jpg');
+});
+
 test('split transforms adapt current split apply and clear behavior', () => {
   const model = parseUrl('https://example.test/image?date=01012001');
   const field = collectUrlFields(model).find((candidate) => candidate.label === 'query date');
