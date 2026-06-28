@@ -1404,7 +1404,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'selected-url/apply') {
-      void this.applySelectedUrl(action.url, [], { pushVisibleUrl: true });
+      this.enqueueSelectedUrlApply(action.url);
       return;
     }
 
@@ -1719,11 +1719,23 @@ export class ImageTrailPanel {
   }
 
   private enqueueFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): void {
+    this.enqueueFieldInteraction(() => this.applyFieldTransform(action));
+  }
+
+  private enqueueSelectedUrlApply(url: string): void {
+    this.enqueueFieldInteraction(() => this.applyUrlEditorUrl(url));
+  }
+
+  private enqueueFieldInteraction(run: () => Promise<void>): void {
     this.fieldTransformQueue = this.fieldTransformQueue
       .catch((error: unknown) => {
-        console.error('Image Trail field transform failed.', error);
+        console.error('Image Trail field interaction failed.', error);
       })
-      .then(() => this.applyFieldTransform(action));
+      .then(run);
+  }
+
+  private async applyUrlEditorUrl(url: string): Promise<void> {
+    await this.applySelectedUrl(url, [], { pushVisibleUrl: true, resetFieldState: url !== this.currentRawUrl() });
   }
 
   private async applyFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): Promise<void> {
@@ -2288,10 +2300,12 @@ export class ImageTrailPanel {
       readonly pushVisibleUrl?: boolean;
       readonly reason?: ProjectionReason;
       readonly preloadDirection?: NeighborPreloadDirection;
+      readonly resetFieldState?: boolean;
     } = {},
   ): Promise<boolean> {
     const session = this.beginProjectionSession(options.reason ?? this.applySelectedUrlReason(attemptedFieldIds), nextUrl);
     if (!session) return false;
+    if (options.resetFieldState) this.state = this.resetParsedFieldInteractionState(this.state);
     const baselineFingerprint = this.currentKnownImageFingerprint();
     this.projections.update(session, { status: 'preloading' });
     const preload = await this.preloadImageUrl(nextUrl);
@@ -2348,6 +2362,20 @@ export class ImageTrailPanel {
 
   private applySelectedUrlReason(attemptedFieldIds: readonly string[]): ProjectionReason {
     return attemptedFieldIds.length > 0 ? 'parsed-field-navigation' : 'selected-url-apply';
+  }
+
+  private resetParsedFieldInteractionState(state: PanelState): PanelState {
+    return {
+      ...state,
+      activeFieldId: null,
+      failedFieldId: null,
+      successfulFieldIds: [],
+      unchangedFieldIds: [],
+      unlockedFieldIds: [],
+      manuallyExcludedFieldIds: [],
+      fieldSplitSpecs: [],
+      fieldDigitWidthSpecs: [],
+    };
   }
 
   private beginProjectionSession(reason: ProjectionReason, sourceUrl: string): ProjectionSession | null {
