@@ -1,4 +1,5 @@
 import { isBuildIdentity, type BuildIdentity } from '../core/build-info.js';
+import type { ImageProbeMethod, ImageRequestIntent } from '../core/image/request-policy.js';
 
 export const MESSAGE_PROTOCOL_VERSION = 1;
 
@@ -38,6 +39,8 @@ export const MessageType = {
   ProbeImageSourceResult: 'imageTrail.probeImageSourceResult',
   FetchBufferedImageSource: 'imageTrail.fetchBufferedImageSource',
   FetchBufferedImageSourceResult: 'imageTrail.fetchBufferedImageSourceResult',
+  CheckImageRequestPolicy: 'imageTrail.checkImageRequestPolicy',
+  CheckImageRequestPolicyResult: 'imageTrail.checkImageRequestPolicyResult',
   FetchLinkedPage: 'imageTrail.fetchLinkedPage',
   FetchLinkedPageResult: 'imageTrail.fetchLinkedPageResult',
   GrantPermissionAndCapture: 'imageTrail.grantPermissionAndCapture',
@@ -349,7 +352,12 @@ export interface CreateBlobPreviewResultMessage {
 export interface FetchThumbnailSourceMessage {
   readonly type: typeof MessageType.FetchThumbnailSource;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly url: string; readonly referrer?: string };
+  readonly payload: {
+    readonly url: string;
+    readonly referrer?: string;
+    readonly intent?: ImageRequestIntent;
+    readonly contextKey?: string;
+  };
 }
 
 export interface FetchThumbnailSourceResultMessage {
@@ -363,7 +371,13 @@ export interface FetchThumbnailSourceResultMessage {
 export interface ProbeImageSourceMessage {
   readonly type: typeof MessageType.ProbeImageSource;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly url: string; readonly referrer?: string; readonly timeoutMs: number };
+  readonly payload: {
+    readonly url: string;
+    readonly referrer?: string;
+    readonly timeoutMs: number;
+    readonly contextKey?: string;
+    readonly probeMethod?: ImageProbeMethod;
+  };
 }
 
 export interface ProbeImageSourceResultMessage {
@@ -377,7 +391,12 @@ export interface ProbeImageSourceResultMessage {
 export interface FetchBufferedImageSourceMessage {
   readonly type: typeof MessageType.FetchBufferedImageSource;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly url: string; readonly referrer?: string };
+  readonly payload: {
+    readonly url: string;
+    readonly referrer?: string;
+    readonly intent?: ImageRequestIntent;
+    readonly contextKey?: string;
+  };
 }
 
 export interface FetchBufferedImageSourceResultMessage {
@@ -386,6 +405,26 @@ export interface FetchBufferedImageSourceResultMessage {
   readonly payload:
     | { readonly ok: true; readonly bytes: ArrayBuffer; readonly mimeType: string; readonly byteLength: number; readonly sha256?: string }
     | { readonly ok: false; readonly reason: string; readonly message: string };
+}
+
+export interface CheckImageRequestPolicyMessage {
+  readonly type: typeof MessageType.CheckImageRequestPolicy;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: {
+    readonly url: string;
+    readonly referrer?: string;
+    readonly intent?: ImageRequestIntent;
+    readonly contextKey?: string;
+  };
+}
+
+export interface CheckImageRequestPolicyResultMessage {
+  readonly type: typeof MessageType.CheckImageRequestPolicyResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload:
+    | { readonly status: 'unknown' }
+    | { readonly status: 'cached-success' }
+    | { readonly status: 'skippable-failed'; readonly reason: string; readonly message: string };
 }
 
 export interface FetchLinkedPageMessage {
@@ -982,6 +1021,7 @@ export type ExtensionRequest =
   | FetchThumbnailSourceMessage
   | ProbeImageSourceMessage
   | FetchBufferedImageSourceMessage
+  | CheckImageRequestPolicyMessage
   | FetchLinkedPageMessage
   | GrantPermissionAndCaptureMessage
   | BlobKeyStatusMessage
@@ -1043,6 +1083,7 @@ export type ExtensionResponse =
   | FetchThumbnailSourceResultMessage
   | ProbeImageSourceResultMessage
   | FetchBufferedImageSourceResultMessage
+  | CheckImageRequestPolicyResultMessage
   | FetchLinkedPageResultMessage
   | BlobKeyStatusResultMessage
   | BlobKeyResultMessage
@@ -1197,16 +1238,37 @@ export function createCreateDataUrlPreviewMessage(dataUrl: string): CreateDataUr
   return { type: MessageType.CreateDataUrlPreview, version: MESSAGE_PROTOCOL_VERSION, payload: { dataUrl } };
 }
 
-export function createFetchThumbnailSourceMessage(url: string, referrer?: string): FetchThumbnailSourceMessage {
-  return { type: MessageType.FetchThumbnailSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer } };
+export function createFetchThumbnailSourceMessage(
+  url: string,
+  referrer?: string,
+  options: { readonly intent?: ImageRequestIntent; readonly contextKey?: string } = {},
+): FetchThumbnailSourceMessage {
+  return { type: MessageType.FetchThumbnailSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer, ...options } };
 }
 
-export function createProbeImageSourceMessage(url: string, referrer: string | undefined, timeoutMs: number): ProbeImageSourceMessage {
-  return { type: MessageType.ProbeImageSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer, timeoutMs } };
+export function createProbeImageSourceMessage(
+  url: string,
+  referrer: string | undefined,
+  timeoutMs: number,
+  options: { readonly contextKey?: string; readonly probeMethod?: ImageProbeMethod } = {},
+): ProbeImageSourceMessage {
+  return { type: MessageType.ProbeImageSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer, timeoutMs, ...options } };
 }
 
-export function createFetchBufferedImageSourceMessage(url: string, referrer?: string): FetchBufferedImageSourceMessage {
-  return { type: MessageType.FetchBufferedImageSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer } };
+export function createFetchBufferedImageSourceMessage(
+  url: string,
+  referrer?: string,
+  options: { readonly intent?: ImageRequestIntent; readonly contextKey?: string } = {},
+): FetchBufferedImageSourceMessage {
+  return { type: MessageType.FetchBufferedImageSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer, ...options } };
+}
+
+export function createCheckImageRequestPolicyMessage(
+  url: string,
+  referrer?: string,
+  options: { readonly intent?: ImageRequestIntent; readonly contextKey?: string } = {},
+): CheckImageRequestPolicyMessage {
+  return { type: MessageType.CheckImageRequestPolicy, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer, ...options } };
 }
 
 export function createFetchLinkedPageMessage(url: string, maxBytes: number, timeoutMs: number): FetchLinkedPageMessage {
@@ -1235,6 +1297,12 @@ export function createFetchBufferedImageSourceResultMessage(
   payload: FetchBufferedImageSourceResultMessage['payload'],
 ): FetchBufferedImageSourceResultMessage {
   return { type: MessageType.FetchBufferedImageSourceResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createCheckImageRequestPolicyResultMessage(
+  payload: CheckImageRequestPolicyResultMessage['payload'],
+): CheckImageRequestPolicyResultMessage {
+  return { type: MessageType.CheckImageRequestPolicyResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createFetchLinkedPageResultMessage(payload: FetchLinkedPageResultMessage['payload']): FetchLinkedPageResultMessage {
@@ -1679,6 +1747,7 @@ export function isExtensionRequest(value: unknown): value is ExtensionRequest {
     value.type === MessageType.FetchThumbnailSource ||
     value.type === MessageType.ProbeImageSource ||
     value.type === MessageType.FetchBufferedImageSource ||
+    value.type === MessageType.CheckImageRequestPolicy ||
     value.type === MessageType.FetchLinkedPage ||
     value.type === MessageType.GrantPermissionAndCapture ||
     value.type === MessageType.BlobKeyStatus ||
@@ -1745,6 +1814,7 @@ export function isExtensionResponse(value: unknown): value is ExtensionResponse 
     value.type === MessageType.FetchThumbnailSourceResult ||
     value.type === MessageType.ProbeImageSourceResult ||
     value.type === MessageType.FetchBufferedImageSourceResult ||
+    value.type === MessageType.CheckImageRequestPolicyResult ||
     value.type === MessageType.FetchLinkedPageResult ||
     value.type === MessageType.BlobKeyStatusResult ||
     value.type === MessageType.BlobKeyResult ||
@@ -1846,6 +1916,11 @@ export function isProbeImageSourceResultMessage(value: unknown): value is ProbeI
 export function isFetchBufferedImageSourceResultMessage(value: unknown): value is FetchBufferedImageSourceResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.FetchBufferedImageSourceResult;
+}
+
+export function isCheckImageRequestPolicyResultMessage(value: unknown): value is CheckImageRequestPolicyResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.CheckImageRequestPolicyResult;
 }
 
 export function isFetchLinkedPageResultMessage(value: unknown): value is FetchLinkedPageResultMessage {

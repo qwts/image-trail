@@ -96,7 +96,7 @@ can carry a stale copy until rebased or restarted from the main repo.
   - **Working path:** output of `pwd` — the directory actually edited (Codex
     worktrees are often under `~/.codex/worktrees/`, not the main checkout).
   - **Build identity:** read `extension/dist/build-info.json` after `npm run
-    build` and paste **Built local** time plus commit, branch, and worktree when
+build` and paste **Built local** time plus commit, branch, and worktree when
     present (any may be null/absent). Do not omit this block; do not paraphrase
     from memory.
 - After the first implementation stretch, provide a manual test run before asking for final signoff or PR approval.

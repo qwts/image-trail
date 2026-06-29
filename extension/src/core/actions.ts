@@ -631,6 +631,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         neighborPreloadEnabled: action.enabled,
         neighborPreloadRadius: action.radius,
         neighborPreloadCacheLimit: action.cacheLimit,
+        neighborPreloadProbeMethod: action.probeMethod,
         lastUpdatedAt: Date.now(),
       };
     case 'url-templates/load': {

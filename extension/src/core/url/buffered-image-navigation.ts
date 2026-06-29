@@ -87,6 +87,15 @@ export function probeKForBuffer(bufferN: number): number {
   return Math.max(2 * bufferN, 8);
 }
 
+export function bufferedPreloadWindowIndices(cursor: number, bufferN: number): readonly number[] {
+  const indices: number[] = [];
+  const boundedBufferN = Math.max(0, Math.floor(bufferN));
+  for (let index = cursor - boundedBufferN; index <= cursor + boundedBufferN; index += 1) {
+    if (index !== cursor) indices.push(index);
+  }
+  return indices;
+}
+
 export function emptyBufferedImageIndex(): BufferedImageIndexState {
   return {
     manifest: ManifestStatus.UNKNOWN,

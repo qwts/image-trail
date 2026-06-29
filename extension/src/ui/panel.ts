@@ -50,6 +50,7 @@ import type {
 } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
 import { filenameFromImageRecord, filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
+import type { ImageRequestIntent } from '../core/image/request-policy.js';
 import {
   classifyRestoreDuplicates,
   type RestoreDuplicateCandidate,
@@ -80,6 +81,7 @@ import { parseUrl } from '../core/url/parse-url.js';
 import {
   ImageStatus,
   ManifestStatus,
+  bufferedPreloadWindowIndices,
   classifyBufferedImageIndex,
   createBufferedImageNavigationState,
   reduceBufferedImageNavigation,
@@ -88,7 +90,6 @@ import {
 import {
   adjacentParsedFieldUrlCandidates,
   fieldsById,
-  selectActiveNavigationNeighborCandidate,
   type AdjacentParsedFieldUrlCandidate,
   type NeighborPreloadDirection,
 } from '../core/url/preload-neighbors.js';
@@ -113,6 +114,7 @@ import {
   isTransientBlobUrl,
 } from '../content/thumbnail-generator.js';
 import { fetchDecodedBufferedImageSource, probeBufferedImageSource } from '../content/buffered-image-source.js';
+import { checkImageRequestPolicy } from '../content/image-request-policy.js';
 import {
   DEFAULT_LOCAL_SETTINGS,
   exportEncryptedBookmarks,
@@ -155,6 +157,14 @@ interface RecordAddOptions {
 type NeighborPreloadCacheEntry =
   | { readonly status: 'loaded'; readonly displayUrl: string; readonly sha256: string | null }
   | { readonly status: 'failed'; readonly message: string };
+
+interface BufferedNavigationRequest {
+  readonly runId: number;
+  readonly promise: Promise<void>;
+  readonly resolve: () => void;
+  readonly reject: (error: unknown) => void;
+  advanceOnResolve: boolean;
+}
 
 const NEIGHBOR_PRELOAD_MINIMUM_INTERVAL_MS = 250;
 const MAX_NEIGHBOR_PRELOAD_REQUESTS_PER_MINUTE = 20;
@@ -296,18 +306,12 @@ export class ImageTrailPanel {
   private bufferedNavigationRunId = 0;
   private bufferedNavigationBaseModel: ParsedUrlModel | null = null;
   private bufferedNavigationFields: readonly UrlField[] = [];
-  private bufferedHeadInflight = new Map<number, Promise<void>>();
-  private bufferedGetInflight = new Map<number, Promise<void>>();
+  private bufferedHeadInflight = new Map<number, BufferedNavigationRequest>();
+  private bufferedGetInflight = new Map<number, BufferedNavigationRequest>();
   private bufferedHeadQueue: number[] = [];
   private bufferedGetQueue: number[] = [];
-  private bufferedHeadQueued = new Map<
-    number,
-    { readonly runId: number; readonly promise: Promise<void>; readonly resolve: () => void; readonly reject: (error: unknown) => void }
-  >();
-  private bufferedGetQueued = new Map<
-    number,
-    { readonly runId: number; readonly promise: Promise<void>; readonly resolve: () => void; readonly reject: (error: unknown) => void }
-  >();
+  private bufferedHeadQueued = new Map<number, BufferedNavigationRequest>();
+  private bufferedGetQueued = new Map<number, BufferedNavigationRequest>();
   private bufferedDebugVisible = false;
   private bufferedNavigationToastTimer: number | null = null;
   private queuedParsedNavigationDelta = 0;
@@ -475,6 +479,7 @@ export class ImageTrailPanel {
       neighborPreloadEnabled: this.localSettings.neighborPreloadEnabled,
       neighborPreloadRadius: this.localSettings.neighborPreloadRadius,
       neighborPreloadCacheLimit: this.localSettings.neighborPreloadCacheLimit,
+      neighborPreloadProbeMethod: this.localSettings.neighborPreloadProbeMethod,
       secondaryControlsOpen: this.localSettings.secondaryControlsOpen,
       lastUpdatedAt: Date.now(),
     };
@@ -908,7 +913,12 @@ export class ImageTrailPanel {
     this.render();
   }
 
-  private updateNeighborPreload(enabled: boolean, radius: number, cacheLimit: number): void {
+  private updateNeighborPreload(
+    enabled: boolean,
+    radius: number,
+    cacheLimit: number,
+    probeMethod = this.localSettings.neighborPreloadProbeMethod,
+  ): void {
     if (
       !Number.isInteger(radius) ||
       radius < NEIGHBOR_PRELOAD_RADIUS_LIMITS.min ||
@@ -918,16 +928,18 @@ export class ImageTrailPanel {
       cacheLimit > NEIGHBOR_PRELOAD_CACHE_LIMITS.max ||
       (enabled === this.state.neighborPreloadEnabled &&
         radius === this.state.neighborPreloadRadius &&
-        cacheLimit === this.state.neighborPreloadCacheLimit)
+        cacheLimit === this.state.neighborPreloadCacheLimit &&
+        probeMethod === this.state.neighborPreloadProbeMethod)
     ) {
       return;
     }
-    this.state = reducePanelAction(this.state, { name: 'settings/update-neighbor-preload', enabled, radius, cacheLimit });
+    this.state = reducePanelAction(this.state, { name: 'settings/update-neighbor-preload', enabled, radius, cacheLimit, probeMethod });
     this.saveLocalSettings({
       ...this.localSettings,
       neighborPreloadEnabled: enabled,
       neighborPreloadRadius: radius,
       neighborPreloadCacheLimit: cacheLimit,
+      neighborPreloadProbeMethod: probeMethod,
     });
     if (!enabled || radius === 0) {
       this.neighborPreloadRunId += 1;
@@ -1255,7 +1267,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'settings/update-neighbor-preload') {
-      this.updateNeighborPreload(action.enabled, action.radius, action.cacheLimit);
+      this.updateNeighborPreload(action.enabled, action.radius, action.cacheLimit, action.probeMethod);
       return;
     }
 
@@ -1927,11 +1939,8 @@ export class ImageTrailPanel {
       }
       if (buffered === 'blocked') return 'blocked';
     }
-    const warmedUrl = this.nextWarmedNavigationUrl(model, navigableFields, delta);
-    const bumped = navigableFields.reduce<ParsedUrlModel>((nextModel, field) => bumpUrlField(nextModel, field, delta), model);
-    const nextUrl = warmedUrl ?? rebuildUrl(bumped);
-    const cachedPreload = this.isNeighborPreloadActive() ? this.neighborPreloadCache.get(nextUrl) : undefined;
-    if (cachedPreload?.status === 'failed') {
+    const candidate = await this.nextParsedFieldNavigationCandidate(model, navigableFields, delta);
+    if (!candidate) {
       this.state = {
         ...this.state,
         status: 'ready',
@@ -1941,7 +1950,8 @@ export class ImageTrailPanel {
       this.render();
       return 'blocked';
     }
-    const shouldStartNetworkRequest = !cachedPreload && !nextUrl.startsWith('data:image/');
+    const nextUrl = candidate.url;
+    const shouldStartNetworkRequest = !nextUrl.startsWith('data:image/');
     if (shouldStartNetworkRequest) {
       const request = this.governor.request(() => undefined);
       if (request.status !== 'ok') {
@@ -1966,8 +1976,30 @@ export class ImageTrailPanel {
       requestsInWindow: this.governor.requestsInWindow(),
     });
     this.render();
-    const failedPreload = this.isNeighborPreloadActive() ? this.neighborPreloadCache.get(nextUrl)?.status === 'failed' : false;
-    return loaded || !failedPreload ? 'loaded' : 'retry';
+    return loaded ? 'loaded' : 'retry';
+  }
+
+  private async nextParsedFieldNavigationCandidate(
+    model: ParsedUrlModel,
+    fields: readonly UrlField[],
+    direction: NeighborPreloadDirection,
+  ): Promise<AdjacentParsedFieldUrlCandidate | null> {
+    const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT)
+      .filter((candidate) => candidate.direction === direction)
+      .sort((a, b) => a.distance - b.distance);
+    for (const candidate of candidates) {
+      const policy = await checkImageRequestPolicy(candidate.url, {
+        intent: 'field-active-navigation',
+        contextKey: this.parsedFieldRequestContextKey(
+          fields.map((field) => field.id),
+          direction,
+          this.neighborPreloadRunId,
+        ),
+      });
+      if (policy.status === 'skippable-failed') continue;
+      return candidate;
+    }
+    return null;
   }
 
   private async runBufferedParsedNavigationStep(
@@ -1999,7 +2031,7 @@ export class ImageTrailPanel {
         this.scheduleBufferedNavigationPreloads();
         return 'blocked';
       }
-      await this.resolveBufferedNavigationIndex(blockedOn);
+      await this.resolveBufferedNavigationIndex(blockedOn, { advanceOnResolve: true });
       if (!this.isCurrentBufferedNavigationRun(runId)) return 'blocked';
     }
     const message = 'Parsed-field navigation is waiting for a decoded neighbor image.';
@@ -2043,10 +2075,11 @@ export class ImageTrailPanel {
   }
 
   private ensureBufferedNavigation(model: ParsedUrlModel, fields: readonly UrlField[]): void {
+    if (this.reuseBufferedNavigationForCurrentUrl(fields)) return;
     const baseUrl = rebuildUrl(model);
     const key = `${baseUrl}|${fields.map((field) => field.id).join(',')}|${this.localSettings.neighborPreloadRadius}`;
     if (this.bufferedNavigationKey === key && this.bufferedNavigation) return;
-    const bufferN = Math.max(1, Math.min(5, this.localSettings.neighborPreloadRadius || 3));
+    const bufferN = this.bufferedNavigationRadius();
     let navigation = createBufferedImageNavigationState(bufferN);
     navigation = reduceBufferedImageNavigation(navigation, {
       type: 'SET_MANIFEST',
@@ -2074,6 +2107,31 @@ export class ImageTrailPanel {
     this.scheduleBufferedNavigationPreloads();
   }
 
+  private reuseBufferedNavigationForCurrentUrl(fields: readonly UrlField[]): boolean {
+    if (!this.bufferedNavigation || this.bufferedNavigationFields.length === 0) return false;
+    const bufferN = this.bufferedNavigationRadius();
+    if (this.bufferedNavigation.settings.bufferN !== bufferN) return false;
+    const currentFieldIds = fields.map((field) => field.id).join(',');
+    const bufferedFieldIds = this.bufferedNavigationFields.map((field) => field.id).join(',');
+    if (currentFieldIds !== bufferedFieldIds) return false;
+    const currentUrl = this.currentNavigationBaseRawUrl();
+    let matchedIndex: number | null = null;
+    for (const [index, entry] of this.bufferedNavigation.indices) {
+      if (!entry.url) continue;
+      if (imageResourceUrlsEqual(entry.url, currentUrl, window.location.href)) {
+        matchedIndex = index;
+        break;
+      }
+    }
+    if (matchedIndex === null) return false;
+    if (this.bufferedNavigation.cursor !== matchedIndex) {
+      this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'INIT_CURSOR', index: matchedIndex });
+      this.clearBufferedNavigationQueues();
+    }
+    this.scheduleBufferedNavigationPreloads();
+    return true;
+  }
+
   private bufferedNavigationUrl(index: number): string | null {
     if (!this.bufferedNavigationBaseModel || this.bufferedNavigationFields.length === 0) return null;
     if (index === 0) return rebuildUrl(this.bufferedNavigationBaseModel);
@@ -2085,18 +2143,22 @@ export class ImageTrailPanel {
     return rebuildUrl(model);
   }
 
-  private async resolveBufferedNavigationIndex(index: number): Promise<void> {
+  private bufferedNavigationRadius(): number {
+    return Math.max(0, Math.min(5, this.localSettings.neighborPreloadRadius));
+  }
+
+  private async resolveBufferedNavigationIndex(index: number, options: { readonly advanceOnResolve?: boolean } = {}): Promise<void> {
     if (!this.bufferedNavigation) return;
     const current = this.bufferedNavigation.indices.get(index);
     if (classifyBufferedImageIndex(current) !== 'WALL') return;
-    await this.probeBufferedNavigationIndex(index);
+    await this.probeBufferedNavigationIndex(index, options);
     const probed = this.bufferedNavigation.indices.get(index);
     if (probed?.manifest === ManifestStatus.PRESENT && probed.image !== ImageStatus.OK && probed.image !== ImageStatus.FAILED_GET) {
-      await this.getBufferedNavigationIndex(index);
+      await this.getBufferedNavigationIndex(index, options);
     }
   }
 
-  private async probeBufferedNavigationIndex(index: number): Promise<void> {
+  private async probeBufferedNavigationIndex(index: number, options: { readonly advanceOnResolve?: boolean } = {}): Promise<void> {
     if (!this.bufferedNavigation) return;
     const current = this.bufferedNavigation.indices.get(index);
     if (
@@ -2107,9 +2169,15 @@ export class ImageTrailPanel {
       return;
     }
     const inflight = this.bufferedHeadInflight.get(index);
-    if (inflight) return inflight;
+    if (inflight) {
+      if (options.advanceOnResolve) inflight.advanceOnResolve = true;
+      return inflight.promise;
+    }
     const queued = this.bufferedHeadQueued.get(index);
-    if (queued) return queued.promise;
+    if (queued) {
+      if (options.advanceOnResolve) queued.advanceOnResolve = true;
+      return queued.promise;
+    }
     const url = this.bufferedNavigationUrl(index);
     if (!url) return;
     const runId = this.bufferedNavigationRunId;
@@ -2119,7 +2187,13 @@ export class ImageTrailPanel {
       resolveQueued = resolve;
       rejectQueued = reject;
     });
-    this.bufferedHeadQueued.set(index, { runId, promise, resolve: resolveQueued, reject: rejectQueued });
+    this.bufferedHeadQueued.set(index, {
+      runId,
+      promise,
+      resolve: resolveQueued,
+      reject: rejectQueued,
+      advanceOnResolve: options.advanceOnResolve === true,
+    });
     this.bufferedHeadQueue.push(index);
     this.sortBufferedNavigationQueues();
     this.drainBufferedHeadQueue();
@@ -2138,40 +2212,75 @@ export class ImageTrailPanel {
       const url = this.bufferedNavigationUrl(index);
       if (!url) return;
       if (!this.isCurrentBufferedNavigationRun(queued.runId)) return;
+      const contextKey = this.bufferedImageRequestContextKey(index, queued.runId);
+      const policy = await checkImageRequestPolicy(url, { intent: 'field-speculative-probe', contextKey });
+      if (!this.isCurrentBufferedNavigationRun(queued.runId)) return;
+      if (policy.status === 'skippable-failed') {
+        this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
+          type: 'SET_MANIFEST',
+          index,
+          status: ManifestStatus.FAILED_HEAD,
+          url,
+        });
+        if (queued.advanceOnResolve) this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'ADVANCE' });
+        this.renderBufferedDebugOverlay();
+        return;
+      }
+      if (policy.status === 'cached-success') {
+        this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
+          type: 'SET_MANIFEST',
+          index,
+          status: ManifestStatus.PRESENT,
+          url,
+        });
+        if (queued.advanceOnResolve) this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'ADVANCE' });
+        this.renderBufferedDebugOverlay();
+        return;
+      }
       this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
         type: 'SET_MANIFEST',
         index,
         status: ManifestStatus.HEAD_PENDING,
         url,
       });
-      const result = await probeBufferedImageSource(url);
+      const probeMethod = this.localSettings.neighborPreloadProbeMethod;
+      const result = await probeBufferedImageSource(url, 8000, {
+        contextKey,
+        probeMethod,
+      });
       if (!this.isCurrentBufferedNavigationRun(queued.runId)) return;
-      const skippableHeadFailure = !result.ok && this.isSkippableBufferedHeadFailure(result.status);
-      if (skippableHeadFailure) this.showBufferedNavigationToast('Skipped a failed image candidate.');
+      const skippableProbeFailure = !result.ok && (probeMethod === 'get' || this.isSkippableBufferedHeadFailure(result.status));
+      if (skippableProbeFailure) this.showBufferedNavigationToast('Skipped a failed image candidate.');
       this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
         type: 'SET_MANIFEST',
         index,
-        status: result.ok || !skippableHeadFailure ? ManifestStatus.PRESENT : ManifestStatus.FAILED_HEAD,
+        status: result.ok || !skippableProbeFailure ? ManifestStatus.PRESENT : ManifestStatus.FAILED_HEAD,
         url,
       });
-      this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'ADVANCE' });
+      if (queued.advanceOnResolve) this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'ADVANCE' });
       this.renderBufferedDebugOverlay();
     })();
-    this.bufferedHeadInflight.set(index, promise);
+    this.bufferedHeadInflight.set(index, queued);
     void promise.then(queued.resolve, queued.reject).finally(() => {
       this.bufferedHeadInflight.delete(index);
       this.drainBufferedHeadQueue();
     });
   }
 
-  private async getBufferedNavigationIndex(index: number): Promise<void> {
+  private async getBufferedNavigationIndex(index: number, options: { readonly advanceOnResolve?: boolean } = {}): Promise<void> {
     if (!this.bufferedNavigation) return;
     const current = this.bufferedNavigation.indices.get(index);
     if (current?.image === ImageStatus.OK || current?.image === ImageStatus.FAILED_GET) return;
     const inflight = this.bufferedGetInflight.get(index);
-    if (inflight) return inflight;
+    if (inflight) {
+      if (options.advanceOnResolve) inflight.advanceOnResolve = true;
+      return inflight.promise;
+    }
     const queued = this.bufferedGetQueued.get(index);
-    if (queued) return queued.promise;
+    if (queued) {
+      if (options.advanceOnResolve) queued.advanceOnResolve = true;
+      return queued.promise;
+    }
     const url = current?.url ?? this.bufferedNavigationUrl(index);
     if (!url) return;
     const runId = this.bufferedNavigationRunId;
@@ -2181,7 +2290,13 @@ export class ImageTrailPanel {
       resolveQueued = resolve;
       rejectQueued = reject;
     });
-    this.bufferedGetQueued.set(index, { runId, promise, resolve: resolveQueued, reject: rejectQueued });
+    this.bufferedGetQueued.set(index, {
+      runId,
+      promise,
+      resolve: resolveQueued,
+      reject: rejectQueued,
+      advanceOnResolve: options.advanceOnResolve === true,
+    });
     this.bufferedGetQueue.push(index);
     this.sortBufferedNavigationQueues();
     this.drainBufferedGetQueue();
@@ -2206,7 +2321,10 @@ export class ImageTrailPanel {
         index,
         status: ImageStatus.GET_PENDING,
       });
-      const result = await fetchDecodedBufferedImageSource(url);
+      const result = await fetchDecodedBufferedImageSource(url, {
+        intent: 'field-active-navigation',
+        contextKey: this.bufferedImageRequestContextKey(index, queued.runId),
+      });
       if (!this.isCurrentBufferedNavigationRun(queued.runId)) return;
       if (result.ok) {
         this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
@@ -2223,13 +2341,13 @@ export class ImageTrailPanel {
           index,
           status: ImageStatus.FAILED_GET,
         });
-        console.error('Image Trail buffered navigation failed to decode candidate image.', { index, url, message: result.message });
+        console.debug('Image Trail buffered navigation skipped unavailable candidate image.', { index, url, message: result.message });
         this.showBufferedNavigationToast('Skipped a failed image candidate.');
       }
-      this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'ADVANCE' });
+      if (queued.advanceOnResolve) this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'ADVANCE' });
       this.renderBufferedDebugOverlay();
     })();
-    this.bufferedGetInflight.set(index, promise);
+    this.bufferedGetInflight.set(index, queued);
     void promise.then(queued.resolve, queued.reject).finally(() => {
       this.bufferedGetInflight.delete(index);
       this.drainBufferedGetQueue();
@@ -2272,6 +2390,10 @@ export class ImageTrailPanel {
     return this.bufferedNavigation !== null && this.bufferedNavigationRunId === runId;
   }
 
+  private bufferedImageRequestContextKey(index: number, runId: number): string {
+    return ['buffered-field-navigation', String(runId), this.bufferedNavigationKey ?? '', String(index)].join('\n');
+  }
+
   private isSkippableBufferedHeadFailure(status: number | undefined): boolean {
     return status === 400 || status === 404 || status === 410;
   }
@@ -2279,21 +2401,17 @@ export class ImageTrailPanel {
   private scheduleBufferedNavigationPreloads(): void {
     if (!this.bufferedNavigation) return;
     const { cursor, settings } = this.bufferedNavigation;
-    const liveMin = cursor - settings.bufferN;
-    const liveMax = cursor + settings.probeK;
+    const preloadIndices = bufferedPreloadWindowIndices(cursor, settings.bufferN);
+    const liveIndices = new Set([cursor, ...preloadIndices]);
     for (const [index, entry] of this.bufferedNavigation.indices) {
-      if (index >= liveMin && index <= liveMax) continue;
+      if (liveIndices.has(index)) continue;
       if (entry.blobUrl && entry.blobUrl.startsWith('blob:')) {
         window.setTimeout(() => URL.revokeObjectURL(entry.blobUrl!), 500);
       }
       this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'EVICT', index });
     }
-    for (let index = cursor - settings.bufferN; index <= cursor + settings.bufferN; index += 1) {
-      if (index === 0) continue;
-      void this.resolveBufferedNavigationIndex(index);
-    }
-    for (let index = cursor + settings.bufferN + 1; index <= cursor + settings.probeK; index += 1) {
-      void this.probeBufferedNavigationIndex(index);
+    for (const index of preloadIndices) {
+      void this.resolveBufferedNavigationIndex(index, { advanceOnResolve: false });
     }
   }
 
@@ -2337,17 +2455,6 @@ export class ImageTrailPanel {
     return mostRecentSuccessfulIncluded ? [mostRecentSuccessfulIncluded] : includedFields;
   }
 
-  private nextWarmedNavigationUrl(model: ParsedUrlModel, fields: readonly UrlField[], direction: NeighborPreloadDirection): string | null {
-    if (!this.isNeighborPreloadActive()) return null;
-    const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT);
-    const navigationCandidate = selectActiveNavigationNeighborCandidate(
-      candidates,
-      direction,
-      (url) => this.neighborPreloadCache.get(url)?.status ?? 'unknown',
-    );
-    return navigationCandidate?.url ?? null;
-  }
-
   private async applySelectedUrl(
     nextUrl: string,
     attemptedFieldIds: readonly string[] = [],
@@ -2363,12 +2470,17 @@ export class ImageTrailPanel {
     if (options.resetFieldState) this.state = this.resetParsedFieldInteractionState(this.state);
     const baselineFingerprint = this.currentKnownImageFingerprint();
     this.projections.update(session, { status: 'preloading' });
-    const preload = await this.preloadImageUrl(nextUrl);
+    const preload = await this.preloadImageUrl(nextUrl, {
+      readCache: session.reason !== 'parsed-field-navigation',
+      writeCache: session.reason !== 'parsed-field-navigation',
+      intent: this.imageRequestIntentForProjectionReason(session.reason),
+      contextKey:
+        session.reason === 'parsed-field-navigation'
+          ? this.parsedFieldRequestContextKey(attemptedFieldIds, options.preloadDirection, this.neighborPreloadRunId)
+          : undefined,
+    });
     if (!this.isCurrentProjectionSession(session)) return false;
     if (!preload.ok) {
-      if (session.reason === 'parsed-field-navigation' && this.isNeighborPreloadActive()) {
-        this.rememberNeighborPreloadFailure(nextUrl, preload.message);
-      }
       this.projections.update(session, { status: 'failed' });
       this.state = this.pruneInvalidFieldSplitSpecsForUrl(
         applyFieldLoadFailureToState(this.state, { draftUrl: nextUrl, attemptedFieldIds, message: preload.message }),
@@ -2379,8 +2491,7 @@ export class ImageTrailPanel {
       void this.saveUrlReviewStatus('failed', nextUrl, attemptedFieldIds, preload.message);
       void this.saveParsedFieldState();
       this.render();
-      if (session.reason === 'parsed-field-navigation')
-        this.scheduleNeighborPreloads(attemptedFieldIds, { direction: options.preloadDirection });
+      if (session.reason === 'parsed-field-navigation') this.scheduleBufferedNavigationPreloads();
       return false;
     }
 
@@ -2422,13 +2533,43 @@ export class ImageTrailPanel {
     void this.loadGrabSettings();
     if (session.reason === 'parsed-field-navigation') {
       this.primeBufferedNavigationPreloads();
-      this.scheduleNeighborPreloads(attemptedFieldIds);
     }
     return true;
   }
 
   private applySelectedUrlReason(attemptedFieldIds: readonly string[]): ProjectionReason {
     return attemptedFieldIds.length > 0 ? 'parsed-field-navigation' : 'selected-url-apply';
+  }
+
+  private imageRequestIntentForProjectionReason(reason: ProjectionReason): ImageRequestIntent {
+    switch (reason) {
+      case 'parsed-field-navigation':
+      case 'parsed-field-restore':
+        return 'field-active-navigation';
+      case 'bookmark-load':
+        return 'bookmark-load';
+      case 'record-preview':
+        return 'recent-load';
+      case 'selected-url-apply':
+        return 'url-editor-apply';
+    }
+  }
+
+  private parsedFieldRequestContextKey(
+    attemptedFieldIds: readonly string[],
+    direction: NeighborPreloadDirection | undefined,
+    runId: number,
+  ): string {
+    return [
+      'parsed-field-navigation',
+      String(runId),
+      this.currentNavigationBaseRawUrl(),
+      attemptedFieldIds.join(','),
+      this.state.fieldSplitSpecs.map((spec) => `${spec.baseFieldId}:${spec.pattern}`).join('|'),
+      this.state.fieldDigitWidthSpecs.map((spec) => `${spec.fieldId}:${spec.width}:${spec.sourceWidth ?? ''}`).join('|'),
+      this.state.target.selectedHandleId ?? '',
+      direction === undefined ? '' : String(direction),
+    ].join('\n');
   }
 
   private resetParsedFieldInteractionState(state: PanelState): PanelState {
@@ -2481,7 +2622,12 @@ export class ImageTrailPanel {
 
   private async preloadImageUrl(
     url: string,
-    options: { readonly readCache?: boolean; readonly writeCache?: boolean } = {},
+    options: {
+      readonly readCache?: boolean;
+      readonly writeCache?: boolean;
+      readonly intent?: ImageRequestIntent;
+      readonly contextKey?: string;
+    } = {},
   ): Promise<
     { readonly ok: true; readonly displayUrl: string; readonly sha256: string | null } | { readonly ok: false; readonly message: string }
   > {
@@ -2489,30 +2635,11 @@ export class ImageTrailPanel {
     if (cached?.status === 'loaded') return { ok: true, displayUrl: cached.displayUrl, sha256: cached.sha256 };
     if (cached?.status === 'failed') return { ok: false, message: cached.message };
     if (url.startsWith('data:image/')) return { ok: true, displayUrl: url, sha256: null };
-    const result = await fetchThumbnailSource(url);
+    const result = await fetchThumbnailSource(url, { intent: options.intent, contextKey: options.contextKey });
     if (!result.ok) return { ok: false, message: `Image failed to load: ${result.message}` };
     const loaded = { displayUrl: result.dataUrl, sha256: result.sha256 ?? null };
     if (options.writeCache !== false && this.isNeighborPreloadActive()) this.rememberNeighborPreload(url, loaded);
     return { ok: true, ...loaded };
-  }
-
-  private scheduleNeighborPreloads(
-    attemptedFieldIds: readonly string[],
-    options: { readonly direction?: NeighborPreloadDirection } = {},
-  ): void {
-    if (!this.isNeighborPreloadActive() || attemptedFieldIds.length === 0) return;
-    let model: ParsedUrlModel;
-    try {
-      model = this.currentNavigationBaseModel();
-    } catch {
-      return;
-    }
-    const fields = fieldsById(collectUrlFields(model), attemptedFieldIds).filter((field) => this.isNavigableQueryField(field));
-    const directions = options.direction === undefined ? ([-1, 1] as const) : ([options.direction] as const);
-    const candidates = directions.flatMap((direction) => this.neighborPreloadFillCandidates(model, fields, direction));
-    if (candidates.length === 0) return;
-    const runId = ++this.neighborPreloadRunId;
-    void this.runNeighborPreloadBatch(candidates, runId, attemptedFieldIds);
   }
 
   private neighborPreloadFillCandidates(
@@ -2638,12 +2765,34 @@ export class ImageTrailPanel {
     void this.runNeighborPreloadBatch(candidates, runId, attemptedFieldIds);
   }
 
+  private neighborPreloadRequestContextKey(
+    direction: NeighborPreloadDirection,
+    runId: number,
+    attemptedFieldIds: readonly string[],
+  ): string {
+    return [
+      'neighbor-preload',
+      String(runId),
+      this.currentNavigationBaseRawUrl(),
+      attemptedFieldIds.join(','),
+      this.state.fieldSplitSpecs.map((spec) => `${spec.baseFieldId}:${spec.pattern}`).join('|'),
+      this.state.fieldDigitWidthSpecs.map((spec) => `${spec.fieldId}:${spec.width}:${spec.sourceWidth ?? ''}`).join('|'),
+      this.state.target.selectedHandleId ?? '',
+      String(direction),
+    ].join('\n');
+  }
+
   private async loadNeighborPreload(
     candidate: AdjacentParsedFieldUrlCandidate,
     runId: number,
     attemptedFieldIds: readonly string[],
   ): Promise<boolean> {
-    const promise = this.preloadImageUrl(candidate.url, { readCache: false, writeCache: false })
+    const promise = this.preloadImageUrl(candidate.url, {
+      readCache: false,
+      writeCache: false,
+      intent: 'field-active-navigation',
+      contextKey: this.neighborPreloadRequestContextKey(candidate.direction, runId, attemptedFieldIds),
+    })
       .then((result) => {
         if (runId !== this.neighborPreloadRunId || !this.isNeighborPreloadActive() || !result.ok) {
           if (runId === this.neighborPreloadRunId && this.isNeighborPreloadActive() && !result.ok) {
@@ -3401,7 +3550,7 @@ export class ImageTrailPanel {
     if (!image) return false;
 
     this.projections.update(session, { status: 'preloading' });
-    const preload = await this.preloadImageUrl(url);
+    const preload = await this.preloadImageUrl(url, { intent: this.imageRequestIntentForProjectionReason(session.reason) });
     if (!this.isCurrentProjectionSession(session)) return false;
     if (!preload.ok) {
       this.projections.update(session, { status: 'failed' });

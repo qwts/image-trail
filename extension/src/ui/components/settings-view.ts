@@ -1,4 +1,5 @@
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
+import type { ImageProbeMethod } from '../../core/image/request-policy.js';
 import { buildIdentityRows, type BuildIdentity } from '../../core/build-info.js';
 import type { PanelAction, PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../../core/types.js';
 import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from '../../core/url/templates.js';
@@ -69,6 +70,7 @@ export function createSettingsView(
     readonly enabled: boolean;
     readonly radius: number;
     readonly cacheLimit: number;
+    readonly probeMethod: ImageProbeMethod;
   },
   utilityChildren: readonly HTMLElement[],
   dispatch: (action: PanelAction) => void,
@@ -287,6 +289,7 @@ function createNeighborPreloadSettingsView(
     readonly enabled: boolean;
     readonly radius: number;
     readonly cacheLimit: number;
+    readonly probeMethod: ImageProbeMethod;
   },
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
@@ -336,6 +339,24 @@ function createNeighborPreloadSettingsView(
   cacheLimitInput.inputMode = 'numeric';
   cacheLimitLabel.append(cacheLimitText, cacheLimitInput);
 
+  const probeMethodLabel = document.createElement('label');
+  probeMethodLabel.className = 'image-trail-panel__settings-field';
+  const probeMethodText = document.createElement('span');
+  probeMethodText.textContent = 'Probe';
+  const probeMethodSelect = document.createElement('select');
+  probeMethodSelect.className = 'image-trail-panel__settings-select';
+  for (const option of [
+    { value: 'get' as const, label: 'GET' },
+    { value: 'head' as const, label: 'HEAD' },
+  ]) {
+    const element = document.createElement('option');
+    element.value = option.value;
+    element.textContent = option.label;
+    element.selected = state.probeMethod === option.value;
+    probeMethodSelect.append(element);
+  }
+  probeMethodLabel.append(probeMethodText, probeMethodSelect);
+
   const apply = document.createElement('button');
   apply.type = 'submit';
   apply.textContent = 'Apply';
@@ -364,7 +385,13 @@ function createNeighborPreloadSettingsView(
     const radius = parsedRadius();
     const cacheLimit = parsedCacheLimit();
     if (radius === null || cacheLimit === null) return;
-    dispatch({ name: 'settings/update-neighbor-preload', enabled: enabledInput.checked, radius, cacheLimit });
+    dispatch({
+      name: 'settings/update-neighbor-preload',
+      enabled: enabledInput.checked,
+      radius,
+      cacheLimit,
+      probeMethod: probeMethodSelect.value === 'head' ? 'head' : 'get',
+    });
   };
 
   form.addEventListener('submit', (event) => {
@@ -377,14 +404,22 @@ function createNeighborPreloadSettingsView(
       enabled: enabledInput.checked,
       radius: parsedRadius() ?? state.radius,
       cacheLimit: parsedCacheLimit() ?? state.cacheLimit,
+      probeMethod: probeMethodSelect.value === 'head' ? 'head' : 'get',
     });
   });
+  probeMethodSelect.addEventListener('change', dispatchCurrent);
   manual.addEventListener('click', () => {
     const radius = parsedRadius();
     const cacheLimit = parsedCacheLimit();
     if (radius === null || cacheLimit === null) return;
     enabledInput.checked = true;
-    dispatch({ name: 'settings/update-neighbor-preload', enabled: true, radius, cacheLimit });
+    dispatch({
+      name: 'settings/update-neighbor-preload',
+      enabled: true,
+      radius,
+      cacheLimit,
+      probeMethod: probeMethodSelect.value === 'head' ? 'head' : 'get',
+    });
     dispatch({ name: 'neighbor-preload/manual', radius, cacheLimit });
   });
 
@@ -393,7 +428,7 @@ function createNeighborPreloadSettingsView(
   meta.textContent =
     'Warms this many parsed-field URLs ahead and behind. Speculative loads stay in this page session only and never add Recents, URL review records, panel messages, pins, or Recall entries. Cache 0 keeps all entries without eviction.';
 
-  form.append(enabledLabel, radiusLabel, cacheLimitLabel, apply, manual);
+  form.append(enabledLabel, radiusLabel, cacheLimitLabel, probeMethodLabel, apply, manual);
   wrapper.append(heading, form, meta);
   return wrapper;
 }

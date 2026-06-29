@@ -5,6 +5,8 @@ import {
   MessageType,
   createCaptureImageMessage,
   createCaptureResultMessage,
+  createCheckImageRequestPolicyMessage,
+  createCheckImageRequestPolicyResultMessage,
   createClearUrlReviewStatusMessage,
   createClearUrlReviewStatusResultMessage,
   createClearBlobKeyMessage,
@@ -22,8 +24,12 @@ import {
   createImportOriginalBlobsResultMessage,
   createFetchLinkedPageMessage,
   createFetchLinkedPageResultMessage,
+  createFetchBufferedImageSourceMessage,
+  createFetchBufferedImageSourceResultMessage,
   createFetchThumbnailSourceMessage,
   createFetchThumbnailSourceResultMessage,
+  createProbeImageSourceMessage,
+  createProbeImageSourceResultMessage,
   createImportBlobKeyBackupMessage,
   createImportBlobKeyBackupResultMessage,
   createImportEncryptedImageMessage,
@@ -107,6 +113,7 @@ import {
   createTogglePanelMessage,
   createUnknownMessageResponse,
   isCaptureResultMessage,
+  isCheckImageRequestPolicyResultMessage,
   isClearUrlReviewStatusResultMessage,
   isDownloadImageResultMessage,
   isExportEncryptedImageResultMessage,
@@ -114,9 +121,11 @@ import {
   isExtensionResponse,
   isExportBlobKeyBackupResultMessage,
   isExportOriginalBlobsResultMessage,
+  isFetchBufferedImageSourceResultMessage,
   isImportOriginalBlobsResultMessage,
   isFetchLinkedPageResultMessage,
   isFetchThumbnailSourceResultMessage,
+  isProbeImageSourceResultMessage,
   isImportBlobKeyBackupResultMessage,
   isImportEncryptedImageResultMessage,
   isImportUrlReviewStatusResultMessage,
@@ -744,11 +753,16 @@ test('creates capture result response messages for success and failure', () => {
   assert.equal(remoteOnly.payload.status, 'remote-only');
 });
 
-test('creates thumbnail source fetch messages', () => {
-  const request = createFetchThumbnailSourceMessage('https://example.test/thumb.jpg', 'https://example.test/page');
+test('creates image request policy messages with compatibility payloads', () => {
+  const request = createFetchThumbnailSourceMessage('https://example.test/thumb.jpg', 'https://example.test/page', {
+    intent: 'thumbnail-refresh',
+    contextKey: 'thumb-context',
+  });
   assert.equal(request.type, MessageType.FetchThumbnailSource);
   assert.equal(request.payload.url, 'https://example.test/thumb.jpg');
   assert.equal(request.payload.referrer, 'https://example.test/page');
+  assert.equal(request.payload.intent, 'thumbnail-refresh');
+  assert.equal(request.payload.contextKey, 'thumb-context');
   assert.equal(isExtensionRequest(request), true);
 
   const success = createFetchThumbnailSourceResultMessage({
@@ -767,6 +781,58 @@ test('creates thumbnail source fetch messages', () => {
   const failure = createFetchThumbnailSourceResultMessage({ ok: false, reason: 'network-error', message: 'Nope.' });
   assert.equal(failure.payload.ok, false);
   assert.equal(isFetchThumbnailSourceResultMessage(failure), true);
+
+  const probe = createProbeImageSourceMessage('https://example.test/next.jpg', 'https://example.test/page', 2000, {
+    contextKey: 'field-run-1',
+    probeMethod: 'head',
+  });
+  assert.equal(probe.type, MessageType.ProbeImageSource);
+  assert.equal(probe.payload.contextKey, 'field-run-1');
+  assert.equal(probe.payload.probeMethod, 'head');
+  assert.equal(isExtensionRequest(probe), true);
+  const probeResult = createProbeImageSourceResultMessage({
+    ok: false,
+    status: 404,
+    reason: 'http-error',
+    message: 'Image probe returned 404.',
+  });
+  assert.equal(isProbeImageSourceResultMessage(probeResult), true);
+
+  const buffered = createFetchBufferedImageSourceMessage('https://example.test/next.jpg', 'https://example.test/page', {
+    intent: 'field-active-navigation',
+    contextKey: 'field-run-1',
+  });
+  assert.equal(buffered.type, MessageType.FetchBufferedImageSource);
+  assert.equal(buffered.payload.intent, 'field-active-navigation');
+  assert.equal(buffered.payload.contextKey, 'field-run-1');
+  assert.equal(isExtensionRequest(buffered), true);
+  const bufferedResult = createFetchBufferedImageSourceResultMessage({
+    ok: true,
+    bytes: new ArrayBuffer(3),
+    mimeType: 'image/png',
+    byteLength: 3,
+    sha256: 'b'.repeat(64),
+  });
+  assert.equal(isFetchBufferedImageSourceResultMessage(bufferedResult), true);
+
+  const policy = createCheckImageRequestPolicyMessage('https://example.test/missing.jpg', 'https://example.test/page', {
+    intent: 'field-active-navigation',
+    contextKey: 'field-run-1',
+  });
+  assert.equal(policy.type, MessageType.CheckImageRequestPolicy);
+  assert.equal(policy.payload.intent, 'field-active-navigation');
+  assert.equal(policy.payload.contextKey, 'field-run-1');
+  assert.equal(isExtensionRequest(policy), true);
+  const policyResult = createCheckImageRequestPolicyResultMessage({
+    status: 'skippable-failed',
+    reason: 'network-error',
+    message: 'HTTP 404 Not Found',
+  });
+  assert.equal(isCheckImageRequestPolicyResultMessage(policyResult), true);
+  assert.equal(isExtensionResponse(policyResult), true);
+  const cachedPolicyResult = createCheckImageRequestPolicyResultMessage({ status: 'cached-success' });
+  assert.equal(isCheckImageRequestPolicyResultMessage(cachedPolicyResult), true);
+  assert.equal(isExtensionResponse(cachedPolicyResult), true);
 });
 
 test('creates linked-page fetch messages', () => {

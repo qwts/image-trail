@@ -12,6 +12,7 @@ import {
   VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
 } from '../core/settings.js';
 import { DEFAULT_GOVERNOR_CONFIG } from '../core/automation/types.js';
+import type { ImageProbeMethod } from '../core/image/request-policy.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT, isObjectFitMode, type ObjectFitMode } from '../core/preview-style.js';
 import type { PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../core/types.js';
 
@@ -35,6 +36,7 @@ export interface PlaintextLocalSettings {
   readonly neighborPreloadEnabled: boolean;
   readonly neighborPreloadRadius: number;
   readonly neighborPreloadCacheLimit: number;
+  readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly secondaryControlsOpen: boolean;
 }
 
@@ -58,6 +60,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   neighborPreloadEnabled: false,
   neighborPreloadRadius: DEFAULT_NEIGHBOR_PRELOAD_RADIUS,
   neighborPreloadCacheLimit: DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
+  neighborPreloadProbeMethod: 'get',
   secondaryControlsOpen: false,
 };
 
@@ -131,8 +134,15 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
     neighborPreloadCacheLimit: isSafeNeighborPreloadCacheLimit(input.neighborPreloadCacheLimit)
       ? input.neighborPreloadCacheLimit
       : DEFAULT_LOCAL_SETTINGS.neighborPreloadCacheLimit,
+    neighborPreloadProbeMethod: isImageProbeMethod(input.neighborPreloadProbeMethod)
+      ? input.neighborPreloadProbeMethod
+      : DEFAULT_LOCAL_SETTINGS.neighborPreloadProbeMethod,
     secondaryControlsOpen: input.secondaryControlsOpen === true,
   };
+}
+
+export function isImageProbeMethod(value: unknown): value is ImageProbeMethod {
+  return value === 'get' || value === 'head';
 }
 
 export function isPinSaveStoragePreference(value: unknown): value is PinSaveStoragePreference {

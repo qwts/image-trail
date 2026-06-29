@@ -109,6 +109,7 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().neighborPreloadEnabled, false);
   assert.equal(repository.load().neighborPreloadRadius, 3);
   assert.equal(repository.load().neighborPreloadCacheLimit, 24);
+  assert.equal(repository.load().neighborPreloadProbeMethod, 'get');
   assert.equal(repository.load().secondaryControlsOpen, false);
   repository.save({ ...DEFAULT_LOCAL_SETTINGS, pinSaveStoragePreference: 'plaintext' });
   assert.equal(repository.load().pinSaveStoragePreference, 'plaintext');
@@ -330,11 +331,17 @@ test('migrates neighbor preload settings safely', () => {
     setItem: () => {},
   });
   const valid = new LocalSettingsRepository({
-    getItem: () => JSON.stringify({ neighborPreloadEnabled: true, neighborPreloadRadius: 3, neighborPreloadCacheLimit: 0 }),
+    getItem: () =>
+      JSON.stringify({
+        neighborPreloadEnabled: true,
+        neighborPreloadRadius: 3,
+        neighborPreloadCacheLimit: 0,
+        neighborPreloadProbeMethod: 'head',
+      }),
     setItem: () => {},
   });
   const invalidEnabled = new LocalSettingsRepository({
-    getItem: () => JSON.stringify({ neighborPreloadEnabled: 'yes', neighborPreloadRadius: 2 }),
+    getItem: () => JSON.stringify({ neighborPreloadEnabled: 'yes', neighborPreloadRadius: 2, neighborPreloadProbeMethod: 'fetch' }),
     setItem: () => {},
   });
 
@@ -345,7 +352,9 @@ test('migrates neighbor preload settings safely', () => {
   assert.equal(valid.load().neighborPreloadEnabled, true);
   assert.equal(valid.load().neighborPreloadRadius, 3);
   assert.equal(valid.load().neighborPreloadCacheLimit, 0);
+  assert.equal(valid.load().neighborPreloadProbeMethod, 'head');
   assert.equal(invalidEnabled.load().neighborPreloadEnabled, false);
+  assert.equal(invalidEnabled.load().neighborPreloadProbeMethod, DEFAULT_LOCAL_SETTINGS.neighborPreloadProbeMethod);
 });
 
 test('tracks session unlock state without persisting key material', async () => {

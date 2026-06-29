@@ -2,6 +2,7 @@ import type { AutomationPhase } from './automation/types.js';
 import type { BuildIdentity } from './build-info.js';
 import type { CaptureResult, StorageUsageSummary } from './image/capture-result.js';
 import type { ImageDisplayRecord } from './display-records.js';
+import type { ImageProbeMethod } from './image/request-policy.js';
 import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from './url/templates.js';
 import type { UrlTemplateGrabStrategy } from './url/grab-strategies.js';
 import type { FieldTransformId } from './url/field-transforms.js';
@@ -190,6 +191,7 @@ export interface PanelState {
   readonly neighborPreloadEnabled: boolean;
   readonly neighborPreloadRadius: number;
   readonly neighborPreloadCacheLimit: number;
+  readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly secondaryControlsOpen: boolean;
   readonly hasOlderBookmarks: boolean;
   readonly hasNewerBookmarks: boolean;
@@ -554,6 +556,7 @@ export type PanelAction =
       readonly enabled: boolean;
       readonly radius: number;
       readonly cacheLimit: number;
+      readonly probeMethod: ImageProbeMethod;
     }
   | { readonly name: 'neighbor-preload/manual'; readonly radius: number; readonly cacheLimit: number }
   | { readonly name: 'url-templates/load'; readonly templates: readonly UrlTemplateRecord[]; readonly activeTemplateId?: string | null }

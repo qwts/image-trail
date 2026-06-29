@@ -1,6 +1,5 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
 import { isBuildIdentity } from '../core/build-info.js';
-import { computeSha256 } from '../core/image/fingerprints.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { IndexedDbPanelPositionStore } from '../data/panel-position-controller.js';
@@ -34,6 +33,7 @@ import {
   createBlobKeyResultMessage,
   createCaptureResultMessage,
   createClearUrlReviewStatusResultMessage,
+  createCheckImageRequestPolicyResultMessage,
   createCleanupOrphanedBlobsResultMessage,
   createCreateBlobPreviewResultMessage,
   createDeleteBlobResultMessage,
@@ -130,6 +130,7 @@ import type {
 import type { SaveLocalSettingsMessage } from './messages.js';
 import type {
   FetchBufferedImageSourceMessage,
+  CheckImageRequestPolicyMessage,
   FetchLinkedPageMessage,
   FetchThumbnailSourceMessage,
   ProbeImageSourceMessage,
@@ -139,6 +140,7 @@ import type { SetupBlobKeyMessage, UnlockBlobKeyMessage, BlobKeyResultMessage } 
 import type { ExportBlobKeyBackupMessage, ImportBlobKeyBackupMessage } from './messages.js';
 import type { ImportEncryptedImageMessage } from './messages.js';
 import type { DownloadPCloudBackupMessage, UploadPCloudBackupMessage } from './messages.js';
+import { ImageRequestManager } from './image-request-manager.js';
 import { extractOrigin, hasOriginPermission, requestOriginPermission } from './permissions.js';
 import {
   connectPCloudProvider,
@@ -152,8 +154,6 @@ import {
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
 const PREVIEW_TTL_MS = 60_000;
-const MAX_THUMBNAIL_SOURCE_BYTES = 5 * 1024 * 1024;
-const MAX_BUFFERED_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_LINKED_PAGE_BYTES = 2 * 1024 * 1024;
 const MAX_LINKED_PAGE_TIMEOUT_MS = 15_000;
 
@@ -164,6 +164,7 @@ interface PreviewPayload {
 }
 
 const previewPayloads = new Map<string, PreviewPayload>();
+const imageRequests = new ImageRequestManager();
 const bookmarkStore = new IndexedDbBookmarkStore({
   getActiveBlobKey,
   getPinSaveStoragePreference: async () => (await loadLocalSettings()).pinSaveStoragePreference,
@@ -483,85 +484,42 @@ async function handleCreateBlobPreview(
 async function handleFetchThumbnailSource(
   message: FetchThumbnailSourceMessage,
 ): Promise<import('./messages.js').FetchThumbnailSourceResultMessage['payload']> {
-  const fetchResult = await fetchImageBytes(message.payload.url, MAX_THUMBNAIL_SOURCE_BYTES, {
+  return imageRequests.fetchThumbnail(message.payload.url, {
+    intent: message.payload.intent,
     referrer: message.payload.referrer,
+    contextKey: message.payload.contextKey,
   });
-  if (!fetchResult.ok) {
-    return { ok: false, reason: fetchResult.reason, message: fetchResult.message };
-  }
-  return {
-    ok: true,
-    dataUrl: `data:${fetchResult.mimeType};base64,${arrayBufferToBase64(fetchResult.bytes)}`,
-    mimeType: fetchResult.mimeType,
-    byteLength: fetchResult.byteLength,
-    sha256: await computeSha256(fetchResult.bytes),
-  };
 }
 
 async function handleProbeImageSource(
   message: ProbeImageSourceMessage,
 ): Promise<import('./messages.js').ProbeImageSourceResultMessage['payload']> {
-  const timeoutMs = Math.min(15_000, Math.max(1000, message.payload.timeoutMs));
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const url = new URL(message.payload.url);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      return { ok: false, reason: 'unsupported-url', message: 'Image URL must use HTTP or HTTPS.' };
-    }
-    console.info('Image Trail buffered HEAD probe started in service worker.', { url: url.href });
-    const response = await fetch(url.href, {
-      cache: 'no-store',
-      credentials: credentialsForBufferedImageRequest(url.href, message.payload.referrer),
-      method: 'HEAD',
-      signal: controller.signal,
-    });
-    console.info('Image Trail buffered HEAD probe completed in service worker.', { url: url.href, status: response.status });
-    if (!response.ok) {
-      console.error('Image Trail buffered HEAD probe returned a non-OK status in service worker.', {
-        url: url.href,
-        status: response.status,
-      });
-      return { ok: false, status: response.status, reason: 'http-error', message: `Image probe returned ${response.status}.` };
-    }
-    return { ok: true, status: response.status, finalUrl: response.url };
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      console.error('Image Trail buffered HEAD probe timed out in service worker.', { url: message.payload.url });
-      return { ok: false, reason: 'timeout', message: 'Image probe timed out.' };
-    }
-    console.error('Image Trail buffered HEAD probe failed in service worker.', { url: message.payload.url, error });
-    return { ok: false, reason: 'network-error', message: 'Image probe failed.' };
-  } finally {
-    clearTimeout(timeout);
-  }
+  return imageRequests.probeSpeculativeImage(message.payload.url, {
+    referrer: message.payload.referrer,
+    timeoutMs: message.payload.timeoutMs,
+    contextKey: message.payload.contextKey,
+    probeMethod: message.payload.probeMethod,
+  });
 }
 
 async function handleFetchBufferedImageSource(
   message: FetchBufferedImageSourceMessage,
 ): Promise<import('./messages.js').FetchBufferedImageSourceResultMessage['payload']> {
-  const fetchResult = await fetchImageBytes(message.payload.url, MAX_BUFFERED_IMAGE_BYTES, {
+  return imageRequests.fetchBufferedImage(message.payload.url, {
+    intent: message.payload.intent,
     referrer: message.payload.referrer,
+    contextKey: message.payload.contextKey,
   });
-  if (!fetchResult.ok) {
-    return { ok: false, reason: fetchResult.reason, message: fetchResult.message };
-  }
-  return {
-    ok: true,
-    bytes: fetchResult.bytes,
-    mimeType: fetchResult.mimeType,
-    byteLength: fetchResult.byteLength,
-    sha256: await computeSha256(fetchResult.bytes),
-  };
 }
 
-function credentialsForBufferedImageRequest(url: string, referrer: string | undefined): RequestCredentials {
-  if (!referrer) return 'omit';
-  try {
-    return new URL(url).origin === new URL(referrer).origin ? 'include' : 'omit';
-  } catch {
-    return 'omit';
-  }
+async function handleCheckImageRequestPolicy(
+  message: CheckImageRequestPolicyMessage,
+): Promise<import('./messages.js').CheckImageRequestPolicyResultMessage['payload']> {
+  return imageRequests.checkRequestPolicy(message.payload.url, {
+    intent: message.payload.intent,
+    referrer: message.payload.referrer,
+    contextKey: message.payload.contextKey,
+  });
 }
 
 async function handleFetchLinkedPage(
@@ -1176,7 +1134,7 @@ async function imageBytesFromUrl(
   | { readonly ok: true; readonly bytes: ArrayBuffer; readonly mimeType: string; readonly sourceUrl: string }
   | { readonly ok: false; readonly reason: string; readonly message: string }
 > {
-  const parsed = url.startsWith('data:image/') ? dataUrlToImageBytes(url) : await fetchImageBytes(url);
+  const parsed = url.startsWith('data:image/') ? dataUrlToImageBytes(url) : await imageRequests.fetchOriginalImage(url);
   if (!parsed.ok) {
     const reason = 'reason' in parsed && typeof parsed.reason === 'string' ? parsed.reason : 'invalid-data-url';
     return { ok: false, reason, message: parsed.message };
@@ -1655,6 +1613,12 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
             createFetchBufferedImageSourceResultMessage({ ok: false, reason: 'unknown', message: 'Buffered image fetch failed.' }),
           ),
         );
+      return true;
+
+    case MessageType.CheckImageRequestPolicy:
+      handleCheckImageRequestPolicy(message)
+        .then((result) => sendResponse(createCheckImageRequestPolicyResultMessage(result)))
+        .catch(() => sendResponse(createCheckImageRequestPolicyResultMessage({ status: 'unknown' })));
       return true;
 
     case MessageType.FetchLinkedPage:

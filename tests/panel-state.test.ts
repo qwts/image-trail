@@ -662,11 +662,13 @@ test('updating neighbor preload settings only changes preload policy state', () 
     enabled: true,
     radius: 2,
     cacheLimit: 0,
+    probeMethod: 'head',
   });
 
   assert.equal(updated.neighborPreloadEnabled, true);
   assert.equal(updated.neighborPreloadRadius, 2);
   assert.equal(updated.neighborPreloadCacheLimit, 0);
+  assert.equal(updated.neighborPreloadProbeMethod, 'head');
   assert.equal(updated.history, state.history);
   assert.equal(updated.bookmarks, state.bookmarks);
 });
