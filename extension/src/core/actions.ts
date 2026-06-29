@@ -211,6 +211,7 @@ function clearFieldMarkers(state: PanelState, fieldIds: readonly string[]): Pane
 
 export function applyFieldSplitSpecToState(state: PanelState, spec: UrlFieldSplitSpec): PanelState {
   const existing = state.fieldSplitSpecs.find((candidate) => candidate.baseFieldId === spec.baseFieldId);
+  if (existing && fieldSplitSpecsEqual(existing, spec)) return state;
   const marked = clearFieldMarkers(state, affectedSplitFieldIds(existing ? [existing, spec] : [spec]));
   return {
     ...marked,
@@ -223,6 +224,7 @@ export function applyFieldSplitSpecToState(state: PanelState, spec: UrlFieldSpli
 
 export function clearFieldSplitSpecFromState(state: PanelState, baseFieldId: string): PanelState {
   const existing = state.fieldSplitSpecs.find((spec) => spec.baseFieldId === baseFieldId);
+  if (!existing) return state;
   const marked = existing ? clearFieldMarkers(state, affectedSplitFieldIds([existing])) : state;
   return {
     ...marked,
@@ -231,6 +233,19 @@ export function clearFieldSplitSpecFromState(state: PanelState, baseFieldId: str
     status: existing ? 'ready' : state.status,
     lastUpdatedAt: Date.now(),
   };
+}
+
+function fieldSplitSpecsEqual(left: UrlFieldSplitSpec, right: UrlFieldSplitSpec): boolean {
+  return (
+    left.baseFieldId === right.baseFieldId &&
+    left.location === right.location &&
+    left.partIndex === right.partIndex &&
+    left.queryIndex === right.queryIndex &&
+    left.tokenIndex === right.tokenIndex &&
+    left.pattern === right.pattern &&
+    left.lengths.length === right.lengths.length &&
+    left.lengths.every((length, index) => length === right.lengths[index])
+  );
 }
 
 export function pruneInvalidFieldSplitSpecsFromState(state: PanelState, model: ParsedUrlModel): PanelState {
@@ -466,17 +481,18 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         lastUpdatedAt: Date.now(),
       };
     }
-    case 'active-field/set':
+    case 'active-field/set': {
+      const failedFieldId = action.id === state.failedFieldId ? state.failedFieldId : null;
+      if (state.activeFieldId === action.id && state.failedFieldId === failedFieldId) return state;
       return {
         ...state,
         activeFieldId: action.id,
-        failedFieldId: action.id === state.failedFieldId ? state.failedFieldId : null,
+        failedFieldId,
         lastUpdatedAt: Date.now(),
       };
+    }
     case 'field-unlock/toggle':
-      if (!state.successfulFieldIds.includes(action.id) && !state.unlockedFieldIds.includes(action.id)) {
-        return { ...state, lastUpdatedAt: Date.now() };
-      }
+      if (!state.successfulFieldIds.includes(action.id) && !state.unlockedFieldIds.includes(action.id)) return state;
       return {
         ...state,
         unlockedFieldIds: toggleItem(state.unlockedFieldIds, action.id),

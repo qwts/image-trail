@@ -34,6 +34,18 @@ test('set-value transform preserves URL rebuild behavior', () => {
   assert.equal(result.url, 'https://example.test/images/image-010.jpg?size=320');
 });
 
+test('set-value transform reports same URL when value is unchanged', () => {
+  const url = 'https://example.test/images/image-001.jpg?size=320';
+  const model = parseUrl(url);
+  const field = collectUrlFields(model).find((candidate) => candidate.value === '001');
+  assert.ok(field);
+
+  const result = applySetFieldValueTransform(model, field, '001');
+
+  assert.equal(result.url, url);
+  assert.deepEqual(result.attemptedFieldIds, [field.id]);
+});
+
 test('step transform preserves numeric padding and clamping', () => {
   const model = parseUrl('https://example.test/images/image-000.jpg');
   const field = collectUrlFields(model).find((candidate) => candidate.value === '000');
@@ -45,6 +57,18 @@ test('step transform preserves numeric padding and clamping', () => {
   assert.equal(incremented.id, 'step');
   assert.equal(incremented.url, 'https://example.test/images/image-001.jpg');
   assert.equal(clamped.url, 'https://example.test/images/image-000.jpg');
+});
+
+test('step transform reports same URL when clamped at boundary', () => {
+  const url = 'https://example.test/images/image-000.jpg';
+  const model = parseUrl(url);
+  const field = collectUrlFields(model).find((candidate) => candidate.value === '000');
+  assert.ok(field);
+
+  const result = applyStepFieldValueTransform(model, field, -1);
+
+  assert.equal(result.url, url);
+  assert.deepEqual(result.attemptedFieldIds, [field.id]);
 });
 
 test('digit-width transform validates and updates width specs with rebuilt URL', () => {

@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyFieldLoadFailureToState, pruneInvalidFieldSplitSpecsFromState, reducePanelAction } from '../extension/src/core/actions.js';
+import {
+  applyFieldLoadFailureToState,
+  applyFieldSplitSpecToState,
+  pruneInvalidFieldSplitSpecsFromState,
+  reducePanelAction,
+} from '../extension/src/core/actions.js';
 import { createInitialPanelState, setTargetState } from '../extension/src/core/state.js';
 import { parseUrl } from '../extension/src/core/url/parse-url.js';
 import { isUnsupportedUrlEditorInput } from '../extension/src/ui/components/url-editor-view.js';
@@ -53,6 +58,14 @@ test('switching active fields clears a previous failed field marker', () => {
 
   assert.equal(next.activeFieldId, 'query-page-0');
   assert.equal(next.failedFieldId, null);
+});
+
+test('duplicate active field selection preserves state reference', () => {
+  const state = { ...createInitialPanelState(), activeFieldId: 'query-page-0' };
+
+  const next = reducePanelAction(state, { name: 'active-field/set', id: 'query-page-0' });
+
+  assert.equal(next, state);
 });
 
 test('secondary manual controls disclosure state is panel state', () => {
@@ -290,6 +303,7 @@ test('Previous/Next inclusion toggle only changes successful fields', () => {
   assert.deepEqual(includedAgain.manuallyExcludedFieldIds, []);
 
   const ignored = reducePanelAction(state, { name: 'field-unlock/toggle', id: 'q:1:0' });
+  assert.equal(ignored, state);
   assert.deepEqual(ignored.unlockedFieldIds, []);
   assert.deepEqual(ignored.manuallyExcludedFieldIds, []);
 });
@@ -1089,6 +1103,30 @@ test('clearing split specs collapses fields and clears related markers', () => {
   assert.deepEqual(next.manuallyExcludedFieldIds, []);
   assert.deepEqual(next.fieldSplitSpecs, []);
   assert.deepEqual(next.fieldDigitWidthSpecs, []);
+});
+
+test('clearing missing split spec preserves state reference', () => {
+  const state = createInitialPanelState();
+
+  const next = reducePanelAction(state, { name: 'field/transform', fieldId: 'q:0:0', transformId: 'split-clear' });
+
+  assert.equal(next, state);
+});
+
+test('reapplying identical split spec preserves state reference', () => {
+  const splitSpec: UrlFieldSplitSpec = {
+    baseFieldId: 'q:0:0',
+    location: 'query',
+    queryIndex: 0,
+    tokenIndex: 0,
+    lengths: [2, 2, 4],
+    pattern: '2-2-4',
+  };
+  const state = { ...createInitialPanelState(), fieldSplitSpecs: [splitSpec] };
+
+  const next = applyFieldSplitSpecToState(state, splitSpec);
+
+  assert.equal(next, state);
 });
 
 test('pruning stale split specs clears related markers after split collapse', () => {
