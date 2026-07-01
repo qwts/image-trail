@@ -1,0 +1,33 @@
+name: Close linked issues
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - claude/dev
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  close-linked-issues:
+    name: Close linked issues
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'claude/dev'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Close issues referenced by merged PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/close-linked-issues.mjs
