@@ -96,6 +96,7 @@ export class BufferedNavigationController {
       this.baseModel = null;
       this.fields = [];
       this.clearQueues();
+      this.cancelInflight();
       return;
     }
     if (!this.deps.hasSelectedTarget()) return;
@@ -163,8 +164,7 @@ export class BufferedNavigationController {
   dispose(): void {
     this.runId += 1;
     this.clearQueues();
-    this.headInflight.clear();
-    this.getInflight.clear();
+    this.cancelInflight();
     this.navigation = null;
     this.navigationKey = null;
     this.baseModel = null;
@@ -198,9 +198,8 @@ export class BufferedNavigationController {
     this.navigationKey = key;
     this.baseModel = model;
     this.fields = fields;
-    this.headInflight.clear();
-    this.getInflight.clear();
     this.clearQueues();
+    this.cancelInflight();
     this.schedulePreloads();
   }
 
@@ -250,6 +249,9 @@ export class BufferedNavigationController {
     const current = this.navigation.indices.get(index);
     if (classifyBufferedImageIndex(current) !== 'WALL') return;
     await this.probeIndex(index, options);
+    // dispose()/prime()/ensure() can settle this probe out from under us (see cancelInflight()),
+    // so navigation may already be gone by the time we resume.
+    if (!this.navigation) return;
     const probed = this.navigation.indices.get(index);
     if (probed?.manifest === ManifestStatus.PRESENT && probed.image !== ImageStatus.OK && probed.image !== ImageStatus.FAILED_GET) {
       await this.getIndex(index, options);
@@ -471,6 +473,16 @@ export class BufferedNavigationController {
     this.getQueue = [];
     this.headQueued.clear();
     this.getQueued.clear();
+  }
+
+  // Settles requests already promoted to in-flight (unlike clearQueues(), which only settles
+  // requests still waiting their turn) so callers awaiting probeIndex()/getIndex() unblock
+  // immediately instead of waiting on the underlying network call to finish on its own.
+  private cancelInflight(): void {
+    for (const request of this.headInflight.values()) request.resolve();
+    for (const request of this.getInflight.values()) request.resolve();
+    this.headInflight.clear();
+    this.getInflight.clear();
   }
 
   private isCurrentRun(runId: number): boolean {
