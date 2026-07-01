@@ -80,7 +80,6 @@ import {
 import { parseUrl } from '../core/url/parse-url.js';
 import {
   adjacentParsedFieldUrlCandidates,
-  fieldsById,
   type AdjacentParsedFieldUrlCandidate,
   type NeighborPreloadDirection,
 } from '../core/url/preload-neighbors.js';
@@ -107,6 +106,7 @@ import {
 import { fetchDecodedBufferedImageSource, probeBufferedImageSource } from '../content/buffered-image-source.js';
 import { checkImageRequestPolicy } from '../content/image-request-policy.js';
 import { BufferedNavigationController } from './panel/buffered-navigation-controller.js';
+import { NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT, NeighborPreloadController } from './panel/neighbor-preload-controller.js';
 import {
   DEFAULT_LOCAL_SETTINGS,
   exportEncryptedBookmarks,
@@ -146,10 +146,6 @@ interface RecordAddOptions {
   readonly projectionId?: string;
 }
 
-type NeighborPreloadCacheEntry =
-  | { readonly status: 'loaded'; readonly displayUrl: string; readonly sha256: string | null }
-  | { readonly status: 'failed'; readonly message: string };
-
 type FieldEditorEffect =
   | { readonly kind: 'noop' }
   | { readonly kind: 'state'; readonly state: PanelState; readonly saveParsedFieldState?: boolean; readonly render?: boolean }
@@ -161,9 +157,6 @@ type FieldEditorEffect =
       readonly saveTemplateOnLoad: 'always' | 'when-unlocked';
     };
 
-const NEIGHBOR_PRELOAD_MINIMUM_INTERVAL_MS = 250;
-const MAX_NEIGHBOR_PRELOAD_REQUESTS_PER_MINUTE = 20;
-const NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT = 50;
 const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
 
 type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
@@ -262,13 +255,6 @@ export class ImageTrailPanel {
   private unsubscribeFromGrabSourcePatternRequests: (() => void) | null = null;
 
   private readonly governor = new RequestGovernor();
-  private readonly neighborPreloadGovernor = new RequestGovernor({
-    minimumIntervalMs: NEIGHBOR_PRELOAD_MINIMUM_INTERVAL_MS,
-    maxRequests: MAX_NEIGHBOR_PRELOAD_REQUESTS_PER_MINUTE,
-    windowMs: 60_000,
-  });
-  private readonly neighborPreloadCache = new Map<string, NeighborPreloadCacheEntry>();
-  private readonly neighborPreloadInflight = new Map<string, Promise<boolean>>();
   private readonly projections = new ProjectionSessionController();
   private readonly keyboard: KeyboardRouter;
   private readonly slideshow: Slideshow;
@@ -293,7 +279,6 @@ export class ImageTrailPanel {
   private fieldTransformQueue: Promise<void> = Promise.resolve();
   private parsedFieldStatePageKey = window.location.href;
   private extensionProjectedPageUrl: string | null = null;
-  private neighborPreloadRunId = 0;
   private readonly bufferedNav = new BufferedNavigationController({
     getLocalSettings: () => this.localSettings,
     currentNavigationBaseRawUrl: () => this.currentNavigationBaseRawUrl(),
@@ -322,6 +307,19 @@ export class ImageTrailPanel {
     checkRequestPolicy: (url, options) => checkImageRequestPolicy(url, options),
     probeImage: (url, timeoutMs, options) => probeBufferedImageSource(url, timeoutMs, options),
     fetchDecodedImage: (url, options) => fetchDecodedBufferedImageSource(url, options),
+  });
+  private readonly neighborPreload = new NeighborPreloadController({
+    getLocalSettings: () => this.localSettings,
+    currentNavigationBaseRawUrl: () => this.currentNavigationBaseRawUrl(),
+    currentNavigationBaseModel: () => this.currentNavigationBaseModel(),
+    currentPageHref: () => window.location.href,
+    isNavigableQueryField: (field) => this.isNavigableQueryField(field),
+    currentFieldContextKeyParts: () => ({
+      fieldSplitSpecs: this.state.fieldSplitSpecs,
+      fieldDigitWidthSpecs: this.state.fieldDigitWidthSpecs,
+      selectedHandleId: this.state.target.selectedHandleId,
+    }),
+    fetchThumbnail: (url, options) => fetchThumbnailSource(url, options),
   });
   private bufferedNavigationToastTimer: number | null = null;
   private queuedParsedNavigationDelta = 0;
@@ -423,6 +421,7 @@ export class ImageTrailPanel {
     this.retry.destroy();
     this.keyboard.disable();
     this.bufferedNav.dispose();
+    this.neighborPreload.dispose();
     this.cleanupMountedElements({ releaseTarget: true });
   }
 
@@ -953,10 +952,9 @@ export class ImageTrailPanel {
       neighborPreloadProbeMethod: probeMethod,
     });
     if (!enabled || radius === 0) {
-      this.neighborPreloadRunId += 1;
-      this.neighborPreloadCache.clear();
+      this.neighborPreload.invalidate();
     }
-    this.pruneNeighborPreloadCache();
+    this.neighborPreload.pruneCache();
     this.render();
   }
 
@@ -1973,7 +1971,7 @@ export class ImageTrailPanel {
     const fields = collectUrlFields(model);
     const navigableFields = this.includedNavigationFields(fields);
     if (navigableFields.length === 0) return 'blocked';
-    if (this.isNeighborPreloadActive()) {
+    if (this.neighborPreload.isActive) {
       const buffered = await this.bufferedNav.step(model, navigableFields, delta);
       if (buffered === 'loaded') {
         void this.saveUrlTemplateFromCurrentFields();
@@ -2040,7 +2038,7 @@ export class ImageTrailPanel {
         contextKey: this.parsedFieldRequestContextKey(
           fields.map((field) => field.id),
           direction,
-          this.neighborPreloadRunId,
+          this.neighborPreload.runId,
         ),
       });
       if (policy.status === 'skippable-failed') continue;
@@ -2104,13 +2102,13 @@ export class ImageTrailPanel {
     if (options.resetFieldState) this.state = this.resetParsedFieldInteractionState(this.state);
     const baselineFingerprint = this.currentKnownImageFingerprint();
     this.projections.update(session, { status: 'preloading' });
-    const preload = await this.preloadImageUrl(nextUrl, {
+    const preload = await this.neighborPreload.preload(nextUrl, {
       readCache: session.reason !== 'parsed-field-navigation',
       writeCache: session.reason !== 'parsed-field-navigation',
       intent: this.imageRequestIntentForProjectionReason(session.reason),
       contextKey:
         session.reason === 'parsed-field-navigation'
-          ? this.parsedFieldRequestContextKey(attemptedFieldIds, options.preloadDirection, this.neighborPreloadRunId)
+          ? this.parsedFieldRequestContextKey(attemptedFieldIds, options.preloadDirection, this.neighborPreload.runId)
           : undefined,
     });
     if (!this.isCurrentProjectionSession(session)) return false;
@@ -2254,59 +2252,9 @@ export class ImageTrailPanel {
     return snapshot;
   }
 
-  private async preloadImageUrl(
-    url: string,
-    options: {
-      readonly readCache?: boolean;
-      readonly writeCache?: boolean;
-      readonly intent?: ImageRequestIntent;
-      readonly contextKey?: string;
-    } = {},
-  ): Promise<
-    { readonly ok: true; readonly displayUrl: string; readonly sha256: string | null } | { readonly ok: false; readonly message: string }
-  > {
-    const cached = options.readCache !== false && this.isNeighborPreloadActive() ? this.neighborPreloadCache.get(url) : undefined;
-    if (cached?.status === 'loaded') return { ok: true, displayUrl: cached.displayUrl, sha256: cached.sha256 };
-    if (cached?.status === 'failed') return { ok: false, message: cached.message };
-    if (url.startsWith('data:image/')) return { ok: true, displayUrl: url, sha256: null };
-    const result = await fetchThumbnailSource(url, { intent: options.intent, contextKey: options.contextKey });
-    if (!result.ok) return { ok: false, message: `Image failed to load: ${result.message}` };
-    const loaded = { displayUrl: result.dataUrl, sha256: result.sha256 ?? null };
-    if (options.writeCache !== false && this.isNeighborPreloadActive()) this.rememberNeighborPreload(url, loaded);
-    return { ok: true, ...loaded };
-  }
-
-  private neighborPreloadFillCandidates(
-    model: ParsedUrlModel,
-    fields: readonly UrlField[],
-    direction: NeighborPreloadDirection,
-  ): readonly AdjacentParsedFieldUrlCandidate[] {
-    const targetCount = this.localSettings.neighborPreloadRadius;
-    if (targetCount <= 0 || fields.length === 0) return [];
-    const baseUrl = this.currentNavigationBaseRawUrl();
-    const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT)
-      .filter((candidate) => candidate.direction === direction)
-      .sort((a, b) => a.distance - b.distance);
-    const selected: AdjacentParsedFieldUrlCandidate[] = [];
-    let buffered = 0;
-    for (const candidate of candidates) {
-      if (imageResourceUrlsEqual(candidate.url, baseUrl, window.location.href)) continue;
-      const cached = this.neighborPreloadCache.get(candidate.url);
-      if (cached?.status === 'failed') continue;
-      if (cached?.status === 'loaded' || this.neighborPreloadInflight.has(candidate.url)) {
-        buffered += 1;
-      } else {
-        selected.push(candidate);
-        buffered += 1;
-      }
-      if (buffered >= targetCount) break;
-    }
-    return selected;
-  }
-
   private preloadMoreNeighbors(radius: number, cacheLimit: number): void {
     this.updateNeighborPreload(true, radius, cacheLimit);
-    if (!this.isNeighborPreloadActive()) return;
+    if (!this.neighborPreload.isActive) return;
     let model: ParsedUrlModel;
     try {
       model = this.currentNavigationBaseModel();
@@ -2315,8 +2263,8 @@ export class ImageTrailPanel {
     }
     const fields = this.includedNavigationFields(collectUrlFields(model));
     if (fields.length === 0) return;
-    const candidates = ([-1, 1] as const).flatMap((direction) => this.neighborPreloadAdditionalCandidates(model, fields, direction));
-    if (candidates.length === 0) {
+    const result = this.neighborPreload.preloadMore(model, fields);
+    if (!result) {
       this.state = {
         ...this.state,
         status: 'ready',
@@ -2326,171 +2274,20 @@ export class ImageTrailPanel {
       this.render();
       return;
     }
-    const runId = this.neighborPreloadRunId;
     this.state = {
       ...this.state,
       status: 'ready',
-      message: `Preloading ${candidates.length} more parsed-field neighbor image(s)...`,
+      message: `Preloading ${result.candidateCount} more parsed-field neighbor image(s)...`,
       lastUpdatedAt: Date.now(),
     };
     this.render();
-    void this.runNeighborPreloadBatch(
-      candidates,
-      runId,
-      fields.map((field) => field.id),
-    );
-  }
-
-  private neighborPreloadAdditionalCandidates(
-    model: ParsedUrlModel,
-    fields: readonly UrlField[],
-    direction: NeighborPreloadDirection,
-  ): readonly AdjacentParsedFieldUrlCandidate[] {
-    const targetCount = this.localSettings.neighborPreloadRadius;
-    if (targetCount <= 0 || fields.length === 0) return [];
-    const baseUrl = this.currentNavigationBaseRawUrl();
-    const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT)
-      .filter((candidate) => candidate.direction === direction)
-      .sort((a, b) => a.distance - b.distance);
-    const selected: AdjacentParsedFieldUrlCandidate[] = [];
-    for (const candidate of candidates) {
-      if (imageResourceUrlsEqual(candidate.url, baseUrl, window.location.href)) continue;
-      if (this.neighborPreloadCache.has(candidate.url) || this.neighborPreloadInflight.has(candidate.url)) continue;
-      selected.push(candidate);
-      if (selected.length >= targetCount) break;
-    }
-    return selected;
-  }
-
-  private async runNeighborPreloadBatch(
-    candidates: readonly AdjacentParsedFieldUrlCandidate[],
-    runId: number,
-    attemptedFieldIds: readonly string[],
-  ): Promise<void> {
-    const tasks: Promise<boolean>[] = [];
-    preloadCandidates: for (const candidate of candidates) {
-      if (runId !== this.neighborPreloadRunId || !this.isNeighborPreloadActive()) break;
-      if (this.neighborPreloadCache.has(candidate.url) || this.neighborPreloadInflight.has(candidate.url)) continue;
-      while (runId === this.neighborPreloadRunId && this.isNeighborPreloadActive()) {
-        const result = this.neighborPreloadGovernor.request(() => this.loadNeighborPreload(candidate, runId, attemptedFieldIds));
-        if (result.status === 'ok') {
-          tasks.push(result.value);
-          continue preloadCandidates;
-        }
-        if (result.status === 'capped') break preloadCandidates;
-        await delay(NEIGHBOR_PRELOAD_MINIMUM_INTERVAL_MS);
-      }
-      break;
-    }
-    await Promise.allSettled(tasks);
-  }
-
-  private topUpNeighborPreloads(attemptedFieldIds: readonly string[], direction: NeighborPreloadDirection, runId: number): void {
-    if (runId !== this.neighborPreloadRunId || !this.isNeighborPreloadActive()) return;
-    let model: ParsedUrlModel;
-    try {
-      model = this.currentNavigationBaseModel();
-    } catch {
-      return;
-    }
-    const fields = fieldsById(collectUrlFields(model), attemptedFieldIds).filter((field) => this.isNavigableQueryField(field));
-    const candidates = this.neighborPreloadFillCandidates(model, fields, direction);
-    if (candidates.length === 0) return;
-    void this.runNeighborPreloadBatch(candidates, runId, attemptedFieldIds);
-  }
-
-  private neighborPreloadRequestContextKey(
-    direction: NeighborPreloadDirection,
-    runId: number,
-    attemptedFieldIds: readonly string[],
-  ): string {
-    return [
-      'neighbor-preload',
-      String(runId),
-      this.currentNavigationBaseRawUrl(),
-      attemptedFieldIds.join(','),
-      this.state.fieldSplitSpecs.map((spec) => `${spec.baseFieldId}:${spec.pattern}`).join('|'),
-      this.state.fieldDigitWidthSpecs.map((spec) => `${spec.fieldId}:${spec.width}:${spec.sourceWidth ?? ''}`).join('|'),
-      this.state.target.selectedHandleId ?? '',
-      String(direction),
-    ].join('\n');
-  }
-
-  private async loadNeighborPreload(
-    candidate: AdjacentParsedFieldUrlCandidate,
-    runId: number,
-    attemptedFieldIds: readonly string[],
-  ): Promise<boolean> {
-    const promise = this.preloadImageUrl(candidate.url, {
-      readCache: false,
-      writeCache: false,
-      intent: 'field-active-navigation',
-      contextKey: this.neighborPreloadRequestContextKey(candidate.direction, runId, attemptedFieldIds),
-    })
-      .then((result) => {
-        if (runId !== this.neighborPreloadRunId || !this.isNeighborPreloadActive() || !result.ok) {
-          if (runId === this.neighborPreloadRunId && this.isNeighborPreloadActive() && !result.ok) {
-            this.rememberNeighborPreloadFailure(candidate.url, result.message);
-            this.neighborPreloadInflight.delete(candidate.url);
-            this.topUpNeighborPreloads(attemptedFieldIds, candidate.direction, runId);
-          }
-          return false;
-        }
-        if (result.ok) {
-          this.rememberNeighborPreload(candidate.url, { displayUrl: result.displayUrl, sha256: result.sha256 });
-        }
-        return true;
-      })
-      .catch((error: unknown) => {
-        if (runId === this.neighborPreloadRunId && this.isNeighborPreloadActive()) {
-          this.rememberNeighborPreloadFailure(
-            candidate.url,
-            imageLoadFailureMessage(error instanceof Error ? error.message : 'unknown error'),
-          );
-          this.neighborPreloadInflight.delete(candidate.url);
-          this.topUpNeighborPreloads(attemptedFieldIds, candidate.direction, runId);
-        }
-        return false;
-      })
-      .finally(() => {
-        this.neighborPreloadInflight.delete(candidate.url);
-      });
-    this.neighborPreloadInflight.set(candidate.url, promise);
-    return await promise;
-  }
-
-  private isNeighborPreloadActive(): boolean {
-    return this.localSettings.neighborPreloadEnabled && this.localSettings.neighborPreloadRadius > 0;
   }
 
   private currentKnownImageFingerprint(): string | null {
     if (this.state.currentImageFingerprint) return this.state.currentImageFingerprint;
     const currentUrl = this.state.target.selectedUrl;
     if (!currentUrl) return null;
-    const cached = this.neighborPreloadCache.get(currentUrl);
-    return cached?.status === 'loaded' ? cached.sha256 : null;
-  }
-
-  private rememberNeighborPreload(url: string, loaded: { readonly displayUrl: string; readonly sha256: string | null }): void {
-    if (this.neighborPreloadCache.has(url)) this.neighborPreloadCache.delete(url);
-    this.neighborPreloadCache.set(url, { status: 'loaded', ...loaded });
-    this.pruneNeighborPreloadCache();
-  }
-
-  private rememberNeighborPreloadFailure(url: string, message: string): void {
-    if (this.neighborPreloadCache.has(url)) this.neighborPreloadCache.delete(url);
-    this.neighborPreloadCache.set(url, { status: 'failed', message });
-    this.pruneNeighborPreloadCache();
-  }
-
-  private pruneNeighborPreloadCache(): void {
-    const limit = this.localSettings.neighborPreloadCacheLimit;
-    if (limit === 0) return;
-    while (this.neighborPreloadCache.size > limit) {
-      const oldest = this.neighborPreloadCache.keys().next().value;
-      if (!oldest) break;
-      this.neighborPreloadCache.delete(oldest);
-    }
+    return this.neighborPreload.getCachedFingerprint(currentUrl);
   }
 
   private applyFieldLoadResult(
@@ -3184,7 +2981,7 @@ export class ImageTrailPanel {
     if (!image) return false;
 
     this.projections.update(session, { status: 'preloading' });
-    const preload = await this.preloadImageUrl(url, { intent: this.imageRequestIntentForProjectionReason(session.reason) });
+    const preload = await this.neighborPreload.preload(url, { intent: this.imageRequestIntentForProjectionReason(session.reason) });
     if (!this.isCurrentProjectionSession(session)) return false;
     if (!preload.ok) {
       this.projections.update(session, { status: 'failed' });
@@ -4914,10 +4711,6 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
-}
-
-function imageLoadFailureMessage(message: string): string {
-  return message.startsWith('Image failed to load: ') ? message : `Image failed to load: ${message}`;
 }
 
 function recordHasBlobId(record: Pick<ImageDisplayRecord, 'blobId' | 'storedOriginal' | 'protectedPin'>, blobId: string): boolean {
