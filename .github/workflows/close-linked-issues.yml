@@ -5,7 +5,7 @@ on:
     types:
       - closed
     branches:
-      - codex/dev
+      - claude/dev
 
 permissions:
   contents: read
@@ -15,7 +15,7 @@ permissions:
 jobs:
   close-linked-issues:
     name: Close linked issues
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'codex/dev'
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'claude/dev'
     runs-on: ubuntu-latest
 
     steps:
