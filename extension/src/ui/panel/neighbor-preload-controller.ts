@@ -242,7 +242,11 @@ export class NeighborPreloadController {
   }
 
   private async loadOne(candidate: AdjacentParsedFieldUrlCandidate, runId: number, attemptedFieldIds: readonly string[]): Promise<boolean> {
-    const promise = this.preload(candidate.url, {
+    // dispose() can clear `inflight` while this call is still pending (e.g. a BFCache
+    // pagehide/resume cycle reuses the same controller instance). Only clear the map
+    // entry that this call itself owns, so a stale settlement can never evict a newer
+    // in-flight entry that a later call registered under the same URL.
+    const promise: Promise<boolean> = this.preload(candidate.url, {
       readCache: false,
       writeCache: false,
       intent: 'field-active-navigation',
@@ -252,7 +256,7 @@ export class NeighborPreloadController {
         if (runId !== this.currentRunId || !this.isActive || !result.ok) {
           if (runId === this.currentRunId && this.isActive && !result.ok) {
             this.rememberFailure(candidate.url, result.message);
-            this.inflight.delete(candidate.url);
+            this.clearInflightIfCurrent(candidate.url, promise);
             this.topUp(attemptedFieldIds, candidate.direction, runId);
           }
           return false;
@@ -263,16 +267,20 @@ export class NeighborPreloadController {
       .catch((error: unknown) => {
         if (runId === this.currentRunId && this.isActive) {
           this.rememberFailure(candidate.url, imageLoadFailureMessage(error instanceof Error ? error.message : 'unknown error'));
-          this.inflight.delete(candidate.url);
+          this.clearInflightIfCurrent(candidate.url, promise);
           this.topUp(attemptedFieldIds, candidate.direction, runId);
         }
         return false;
       })
       .finally(() => {
-        this.inflight.delete(candidate.url);
+        this.clearInflightIfCurrent(candidate.url, promise);
       });
     this.inflight.set(candidate.url, promise);
     return await promise;
+  }
+
+  private clearInflightIfCurrent(url: string, promise: Promise<boolean>): void {
+    if (this.inflight.get(url) === promise) this.inflight.delete(url);
   }
 
   private remember(url: string, loaded: { readonly displayUrl: string; readonly sha256: string | null }): void {
