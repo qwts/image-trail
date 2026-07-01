@@ -128,7 +128,9 @@ test('a later step() invalidates a still-pending earlier one so it resolves bloc
   assert.equal(landed.length, 1, 'the stale run must not apply a second, invalid load');
 });
 
-test('dispose() resets state without throwing and prevents further application of in-flight work', async () => {
+test('dispose() settles an in-flight step() instead of leaving it hanging forever', async () => {
+  // This checkRequestPolicy never resolves on its own - the only way step() can
+  // possibly settle is if dispose() actively cancels the in-flight probe.
   const pending = createDeferred<{ status: 'unknown' }>();
   const { controller, landed } = createHarness({
     checkRequestPolicy: async () => pending.promise,
@@ -136,10 +138,14 @@ test('dispose() resets state without throwing and prevents further application o
   const model = baseModel();
   const fields = navigableFields(model);
 
-  void controller.step(model, fields, 1);
+  const stepPromise = controller.step(model, fields, 1);
 
   assert.doesNotThrow(() => controller.dispose());
   assert.equal(controller.getDebugSnapshot(), null);
+
+  const result = await stepPromise;
+
+  assert.equal(result, 'blocked');
   assert.equal(landed.length, 0);
 
   assert.doesNotThrow(() => controller.dispose());
