@@ -79,21 +79,12 @@ import {
 } from '../core/url/field-transforms.js';
 import { parseUrl } from '../core/url/parse-url.js';
 import {
-  ImageStatus,
-  ManifestStatus,
-  bufferedPreloadWindowIndices,
-  classifyBufferedImageIndex,
-  createBufferedImageNavigationState,
-  reduceBufferedImageNavigation,
-  type BufferedImageNavigationState,
-} from '../core/url/buffered-image-navigation.js';
-import {
   adjacentParsedFieldUrlCandidates,
   fieldsById,
   type AdjacentParsedFieldUrlCandidate,
   type NeighborPreloadDirection,
 } from '../core/url/preload-neighbors.js';
-import { bumpUrlField, rebuildUrl } from '../core/url/rebuild-url.js';
+import { rebuildUrl } from '../core/url/rebuild-url.js';
 import { collectUrlFields } from '../core/url/tokenize-fields.js';
 import { ProjectionSessionController, type ProjectionReason, type ProjectionSession } from '../core/projection-session.js';
 import {
@@ -115,6 +106,7 @@ import {
 } from '../content/thumbnail-generator.js';
 import { fetchDecodedBufferedImageSource, probeBufferedImageSource } from '../content/buffered-image-source.js';
 import { checkImageRequestPolicy } from '../content/image-request-policy.js';
+import { BufferedNavigationController } from './panel/buffered-navigation-controller.js';
 import {
   DEFAULT_LOCAL_SETTINGS,
   exportEncryptedBookmarks,
@@ -169,19 +161,9 @@ type FieldEditorEffect =
       readonly saveTemplateOnLoad: 'always' | 'when-unlocked';
     };
 
-interface BufferedNavigationRequest {
-  readonly runId: number;
-  readonly promise: Promise<void>;
-  readonly resolve: () => void;
-  readonly reject: (error: unknown) => void;
-  advanceOnResolve: boolean;
-}
-
 const NEIGHBOR_PRELOAD_MINIMUM_INTERVAL_MS = 250;
 const MAX_NEIGHBOR_PRELOAD_REQUESTS_PER_MINUTE = 20;
 const NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT = 50;
-const MAX_BUFFERED_HEAD_CONCURRENCY = 10;
-const MAX_BUFFERED_GET_CONCURRENCY = 4;
 const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
 
 type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
@@ -312,18 +294,35 @@ export class ImageTrailPanel {
   private parsedFieldStatePageKey = window.location.href;
   private extensionProjectedPageUrl: string | null = null;
   private neighborPreloadRunId = 0;
-  private bufferedNavigation: BufferedImageNavigationState | null = null;
-  private bufferedNavigationKey: string | null = null;
-  private bufferedNavigationRunId = 0;
-  private bufferedNavigationBaseModel: ParsedUrlModel | null = null;
-  private bufferedNavigationFields: readonly UrlField[] = [];
-  private bufferedHeadInflight = new Map<number, BufferedNavigationRequest>();
-  private bufferedGetInflight = new Map<number, BufferedNavigationRequest>();
-  private bufferedHeadQueue: number[] = [];
-  private bufferedGetQueue: number[] = [];
-  private bufferedHeadQueued = new Map<number, BufferedNavigationRequest>();
-  private bufferedGetQueued = new Map<number, BufferedNavigationRequest>();
-  private bufferedDebugVisible = false;
+  private readonly bufferedNav = new BufferedNavigationController({
+    getLocalSettings: () => this.localSettings,
+    currentNavigationBaseRawUrl: () => this.currentNavigationBaseRawUrl(),
+    currentNavigationBaseModel: () => this.currentNavigationBaseModel(),
+    includedNavigationFields: (fields) => this.includedNavigationFields(fields),
+    currentKnownImageFingerprint: () => this.currentKnownImageFingerprint(),
+    hasSelectedTarget: () => Boolean(this.pageAdapter.getSnapshot().selected?.url),
+    currentPageHref: () => window.location.href,
+    applyLandedUrl: (nextUrl, displayUrl, sha256, attemptedFieldIds) =>
+      this.applyBufferedNavigationUrl(nextUrl, displayUrl, sha256, attemptedFieldIds),
+    createPlaceholderImage: () => new Image(),
+    scheduleRevoke: (blobUrl) => window.setTimeout(() => URL.revokeObjectURL(blobUrl), 500),
+    onToast: (message) => this.showBufferedNavigationToast(message),
+    onSkipCapReached: (message) => {
+      this.state = {
+        ...this.state,
+        status: 'ready',
+        message,
+        failedFieldId: null,
+        lastUpdatedAt: Date.now(),
+      };
+      this.render();
+      this.showBufferedNavigationToast(message);
+    },
+    onDebugChanged: () => this.renderBufferedDebugOverlay(),
+    checkRequestPolicy: (url, options) => checkImageRequestPolicy(url, options),
+    probeImage: (url, timeoutMs, options) => probeBufferedImageSource(url, timeoutMs, options),
+    fetchDecodedImage: (url, options) => fetchDecodedBufferedImageSource(url, options),
+  });
   private bufferedNavigationToastTimer: number | null = null;
   private queuedParsedNavigationDelta = 0;
   private parsedNavigationQueueRunning = false;
@@ -423,6 +422,7 @@ export class ImageTrailPanel {
     this.slideshow.destroy();
     this.retry.destroy();
     this.keyboard.disable();
+    this.bufferedNav.dispose();
     this.cleanupMountedElements({ releaseTarget: true });
   }
 
@@ -534,7 +534,7 @@ export class ImageTrailPanel {
       patterns: grabSourcePatterns,
     });
     this.syncGrabSettings();
-    this.primeBufferedNavigationPreloads();
+    this.bufferedNav.prime();
     if (options.render !== false) this.render();
   }
 
@@ -1425,7 +1425,7 @@ export class ImageTrailPanel {
       const updated = this.applyPanelState(reducePanelAction(this.state, action), { saveParsedFieldState: true });
       if (!updated) return;
       void this.saveUrlTemplateFromCurrentFields().then(() => {
-        this.primeBufferedNavigationPreloads();
+        this.bufferedNav.prime();
         this.render();
       });
       return;
@@ -1676,8 +1676,7 @@ export class ImageTrailPanel {
         }
         break;
       case 'buffer-debug-toggle':
-        this.bufferedDebugVisible = !this.bufferedDebugVisible;
-        this.renderBufferedDebugOverlay();
+        this.bufferedNav.toggleDebugVisible();
         break;
       case 'stop':
         this.dispatch({ name: 'stop-all' });
@@ -1975,7 +1974,7 @@ export class ImageTrailPanel {
     const navigableFields = this.includedNavigationFields(fields);
     if (navigableFields.length === 0) return 'blocked';
     if (this.isNeighborPreloadActive()) {
-      const buffered = await this.runBufferedParsedNavigationStep(model, navigableFields, delta);
+      const buffered = await this.bufferedNav.step(model, navigableFields, delta);
       if (buffered === 'loaded') {
         void this.saveUrlTemplateFromCurrentFields();
         this.state = setAutomationState(this.state, {
@@ -2048,419 +2047,6 @@ export class ImageTrailPanel {
       return candidate;
     }
     return null;
-  }
-
-  private async runBufferedParsedNavigationStep(
-    model: ParsedUrlModel,
-    fields: readonly UrlField[],
-    direction: NeighborPreloadDirection,
-  ): Promise<'loaded' | 'blocked'> {
-    this.ensureBufferedNavigation(model, fields);
-    if (!this.bufferedNavigation || !this.bufferedNavigationBaseModel) return 'blocked';
-    const runId = this.bufferedNavigationRunId;
-    const previousCursor = this.bufferedNavigation.cursor;
-    this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'SEEK', dir: direction });
-    for (let attempt = 0; attempt <= this.bufferedNavigation.settings.probeK + 1; attempt += 1) {
-      if (this.bufferedNavigation.cursor !== previousCursor) {
-        const landed = this.bufferedNavigation.indices.get(this.bufferedNavigation.cursor);
-        if (landed?.image === ImageStatus.OK && landed.url && landed.blobUrl) {
-          const loaded = await this.applyBufferedNavigationUrl(
-            landed.url,
-            landed.blobUrl,
-            landed.sha256,
-            fields.map((field) => field.id),
-          );
-          this.scheduleBufferedNavigationPreloads();
-          return loaded ? 'loaded' : 'blocked';
-        }
-      }
-      const blockedOn = this.bufferedNavigation.blockedOn;
-      if (blockedOn === null) {
-        this.scheduleBufferedNavigationPreloads();
-        return 'blocked';
-      }
-      await this.resolveBufferedNavigationIndex(blockedOn, { advanceOnResolve: true });
-      if (!this.isCurrentBufferedNavigationRun(runId)) return 'blocked';
-    }
-    const message = 'Parsed-field navigation is waiting for a decoded neighbor image.';
-    this.state = {
-      ...this.state,
-      status: 'ready',
-      message,
-      failedFieldId: null,
-      lastUpdatedAt: Date.now(),
-    };
-    console.warn('Image Trail buffered navigation reached the skip cap before finding a decoded image.', {
-      direction,
-      cursor: this.bufferedNavigation.cursor,
-    });
-    this.render();
-    this.showBufferedNavigationToast(message);
-    return 'blocked';
-  }
-
-  private primeBufferedNavigationPreloads(): void {
-    if (!this.isNeighborPreloadActive()) {
-      this.bufferedNavigationRunId += 1;
-      this.bufferedNavigation = null;
-      this.bufferedNavigationKey = null;
-      this.bufferedNavigationBaseModel = null;
-      this.bufferedNavigationFields = [];
-      this.clearBufferedNavigationQueues();
-      return;
-    }
-    const snapshot = this.pageAdapter.getSnapshot();
-    if (!snapshot.selected?.url) return;
-    let model: ParsedUrlModel;
-    try {
-      model = this.currentNavigationBaseModel();
-    } catch {
-      return;
-    }
-    const fields = this.includedNavigationFields(collectUrlFields(model));
-    if (fields.length === 0) return;
-    this.ensureBufferedNavigation(model, fields);
-  }
-
-  private ensureBufferedNavigation(model: ParsedUrlModel, fields: readonly UrlField[]): void {
-    if (this.reuseBufferedNavigationForCurrentUrl(fields)) return;
-    const baseUrl = rebuildUrl(model);
-    const key = `${baseUrl}|${fields.map((field) => field.id).join(',')}|${this.localSettings.neighborPreloadRadius}`;
-    if (this.bufferedNavigationKey === key && this.bufferedNavigation) return;
-    const bufferN = this.bufferedNavigationRadius();
-    let navigation = createBufferedImageNavigationState(bufferN);
-    navigation = reduceBufferedImageNavigation(navigation, {
-      type: 'SET_MANIFEST',
-      index: 0,
-      status: ManifestStatus.PRESENT,
-      url: baseUrl,
-    });
-    navigation = reduceBufferedImageNavigation(navigation, {
-      type: 'SET_IMAGE',
-      index: 0,
-      status: ImageStatus.OK,
-      blobUrl: baseUrl,
-      imgElement: new Image(),
-      sha256: this.currentKnownImageFingerprint(),
-    });
-    navigation = reduceBufferedImageNavigation(navigation, { type: 'INIT_CURSOR', index: 0 });
-    this.bufferedNavigationRunId += 1;
-    this.bufferedNavigation = navigation;
-    this.bufferedNavigationKey = key;
-    this.bufferedNavigationBaseModel = model;
-    this.bufferedNavigationFields = fields;
-    this.bufferedHeadInflight.clear();
-    this.bufferedGetInflight.clear();
-    this.clearBufferedNavigationQueues();
-    this.scheduleBufferedNavigationPreloads();
-  }
-
-  private reuseBufferedNavigationForCurrentUrl(fields: readonly UrlField[]): boolean {
-    if (!this.bufferedNavigation || this.bufferedNavigationFields.length === 0) return false;
-    const bufferN = this.bufferedNavigationRadius();
-    if (this.bufferedNavigation.settings.bufferN !== bufferN) return false;
-    const currentFieldIds = fields.map((field) => field.id).join(',');
-    const bufferedFieldIds = this.bufferedNavigationFields.map((field) => field.id).join(',');
-    if (currentFieldIds !== bufferedFieldIds) return false;
-    const currentUrl = this.currentNavigationBaseRawUrl();
-    let matchedIndex: number | null = null;
-    for (const [index, entry] of this.bufferedNavigation.indices) {
-      if (!entry.url) continue;
-      if (imageResourceUrlsEqual(entry.url, currentUrl, window.location.href)) {
-        matchedIndex = index;
-        break;
-      }
-    }
-    if (matchedIndex === null) return false;
-    if (this.bufferedNavigation.cursor !== matchedIndex) {
-      this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'INIT_CURSOR', index: matchedIndex });
-      this.clearBufferedNavigationQueues();
-    }
-    this.scheduleBufferedNavigationPreloads();
-    return true;
-  }
-
-  private bufferedNavigationUrl(index: number): string | null {
-    if (!this.bufferedNavigationBaseModel || this.bufferedNavigationFields.length === 0) return null;
-    if (index === 0) return rebuildUrl(this.bufferedNavigationBaseModel);
-    const direction: NeighborPreloadDirection = index > 0 ? 1 : -1;
-    let model = this.bufferedNavigationBaseModel;
-    for (let step = 0; step < Math.abs(index); step += 1) {
-      model = this.bufferedNavigationFields.reduce<ParsedUrlModel>((nextModel, field) => bumpUrlField(nextModel, field, direction), model);
-    }
-    return rebuildUrl(model);
-  }
-
-  private bufferedNavigationRadius(): number {
-    return Math.max(0, Math.min(5, this.localSettings.neighborPreloadRadius));
-  }
-
-  private async resolveBufferedNavigationIndex(index: number, options: { readonly advanceOnResolve?: boolean } = {}): Promise<void> {
-    if (!this.bufferedNavigation) return;
-    const current = this.bufferedNavigation.indices.get(index);
-    if (classifyBufferedImageIndex(current) !== 'WALL') return;
-    await this.probeBufferedNavigationIndex(index, options);
-    const probed = this.bufferedNavigation.indices.get(index);
-    if (probed?.manifest === ManifestStatus.PRESENT && probed.image !== ImageStatus.OK && probed.image !== ImageStatus.FAILED_GET) {
-      await this.getBufferedNavigationIndex(index, options);
-    }
-  }
-
-  private async probeBufferedNavigationIndex(index: number, options: { readonly advanceOnResolve?: boolean } = {}): Promise<void> {
-    if (!this.bufferedNavigation) return;
-    const current = this.bufferedNavigation.indices.get(index);
-    if (
-      current?.manifest === ManifestStatus.PRESENT ||
-      current?.manifest === ManifestStatus.FAILED_HEAD ||
-      current?.manifest === ManifestStatus.END
-    ) {
-      return;
-    }
-    const inflight = this.bufferedHeadInflight.get(index);
-    if (inflight) {
-      if (options.advanceOnResolve) inflight.advanceOnResolve = true;
-      return inflight.promise;
-    }
-    const queued = this.bufferedHeadQueued.get(index);
-    if (queued) {
-      if (options.advanceOnResolve) queued.advanceOnResolve = true;
-      return queued.promise;
-    }
-    const url = this.bufferedNavigationUrl(index);
-    if (!url) return;
-    const runId = this.bufferedNavigationRunId;
-    let resolveQueued!: () => void;
-    let rejectQueued!: (error: unknown) => void;
-    const promise = new Promise<void>((resolve, reject) => {
-      resolveQueued = resolve;
-      rejectQueued = reject;
-    });
-    this.bufferedHeadQueued.set(index, {
-      runId,
-      promise,
-      resolve: resolveQueued,
-      reject: rejectQueued,
-      advanceOnResolve: options.advanceOnResolve === true,
-    });
-    this.bufferedHeadQueue.push(index);
-    this.sortBufferedNavigationQueues();
-    this.drainBufferedHeadQueue();
-    return promise;
-  }
-
-  private startBufferedHeadProbe(index: number): void {
-    const queued = this.bufferedHeadQueued.get(index);
-    if (!queued) return;
-    this.bufferedHeadQueued.delete(index);
-    if (!this.isCurrentBufferedNavigationRun(queued.runId)) {
-      queued.resolve();
-      return;
-    }
-    const promise = (async (): Promise<void> => {
-      const url = this.bufferedNavigationUrl(index);
-      if (!url) return;
-      if (!this.isCurrentBufferedNavigationRun(queued.runId)) return;
-      const contextKey = this.bufferedImageRequestContextKey(index, queued.runId);
-      const policy = await checkImageRequestPolicy(url, { intent: 'field-speculative-probe', contextKey });
-      if (!this.isCurrentBufferedNavigationRun(queued.runId)) return;
-      if (policy.status === 'skippable-failed') {
-        this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
-          type: 'SET_MANIFEST',
-          index,
-          status: ManifestStatus.FAILED_HEAD,
-          url,
-        });
-        if (queued.advanceOnResolve) this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'ADVANCE' });
-        this.renderBufferedDebugOverlay();
-        return;
-      }
-      if (policy.status === 'cached-success') {
-        this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
-          type: 'SET_MANIFEST',
-          index,
-          status: ManifestStatus.PRESENT,
-          url,
-        });
-        if (queued.advanceOnResolve) this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'ADVANCE' });
-        this.renderBufferedDebugOverlay();
-        return;
-      }
-      this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
-        type: 'SET_MANIFEST',
-        index,
-        status: ManifestStatus.HEAD_PENDING,
-        url,
-      });
-      const probeMethod = this.localSettings.neighborPreloadProbeMethod;
-      const result = await probeBufferedImageSource(url, 8000, {
-        contextKey,
-        probeMethod,
-      });
-      if (!this.isCurrentBufferedNavigationRun(queued.runId)) return;
-      const skippableProbeFailure = !result.ok && (probeMethod === 'get' || this.isSkippableBufferedHeadFailure(result.status));
-      if (skippableProbeFailure) this.showBufferedNavigationToast('Skipped a failed image candidate.');
-      this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
-        type: 'SET_MANIFEST',
-        index,
-        status: result.ok || !skippableProbeFailure ? ManifestStatus.PRESENT : ManifestStatus.FAILED_HEAD,
-        url,
-      });
-      if (queued.advanceOnResolve) this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'ADVANCE' });
-      this.renderBufferedDebugOverlay();
-    })();
-    this.bufferedHeadInflight.set(index, queued);
-    void promise.then(queued.resolve, queued.reject).finally(() => {
-      this.bufferedHeadInflight.delete(index);
-      this.drainBufferedHeadQueue();
-    });
-  }
-
-  private async getBufferedNavigationIndex(index: number, options: { readonly advanceOnResolve?: boolean } = {}): Promise<void> {
-    if (!this.bufferedNavigation) return;
-    const current = this.bufferedNavigation.indices.get(index);
-    if (current?.image === ImageStatus.OK || current?.image === ImageStatus.FAILED_GET) return;
-    const inflight = this.bufferedGetInflight.get(index);
-    if (inflight) {
-      if (options.advanceOnResolve) inflight.advanceOnResolve = true;
-      return inflight.promise;
-    }
-    const queued = this.bufferedGetQueued.get(index);
-    if (queued) {
-      if (options.advanceOnResolve) queued.advanceOnResolve = true;
-      return queued.promise;
-    }
-    const url = current?.url ?? this.bufferedNavigationUrl(index);
-    if (!url) return;
-    const runId = this.bufferedNavigationRunId;
-    let resolveQueued!: () => void;
-    let rejectQueued!: (error: unknown) => void;
-    const promise = new Promise<void>((resolve, reject) => {
-      resolveQueued = resolve;
-      rejectQueued = reject;
-    });
-    this.bufferedGetQueued.set(index, {
-      runId,
-      promise,
-      resolve: resolveQueued,
-      reject: rejectQueued,
-      advanceOnResolve: options.advanceOnResolve === true,
-    });
-    this.bufferedGetQueue.push(index);
-    this.sortBufferedNavigationQueues();
-    this.drainBufferedGetQueue();
-    return promise;
-  }
-
-  private startBufferedGet(index: number): void {
-    const queued = this.bufferedGetQueued.get(index);
-    if (!queued) return;
-    this.bufferedGetQueued.delete(index);
-    if (!this.isCurrentBufferedNavigationRun(queued.runId)) {
-      queued.resolve();
-      return;
-    }
-    const promise = (async (): Promise<void> => {
-      const current = this.bufferedNavigation!.indices.get(index);
-      const url = current?.url ?? this.bufferedNavigationUrl(index);
-      if (!url) return;
-      if (!this.isCurrentBufferedNavigationRun(queued.runId)) return;
-      this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
-        type: 'SET_IMAGE',
-        index,
-        status: ImageStatus.GET_PENDING,
-      });
-      const result = await fetchDecodedBufferedImageSource(url, {
-        intent: 'field-active-navigation',
-        contextKey: this.bufferedImageRequestContextKey(index, queued.runId),
-      });
-      if (!this.isCurrentBufferedNavigationRun(queued.runId)) return;
-      if (result.ok) {
-        this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
-          type: 'SET_IMAGE',
-          index,
-          status: ImageStatus.OK,
-          blobUrl: result.blobUrl,
-          imgElement: result.imgElement,
-          sha256: result.sha256,
-        });
-      } else {
-        this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation!, {
-          type: 'SET_IMAGE',
-          index,
-          status: ImageStatus.FAILED_GET,
-        });
-        console.debug('Image Trail buffered navigation skipped unavailable candidate image.', { index, url, message: result.message });
-        this.showBufferedNavigationToast('Skipped a failed image candidate.');
-      }
-      if (queued.advanceOnResolve) this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'ADVANCE' });
-      this.renderBufferedDebugOverlay();
-    })();
-    this.bufferedGetInflight.set(index, queued);
-    void promise.then(queued.resolve, queued.reject).finally(() => {
-      this.bufferedGetInflight.delete(index);
-      this.drainBufferedGetQueue();
-    });
-  }
-
-  private drainBufferedHeadQueue(): void {
-    while (this.bufferedHeadInflight.size < MAX_BUFFERED_HEAD_CONCURRENCY && this.bufferedHeadQueue.length > 0) {
-      const index = this.bufferedHeadQueue.shift()!;
-      if (!this.bufferedHeadQueued.has(index)) continue;
-      this.startBufferedHeadProbe(index);
-    }
-  }
-
-  private drainBufferedGetQueue(): void {
-    while (this.bufferedGetInflight.size < MAX_BUFFERED_GET_CONCURRENCY && this.bufferedGetQueue.length > 0) {
-      const index = this.bufferedGetQueue.shift()!;
-      if (!this.bufferedGetQueued.has(index)) continue;
-      this.startBufferedGet(index);
-    }
-  }
-
-  private sortBufferedNavigationQueues(): void {
-    const cursor = this.bufferedNavigation?.cursor ?? 0;
-    const byDistance = (a: number, b: number): number => Math.abs(a - cursor) - Math.abs(b - cursor) || a - b;
-    this.bufferedHeadQueue.sort(byDistance);
-    this.bufferedGetQueue.sort(byDistance);
-  }
-
-  private clearBufferedNavigationQueues(): void {
-    for (const queued of this.bufferedHeadQueued.values()) queued.resolve();
-    for (const queued of this.bufferedGetQueued.values()) queued.resolve();
-    this.bufferedHeadQueue = [];
-    this.bufferedGetQueue = [];
-    this.bufferedHeadQueued.clear();
-    this.bufferedGetQueued.clear();
-  }
-
-  private isCurrentBufferedNavigationRun(runId: number): boolean {
-    return this.bufferedNavigation !== null && this.bufferedNavigationRunId === runId;
-  }
-
-  private bufferedImageRequestContextKey(index: number, runId: number): string {
-    return ['buffered-field-navigation', String(runId), this.bufferedNavigationKey ?? '', String(index)].join('\n');
-  }
-
-  private isSkippableBufferedHeadFailure(status: number | undefined): boolean {
-    return status === 400 || status === 404 || status === 410;
-  }
-
-  private scheduleBufferedNavigationPreloads(): void {
-    if (!this.bufferedNavigation) return;
-    const { cursor, settings } = this.bufferedNavigation;
-    const preloadIndices = bufferedPreloadWindowIndices(cursor, settings.bufferN);
-    const liveIndices = new Set([cursor, ...preloadIndices]);
-    for (const [index, entry] of this.bufferedNavigation.indices) {
-      if (liveIndices.has(index)) continue;
-      if (entry.blobUrl && entry.blobUrl.startsWith('blob:')) {
-        window.setTimeout(() => URL.revokeObjectURL(entry.blobUrl!), 500);
-      }
-      this.bufferedNavigation = reduceBufferedImageNavigation(this.bufferedNavigation, { type: 'EVICT', index });
-    }
-    for (const index of preloadIndices) {
-      void this.resolveBufferedNavigationIndex(index, { advanceOnResolve: false });
-    }
   }
 
   private async applyBufferedNavigationUrl(
@@ -2539,7 +2125,7 @@ export class ImageTrailPanel {
       void this.saveUrlReviewStatus('failed', nextUrl, attemptedFieldIds, preload.message);
       void this.saveParsedFieldState();
       this.render();
-      if (session.reason === 'parsed-field-navigation') this.scheduleBufferedNavigationPreloads();
+      if (session.reason === 'parsed-field-navigation') this.bufferedNav.refreshPreloads();
       return false;
     }
 
@@ -2580,7 +2166,7 @@ export class ImageTrailPanel {
     this.render();
     void this.loadGrabSettings();
     if (session.reason === 'parsed-field-navigation') {
-      this.primeBufferedNavigationPreloads();
+      this.bufferedNav.prime();
     }
     return true;
   }
@@ -4553,16 +4139,17 @@ export class ImageTrailPanel {
   private renderBufferedDebugOverlay(): void {
     if (!this.root) return;
     const existing = this.root.querySelector('.image-trail-panel__buffer-debug');
-    if (!this.bufferedDebugVisible || !this.bufferedNavigation) {
+    const snapshot = this.bufferedNav.getDebugSnapshot();
+    if (!snapshot) {
       existing?.remove();
       return;
     }
     const overlay = existing instanceof HTMLElement ? existing : document.createElement('div');
     overlay.className = 'image-trail-panel__buffer-debug';
-    const { cursor, settings } = this.bufferedNavigation;
+    const { cursor, bufferN, indices } = snapshot;
     const cells: HTMLElement[] = [];
-    for (let index = cursor - settings.bufferN; index <= cursor + settings.bufferN; index += 1) {
-      const entry = this.bufferedNavigation.indices.get(index);
+    for (let index = cursor - bufferN; index <= cursor + bufferN; index += 1) {
+      const entry = indices.get(index);
       const cell = document.createElement('span');
       cell.className = 'image-trail-panel__buffer-debug-cell';
       cell.dataset.status = entry ? `${entry.manifest}:${entry.image}` : 'UNKNOWN';
