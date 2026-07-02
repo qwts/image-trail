@@ -488,6 +488,7 @@ async function handleFetchThumbnailSource(
     intent: message.payload.intent,
     referrer: message.payload.referrer,
     contextKey: message.payload.contextKey,
+    sourceProfile: message.payload.sourceProfile,
   });
 }
 

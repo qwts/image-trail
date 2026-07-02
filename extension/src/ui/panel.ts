@@ -319,11 +319,19 @@ export class ImageTrailPanel {
       fieldDigitWidthSpecs: this.state.fieldDigitWidthSpecs,
       selectedHandleId: this.state.target.selectedHandleId,
     }),
-    fetchThumbnail: (url, options) => fetchThumbnailSource(url, options),
+    // The projected navigation image shares the buffered/display byte budget so its load and the
+    // request-policy skip check use the same cache key (a failed candidate is actually skippable).
+    fetchThumbnail: (url, options) => fetchThumbnailSource(url, { ...options, sourceProfile: 'navigation' }),
   });
   private bufferedNavigationToastTimer: number | null = null;
   private queuedParsedNavigationDelta = 0;
   private parsedNavigationQueueRunning = false;
+  // Candidates that failed to load for the current navigation base. Guarantees the drain loop
+  // makes forward progress: a failed candidate is never re-selected while the base is unchanged,
+  // so a bad URL can't spin `runQueuedParsedNavigationStep` on an endless 'retry' (which would
+  // otherwise exhaust the request governor into a spurious throttled/capped state).
+  private navigationFailedCandidateBaseUrl: string | null = null;
+  private readonly navigationFailedCandidateUrls = new Set<string>();
   private readonly layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
     fieldsPanelBlockSize: null,
@@ -2015,6 +2023,7 @@ export class ImageTrailPanel {
       { preloadDirection: delta },
     );
     if (loaded) void this.saveUrlTemplateFromCurrentFields();
+    else this.recordFailedNavigationCandidate(nextUrl);
 
     this.state = setAutomationState(this.state, {
       governorStatus: 'ready',
@@ -2024,15 +2033,33 @@ export class ImageTrailPanel {
     return loaded ? 'loaded' : 'retry';
   }
 
+  // Tracks navigation candidates that failed (or loaded unchanged) for the current base URL, so
+  // `nextParsedFieldNavigationCandidate` skips them on subsequent scans. The set is reset whenever
+  // the base URL moves (a successful load), keeping it scoped to the in-progress traversal.
+  private recordFailedNavigationCandidate(url: string): void {
+    const baseUrl = this.currentNavigationBaseRawUrl();
+    if (this.navigationFailedCandidateBaseUrl !== baseUrl) {
+      this.navigationFailedCandidateBaseUrl = baseUrl;
+      this.navigationFailedCandidateUrls.clear();
+    }
+    this.navigationFailedCandidateUrls.add(url);
+  }
+
   private async nextParsedFieldNavigationCandidate(
     model: ParsedUrlModel,
     fields: readonly UrlField[],
     direction: NeighborPreloadDirection,
   ): Promise<AdjacentParsedFieldUrlCandidate | null> {
+    const baseUrl = this.currentNavigationBaseRawUrl();
+    if (this.navigationFailedCandidateBaseUrl !== baseUrl) {
+      this.navigationFailedCandidateBaseUrl = baseUrl;
+      this.navigationFailedCandidateUrls.clear();
+    }
     const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT)
       .filter((candidate) => candidate.direction === direction)
       .sort((a, b) => a.distance - b.distance);
     for (const candidate of candidates) {
+      if (this.navigationFailedCandidateUrls.has(candidate.url)) continue;
       const policy = await checkImageRequestPolicy(candidate.url, {
         intent: 'field-active-navigation',
         contextKey: this.parsedFieldRequestContextKey(

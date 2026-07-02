@@ -370,6 +370,44 @@ test('field-active-navigation failure records skippable policy for matching pars
   assert.equal(calls, 1);
 });
 
+test('navigation-profile failure is skippable for the buffered policy check (single byte profile)', async () => {
+  let calls = 0;
+  const manager = new ImageRequestManager({
+    fetchImage: async () => {
+      calls += 1;
+      return { ok: false, reason: 'network-error', message: 'HTTP 404 Not Found' };
+    },
+  });
+
+  // The projected navigation image loads on the navigation profile, which shares the buffered
+  // byte budget used by checkRequestPolicy — so a failed candidate is actually reported skippable
+  // and parsed-field navigation can skip it instead of looping on it forever.
+  const failed = await manager.fetchThumbnail('https://cdn.example.test/missing.png', {
+    intent: 'field-active-navigation',
+    contextKey: 'field-session',
+    sourceProfile: 'navigation',
+  });
+  const bufferedPolicy = manager.checkRequestPolicy('https://cdn.example.test/missing.png', {
+    intent: 'field-active-navigation',
+    contextKey: 'field-session',
+  });
+  const explicit = manager.checkRequestPolicy('https://cdn.example.test/missing.png', {
+    intent: 'url-editor-apply',
+    contextKey: 'field-session',
+  });
+
+  assert.equal(failed.ok, false);
+  assert.equal(bufferedPolicy.status, 'skippable-failed');
+  assert.equal(explicit.status, 'unknown');
+  const skipped = await manager.fetchThumbnail('https://cdn.example.test/missing.png', {
+    intent: 'field-active-navigation',
+    contextKey: 'field-session',
+    sourceProfile: 'navigation',
+  });
+  assert.equal(skipped.ok, false);
+  assert.equal(calls, 1);
+});
+
 test('field-active-navigation failure records skippable policy for matching referrer only', async () => {
   let calls = 0;
   const manager = new ImageRequestManager({
