@@ -465,6 +465,48 @@ test('BookmarksRepository pages encrypted records newest first', async (t) => {
   );
 });
 
+test('BookmarksRepository paging offsets count valid records only, so a quarantined row cannot dup/skip pages', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  t.mock.method(console, 'warn', () => {});
+  const repository = new BookmarksRepository(db);
+
+  const at = (uuid: string, when: string): EncryptedBookmarkRecord => ({
+    ...bookmarkRecord(uuid),
+    url: `https://example.test/${uuid}.jpg`,
+    queueUpdatedAt: when,
+    envelope: { ...bookmarkRecord(uuid).envelope, updatedAt: when },
+  });
+  await repository.putEncrypted(at('bookmark-new', '2026-06-17T00:00:04.000Z'));
+  await repository.putEncrypted(at('bookmark-middle', '2026-06-17T00:00:02.000Z'));
+  await repository.putEncrypted(at('bookmark-old', '2026-06-17T00:00:01.000Z'));
+
+  // A corrupted row (schemaVersion 2) that sorts between new and middle in the queue index.
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(DataStore.Bookmarks, 'readwrite');
+    transaction.objectStore(DataStore.Bookmarks).put({
+      uuid: 'corrupt',
+      url: 'https://example.test/corrupt.jpg',
+      queueUpdatedAt: '2026-06-17T00:00:03.000Z',
+      envelope: { schemaVersion: 2 },
+    });
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+
+  // Page 1 collects the first two valid records; the quarantined row is invisible to paging.
+  assert.deepEqual(
+    (await repository.listEncryptedPage({ offset: 0, limit: 2 })).map((record) => record.uuid),
+    ['bookmark-new', 'bookmark-middle'],
+  );
+  // Page 2 at offset 2 resumes at the third valid record — it must not re-read 'bookmark-middle'
+  // (raw-row offset counting would have skipped past the corrupt row and duplicated it).
+  assert.deepEqual(
+    (await repository.listEncryptedPage({ offset: 2, limit: 2 })).map((record) => record.uuid),
+    ['bookmark-old'],
+  );
+});
+
 test('BookmarksRepository reports durable queue storage usage', async (t) => {
   const db = await openFreshImageTrailDb();
   t.after(() => db.close());

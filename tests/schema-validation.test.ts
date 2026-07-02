@@ -19,6 +19,7 @@ import { parsedFieldStateRecordSchema, urlReviewStatusClearFilterSchema } from '
 import { plaintextLocalSettingsSchema } from '../extension/src/data/local-settings.schema.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
 import { portableStoredBlobRecordSchema } from '../extension/src/data/import-export/full-backup.schema.js';
+import { storedKeyRecordSchema } from '../extension/src/data/crypto/types.schema.js';
 
 import {
   buildExportFileHeader,
@@ -188,6 +189,22 @@ test('record schemas accept canonical fixtures and reject corrupted mutants with
   assert.equal(v.is(portableStoredBlobRecordSchema, portableBlob), true);
   // Thumbnails are not portable originals.
   assert.equal(v.is(portableStoredBlobRecordSchema, { ...portableBlob, kind: 'thumbnail' }), false);
+});
+
+test('storedKeyRecordSchema quarantines a row whose reference disagrees with kind/uuid', () => {
+  const base = {
+    kind: 'blob',
+    uuid: 'abc',
+    reference: 'blob:abc',
+    createdAt: '2026-06-30T00:00:00.000Z',
+    updatedAt: '2026-06-30T00:00:00.000Z',
+    wrapping: { mode: 'password', algorithm: 'AES-GCM', salt: 's', iv: 'i', wrappedKey: 'w', iterations: 600_000 },
+    extractable: false,
+  };
+  assert.equal(v.is(storedKeyRecordSchema, base), true);
+  // reference no longer matches `${kind}:${uuid}` — must fail at the boundary, not deep in assertKeyReference.
+  assert.equal(v.is(storedKeyRecordSchema, { ...base, reference: 'blob:different' }), false);
+  assert.equal(v.is(storedKeyRecordSchema, { ...base, kind: 'download' }), false);
 });
 
 test('emptyPayloadSchema accepts an empty object and tolerates forward-compat extra keys', () => {

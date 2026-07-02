@@ -33,23 +33,28 @@ export function keyReferenceForKind<K extends KeyKind>(kind: K): v.GenericSchema
   ) as v.GenericSchema<unknown, KeyReference<K>>;
 }
 
-export const storedKeyRecordSchema = v.object({
-  kind: keyKindSchema,
-  uuid: v.string(),
-  reference: v.string(),
-  createdAt: v.string(),
-  updatedAt: v.string(),
-  wrapping: v.object({
-    mode: keyWrappingModeSchema,
-    algorithm: v.union([encryptionAlgorithmSchema, v.literal('none')]),
-    salt: v.optional(v.string()),
-    iv: v.optional(v.string()),
-    iterations: v.optional(v.number()),
-    wrappedKey: v.optional(v.string()),
+export const storedKeyRecordSchema = v.pipe(
+  v.object({
+    kind: keyKindSchema,
+    uuid: v.string(),
+    reference: v.string(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+    wrapping: v.object({
+      mode: keyWrappingModeSchema,
+      algorithm: v.union([encryptionAlgorithmSchema, v.literal('none')]),
+      salt: v.optional(v.string()),
+      iv: v.optional(v.string()),
+      iterations: v.optional(v.number()),
+      wrappedKey: v.optional(v.string()),
+    }),
+    extractable: v.boolean(),
+    key: v.optional(v.instance(CryptoKey)),
   }),
-  extractable: v.boolean(),
-  key: v.optional(v.instance(CryptoKey)),
-}) as v.GenericSchema<unknown, StoredKeyRecord>;
+  // Quarantine rows whose reference disagrees with kind/uuid at the IDB boundary, rather
+  // than letting a mismatched record hydrate and fail deep in assertKeyReference.
+  v.check((record) => record.reference === `${record.kind}:${record.uuid}`, 'Key reference must equal `${kind}:${uuid}`.'),
+) as v.GenericSchema<unknown, StoredKeyRecord>;
 
 /**
  * Builds an `EncryptedEnvelope` schema whose `authenticatedMetadata.recordType`

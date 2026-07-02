@@ -67,8 +67,11 @@ export function dispatchRequest(
     respondWithFallback(entry, message, sendResponse);
     return true;
   }
-  entry
-    .handle(message)
+  // Start the chain with a resolved promise so a handler that throws *synchronously*
+  // (before returning its Promise) rejects into the same `.catch` as an async rejection,
+  // rather than escaping the boundary.
+  Promise.resolve()
+    .then(() => entry.handle(message))
     .then((result) => sendResponse(entry.respond(result)))
     .catch(() => respondWithFallback(entry, message, sendResponse));
   return true;

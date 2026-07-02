@@ -61,6 +61,33 @@ test('dispatchRequest replies with the entry fallback when the handler rejects',
   assert.equal(sent?.payload.status, 'fallback');
 });
 
+test('dispatchRequest routes a synchronous handler throw to the fallback (no exception escapes)', async () => {
+  let sent: StatusMessage | undefined;
+  // A non-async handle that throws before returning its Promise must not escape the boundary.
+  const registry = {
+    [MessageType.Ping]: defineMessage<PingMessage, StatusMessage, string>({
+      requestSchema: v.object({ sentAt: v.number() }),
+      handle: (): Promise<string> => {
+        throw new Error('synchronous handler blew up');
+      },
+      respond: (result) => createStatusMessage(true, result),
+      fallback: () => createStatusMessage(false, 'fallback'),
+    }),
+  };
+
+  let kept: boolean | undefined;
+  assert.doesNotThrow(() => {
+    kept = dispatchRequest(registry, createPingMessage(), (response) => {
+      sent = response as StatusMessage;
+    });
+  });
+
+  assert.equal(kept, true);
+  await flushMicrotasks();
+  assert.equal(sent?.payload.panelVisible, false);
+  assert.equal(sent?.payload.status, 'fallback');
+});
+
 test('dispatchRequest rejects a malformed payload with the fallback and never calls the handler', async () => {
   let sent: StatusMessage | undefined;
   let handlerCalled = false;

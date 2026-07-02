@@ -111,13 +111,20 @@ export class BookmarksRepository {
           resolve();
           return;
         }
+        const record = hydrateRecord(DataStore.Bookmarks, encryptedBookmarkRecordSchema, cursor.value);
+        // Quarantined rows count toward neither the offset nor the page, so `offset` indexes
+        // the stream of valid records and pages can't duplicate or skip bookmarks around a
+        // corrupted row.
+        if (!record) {
+          cursor.continue();
+          return;
+        }
         if (skipped < offset) {
           skipped += 1;
           cursor.continue();
           return;
         }
-        const record = hydrateRecord(DataStore.Bookmarks, encryptedBookmarkRecordSchema, cursor.value);
-        if (record) result.push(record);
+        result.push(record);
         cursor.continue();
       };
       request.onerror = () => reject(request.error);
