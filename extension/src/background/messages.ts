@@ -1,5 +1,5 @@
 import { isBuildIdentity, type BuildIdentity } from '../core/build-info.js';
-import type { ImageProbeMethod, ImageRequestIntent } from '../core/image/request-policy.js';
+import type { ImageProbeMethod, ImageRequestIntent, ImageSourceProfile } from '../core/image/request-policy.js';
 
 export const MESSAGE_PROTOCOL_VERSION = 1;
 
@@ -357,6 +357,7 @@ export interface FetchThumbnailSourceMessage {
     readonly referrer?: string;
     readonly intent?: ImageRequestIntent;
     readonly contextKey?: string;
+    readonly sourceProfile?: ImageSourceProfile;
   };
 }
 
@@ -1241,7 +1242,7 @@ export function createCreateDataUrlPreviewMessage(dataUrl: string): CreateDataUr
 export function createFetchThumbnailSourceMessage(
   url: string,
   referrer?: string,
-  options: { readonly intent?: ImageRequestIntent; readonly contextKey?: string } = {},
+  options: { readonly intent?: ImageRequestIntent; readonly contextKey?: string; readonly sourceProfile?: ImageSourceProfile } = {},
 ): FetchThumbnailSourceMessage {
   return { type: MessageType.FetchThumbnailSource, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer, ...options } };
 }

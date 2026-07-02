@@ -1,5 +1,5 @@
 import { computeSha256 } from '../core/image/fingerprints.js';
-import type { ImageProbeMethod, ImageRequestContext, ImageRequestIntent } from '../core/image/request-policy.js';
+import type { ImageProbeMethod, ImageRequestContext, ImageRequestIntent, ImageSourceProfile } from '../core/image/request-policy.js';
 import { DEFAULT_MAX_ORIGINAL_BYTES } from '../core/image/capture-result.js';
 import { fetchImageBytes } from './fetch-image.js';
 
@@ -51,7 +51,10 @@ export interface ImageRequestManagerOptions {
   readonly now?: () => number;
 }
 
-type ImageBytesRequestContext = Omit<ImageRequestContext, 'intent'> & { readonly intent?: ImageRequestIntent };
+type ImageBytesRequestContext = Omit<ImageRequestContext, 'intent'> & {
+  readonly intent?: ImageRequestIntent;
+  readonly sourceProfile?: ImageSourceProfile;
+};
 type ImageProbeRequestContext = Omit<ImageRequestContext, 'intent'> & {
   readonly timeoutMs: number;
   readonly probeMethod?: ImageProbeMethod;
@@ -92,7 +95,10 @@ export class ImageRequestManager {
   }
 
   async fetchThumbnail(url: string, context: ImageBytesRequestContext = {}): Promise<ThumbnailSourceResult> {
-    const result = await this.fetchBytes(url, MAX_THUMBNAIL_SOURCE_BYTES, context);
+    // The projected navigation image shares the buffered/display byte budget (and thus the same
+    // request-policy cache key), while genuine 256px thumbnail generation stays on the small budget.
+    const maxBytes = context.sourceProfile === 'navigation' ? MAX_BUFFERED_IMAGE_BYTES : MAX_THUMBNAIL_SOURCE_BYTES;
+    const result = await this.fetchBytes(url, maxBytes, context);
     if (!result.ok) return result;
     return {
       ok: true,

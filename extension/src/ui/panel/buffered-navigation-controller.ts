@@ -138,6 +138,12 @@ export class BufferedNavigationController {
       }
       await this.resolveIndex(blockedOn, { advanceOnResolve: true });
       if (!this.isCurrentRun(runId)) return 'blocked';
+      // Re-run the seek against the now-updated index states. resolveIndex() only fires an ADVANCE
+      // via advanceOnResolve when it actually performs a probe/GET; when the blocked index was
+      // already resolved (e.g. the preload finished it before the seek reached it) it is a no-op,
+      // so without this the cursor would never move onto that landable neighbor and the loop would
+      // spin to the skip cap instead of skipping past failed images to the next good one.
+      this.navigation = reduceBufferedImageNavigation(this.navigation, { type: 'ADVANCE' });
     }
     console.warn('Image Trail buffered navigation reached the skip cap before finding a decoded image.', {
       direction,

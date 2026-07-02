@@ -1,5 +1,5 @@
 import { imageResourceUrlsEqual } from '../../core/image/image-navigation.js';
-import type { ImageRequestIntent } from '../../core/image/request-policy.js';
+import type { ImageRequestIntent, ImageSourceProfile } from '../../core/image/request-policy.js';
 import {
   adjacentParsedFieldUrlCandidates,
   fieldsById,
@@ -46,7 +46,7 @@ export interface NeighborPreloadControllerDeps {
   currentFieldContextKeyParts(): FieldContextKeyParts;
   fetchThumbnail(
     url: string,
-    options: { readonly intent?: ImageRequestIntent; readonly contextKey?: string },
+    options: { readonly intent?: ImageRequestIntent; readonly contextKey?: string; readonly sourceProfile?: ImageSourceProfile },
   ): Promise<FetchThumbnailResult>;
 }
 
@@ -94,7 +94,11 @@ export class NeighborPreloadController {
     if (cached?.status === 'loaded') return { ok: true, displayUrl: cached.displayUrl, sha256: cached.sha256 };
     if (cached?.status === 'failed') return { ok: false, message: cached.message };
     if (url.startsWith('data:image/')) return { ok: true, displayUrl: url, sha256: null };
-    const result = await this.deps.fetchThumbnail(url, { intent: options.intent, contextKey: options.contextKey });
+    // Only the active parsed-field navigation display uses the 25 MB navigation budget, so its load
+    // matches the skip-policy cache key. Other reasons routed through applySelectedUrl (bookmark and
+    // URL-editor applies, record previews, restore) keep the smaller thumbnail-source budget.
+    const sourceProfile: ImageSourceProfile = options.intent === 'field-active-navigation' ? 'navigation' : 'thumbnail';
+    const result = await this.deps.fetchThumbnail(url, { intent: options.intent, contextKey: options.contextKey, sourceProfile });
     if (!result.ok) return { ok: false, message: `Image failed to load: ${result.message}` };
     const loaded = { displayUrl: result.dataUrl, sha256: result.sha256 ?? null };
     if (options.writeCache !== false && this.isActive) this.remember(url, loaded);

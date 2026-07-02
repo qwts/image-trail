@@ -763,7 +763,14 @@ test('creates image request policy messages with compatibility payloads', () => 
   assert.equal(request.payload.referrer, 'https://example.test/page');
   assert.equal(request.payload.intent, 'thumbnail-refresh');
   assert.equal(request.payload.contextKey, 'thumb-context');
+  assert.equal(request.payload.sourceProfile, undefined);
   assert.equal(isExtensionRequest(request), true);
+
+  const navigationRequest = createFetchThumbnailSourceMessage('https://example.test/thumb.jpg', 'https://example.test/page', {
+    intent: 'field-active-navigation',
+    sourceProfile: 'navigation',
+  });
+  assert.equal(navigationRequest.payload.sourceProfile, 'navigation');
 
   const success = createFetchThumbnailSourceResultMessage({
     ok: true,

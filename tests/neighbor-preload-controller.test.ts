@@ -63,6 +63,22 @@ test('preload() caches a successful fetch and skips re-fetching on repeat calls'
   assert.equal(fetchCalls.length, 1);
 });
 
+test('preload() uses the navigation byte profile only for field-active-navigation intent', async () => {
+  const profiles: (string | undefined)[] = [];
+  const { controller } = createHarness({
+    fetchThumbnail: async (_url, options) => {
+      profiles.push(options.sourceProfile);
+      return { ok: true, dataUrl: 'data:x', mimeType: 'image/png', byteLength: 1, sha256: 's' };
+    },
+  });
+
+  await controller.preload('https://example.test/nav.jpg', { intent: 'field-active-navigation' });
+  await controller.preload('https://example.test/bookmark.jpg', { intent: 'bookmark-load' });
+  await controller.preload('https://example.test/plain.jpg');
+
+  assert.deepEqual(profiles, ['navigation', 'thumbnail', 'thumbnail']);
+});
+
 test('preload() with readCache:false bypasses the cache and re-fetches', async () => {
   const { controller, fetchCalls } = createHarness();
 

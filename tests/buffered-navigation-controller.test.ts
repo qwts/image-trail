@@ -128,6 +128,42 @@ test('a later step() invalidates a still-pending earlier one so it resolves bloc
   assert.equal(landed.length, 1, 'the stale run must not apply a second, invalid load');
 });
 
+test('step() skips a failed neighbor (probe) and lands on the next good one', async () => {
+  const { controller, landed } = createHarness({
+    probeImage: async (url) => {
+      if (url.endsWith('image=11')) return { ok: false, status: 404, message: 'not found' };
+      return { ok: true, status: 200, finalUrl: url };
+    },
+  });
+  const model = baseModel();
+  const fields = navigableFields(model);
+
+  const result = await controller.step(model, fields, 1);
+
+  assert.equal(result, 'loaded');
+  assert.equal(landed.length, 1);
+  assert.match(landed[0]!.nextUrl, /image=12$/);
+});
+
+test('step() skips a failed neighbor (decoded GET) and lands on the next good one', async () => {
+  let fetchCount = 0;
+  const { controller, landed } = createHarness({
+    fetchDecodedImage: async (url) => {
+      if (url.endsWith('image=11')) return { ok: false, message: 'http 404' };
+      fetchCount += 1;
+      return { ok: true, blobUrl: `blob:ok-${fetchCount}`, imgElement: {} as unknown as HTMLImageElement, sha256: `sha-${fetchCount}` };
+    },
+  });
+  const model = baseModel();
+  const fields = navigableFields(model);
+
+  const result = await controller.step(model, fields, 1);
+
+  assert.equal(result, 'loaded');
+  assert.equal(landed.length, 1);
+  assert.match(landed[0]!.nextUrl, /image=12$/);
+});
+
 test('dispose() settles an in-flight step() instead of leaving it hanging forever', async () => {
   // This checkRequestPolicy never resolves on its own - the only way step() can
   // possibly settle is if dispose() actively cancels the in-flight probe.
