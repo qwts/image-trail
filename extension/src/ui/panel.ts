@@ -107,6 +107,7 @@ import { fetchDecodedBufferedImageSource, probeBufferedImageSource } from '../co
 import { checkImageRequestPolicy } from '../content/image-request-policy.js';
 import { BufferedNavigationController } from './panel/buffered-navigation-controller.js';
 import { NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT, NeighborPreloadController } from './panel/neighbor-preload-controller.js';
+import { ParsedFieldStateSync } from './panel/parsed-field-state-sync.js';
 import {
   DEFAULT_LOCAL_SETTINGS,
   exportEncryptedBookmarks,
@@ -218,30 +219,10 @@ function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
   };
 }
 
-export function shouldRestoreParsedFieldState(
-  record: ParsedFieldStateRecord,
-  currentSelectedUrl: string | null,
-  selectedHandleId: string | null,
-  currentPageUrl?: string,
-): boolean {
-  if (currentPageUrl && record.pageUrl === currentPageUrl) return true;
-  if (record.sourceUrl === currentSelectedUrl) return true;
-  if (record.pageUrl === currentSelectedUrl && (!record.selectedHandleId || record.selectedHandleId === selectedHandleId)) return true;
-  if (!record.selectedHandleId || record.selectedHandleId !== selectedHandleId) return false;
-  return !!record.selectedUrl && record.selectedUrl === currentSelectedUrl;
-}
+export { nextParsedFieldStatePageKey, shouldRestoreParsedFieldState } from './panel/parsed-field-state-sync.js';
 
 export function projectionSessionOwnsSelectedTarget(session: ProjectionSession, selectedHandleId: string | null): boolean {
   return session.selectedHandleId === selectedHandleId;
-}
-
-export function nextParsedFieldStatePageKey(
-  currentPageUrl: string,
-  storedPageKey: string,
-  extensionProjectedPageUrl: string | null,
-): string {
-  if (currentPageUrl === storedPageKey || currentPageUrl === extensionProjectedPageUrl) return storedPageKey;
-  return currentPageUrl;
 }
 
 export class ImageTrailPanel {
@@ -273,12 +254,18 @@ export class ImageTrailPanel {
   private recallMessageClearTimer: number | null = null;
   private finiteCaptureErrorTimer: number | null = null;
   private pendingRestoreImport: PendingRestoreImport | null = null;
-  private parsedFieldStateRestoreInProgress = false;
-  private parsedFieldStateUpdatedAtMs = 0;
-  private parsedFieldStateSaveQueue: Promise<void> = Promise.resolve();
-  private fieldTransformQueue: Promise<void> = Promise.resolve();
-  private parsedFieldStatePageKey = window.location.href;
-  private extensionProjectedPageUrl: string | null = null;
+  private readonly fieldStateSync = new ParsedFieldStateSync({
+    store: () => this.parsedFieldStateStore,
+    hostname: () => this.parsedFieldStateHostname(),
+    currentPageHref: () => window.location.href,
+    currentSelectedUrl: () => this.currentSelectedUrl(),
+    selectedHandleId: () => this.state.target.selectedHandleId,
+    syncTargetStateFromSnapshot: () => {
+      this.state = setTargetState(this.state, toTargetState(this.pageAdapter.getSnapshot()));
+    },
+    createRecord: () => this.createParsedFieldStateRecord(),
+    applyRestoredRecord: (record, ctx) => this.applyRestoredParsedFieldState(record, ctx),
+  });
   private readonly bufferedNav = new BufferedNavigationController({
     getLocalSettings: () => this.localSettings,
     currentNavigationBaseRawUrl: () => this.currentNavigationBaseRawUrl(),
@@ -345,7 +332,7 @@ export class ImageTrailPanel {
     this.unsubscribeFromTarget = this.pageAdapter.subscribe((snapshot) => {
       this.state = setTargetState(this.state, toTargetState(snapshot));
       this.render();
-      void this.loadGrabSettings().then(() => this.restoreParsedFieldState());
+      void this.loadGrabSettings().then(() => this.fieldStateSync.restore());
     });
     this.unsubscribeFromLoads = this.pageAdapter.subscribeToSuccessfulLoads((target) => {
       if (target.projectionId && !this.projections.isActive(target.projectionId)) return;
@@ -370,7 +357,7 @@ export class ImageTrailPanel {
       void this.learnGrabSourcePattern(url);
     });
     void this.loadSettingsBookmarksAndRecents();
-    void this.loadGrabSettings().then(() => this.restoreParsedFieldState());
+    void this.loadGrabSettings().then(() => this.fieldStateSync.restore());
     void this.refreshStorageUsage();
     void this.refreshBlobKeyStatus();
     void this.refreshPCloudProviderStatus({ render: false });
@@ -707,19 +694,6 @@ export class ImageTrailPanel {
     return hostnameFromLocation();
   }
 
-  private parsedFieldStatePageUrl(): string {
-    this.refreshParsedFieldStatePageKey();
-    return this.parsedFieldStatePageKey;
-  }
-
-  private refreshParsedFieldStatePageKey(): void {
-    const currentPageUrl = window.location.href;
-    const nextPageKey = nextParsedFieldStatePageKey(currentPageUrl, this.parsedFieldStatePageKey, this.extensionProjectedPageUrl);
-    if (nextPageKey === this.parsedFieldStatePageKey) return;
-    this.parsedFieldStatePageKey = nextPageKey;
-    this.extensionProjectedPageUrl = null;
-  }
-
   private createParsedFieldStateRecord(): ParsedFieldStateRecord | null {
     const hostname = this.parsedFieldStateHostname();
     if (!hostname) return null;
@@ -727,7 +701,7 @@ export class ImageTrailPanel {
     return {
       schemaVersion: 1,
       hostname,
-      pageUrl: this.parsedFieldStatePageUrl(),
+      pageUrl: this.fieldStateSync.pageUrl(),
       sourceUrl: this.currentRawUrl(),
       selectedUrl: this.state.target.selectedUrl,
       selectedHandleId: this.state.target.selectedHandleId,
@@ -740,62 +714,29 @@ export class ImageTrailPanel {
       fieldSplitSpecs: this.state.fieldSplitSpecs,
       fieldDigitWidthSpecs: this.state.fieldDigitWidthSpecs,
       activeUrlTemplateId: this.state.activeUrlTemplateId,
-      updatedAt: this.nextParsedFieldStateUpdatedAt(),
+      updatedAt: this.fieldStateSync.nextUpdatedAt(),
     };
   }
 
-  private nextParsedFieldStateUpdatedAt(): string {
-    const now = Date.now();
-    this.parsedFieldStateUpdatedAtMs = Math.max(now, this.parsedFieldStateUpdatedAtMs + 1);
-    return new Date(this.parsedFieldStateUpdatedAtMs).toISOString();
-  }
-
-  private async saveParsedFieldState(): Promise<void> {
-    if (!this.parsedFieldStateStore) return;
-    const record = this.createParsedFieldStateRecord();
-    if (!record) return;
-    this.parsedFieldStateSaveQueue = this.parsedFieldStateSaveQueue.then(
-      () => this.parsedFieldStateStore?.save(record) ?? Promise.resolve(),
-    );
-    await this.parsedFieldStateSaveQueue;
-  }
-
-  private async restoreParsedFieldState(options: { readonly projectSavedSource?: boolean } = {}): Promise<void> {
-    if (this.parsedFieldStateRestoreInProgress) return;
-    if (!this.parsedFieldStateStore) return;
-    this.state = setTargetState(this.state, toTargetState(this.pageAdapter.getSnapshot()));
-    const hostname = this.parsedFieldStateHostname();
-    if (!hostname) return;
-    const currentSelectedUrl = this.currentSelectedUrl();
-    const currentPageUrl = this.parsedFieldStatePageUrl();
-    const exactRecord = await this.parsedFieldStateStore.load(hostname, currentPageUrl);
-    const sourceRecord = currentSelectedUrl ? await this.parsedFieldStateStore.loadForSource(hostname, currentSelectedUrl) : null;
-    const record = [exactRecord, sourceRecord].find(
-      (candidate): candidate is ParsedFieldStateRecord =>
-        !!candidate && shouldRestoreParsedFieldState(candidate, currentSelectedUrl, this.state.target.selectedHandleId, currentPageUrl),
-    );
-    if (!record) return;
-    const sameSource = imageResourceUrlsEqual(record.sourceUrl, currentSelectedUrl, window.location.href);
-    this.parsedFieldStateRestoreInProgress = true;
-    try {
-      if (options.projectSavedSource && !sameSource) {
-        const projected = await this.applySelectedUrl(record.sourceUrl, [], { reason: 'parsed-field-restore' });
-        if (!projected && !imageResourceUrlsEqual(record.sourceUrl, this.currentRawUrl(), window.location.href)) return;
-      }
-      this.state = reducePanelAction(this.state, {
-        name: 'parsed-field-state/restore',
-        record: this.filterParsedFieldStateForCurrentUrl(record),
-      });
-      this.syncGrabSettings();
-      void this.saveParsedFieldState();
-      this.render();
-    } finally {
-      this.parsedFieldStateRestoreInProgress = false;
+  private async applyRestoredParsedFieldState(
+    record: ParsedFieldStateRecord,
+    ctx: { readonly sameSource: boolean; readonly projectSavedSource: boolean },
+  ): Promise<void> {
+    if (ctx.projectSavedSource && !ctx.sameSource) {
+      const projected = await this.applySelectedUrl(record.sourceUrl, [], { reason: 'parsed-field-restore' });
+      if (!projected && !imageResourceUrlsEqual(record.sourceUrl, this.currentRawUrl(), window.location.href)) return;
     }
+    this.state = reducePanelAction(this.state, {
+      name: 'parsed-field-state/restore',
+      record: this.filterParsedFieldStateForCurrentUrl(record),
+    });
+    this.syncGrabSettings();
+    void this.fieldStateSync.save();
+    this.render();
   }
 
   private restoreParsedFieldStateForCurrentPanel(): void {
-    void this.loadGrabSettings({ render: false }).then(() => this.restoreParsedFieldState({ projectSavedSource: true }));
+    void this.loadGrabSettings({ render: false }).then(() => this.fieldStateSync.restore({ projectSavedSource: true }));
   }
 
   private filterParsedFieldStateForCurrentUrl(record: ParsedFieldStateRecord): ParsedFieldStateRecord {
@@ -1298,7 +1239,7 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'panel/minimize' || action.name === 'panel/expand') {
-      if (action.name === 'panel/minimize') void this.saveParsedFieldState();
+      if (action.name === 'panel/minimize') void this.fieldStateSync.save();
       this.state = reducePanelAction(this.state, action);
       this.mount();
       this.keyboard.enable();
@@ -1641,7 +1582,7 @@ export class ImageTrailPanel {
 
     this.state = reducePanelAction(this.state, action);
     if (!this.state.visible) {
-      void this.saveParsedFieldState();
+      void this.fieldStateSync.save();
       this.slideshow.destroy();
       this.retry.destroy();
       this.keyboard.disable();
@@ -1721,7 +1662,7 @@ export class ImageTrailPanel {
     const nextState = this.pruneInvalidFieldSplitSpecsForUrl(this.state, this.currentRawUrl());
     if (nextState === this.state) return false;
     this.state = nextState;
-    void this.saveParsedFieldState();
+    void this.fieldStateSync.save();
     return true;
   }
 
@@ -1779,7 +1720,7 @@ export class ImageTrailPanel {
   ): boolean {
     if (nextState === this.state) return false;
     this.state = nextState;
-    if (options.saveParsedFieldState) void this.saveParsedFieldState();
+    if (options.saveParsedFieldState) void this.fieldStateSync.save();
     if (options.render) this.render();
     return true;
   }
@@ -1793,9 +1734,7 @@ export class ImageTrailPanel {
   }
 
   private enqueueFieldInteraction(run: () => Promise<void>): void {
-    this.fieldTransformQueue = this.fieldTransformQueue.then(run).catch((error: unknown) => {
-      console.error('Image Trail field interaction failed.', error);
-    });
+    this.fieldStateSync.enqueueFieldInteraction(run);
   }
 
   private async applyUrlEditorUrl(url: string): Promise<void> {
@@ -2066,7 +2005,7 @@ export class ImageTrailPanel {
     }
     this.state = this.applyFieldLoadResult(this.state, attemptedFieldIds, sha256, baselineFingerprint);
     if (reviewStatus === 'passed') void this.saveUrlReviewStatus(reviewStatus, nextUrl, attemptedFieldIds);
-    void this.saveParsedFieldState();
+    void this.fieldStateSync.save();
     this.render();
     void this.loadGrabSettings();
     return true;
@@ -2121,7 +2060,7 @@ export class ImageTrailPanel {
       );
       this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'status');
       void this.saveUrlReviewStatus('failed', nextUrl, attemptedFieldIds, preload.message);
-      void this.saveParsedFieldState();
+      void this.fieldStateSync.save();
       this.render();
       if (session.reason === 'parsed-field-navigation') this.bufferedNav.refreshPreloads();
       return false;
@@ -2141,7 +2080,7 @@ export class ImageTrailPanel {
         { preserveMessage: true },
       );
       void this.saveUrlReviewStatus('unchanged', nextUrl, attemptedFieldIds, 'Image loaded but did not change.');
-      void this.saveParsedFieldState();
+      void this.fieldStateSync.save();
       this.render();
       return false;
     }
@@ -2159,8 +2098,9 @@ export class ImageTrailPanel {
       { preserveMessage: true },
     );
     if (reviewStatus === 'passed') void this.saveUrlReviewStatus(reviewStatus, nextUrl, attemptedFieldIds);
-    if (options.pushVisibleUrl && pushVisibleUrlWhenSameOrigin(nextUrl)) this.extensionProjectedPageUrl = window.location.href;
-    void this.saveParsedFieldState();
+    if (options.pushVisibleUrl && pushVisibleUrlWhenSameOrigin(nextUrl))
+      this.fieldStateSync.setExtensionProjectedPageUrl(window.location.href);
+    void this.fieldStateSync.save();
     this.render();
     void this.loadGrabSettings();
     if (session.reason === 'parsed-field-navigation') {
@@ -2343,7 +2283,7 @@ export class ImageTrailPanel {
       {
         schemaVersion: 1,
         hostname,
-        pageUrl: this.parsedFieldStatePageUrl(),
+        pageUrl: this.fieldStateSync.pageUrl(),
         sourceUrl,
         status,
         fieldIds,
@@ -3367,7 +3307,7 @@ export class ImageTrailPanel {
     const hostname = hostnameFromLocation();
     if (!hostname) return null;
     if (scope === 'hostname') return { scope: 'hostname', hostname };
-    if (scope === 'page') return { scope: 'page', hostname, pageUrl: this.parsedFieldStatePageUrl() };
+    if (scope === 'page') return { scope: 'page', hostname, pageUrl: this.fieldStateSync.pageUrl() };
     const sourceUrl = this.state.draftUrl ?? this.state.target.selectedUrl;
     return sourceUrl ? { scope: 'source', hostname, sourceUrl } : null;
   }
