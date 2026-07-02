@@ -1,12 +1,21 @@
+import * as v from 'valibot';
 import { DEFAULT_URL_REVIEW_STATUS_LIMIT } from '../../core/settings.js';
 import type { UrlReviewStatusClearFilter, UrlReviewStatusRecord } from '../../core/types.js';
+import { urlReviewStatusRecordSchema } from '../../core/types.schema.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore } from '../schema.js';
+import { hydrateRecords } from './hydration.js';
 
 interface UrlReviewStatusMetadataRecord extends UrlReviewStatusRecord {
   readonly key: string;
   readonly kind: 'urlReviewStatus';
 }
+
+const urlReviewStatusMetadataRecordSchema = v.object({
+  ...urlReviewStatusRecordSchema.entries,
+  key: v.string(),
+  kind: v.literal('urlReviewStatus'),
+}) as v.GenericSchema<unknown, UrlReviewStatusMetadataRecord>;
 
 const URL_REVIEW_STATUS_KEY_PREFIX = 'url-review-status:';
 export class UrlReviewStatusRepository {
@@ -16,10 +25,9 @@ export class UrlReviewStatusRepository {
     const transaction = this.db.transaction(DataStore.Metadata, 'readonly');
     const store = transaction.objectStore(DataStore.Metadata);
     const prefix = urlReviewStatusHostPrefix(hostname);
-    const records = await requestToPromise<UrlReviewStatusMetadataRecord[]>(store.getAll(IDBKeyRange.bound(prefix, `${prefix}\uffff`)));
+    const raw = await requestToPromise<unknown[]>(store.getAll(IDBKeyRange.bound(prefix, `${prefix}\uffff`)));
     await transactionDone(transaction);
-    return records
-      .filter((record) => record.kind === 'urlReviewStatus')
+    return hydrateRecords(DataStore.Metadata, urlReviewStatusMetadataRecordSchema, raw)
       .map(stripMetadataKey)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }

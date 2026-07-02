@@ -1,8 +1,11 @@
+import * as v from 'valibot';
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import { openBlobPayload, sealBlobPayload } from '../crypto/binary-envelope.js';
 import type { KeyReference } from '../crypto/types.js';
+import { keyReferenceForKind } from '../crypto/types.schema.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore } from '../schema.js';
+import { hydrateRecord } from './hydration.js';
 
 export interface EncryptedPinThumbnailRecord {
   readonly id: string;
@@ -16,6 +19,19 @@ export interface EncryptedPinThumbnailRecord {
   readonly createdAt: string;
   readonly key: KeyReference<'blob'>;
 }
+
+const encryptedPinThumbnailRecordSchema = v.object({
+  id: v.string(),
+  pinId: v.string(),
+  schemaVersion: v.literal(1),
+  algorithm: v.literal('AES-GCM'),
+  iv: v.string(),
+  ciphertext: v.instance(ArrayBuffer),
+  encryptedByteLength: v.number(),
+  byteLength: v.number(),
+  createdAt: v.string(),
+  key: keyReferenceForKind('blob'),
+}) as v.GenericSchema<unknown, EncryptedPinThumbnailRecord>;
 
 export interface OpenedEncryptedPinThumbnail {
   readonly dataUrl: string;
@@ -35,11 +51,9 @@ export class EncryptedPinThumbnailsRepository {
 
   async get(id: string): Promise<EncryptedPinThumbnailRecord | undefined> {
     const transaction = this.db.transaction(DataStore.EncryptedPinThumbnails, 'readonly');
-    const result = await requestToPromise<EncryptedPinThumbnailRecord | undefined>(
-      transaction.objectStore(DataStore.EncryptedPinThumbnails).get(id),
-    );
+    const result = await requestToPromise<unknown>(transaction.objectStore(DataStore.EncryptedPinThumbnails).get(id));
     await transactionDone(transaction);
-    return result;
+    return hydrateRecord(DataStore.EncryptedPinThumbnails, encryptedPinThumbnailRecordSchema, result);
   }
 
   async remove(id: string): Promise<void> {

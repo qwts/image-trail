@@ -1,6 +1,9 @@
+import * as v from 'valibot';
 import type { PanelPosition } from '../../core/types.js';
+import { panelPositionSchema } from '../../core/types.schema.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore } from '../schema.js';
+import { hydrateRecord } from './hydration.js';
 
 export interface PanelPositionRecord extends PanelPosition {
   readonly key: string;
@@ -9,6 +12,14 @@ export interface PanelPositionRecord extends PanelPosition {
   readonly updatedAt: string;
 }
 
+const panelPositionRecordSchema = v.object({
+  ...panelPositionSchema.entries,
+  key: v.string(),
+  kind: v.literal('panelPosition'),
+  hostname: v.string(),
+  updatedAt: v.string(),
+}) as v.GenericSchema<unknown, PanelPositionRecord>;
+
 const PANEL_POSITION_KEY_PREFIX = 'panel-position:';
 
 export class PanelPositionRepository {
@@ -16,10 +27,9 @@ export class PanelPositionRepository {
 
   async get(hostname: string): Promise<PanelPosition | null> {
     const transaction = this.db.transaction(DataStore.Metadata, 'readonly');
-    const record = await requestToPromise<PanelPositionRecord | undefined>(
-      transaction.objectStore(DataStore.Metadata).get(panelPositionKey(hostname)),
-    );
+    const raw = await requestToPromise<unknown>(transaction.objectStore(DataStore.Metadata).get(panelPositionKey(hostname)));
     await transactionDone(transaction);
+    const record = hydrateRecord(DataStore.Metadata, panelPositionRecordSchema, raw);
     return record ? { left: record.left, top: record.top } : null;
   }
 

@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
     "build:storybook": "storybook build",
-    "build": "npm run clean && tsc -p tsconfig.json && node scripts/build-content-script.mjs && node scripts/copy-extension-assets.mjs",
+    "build": "npm run clean && tsc -p tsconfig.json && node scripts/build-content-script.mjs && node scripts/build-service-worker.mjs && node scripts/copy-extension-assets.mjs",
     "test:unit": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js",
     "test": "npm run typecheck && npm run test:unit",
     "format:check": "prettier --check \"**/*.{ts,json,md,css,yml,yaml}\" \".prettierrc.json\"",
@@ -30,6 +30,7 @@
     "storybook": "^10.4.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.1",
+    "valibot": "^1.4.2",
     "vite": "^7.2.7"
   }
 }

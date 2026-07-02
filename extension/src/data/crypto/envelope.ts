@@ -1,3 +1,4 @@
+import * as v from 'valibot';
 import { assertKeyReference } from './key-reference.js';
 import type { EncryptedEnvelope, KeyReference } from './types.js';
 import { createAesGcmIv, decryptAesGcm, encryptAesGcm } from './webcrypto.js';
@@ -59,4 +60,22 @@ export async function openJsonEnvelope<TPayload>(envelope: EncryptedEnvelope, ke
     aad(envelope.authenticatedMetadata, envelope.payloadVersion, envelope.key),
   );
   return JSON.parse(decoder.decode(plaintext)) as TPayload;
+}
+
+/**
+ * Decrypts an envelope and validates the decrypted JSON payload against `schema`,
+ * throwing when it does not conform (callers already treat a throw here as an
+ * unreadable/quarantined row). Returns the original parsed payload unchanged so
+ * unknown forward-compat fields survive a decrypt/modify/re-seal round-trip.
+ */
+export async function openValidatedJsonEnvelope<TPayload>(
+  envelope: EncryptedEnvelope,
+  key: CryptoKey,
+  schema: v.GenericSchema<unknown, TPayload>,
+): Promise<TPayload> {
+  const payload = await openJsonEnvelope<unknown>(envelope, key);
+  if (!v.is(schema, payload)) {
+    throw new Error('Decrypted envelope payload failed schema validation.');
+  }
+  return payload as TPayload;
 }

@@ -7,17 +7,32 @@ import {
   toBase64,
   fromBase64,
 } from '../import-export/encrypted-file-format.js';
-import { openJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
+import * as v from 'valibot';
+import { openValidatedJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
 import type { EncryptedEnvelope } from '../crypto/types.js';
+import { encryptedEnvelopeSchema } from '../crypto/types.schema.js';
 import { findDownloadDuplicate } from '../../core/image/downloads.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore, SchemaIndex } from '../schema.js';
 import type { DurableDownloadPayloadV1 } from '../types.js';
+import { durableDownloadPayloadSchema } from '../types.schema.js';
+import { hydrateRecord } from './hydration.js';
 
 export interface EncryptedDownloadRecord {
   readonly uuid: string;
   readonly envelope: EncryptedEnvelope<{ readonly recordType: 'download' }>;
 }
+
+const encryptedDownloadRecordSchema = v.object({
+  uuid: v.string(),
+  envelope: encryptedEnvelopeSchema('download'),
+}) as v.GenericSchema<unknown, EncryptedDownloadRecord>;
+
+const decryptedDownloadPayloadSchema = v.object({
+  mimeType: v.string(),
+  sourceUrl: v.string(),
+  data: v.string(),
+});
 
 export interface DownloadDuplicateResult {
   readonly record: EncryptedDownloadRecord;
@@ -36,9 +51,9 @@ export class DownloadsRepository {
 
   async getEncrypted(uuid: string): Promise<EncryptedDownloadRecord | undefined> {
     const transaction = this.db.transaction(DataStore.Downloads, 'readonly');
-    const result = await requestToPromise<EncryptedDownloadRecord | undefined>(transaction.objectStore(DataStore.Downloads).get(uuid));
+    const result = await requestToPromise<unknown>(transaction.objectStore(DataStore.Downloads).get(uuid));
     await transactionDone(transaction);
-    return result;
+    return hydrateRecord(DataStore.Downloads, encryptedDownloadRecordSchema, result);
   }
 
   async listEncryptedNewestFirst(): Promise<readonly EncryptedDownloadRecord[]> {
@@ -54,7 +69,8 @@ export class DownloadsRepository {
           resolve();
           return;
         }
-        result.push(cursor.value as EncryptedDownloadRecord);
+        const record = hydrateRecord(DataStore.Downloads, encryptedDownloadRecordSchema, cursor.value);
+        if (record) result.push(record);
         cursor.continue();
       };
       request.onerror = () => reject(request.error);
@@ -85,7 +101,7 @@ export class DownloadsRepository {
   }
 
   async openRecord(record: EncryptedDownloadRecord, key: CryptoKey): Promise<DurableDownloadPayloadV1> {
-    return openJsonEnvelope<DurableDownloadPayloadV1>(record.envelope, key);
+    return openValidatedJsonEnvelope(record.envelope, key, durableDownloadPayloadSchema);
   }
 
   async findDuplicate(
@@ -182,7 +198,11 @@ export async function openEncryptedDownload(fileContent: string, password: strin
 
   const plaintext = await decryptAesGcm(encryptionKey, ciphertext, iv);
   const decoded = new TextDecoder().decode(plaintext);
-  const parsed = JSON.parse(decoded) as { mimeType: string; sourceUrl: string; data: string };
+  const result = v.safeParse(decryptedDownloadPayloadSchema, JSON.parse(decoded));
+  if (!result.success) {
+    throw new Error('Encrypted download payload is invalid.');
+  }
+  const parsed = result.output;
 
   return {
     data: fromBase64(parsed.data),

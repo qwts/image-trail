@@ -1,11 +1,20 @@
+import * as v from 'valibot';
 import type { ParsedFieldStateRecord } from '../../core/types.js';
+import { parsedFieldStateRecordSchema } from '../../core/types.schema.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore } from '../schema.js';
+import { hydrateRecord, hydrateRecords } from './hydration.js';
 
 interface ParsedFieldStateMetadataRecord extends ParsedFieldStateRecord {
   readonly key: string;
   readonly kind: 'parsedFieldState';
 }
+
+const parsedFieldStateMetadataRecordSchema = v.object({
+  ...parsedFieldStateRecordSchema.entries,
+  key: v.string(),
+  kind: v.literal('parsedFieldState'),
+}) as v.GenericSchema<unknown, ParsedFieldStateMetadataRecord>;
 
 const PARSED_FIELD_STATE_KEY_PREFIX = 'parsed-field-state:';
 
@@ -14,25 +23,20 @@ export class ParsedFieldStateRepository {
 
   async get(hostname: string, pageUrl: string): Promise<ParsedFieldStateRecord | null> {
     const transaction = this.db.transaction(DataStore.Metadata, 'readonly');
-    const record = await requestToPromise<ParsedFieldStateMetadataRecord | undefined>(
-      transaction.objectStore(DataStore.Metadata).get(parsedFieldStateKey(hostname, pageUrl)),
-    );
+    const raw = await requestToPromise<unknown>(transaction.objectStore(DataStore.Metadata).get(parsedFieldStateKey(hostname, pageUrl)));
     await transactionDone(transaction);
-    return record?.kind === 'parsedFieldState' ? stripMetadataKey(record) : null;
+    const record = hydrateRecord(DataStore.Metadata, parsedFieldStateMetadataRecordSchema, raw);
+    return record ? stripMetadataKey(record) : null;
   }
 
   async getForSource(hostname: string, sourceUrl: string): Promise<ParsedFieldStateRecord | null> {
     const transaction = this.db.transaction(DataStore.Metadata, 'readonly');
     const store = transaction.objectStore(DataStore.Metadata);
     const prefix = parsedFieldStateHostPrefix(hostname);
-    const records = await requestToPromise<ParsedFieldStateMetadataRecord[]>(store.getAll(IDBKeyRange.bound(prefix, `${prefix}\uffff`)));
+    const raw = await requestToPromise<unknown[]>(store.getAll(IDBKeyRange.bound(prefix, `${prefix}\uffff`)));
     await transactionDone(transaction);
-    const latest = records
-      .filter(
-        (record) =>
-          record.kind === 'parsedFieldState' &&
-          (record.sourceUrl === sourceUrl || record.selectedUrl === sourceUrl || record.pageUrl === sourceUrl),
-      )
+    const latest = hydrateRecords(DataStore.Metadata, parsedFieldStateMetadataRecordSchema, raw)
+      .filter((record) => record.sourceUrl === sourceUrl || record.selectedUrl === sourceUrl || record.pageUrl === sourceUrl)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
     return latest ? stripMetadataKey(latest) : null;
   }

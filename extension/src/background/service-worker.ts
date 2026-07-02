@@ -150,7 +150,10 @@ import {
   loadPCloudProviderStatus,
   uploadPCloudBackup,
 } from './pcloud-provider.js';
+import * as v from 'valibot';
 import { defineMessage, dispatchRequest, type MessageDef } from './message-dispatch.js';
+import * as requestSchemas from './message-schemas.js';
+import { imageDisplayRecordSchema } from '../core/display-records.schema.js';
 import type { ExtensionRequest, ExtensionResponse } from './messages.js';
 import type {
   BlobKeyStatusMessage,
@@ -1230,36 +1233,43 @@ type DispatchedRequestType = Exclude<ExtensionRequest['type'], typeof MessageTyp
  */
 const messageRegistry = {
   [MessageType.LoadBuildIdentity]: defineMessage({
+    requestSchema: requestSchemas.loadBuildIdentityRequestSchema,
     handle: (_message: LoadBuildIdentityMessage) => handleLoadBuildIdentity(),
     respond: (result) => createLoadBuildIdentityResultMessage(result),
     fallback: () => createLoadBuildIdentityResultMessage({ ok: false, identity: null, message: 'Build identity could not be loaded.' }),
   }),
   [MessageType.CaptureImage]: defineMessage({
+    requestSchema: requestSchemas.captureImageRequestSchema,
     handle: (message: CaptureImageMessage) => handleCaptureImage(message),
     respond: (result) => createCaptureResultMessage(result),
     fallback: () => createCaptureResultMessage({ status: 'failed', reason: 'unknown', message: 'Internal capture error.' }),
   }),
   [MessageType.DownloadImage]: defineMessage({
+    requestSchema: requestSchemas.downloadImageRequestSchema,
     handle: (message: DownloadImageMessage) => handleDownloadImage(message),
     respond: (result) => createDownloadImageResultMessage(result),
     fallback: () => createDownloadImageResultMessage({ ok: false, message: 'Image download could not be started.' }),
   }),
   [MessageType.ExportEncryptedImage]: defineMessage({
+    requestSchema: requestSchemas.exportEncryptedImageRequestSchema,
     handle: (message: ExportEncryptedImageMessage) => handleExportEncryptedImage(message),
     respond: (result) => createExportEncryptedImageResultMessage(result),
     fallback: () => createExportEncryptedImageResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted image export failed.' }),
   }),
   [MessageType.ImportEncryptedImage]: defineMessage({
+    requestSchema: requestSchemas.importEncryptedImageRequestSchema,
     handle: (message: ImportEncryptedImageMessage) => handleImportEncryptedImage(message),
     respond: (result) => createImportEncryptedImageResultMessage(result),
     fallback: () => createImportEncryptedImageResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted image import failed.' }),
   }),
   [MessageType.StorageUsageRequest]: defineMessage({
+    requestSchema: requestSchemas.emptyPayloadSchema,
     handle: (_message: StorageUsageRequestMessage) => handleStorageUsage(),
     respond: (result) => createStorageUsageResponseMessage(result),
     fallback: () => createStorageUsageResponseMessage({ totalBytes: 0, blobCount: 0 }),
   }),
   [MessageType.LoadBookmarks]: defineMessage({
+    requestSchema: requestSchemas.loadBookmarksRequestSchema,
     handle: (message: LoadBookmarksMessage) => handleLoadBookmarks(message),
     respond: (result) => createLoadBookmarksResultMessage(result),
     fallback: (message) =>
@@ -1273,152 +1283,185 @@ const messageRegistry = {
       }),
   }),
   [MessageType.LoadRecentHistory]: defineMessage({
+    requestSchema: requestSchemas.loadRecentHistoryRequestSchema,
     handle: (message: LoadRecentHistoryMessage) => handleLoadRecentHistory(message),
     respond: (result) => createLoadRecentHistoryResultMessage(result.items),
     fallback: () => createLoadRecentHistoryResultMessage([]),
   }),
   [MessageType.LoadBookmarksByIds]: defineMessage({
+    requestSchema: requestSchemas.loadBookmarksByIdsRequestSchema,
     handle: (message: LoadBookmarksByIdsMessage) => handleLoadBookmarksByIds(message),
     respond: (result) => createLoadBookmarksByIdsResultMessage(result),
     fallback: () => createLoadBookmarksByIdsResultMessage({ items: [] }),
   }),
   [MessageType.AddRecentHistory]: defineMessage({
+    requestSchema: requestSchemas.addRecentHistoryRequestSchema,
     handle: (message: AddRecentHistoryMessage) => handleAddRecentHistory(message),
     respond: (result) => createAddRecentHistoryResultMessage(result.items),
-    fallback: (message) => createAddRecentHistoryResultMessage([message.payload.item]),
+    // Only echo the item back optimistically when it is a valid record; a payload that
+    // failed validation reaches this fallback too, and its `item` may be malformed.
+    fallback: (message) =>
+      createAddRecentHistoryResultMessage(v.is(imageDisplayRecordSchema, message.payload.item) ? [message.payload.item] : []),
   }),
   [MessageType.RemoveRecentHistory]: defineMessage({
+    requestSchema: requestSchemas.removeRecentHistoryRequestSchema,
     handle: (message: RemoveRecentHistoryMessage) => handleRemoveRecentHistory(message),
     respond: (result) => createRemoveRecentHistoryResultMessage(result.items),
     fallback: () => createRemoveRecentHistoryResultMessage([]),
   }),
   [MessageType.LoadRecallCandidates]: defineMessage({
+    requestSchema: requestSchemas.loadRecallCandidatesRequestSchema,
     handle: (message: LoadRecallCandidatesMessage) => handleLoadRecallCandidates(message),
     respond: (result) => createLoadRecallCandidatesResultMessage(result),
     fallback: () =>
       createLoadRecallCandidatesResultMessage({ ok: false, reason: 'unknown', message: 'Recall records could not be loaded.' }),
   }),
   [MessageType.RecallRecords]: defineMessage({
+    requestSchema: requestSchemas.recallRecordsRequestSchema,
     handle: (message: RecallRecordsMessage) => handleRecallRecords(message),
     respond: (result) => createRecallRecordsResultMessage(result),
     fallback: () => createRecallRecordsResultMessage({ ok: false, reason: 'unknown', message: 'Selected records could not be recalled.' }),
   }),
   [MessageType.SaveBookmark]: defineMessage({
+    requestSchema: requestSchemas.saveBookmarkRequestSchema,
     handle: (message: SaveBookmarkMessage) => handleSaveBookmark(message),
     respond: (result) => createSaveBookmarkResultMessage(result),
     fallback: () => createSaveBookmarkResultMessage({ ok: false, message: 'Bookmark save failed.' }),
   }),
   [MessageType.RemoveBookmark]: defineMessage({
+    requestSchema: requestSchemas.removeBookmarkRequestSchema,
     handle: (message: RemoveBookmarkMessage) => handleRemoveBookmark(message),
     respond: (result) => createRemoveBookmarkResultMessage(result),
     fallback: () => createRemoveBookmarkResultMessage({ ok: false }),
   }),
   [MessageType.RemoveBookmarks]: defineMessage({
+    requestSchema: requestSchemas.removeBookmarksRequestSchema,
     handle: (message: RemoveBookmarksMessage) => handleRemoveBookmarks(message),
     respond: (result) => createRemoveBookmarksResultMessage(result),
     fallback: () => createRemoveBookmarksResultMessage({ ok: false, removedCount: 0 }),
   }),
   [MessageType.RemoveRecallBookmarks]: defineMessage({
+    requestSchema: requestSchemas.removeRecallBookmarksRequestSchema,
     handle: (message: RemoveRecallBookmarksMessage) => handleRemoveRecallBookmarks(message),
     respond: (result) => createRemoveRecallBookmarksResultMessage(result),
     fallback: () => createRemoveRecallBookmarksResultMessage({ ok: false, removedCount: 0 }),
   }),
   [MessageType.LoadPanelPosition]: defineMessage({
+    requestSchema: requestSchemas.loadPanelPositionRequestSchema,
     handle: (message: LoadPanelPositionMessage) => handleLoadPanelPosition(message),
     respond: (result) => createLoadPanelPositionResultMessage(result),
     fallback: () => createLoadPanelPositionResultMessage({ ok: false, message: 'Panel position could not be loaded.' }),
   }),
   [MessageType.SavePanelPosition]: defineMessage({
+    requestSchema: requestSchemas.savePanelPositionRequestSchema,
     handle: (message: SavePanelPositionMessage) => handleSavePanelPosition(message),
     respond: (result) => createSavePanelPositionResultMessage(result),
     fallback: () => createSavePanelPositionResultMessage({ ok: false }),
   }),
   [MessageType.DeletePanelPosition]: defineMessage({
+    requestSchema: requestSchemas.deletePanelPositionRequestSchema,
     handle: (message: DeletePanelPositionMessage) => handleDeletePanelPosition(message),
     respond: (result) => createDeletePanelPositionResultMessage(result),
     fallback: () => createDeletePanelPositionResultMessage({ ok: false }),
   }),
   [MessageType.LoadParsedFieldState]: defineMessage({
+    requestSchema: requestSchemas.loadParsedFieldStateRequestSchema,
     handle: (message: LoadParsedFieldStateMessage) => handleLoadParsedFieldState(message),
     respond: (result) => createLoadParsedFieldStateResultMessage(result),
     fallback: () => createLoadParsedFieldStateResultMessage({ ok: false, message: 'Parsed field state could not be loaded.' }),
   }),
   [MessageType.LoadParsedFieldStateBySource]: defineMessage({
+    requestSchema: requestSchemas.loadParsedFieldStateBySourceRequestSchema,
     handle: (message: LoadParsedFieldStateBySourceMessage) => handleLoadParsedFieldStateBySource(message),
     respond: (result) => createLoadParsedFieldStateBySourceResultMessage(result),
     fallback: () => createLoadParsedFieldStateBySourceResultMessage({ ok: false, message: 'Parsed field state could not be loaded.' }),
   }),
   [MessageType.SaveParsedFieldState]: defineMessage({
+    requestSchema: requestSchemas.saveParsedFieldStateRequestSchema,
     handle: (message: SaveParsedFieldStateMessage) => handleSaveParsedFieldState(message),
     respond: (result) => createSaveParsedFieldStateResultMessage(result),
     fallback: () => createSaveParsedFieldStateResultMessage({ ok: false }),
   }),
   [MessageType.ListUrlReviewStatus]: defineMessage({
+    requestSchema: requestSchemas.listUrlReviewStatusRequestSchema,
     handle: (message: ListUrlReviewStatusMessage) => handleListUrlReviewStatus(message),
     respond: (result) => createListUrlReviewStatusResultMessage(result),
     fallback: () => createListUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be loaded.' }),
   }),
   [MessageType.SaveUrlReviewStatus]: defineMessage({
+    requestSchema: requestSchemas.saveUrlReviewStatusRequestSchema,
     handle: (message: SaveUrlReviewStatusMessage) => handleSaveUrlReviewStatus(message),
     respond: (result) => createSaveUrlReviewStatusResultMessage(result),
     fallback: () => createSaveUrlReviewStatusResultMessage({ ok: false }),
   }),
   [MessageType.ImportUrlReviewStatus]: defineMessage({
+    requestSchema: requestSchemas.importUrlReviewStatusRequestSchema,
     handle: (message: ImportUrlReviewStatusMessage) => handleImportUrlReviewStatus(message),
     respond: (result) => createImportUrlReviewStatusResultMessage(result),
     fallback: () => createImportUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be imported.' }),
   }),
   [MessageType.ClearUrlReviewStatus]: defineMessage({
+    requestSchema: requestSchemas.clearUrlReviewStatusRequestSchema,
     handle: (message: ClearUrlReviewStatusMessage) => handleClearUrlReviewStatus(message),
     respond: (result) => createClearUrlReviewStatusResultMessage(result),
     fallback: () => createClearUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be cleared.' }),
   }),
   [MessageType.ListUrlTemplates]: defineMessage({
+    requestSchema: requestSchemas.listUrlTemplatesRequestSchema,
     handle: (message: ListUrlTemplatesMessage) => handleListUrlTemplates(message),
     respond: (result) => createListUrlTemplatesResultMessage(result),
     fallback: () => createListUrlTemplatesResultMessage({ ok: false, message: 'URL templates could not be loaded.' }),
   }),
   [MessageType.SaveUrlTemplate]: defineMessage({
+    requestSchema: requestSchemas.saveUrlTemplateRequestSchema,
     handle: (message: SaveUrlTemplateMessage) => handleSaveUrlTemplate(message),
     respond: (result) => createSaveUrlTemplateResultMessage(result),
     fallback: () => createSaveUrlTemplateResultMessage({ ok: false }),
   }),
   [MessageType.DeleteUrlTemplate]: defineMessage({
+    requestSchema: requestSchemas.deleteUrlTemplateRequestSchema,
     handle: (message: DeleteUrlTemplateMessage) => handleDeleteUrlTemplate(message),
     respond: (result) => createDeleteUrlTemplateResultMessage(result),
     fallback: () => createDeleteUrlTemplateResultMessage({ ok: false }),
   }),
   [MessageType.ListGrabSourcePatterns]: defineMessage({
+    requestSchema: requestSchemas.listGrabSourcePatternsRequestSchema,
     handle: (message: ListGrabSourcePatternsMessage) => handleListGrabSourcePatterns(message),
     respond: (result) => createListGrabSourcePatternsResultMessage(result),
     fallback: () => createListGrabSourcePatternsResultMessage({ ok: false, message: 'Grab source patterns could not be loaded.' }),
   }),
   [MessageType.SaveGrabSourcePattern]: defineMessage({
+    requestSchema: requestSchemas.saveGrabSourcePatternRequestSchema,
     handle: (message: SaveGrabSourcePatternMessage) => handleSaveGrabSourcePattern(message),
     respond: (result) => createSaveGrabSourcePatternResultMessage(result),
     fallback: () => createSaveGrabSourcePatternResultMessage({ ok: false }),
   }),
   [MessageType.DeleteGrabSourcePattern]: defineMessage({
+    requestSchema: requestSchemas.deleteGrabSourcePatternRequestSchema,
     handle: (message: DeleteGrabSourcePatternMessage) => handleDeleteGrabSourcePattern(message),
     respond: (result) => createDeleteGrabSourcePatternResultMessage(result),
     fallback: () => createDeleteGrabSourcePatternResultMessage({ ok: false }),
   }),
   [MessageType.LoadLocalSettings]: defineMessage({
+    requestSchema: requestSchemas.loadLocalSettingsRequestSchema,
     handle: (_message: LoadLocalSettingsMessage) => handleLoadLocalSettings(),
     respond: (result) => createLoadLocalSettingsResultMessage(result),
     fallback: () => createLoadLocalSettingsResultMessage({ ok: false, message: 'Local settings could not be loaded.' }),
   }),
   [MessageType.SaveLocalSettings]: defineMessage({
+    requestSchema: requestSchemas.saveLocalSettingsRequestSchema,
     handle: (message: SaveLocalSettingsMessage) => handleSaveLocalSettings(message),
     respond: (result) => createSaveLocalSettingsResultMessage(result),
     fallback: () => createSaveLocalSettingsResultMessage({ ok: false }),
   }),
   [MessageType.PCloudProviderStatus]: defineMessage({
+    requestSchema: requestSchemas.emptyPayloadSchema,
     handle: (_message: PCloudProviderStatusMessage) => loadPCloudProviderStatus(),
     respond: (result) => createPCloudProviderStatusResultMessage(result),
     fallback: () => createPCloudProviderStatusResultMessage({ connected: false, message: 'pCloud status could not be loaded.' }),
   }),
   [MessageType.ConnectPCloudProvider]: defineMessage({
+    requestSchema: requestSchemas.emptyPayloadSchema,
     handle: (_message: ConnectPCloudProviderMessage) => connectPCloudProvider(),
     respond: (result) => createConnectPCloudProviderResultMessage(result),
     fallback: () =>
@@ -1429,6 +1472,7 @@ const messageRegistry = {
       }),
   }),
   [MessageType.DisconnectPCloudProvider]: defineMessage({
+    requestSchema: requestSchemas.emptyPayloadSchema,
     handle: (_message: DisconnectPCloudProviderMessage) => disconnectPCloudProvider(),
     respond: (result) => createDisconnectPCloudProviderResultMessage(result),
     fallback: () =>
@@ -1439,6 +1483,7 @@ const messageRegistry = {
       }),
   }),
   [MessageType.UploadPCloudBackup]: defineMessage({
+    requestSchema: requestSchemas.uploadPCloudBackupRequestSchema,
     handle: (message: UploadPCloudBackupMessage) => uploadPCloudBackup(message.payload),
     respond: (result) => createUploadPCloudBackupResultMessage(result),
     fallback: () =>
@@ -1450,6 +1495,7 @@ const messageRegistry = {
       }),
   }),
   [MessageType.ListPCloudBackups]: defineMessage({
+    requestSchema: requestSchemas.emptyPayloadSchema,
     handle: (_message: ListPCloudBackupsMessage) => listPCloudBackups(),
     respond: (result) => createListPCloudBackupsResultMessage(result),
     fallback: () =>
@@ -1461,6 +1507,7 @@ const messageRegistry = {
       }),
   }),
   [MessageType.DownloadPCloudBackup]: defineMessage({
+    requestSchema: requestSchemas.downloadPCloudBackupRequestSchema,
     handle: (message: DownloadPCloudBackupMessage) => downloadPCloudBackup(message.payload),
     respond: (result) => createDownloadPCloudBackupResultMessage(result),
     fallback: () =>
@@ -1472,96 +1519,115 @@ const messageRegistry = {
       }),
   }),
   [MessageType.DeleteBlob]: defineMessage({
+    requestSchema: requestSchemas.deleteBlobRequestSchema,
     handle: (message: DeleteBlobMessage) => handleDeleteBlob(message),
     respond: (result) => createDeleteBlobResultMessage(result.deleted, result.usage),
     fallback: () => createDeleteBlobResultMessage(false, { totalBytes: 0, blobCount: 0 }),
   }),
   [MessageType.CleanupOrphanedBlobs]: defineMessage({
+    requestSchema: requestSchemas.emptyPayloadSchema,
     handle: (_message: CleanupOrphanedBlobsMessage) => handleCleanupOrphanedBlobs(),
     respond: (result) => createCleanupOrphanedBlobsResultMessage(result),
     fallback: () => createCleanupOrphanedBlobsResultMessage({ deletedCount: 0, usage: { totalBytes: 0, blobCount: 0 } }),
   }),
   [MessageType.RetrieveBlob]: defineMessage({
+    requestSchema: requestSchemas.retrieveBlobRequestSchema,
     handle: (message: RetrieveBlobMessage) => handleRetrieveBlob(message),
     respond: (result) => createRetrieveBlobResultMessage(result),
     fallback: () => createRetrieveBlobResultMessage({ ok: false, reason: 'unknown', message: 'Blob retrieval failed.' }),
   }),
   [MessageType.ExportOriginalBlobs]: defineMessage({
+    requestSchema: requestSchemas.exportOriginalBlobsRequestSchema,
     handle: (message: ExportOriginalBlobsMessage) => handleExportOriginalBlobs(message),
     respond: (result) => createExportOriginalBlobsResultMessage(result),
     fallback: () => createExportOriginalBlobsResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted originals export failed.' }),
   }),
   [MessageType.ImportOriginalBlobs]: defineMessage({
+    requestSchema: requestSchemas.importOriginalBlobsRequestSchema,
     handle: (message: ImportOriginalBlobsMessage) => handleImportOriginalBlobs(message),
     respond: (result) => createImportOriginalBlobsResultMessage(result),
     fallback: () => createImportOriginalBlobsResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted originals import failed.' }),
   }),
   [MessageType.CreateBlobPreview]: defineMessage({
+    requestSchema: requestSchemas.createBlobPreviewRequestSchema,
     handle: (message: CreateBlobPreviewMessage) => handleCreateBlobPreview(message),
     respond: (result) => createCreateBlobPreviewResultMessage(result),
     fallback: () => createCreateBlobPreviewResultMessage({ ok: false, reason: 'unknown', message: 'Preview creation failed.' }),
   }),
   [MessageType.CreateDataUrlPreview]: defineMessage({
+    requestSchema: requestSchemas.createDataUrlPreviewRequestSchema,
     handle: (message: CreateDataUrlPreviewMessage) => createPreviewForDataUrl(message.payload.dataUrl),
     respond: (result) => createCreateBlobPreviewResultMessage(result),
     fallback: () => createCreateBlobPreviewResultMessage({ ok: false, reason: 'unknown', message: 'Preview creation failed.' }),
   }),
   [MessageType.FetchThumbnailSource]: defineMessage({
+    requestSchema: requestSchemas.fetchThumbnailSourceRequestSchema,
     handle: (message: FetchThumbnailSourceMessage) => handleFetchThumbnailSource(message),
     respond: (result) => createFetchThumbnailSourceResultMessage(result),
     fallback: () => createFetchThumbnailSourceResultMessage({ ok: false, reason: 'unknown', message: 'Thumbnail source fetch failed.' }),
   }),
   [MessageType.ProbeImageSource]: defineMessage({
+    requestSchema: requestSchemas.probeImageSourceRequestSchema,
     handle: (message: ProbeImageSourceMessage) => handleProbeImageSource(message),
     respond: (result) => createProbeImageSourceResultMessage(result),
     fallback: () => createProbeImageSourceResultMessage({ ok: false, reason: 'unknown', message: 'Image probe failed.' }),
   }),
   [MessageType.FetchBufferedImageSource]: defineMessage({
+    requestSchema: requestSchemas.fetchBufferedImageSourceRequestSchema,
     handle: (message: FetchBufferedImageSourceMessage) => handleFetchBufferedImageSource(message),
     respond: (result) => createFetchBufferedImageSourceResultMessage(result),
     fallback: () => createFetchBufferedImageSourceResultMessage({ ok: false, reason: 'unknown', message: 'Buffered image fetch failed.' }),
   }),
   [MessageType.CheckImageRequestPolicy]: defineMessage({
+    requestSchema: requestSchemas.checkImageRequestPolicyRequestSchema,
     handle: (message: CheckImageRequestPolicyMessage) => handleCheckImageRequestPolicy(message),
     respond: (result) => createCheckImageRequestPolicyResultMessage(result),
     fallback: () => createCheckImageRequestPolicyResultMessage({ status: 'unknown' }),
   }),
   [MessageType.FetchLinkedPage]: defineMessage({
+    requestSchema: requestSchemas.fetchLinkedPageRequestSchema,
     handle: (message: FetchLinkedPageMessage) => handleFetchLinkedPage(message),
     respond: (result) => createFetchLinkedPageResultMessage(result),
     fallback: () => createFetchLinkedPageResultMessage({ ok: false, reason: 'unknown', message: 'Linked page fetch failed.' }),
   }),
   [MessageType.BlobKeyStatus]: defineMessage({
+    requestSchema: requestSchemas.emptyPayloadSchema,
     handle: (_message: BlobKeyStatusMessage) => handleBlobKeyStatus(),
     respond: (result) => createBlobKeyStatusResultMessage(result),
     fallback: () => createBlobKeyStatusResultMessage({ unlocked: false, keyReference: null, hasKey: false }),
   }),
   [MessageType.SetupBlobKey]: defineMessage({
+    requestSchema: requestSchemas.setupBlobKeyRequestSchema,
     handle: (message: SetupBlobKeyMessage) => handleSetupBlobKey(message),
     respond: (result) => createBlobKeyResultMessage(result),
     fallback: () => createBlobKeyResultMessage({ ok: false, reason: 'unknown', message: 'Blob key setup failed.' }),
   }),
   [MessageType.UnlockBlobKey]: defineMessage({
+    requestSchema: requestSchemas.unlockBlobKeyRequestSchema,
     handle: (message: UnlockBlobKeyMessage) => handleUnlockBlobKey(message),
     respond: (result) => createBlobKeyResultMessage(result),
     fallback: () => createBlobKeyResultMessage({ ok: false, reason: 'unknown', message: 'Blob key unlock failed.' }),
   }),
   [MessageType.ClearBlobKey]: defineMessage({
+    requestSchema: requestSchemas.emptyPayloadSchema,
     handle: (_message: ClearBlobKeyMessage) => handleClearBlobKey(),
     respond: (result) => createBlobKeyResultMessage(result),
     fallback: () => createBlobKeyResultMessage({ ok: false, reason: 'unknown', message: 'Blob key clear failed.' }),
   }),
   [MessageType.ExportBlobKeyBackup]: defineMessage({
+    requestSchema: requestSchemas.exportBlobKeyBackupRequestSchema,
     handle: (message: ExportBlobKeyBackupMessage) => handleExportBlobKeyBackup(message),
     respond: (result) => createExportBlobKeyBackupResultMessage(result),
     fallback: () => createExportBlobKeyBackupResultMessage({ ok: false, reason: 'unknown', message: 'Key backup export failed.' }),
   }),
   [MessageType.ImportBlobKeyBackup]: defineMessage({
+    requestSchema: requestSchemas.importBlobKeyBackupRequestSchema,
     handle: (message: ImportBlobKeyBackupMessage) => handleImportBlobKeyBackup(message),
     respond: (result) => createImportBlobKeyBackupResultMessage(result),
     fallback: () => createImportBlobKeyBackupResultMessage({ ok: false, reason: 'unknown', message: 'Key backup import failed.' }),
   }),
   [MessageType.GrantPermissionAndCapture]: defineMessage({
+    requestSchema: requestSchemas.grantPermissionAndCaptureRequestSchema,
     handle: (message: GrantPermissionAndCaptureMessage) => handleGrantPermissionAndCapture(message),
     respond: (result) => createCaptureResultMessage(result),
     fallback: () => createCaptureResultMessage({ status: 'failed', reason: 'unknown', message: 'Internal permission/capture error.' }),

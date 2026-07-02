@@ -1,7 +1,16 @@
+import * as v from 'valibot';
 import type { KeyReference } from '../crypto/types.js';
 import { createAesGcmIv, decryptAesGcm, encryptAesGcm } from '../crypto/webcrypto.js';
 import { buildExportFileHeader, fromBase64, parseExportFile, serializeExportFile, toBase64 } from './encrypted-file-format.js';
 import type { ExportFileEnvelope } from './encrypted-file-format.js';
+
+const encryptedImagePayloadSchema = v.object({
+  schemaVersion: v.literal(1),
+  mimeType: v.pipe(v.string(), v.startsWith('image/')),
+  sourceUrl: v.string(),
+  fileName: v.string(),
+  data: v.string(),
+});
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -88,17 +97,11 @@ export async function openEncryptedImageFile(
     fromBase64(envelope.header.iv),
     aad(envelope.header.keyReference),
   );
-  const payload = JSON.parse(decoder.decode(plaintext)) as Partial<EncryptedImagePayload>;
-  if (
-    payload.schemaVersion !== 1 ||
-    typeof payload.mimeType !== 'string' ||
-    !payload.mimeType.startsWith('image/') ||
-    typeof payload.sourceUrl !== 'string' ||
-    typeof payload.fileName !== 'string' ||
-    typeof payload.data !== 'string'
-  ) {
+  const result = v.safeParse(encryptedImagePayloadSchema, JSON.parse(decoder.decode(plaintext)));
+  if (!result.success) {
     throw new Error('Encrypted image payload is invalid.');
   }
+  const payload = result.output;
   return {
     bytes: fromBase64(payload.data),
     mimeType: payload.mimeType,

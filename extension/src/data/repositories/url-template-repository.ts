@@ -1,6 +1,9 @@
+import * as v from 'valibot';
 import type { GrabSourcePattern, UrlTemplateRecord } from '../../core/url/templates.js';
+import { grabSourcePatternSchema, urlTemplateRecordSchema } from '../../core/url/templates.schema.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore } from '../schema.js';
+import { hydrateRecords } from './hydration.js';
 
 interface UrlTemplateMetadataRecord extends UrlTemplateRecord {
   readonly key: string;
@@ -12,7 +15,17 @@ interface GrabSourcePatternMetadataRecord extends GrabSourcePattern {
   readonly kind: 'grabSourcePattern';
 }
 
-type TemplateMetadataRecord = UrlTemplateMetadataRecord | GrabSourcePatternMetadataRecord;
+const urlTemplateMetadataRecordSchema = v.object({
+  ...urlTemplateRecordSchema.entries,
+  key: v.string(),
+  kind: v.literal('urlTemplate'),
+}) as v.GenericSchema<unknown, UrlTemplateMetadataRecord>;
+
+const grabSourcePatternMetadataRecordSchema = v.object({
+  ...grabSourcePatternSchema.entries,
+  key: v.string(),
+  kind: v.literal('grabSourcePattern'),
+}) as v.GenericSchema<unknown, GrabSourcePatternMetadataRecord>;
 
 const URL_TEMPLATE_KEY_PREFIX = 'url-template:';
 const URL_TEMPLATE_HOST_PREFIX = 'url-template-host:';
@@ -27,10 +40,9 @@ export class UrlTemplateRepository {
     const store = transaction.objectStore(DataStore.Metadata);
     const prefix = templateHostPrefix(hostname);
     const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`);
-    const records = await requestToPromise<TemplateMetadataRecord[]>(store.getAll(range));
+    const raw = await requestToPromise<unknown[]>(store.getAll(range));
     await transactionDone(transaction);
-    return records
-      .filter((record) => record.kind === 'urlTemplate')
+    return hydrateRecords(DataStore.Metadata, urlTemplateMetadataRecordSchema, raw)
       .map(stripTemplateMetadataKey)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
@@ -40,10 +52,9 @@ export class UrlTemplateRepository {
     const store = transaction.objectStore(DataStore.Metadata);
     const prefix = grabSourcePatternHostPrefix(hostname);
     const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`);
-    const records = await requestToPromise<TemplateMetadataRecord[]>(store.getAll(range));
+    const raw = await requestToPromise<unknown[]>(store.getAll(range));
     await transactionDone(transaction);
-    return records
-      .filter((record) => record.kind === 'grabSourcePattern')
+    return hydrateRecords(DataStore.Metadata, grabSourcePatternMetadataRecordSchema, raw)
       .map(stripGrabSourcePatternMetadataKey)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }

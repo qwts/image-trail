@@ -2,6 +2,8 @@ import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore } from '../schema.js';
 import type { StoredBlobRecord } from '../types.js';
+import { storedBlobRecordSchema } from '../types.schema.js';
+import { hydrateRecord, hydrateRecords } from './hydration.js';
 
 export class BlobsRepository {
   constructor(private readonly db: IDBDatabase) {}
@@ -15,16 +17,16 @@ export class BlobsRepository {
 
   async get(id: string): Promise<StoredBlobRecord | undefined> {
     const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
-    const result = await requestToPromise<StoredBlobRecord | undefined>(transaction.objectStore(DataStore.Blobs).get(id));
+    const result = await requestToPromise<unknown>(transaction.objectStore(DataStore.Blobs).get(id));
     await transactionDone(transaction);
-    return result;
+    return hydrateRecord(DataStore.Blobs, storedBlobRecordSchema, result);
   }
 
   async list(): Promise<readonly StoredBlobRecord[]> {
     const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
-    const result = await requestToPromise<StoredBlobRecord[]>(transaction.objectStore(DataStore.Blobs).getAll());
+    const result = await requestToPromise<unknown[]>(transaction.objectStore(DataStore.Blobs).getAll());
     await transactionDone(transaction);
-    return result;
+    return hydrateRecords(DataStore.Blobs, storedBlobRecordSchema, result);
   }
 
   async remove(id: string): Promise<void> {

@@ -1,3 +1,4 @@
+import * as v from 'valibot';
 import { createAesGcmIv, decryptAesGcm, encryptAesGcm } from '../crypto/webcrypto.js';
 import { createPasswordSalt, deriveEncryptionKey } from '../crypto/password-wrap.js';
 import type { KeyKind, StoredKeyRecord } from '../crypto/types.js';
@@ -7,6 +8,29 @@ import { buildExportFileHeader, fromBase64, parseExportFile, serializeExportFile
 type RecoverableKeyKind = Extract<KeyKind, 'blob' | 'download'>;
 const KEY_BACKUP_ITERATIONS = 600_000;
 const MIN_KEY_BACKUP_ITERATIONS = 100_000;
+
+const keyBackupPayloadSchema = v.object({
+  schemaVersion: v.literal(1),
+  record: v.pipe(
+    v.object({
+      kind: v.picklist(['blob', 'download']),
+      uuid: v.string(),
+      reference: v.string(),
+      createdAt: v.string(),
+      updatedAt: v.string(),
+      extractable: v.literal(false),
+      wrapping: v.object({
+        mode: v.literal('password'),
+        algorithm: v.literal('AES-GCM'),
+        salt: v.string(),
+        iv: v.string(),
+        wrappedKey: v.string(),
+        iterations: v.number(),
+      }),
+    }),
+    v.check((record) => record.reference === `${record.kind}:${record.uuid}`, 'Key reference must equal `${kind}:${uuid}`.'),
+  ),
+}) as v.GenericSchema<unknown, KeyBackupPayload>;
 
 export interface KeyBackupExportResult {
   readonly status: RecoverableDataStatus;
@@ -101,27 +125,5 @@ function stripRuntimeKey<K extends RecoverableKeyKind>(record: StoredKeyRecord<K
 }
 
 function isKeyBackupPayload(value: unknown): value is KeyBackupPayload {
-  if (!value || typeof value !== 'object') return false;
-  const payload = value as { schemaVersion?: unknown; record?: unknown };
-  return payload.schemaVersion === 1 && isRecoverableStoredKeyRecord(payload.record);
-}
-
-function isRecoverableStoredKeyRecord(value: unknown): value is StoredKeyRecord<RecoverableKeyKind> {
-  if (!value || typeof value !== 'object') return false;
-  const record = value as Record<string, unknown>;
-  if (record.kind !== 'blob' && record.kind !== 'download') return false;
-  if (typeof record.uuid !== 'string' || typeof record.reference !== 'string') return false;
-  if (record.reference !== `${record.kind}:${record.uuid}`) return false;
-  if (typeof record.createdAt !== 'string' || typeof record.updatedAt !== 'string') return false;
-  if (record.extractable !== false) return false;
-  if (!record.wrapping || typeof record.wrapping !== 'object') return false;
-  const wrapping = record.wrapping as Record<string, unknown>;
-  return (
-    wrapping.mode === 'password' &&
-    wrapping.algorithm === 'AES-GCM' &&
-    typeof wrapping.salt === 'string' &&
-    typeof wrapping.iv === 'string' &&
-    typeof wrapping.wrappedKey === 'string' &&
-    typeof wrapping.iterations === 'number'
-  );
+  return v.is(keyBackupPayloadSchema, value);
 }

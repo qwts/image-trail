@@ -1,10 +1,18 @@
+import * as v from 'valibot';
 import { decryptAesGcm } from '../crypto/webcrypto.js';
 import { deriveEncryptionKey } from '../crypto/password-wrap.js';
 import type { DurableBookmarkPayloadV1, RecoverableDataStatus } from '../types.js';
+import { durableBookmarkPayloadSchema } from '../types.schema.js';
 import { fromBase64, parseExportFile } from './encrypted-file-format.js';
 import { fullBackupPayloadFromUnknown, type FullBackupBlobKeyBackup, type PortableStoredBlobRecord } from './full-backup.js';
 import { parsePlainRecordsExport } from './plain-records-format.js';
+import { firstIssueReason } from './schema-issues.js';
 import { createImportValidationReport, type ImportValidationReport } from './validation-report.js';
+
+const bookmarkImportEntrySchema = v.object({
+  uuid: v.string(),
+  payload: durableBookmarkPayloadSchema,
+});
 
 export interface BookmarksImportEntry {
   readonly uuid: string;
@@ -148,14 +156,8 @@ function parseBookmarkEntries(parsed: unknown, options: { readonly preserveOrigi
 }
 
 function bookmarkEntryRejectionReason(value: unknown): string | null {
-  if (typeof value !== 'object' || value === null) return 'Entry is not an object';
-  const obj = value as Record<string, unknown>;
-  if (typeof obj.uuid !== 'string') return 'Missing record id';
-  if (typeof obj.payload !== 'object' || obj.payload === null) return 'Missing payload';
-  const payload = obj.payload as Record<string, unknown>;
-  if (typeof payload.url !== 'string') return 'Missing image URL';
-  if (typeof payload.bookmarkedAt !== 'string') return 'Missing bookmark timestamp';
-  return null;
+  const result = v.safeParse(bookmarkImportEntrySchema, value);
+  return result.success ? null : firstIssueReason(result.issues, 'Invalid bookmark entry');
 }
 
 function stripExternalBlobReference(entry: BookmarksImportEntry): BookmarksImportEntry {

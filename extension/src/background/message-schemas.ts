@@ -1,0 +1,216 @@
+import * as v from 'valibot';
+import { imageDisplayRecordSchema } from '../core/display-records.schema.js';
+import {
+  panelPositionSchema,
+  parsedFieldStateRecordSchema,
+  urlReviewStatusClearFilterSchema,
+  urlReviewStatusRecordSchema,
+} from '../core/types.schema.js';
+import { grabSourcePatternSchema, urlTemplateRecordSchema } from '../core/url/templates.schema.js';
+import { pcloudBackupDownloadInputSchema, pcloudBackupUploadInputSchema } from '../core/cloud/pcloud-provider.schema.js';
+import { plaintextLocalSettingsSchema } from '../data/local-settings.schema.js';
+import { portableStoredBlobRecordSchema } from '../data/import-export/full-backup.schema.js';
+
+/**
+ * Runtime schema for every dispatched request payload, reused by the message
+ * registry (see service-worker.ts) as the single definition validated before a
+ * handler runs. Objects are loose (`v.object`) so a peer running a newer protocol
+ * version can add fields without every request degrading to a fallback; empty
+ * payloads accept `{}` and tolerate extra keys the same way.
+ */
+export const emptyPayloadSchema = v.object({}) as v.GenericSchema<unknown, Record<string, never>>;
+
+const captureSourceTypeSchema = v.picklist(['target', 'history', 'bookmark']);
+const imageRequestIntentSchema = v.picklist([
+  'field-speculative-probe',
+  'field-active-navigation',
+  'url-editor-apply',
+  'recent-load',
+  'bookmark-load',
+  'pin-load',
+  'thumbnail-refresh',
+  'capture-original',
+]);
+const imageProbeMethodSchema = v.picklist(['get', 'head']);
+const imageSourceProfileSchema = v.picklist(['thumbnail', 'navigation']);
+const bookmarkScopeSchema = v.picklist(['global', 'site']);
+const stringArraySchema = v.pipe(v.array(v.string()), v.readonly());
+
+export const loadBuildIdentityRequestSchema = v.object({ requestedAt: v.number() });
+
+export const captureImageRequestSchema = v.object({
+  url: v.string(),
+  sourceRecordId: v.optional(v.string()),
+  sourceType: captureSourceTypeSchema,
+});
+
+export const downloadImageRequestSchema = v.object({
+  url: v.string(),
+  fileName: v.string(),
+  saveAs: v.boolean(),
+});
+
+export const exportEncryptedImageRequestSchema = v.object({
+  url: v.string(),
+  fileName: v.string(),
+  blobId: v.optional(v.string()),
+});
+
+export const importEncryptedImageRequestSchema = v.object({ fileContent: v.string() });
+
+export const loadBookmarksRequestSchema = v.object({
+  offset: v.number(),
+  limit: v.number(),
+  scope: v.optional(bookmarkScopeSchema),
+  currentPageUrl: v.optional(v.string()),
+});
+
+export const loadRecentHistoryRequestSchema = v.object({
+  pageUrl: v.string(),
+  includeRetained: v.optional(v.boolean()),
+});
+
+export const loadBookmarksByIdsRequestSchema = v.object({ ids: stringArraySchema });
+
+export const addRecentHistoryRequestSchema = v.object({
+  pageUrl: v.string(),
+  item: imageDisplayRecordSchema,
+});
+
+export const removeRecentHistoryRequestSchema = v.object({ pageUrl: v.string(), id: v.string() });
+
+export const loadRecallCandidatesRequestSchema = v.object({
+  offset: v.number(),
+  limit: v.number(),
+  scope: v.optional(bookmarkScopeSchema),
+  currentPageUrl: v.optional(v.string()),
+});
+
+export const recallRecordsRequestSchema = v.object({ ids: stringArraySchema });
+
+export const saveBookmarkRequestSchema = v.object({ record: imageDisplayRecordSchema });
+
+export const removeBookmarkRequestSchema = v.object({ record: imageDisplayRecordSchema });
+
+export const removeBookmarksRequestSchema = v.object({ ids: stringArraySchema });
+
+export const removeRecallBookmarksRequestSchema = v.object({
+  offset: v.number(),
+  scope: v.optional(bookmarkScopeSchema),
+  currentPageUrl: v.optional(v.string()),
+});
+
+export const loadPanelPositionRequestSchema = v.object({ hostname: v.string() });
+
+export const savePanelPositionRequestSchema = v.object({
+  hostname: v.string(),
+  position: panelPositionSchema,
+});
+
+export const deletePanelPositionRequestSchema = v.object({ hostname: v.string() });
+
+export const loadParsedFieldStateRequestSchema = v.object({ hostname: v.string(), pageUrl: v.string() });
+
+export const loadParsedFieldStateBySourceRequestSchema = v.object({ hostname: v.string(), sourceUrl: v.string() });
+
+export const saveParsedFieldStateRequestSchema = v.object({ record: parsedFieldStateRecordSchema });
+
+export const listUrlReviewStatusRequestSchema = v.object({ hostname: v.string() });
+
+export const saveUrlReviewStatusRequestSchema = v.object({ record: urlReviewStatusRecordSchema });
+
+export const importUrlReviewStatusRequestSchema = v.object({
+  records: v.pipe(v.array(urlReviewStatusRecordSchema), v.readonly()),
+});
+
+export const clearUrlReviewStatusRequestSchema = v.object({ filter: urlReviewStatusClearFilterSchema });
+
+export const listUrlTemplatesRequestSchema = v.object({ hostname: v.string() });
+
+export const saveUrlTemplateRequestSchema = v.object({ template: urlTemplateRecordSchema });
+
+export const deleteUrlTemplateRequestSchema = v.object({ hostname: v.string(), id: v.string() });
+
+export const listGrabSourcePatternsRequestSchema = v.object({ hostname: v.string() });
+
+export const saveGrabSourcePatternRequestSchema = v.object({ pattern: grabSourcePatternSchema });
+
+export const deleteGrabSourcePatternRequestSchema = v.object({ hostname: v.string(), id: v.string() });
+
+export const loadLocalSettingsRequestSchema = v.object({ requestedAt: v.number() });
+
+export const saveLocalSettingsRequestSchema = v.object({ settings: plaintextLocalSettingsSchema });
+
+export const uploadPCloudBackupRequestSchema = pcloudBackupUploadInputSchema;
+
+export const downloadPCloudBackupRequestSchema = pcloudBackupDownloadInputSchema;
+
+export const deleteBlobRequestSchema = v.object({ blobId: v.string() });
+
+export const retrieveBlobRequestSchema = v.object({ blobId: v.string() });
+
+export const exportOriginalBlobsRequestSchema = v.object({ blobIds: stringArraySchema });
+
+export const importOriginalBlobsRequestSchema = v.object({
+  records: v.pipe(v.array(portableStoredBlobRecordSchema), v.readonly()),
+});
+
+export const createBlobPreviewRequestSchema = v.object({ blobId: v.string() });
+
+export const createDataUrlPreviewRequestSchema = v.object({ dataUrl: v.string() });
+
+export const fetchThumbnailSourceRequestSchema = v.object({
+  url: v.string(),
+  referrer: v.optional(v.string()),
+  intent: v.optional(imageRequestIntentSchema),
+  contextKey: v.optional(v.string()),
+  sourceProfile: v.optional(imageSourceProfileSchema),
+});
+
+export const probeImageSourceRequestSchema = v.object({
+  url: v.string(),
+  referrer: v.optional(v.string()),
+  timeoutMs: v.number(),
+  contextKey: v.optional(v.string()),
+  probeMethod: v.optional(imageProbeMethodSchema),
+});
+
+export const fetchBufferedImageSourceRequestSchema = v.object({
+  url: v.string(),
+  referrer: v.optional(v.string()),
+  intent: v.optional(imageRequestIntentSchema),
+  contextKey: v.optional(v.string()),
+});
+
+export const checkImageRequestPolicyRequestSchema = v.object({
+  url: v.string(),
+  referrer: v.optional(v.string()),
+  intent: v.optional(imageRequestIntentSchema),
+  contextKey: v.optional(v.string()),
+});
+
+export const fetchLinkedPageRequestSchema = v.object({
+  url: v.string(),
+  maxBytes: v.number(),
+  timeoutMs: v.number(),
+});
+
+export const setupBlobKeyRequestSchema = v.object({ password: v.string() });
+
+export const unlockBlobKeyRequestSchema = v.object({
+  password: v.string(),
+  keyReference: v.optional(v.string()),
+});
+
+export const exportBlobKeyBackupRequestSchema = v.object({
+  password: v.string(),
+  keyReference: v.optional(v.string()),
+});
+
+export const importBlobKeyBackupRequestSchema = v.object({ fileContent: v.string(), password: v.string() });
+
+export const grantPermissionAndCaptureRequestSchema = v.object({
+  url: v.string(),
+  sourceType: captureSourceTypeSchema,
+  sourceRecordId: v.optional(v.string()),
+});

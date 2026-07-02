@@ -1,9 +1,17 @@
+import * as v from 'valibot';
 import { decryptAesGcm } from '../crypto/webcrypto.js';
 import { deriveEncryptionKey } from '../crypto/password-wrap.js';
 import type { DurableHistoryPayloadV1, RecoverableDataStatus } from '../types.js';
+import { durableHistoryPayloadSchema } from '../types.schema.js';
 import { fromBase64, parseExportFile } from './encrypted-file-format.js';
 import { parsePlainRecordsExport } from './plain-records-format.js';
+import { firstIssueReason } from './schema-issues.js';
 import { createImportValidationReport, type ImportValidationReport } from './validation-report.js';
+
+const historyImportEntrySchema = v.object({
+  uuid: v.string(),
+  payload: durableHistoryPayloadSchema,
+});
 
 export interface HistoryImportEntry {
   readonly uuid: string;
@@ -109,16 +117,7 @@ function parseHistoryEntries(parsed: unknown): Omit<HistoryImportResult, 'plaint
   };
 }
 
-const VALID_CAPTURE_STATUSES = new Set(['remote-only', 'downloaded', 'failed']);
-
 function historyEntryRejectionReason(value: unknown): string | null {
-  if (typeof value !== 'object' || value === null) return 'Entry is not an object';
-  const obj = value as Record<string, unknown>;
-  if (typeof obj.uuid !== 'string') return 'Missing record id';
-  if (typeof obj.payload !== 'object' || obj.payload === null) return 'Missing payload';
-  const payload = obj.payload as Record<string, unknown>;
-  if (typeof payload.url !== 'string') return 'Missing image URL';
-  if (typeof payload.capturedAt !== 'string') return 'Missing capture timestamp';
-  if (!VALID_CAPTURE_STATUSES.has(payload.captureStatus as string)) return 'Invalid capture status';
-  return null;
+  const result = v.safeParse(historyImportEntrySchema, value);
+  return result.success ? null : firstIssueReason(result.issues, 'Invalid history entry');
 }

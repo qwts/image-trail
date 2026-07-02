@@ -1,7 +1,14 @@
+import * as v from 'valibot';
 import { isBuildIdentity, type BuildIdentity } from '../core/build-info.js';
+import { storageUsageSummarySchema } from '../core/image/capture-result.schema.js';
 import type { ImageProbeMethod, ImageRequestIntent, ImageSourceProfile } from '../core/image/request-policy.js';
 
 export const MESSAGE_PROTOCOL_VERSION = 1;
+
+const deleteBlobResultPayloadSchema = v.object({
+  deleted: v.boolean(),
+  usage: storageUsageSummarySchema,
+});
 
 export const MessageType = {
   TogglePanel: 'imageTrail.togglePanel',
@@ -1905,6 +1912,18 @@ export function isImportOriginalBlobsResultMessage(value: unknown): value is Imp
 export function isCleanupOrphanedBlobsResultMessage(value: unknown): value is CleanupOrphanedBlobsResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.CleanupOrphanedBlobsResult;
+}
+
+export function isDeleteBlobResultMessage(value: unknown): value is DeleteBlobResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  if (value.type !== MessageType.DeleteBlobResult) return false;
+  return v.is(deleteBlobResultPayloadSchema, value.payload);
+}
+
+export function isStorageUsageResponseMessage(value: unknown): value is StorageUsageResponseMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  if (value.type !== MessageType.StorageUsageResponse) return false;
+  return v.is(storageUsageSummarySchema, value.payload);
 }
 
 export function isCreateBlobPreviewResultMessage(value: unknown): value is CreateBlobPreviewResultMessage {

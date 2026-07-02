@@ -1,3 +1,4 @@
+import * as v from 'valibot';
 import type { DurableBookmarkPayloadV1, DurableHistoryPayloadV1, RecoverableDataStatus } from '../types.js';
 
 export const PLAIN_RECORDS_FORMAT = 'image-trail.records';
@@ -38,21 +39,25 @@ export function serializePlainRecordsExport<TEntry>(input: {
   return JSON.stringify(envelope, null, 2);
 }
 
-export function parsePlainRecordsExport(raw: string): PlainRecordsExportEnvelope {
+const plainRecordsExportEnvelopeSchema = v.object({
+  format: v.literal(PLAIN_RECORDS_FORMAT),
+  formatVersion: v.literal(PLAIN_RECORDS_FORMAT_VERSION),
+  payloadType: v.picklist(['history', 'bookmarks']),
+  createdAt: v.string(),
+  recordCount: v.number(),
+  entries: v.pipe(v.array(v.unknown()), v.readonly()),
+}) as v.GenericSchema<unknown, PlainRecordsExportEnvelope<unknown>>;
+
+/**
+ * Validates the envelope structure only; individual `entries` stay `unknown` and
+ * are shape-checked per item by the history/bookmark entry parsers downstream,
+ * which skip and report malformed rows rather than failing the whole import.
+ */
+export function parsePlainRecordsExport(raw: string): PlainRecordsExportEnvelope<unknown> {
   const parsed: unknown = JSON.parse(raw);
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error('Plain export must be a JSON object.');
-  }
-  const obj = parsed as Record<string, unknown>;
-  if (
-    obj.format !== PLAIN_RECORDS_FORMAT ||
-    obj.formatVersion !== PLAIN_RECORDS_FORMAT_VERSION ||
-    (obj.payloadType !== 'history' && obj.payloadType !== 'bookmarks') ||
-    typeof obj.createdAt !== 'string' ||
-    typeof obj.recordCount !== 'number' ||
-    !Array.isArray(obj.entries)
-  ) {
+  const result = v.safeParse(plainRecordsExportEnvelopeSchema, parsed);
+  if (!result.success) {
     throw new Error('Invalid plain Image Trail export.');
   }
-  return obj as unknown as PlainRecordsExportEnvelope;
+  return result.output;
 }

@@ -1,9 +1,13 @@
+import * as v from 'valibot';
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
-import { openJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
+import { openValidatedJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
 import type { EncryptedEnvelope, KeyReference } from '../crypto/types.js';
+import { encryptedEnvelopeSchema } from '../crypto/types.schema.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore, SchemaIndex } from '../schema.js';
 import type { DurableEncryptedPinPayloadV1 } from '../types.js';
+import { durableEncryptedPinPayloadSchema } from '../types.schema.js';
+import { hydrateRecord } from './hydration.js';
 
 export interface EncryptedPinRecord {
   readonly id: string;
@@ -12,6 +16,14 @@ export interface EncryptedPinRecord {
   readonly queueUpdatedAt: string;
   readonly envelope: EncryptedEnvelope<{ readonly recordType: 'encryptedPin' }>;
 }
+
+const encryptedPinRecordSchema = v.object({
+  id: v.string(),
+  plainPinId: v.string(),
+  urlHash: v.string(),
+  queueUpdatedAt: v.string(),
+  envelope: encryptedEnvelopeSchema('encryptedPin'),
+}) as v.GenericSchema<unknown, EncryptedPinRecord>;
 
 export class EncryptedPinsRepository {
   constructor(private readonly db: IDBDatabase) {}
@@ -25,27 +37,27 @@ export class EncryptedPinsRepository {
 
   async get(id: string): Promise<EncryptedPinRecord | undefined> {
     const transaction = this.db.transaction(DataStore.EncryptedPins, 'readonly');
-    const result = await requestToPromise<EncryptedPinRecord | undefined>(transaction.objectStore(DataStore.EncryptedPins).get(id));
+    const result = await requestToPromise<unknown>(transaction.objectStore(DataStore.EncryptedPins).get(id));
     await transactionDone(transaction);
-    return result;
+    return hydrateRecord(DataStore.EncryptedPins, encryptedPinRecordSchema, result);
   }
 
   async getByPlainPinId(plainPinId: string): Promise<EncryptedPinRecord | undefined> {
     const transaction = this.db.transaction(DataStore.EncryptedPins, 'readonly');
-    const result = await requestToPromise<EncryptedPinRecord | undefined>(
+    const result = await requestToPromise<unknown>(
       transaction.objectStore(DataStore.EncryptedPins).index(SchemaIndex.EncryptedPinsByPlainPinId).get(plainPinId),
     );
     await transactionDone(transaction);
-    return result;
+    return hydrateRecord(DataStore.EncryptedPins, encryptedPinRecordSchema, result);
   }
 
   async getByUrlHash(urlHash: string): Promise<EncryptedPinRecord | undefined> {
     const transaction = this.db.transaction(DataStore.EncryptedPins, 'readonly');
-    const result = await requestToPromise<EncryptedPinRecord | undefined>(
+    const result = await requestToPromise<unknown>(
       transaction.objectStore(DataStore.EncryptedPins).index(SchemaIndex.EncryptedPinsByUrlHash).get(urlHash),
     );
     await transactionDone(transaction);
-    return result;
+    return hydrateRecord(DataStore.EncryptedPins, encryptedPinRecordSchema, result);
   }
 
   async listNewestFirst(): Promise<readonly EncryptedPinRecord[]> {
@@ -61,7 +73,8 @@ export class EncryptedPinsRepository {
           resolve();
           return;
         }
-        result.push(cursor.value as EncryptedPinRecord);
+        const record = hydrateRecord(DataStore.EncryptedPins, encryptedPinRecordSchema, cursor.value);
+        if (record) result.push(record);
         cursor.continue();
       };
       request.onerror = () => reject(request.error);
@@ -141,6 +154,6 @@ export class EncryptedPinsRepository {
   }
 
   async openRecord(record: EncryptedPinRecord, key: CryptoKey): Promise<DurableEncryptedPinPayloadV1> {
-    return openJsonEnvelope<DurableEncryptedPinPayloadV1>(record.envelope, key);
+    return openValidatedJsonEnvelope(record.envelope, key, durableEncryptedPinPayloadSchema);
   }
 }

@@ -21,11 +21,13 @@ import {
   isCaptureResultMessage,
   isCleanupOrphanedBlobsResultMessage,
   isCreateBlobPreviewResultMessage,
+  isDeleteBlobResultMessage,
   isExportBlobKeyBackupResultMessage,
   isExportOriginalBlobsResultMessage,
   isImportOriginalBlobsResultMessage,
   isImportBlobKeyBackupResultMessage,
   isRetrieveBlobResultMessage,
+  isStorageUsageResponseMessage,
 } from '../background/messages.js';
 import type { CaptureSourceType } from '../background/messages.js';
 import type {
@@ -80,8 +82,8 @@ export class CaptureController implements CaptureStore {
 
   async requestDeleteBlob(blobId: string): Promise<{ deleted: boolean; usage: StorageUsageSummary }> {
     const response = await sendRuntimeMessage(createDeleteBlobMessage(blobId));
-    if (response && typeof response === 'object' && 'payload' in response) {
-      return (response as { payload: { deleted: boolean; usage: StorageUsageSummary } }).payload;
+    if (isDeleteBlobResultMessage(response)) {
+      return response.payload;
     }
     return { deleted: false, usage: { totalBytes: 0, blobCount: 0 } };
   }
@@ -128,8 +130,8 @@ export class CaptureController implements CaptureStore {
 
   async requestStorageUsage(): Promise<StorageUsageSummary> {
     const response = await sendRuntimeMessage(createStorageUsageRequestMessage());
-    if (response && typeof response === 'object' && 'payload' in response) {
-      return (response as { payload: StorageUsageSummary }).payload;
+    if (isStorageUsageResponseMessage(response)) {
+      return response.payload;
     }
     return { totalBytes: 0, blobCount: 0 };
   }

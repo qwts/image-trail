@@ -1,9 +1,13 @@
-import { openJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
+import * as v from 'valibot';
+import { openJsonEnvelope, openValidatedJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
 import type { EncryptedEnvelope } from '../crypto/types.js';
+import { encryptedEnvelopeSchema } from '../crypto/types.schema.js';
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore, SchemaIndex } from '../schema.js';
 import type { DurableBookmarkPayloadV1 } from '../types.js';
+import { durableBookmarkPayloadSchema } from '../types.schema.js';
+import { hydrateRecord, hydrateRecords } from './hydration.js';
 
 export interface EncryptedBookmarkRecord {
   readonly uuid: string;
@@ -11,6 +15,13 @@ export interface EncryptedBookmarkRecord {
   readonly queueUpdatedAt: string;
   readonly envelope: EncryptedEnvelope<{ readonly recordType: 'bookmark' }>;
 }
+
+const encryptedBookmarkRecordSchema = v.object({
+  uuid: v.string(),
+  url: v.string(),
+  queueUpdatedAt: v.string(),
+  envelope: encryptedEnvelopeSchema('bookmark'),
+}) as v.GenericSchema<unknown, EncryptedBookmarkRecord>;
 
 export class BookmarksRepository {
   constructor(private readonly db: IDBDatabase) {}
@@ -23,16 +34,16 @@ export class BookmarksRepository {
 
   async getEncrypted(uuid: string): Promise<EncryptedBookmarkRecord | undefined> {
     const transaction = this.db.transaction(DataStore.Bookmarks, 'readonly');
-    const result = await requestToPromise<EncryptedBookmarkRecord | undefined>(transaction.objectStore(DataStore.Bookmarks).get(uuid));
+    const result = await requestToPromise<unknown>(transaction.objectStore(DataStore.Bookmarks).get(uuid));
     await transactionDone(transaction);
-    return result;
+    return hydrateRecord(DataStore.Bookmarks, encryptedBookmarkRecordSchema, result);
   }
 
   async listEncrypted(): Promise<readonly EncryptedBookmarkRecord[]> {
     const transaction = this.db.transaction(DataStore.Bookmarks, 'readonly');
-    const result = await requestToPromise<EncryptedBookmarkRecord[]>(transaction.objectStore(DataStore.Bookmarks).getAll());
+    const result = await requestToPromise<unknown[]>(transaction.objectStore(DataStore.Bookmarks).getAll());
     await transactionDone(transaction);
-    return result;
+    return hydrateRecords(DataStore.Bookmarks, encryptedBookmarkRecordSchema, result);
   }
 
   async countEncrypted(): Promise<number> {
@@ -105,7 +116,8 @@ export class BookmarksRepository {
           cursor.continue();
           return;
         }
-        result.push(cursor.value as EncryptedBookmarkRecord);
+        const record = hydrateRecord(DataStore.Bookmarks, encryptedBookmarkRecordSchema, cursor.value);
+        if (record) result.push(record);
         cursor.continue();
       };
       request.onerror = () => reject(request.error);
@@ -128,7 +140,8 @@ export class BookmarksRepository {
           resolve();
           return;
         }
-        result.push(cursor.value as EncryptedBookmarkRecord);
+        const record = hydrateRecord(DataStore.Bookmarks, encryptedBookmarkRecordSchema, cursor.value);
+        if (record) result.push(record);
         cursor.continue();
       };
       request.onerror = () => reject(request.error);
@@ -140,11 +153,9 @@ export class BookmarksRepository {
 
   async getEncryptedByUrl(url: string): Promise<EncryptedBookmarkRecord | undefined> {
     const transaction = this.db.transaction(DataStore.Bookmarks, 'readonly');
-    const result = await requestToPromise<EncryptedBookmarkRecord | undefined>(
-      transaction.objectStore(DataStore.Bookmarks).index(SchemaIndex.BookmarksByUrl).get(url),
-    );
+    const result = await requestToPromise<unknown>(transaction.objectStore(DataStore.Bookmarks).index(SchemaIndex.BookmarksByUrl).get(url));
     await transactionDone(transaction);
-    return result;
+    return hydrateRecord(DataStore.Bookmarks, encryptedBookmarkRecordSchema, result);
   }
 
   async remove(uuid: string): Promise<void> {
@@ -195,10 +206,10 @@ export class BookmarksRepository {
 
   async open(uuid: string, key: CryptoKey): Promise<DurableBookmarkPayloadV1 | null> {
     const record = await this.getEncrypted(uuid);
-    return record ? openJsonEnvelope<DurableBookmarkPayloadV1>(record.envelope, key) : null;
+    return record ? openValidatedJsonEnvelope(record.envelope, key, durableBookmarkPayloadSchema) : null;
   }
 
   async openRecord(record: EncryptedBookmarkRecord, key: CryptoKey): Promise<DurableBookmarkPayloadV1> {
-    return openJsonEnvelope<DurableBookmarkPayloadV1>(record.envelope, key);
+    return openValidatedJsonEnvelope(record.envelope, key, durableBookmarkPayloadSchema);
   }
 }

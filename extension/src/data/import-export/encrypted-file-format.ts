@@ -1,4 +1,6 @@
+import * as v from 'valibot';
 import type { EncryptionAlgorithm, KeyKind, KeyWrappingMode } from '../crypto/types.js';
+import { exportFileEnvelopeSchema, exportFileHeaderSchema } from './encrypted-file-format.schema.js';
 
 export const EXPORT_FORMAT_MAGIC = 'IMAGE-TRAIL-EXPORT';
 export const EXPORT_FORMAT_VERSION = 1;
@@ -68,22 +70,7 @@ export function buildExportFileHeader(params: {
 }
 
 export function validateExportFileHeader(header: unknown): header is ExportFileHeader {
-  if (typeof header !== 'object' || header === null) return false;
-  const h = header as Record<string, unknown>;
-  return (
-    h.magic === EXPORT_FORMAT_MAGIC &&
-    h.formatVersion === EXPORT_FORMAT_VERSION &&
-    typeof h.payloadType === 'string' &&
-    typeof h.algorithm === 'string' &&
-    typeof h.wrappingMode === 'string' &&
-    typeof h.keyKind === 'string' &&
-    typeof h.keyReference === 'string' &&
-    typeof h.salt === 'string' &&
-    typeof h.iv === 'string' &&
-    typeof h.iterations === 'number' &&
-    typeof h.createdAt === 'string' &&
-    typeof h.recordCount === 'number'
-  );
+  return v.is(exportFileHeaderSchema, header);
 }
 
 export function serializeExportFile(envelope: ExportFileEnvelope): string {
@@ -92,17 +79,11 @@ export function serializeExportFile(envelope: ExportFileEnvelope): string {
 
 export function parseExportFile(raw: string): ExportFileEnvelope {
   const parsed: unknown = JSON.parse(raw);
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error('Invalid export file: not a JSON object.');
-  }
-  const obj = parsed as Record<string, unknown>;
-  if (!validateExportFileHeader(obj.header)) {
+  const result = v.safeParse(exportFileEnvelopeSchema, parsed);
+  if (!result.success) {
     throw new Error('Invalid export file: header validation failed.');
   }
-  if (typeof obj.payload !== 'string') {
-    throw new Error('Invalid export file: missing payload.');
-  }
-  return { header: obj.header, payload: obj.payload as string };
+  return result.output;
 }
 
 export { toBase64, fromBase64 };

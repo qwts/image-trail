@@ -1,13 +1,22 @@
-import { openJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
+import * as v from 'valibot';
+import { openValidatedJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
 import type { EncryptedEnvelope } from '../crypto/types.js';
+import { encryptedEnvelopeSchema } from '../crypto/types.schema.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore } from '../schema.js';
 import type { DurableHistoryPayloadV1 } from '../types.js';
+import { durableHistoryPayloadSchema } from '../types.schema.js';
+import { hydrateRecord, hydrateRecords } from './hydration.js';
 
 export interface EncryptedHistoryRecord {
   readonly uuid: string;
   readonly envelope: EncryptedEnvelope<{ readonly recordType: 'history' }>;
 }
+
+const encryptedHistoryRecordSchema = v.object({
+  uuid: v.string(),
+  envelope: encryptedEnvelopeSchema('history'),
+}) as v.GenericSchema<unknown, EncryptedHistoryRecord>;
 
 export class HistoryRepository {
   constructor(private readonly db: IDBDatabase) {}
@@ -20,16 +29,16 @@ export class HistoryRepository {
 
   async getEncrypted(uuid: string): Promise<EncryptedHistoryRecord | undefined> {
     const transaction = this.db.transaction(DataStore.History, 'readonly');
-    const result = await requestToPromise<EncryptedHistoryRecord | undefined>(transaction.objectStore(DataStore.History).get(uuid));
+    const result = await requestToPromise<unknown>(transaction.objectStore(DataStore.History).get(uuid));
     await transactionDone(transaction);
-    return result;
+    return hydrateRecord(DataStore.History, encryptedHistoryRecordSchema, result);
   }
 
   async listEncrypted(): Promise<readonly EncryptedHistoryRecord[]> {
     const transaction = this.db.transaction(DataStore.History, 'readonly');
-    const result = await requestToPromise<EncryptedHistoryRecord[]>(transaction.objectStore(DataStore.History).getAll());
+    const result = await requestToPromise<unknown[]>(transaction.objectStore(DataStore.History).getAll());
     await transactionDone(transaction);
-    return result;
+    return hydrateRecords(DataStore.History, encryptedHistoryRecordSchema, result);
   }
 
   async sealAndPut(
@@ -52,6 +61,6 @@ export class HistoryRepository {
 
   async open(uuid: string, key: CryptoKey): Promise<DurableHistoryPayloadV1 | null> {
     const record = await this.getEncrypted(uuid);
-    return record ? openJsonEnvelope<DurableHistoryPayloadV1>(record.envelope, key) : null;
+    return record ? openValidatedJsonEnvelope(record.envelope, key, durableHistoryPayloadSchema) : null;
   }
 }

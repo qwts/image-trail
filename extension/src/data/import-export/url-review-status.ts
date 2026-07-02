@@ -1,9 +1,22 @@
+import * as v from 'valibot';
 import type { UrlReviewStatusRecord } from '../../core/types.js';
+import { urlReviewStatusRecordSchema } from '../../core/types.schema.js';
 import type { RecoverableDataStatus } from '../types.js';
+import { firstIssueReason } from './schema-issues.js';
 import { createImportValidationReport, type ImportValidationReport } from './validation-report.js';
 
 export const URL_REVIEW_STATUS_EXPORT_FORMAT = 'image-trail.url-review-status';
 export const URL_REVIEW_STATUS_EXPORT_VERSION = 1;
+
+const urlReviewStatusExportEnvelopeSchema = v.object({
+  format: v.literal(URL_REVIEW_STATUS_EXPORT_FORMAT),
+  formatVersion: v.literal(URL_REVIEW_STATUS_EXPORT_VERSION),
+  // createdAt/recordCount are unused metadata; keep them optional so a file that omits
+  // them still imports, matching the former envelope check (format + version + records).
+  createdAt: v.optional(v.string()),
+  recordCount: v.optional(v.number()),
+  records: v.pipe(v.array(v.unknown()), v.readonly()),
+});
 
 export interface UrlReviewStatusExportEnvelope {
   readonly format: typeof URL_REVIEW_STATUS_EXPORT_FORMAT;
@@ -63,15 +76,11 @@ export function importUrlReviewStatus(fileContent: string): UrlReviewStatusImpor
     return fail('Invalid URL review status export JSON.');
   }
 
-  if (typeof parsed !== 'object' || parsed === null) return fail('URL review status export must be a JSON object.');
-  const envelope = parsed as Record<string, unknown>;
-  if (
-    envelope.format !== URL_REVIEW_STATUS_EXPORT_FORMAT ||
-    envelope.formatVersion !== URL_REVIEW_STATUS_EXPORT_VERSION ||
-    !Array.isArray(envelope.records)
-  ) {
+  const envelopeResult = v.safeParse(urlReviewStatusExportEnvelopeSchema, parsed);
+  if (!envelopeResult.success) {
     return fail('Invalid URL review status export format.');
   }
+  const envelope = envelopeResult.output;
 
   const records: UrlReviewStatusRecord[] = [];
   const skipped: string[] = [];
@@ -99,16 +108,6 @@ export function importUrlReviewStatus(fileContent: string): UrlReviewStatusImpor
 }
 
 function urlReviewStatusRejectionReason(value: unknown): string | null {
-  if (typeof value !== 'object' || value === null) return 'Entry is not an object';
-  const record = value as Record<string, unknown>;
-  if (record.schemaVersion !== 1) return 'Invalid schema version';
-  if (typeof record.hostname !== 'string') return 'Missing hostname';
-  if (typeof record.pageUrl !== 'string') return 'Missing page URL';
-  if (typeof record.sourceUrl !== 'string') return 'Missing source URL';
-  if (record.status !== 'passed' && record.status !== 'failed' && record.status !== 'unchanged') return 'Invalid review status';
-  if (!Array.isArray(record.fieldIds) || !record.fieldIds.every((fieldId) => typeof fieldId === 'string')) return 'Invalid field IDs';
-  if (typeof record.activeFieldId !== 'string' && record.activeFieldId !== null) return 'Invalid active field';
-  if (typeof record.reason !== 'string' && record.reason !== undefined) return 'Invalid review reason';
-  if (typeof record.updatedAt !== 'string') return 'Missing update timestamp';
-  return null;
+  const result = v.safeParse(urlReviewStatusRecordSchema, value);
+  return result.success ? null : firstIssueReason(result.issues, 'Invalid URL review status entry');
 }

@@ -24,6 +24,7 @@ import { importBookmarks } from '../extension/src/data/import-export/bookmarks-i
 import {
   exportEncryptedFullBackup,
   fullBackupPayloadFromUnknown,
+  parseFullBackupPayload,
   storedBlobRecordFromPortable,
   portableStoredBlobRecord,
 } from '../extension/src/data/import-export/full-backup.js';
@@ -620,6 +621,65 @@ test('full-backup: filters malformed missing original ids while preserving valid
   assert.deepEqual(payload.missingOriginalBlobIds, ['missing-original', 'other-missing-original']);
 });
 
+test('full-backup: parseFullBackupPayload rejects a malformed corrupted-record fixture with structured issues', () => {
+  const corrupted = {
+    schemaVersion: 1,
+    bookmarks: [],
+    // originalBlobs carries a corrupted record: kind must be 'original' and the byte length a number.
+    originalBlobs: [
+      {
+        id: 'blob-1',
+        kind: 'thumbnail',
+        schemaVersion: 1,
+        algorithm: 'AES-GCM',
+        iv: 'iv',
+        ciphertext: 'AAAA',
+        encryptedByteLength: 'not-a-number',
+        createdAt: '2026-06-28T00:00:00.000Z',
+        key: { kind: 'blob', uuid: 'k', reference: 'blob:k' },
+        referenceCount: 1,
+      },
+    ],
+    blobKeyBackups: [],
+    missingOriginalBlobIds: [],
+  };
+
+  const result = parseFullBackupPayload(corrupted);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.reason, 'invalid-full-backup');
+    assert.ok(result.issues.length >= 1);
+    assert.ok(result.issues.some((issue) => issue.includes('originalBlobs')));
+  }
+
+  // A structurally valid payload still round-trips through the thin wrapper.
+  assert.ok(fullBackupPayloadFromUnknown({ schemaVersion: 1, bookmarks: [], originalBlobs: [], blobKeyBackups: [] }));
+});
+
+test('full-backup: a corrupted bookmark entry is skipped, not fatal, on import', async () => {
+  const exported = await exportEncryptedFullBackup({
+    bookmarks: [
+      { uuid: 'valid', payload: { url: 'https://example.test/valid.jpg', bookmarkedAt: '2026-06-28T00:00:00.000Z' } },
+      // Corrupted entry: payload is missing the required `url`.
+      { uuid: 'corrupt', payload: { bookmarkedAt: '2026-06-28T00:00:00.000Z' } as never },
+    ],
+    originalBlobs: [],
+    password: 'backup-password',
+    now: '2026-06-28T00:00:00.000Z',
+  });
+
+  assert.ok(exported.status.ok, exported.status.message);
+  const imported = await importBookmarks(exported.fileContent!, 'backup-password');
+
+  assert.ok(imported.status.ok, imported.status.message);
+  assert.equal(imported.fullBackup, true);
+  assert.equal(imported.entries.length, 1);
+  assert.equal(imported.entries[0]?.uuid, 'valid');
+  assert.equal(imported.skipped.length, 1);
+  assert.equal(imported.validationReport.rejectedCount, 1);
+  assert.ok(imported.validationReport.reasons[0]!.reason.includes('url'));
+});
+
 test('full-backup: strips original references whose encrypted bytes are missing', async () => {
   const exported = await exportEncryptedFullBackup({
     bookmarks: [
@@ -759,10 +819,12 @@ test('history-import: skips entries with missing captureStatus', async () => {
   assert.equal(importResult.entries.length, 1);
   assert.equal(importResult.entries[0].uuid, 'valid-entry');
   assert.equal(importResult.skipped.length, 1);
-  assert.deepEqual(importResult.validationReport, {
-    rejectedCount: 1,
-    reasons: [{ reason: 'Invalid capture status', count: 1 }],
-  });
+  assert.equal(importResult.validationReport.rejectedCount, 1);
+  assert.equal(importResult.validationReport.reasons.length, 1);
+  // Structured, privacy-safe reason: names the offending field, never leaks the record URL.
+  assert.match(importResult.validationReport.reasons[0]!.reason, /captureStatus/u);
+  assert.equal(importResult.validationReport.reasons[0]!.count, 1);
+  assert.ok(!importResult.validationReport.reasons[0]!.reason.includes('example.test'));
 });
 
 test('bookmarks-import: reports rejected records by privacy-safe reason', async () => {
@@ -788,13 +850,12 @@ test('bookmarks-import: reports rejected records by privacy-safe reason', async 
   assert.ok(importResult.status.ok);
   assert.equal(importResult.entries.length, 1);
   assert.deepEqual(importResult.skipped, ['missing-url', 'missing-time']);
-  assert.deepEqual(importResult.validationReport, {
-    rejectedCount: 2,
-    reasons: [
-      { reason: 'Missing image URL', count: 1 },
-      { reason: 'Missing bookmark timestamp', count: 1 },
-    ],
-  });
+  assert.equal(importResult.validationReport.rejectedCount, 2);
+  const bookmarkReasons = importResult.validationReport.reasons.map((entry) => entry.reason);
+  // Structured reasons name each offending field; they stay privacy-safe (no record URL).
+  assert.ok(bookmarkReasons.some((reason) => reason.includes('url')));
+  assert.ok(bookmarkReasons.some((reason) => reason.includes('bookmarkedAt')));
+  assert.ok(bookmarkReasons.every((reason) => !reason.includes('example.test')));
 });
 
 test('url-review-status: exports and imports reviewed URL state', () => {
@@ -867,10 +928,10 @@ test('url-review-status: skips invalid imported status records', () => {
   assert.equal(imported.records.length, 1);
   assert.equal(imported.records[0]?.status, 'unchanged');
   assert.deepEqual(imported.skipped, ['redacted']);
-  assert.deepEqual(imported.validationReport, {
-    rejectedCount: 1,
-    reasons: [{ reason: 'Invalid review status', count: 1 }],
-  });
+  assert.equal(imported.validationReport.rejectedCount, 1);
+  assert.equal(imported.validationReport.reasons.length, 1);
+  // The invalid record has a bad `status`; the structured reason names that field.
+  assert.match(imported.validationReport.reasons[0]!.reason, /status/u);
 });
 
 test('encrypted-file-format: header contains all required metadata fields', () => {
