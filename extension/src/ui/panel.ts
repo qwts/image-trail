@@ -134,6 +134,10 @@ const STYLE_PATH = 'src/ui/styles/panel.css';
 const RECALL_DRAWER_OPEN_ANIMATION_MS = 190;
 const RECALL_SUCCESS_MESSAGE_MS = 1800;
 const FINITE_CAPTURE_ERROR_MS = 2400;
+// Field-load (parsed-field navigation) errors are transient and should clear quickly; arrow / next
+// / prev traversal mutes them entirely (see applySelectedUrl's quietFailure), while the +/- single
+// step surfaces them for only about this long.
+const FIELD_LOAD_ERROR_DISPLAY_MS = 1500;
 
 interface ValidatedRecordUrl extends ImageRecordUrlValidation {
   readonly preloadDataUrl?: string;
@@ -1103,7 +1107,11 @@ export class ImageTrailPanel {
     this.recallMessageClearTimer = null;
   }
 
-  private scheduleFiniteCaptureErrorReset(updatedAt: number, mode: 'status' | 'capture-result'): void {
+  private scheduleFiniteCaptureErrorReset(
+    updatedAt: number,
+    mode: 'status' | 'capture-result',
+    durationMs: number = FINITE_CAPTURE_ERROR_MS,
+  ): void {
     this.clearFiniteCaptureErrorTimer();
     this.finiteCaptureErrorTimer = window.setTimeout(() => {
       this.finiteCaptureErrorTimer = null;
@@ -1116,7 +1124,7 @@ export class ImageTrailPanel {
         this.state = { ...reducePanelAction(this.state, { name: 'capture/clear' }), message: 'Image Trail is ready.' };
       }
       this.render();
-    }, FINITE_CAPTURE_ERROR_MS);
+    }, durationMs);
   }
 
   private clearFiniteCaptureErrorTimer(): void {
@@ -2036,7 +2044,7 @@ export class ImageTrailPanel {
     const loaded = await this.applySelectedUrl(
       nextUrl,
       navigableFields.map((field) => field.id),
-      { preloadDirection: delta },
+      { preloadDirection: delta, quietFailure: true },
     );
     if (loaded) {
       void this.saveUrlTemplateFromCurrentFields();
@@ -2129,6 +2137,7 @@ export class ImageTrailPanel {
       readonly reason?: ProjectionReason;
       readonly preloadDirection?: NeighborPreloadDirection;
       readonly resetFieldState?: boolean;
+      readonly quietFailure?: boolean;
     } = {},
   ): Promise<boolean> {
     const session = this.beginProjectionSession(options.reason ?? this.applySelectedUrlReason(attemptedFieldIds), nextUrl);
@@ -2148,15 +2157,24 @@ export class ImageTrailPanel {
     if (!this.isCurrentProjectionSession(session)) return false;
     if (!preload.ok) {
       this.projections.update(session, { status: 'failed' });
-      this.state = this.pruneInvalidFieldSplitSpecsForUrl(
+      const failedState = this.pruneInvalidFieldSplitSpecsForUrl(
         applyFieldLoadFailureToState(this.state, { draftUrl: nextUrl, attemptedFieldIds, message: preload.message }),
         nextUrl,
         { preserveMessage: true },
       );
-      this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'status');
+      // Arrow / next / prev traversal skips past bad URLs, so it mutes the alert: keep the failure in
+      // field/review state (which drives the skip) but leave the previous status/message so we don't
+      // flash a red error or churn the panel on every skipped image. The +/- single step still shows
+      // the error, briefly.
+      if (options.quietFailure) {
+        this.state = { ...failedState, status: this.state.status, message: this.state.message, lastUpdatedAt: this.state.lastUpdatedAt };
+      } else {
+        this.state = failedState;
+        this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'status', FIELD_LOAD_ERROR_DISPLAY_MS);
+        this.render();
+      }
       void this.saveUrlReviewStatus('failed', nextUrl, attemptedFieldIds, preload.message);
       void this.saveParsedFieldState();
-      this.render();
       if (session.reason === 'parsed-field-navigation') this.bufferedNav.refreshPreloads();
       return false;
     }
