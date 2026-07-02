@@ -239,6 +239,33 @@ test('restore() ignores reentrant calls while a restore is in progress', async (
   assert.equal(harness.loadCalls.length, 2, 'a later restore proceeds once the first completes');
 });
 
+test('restore() ignores reentrant calls issued while the initial load is still pending', async () => {
+  const loading = createDeferred<ParsedFieldStateRecord | null>();
+  let loadCallCount = 0;
+  const harness = createHarness(
+    {},
+    {
+      load: async (hostname, pageUrl) => {
+        loadCallCount += 1;
+        return loading.promise.then(() => createRecord({ hostname, pageUrl }));
+      },
+    },
+  );
+
+  const first = harness.sync.restore();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(loadCallCount, 1, 'the first restore must have started its load');
+
+  const second = harness.sync.restore();
+  await second;
+  assert.equal(loadCallCount, 1, 'a reentrant restore issued mid-load must not start a second load');
+  assert.equal(harness.appliedRestores.length, 0, 'nothing has resolved yet');
+
+  loading.resolve(null);
+  await first;
+  assert.equal(harness.appliedRestores.length, 1);
+});
+
 test('pageUrl() keeps the stored key while on an extension-projected URL and clears it on real navigation', () => {
   const harness = createHarness();
   const projectedUrl = 'https://example.test/projected-image.jpg';
