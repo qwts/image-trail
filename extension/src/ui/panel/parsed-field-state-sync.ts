@@ -65,10 +65,11 @@ export class ParsedFieldStateSync {
   }
 
   async save(): Promise<void> {
-    if (!this.deps.store()) return;
+    const store = this.deps.store();
+    if (!store) return;
     const record = this.deps.createRecord();
     if (!record) return;
-    this.saveQueue = this.saveQueue.then(() => this.deps.store()?.save(record) ?? Promise.resolve());
+    this.saveQueue = this.saveQueue.then(() => store.save(record));
     await this.saveQueue;
   }
 
@@ -76,21 +77,21 @@ export class ParsedFieldStateSync {
     if (this.restoreInProgress) return;
     const store = this.deps.store();
     if (!store) return;
-    this.deps.syncTargetStateFromSnapshot();
-    const hostname = this.deps.hostname();
-    if (!hostname) return;
-    const currentSelectedUrl = this.deps.currentSelectedUrl();
-    const currentPageUrl = this.pageUrl();
-    const exactRecord = await store.load(hostname, currentPageUrl);
-    const sourceRecord = currentSelectedUrl ? await store.loadForSource(hostname, currentSelectedUrl) : null;
-    const record = [exactRecord, sourceRecord].find(
-      (candidate): candidate is ParsedFieldStateRecord =>
-        !!candidate && shouldRestoreParsedFieldState(candidate, currentSelectedUrl, this.deps.selectedHandleId(), currentPageUrl),
-    );
-    if (!record) return;
-    const sameSource = imageResourceUrlsEqual(record.sourceUrl, currentSelectedUrl, this.deps.currentPageHref());
     this.restoreInProgress = true;
     try {
+      this.deps.syncTargetStateFromSnapshot();
+      const hostname = this.deps.hostname();
+      if (!hostname) return;
+      const currentSelectedUrl = this.deps.currentSelectedUrl();
+      const currentPageUrl = this.pageUrl();
+      const exactRecord = await store.load(hostname, currentPageUrl);
+      const sourceRecord = currentSelectedUrl ? await store.loadForSource(hostname, currentSelectedUrl) : null;
+      const record = [exactRecord, sourceRecord].find(
+        (candidate): candidate is ParsedFieldStateRecord =>
+          !!candidate && shouldRestoreParsedFieldState(candidate, currentSelectedUrl, this.deps.selectedHandleId(), currentPageUrl),
+      );
+      if (!record) return;
+      const sameSource = imageResourceUrlsEqual(record.sourceUrl, currentSelectedUrl, this.deps.currentPageHref());
       await this.deps.applyRestoredRecord(record, { sameSource, projectSavedSource: options.projectSavedSource ?? false });
     } finally {
       this.restoreInProgress = false;
