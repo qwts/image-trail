@@ -11,12 +11,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
-          "notes": "Covers service-worker/id resolution, extension-action panel open/close, duplicate-DOM prevention, and close cleanup."
-        },
-        {
-          "type": "deferred",
-          "issue": 305,
-          "notes": "Broader target selection, lifecycle, and host-projection flows."
+          "notes": "Covers service-worker/id resolution, extension-action panel open/close, single-image auto-select, multi-image target picking, minimize/expand/close/reopen lifecycle, duplicate-DOM prevention, and close cleanup."
         }
       ]
     },
@@ -31,9 +26,9 @@
           "paths": ["tests/dom/buffered-navigation-controller.test.ts", "tests/parsed-field-state-sync.test.ts"]
         },
         {
-          "type": "deferred",
-          "issue": 305,
-          "notes": "Browser-level projection success, failure, same-current, and release coverage."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/extension-smoke.spec.ts",
+          "notes": "Covers Recent preview projection into the selected host image, failed projection preserving the previous successful image, same-current already-projected reporting, and release/close restoration of host image src/srcset/sizes and extension-owned styles."
         }
       ]
     },
@@ -46,16 +41,11 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
-          "notes": "Current smoke coverage asserts open/close and duplicate panel root behavior."
+          "notes": "Covers open/close, duplicate panel root behavior, minimize/expand, close/reopen, and single-image auto-select selected-target preview assertions."
         },
         {
           "type": "storybook",
           "path": "extension/src/ui/render.stories.ts"
-        },
-        {
-          "type": "deferred",
-          "issue": 305,
-          "notes": "Full minimize, expand, close, reopen, and selected-target assertions."
         }
       ]
     },
@@ -66,9 +56,9 @@
       "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Target-Picker-Captures-Only-The-Selected-Image",
       "coverage": [
         {
-          "type": "deferred",
-          "issue": 305,
-          "notes": "Target picking and visible selected-target indicator are the next E2E slice."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/extension-smoke.spec.ts",
+          "notes": "Covers multi-image target picking and the visible selected-target indicator on only the chosen host image."
         }
       ]
     },

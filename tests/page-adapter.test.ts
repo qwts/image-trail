@@ -354,7 +354,7 @@ test('selected image load ignores stale projection completion after newer projec
   }
 });
 
-test('release keeps hosted image backdrop black after restoring original URL', () => {
+test('release restores hosted image backdrop after restoring original URL', () => {
   const image = new FakeImageElement();
   image.style.background = 'rgb(230, 230, 230)';
   image.style.backgroundColor = 'rgb(230, 230, 230)';
@@ -377,8 +377,8 @@ test('release keeps hosted image backdrop black after restoring original URL', (
     adapter.releaseSelectedTarget();
 
     assert.equal(image.src, 'https://example.test/original.jpg');
-    assert.equal(image.style.background, '#000');
-    assert.equal(image.style.backgroundColor, '#000');
+    assert.equal(image.style.background, 'rgb(230, 230, 230)');
+    assert.equal(image.style.backgroundColor, 'rgb(230, 230, 230)');
     assert.equal(image.dataset.imageTrailSelected, undefined);
 
     image.complete = true;
@@ -386,8 +386,8 @@ test('release keeps hosted image backdrop black after restoring original URL', (
     image.naturalWidth = 640;
     image.dispatchEvent(new Event('load'));
 
-    assert.equal(image.style.background, '#000');
-    assert.equal(image.style.backgroundColor, '#000');
+    assert.equal(image.style.background, 'rgb(230, 230, 230)');
+    assert.equal(image.style.backgroundColor, 'rgb(230, 230, 230)');
   } finally {
     restoreDom();
   }

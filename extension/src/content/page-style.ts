@@ -33,7 +33,7 @@ const snapshots = new WeakMap<HTMLElement, StyleSnapshot>();
 const grabPreviewSnapshots = new WeakMap<HTMLElement, GrabPreviewStyleSnapshot>();
 let pageBackdropSnapshot: { readonly body: PageBackdropSnapshot; readonly documentElement: PageBackdropSnapshot } | null = null;
 
-function snapshot(element: HTMLElement): void {
+export function snapshotElementStyles(element: HTMLElement): void {
   if (snapshots.has(element)) return;
   snapshots.set(element, {
     backgroundColor: element.style.backgroundColor,
@@ -80,13 +80,13 @@ function restoreLockBoxLayout(element: HTMLElement): void {
 }
 
 export function markPickModeCandidate(element: HTMLElement): void {
-  snapshot(element);
+  snapshotElementStyles(element);
   element.dataset.imageTrailCandidate = 'true';
   element.style.cursor = 'crosshair';
 }
 
 export function markHoveredTarget(element: HTMLElement): void {
-  snapshot(element);
+  snapshotElementStyles(element);
   element.dataset.imageTrailHover = 'true';
   element.style.outline = '3px dashed #f59e0b';
   element.style.outlineOffset = '3px';
@@ -121,8 +121,8 @@ export function restoreGrabPreviewTarget(element: HTMLElement): void {
 }
 
 export function markSelectedTarget(element: HTMLElement, options: SelectedTargetOptions = {}): void {
+  snapshotElementStyles(element);
   keepSelectedTargetBackdropBlack(element);
-  snapshot(element);
   if (!options.lockBox && element.dataset.imageTrailLockBox) restoreLockBoxLayout(element);
   element.dataset.imageTrailSelected = 'true';
   if (options.lockBox) {

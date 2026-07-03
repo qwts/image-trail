@@ -73,8 +73,8 @@ test('selected target lockBox constrains the host image box and restores origina
   assert.equal(element.style.maxHeight, '90vh');
   assert.equal(element.style.maxWidth, '90vw');
   assert.equal(element.style.width, '144px');
-  assert.equal(element.style.background, '#000');
-  assert.equal(element.style.backgroundColor, '#000');
+  assert.equal(element.style.background, '');
+  assert.equal(element.style.backgroundColor, '');
   assert.equal(element.dataset.imageTrailSelected, undefined);
 });
 
@@ -103,7 +103,7 @@ test('selected target restore can preserve black hosted-image backdrop', () => {
   assert.equal(element.style.backgroundColor, '#000');
 });
 
-test('selected target first style change paints black and never restores grey backdrop', () => {
+test('selected target first style change paints black and restores the original backdrop', () => {
   const element = createImageElement();
   element.style.background = 'rgb(230, 230, 230)';
   element.style.backgroundColor = 'rgb(230, 230, 230)';
@@ -115,8 +115,8 @@ test('selected target first style change paints black and never restores grey ba
 
   restoreElementStyles(element);
 
-  assert.equal(element.style.background, '#000');
-  assert.equal(element.style.backgroundColor, '#000');
+  assert.equal(element.style.background, 'rgb(230, 230, 230)');
+  assert.equal(element.style.backgroundColor, 'rgb(230, 230, 230)');
 });
 
 test('selected target lockBox accepts explicit preview object fit and restores it', () => {
@@ -175,8 +175,8 @@ test('selected target without lockBox leaves inline sizing alone and defaults im
 
   restoreElementStyles(element);
 
-  assert.equal(element.style.background, '#000');
-  assert.equal(element.style.backgroundColor, '#000');
+  assert.equal(element.style.background, '');
+  assert.equal(element.style.backgroundColor, '');
   assert.equal(element.style.objectFit, 'contain');
 });
 
@@ -221,8 +221,8 @@ test('selected target can defer lockBox styling until preview replaces the image
     assert.equal(element.style.height, '72px');
     assert.equal(element.style.objectFit, 'cover');
     assert.equal(element.style.width, '144px');
-    assert.equal(element.style.background, '#000');
-    assert.equal(element.style.backgroundColor, '#000');
+    assert.equal(element.style.background, '');
+    assert.equal(element.style.backgroundColor, '');
     assert.equal(body.style.background, 'white');
     assert.equal(documentElement.style.background, 'lightgray');
   } finally {

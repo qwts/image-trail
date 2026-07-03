@@ -44,8 +44,8 @@ export function restoreImageNavigationSnapshot(snapshot: ImageNavigationSnapshot
   }
   setOptionalAttribute(snapshot.image, 'srcset', snapshot.srcset);
   setOptionalAttribute(snapshot.image, 'sizes', snapshot.sizes);
-  setOptionalAttribute(snapshot.image, 'src', snapshot.srcAttribute);
   snapshot.image.src = snapshot.src;
+  setOptionalAttribute(snapshot.image, 'src', snapshot.srcAttribute);
 }
 
 export function clearResponsiveImageAttributes(image: HTMLImageElement): void {

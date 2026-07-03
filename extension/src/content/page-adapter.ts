@@ -30,6 +30,7 @@ import {
   keepSelectedTargetBackdropBlack,
   restoreElementStyles,
   restoreGrabPreviewTarget,
+  snapshotElementStyles,
 } from './page-style.js';
 import { createThumbnailDataUrlFromImage } from './thumbnail-generator.js';
 import { createFetchLinkedPageMessage, isFetchLinkedPageResultMessage } from '../background/messages.js';
@@ -184,7 +185,10 @@ export class PageAdapter {
   prepareStandaloneImageBackdrop(options: { readonly requireBodyOnlyImage?: boolean } = {}): void {
     const images = Array.from(document.images);
     if (options.requireBodyOnlyImage && !isBodyOnlyImageDocument(images[0])) return;
-    if (images.length === 1) keepSelectedTargetBackdropBlack(images[0]);
+    if (images.length === 1) {
+      snapshotElementStyles(images[0]);
+      keepSelectedTargetBackdropBlack(images[0]);
+    }
   }
 
   enableBookmarkShortcut(): void {
@@ -272,7 +276,10 @@ export class PageAdapter {
   }
 
   cleanup(): void {
-    this.suspend();
+    this.disableBookmarkShortcut();
+    this.grabModeActive = false;
+    this.clearGrabPreview();
+    this.stopPickMode();
     this.restoreSelectedTarget();
     this.emit('Target selection cleaned up.');
   }
@@ -657,7 +664,7 @@ export class PageAdapter {
         applyImageUrl(this.selected, this.selectedOriginalUrl);
       }
       this.selected.removeAttribute('data-image-trail-handle');
-      restoreElementStyles(this.selected, { preserveBackdropBlack: true });
+      restoreElementStyles(this.selected);
     }
     this.clearPendingLoadTarget();
     this.selected = null;
