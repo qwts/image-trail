@@ -20,7 +20,6 @@ import { createInitialPanelState, setAutomationState, setTargetState } from '../
 import type {
   BookmarkStore,
   PanelAction,
-  PanelPosition,
   PanelPositionStore,
   PanelState,
   ParsedFieldStateRecord,
@@ -71,6 +70,8 @@ import { BufferedNavigationController } from './panel/buffered-navigation-contro
 import { NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT, NeighborPreloadController } from './panel/neighbor-preload-controller.js';
 import { ParsedFieldStateSync } from './panel/parsed-field-state-sync.js';
 import { PanelMount } from './panel/panel-mount.js';
+import { PanelPositionController } from './panel/panel-position-controller.js';
+import { RecallDrawerController } from './panel/recall-drawer-controller.js';
 import { RecallExportController } from './panel/recall-export-controller.js';
 import { RecallRestoreController } from './panel/recall-restore-controller.js';
 import { RecordLibraryController } from './panel/record-library-controller.js';
@@ -85,10 +86,8 @@ import { urlReviewStatusClearScopeLabel } from './panel/record-export-helpers.js
 import { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../content/panel-services.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
 import { isUnsupportedUrlEditorInput } from './components/url-editor-view.js';
-import { clampPanelPosition, hostnameFromLocation } from './panel-position.js';
+import { hostnameFromLocation } from './panel-position.js';
 
-const RECALL_DRAWER_OPEN_ANIMATION_MS = 190;
-const RECALL_SUCCESS_MESSAGE_MS = 1800;
 const FINITE_CAPTURE_ERROR_MS = 2400;
 
 type FieldEditorEffect =
@@ -130,8 +129,8 @@ export class ImageTrailPanel {
     isPanelVisible: () => this.state.visible,
     isPanelMinimized: () => this.state.minimized,
     onStylesReady: () => {
-      this.queuePanelPositionRestore();
-      this.applyRestoredPanelPosition();
+      this.panelPosition.queuePanelPositionRestore();
+      this.panelPosition.applyRestoredPanelPosition();
     },
   });
   private get root(): HTMLElement | null {
@@ -152,15 +151,9 @@ export class ImageTrailPanel {
   private readonly retry: Retry404;
   private localSettings: PlaintextLocalSettings = DEFAULT_LOCAL_SETTINGS;
   private storageUsageRequestId = 0;
-  private panelPositionRestored = false;
-  private panelPositionRestorePromise: Promise<void> | null = null;
-  private panelPositionRestoreAttempt = 0;
-  private restoredPanelPosition: PanelPosition | null = null;
   private get panelStylesReady(): boolean {
     return this.panelMount.panelStylesReady;
   }
-  private recallOpeningUntil = 0;
-  private recallMessageClearTimer: number | null = null;
   private finiteCaptureErrorTimer: number | null = null;
   private readonly fieldStateSync = new ParsedFieldStateSync({
     store: () => this.parsedFieldStateStore,
@@ -340,6 +333,31 @@ export class ImageTrailPanel {
     pageAdapter: () => this.pageAdapter,
     captureStore: () => this.captureStore,
   });
+  private readonly panelPosition: PanelPositionController = new PanelPositionController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    renderRecallOnly: () => this.renderRecallOnly(),
+    whenStylesReady: () => this.panelMount.whenStylesReady(),
+    root: () => this.root,
+    panelPositionStore: () => this.panelPositionStore,
+  });
+  private readonly recallDrawer: RecallDrawerController = new RecallDrawerController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    renderRecallOnly: () => this.renderRecallOnly(),
+    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
+    ensurePanelPositionRestored: () => this.panelPosition.ensurePanelPositionRestored(),
+    refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
+    root: () => this.root,
+    recallStore: () => this.recallStore,
+  });
   private bufferedNavigationToastTimer: number | null = null;
   private queuedParsedNavigationDelta = 0;
   private parsedNavigationQueueRunning = false;
@@ -460,11 +478,8 @@ export class ImageTrailPanel {
       this.pageAdapter.suspend();
     }
     this.panelMount.teardown();
-    this.panelPositionRestoreAttempt += 1;
-    this.panelPositionRestored = false;
-    this.panelPositionRestorePromise = null;
-    this.restoredPanelPosition = null;
-    this.clearRecallMessageTimer();
+    this.panelPosition.invalidateRestore();
+    this.recallDrawer.clearRecallMessageTimer();
     this.clearFiniteCaptureErrorTimer();
   }
 
@@ -789,109 +804,6 @@ export class ImageTrailPanel {
     if (options.render !== false) this.render();
   };
 
-  private async openRecallDrawer(): Promise<void> {
-    await this.ensurePanelPositionRestored();
-    this.state = reducePanelAction(this.state, { name: 'recall/open', side: this.recallDrawerSide() });
-    this.recallOpeningUntil = Date.now() + RECALL_DRAWER_OPEN_ANIMATION_MS;
-    this.render();
-    if (!this.recallStore) {
-      return;
-    }
-    void this.loadRecallCandidates({ offset: this.state.bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax, append: false });
-  }
-
-  private recallDrawerSide(): 'left' | 'right' {
-    if (!this.root) return 'right';
-    const rect = this.root.getBoundingClientRect();
-    const leftSpace = rect.left;
-    const rightSpace = window.innerWidth - rect.right;
-    return rightSpace >= 360 || rightSpace >= leftSpace ? 'right' : 'left';
-  }
-
-  private async loadRecallCandidates(input: {
-    readonly offset: number;
-    readonly append: boolean;
-    readonly renderScope?: 'panel' | 'recall';
-    readonly showBusy?: boolean;
-  }): Promise<void> {
-    if (!this.recallStore) return;
-    const renderUpdatedRecall = input.renderScope === 'panel' ? () => this.render() : () => this.renderRecallOnly();
-    let pending = true;
-    if (input.showBusy !== false) {
-      this.clearRecallMessageTimer();
-      this.state = reducePanelAction(this.state, { name: 'recall/load-start' });
-      if (this.isRecallOpening()) {
-        void this.waitForRecallOpening().then(() => {
-          if (pending && this.state.recall.busy) renderUpdatedRecall();
-        });
-      } else {
-        renderUpdatedRecall();
-      }
-    }
-    const result = await this.recallStore.loadCandidates({
-      offset: input.offset,
-      limit: 100,
-      scope: this.state.bookmarkVisibilityScope,
-      currentPageUrl: window.location.href,
-    });
-    pending = false;
-    await this.waitForRecallOpening();
-    if (!result.ok) {
-      this.clearRecallMessageTimer();
-      if (result.reason === 'encryption-locked') await this.recallExport.refreshBlobKeyStatus();
-      this.state = reducePanelAction(this.state, { name: 'recall/error', message: result.message });
-      renderUpdatedRecall();
-      return;
-    }
-    this.state = reducePanelAction(this.state, {
-      name: 'recall/load-complete',
-      candidates: result.candidates,
-      append: input.append,
-      offset: input.offset,
-      nextOffset: result.nextOffset,
-      hasMore: result.hasMore,
-      total: result.total,
-      failedCount: result.failedCount,
-      message: result.message,
-    });
-    this.scheduleRecallMessageClear(result.message);
-    renderUpdatedRecall();
-  }
-
-  private isRecallOpening(): boolean {
-    return Date.now() < this.recallOpeningUntil;
-  }
-
-  private async waitForRecallOpening(): Promise<void> {
-    const remaining = this.recallOpeningUntil - Date.now();
-    if (remaining <= 0) return;
-    await new Promise((resolve) => window.setTimeout(resolve, remaining));
-  }
-
-  private refreshRecallIfOpen(): void {
-    if (!this.state.recall.open) return;
-    void this.loadRecallCandidates({
-      offset: this.state.bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
-      append: false,
-      showBusy: false,
-    });
-  }
-
-  private scheduleRecallMessageClear(message: string): void {
-    this.clearRecallMessageTimer();
-    this.recallMessageClearTimer = window.setTimeout(() => {
-      this.recallMessageClearTimer = null;
-      this.state = reducePanelAction(this.state, { name: 'recall/message-clear', message });
-      this.renderRecallOnly();
-    }, RECALL_SUCCESS_MESSAGE_MS);
-  }
-
-  private clearRecallMessageTimer(): void {
-    if (this.recallMessageClearTimer === null) return;
-    window.clearTimeout(this.recallMessageClearTimer);
-    this.recallMessageClearTimer = null;
-  }
-
   private scheduleFiniteCaptureErrorReset(
     updatedAt: number,
     mode: 'status' | 'capture-result',
@@ -920,28 +832,7 @@ export class ImageTrailPanel {
 
   private renderPanelAndRefreshRecall(): void {
     this.render({ includeRecall: false });
-    this.refreshRecallIfOpen();
-  }
-
-  private async recallSelectedRecords(): Promise<void> {
-    if (!this.recallStore || this.state.recall.selectedIds.length === 0) return;
-    this.state = reducePanelAction(this.state, { name: 'recall/load-start' });
-    this.renderRecallOnly();
-    const result = await this.recallStore.recall(this.state.recall.selectedIds);
-    if (!result.ok) {
-      if (result.reason === 'encryption-locked') await this.recallExport.refreshBlobKeyStatus();
-      this.state = reducePanelAction(this.state, { name: 'recall/error', message: result.message });
-      this.renderRecallOnly();
-      return;
-    }
-    await this.loadBookmarkPage(0, { render: false });
-    this.state = reducePanelAction(this.state, {
-      name: 'recall/complete',
-      records: result.records,
-      failedCount: result.failedCount,
-      message: result.message,
-    });
-    this.renderPanelAndRefreshRecall();
+    this.recallDrawer.refreshRecallIfOpen();
   }
 
   private createActionDeps(): PanelActionDeps {
@@ -956,8 +847,8 @@ export class ImageTrailPanel {
       },
       render: (options) => this.render(options),
       renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
-      refreshRecallIfOpen: () => this.refreshRecallIfOpen(),
-      clearRecallMessageTimer: () => this.clearRecallMessageTimer(),
+      refreshRecallIfOpen: () => this.recallDrawer.refreshRecallIfOpen(),
+      clearRecallMessageTimer: () => this.recallDrawer.clearRecallMessageTimer(),
       getLocalSettings: () => this.localSettings,
       saveLocalSettings: (settings) => this.saveLocalSettings(settings),
       pageAdapter: () => this.pageAdapter,
@@ -989,12 +880,12 @@ export class ImageTrailPanel {
       updateNeighborPreload: (enabled, radius, cacheLimit, probeMethod) =>
         this.updateNeighborPreload(enabled, radius, cacheLimit, probeMethod),
       preloadMoreNeighbors: (radius, cacheLimit) => this.preloadMoreNeighbors(radius, cacheLimit),
-      resetPanelPosition: () => this.resetPanelPosition(),
+      resetPanelPosition: () => this.panelPosition.resetPanelPosition(),
       refreshStorageUsage: (options) => this.refreshStorageUsage(options),
       restoreParsedFieldStateForCurrentPanel: () => this.restoreParsedFieldStateForCurrentPanel(),
-      openRecallDrawer: () => this.openRecallDrawer(),
-      loadRecallCandidates: (input) => this.loadRecallCandidates(input),
-      recallSelectedRecords: () => this.recallSelectedRecords(),
+      openRecallDrawer: () => this.recallDrawer.openRecallDrawer(),
+      loadRecallCandidates: (input) => this.recallDrawer.loadRecallCandidates(input),
+      recallSelectedRecords: () => this.recallDrawer.recallSelectedRecords(),
       enqueueFieldTransform: (action) => this.enqueueFieldTransform(action),
       enqueueSelectedUrlApply: (url) => this.enqueueSelectedUrlApply(url),
       rejectUrlEditorInput: () => this.rejectUrlEditorInput(),
@@ -1692,15 +1583,15 @@ export class ImageTrailPanel {
           dispatch: this.dispatch,
           layoutState: this.layoutState,
           scrollAnchorId: this.projectionApplication.previewScrollAnchorId,
-          onPanelDragStart: this.handlePanelDragStart,
+          onPanelDragStart: this.panelPosition.handlePanelDragStart,
         },
         this.state,
         { renderRecall: options.includeRecall !== false },
       );
       this.restoreFocusedPanelControl(focusedControl);
       if (!this.state.minimized && this.panelStylesReady) {
-        this.queuePanelPositionRestore();
-        this.applyRestoredPanelPosition();
+        this.panelPosition.queuePanelPositionRestore();
+        this.panelPosition.applyRestoredPanelPosition();
       }
       this.renderBufferedDebugOverlay();
     }
@@ -1859,135 +1750,9 @@ export class ImageTrailPanel {
         dispatch: this.dispatch,
         layoutState: this.layoutState,
         scrollAnchorId: this.projectionApplication.previewScrollAnchorId,
-        onPanelDragStart: this.handlePanelDragStart,
+        onPanelDragStart: this.panelPosition.handlePanelDragStart,
       },
       this.state,
     );
-  }
-
-  private async ensurePanelPositionRestored(): Promise<void> {
-    if (!this.root) return;
-    this.panelPositionRestorePromise ??= this.beginPanelPositionRestore();
-    await this.panelPositionRestorePromise;
-  }
-
-  private queuePanelPositionRestore(): void {
-    if (!this.root || this.panelPositionRestored || this.panelPositionRestorePromise) return;
-    this.panelPositionRestorePromise = this.beginPanelPositionRestore();
-  }
-
-  private beginPanelPositionRestore(): Promise<void> {
-    const attempt = (this.panelPositionRestoreAttempt += 1);
-    return this.restorePanelPosition(attempt);
-  }
-
-  private async restorePanelPosition(attempt: number): Promise<void> {
-    if (!this.root || !this.panelPositionStore || this.panelPositionRestored) return;
-    try {
-      const hostname = hostnameFromLocation();
-      if (!hostname) return;
-      const saved = await this.panelPositionStore.load(hostname);
-      if (!saved || !this.isPanelPositionRestoreCurrent(attempt)) return;
-      await this.waitForPanelLayout();
-      if (!this.isPanelPositionRestoreCurrent(attempt)) return;
-      this.restoredPanelPosition = this.clampPanelPosition(saved);
-      this.applyRestoredPanelPosition();
-      this.renderRecallOnly();
-    } finally {
-      if (this.root && this.panelPositionRestoreAttempt === attempt) {
-        this.panelPositionRestored = true;
-      }
-    }
-  }
-
-  private isPanelPositionRestoreCurrent(attempt: number): boolean {
-    return Boolean(this.root) && this.panelPositionRestoreAttempt === attempt && !this.panelPositionRestored;
-  }
-
-  private async waitForPanelLayout(): Promise<void> {
-    await this.panelMount.whenStylesReady();
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-  }
-
-  private handlePanelDragStart = (event: PointerEvent): void => {
-    if (event.button !== 0 || !this.root) return;
-    event.preventDefault();
-    const root = this.root;
-    const startRect = root.getBoundingClientRect();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    let latest = this.clampPanelPosition({ left: startRect.left, top: startRect.top });
-
-    const onMove = (moveEvent: PointerEvent): void => {
-      latest = this.clampPanelPosition({
-        left: startRect.left + moveEvent.clientX - startX,
-        top: startRect.top + moveEvent.clientY - startY,
-      });
-      this.applyPanelPosition(latest);
-      this.restoredPanelPosition = latest;
-      this.renderRecallOnly();
-    };
-
-    const onUp = (): void => {
-      document.removeEventListener('pointermove', onMove, true);
-      document.removeEventListener('pointerup', onUp, true);
-      document.removeEventListener('pointercancel', onUp, true);
-      void this.savePanelPosition(latest);
-    };
-
-    document.addEventListener('pointermove', onMove, true);
-    document.addEventListener('pointerup', onUp, true);
-    document.addEventListener('pointercancel', onUp, true);
-  };
-
-  private clampPanelPosition(position: PanelPosition): PanelPosition {
-    if (!this.root) return position;
-    const rect = this.root.getBoundingClientRect();
-    return clampPanelPosition(
-      position,
-      { width: rect.width, height: rect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-  }
-
-  private applyPanelPosition(position: PanelPosition): void {
-    if (!this.root) return;
-    this.root.style.left = `${Math.round(position.left)}px`;
-    this.root.style.top = `${Math.round(position.top)}px`;
-    this.root.style.right = 'auto';
-  }
-
-  private clearPanelPosition(): void {
-    if (!this.root) return;
-    this.root.style.removeProperty('left');
-    this.root.style.removeProperty('top');
-    this.root.style.removeProperty('right');
-  }
-
-  private applyRestoredPanelPosition(): void {
-    if (!this.restoredPanelPosition) return;
-    this.applyPanelPosition(this.restoredPanelPosition);
-  }
-
-  private async savePanelPosition(position: PanelPosition): Promise<void> {
-    if (!this.panelPositionStore) return;
-    const hostname = hostnameFromLocation();
-    if (!hostname) return;
-    await this.panelPositionStore.save(hostname, position);
-  }
-
-  private async resetPanelPosition(): Promise<void> {
-    const hostname = hostnameFromLocation();
-    if (!hostname) return;
-    this.panelPositionRestoreAttempt += 1;
-    this.panelPositionRestorePromise = null;
-    await this.panelPositionStore?.remove(hostname);
-    this.restoredPanelPosition = null;
-    this.panelPositionRestored = true;
-    this.clearPanelPosition();
-    this.state = { ...this.state, message: 'Panel position reset for this site.', status: 'ready', lastUpdatedAt: Date.now() };
-    this.render();
-    this.renderRecallOnly();
   }
 }
