@@ -42,7 +42,8 @@ test('close action removes panel DOM and restores page state', async ({ page, se
   await openFixturePage(page, fixturePaths.singleImage);
 
   const before = await page.locator('#fixture-primary-image').evaluate((image) => ({
-    bodyStyle: document.body.getAttribute('style'),
+    bodyBackground: document.body.style.background,
+    documentElementBackground: document.documentElement.style.background,
     imageStyle: image.getAttribute('style'),
   }));
 
@@ -51,6 +52,10 @@ test('close action removes panel DOM and restores page state', async ({ page, se
   await page.getByRole('button', { name: 'Close panel' }).click();
   await expectPanelClosed(page);
 
-  await expect(page.locator('#fixture-primary-image')).toHaveAttribute('style', before.imageStyle ?? '');
-  await expect(page.locator('body')).toHaveAttribute('style', before.bodyStyle ?? '');
+  const after = await page.locator('#fixture-primary-image').evaluate((image) => ({
+    bodyBackground: document.body.style.background,
+    documentElementBackground: document.documentElement.style.background,
+    imageStyle: image.getAttribute('style'),
+  }));
+  expect(after).toEqual(before);
 });
