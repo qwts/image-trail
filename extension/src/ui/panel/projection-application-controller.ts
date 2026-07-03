@@ -107,14 +107,17 @@ export class ProjectionApplicationController {
     if (!session) return false;
     if (options.resetFieldState) this.deps.setState(this.resetParsedFieldInteractionState(this.deps.getState()));
     const baselineFingerprint = this.deps.currentKnownImageFingerprint();
+    // Resolve the collaborator once so the preload call and its runId context key read the same
+    // instance (the lazy getter is a seam; a single reference keeps runId consistent per load).
+    const neighborPreload = this.deps.neighborPreload();
     this.deps.projections().update(session, { status: 'preloading' });
-    const preload = await this.deps.neighborPreload().preload(nextUrl, {
+    const preload = await neighborPreload.preload(nextUrl, {
       readCache: session.reason !== 'parsed-field-navigation',
       writeCache: session.reason !== 'parsed-field-navigation',
       intent: this.imageRequestIntentForProjectionReason(session.reason),
       contextKey:
         session.reason === 'parsed-field-navigation'
-          ? this.deps.parsedFieldRequestContextKey(attemptedFieldIds, options.preloadDirection, this.deps.neighborPreload().runId)
+          ? this.deps.parsedFieldRequestContextKey(attemptedFieldIds, options.preloadDirection, neighborPreload.runId)
           : undefined,
     });
     if (!this.isCurrentProjectionSession(session)) return false;
