@@ -1016,7 +1016,7 @@ export class ImageTrailPanel {
       this.slideshow.destroy();
       this.retry.destroy();
       this.keyboard.disable();
-      this.cleanupMountedElements();
+      this.cleanupMountedElements({ releaseTarget: true });
       return;
     }
     this.pageAdapter.prepareStandaloneImageBackdrop();
