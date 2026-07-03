@@ -99,7 +99,6 @@ import {
   urlReviewStatusClearScopeLabel,
   withoutRecentPinState,
 } from './panel/record-export-helpers.js';
-import { type BookmarkImportResult, type HistoryImportResult, type UrlReviewStatusImportResult } from './panel/restore-import-preview.js';
 import { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../content/panel-services.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
 import { isUnsupportedUrlEditorInput } from './components/url-editor-view.js';
@@ -144,16 +143,6 @@ const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
 const MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS = 50;
 
 type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
-
-type PendingRestoreImport =
-  | { readonly kind: 'history'; readonly result: HistoryImportResult; readonly duplicateCount: number }
-  | {
-      readonly kind: 'bookmarks';
-      readonly result: BookmarkImportResult;
-      readonly duplicateCount: number;
-      readonly password: string;
-    }
-  | { readonly kind: 'url-review-status'; readonly result: UrlReviewStatusImportResult };
 
 function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {
   const match = value?.match(/^\s*(\d+)\s*[x×]\s*(\d+)\s*$/iu);
@@ -237,7 +226,6 @@ export class ImageTrailPanel {
   private recallOpeningUntil = 0;
   private recallMessageClearTimer: number | null = null;
   private finiteCaptureErrorTimer: number | null = null;
-  private pendingRestoreImport: PendingRestoreImport | null = null;
   private readonly fieldStateSync = new ParsedFieldStateSync({
     store: () => this.parsedFieldStateStore,
     hostname: () => this.parsedFieldStateHostname(),
