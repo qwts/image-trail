@@ -11,13 +11,8 @@ import {
 } from '../content/pcloud-provider-client.js';
 import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
-import type { PageAdapter, TargetSelectionSnapshot } from '../content/page-adapter.js';
-import {
-  applyFieldLoadFailureToState,
-  applyFieldSplitSpecToState,
-  pruneInvalidFieldSplitSpecsFromState,
-  reducePanelAction,
-} from '../core/actions.js';
+import type { PageAdapter } from '../content/page-adapter.js';
+import { applyFieldSplitSpecToState, pruneInvalidFieldSplitSpecsFromState, reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
 import type { BuildIdentity } from '../core/build-info.js';
@@ -30,14 +25,12 @@ import type {
   PanelState,
   ParsedFieldStateRecord,
   ParsedFieldStateStore,
-  TargetState,
   UrlReviewStatusClearFilter,
   UrlTemplateStore,
   UrlReviewStatus,
   UrlReviewStatusStore,
 } from '../core/types.js';
-import type { ImageRequestIntent } from '../core/image/request-policy.js';
-import { imageResourceUrlsEqual, pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
+import { imageResourceUrlsEqual } from '../core/image/image-navigation.js';
 import {
   NEIGHBOR_PRELOAD_CACHE_LIMITS,
   NEIGHBOR_PRELOAD_RADIUS_LIMITS,
@@ -64,7 +57,7 @@ import {
   type NeighborPreloadDirection,
 } from '../core/url/preload-neighbors.js';
 import { collectUrlFields } from '../core/url/tokenize-fields.js';
-import { ProjectionSessionController, type ProjectionReason, type ProjectionSession } from '../core/projection-session.js';
+import { ProjectionSessionController } from '../core/projection-session.js';
 import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
 import {
   createThumbnailDataUrlFromDataUrl,
@@ -83,6 +76,7 @@ import { RecallRestoreController } from './panel/recall-restore-controller.js';
 import { RecordLibraryController } from './panel/record-library-controller.js';
 import { CapturedOriginalsController } from './panel/captured-originals-controller.js';
 import { UrlTemplateSettingsController } from './panel/url-template-settings-controller.js';
+import { ProjectionApplicationController, toTargetState, urlReviewStatusForLoadResult } from './panel/projection-application-controller.js';
 import { dispatchPanelAction } from './panel/action-dispatch.js';
 import { buildPanelActionRegistry } from './panel/actions/registry.js';
 import type { PanelActionDeps } from './panel/actions/deps.js';
@@ -96,10 +90,6 @@ import { clampPanelPosition, hostnameFromLocation } from './panel-position.js';
 const RECALL_DRAWER_OPEN_ANIMATION_MS = 190;
 const RECALL_SUCCESS_MESSAGE_MS = 1800;
 const FINITE_CAPTURE_ERROR_MS = 2400;
-// Field-load (parsed-field navigation) errors are transient and should clear quickly; arrow / next
-// / prev traversal mutes them entirely (see applySelectedUrl's quietFailure), while the +/- single
-// step surfaces them for only about this long.
-const FIELD_LOAD_ERROR_DISPLAY_MS = 1500;
 
 type FieldEditorEffect =
   | { readonly kind: 'noop' }
@@ -132,32 +122,8 @@ function removeItems(items: readonly string[], removedItems: readonly string[]):
   return items.filter((item) => !removed.has(item));
 }
 
-export function urlReviewStatusForLoadResult(nextFingerprint: string | null, previousFingerprint: string | null): UrlReviewStatus | null {
-  if (!nextFingerprint || !previousFingerprint) return null;
-  return nextFingerprint === previousFingerprint ? 'unchanged' : 'passed';
-}
-
-function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
-  const selectedUrl = snapshot.selected?.url ?? null;
-  return {
-    mode: snapshot.mode,
-    picking: snapshot.picking,
-    grabModeActive: snapshot.grabModeActive,
-    candidateCount: snapshot.candidateCount,
-    selectedUrl: selectedUrl?.startsWith('data:') ? 'data:' : selectedUrl,
-    selectedHandleId: snapshot.selected?.handleId ?? null,
-    selectedDimensions: snapshot.selected ? `${snapshot.selected.width}×${snapshot.selected.height}` : null,
-    fillScreen: snapshot.fillScreen,
-    objectFit: snapshot.objectFit,
-    message: snapshot.message,
-  };
-}
-
 export { nextParsedFieldStatePageKey, shouldRestoreParsedFieldState } from './panel/parsed-field-state-sync.js';
-
-export function projectionSessionOwnsSelectedTarget(session: ProjectionSession, selectedHandleId: string | null): boolean {
-  return session.selectedHandleId === selectedHandleId;
-}
+export { projectionSessionOwnsSelectedTarget, urlReviewStatusForLoadResult } from './panel/projection-application-controller.js';
 
 export class ImageTrailPanel {
   private readonly panelMount = new PanelMount({
@@ -185,7 +151,6 @@ export class ImageTrailPanel {
   private readonly slideshow: Slideshow;
   private readonly retry: Retry404;
   private localSettings: PlaintextLocalSettings = DEFAULT_LOCAL_SETTINGS;
-  private previewScrollAnchorId: string | null = null;
   private storageUsageRequestId = 0;
   private panelPositionRestored = false;
   private panelPositionRestorePromise: Promise<void> | null = null;
@@ -317,7 +282,7 @@ export class ImageTrailPanel {
     scheduleFiniteCaptureErrorReset: (updatedAt, mode) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode),
     findSelectedImage: (handleId) => this.findSelectedImage(handleId),
     isProjectionActive: (projectionId) => this.projections.isActive(projectionId),
-    applySelectedUrl: (url, attemptedFieldIds, options) => this.applySelectedUrl(url, attemptedFieldIds, options),
+    applySelectedUrl: (url, attemptedFieldIds, options) => this.projectionApplication.applySelectedUrl(url, attemptedFieldIds, options),
     removeCapturedBlobReference: (blobId, options) => this.capturedOriginals.removeCapturedBlobReference(blobId, options),
     bookmarkStore: () => this.bookmarkStore,
     recentHistoryStore: () => this.recentHistoryStore,
@@ -346,6 +311,34 @@ export class ImageTrailPanel {
     captureStore: () => this.captureStore,
     bookmarkStore: () => this.bookmarkStore,
     recentHistoryStore: () => this.recentHistoryStore,
+  });
+  private readonly projectionApplication: ProjectionApplicationController = new ProjectionApplicationController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    loadGrabSettings: () => this.loadGrabSettings(),
+    scheduleFiniteCaptureErrorReset: (updatedAt, mode, durationMs) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode, durationMs),
+    saveFieldState: () => this.fieldStateSync.save(),
+    setExtensionProjectedPageUrl: (pageUrl) => this.fieldStateSync.setExtensionProjectedPageUrl(pageUrl),
+    refreshBufferedNavPreloads: () => this.bufferedNav.refreshPreloads(),
+    primeBufferedNav: () => this.bufferedNav.prime(),
+    refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
+    saveUrlReviewStatus: (status, sourceUrl, fieldIds, reason) => this.saveUrlReviewStatus(status, sourceUrl, fieldIds, reason),
+    currentKnownImageFingerprint: () => this.currentKnownImageFingerprint(),
+    applyFieldLoadResult: (state, attemptedFieldIds, nextFingerprint, previousFingerprint) =>
+      this.applyFieldLoadResult(state, attemptedFieldIds, nextFingerprint, previousFingerprint),
+    pruneInvalidFieldSplitSpecsForUrl: (state, url, options) => this.pruneInvalidFieldSplitSpecsForUrl(state, url, options),
+    parsedFieldRequestContextKey: (attemptedFieldIds, direction, runId) =>
+      this.parsedFieldRequestContextKey(attemptedFieldIds, direction, runId),
+    currentSelectedUrl: () => this.currentSelectedUrl(),
+    projectedSourceUrl: () => this.projectedSourceUrl(),
+    findSelectedImage: (handleId) => this.findSelectedImage(handleId),
+    projections: () => this.projections,
+    neighborPreload: () => this.neighborPreload,
+    pageAdapter: () => this.pageAdapter,
+    captureStore: () => this.captureStore,
   });
   private bufferedNavigationToastTimer: number | null = null;
   private queuedParsedNavigationDelta = 0;
@@ -593,7 +586,7 @@ export class ImageTrailPanel {
     ctx: { readonly sameSource: boolean; readonly projectSavedSource: boolean },
   ): Promise<void> {
     if (ctx.projectSavedSource && !ctx.sameSource) {
-      const projected = await this.applySelectedUrl(record.sourceUrl, [], { reason: 'parsed-field-restore' });
+      const projected = await this.projectionApplication.applySelectedUrl(record.sourceUrl, [], { reason: 'parsed-field-restore' });
       if (!projected && !imageResourceUrlsEqual(record.sourceUrl, this.currentRawUrl(), window.location.href)) return;
     }
     this.state = reducePanelAction(this.state, {
@@ -1008,7 +1001,7 @@ export class ImageTrailPanel {
       captureImage: (url, sourceType, sourceRecordId) => this.capturedOriginals.captureImage(url, sourceType, sourceRecordId),
       deleteCapturedBlob: (recordId, blobId) => this.capturedOriginals.deleteCapturedBlob(recordId, blobId),
       cleanupOrphanedBlobs: () => this.capturedOriginals.cleanupOrphanedBlobs(),
-      previewRecord: (url, blobId, scrollAnchorId) => this.previewRecord(url, blobId, scrollAnchorId),
+      previewRecord: (url, blobId, scrollAnchorId) => this.projectionApplication.previewRecord(url, blobId, scrollAnchorId),
       clearUrlReviewStatus: (scope) => this.clearUrlReviewStatus(scope),
       navigateBy: (delta) => this.navigateBy(delta),
     };
@@ -1188,7 +1181,7 @@ export class ImageTrailPanel {
       return;
     }
 
-    await this.applySelectedUrl(url, [], { pushVisibleUrl: true, resetFieldState: url !== this.currentRawUrl() });
+    await this.projectionApplication.applySelectedUrl(url, [], { pushVisibleUrl: true, resetFieldState: url !== this.currentRawUrl() });
   }
 
   private rejectUrlEditorInput(): void {
@@ -1308,7 +1301,7 @@ export class ImageTrailPanel {
       });
     }
     if (effect.state) this.applyPanelState(effect.state);
-    const loaded = await this.applySelectedUrl(effect.url, effect.attemptedFieldIds);
+    const loaded = await this.projectionApplication.applySelectedUrl(effect.url, effect.attemptedFieldIds);
     if (loaded && (effect.saveTemplateOnLoad === 'always' || this.state.unlockedFieldIds.length > 0)) {
       await this.urlTemplateSettings.saveUrlTemplateFromCurrentFields();
     }
@@ -1402,7 +1395,7 @@ export class ImageTrailPanel {
       }
     }
 
-    const loaded = await this.applySelectedUrl(
+    const loaded = await this.projectionApplication.applySelectedUrl(
       nextUrl,
       navigableFields.map((field) => field.id),
       { preloadDirection: delta, quietFailure: true },
@@ -1456,15 +1449,15 @@ export class ImageTrailPanel {
     sha256: string | null,
     attemptedFieldIds: readonly string[],
   ): Promise<boolean> {
-    const session = this.beginProjectionSession('parsed-field-navigation', nextUrl);
+    const session = this.projectionApplication.beginProjectionSession('parsed-field-navigation', nextUrl);
     if (!session) return false;
     const baselineFingerprint = this.currentKnownImageFingerprint();
     const reviewStatus = urlReviewStatusForLoadResult(sha256, baselineFingerprint);
     const snapshot = this.pageAdapter.getSnapshot();
     if (snapshot.selected) {
-      const nextSnapshot = this.applyProjectionToSelectedImage(session, displayUrl);
+      const nextSnapshot = this.projectionApplication.applyProjectionToSelectedImage(session, displayUrl);
       if (!nextSnapshot) return false;
-      if (!this.isCurrentProjectionSession(session)) return false;
+      if (!this.projectionApplication.isCurrentProjectionSession(session)) return false;
       this.state = { ...setTargetState(this.state, toTargetState(nextSnapshot)), draftUrl: null };
     }
     this.state = this.applyFieldLoadResult(this.state, attemptedFieldIds, sha256, baselineFingerprint);
@@ -1490,117 +1483,6 @@ export class ImageTrailPanel {
     return mostRecentSuccessfulIncluded ? [mostRecentSuccessfulIncluded] : includedFields;
   }
 
-  private async applySelectedUrl(
-    nextUrl: string,
-    attemptedFieldIds: readonly string[] = [],
-    options: {
-      readonly pushVisibleUrl?: boolean;
-      readonly reason?: ProjectionReason;
-      readonly preloadDirection?: NeighborPreloadDirection;
-      readonly resetFieldState?: boolean;
-      readonly quietFailure?: boolean;
-    } = {},
-  ): Promise<boolean> {
-    const session = this.beginProjectionSession(options.reason ?? this.applySelectedUrlReason(attemptedFieldIds), nextUrl);
-    if (!session) return false;
-    if (options.resetFieldState) this.state = this.resetParsedFieldInteractionState(this.state);
-    const baselineFingerprint = this.currentKnownImageFingerprint();
-    this.projections.update(session, { status: 'preloading' });
-    const preload = await this.neighborPreload.preload(nextUrl, {
-      readCache: session.reason !== 'parsed-field-navigation',
-      writeCache: session.reason !== 'parsed-field-navigation',
-      intent: this.imageRequestIntentForProjectionReason(session.reason),
-      contextKey:
-        session.reason === 'parsed-field-navigation'
-          ? this.parsedFieldRequestContextKey(attemptedFieldIds, options.preloadDirection, this.neighborPreload.runId)
-          : undefined,
-    });
-    if (!this.isCurrentProjectionSession(session)) return false;
-    if (!preload.ok) {
-      this.projections.update(session, { status: 'failed' });
-      const failedState = this.pruneInvalidFieldSplitSpecsForUrl(
-        applyFieldLoadFailureToState(this.state, { draftUrl: nextUrl, attemptedFieldIds, message: preload.message }),
-        nextUrl,
-        { preserveMessage: true },
-      );
-      // Arrow / next / prev traversal skips past bad URLs, so it mutes the alert: keep the failure in
-      // field/review state (which drives the skip) but leave the previous status/message so we don't
-      // flash a red error or churn the panel on every skipped image. The +/- single step still shows
-      // the error, briefly.
-      if (options.quietFailure) {
-        this.state = { ...failedState, status: this.state.status, message: this.state.message, lastUpdatedAt: this.state.lastUpdatedAt };
-      } else {
-        this.state = failedState;
-        this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'status', FIELD_LOAD_ERROR_DISPLAY_MS);
-        this.render();
-      }
-      void this.saveUrlReviewStatus('failed', nextUrl, attemptedFieldIds, preload.message);
-      void this.fieldStateSync.save();
-      if (session.reason === 'parsed-field-navigation') this.bufferedNav.refreshPreloads();
-      return false;
-    }
-
-    const reviewStatus = urlReviewStatusForLoadResult(preload.sha256, baselineFingerprint);
-    if (attemptedFieldIds.length > 0 && reviewStatus === 'unchanged') {
-      this.projections.update(session, { status: 'loaded', displayUrl: preload.displayUrl });
-      this.state = this.pruneInvalidFieldSplitSpecsForUrl(
-        this.applyFieldLoadResult(
-          { ...this.state, draftUrl: nextUrl, message: 'Image loaded but did not change.', status: 'ready', lastUpdatedAt: Date.now() },
-          attemptedFieldIds,
-          preload.sha256,
-          baselineFingerprint,
-        ),
-        nextUrl,
-        { preserveMessage: true },
-      );
-      void this.saveUrlReviewStatus('unchanged', nextUrl, attemptedFieldIds, 'Image loaded but did not change.');
-      void this.fieldStateSync.save();
-      this.render();
-      return false;
-    }
-
-    const snapshot = this.pageAdapter.getSnapshot();
-    if (snapshot.selected) {
-      const nextSnapshot = this.applyProjectionToSelectedImage(session, preload.displayUrl);
-      if (!nextSnapshot) return false;
-      if (!this.isCurrentProjectionSession(session)) return false;
-      this.state = { ...setTargetState(this.state, toTargetState(nextSnapshot)), draftUrl: null };
-    }
-    this.state = this.pruneInvalidFieldSplitSpecsForUrl(
-      this.applyFieldLoadResult(this.state, attemptedFieldIds, preload.sha256, baselineFingerprint),
-      nextUrl,
-      { preserveMessage: true },
-    );
-    if (reviewStatus === 'passed') void this.saveUrlReviewStatus(reviewStatus, nextUrl, attemptedFieldIds);
-    if (options.pushVisibleUrl && pushVisibleUrlWhenSameOrigin(nextUrl))
-      this.fieldStateSync.setExtensionProjectedPageUrl(window.location.href);
-    void this.fieldStateSync.save();
-    this.render();
-    void this.loadGrabSettings();
-    if (session.reason === 'parsed-field-navigation') {
-      this.bufferedNav.prime();
-    }
-    return true;
-  }
-
-  private applySelectedUrlReason(attemptedFieldIds: readonly string[]): ProjectionReason {
-    return attemptedFieldIds.length > 0 ? 'parsed-field-navigation' : 'selected-url-apply';
-  }
-
-  private imageRequestIntentForProjectionReason(reason: ProjectionReason): ImageRequestIntent {
-    switch (reason) {
-      case 'parsed-field-navigation':
-      case 'parsed-field-restore':
-        return 'field-active-navigation';
-      case 'bookmark-load':
-        return 'bookmark-load';
-      case 'record-preview':
-        return 'recent-load';
-      case 'selected-url-apply':
-        return 'url-editor-apply';
-    }
-  }
-
   private parsedFieldRequestContextKey(
     attemptedFieldIds: readonly string[],
     direction: NeighborPreloadDirection | undefined,
@@ -1616,54 +1498,6 @@ export class ImageTrailPanel {
       this.state.target.selectedHandleId ?? '',
       direction === undefined ? '' : String(direction),
     ].join('\n');
-  }
-
-  private resetParsedFieldInteractionState(state: PanelState): PanelState {
-    return {
-      ...state,
-      activeFieldId: null,
-      failedFieldId: null,
-      successfulFieldIds: [],
-      unchangedFieldIds: [],
-      unlockedFieldIds: [],
-      manuallyExcludedFieldIds: [],
-      fieldSplitSpecs: [],
-      fieldDigitWidthSpecs: [],
-    };
-  }
-
-  private beginProjectionSession(reason: ProjectionReason, sourceUrl: string): ProjectionSession | null {
-    const result = this.projections.beginGuarded({
-      reason,
-      sourceUrl,
-      selectedHandleId: this.state.target.selectedHandleId,
-      originalSourceUrl: this.projectedSourceUrl(),
-    });
-    if (result.ok) return result.session;
-    console.warn('Image Trail projection loop guard blocked a repeated host image projection request.', result.warning);
-    this.state = {
-      ...this.state,
-      status: 'error',
-      message: 'Projection stopped because repeated host image requests looked like a loop.',
-      lastUpdatedAt: Date.now(),
-    };
-    this.render();
-    return null;
-  }
-
-  private isCurrentProjectionSession(session: ProjectionSession): boolean {
-    return this.projections.isActive(session) && projectionSessionOwnsSelectedTarget(session, this.state.target.selectedHandleId);
-  }
-
-  private applyProjectionToSelectedImage(session: ProjectionSession, displayUrl: string): TargetSelectionSnapshot | null {
-    if (!this.isCurrentProjectionSession(session)) return null;
-    this.projections.update(session, { status: 'applying', displayUrl });
-    const snapshot = this.pageAdapter.applyUrlToSelected(session.sourceUrl, displayUrl, {
-      projectionId: session.id,
-      projectionReason: session.reason,
-    });
-    if (!this.isCurrentProjectionSession(session)) return null;
-    return snapshot;
   }
 
   private preloadMoreNeighbors(radius: number, cacheLimit: number): void {
@@ -1798,128 +1632,6 @@ export class ImageTrailPanel {
     return document.querySelector<HTMLImageElement>(`[data-image-trail-handle="${handleId}"]`);
   }
 
-  private async previewRecord(url: string, blobId?: string, scrollAnchorId?: string): Promise<void> {
-    this.previewScrollAnchorId = scrollAnchorId ?? null;
-    let session: ProjectionSession | null = null;
-    try {
-      if ((!blobId || !this.captureStore) && this.isCurrentSelectedImageUrl(url)) {
-        this.applyAlreadyProjectedPreviewMessage();
-        return;
-      }
-      session = this.beginProjectionSession('record-preview', url);
-      if (!session) return;
-      if (!blobId) {
-        await this.previewUrl(url, session);
-        return;
-      }
-
-      if (!this.captureStore) {
-        await this.previewUrl(url, session);
-        return;
-      }
-      const retrieved = await this.captureStore.requestRetrieveBlob(blobId);
-      if (!this.isCurrentProjectionSession(session)) return;
-      if (!retrieved.ok) {
-        if (retrieved.reason === 'encryption-locked') await this.recallExport.refreshBlobKeyStatus();
-        if (!this.isCurrentProjectionSession(session)) return;
-        this.projections.update(session, { status: 'failed' });
-        this.state = { ...this.state, message: retrieved.message, status: 'error', lastUpdatedAt: Date.now() };
-        this.render();
-        return;
-      }
-
-      if (await this.projectUrlToSelectedImage(retrieved.dataUrl, session)) {
-        if (!this.isCurrentProjectionSession(session)) return;
-        this.state = {
-          ...this.state,
-          message: `Projected encrypted original (${(retrieved.byteLength / 1024).toFixed(1)} KB).`,
-          lastUpdatedAt: Date.now(),
-        };
-        this.render();
-        return;
-      }
-
-      if (!this.isCurrentProjectionSession(session)) return;
-      this.projections.update(session, { status: 'failed' });
-      this.state = {
-        ...this.state,
-        message: 'Select a host image before previewing encrypted originals.',
-        status: 'error',
-        lastUpdatedAt: Date.now(),
-      };
-      this.render();
-    } finally {
-      if (!session || this.isCurrentProjectionSession(session)) this.previewScrollAnchorId = null;
-    }
-  }
-
-  private async previewUrl(url: string, session: ProjectionSession): Promise<void> {
-    if (!this.canProjectToSelectedImage()) {
-      if (!this.isCurrentProjectionSession(session)) return;
-      this.projections.update(session, { status: 'failed' });
-      this.state = {
-        ...this.state,
-        message: 'Select a host image before previewing an image.',
-        status: 'error',
-        lastUpdatedAt: Date.now(),
-      };
-      this.render();
-      return;
-    }
-
-    if (await this.projectUrlToSelectedImage(url, session)) {
-      if (!this.isCurrentProjectionSession(session)) return;
-      this.state = { ...this.state, message: 'Projected image into selected host element.', lastUpdatedAt: Date.now() };
-      this.render();
-      return;
-    }
-  }
-
-  private canProjectToSelectedImage(): boolean {
-    const handleId = this.state.target.selectedHandleId;
-    return !!handleId && !!this.findSelectedImage(handleId);
-  }
-
-  private isCurrentSelectedImageUrl(url: string): boolean {
-    return imageResourceUrlsEqual(url, this.currentSelectedUrl(), window.location.href);
-  }
-
-  private applyAlreadyProjectedPreviewMessage(): void {
-    this.state = {
-      ...this.state,
-      message: 'Recent image is already projected into the selected host element.',
-      status: 'ready',
-      lastUpdatedAt: Date.now(),
-    };
-    this.render();
-  }
-
-  private async projectUrlToSelectedImage(url: string, session: ProjectionSession): Promise<boolean> {
-    const handleId = this.state.target.selectedHandleId;
-    if (!handleId) return false;
-    const image = this.findSelectedImage(handleId);
-    if (!image) return false;
-
-    this.projections.update(session, { status: 'preloading' });
-    const preload = await this.neighborPreload.preload(url, { intent: this.imageRequestIntentForProjectionReason(session.reason) });
-    if (!this.isCurrentProjectionSession(session)) return false;
-    if (!preload.ok) {
-      this.projections.update(session, { status: 'failed' });
-      this.state = { ...this.state, message: preload.message, status: 'error', lastUpdatedAt: Date.now() };
-      this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'status');
-      this.render();
-      return false;
-    }
-
-    const snapshot = this.applyProjectionToSelectedImage(session, preload.displayUrl);
-    if (!snapshot) return false;
-    if (!this.isCurrentProjectionSession(session)) return false;
-    this.state = setTargetState(this.state, toTargetState(snapshot));
-    this.render();
-    void this.loadGrabSettings();
-    return true;
-  }
-
   private showPCloudBackupPlaceholder(kind: 'backup' | 'restore'): void {
     const message =
       kind === 'backup'
@@ -1979,7 +1691,7 @@ export class ImageTrailPanel {
           toastRoot: this.toastRoot,
           dispatch: this.dispatch,
           layoutState: this.layoutState,
-          scrollAnchorId: this.previewScrollAnchorId,
+          scrollAnchorId: this.projectionApplication.previewScrollAnchorId,
           onPanelDragStart: this.handlePanelDragStart,
         },
         this.state,
@@ -2146,7 +1858,7 @@ export class ImageTrailPanel {
         toastRoot: this.toastRoot,
         dispatch: this.dispatch,
         layoutState: this.layoutState,
-        scrollAnchorId: this.previewScrollAnchorId,
+        scrollAnchorId: this.projectionApplication.previewScrollAnchorId,
         onPanelDragStart: this.handlePanelDragStart,
       },
       this.state,
