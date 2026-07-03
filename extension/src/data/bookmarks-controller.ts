@@ -818,7 +818,12 @@ function privatePinUrl(plainPinId: string): string {
   return `image-trail-private:${plainPinId}`;
 }
 
-function recordQueueTime(record: ImageDisplayRecord): string {
+/**
+ * Queue sort key for a record. Queue ordering is `queueUpdatedAt` (falling back to the
+ * capture `timestamp`), never the encrypted envelope's `updatedAt` — see AGENTS.md
+ * "Storage Rules". Exported so the invariant can be asserted directly (tests/invariants.test.ts).
+ */
+export function recordQueueTime(record: ImageDisplayRecord): string {
   return record.queueUpdatedAt ?? record.timestamp;
 }
 
