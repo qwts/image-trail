@@ -10,13 +10,12 @@ import { createInitialPanelState, setTargetState } from '../extension/src/core/s
 import { parseUrl } from '../extension/src/core/url/parse-url.js';
 import { isUnsupportedUrlEditorInput } from '../extension/src/ui/components/url-editor-view.js';
 import {
-  isLockedPrivatePin,
   nextParsedFieldStatePageKey,
-  originalBlobIdsForFullBackup,
   projectionSessionOwnsSelectedTarget,
   shouldRestoreParsedFieldState,
   urlReviewStatusForLoadResult,
 } from '../extension/src/ui/panel.js';
+import { isLockedPrivatePin, originalBlobIdsForFullBackup } from '../extension/src/ui/panel/record-export-helpers.js';
 import { createDisplayRecord } from '../extension/src/core/display-records.js';
 import {
   PRIVACY_RECORD_META,

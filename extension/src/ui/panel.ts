@@ -1,5 +1,5 @@
 import type { CaptureStore } from '../content/capture-controller.js';
-import { requestEncryptedImageExport, requestEncryptedImageImport, requestImageDownload } from '../content/download-controller.js';
+import { requestEncryptedImageImport } from '../content/download-controller.js';
 import type { RecallStore } from '../content/recall-store.js';
 import type { RecentHistoryStore } from '../content/recent-history-store.js';
 import {
@@ -35,7 +35,6 @@ import type {
   BookmarkStore,
   ImportedEncryptedImageFile,
   ImportedImageFile,
-  ImportRestorePreviewState,
   PanelAction,
   PanelPosition,
   PanelPositionStore,
@@ -49,14 +48,8 @@ import type {
   UrlReviewStatusStore,
 } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
-import { filenameFromImageRecord, filenameFromUrl, selectImageDownloadUrls } from '../core/image/downloads.js';
+import { selectImageDownloadUrls } from '../core/image/downloads.js';
 import type { ImageRequestIntent } from '../core/image/request-policy.js';
-import {
-  classifyRestoreDuplicates,
-  type RestoreDuplicateCandidate,
-  type RestoreDuplicateMatch,
-  type RestoreDuplicateRecord,
-} from '../core/import/restore-duplicates.js';
 import { imageResourceUrlsEqual, pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
 import {
   NEIGHBOR_PRELOAD_CACHE_LIMITS,
@@ -110,6 +103,45 @@ import { NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT, NeighborPreloadController } from './p
 import { ParsedFieldStateSync } from './panel/parsed-field-state-sync.js';
 import { PanelMount } from './panel/panel-mount.js';
 import {
+  delay,
+  downloadTextFile,
+  downloadUrlsInSeries,
+  encryptedImageExportResultMessage,
+  exportEncryptedImagesInSeries,
+  filenameForExportedImage,
+  filenameForExportedImageRecord,
+  imageDownloadResultMessage,
+  isFocusablePanelControl,
+} from './panel/export-download.js';
+import {
+  bookmarkRecordToExportEntry,
+  bookmarkSaveMessage,
+  historyRecordToExportEntry,
+  isLockedPrivatePin,
+  originalBlobIdsForFullBackup,
+  pcloudBackupFileName,
+  pcloudBackupUploadMessage,
+  PRIVATE_PIN_EXPORT_LOCKED_MESSAGE,
+  recordHasBlobId,
+  selectedRecords,
+  urlReviewStatusClearScopeLabel,
+  withoutRecentPinState,
+} from './panel/record-export-helpers.js';
+import {
+  bookmarkEntriesOriginalReferenceCount,
+  bookmarkPayloadToDisplayRecord,
+  createBookmarksRestorePreview,
+  createHistoryRestorePreview,
+  createRestoreDuplicateSummary,
+  createUrlReviewStatusRestorePreview,
+  fullBackupRestoreDetail,
+  historyPayloadToDisplayRecord,
+  restoreImportCompleteMessage,
+  type BookmarkImportResult,
+  type HistoryImportResult,
+  type UrlReviewStatusImportResult,
+} from './panel/restore-import-preview.js';
+import {
   DEFAULT_LOCAL_SETTINGS,
   exportEncryptedBookmarks,
   exportEncryptedFullBackup,
@@ -123,8 +155,6 @@ import {
   storedBlobRecordFromPortable,
   type LocalSettingsStore,
   type PlaintextLocalSettings,
-  type DurableBookmarkPayloadV1,
-  type DurableHistoryPayloadV1,
   type FullBackupBlobKeyBackup,
 } from '../content/panel-services.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
@@ -172,24 +202,14 @@ const MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS = 50;
 type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
 
 type PendingRestoreImport =
-  | { readonly kind: 'history'; readonly result: Awaited<ReturnType<typeof importEncryptedHistory>>; readonly duplicateCount: number }
+  | { readonly kind: 'history'; readonly result: HistoryImportResult; readonly duplicateCount: number }
   | {
       readonly kind: 'bookmarks';
-      readonly result: Awaited<ReturnType<typeof importBookmarkRecords>>;
+      readonly result: BookmarkImportResult;
       readonly duplicateCount: number;
       readonly password: string;
     }
-  | { readonly kind: 'url-review-status'; readonly result: ReturnType<typeof importUrlReviewStatusFile> };
-
-type HistoryImportResult = Awaited<ReturnType<typeof importEncryptedHistory>>;
-type BookmarkImportResult = Awaited<ReturnType<typeof importBookmarkRecords>>;
-type RestoreImageImportEntry = HistoryImportResult['entries'][number] | BookmarkImportResult['entries'][number];
-
-interface RestoreDuplicateSummary<TEntry extends RestoreImageImportEntry> {
-  readonly uniqueEntries: readonly TEntry[];
-  readonly duplicateCount: number;
-  readonly matchesByUuid: ReadonlyMap<string, RestoreDuplicateMatch>;
-}
+  | { readonly kind: 'url-review-status'; readonly result: UrlReviewStatusImportResult };
 
 function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {
   const match = value?.match(/^\s*(\d+)\s*[x×]\s*(\d+)\s*$/iu);
@@ -4163,534 +4183,4 @@ export class ImageTrailPanel {
     this.render();
     this.renderRecallOnly();
   }
-}
-
-function withoutRecentPinState(record: ImageDisplayRecord): ImageDisplayRecord {
-  const copy = { ...record };
-  delete copy.pinnedAt;
-  delete copy.pinnedRecordId;
-  return copy;
-}
-
-function createRestoreDuplicateSummary<TEntry extends RestoreImageImportEntry>(
-  entries: readonly TEntry[],
-  existingRecords: readonly ImageDisplayRecord[],
-): RestoreDuplicateSummary<TEntry> {
-  const candidates = entries.map((entry): RestoreDuplicateCandidate & { readonly entry: TEntry } => ({
-    id: entry.uuid,
-    url: entry.payload.url,
-    sha256: restoreSha256FromUnknown(entry.payload),
-    entry,
-  }));
-  const existing = existingRecords.map(
-    (record): RestoreDuplicateRecord => ({
-      id: record.id,
-      url: record.url,
-      sha256: restoreSha256FromUnknown(record),
-    }),
-  );
-  const classifications = classifyRestoreDuplicates(candidates, existing);
-  const matchesByUuid = new Map<string, RestoreDuplicateMatch>();
-  const uniqueEntries: TEntry[] = [];
-
-  for (const classification of classifications) {
-    if (classification.duplicate) {
-      matchesByUuid.set(classification.candidate.entry.uuid, classification.duplicate.matchedBy);
-    } else {
-      uniqueEntries.push(classification.candidate.entry);
-    }
-  }
-
-  return {
-    uniqueEntries,
-    duplicateCount: matchesByUuid.size,
-    matchesByUuid,
-  };
-}
-
-function emptyRestoreDuplicateSummary<TEntry extends RestoreImageImportEntry>(): RestoreDuplicateSummary<TEntry> {
-  return {
-    uniqueEntries: [],
-    duplicateCount: 0,
-    matchesByUuid: new Map<string, RestoreDuplicateMatch>(),
-  };
-}
-
-function restorePreviewMessage(duplicateCount: number, skippedCount: number, extra?: string): string {
-  const duplicateMessage =
-    duplicateCount > 0 ? `${duplicateCount} duplicate record${duplicateCount === 1 ? '' : 's'} will be skipped on confirm.` : undefined;
-  const skippedMessage =
-    skippedCount > 0
-      ? `${skippedCount} rejected record${skippedCount === 1 ? '' : 's'} summarized by reason; sensitive URLs are not shown.`
-      : undefined;
-  return ['Preview loaded. Import has not changed local records yet.', duplicateMessage, skippedMessage, extra].filter(Boolean).join(' ');
-}
-
-function restorePreviewSampleDetail(detail: string | undefined, duplicateMatch: RestoreDuplicateMatch | undefined): string | undefined {
-  if (!duplicateMatch) return detail;
-  const duplicateDetail = duplicateMatch === 'sha256' ? 'Duplicate SHA-256, skipped on confirm' : 'Duplicate URL, skipped on confirm';
-  return [detail, duplicateDetail].filter((part): part is string => !!part).join('; ');
-}
-
-function restoreImportCompleteMessage(
-  noun: string,
-  importedCount: number,
-  duplicateCount: number,
-  skippedCount: number,
-  plaintext: boolean,
-  plaintextDetail: string,
-): string {
-  const imported = `Imported ${importedCount} ${noun}${importedCount === 1 ? '' : 's'}.`;
-  const skipped = skippedCount > 0 ? `Skipped ${skippedCount} invalid ${noun}${skippedCount === 1 ? '' : 's'}.` : undefined;
-  const duplicates = duplicateCount > 0 ? `Skipped ${duplicateCount} duplicate ${noun}${duplicateCount === 1 ? '' : 's'}.` : undefined;
-  const plaintextMessage = plaintext ? `Plaintext import was ${plaintextDetail}.` : undefined;
-  return [imported, skipped, duplicates, plaintextMessage].filter(Boolean).join(' ');
-}
-
-function fullBackupRestoreDetail(importedOriginalCount: number): string {
-  return `encrypted into bookmark storage with ${importedOriginalCount} encrypted original${importedOriginalCount === 1 ? '' : 's'} restored`;
-}
-
-function restoreSha256FromUnknown(value: unknown): string | undefined {
-  const object = recordObject(value);
-  if (!object) return undefined;
-  const direct = stringField(object, 'sha256') ?? stringField(object, 'fingerprint');
-  if (direct) return direct;
-  return restoreSha256FromUnknown(object.storedOriginal);
-}
-
-function recordObject(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
-}
-
-function stringField(object: Record<string, unknown>, key: string): string | undefined {
-  const value = object[key];
-  return typeof value === 'string' ? value : undefined;
-}
-
-function createHistoryRestorePreview(
-  result: HistoryImportResult,
-  fileName = 'Selected JSON file',
-  duplicateSummary: RestoreDuplicateSummary<HistoryImportResult['entries'][number]> = emptyRestoreDuplicateSummary(),
-): ImportRestorePreviewState {
-  const originalReferenceCount = result.entries.filter((entry) => entry.payload.storedOriginal).length;
-  return {
-    fileName,
-    payloadLabel: 'History',
-    recordCount: result.entries.length,
-    capturedOriginalCount: originalReferenceCount,
-    duplicateCount: duplicateSummary.duplicateCount,
-    skippedCount: result.skipped.length,
-    unsupportedCount: originalReferenceCount > 0 ? 1 : 0,
-    plaintext: result.plaintext,
-    message: restorePreviewMessage(
-      duplicateSummary.duplicateCount,
-      result.validationReport.rejectedCount,
-      result.plaintext ? 'Plaintext history will be reloaded into extension state after confirmation.' : undefined,
-    ),
-    samples: result.entries.slice(0, 3).map((entry) =>
-      imagePayloadPreviewSample(entry.payload.url, {
-        label: entry.payload.label,
-        title: entry.payload.title,
-        detail: restorePreviewSampleDetail(
-          entry.payload.storedOriginal ? `${entry.payload.captureStatus}, original metadata reference` : entry.payload.captureStatus,
-          duplicateSummary.matchesByUuid.get(entry.uuid),
-        ),
-      }),
-    ),
-    validationIssues: result.validationReport.reasons,
-    unsupportedSections:
-      originalReferenceCount > 0
-        ? [
-            {
-              label: 'Captured original bytes',
-              detail: 'Record imports restore metadata; original bytes must already exist or be restored by an encrypted-original flow.',
-            },
-          ]
-        : undefined,
-  };
-}
-
-function createBookmarksRestorePreview(
-  result: BookmarkImportResult,
-  fileName = 'Selected JSON file',
-  duplicateSummary: RestoreDuplicateSummary<BookmarkImportResult['entries'][number]> = emptyRestoreDuplicateSummary(),
-): ImportRestorePreviewState {
-  const missingOriginalBackupCount = fullBackupMissingOriginalReferenceCount(result);
-  const unsupportedOriginalCount = result.fullBackup ? missingOriginalBackupCount : result.externalOriginalCount;
-  return {
-    fileName,
-    payloadLabel: 'Bookmarks',
-    recordCount: result.entries.length,
-    capturedOriginalCount: result.externalOriginalCount,
-    duplicateCount: duplicateSummary.duplicateCount,
-    skippedCount: result.skipped.length,
-    unsupportedCount: unsupportedOriginalCount > 0 ? 1 : 0,
-    plaintext: result.plaintext,
-    message: restorePreviewMessage(
-      duplicateSummary.duplicateCount,
-      result.validationReport.rejectedCount,
-      result.plaintext ? 'Plaintext bookmarks will be encrypted into bookmark storage after confirmation.' : undefined,
-    ),
-    samples: result.entries.slice(0, 3).map((entry) =>
-      imagePayloadPreviewSample(entry.payload.url, {
-        label: entry.payload.label,
-        title: entry.payload.title,
-        detail: restorePreviewSampleDetail(bookmarkPayloadPreviewDetail(entry.payload), duplicateSummary.matchesByUuid.get(entry.uuid)),
-      }),
-    ),
-    validationIssues: result.validationReport.reasons,
-    unsupportedSections:
-      unsupportedOriginalCount > 0
-        ? [
-            {
-              label: result.fullBackup ? 'Missing original backups' : 'External original references',
-              detail: result.fullBackup
-                ? `${missingOriginalBackupCount} original reference${missingOriginalBackupCount === 1 ? '' : 's'} did not have matching encrypted bytes in the backup.`
-                : 'Bookmark imports strip external blob references; original bytes are not imported from record JSON.',
-            },
-          ]
-        : undefined,
-  };
-}
-
-function fullBackupMissingOriginalReferenceCount(result: BookmarkImportResult): number {
-  if (!result.fullBackup) return result.externalOriginalCount;
-  const backedBlobIds = new Set(result.originalBlobs.map((record) => record.id));
-  const missingBlobIds = new Set(result.missingOriginalBlobIds.filter((blobId) => !backedBlobIds.has(blobId)));
-  for (const entry of result.entries) {
-    const blobId = entry.payload.storedOriginal?.blobId ?? entry.payload.protectedPin?.storedOriginalBlobId;
-    if (blobId && !backedBlobIds.has(blobId)) missingBlobIds.add(blobId);
-  }
-  return missingBlobIds.size;
-}
-
-function bookmarkEntriesOriginalReferenceCount(entries: readonly BookmarkImportResult['entries'][number][]): number {
-  return entries.filter((entry) => entry.payload.storedOriginal || entry.payload.protectedPin?.storedOriginalBlobId).length;
-}
-
-function createUrlReviewStatusRestorePreview(
-  result: ReturnType<typeof importUrlReviewStatusFile>,
-  fileName = 'Selected JSON file',
-): ImportRestorePreviewState {
-  return {
-    fileName,
-    payloadLabel: 'URL review status',
-    recordCount: result.records.length,
-    skippedCount: result.skipped.length,
-    unsupportedCount: 0,
-    plaintext: true,
-    message: restorePreviewMessage(0, result.validationReport.rejectedCount),
-    samples: result.records.slice(0, 3).map((record) => ({
-      label: `${record.status} · ${record.hostname}`,
-      url: record.sourceUrl,
-      detail: `${record.fieldIds.length} field${record.fieldIds.length === 1 ? '' : 's'}, updated ${record.updatedAt}`,
-    })),
-    validationIssues: result.validationReport.reasons,
-  };
-}
-
-function imagePayloadPreviewSample(
-  url: string,
-  options: { readonly label?: string; readonly title?: string; readonly detail?: string } = {},
-): NonNullable<ImportRestorePreviewState['samples']>[number] {
-  return {
-    label: options.label ?? options.title ?? filenameFromUrl(url),
-    url,
-    detail: options.detail,
-  };
-}
-
-function bookmarkPayloadPreviewDetail(payload: DurableBookmarkPayloadV1): string | undefined {
-  const dimensions = payload.width && payload.height ? `${payload.width} x ${payload.height}` : undefined;
-  const source = payload.sourceCompatibility === 'favorites' ? 'Legacy favorite' : undefined;
-  return [dimensions, source].filter((part): part is string => !!part).join(', ') || undefined;
-}
-
-function historyRecordToExportEntry(record: ImageDisplayRecord): { readonly uuid: string; readonly payload: DurableHistoryPayloadV1 } {
-  return {
-    uuid: record.id,
-    payload: {
-      url: record.url,
-      title: record.title,
-      label: record.label,
-      thumbnail: record.thumbnail,
-      capturedAt: record.timestamp,
-      captureStatus: record.storedOriginal ? 'downloaded' : 'remote-only',
-      storedOriginal: record.storedOriginal,
-    },
-  };
-}
-
-function bookmarkRecordToExportEntry(record: ImageDisplayRecord): { readonly uuid: string; readonly payload: DurableBookmarkPayloadV1 } {
-  return {
-    uuid: record.id,
-    payload: {
-      url: record.url,
-      title: record.title,
-      label: record.label,
-      thumbnail: record.thumbnail,
-      width: record.width,
-      height: record.height,
-      bookmarkedAt: record.timestamp,
-      downloadedAt: record.downloadedAt,
-      capturedAt: record.capturedAt,
-      sourceCompatibility: record.source === 'favorites' ? 'favorites' : undefined,
-      storedOriginal: record.storedOriginal,
-    },
-  };
-}
-
-function selectedRecords(records: readonly ImageDisplayRecord[], selectedIds: readonly string[]): readonly ImageDisplayRecord[] {
-  if (selectedIds.length === 0) return records;
-  const selected = new Set(selectedIds);
-  return records.filter((record) => selected.has(record.id));
-}
-
-export function originalBlobIdsForFullBackup(records: readonly ImageDisplayRecord[]): readonly string[] {
-  const blobIds = new Set<string>();
-  for (const record of records) {
-    const capturedBlobId = encryptedBlobIdForRecord(record);
-    if (capturedBlobId) blobIds.add(capturedBlobId);
-    if (record.storedOriginal?.blobId) blobIds.add(record.storedOriginal.blobId);
-    if (record.protectedPin?.storedOriginalBlobId) blobIds.add(record.protectedPin.storedOriginalBlobId);
-  }
-  return [...blobIds];
-}
-
-export function isLockedPrivatePin(record: ImageDisplayRecord): boolean {
-  return record.privacyStatus === 'locked' || record.url.startsWith('image-trail-private:');
-}
-
-function pcloudBackupFileName(isoTimestamp: string): string {
-  const timestamp = isoTimestamp.replaceAll(':', '-').replace(/\.\d{3}Z$/u, 'Z');
-  return `image-trail-pcloud-backup-${timestamp}.image-trail-encrypted.json`;
-}
-
-function pcloudBackupUploadMessage(
-  uploadMessage: string,
-  originalCount: number,
-  originalBytes: number,
-  missingOriginalCount: number,
-): string {
-  const originalSummary = `${originalCount} encrypted original${originalCount === 1 ? '' : 's'} (${formatCloudBackupBytes(originalBytes)})`;
-  if (missingOriginalCount === 0) return `${uploadMessage} Included ${originalSummary}.`;
-  return `${uploadMessage} Included ${originalSummary}; ${missingOriginalCount} referenced original${missingOriginalCount === 1 ? '' : 's'} missing.`;
-}
-
-function formatCloudBackupBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${bytes} B`;
-}
-
-function bookmarkSaveMessage(record: ImageDisplayRecord, label = record.url): string {
-  if (record.pinSaveStorage?.destination !== 'plaintext') return `Added to Image Trail: ${label}`;
-  switch (record.pinSaveStorage.reason) {
-    case 'setting':
-      return `Saved plaintext pin by current storage setting: ${label}`;
-    case 'failed':
-      return `Saved plaintext pin because encrypted storage failed: ${label}`;
-    case 'unavailable':
-      return `Saved plaintext pin because encrypted storage is not set up: ${label}`;
-    case 'locked':
-    default:
-      return `Saved plaintext pin because encrypted storage is locked: ${label}`;
-  }
-}
-
-const PRIVATE_PIN_EXPORT_LOCKED_MESSAGE =
-  'Unlock encrypted storage before exporting private pins so their image metadata and originals are available.';
-
-function historyPayloadToDisplayRecord(uuid: string, payload: DurableHistoryPayloadV1): ImageDisplayRecord {
-  return createDisplayRecord({
-    id: uuid,
-    url: payload.url,
-    title: payload.title,
-    label: payload.label,
-    thumbnail: payload.thumbnail,
-    timestamp: payload.capturedAt,
-    captureStatus: payload.storedOriginal ? 'captured' : undefined,
-    blobId: payload.storedOriginal?.blobId,
-    storedOriginal: payload.storedOriginal,
-    source: 'history',
-  });
-}
-
-function bookmarkPayloadToDisplayRecord(uuid: string, payload: DurableBookmarkPayloadV1): ImageDisplayRecord {
-  return createDisplayRecord({
-    id: uuid,
-    url: payload.url,
-    title: payload.title,
-    label: payload.label,
-    thumbnail: payload.thumbnail,
-    width: payload.width,
-    height: payload.height,
-    timestamp: payload.bookmarkedAt,
-    downloadedAt: payload.downloadedAt,
-    capturedAt: payload.capturedAt ?? payload.storedOriginal?.capturedAt,
-    captureStatus: payload.storedOriginal ? 'captured' : undefined,
-    blobId: payload.storedOriginal?.blobId,
-    storedOriginal: payload.storedOriginal,
-    source: payload.sourceCompatibility ?? 'bookmark',
-  });
-}
-
-function downloadTextFile(fileContent: string, fileName: string): void {
-  const url = URL.createObjectURL(new Blob([fileContent], { type: 'application/json' }));
-  downloadUrl(url, fileName);
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
-async function downloadUrlsInSeries(
-  downloads: readonly { readonly url: string; readonly fileName: string }[],
-  saveAs: boolean,
-): Promise<{
-  readonly requested: number;
-  readonly started: number;
-  readonly failed: number;
-  readonly saveAsFallbacks: number;
-  readonly failedFileNames: readonly string[];
-}> {
-  let started = 0;
-  let failed = 0;
-  let saveAsFallbacks = 0;
-  const failedFileNames: string[] = [];
-  for (const [index, download] of downloads.entries()) {
-    const result = await downloadImageFile(download.url, download.fileName, saveAs);
-    if (result.ok) {
-      started += 1;
-      if (result.saveAsFallback) saveAsFallbacks += 1;
-    } else {
-      failed += 1;
-      failedFileNames.push(download.fileName);
-    }
-    if (index < downloads.length - 1) await delay(120);
-  }
-  return { requested: downloads.length, started, failed, saveAsFallbacks, failedFileNames };
-}
-
-async function exportEncryptedImagesInSeries(
-  downloads: readonly { readonly url: string; readonly fileName: string; readonly blobId?: string }[],
-): Promise<{
-  readonly requested: number;
-  readonly started: number;
-  readonly failed: number;
-  readonly encryptionLocked: boolean;
-  readonly failedFileNames: readonly string[];
-}> {
-  let started = 0;
-  let failed = 0;
-  let encryptionLocked = false;
-  const failedFileNames: string[] = [];
-  for (const [index, download] of downloads.entries()) {
-    const result = await requestEncryptedImageExport(download);
-    if (result.ok) {
-      downloadTextFile(result.fileContent, result.fileName);
-      started += 1;
-    } else {
-      failed += 1;
-      if (result.reason === 'encryption-locked') encryptionLocked = true;
-      failedFileNames.push(download.fileName);
-    }
-    if (index < downloads.length - 1) await delay(120);
-  }
-  return { requested: downloads.length, started, failed, encryptionLocked, failedFileNames };
-}
-
-function encryptedImageExportResultMessage(result: {
-  readonly requested: number;
-  readonly started: number;
-  readonly failed: number;
-  readonly encryptionLocked: boolean;
-  readonly failedFileNames: readonly string[];
-}): string {
-  if (result.started === 0) {
-    const failedName = result.failedFileNames[0];
-    return failedName ? `Encrypted image export failed for ${failedName}.` : 'Encrypted image export could not be started.';
-  }
-  if (result.failed > 0) {
-    return `Started ${result.started} of ${result.requested} encrypted image exports. ${result.failed} failed.`;
-  }
-  return result.started === 1 ? 'Encrypted image export started.' : `Started ${result.started} encrypted image exports.`;
-}
-
-async function downloadImageFile(
-  url: string,
-  fileName: string,
-  saveAs: boolean,
-): Promise<{ readonly ok: true; readonly saveAsFallback?: boolean } | { readonly ok: false; readonly message: string }> {
-  const result = await requestImageDownload({ url, fileName, saveAs });
-  if (result.ok) return result;
-  downloadUrl(url, fileName);
-  return { ok: true, saveAsFallback: saveAs };
-}
-
-function imageDownloadResultMessage(result: {
-  readonly requested: number;
-  readonly started: number;
-  readonly failed: number;
-  readonly saveAsFallbacks: number;
-  readonly failedFileNames: readonly string[];
-}): string {
-  if (result.started === 0) {
-    const failedName = result.failedFileNames[0];
-    return failedName ? `Image export failed for ${failedName}.` : 'Image export could not be started.';
-  }
-  if (result.failed > 0) {
-    return `Started ${result.started} of ${result.requested} image downloads. ${result.failed} failed.`;
-  }
-  if (result.saveAsFallbacks > 0) {
-    return `Save As unavailable; started ${result.started === 1 ? '1 image download normally' : `${result.started} image downloads normally`}.`;
-  }
-  return result.started === 1 ? 'Image export started.' : `Started ${result.started} image downloads.`;
-}
-
-function urlReviewStatusClearScopeLabel(scope: 'hostname' | 'page' | 'source' | 'all'): string {
-  if (scope === 'all') return 'all sites';
-  if (scope === 'page') return 'this page';
-  if (scope === 'source') return 'the selected URL';
-  return 'this site';
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
-function recordHasBlobId(record: Pick<ImageDisplayRecord, 'blobId' | 'storedOriginal' | 'protectedPin'>, blobId: string): boolean {
-  return record.blobId === blobId || record.storedOriginal?.blobId === blobId || record.protectedPin?.storedOriginalBlobId === blobId;
-}
-
-function isFocusablePanelControl(
-  element: HTMLElement,
-): element is HTMLButtonElement | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
-  return (
-    element instanceof HTMLButtonElement ||
-    element instanceof HTMLInputElement ||
-    element instanceof HTMLSelectElement ||
-    element instanceof HTMLTextAreaElement
-  );
-}
-
-function filenameForExportedImage(url: string): string {
-  if (!url.startsWith('data:image/')) return filenameFromUrl(url);
-  const extension = /^data:image\/([a-z0-9.+-]+);/iu.exec(url)?.[1]?.toLowerCase();
-  const normalized = extension === 'jpeg' ? 'jpg' : extension;
-  return `image-trail-image.${normalized && /^[a-z0-9]+$/u.test(normalized) ? normalized : 'png'}`;
-}
-
-function filenameForExportedImageRecord(record: Pick<ImageDisplayRecord, 'url' | 'title' | 'label'>): string {
-  return filenameFromImageRecord(record);
-}
-
-function downloadUrl(url: string, fileName: string): void {
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.rel = 'noopener';
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
 }
