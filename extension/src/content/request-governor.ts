@@ -8,25 +8,28 @@ export class RequestGovernor {
   private lastRunAt = 0;
   private config: RequestGovernorConfig;
 
-  constructor(config?: Partial<RequestGovernorConfig>) {
+  constructor(
+    config?: Partial<RequestGovernorConfig>,
+    private readonly now: () => number = Date.now,
+  ) {
     this.config = { ...DEFAULT_GOVERNOR_CONFIG, ...config };
   }
 
   get status(): GovernorStatus {
-    return this.getStatus(Date.now());
+    return this.getStatus(this.now());
   }
 
-  canRequest(now = Date.now()): boolean {
+  canRequest(now = this.now()): boolean {
     return this.getStatus(now) === 'ready';
   }
 
-  record(now = Date.now()): void {
+  record(now = this.now()): void {
     this.lastRunAt = now;
     this.timestamps.push(now);
     this.pruneOldTimestamps(now);
   }
 
-  request<T>(operation: () => T, now = Date.now()): { value: T; status: 'ok' } | { value: null; status: GovernorStatus } {
+  request<T>(operation: () => T, now = this.now()): { value: T; status: 'ok' } | { value: null; status: GovernorStatus } {
     if (!this.canRequest(now)) {
       return { value: null, status: this.getStatus(now) };
     }
@@ -34,12 +37,12 @@ export class RequestGovernor {
     return { value: operation(), status: 'ok' };
   }
 
-  requestsInWindow(now = Date.now()): number {
+  requestsInWindow(now = this.now()): number {
     this.pruneOldTimestamps(now);
     return this.timestamps.length;
   }
 
-  nextReadyDelayMs(now = Date.now()): number {
+  nextReadyDelayMs(now = this.now()): number {
     const status = this.getStatus(now);
     if (status === 'ready') return 0;
     if (status === 'throttled') return Math.max(0, this.config.minimumIntervalMs - (now - this.lastRunAt));

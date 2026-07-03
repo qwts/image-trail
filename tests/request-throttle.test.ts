@@ -3,29 +3,35 @@ import assert from 'node:assert/strict';
 import { RequestThrottle } from '../extension/src/content/request-throttle.js';
 
 test('throttles rapid manual navigation requests', () => {
-  const throttle = new RequestThrottle(250);
+  let now = 1000;
+  const throttle = new RequestThrottle(250, () => now);
   let count = 0;
 
   assert.equal(
     throttle.run(() => {
       count += 1;
       return 'first';
-    }, 1000),
+    }),
     'first',
   );
+
+  now = 1100;
   assert.equal(
     throttle.run(() => {
       count += 1;
       return 'blocked';
-    }, 1100),
+    }),
     null,
   );
+
+  now = 1250;
   assert.equal(
     throttle.run(() => {
       count += 1;
       return 'second';
-    }, 1250),
+    }),
     'second',
   );
+
   assert.equal(count, 2);
 });

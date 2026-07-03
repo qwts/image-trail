@@ -2,92 +2,129 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RequestGovernor } from '../extension/src/content/request-governor.js';
 
+// Fixed epoch for the injected fake clock. Comfortably larger than any interval
+// or window used below so the initial lastRunAt=0 never causes a spurious throttle.
+const START = 1_000_000;
+
 test('allows first request when governor is idle', () => {
-  const gov = new RequestGovernor();
-  const now = Date.now();
-  const result = gov.request(() => 'ok', now);
+  const now = START;
+  const gov = new RequestGovernor(undefined, () => now);
+  const result = gov.request(() => 'ok');
   assert.deepEqual(result, { value: 'ok', status: 'ok' });
 });
 
 test('throttles request within minimum interval', () => {
-  const gov = new RequestGovernor({ minimumIntervalMs: 200, maxRequests: 60, windowMs: 60_000 });
-  const now = Date.now();
-  gov.request(() => 'first', now);
-  const result = gov.request(() => 'second', now + 100);
+  let now = START;
+  const gov = new RequestGovernor({ minimumIntervalMs: 200, maxRequests: 60, windowMs: 60_000 }, () => now);
+  gov.request(() => 'first');
+  now = START + 100;
+  const result = gov.request(() => 'second');
   assert.deepEqual(result, { value: null, status: 'throttled' });
 });
 
 test('allows request after minimum interval elapses', () => {
-  const gov = new RequestGovernor({ minimumIntervalMs: 200, maxRequests: 60, windowMs: 60_000 });
-  const now = Date.now();
-  gov.request(() => 'first', now);
-  const result = gov.request(() => 'second', now + 200);
+  let now = START;
+  const gov = new RequestGovernor({ minimumIntervalMs: 200, maxRequests: 60, windowMs: 60_000 }, () => now);
+  gov.request(() => 'first');
+  now = START + 200;
+  const result = gov.request(() => 'second');
   assert.deepEqual(result, { value: 'second', status: 'ok' });
 });
 
 test('caps requests per minute', () => {
-  const gov = new RequestGovernor({ minimumIntervalMs: 0, maxRequests: 3, windowMs: 60_000 });
-  const now = Date.now();
-  gov.request(() => 1, now);
-  gov.request(() => 2, now + 1);
-  gov.request(() => 3, now + 2);
-  const result = gov.request(() => 4, now + 3);
+  let now = START;
+  const gov = new RequestGovernor({ minimumIntervalMs: 0, maxRequests: 3, windowMs: 60_000 }, () => now);
+  gov.request(() => 1);
+  now = START + 1;
+  gov.request(() => 2);
+  now = START + 2;
+  gov.request(() => 3);
+  now = START + 3;
+  const result = gov.request(() => 4);
   assert.deepEqual(result, { value: null, status: 'capped' });
 });
 
 test('uncaps after timestamps age out past 60 seconds', () => {
-  const gov = new RequestGovernor({ minimumIntervalMs: 0, maxRequests: 2, windowMs: 60_000 });
-  const now = Date.now();
-  gov.request(() => 1, now);
-  gov.request(() => 2, now + 1);
-  const result = gov.request(() => 3, now + 60_001);
+  let now = START;
+  const gov = new RequestGovernor({ minimumIntervalMs: 0, maxRequests: 2, windowMs: 60_000 }, () => now);
+  gov.request(() => 1);
+  now = START + 1;
+  gov.request(() => 2);
+  now = START + 60_001;
+  const result = gov.request(() => 3);
   assert.deepEqual(result, { value: 3, status: 'ok' });
 });
 
 test('requestsInWindow counts correctly', () => {
-  const gov = new RequestGovernor({ minimumIntervalMs: 0, maxRequests: 100, windowMs: 60_000 });
-  const now = Date.now();
-  gov.request(() => 1, now);
-  gov.request(() => 2, now + 1);
-  gov.request(() => 3, now + 2);
-  assert.equal(gov.requestsInWindow(now + 3), 3);
-  assert.equal(gov.requestsInWindow(now + 60_001), 2);
-  assert.equal(gov.requestsInWindow(now + 60_003), 0);
+  let now = START;
+  const gov = new RequestGovernor({ minimumIntervalMs: 0, maxRequests: 100, windowMs: 60_000 }, () => now);
+  gov.request(() => 1);
+  now = START + 1;
+  gov.request(() => 2);
+  now = START + 2;
+  gov.request(() => 3);
+  now = START + 3;
+  assert.equal(gov.requestsInWindow(), 3);
+  now = START + 60_001;
+  assert.equal(gov.requestsInWindow(), 2);
+  now = START + 60_003;
+  assert.equal(gov.requestsInWindow(), 0);
 });
 
 test('reset clears all state', () => {
-  const gov = new RequestGovernor({ minimumIntervalMs: 0, maxRequests: 1, windowMs: 60_000 });
-  const now = Date.now();
-  gov.request(() => 1, now);
-  assert.equal(gov.canRequest(now + 1), false);
+  let now = START;
+  const gov = new RequestGovernor({ minimumIntervalMs: 0, maxRequests: 1, windowMs: 60_000 }, () => now);
+  gov.request(() => 1);
+  now = START + 1;
+  assert.equal(gov.canRequest(), false);
   gov.reset();
-  assert.equal(gov.canRequest(now + 1), true);
+  assert.equal(gov.canRequest(), true);
 });
 
 test('uses configurable request count window', () => {
-  const gov = new RequestGovernor({ minimumIntervalMs: 0, maxRequests: 2, windowMs: 1_000 });
-  const now = Date.now();
-  gov.request(() => 1, now);
-  gov.request(() => 2, now + 1);
+  let now = START;
+  const gov = new RequestGovernor({ minimumIntervalMs: 0, maxRequests: 2, windowMs: 1_000 }, () => now);
+  gov.request(() => 1);
+  now = START + 1;
+  gov.request(() => 2);
 
+  now = START + 999;
   assert.deepEqual(
-    gov.request(() => 3, now + 999),
+    gov.request(() => 3),
     { value: null, status: 'capped' },
   );
+  now = START + 1_001;
   assert.deepEqual(
-    gov.request(() => 4, now + 1_001),
+    gov.request(() => 4),
     { value: 4, status: 'ok' },
   );
 });
 
 test('reports delay until the next request can start', () => {
-  const gov = new RequestGovernor({ minimumIntervalMs: 200, maxRequests: 2, windowMs: 1_000 });
-  const now = Date.now();
-  gov.request(() => 1, now);
+  let now = START;
+  const gov = new RequestGovernor({ minimumIntervalMs: 200, maxRequests: 2, windowMs: 1_000 }, () => now);
+  gov.request(() => 1);
 
-  assert.equal(gov.nextReadyDelayMs(now + 50), 150);
-  assert.equal(gov.nextReadyDelayMs(now + 200), 0);
+  now = START + 50;
+  assert.equal(gov.nextReadyDelayMs(), 150);
+  now = START + 200;
+  assert.equal(gov.nextReadyDelayMs(), 0);
 
-  gov.request(() => 2, now + 200);
-  assert.equal(gov.nextReadyDelayMs(now + 400), 600);
+  gov.request(() => 2);
+  now = START + 400;
+  assert.equal(gov.nextReadyDelayMs(), 600);
+});
+
+test('status getter reads the injected clock', () => {
+  let now = START;
+  const gov = new RequestGovernor({ minimumIntervalMs: 200, maxRequests: 2, windowMs: 60_000 }, () => now);
+
+  assert.equal(gov.status, 'ready');
+  gov.record();
+  assert.equal(gov.status, 'throttled');
+  now = START + 200;
+  assert.equal(gov.status, 'ready');
+  gov.record();
+  now = START + 400;
+  assert.equal(gov.status, 'capped');
 });
