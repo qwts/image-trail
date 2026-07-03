@@ -13,6 +13,7 @@ npm run lint          # includes lint:package (no "latest" pins) + eslint (incl.
 npm run format:check
 npm test              # typecheck + compile + unit + DOM suites (includes tests/invariants.test.ts)
 npm run build
+npm run test:e2e      # validates tests/e2e/coverage-map.json, then runs the Playwright extension smoke gate
 npm run test:cov      # c8 coverage gate; must stay at/above the .c8rc.json floor
 ```
 
@@ -34,7 +35,7 @@ already runs them; call out each one by name so a regression is impossible to mi
 
 State, explicitly:
 
-- ✅/❌ per gate (lint, format:check, test, build, test:cov), with the failing output if any.
+- ✅/❌ per gate (lint, format:check, test, build, test:e2e, test:cov), with the failing output if any.
 - ✅/❌ per invariant above. If `tests/invariants.test.ts` failed, name which invariant regressed and
   quote the assertion message.
 - Any `no-restricted-syntax` violation reported by `eslint` (the envelope.updatedAt sort footgun).

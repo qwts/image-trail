@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 1,
+  "issue": 304,
+  "description": "Manual acceptance coverage map for the maintained Playwright E2E gate. Each entry links a canonical acceptance flow to automated coverage, intentional manual coverage, or a deferred issue.",
+  "entries": [
+    {
+      "id": "extension-smoke",
+      "acceptance": "Extension port acceptance baseline",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Extension-Port-Acceptance-Baseline",
+      "coverage": [
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/extension-smoke.spec.ts",
+          "notes": "Covers service-worker/id resolution, extension-action panel open/close, duplicate-DOM prevention, and close cleanup."
+        },
+        {
+          "type": "deferred",
+          "issue": 305,
+          "notes": "Broader target selection, lifecycle, and host-projection flows."
+        }
+      ]
+    },
+    {
+      "id": "host-image-projection-ownership",
+      "acceptance": "Host image projection ownership",
+      "repoPath": "docs/acceptance-tests/host-image-projection-ownership.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Host-Image-Projection-Ownership",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/dom/buffered-navigation-controller.test.ts", "tests/parsed-field-state-sync.test.ts"]
+        },
+        {
+          "type": "deferred",
+          "issue": 305,
+          "notes": "Browser-level projection success, failure, same-current, and release coverage."
+        }
+      ]
+    },
+    {
+      "id": "panel-layout-stability",
+      "acceptance": "Panel layout stability",
+      "repoPath": "docs/acceptance-tests/panel-layout-stability.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Panel-Layout-Stability",
+      "coverage": [
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/extension-smoke.spec.ts",
+          "notes": "Current smoke coverage asserts open/close and duplicate panel root behavior."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/render.stories.ts"
+        },
+        {
+          "type": "deferred",
+          "issue": 305,
+          "notes": "Full minimize, expand, close, reopen, and selected-target assertions."
+        }
+      ]
+    },
+    {
+      "id": "target-picker-captures-only-selected-image",
+      "acceptance": "Target picker captures only the selected image",
+      "repoPath": "docs/acceptance-tests/target-picker-captures-only-selected-image.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Target-Picker-Captures-Only-The-Selected-Image",
+      "coverage": [
+        {
+          "type": "deferred",
+          "issue": 305,
+          "notes": "Target picking and visible selected-target indicator are the next E2E slice."
+        }
+      ]
+    },
+    {
+      "id": "url-template-learning",
+      "acceptance": "URL template learning",
+      "repoPath": "docs/acceptance-tests/url-template-learning.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-URL-Template-Learning",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/parsed-field-state-sync.test.ts", "tests/dom/fields-view.test.ts"]
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/fields-view.stories.ts"
+        },
+        {
+          "type": "deferred",
+          "issue": 306,
+          "notes": "Browser-level URL editor, parsed field, navigation, and restore flows."
+        }
+      ]
+    },
+    {
+      "id": "url-review-status-import-export",
+      "acceptance": "URL review status import/export",
+      "repoPath": "docs/acceptance-tests/url-review-status-import-export.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-URL-Review-Status-Import-Export",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/import-export.test.ts", "tests/restore-import-preview.test.ts"]
+        },
+        {
+          "type": "deferred",
+          "issue": 306,
+          "notes": "End-to-end import/export round trip and clean side-effect assertions."
+        }
+      ]
+    },
+    {
+      "id": "queue-recall-clear-delete",
+      "acceptance": "Queue and Recall clear/delete semantics",
+      "repoPath": "docs/acceptance-tests/queue-recall-clear-delete.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/invariants.test.ts", "tests/panel-state.test.ts", "tests/dom/recall-restore-controller.test.ts"]
+        },
+        {
+          "type": "deferred",
+          "issue": 307,
+          "notes": "Browser-level Recents, queue, Recall, selection, and clear behavior."
+        }
+      ]
+    },
+    {
+      "id": "recents-retention-settings",
+      "acceptance": "Recents retention settings",
+      "repoPath": "docs/acceptance-tests/recents-retention-settings.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Recents-Retention-Settings",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/invariants.test.ts", "tests/panel-state.test.ts"]
+        },
+        {
+          "type": "deferred",
+          "issue": 307,
+          "notes": "Browser-level transient Recents assertions."
+        }
+      ]
+    },
+    {
+      "id": "multi-select-image-download",
+      "acceptance": "Multi-select image download",
+      "repoPath": "docs/acceptance-tests/multi-select-image-download.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Multi-Select-Image-Download",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "path": "tests/panel-state.test.ts"
+        },
+        {
+          "type": "deferred",
+          "issue": 307,
+          "notes": "Selection ordering across Recents, visible queue, and Recall."
+        },
+        {
+          "type": "deferred",
+          "issue": 308,
+          "notes": "Browser download metadata and export behavior."
+        }
+      ]
+    },
+    {
+      "id": "encrypted-image-downloads",
+      "acceptance": "Encrypted image downloads",
+      "repoPath": "docs/acceptance-tests/encrypted-image-downloads.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Encrypted-Image-Downloads",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/indexeddb-data.test.ts", "tests/encrypted-blobs.test.ts"]
+        },
+        {
+          "type": "deferred",
+          "issue": 308,
+          "notes": "Browser encrypted image export/import and failure behavior."
+        }
+      ]
+    },
+    {
+      "id": "local-original-capture-survives-remote-loss",
+      "acceptance": "Local original capture survives remote loss",
+      "repoPath": "docs/acceptance-tests/local-original-capture-survives-remote-loss.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Local-Original-Capture-Survives-Remote-Loss",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/indexeddb-data.test.ts", "tests/encrypted-blobs.test.ts"]
+        },
+        {
+          "type": "deferred",
+          "issue": 308,
+          "notes": "Browser capture indicator, remote-loss, and preferred-original export assertions."
+        }
+      ]
+    },
+    {
+      "id": "oversized-original-is-bounded",
+      "acceptance": "Oversized original is bounded",
+      "repoPath": "docs/acceptance-tests/oversized-original-is-bounded.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Oversized-Original-Is-Bounded",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/encrypted-blobs.test.ts", "tests/image-request-manager.test.ts"]
+        },
+        {
+          "type": "deferred",
+          "issue": 308,
+          "notes": "Browser-level oversized original capture/export boundaries."
+        }
+      ]
+    },
+    {
+      "id": "key-backup-restore",
+      "acceptance": "Key backup restore",
+      "repoPath": "docs/acceptance-tests/key-backup-restore.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Key-Backup-Restore",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/data-crypto.test.ts", "tests/indexeddb-data.test.ts"]
+        },
+        {
+          "type": "deferred",
+          "issue": 309,
+          "notes": "Clean-context browser restore and plaintext-storage assertions."
+        }
+      ]
+    },
+    {
+      "id": "settings-utility-layout",
+      "acceptance": "Settings utility layout",
+      "repoPath": "docs/acceptance-tests/settings-utility-layout.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Settings-Utility-Layout",
+      "coverage": [
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/import-export-view.stories.ts"
+        },
+        {
+          "type": "deferred",
+          "issue": 309,
+          "notes": "Browser-level settings reachability and persistence."
+        }
+      ]
+    },
+    {
+      "id": "pcloud-provider-boundary",
+      "acceptance": "pCloud provider boundary",
+      "repoPath": "docs/acceptance-tests/pcloud-provider-boundary.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-pCloud-Provider-Boundary",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "path": "tests/pcloud-upload-provider.test.ts"
+        },
+        {
+          "type": "manual",
+          "reason": "Live pCloud OAuth and backup/restore proof requires user-controlled provider credentials."
+        },
+        {
+          "type": "deferred",
+          "issue": 309,
+          "notes": "Mocked browser pCloud boundary coverage without real secrets."
+        }
+      ]
+    },
+    {
+      "id": "pcloud-api-spike",
+      "acceptance": "pCloud API spike",
+      "repoPath": "docs/acceptance-tests/pcloud-api-spike.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-pCloud-API-Spike",
+      "coverage": [
+        {
+          "type": "manual",
+          "reason": "Provider API spike remains an operator-run proof with local OAuth callback and cleanup controls."
+        },
+        {
+          "type": "deferred",
+          "issue": 309,
+          "notes": "Product UI boundary coverage is separate from live provider proof."
+        }
+      ]
+    },
+    {
+      "id": "bounded-neighbor-preloading",
+      "acceptance": "Bounded neighbor preloading",
+      "repoPath": "docs/acceptance-tests/bounded-neighbor-preloading.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Bounded-Neighbor-Preloading",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/neighbor-preload-controller.test.ts", "tests/buffered-navigation-controller.test.ts"]
+        },
+        {
+          "type": "deferred",
+          "issue": 310,
+          "notes": "Browser-level automation and request-governance coverage."
+        }
+      ]
+    },
+    {
+      "id": "third-party-cdn-permission-flow",
+      "acceptance": "Third-party CDN permission flow",
+      "repoPath": "docs/acceptance-tests/third-party-cdn-permission-flow.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Third-Party-CDN-Permission-Flow",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "path": "tests/image-request-manager.test.ts"
+        },
+        {
+          "type": "manual",
+          "reason": "Browser permission prompts remain manual until the permission UI is stable enough for deterministic automation."
+        },
+        {
+          "type": "deferred",
+          "issue": 310,
+          "notes": "Request-governance E2E coverage."
+        }
+      ]
+    },
+    {
+      "id": "grab-mode-strategies",
+      "acceptance": "Grab mode strategies",
+      "repoPath": "docs/acceptance-tests/grab-mode-strategies.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Grab-Mode-Strategies",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/image-request-manager.test.ts", "tests/buffered-navigation-controller.test.ts"]
+        },
+        {
+          "type": "deferred",
+          "issue": 310,
+          "notes": "Browser-level retry and request-governance flows."
+        }
+      ]
+    },
+    {
+      "id": "storybook-ui-review",
+      "acceptance": "Storybook UI review",
+      "repoPath": "docs/acceptance-tests/storybook-ui-review.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Storybook-UI-Review",
+      "coverage": [
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/stories/story-host.ts"
+        },
+        {
+          "type": "manual",
+          "reason": "Critique coverage still requires human review of visual hierarchy, accessibility cues, and interaction feedback."
+        }
+      ]
+    },
+    {
+      "id": "form-control-consistency",
+      "acceptance": "Form control consistency",
+      "repoPath": "docs/acceptance-tests/form-control-consistency.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Form-Control-Consistency",
+      "coverage": [
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/import-export-view.stories.ts"
+        },
+        {
+          "type": "unit-dom",
+          "path": "tests/form-controls.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "settings-action-hierarchy",
+      "acceptance": "Settings action hierarchy",
+      "repoPath": "docs/acceptance-tests/settings-action-hierarchy.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Settings-Action-Hierarchy",
+      "coverage": [
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/action-group.stories.ts"
+        },
+        {
+          "type": "unit-dom",
+          "path": "tests/settings-view.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "row-list-visual-system",
+      "acceptance": "Row and list visual system",
+      "repoPath": "docs/acceptance-tests/row-list-visual-system.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Row-And-List-Visual-System",
+      "coverage": [
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/render.stories.ts"
+        },
+        {
+          "type": "manual",
+          "reason": "Visual consistency across dense row states remains human-reviewed."
+        }
+      ]
+    },
+    {
+      "id": "m00-planning-baseline-review",
+      "acceptance": "M00 planning baseline review",
+      "repoPath": "docs/acceptance-tests/m00-planning-baseline-review.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-M00-Planning-Baseline-Review",
+      "coverage": [
+        {
+          "type": "manual",
+          "reason": "Planning baseline review is documentation and behavior-map inspection, not executable product behavior."
+        }
+      ]
+    }
+  ]
+}
