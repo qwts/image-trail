@@ -12,12 +12,13 @@ workflow. This file only adds Claude-specific orientation; do not duplicate
 Layers, with a strict import direction:
 
 ```
-core  ->  data  ->  background + content  ->  ui
+core  ->  data  ->  background  ->  content  ->  ui
 ```
 
 - `core` — pure domain logic, no DOM or `chrome` APIs.
 - `data` — IndexedDB persistence and crypto (`extension/src/data/`).
-- `background` — MV3 service worker; `content` — content scripts bridging the page.
+- `background` — MV3 service worker; must not import `content/` or `ui/`.
+- `content` — content scripts bridging the page; may depend on `background/`.
 - `ui` — panel rendering; routes through `content/` controllers, never
   `data`/`background` directly.
 
