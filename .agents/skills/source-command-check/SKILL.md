@@ -21,6 +21,7 @@ npm test              # typecheck + compile + unit + DOM suites (includes tests/
 npm run build
 npm run test:e2e      # validates tests/e2e/coverage-map.json, then runs the Playwright extension smoke gate
 npm run test:cov      # c8 coverage gate; must stay at/above the .c8rc.json floor
+npm run test:stories:ci  # Storybook interaction (play) tests; matches CI after build + e2e
 ```
 
 ## 2. Confirm the product invariants (from `tests/invariants.test.ts`)
@@ -28,8 +29,9 @@ npm run test:cov      # c8 coverage gate; must stay at/above the .c8rc.json floo
 These encode the highest-stakes rules in `AGENTS.md` → "Product Model" / "Storage Rules". `npm test`
 already runs them; call out each one by name so a regression is impossible to miss:
 
-- **Recents persistence (privacy leak):** the recents layer (`content/recent-history-store.ts`,
-  `data/runtime/runtime-history.ts`) must expose no durable IndexedDB / `chrome.storage` write path.
+- **Recents persistence (privacy leak):** the recents layer
+  (`extension/src/content/recent-history-store.ts`, `extension/src/data/runtime/runtime-history.ts`)
+  must expose no durable IndexedDB / `chrome.storage` write path.
   Recents are transient — persisting them is a privacy leak.
 - **Queue order:** queue paging must sort by `queueUpdatedAt`, never the encrypted envelope's
   `updatedAt`. Enforced behaviorally by the repository test and syntactically by the
@@ -41,7 +43,8 @@ already runs them; call out each one by name so a regression is impossible to mi
 
 State, explicitly:
 
-- ✅/❌ per gate (lint, format:check, test, build, test:e2e, test:cov), with the failing output if any.
+- ✅/❌ per gate (lint, format:check, test, build, test:e2e, test:cov, test:stories:ci), with the
+  failing output if any.
 - ✅/❌ per invariant above. If `tests/invariants.test.ts` failed, name which invariant regressed and
   quote the assertion message.
 - Any `no-restricted-syntax` violation reported by `eslint` (the envelope.updatedAt sort footgun).

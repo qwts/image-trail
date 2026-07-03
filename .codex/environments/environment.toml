@@ -34,6 +34,8 @@ rm -rf \
   temp \
   .tmp \
   dist \
+  extension/dist \
+  .test-dist \
   build \
   coverage \
   playwright-report \
@@ -58,4 +60,22 @@ exit 0
 '''
 
 [cleanup]
-script = "rm -rf dist build coverage playwright-report test-results .cache/tmp"
+script = '''
+set -u
+
+if git rev-parse --show-toplevel >/dev/null 2>&1; then
+  cd "$(git rev-parse --show-toplevel)"
+fi
+
+rm -rf \
+  .cache/tmp \
+  dist \
+  extension/dist \
+  .test-dist \
+  build \
+  coverage \
+  playwright-report \
+  test-results
+
+exit 0
+'''
