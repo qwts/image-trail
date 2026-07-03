@@ -111,7 +111,10 @@ build` and paste **Built local** time plus commit, branch, and worktree when
 ## Tooling
 
 - Node version is pinned in `.nvmrc`; select it (`nvm use`, or an equivalent
-  version manager) so local builds match CI.
+  version manager) before installing dependencies. CI
+  (`.github/workflows/ci.yml`) currently runs a newer Node major than
+  `.nvmrc` pins — treat `.nvmrc` as the local default, not a guarantee of
+  exact CI parity, until the two are aligned.
 - Install with `npm ci`, then run the gate commands from **Documentation And
   Validation** (`npm run lint`, `npm run format:check`, `npm test`,
   `npm run build`).
