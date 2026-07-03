@@ -8,6 +8,14 @@ const CLOSING_REFERENCE_RE =
   /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b\s+(?<references>(?:(?:[a-z0-9_.-]+\/[a-z0-9_.-]+)?#\d+)(?:\s*(?:,|and)\s*(?:(?:[a-z0-9_.-]+\/[a-z0-9_.-]+)?#\d+))*)/giu;
 const ISSUE_REFERENCE_RE = /(?:(?<owner>[a-z0-9_.-]+)\/(?<repo>[a-z0-9_.-]+))?#(?<number>\d+)/giu;
 
+// Must match the `branches:`/`base.ref` filter in .github/workflows/close-linked-issues.yml.
+// Both are live integration branches that get cherry-picked into main.
+export const TARGET_BASE_REFS = ['claude/dev', 'codex/dev'];
+
+export function shouldProcessMergedPullRequest(pullRequest) {
+  return pullRequest?.merged === true && TARGET_BASE_REFS.includes(pullRequest.base?.ref);
+}
+
 export function extractClosingIssueNumbers(body, repository) {
   const issues = [];
   const seen = new Set();
@@ -54,7 +62,7 @@ async function main() {
   const pullRequest = event.pull_request;
   const repository = process.env.GITHUB_REPOSITORY;
   if (!repository) throw new Error('GITHUB_REPOSITORY is required.');
-  if (!pullRequest?.merged || pullRequest.base?.ref !== 'codex/dev') {
+  if (!shouldProcessMergedPullRequest(pullRequest)) {
     console.log('No issue close-out required for this pull request event.');
     return;
   }

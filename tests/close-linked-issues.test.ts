@@ -7,6 +7,8 @@ type CloseLinkedIssuesModule = {
   extractClosingIssueNumbers(body: string, repository: string): number[];
   removeWipPrefix(title: string): string;
   closeCommentForPullRequest(prNumber: number, baseRef: string): string;
+  shouldProcessMergedPullRequest(pullRequest: { merged?: boolean; base?: { ref?: string } } | undefined): boolean;
+  TARGET_BASE_REFS: string[];
 };
 
 const closeLinkedIssues = (await import(
@@ -38,4 +40,18 @@ test('removeWipPrefix removes only the leading WIP marker', () => {
 
 test('closeCommentForPullRequest names the merged PR and base branch', () => {
   assert.equal(closeLinkedIssues.closeCommentForPullRequest(158, 'codex/dev'), 'Closed by merged PR #158 into codex/dev.');
+});
+
+test('shouldProcessMergedPullRequest accepts a merged PR based on either live integration branch', () => {
+  assert.deepEqual(closeLinkedIssues.TARGET_BASE_REFS, ['claude/dev', 'codex/dev']);
+  assert.equal(closeLinkedIssues.shouldProcessMergedPullRequest({ merged: true, base: { ref: 'claude/dev' } }), true);
+  assert.equal(closeLinkedIssues.shouldProcessMergedPullRequest({ merged: true, base: { ref: 'codex/dev' } }), true);
+});
+
+test('shouldProcessMergedPullRequest rejects an unmerged PR', () => {
+  assert.equal(closeLinkedIssues.shouldProcessMergedPullRequest({ merged: false, base: { ref: 'claude/dev' } }), false);
+});
+
+test('shouldProcessMergedPullRequest rejects a merge into a branch that is not an integration branch', () => {
+  assert.equal(closeLinkedIssues.shouldProcessMergedPullRequest({ merged: true, base: { ref: 'main' } }), false);
 });
