@@ -148,6 +148,7 @@ export class PageAdapter {
   private activeTemplateGrabStrategy: UrlTemplateGrabStrategy | undefined;
   private suppressBookmarkShortcutClickTarget: EventTarget | null = null;
   private grabPreview: { readonly element: HTMLElement; readonly state: 'valid' | 'invalid' } | null = null;
+  private preparedStandaloneBackdrop: HTMLImageElement | null = null;
   private readonly grabStrategies: readonly GrabStrategy[] = [
     {
       id: 'linked-page-image',
@@ -188,6 +189,7 @@ export class PageAdapter {
     if (images.length === 1) {
       snapshotElementStyles(images[0]);
       keepSelectedTargetBackdropBlack(images[0]);
+      this.preparedStandaloneBackdrop = images[0];
     }
   }
 
@@ -280,6 +282,7 @@ export class PageAdapter {
     this.grabModeActive = false;
     this.clearGrabPreview();
     this.stopPickMode();
+    this.restorePreparedStandaloneBackdrop();
     this.restoreSelectedTarget();
     this.emit('Target selection cleaned up.');
   }
@@ -666,6 +669,7 @@ export class PageAdapter {
       this.selected.removeAttribute('data-image-trail-handle');
       restoreElementStyles(this.selected);
     }
+    if (this.preparedStandaloneBackdrop === this.selected) this.preparedStandaloneBackdrop = null;
     this.clearPendingLoadTarget();
     this.selected = null;
     this.selectedOriginalUrl = null;
@@ -674,6 +678,13 @@ export class PageAdapter {
     this.selectedDisplayUrl = null;
     this.selectedProjectionId = null;
     this.selectedProjectionReason = null;
+  }
+
+  private restorePreparedStandaloneBackdrop(): void {
+    const prepared = this.preparedStandaloneBackdrop;
+    if (!prepared || prepared === this.selected) return;
+    restoreElementStyles(prepared);
+    this.preparedStandaloneBackdrop = null;
   }
 
   private watchSelectedLoad(image: HTMLImageElement): void {

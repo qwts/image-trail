@@ -8,6 +8,7 @@ export interface ImageNavigationSnapshot {
   readonly image: HTMLImageElement;
   readonly src: string;
   readonly srcAttribute: string | null;
+  readonly baseUri: string;
   readonly srcset: string | null;
   readonly sizes: string | null;
   readonly sources: readonly SourceNavigationSnapshot[];
@@ -25,6 +26,7 @@ export function captureImageNavigationSnapshot(image: HTMLImageElement): ImageNa
     image,
     src: image.src,
     srcAttribute: image.getAttribute('src'),
+    baseUri: image.ownerDocument.baseURI,
     srcset: image.getAttribute('srcset'),
     sizes: image.getAttribute('sizes'),
     sources: picture
@@ -45,7 +47,7 @@ export function restoreImageNavigationSnapshot(snapshot: ImageNavigationSnapshot
   setOptionalAttribute(snapshot.image, 'srcset', snapshot.srcset);
   setOptionalAttribute(snapshot.image, 'sizes', snapshot.sizes);
   snapshot.image.src = snapshot.src;
-  setOptionalAttribute(snapshot.image, 'src', snapshot.srcAttribute);
+  setOptionalAttribute(snapshot.image, 'src', restoredSrcAttribute(snapshot));
 }
 
 export function clearResponsiveImageAttributes(image: HTMLImageElement): void {
@@ -81,6 +83,11 @@ function setOptionalAttribute(element: Element, name: string, value: string | nu
   } else {
     element.setAttribute(name, value);
   }
+}
+
+function restoredSrcAttribute(snapshot: ImageNavigationSnapshot): string | null {
+  if (snapshot.srcAttribute === null) return null;
+  return snapshot.image.ownerDocument.baseURI === snapshot.baseUri ? snapshot.srcAttribute : snapshot.src;
 }
 
 export function pushVisibleUrlWhenSameOrigin(

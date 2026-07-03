@@ -32,6 +32,7 @@ async function openHostTargetDetails(page: Parameters<typeof imageNavigationSnap
 async function expectHostRestoredTo(
   page: Parameters<typeof imageNavigationSnapshot>[0],
   expected: Awaited<ReturnType<typeof imageNavigationSnapshot>>,
+  options: { readonly expectedSrcAttribute?: string } = {},
 ): Promise<void> {
   const actual = await imageNavigationSnapshot(page, primaryImage, primarySource);
   expect({
@@ -45,7 +46,7 @@ async function expectHostRestoredTo(
     handle: actual.handle,
     lockBox: actual.lockBox,
   }).toEqual({
-    src: expected.src,
+    src: options.expectedSrcAttribute ?? expected.src,
     srcset: expected.srcset,
     sizes: expected.sizes,
     sourceSrcset: expected.sourceSrcset,
@@ -183,7 +184,7 @@ test('release and close restore host image navigation attributes and owned styli
   await expectPanelStatusMessage(page, /Loaded .*asset-two\.svg/u);
   await page.getByRole('button', { name: 'Close panel' }).click();
   await expectPanelClosed(page);
-  await expectHostRestoredTo(page, beforeRelease);
+  await expectHostRestoredTo(page, beforeRelease, { expectedSrcAttribute: fixtureUrl(fixtureAssetPaths.assetOne) });
 });
 
 test('recent preview projects into selected host image and guards repeated current previews', async ({ page, serviceWorker }) => {

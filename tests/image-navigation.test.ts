@@ -11,6 +11,7 @@ import {
 function fakeImage(): HTMLImageElement {
   const removed: string[] = [];
   const sourceRemoved: string[] = [];
+  const ownerDocument = { baseURI: 'https://example.test/page' };
   const imageAttrs = new Map<string, string>([
     ['src', 'old.jpg'],
     ['srcset', 'old-1x.jpg 1x, old-2x.jpg 2x'],
@@ -34,6 +35,7 @@ function fakeImage(): HTMLImageElement {
   };
   return {
     src: 'https://example.test/old.jpg',
+    ownerDocument,
     removed,
     sourceRemoved,
     imageAttrs,
@@ -77,6 +79,22 @@ test('restores responsive image attributes after a failed target image URL', () 
   assert.equal(image.getAttribute('sizes'), '100vw');
   assert.equal((image as unknown as { sourceAttrs: Map<string, string> }).sourceAttrs.get('srcset'), 'source-old.webp 1x');
   assert.equal((image as unknown as { sourceAttrs: Map<string, string> }).sourceAttrs.get('sizes'), '80vw');
+});
+
+test('restores relative src as the original absolute URL after base URL changes', () => {
+  const image = fakeImage();
+  const doc = (image as unknown as { ownerDocument: { baseURI: string } }).ownerDocument;
+  doc.baseURI = 'https://example.test/gallery/page.html';
+  image.src = 'https://example.test/gallery/assets/asset-one.svg';
+  image.setAttribute('src', './assets/asset-one.svg');
+  const snapshot = captureImageNavigationSnapshot(image);
+
+  doc.baseURI = 'https://example.test/gallery/assets/asset-two.svg';
+  applyImageUrl(image, 'https://example.test/gallery/assets/asset-two.svg');
+  restoreImageNavigationSnapshot(snapshot);
+
+  assert.equal(image.src, 'https://example.test/gallery/assets/asset-one.svg');
+  assert.equal(image.getAttribute('src'), 'https://example.test/gallery/assets/asset-one.svg');
 });
 
 test('pushes visible URL only for same-origin updates', () => {

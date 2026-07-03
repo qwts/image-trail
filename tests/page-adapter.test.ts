@@ -54,6 +54,7 @@ class FakeImageElement extends EventTarget {
   isConnected = true;
   naturalHeight = 480;
   naturalWidth = 640;
+  ownerDocument = { baseURI: 'https://example.test/page' } as Document;
   src = 'https://example.test/original.jpg';
   readonly attrs = new Map<string, string>([['src', 'https://example.test/original.jpg']]);
   readonly removedAttrs: string[] = [];
@@ -162,6 +163,49 @@ test('standalone image backdrop is prepared before selection or resize styling',
     assert.equal(image.style.height, '');
     assert.equal(image.style.width, '');
     assert.equal(image.style.position, '');
+  } finally {
+    restoreDom();
+  }
+});
+
+test('cleanup restores prepared standalone backdrop when auto-select does not keep it selected', () => {
+  const image = new FakeImageElement();
+  image.style.background = 'rgb(230, 230, 230)';
+  image.style.backgroundColor = 'rgb(230, 230, 230)';
+  const restoreDom = installFakeDom(image);
+  const adapter = new PageAdapter();
+
+  try {
+    adapter.prepareStandaloneImageBackdrop();
+    assert.equal(image.style.background, '#000');
+    assert.equal(image.style.backgroundColor, '#000');
+
+    adapter.cleanup();
+
+    assert.equal(image.style.background, 'rgb(230, 230, 230)');
+    assert.equal(image.style.backgroundColor, 'rgb(230, 230, 230)');
+    assert.equal(image.dataset.imageTrailSelected, undefined);
+  } finally {
+    restoreDom();
+  }
+});
+
+test('cleanup restores selected standalone backdrop through selected target release', () => {
+  const image = new FakeImageElement();
+  image.style.background = 'rgb(230, 230, 230)';
+  image.style.backgroundColor = 'rgb(230, 230, 230)';
+  const restoreDom = installFakeDom(image);
+  const adapter = new PageAdapter();
+
+  try {
+    adapter.prepareStandaloneImageBackdrop();
+    adapter.autoSelectSingleImage();
+
+    adapter.cleanup();
+
+    assert.equal(image.style.background, 'rgb(230, 230, 230)');
+    assert.equal(image.style.backgroundColor, 'rgb(230, 230, 230)');
+    assert.equal(image.dataset.imageTrailSelected, undefined);
   } finally {
     restoreDom();
   }
