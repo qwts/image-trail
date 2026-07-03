@@ -83,6 +83,7 @@ can carry a stale copy until rebased or restarted from the main repo.
 - Review/issue feedback must get a visible reply before it is resolved or left open: say what commit/code fixed it, why no action was needed, or what linked follow-up owns it.
 - Do not resolve GitHub review threads silently. If no code change is needed, reply with the rationale first.
 - Commit intentional, scoped slices regularly after validating them; do not push, open PRs, close issues, resolve threads, or update broad project state unless the user has asked for that step.
+- When a PR merges or issue work is abandoned, clean up the task worktree from the main checkout (`git worktree remove` then `git worktree prune`); see wiki [Contributing](https://github.com/qwtm/image-trail/wiki/Contributing).
 
 ## Documentation And Validation
 
