@@ -12,7 +12,7 @@ route through `content/` controllers (ESLint-enforced).
   panel. Focus and scroll are captured/restored across renders; preserve that.
 - **Selected vs stored-original must stay visually distinct.** Selection is a
   row-level highlight (`.is-selected`, `styles/panel.css`); a stored original is
-  a separate indicator dot (`.stored-original-dot`, set by
+  a separate indicator dot (`.image-trail-panel__stored-original-dot`, set by
   `createExtensionIndicator` in `components/bookmarks-view.ts` and
   `components/history-view.ts`). Keep them on separate visual channels — the dot
   is an indicator, not a competing selected-row background.
