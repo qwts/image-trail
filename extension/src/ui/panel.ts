@@ -13,14 +13,6 @@ import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
 import type { PageAdapter, TargetSelectionSnapshot } from '../content/page-adapter.js';
 import {
-  createDisplayRecord,
-  encryptedBlobIdForRecord,
-  isDurableImageSourceUrl,
-  validateImageRecordUrl,
-  type ImageRecordUrlValidation,
-} from '../core/display-records.js';
-import type { ImageDisplayRecord } from '../core/display-records.js';
-import {
   applyFieldLoadFailureToState,
   applyFieldSplitSpecToState,
   pruneInvalidFieldSplitSpecsFromState,
@@ -32,7 +24,6 @@ import type { BuildIdentity } from '../core/build-info.js';
 import { createInitialPanelState, setAutomationState, setTargetState } from '../core/state.js';
 import type {
   BookmarkStore,
-  ImportedImageFile,
   PanelAction,
   PanelPosition,
   PanelPositionStore,
@@ -45,7 +36,6 @@ import type {
   UrlReviewStatus,
   UrlReviewStatusStore,
 } from '../core/types.js';
-import { isCapturedResult } from '../core/image/capture-result.js';
 import type { ImageRequestIntent } from '../core/image/request-policy.js';
 import { imageResourceUrlsEqual, pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
 import {
@@ -81,7 +71,6 @@ import {
   createThumbnailDataUrlFromImage,
   createThumbnailDataUrlFromUrl,
   fetchThumbnailSource,
-  isTransientBlobUrl,
 } from '../content/thumbnail-generator.js';
 import { fetchDecodedBufferedImageSource, probeBufferedImageSource } from '../content/buffered-image-source.js';
 import { checkImageRequestPolicy } from '../content/image-request-policy.js';
@@ -91,17 +80,14 @@ import { ParsedFieldStateSync } from './panel/parsed-field-state-sync.js';
 import { PanelMount } from './panel/panel-mount.js';
 import { RecallExportController } from './panel/recall-export-controller.js';
 import { RecallRestoreController } from './panel/recall-restore-controller.js';
+import { RecordLibraryController } from './panel/record-library-controller.js';
+import { CapturedOriginalsController } from './panel/captured-originals-controller.js';
 import { UrlTemplateSettingsController } from './panel/url-template-settings-controller.js';
 import { dispatchPanelAction } from './panel/action-dispatch.js';
 import { buildPanelActionRegistry } from './panel/actions/registry.js';
 import type { PanelActionDeps } from './panel/actions/deps.js';
 import { delay, isFocusablePanelControl } from './panel/export-download.js';
-import {
-  bookmarkSaveMessage,
-  recordHasBlobId,
-  urlReviewStatusClearScopeLabel,
-  withoutRecentPinState,
-} from './panel/record-export-helpers.js';
+import { urlReviewStatusClearScopeLabel } from './panel/record-export-helpers.js';
 import { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../content/panel-services.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
 import { isUnsupportedUrlEditorInput } from './components/url-editor-view.js';
@@ -114,17 +100,6 @@ const FINITE_CAPTURE_ERROR_MS = 2400;
 // / prev traversal mutes them entirely (see applySelectedUrl's quietFailure), while the +/- single
 // step surfaces them for only about this long.
 const FIELD_LOAD_ERROR_DISPLAY_MS = 1500;
-
-interface ValidatedRecordUrl extends ImageRecordUrlValidation {
-  readonly preloadDataUrl?: string;
-}
-
-interface RecordAddOptions {
-  readonly trustLoadedImage?: boolean;
-  readonly width?: number;
-  readonly height?: number;
-  readonly projectionId?: string;
-}
 
 type FieldEditorEffect =
   | { readonly kind: 'noop' }
@@ -146,12 +121,6 @@ const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
 const MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS = 50;
 
 type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
-
-function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {
-  const match = value?.match(/^\s*(\d+)\s*[x×]\s*(\d+)\s*$/iu);
-  if (!match) return {};
-  return { width: Number(match[1]), height: Number(match[2]) };
-}
 
 function addItems(items: readonly string[], nextItems: readonly string[]): readonly string[] {
   return [...items, ...nextItems.filter((item) => !items.includes(item))];
@@ -218,7 +187,6 @@ export class ImageTrailPanel {
   private localSettings: PlaintextLocalSettings = DEFAULT_LOCAL_SETTINGS;
   private previewScrollAnchorId: string | null = null;
   private storageUsageRequestId = 0;
-  private bookmarkMutationQueue: Promise<void> = Promise.resolve();
   private panelPositionRestored = false;
   private panelPositionRestorePromise: Promise<void> | null = null;
   private panelPositionRestoreAttempt = 0;
@@ -326,7 +294,7 @@ export class ImageTrailPanel {
     loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
     loadRecentHistory: (options) => this.loadRecentHistory(options),
     refreshStorageUsage: (options) => this.refreshStorageUsage(options),
-    addImportedImage: (file) => this.addImportedImage(file),
+    addImportedImage: (file) => this.recordLibrary.addImportedImage(file),
     getLocalSettings: () => this.localSettings,
     bookmarkStore: () => this.bookmarkStore,
     captureStore: () => this.captureStore,
@@ -336,6 +304,48 @@ export class ImageTrailPanel {
     downloadPCloudBackup: (input) => downloadPCloudBackup(input),
     loadAllBookmarks: () => this.recallExport.loadAllBookmarksForExport(),
     refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
+  });
+  private readonly recordLibrary: RecordLibraryController = new RecordLibraryController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
+    refreshStorageUsage: (options) => this.refreshStorageUsage(options),
+    scheduleFiniteCaptureErrorReset: (updatedAt, mode) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode),
+    findSelectedImage: (handleId) => this.findSelectedImage(handleId),
+    isProjectionActive: (projectionId) => this.projections.isActive(projectionId),
+    applySelectedUrl: (url, attemptedFieldIds, options) => this.applySelectedUrl(url, attemptedFieldIds, options),
+    removeCapturedBlobReference: (blobId, options) => this.capturedOriginals.removeCapturedBlobReference(blobId, options),
+    bookmarkStore: () => this.bookmarkStore,
+    recentHistoryStore: () => this.recentHistoryStore,
+    createThumbnailDataUrlFromImage,
+    createThumbnailDataUrlFromUrl,
+    createThumbnailDataUrlFromDataUrl,
+    fetchThumbnailSource,
+  });
+  private readonly capturedOriginals: CapturedOriginalsController = new CapturedOriginalsController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: (options) => this.render(options),
+    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
+    refreshStorageUsage: (options) => this.refreshStorageUsage(options),
+    applyStorageUsage: (usage) => this.applyStorageUsage(usage),
+    invalidateStorageUsageRequests: () => {
+      this.storageUsageRequestId += 1;
+    },
+    scheduleFiniteCaptureErrorReset: (updatedAt, mode) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode),
+    refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
+    saveRecentRecordAsBookmark: (record, options) => this.recordLibrary.saveRecentRecordAsBookmark(record, options),
+    markRecentHistoryRowPinned: (id, bookmark) => this.recordLibrary.markRecentHistoryRowPinned(id, bookmark),
+    captureStore: () => this.captureStore,
+    bookmarkStore: () => this.bookmarkStore,
+    recentHistoryStore: () => this.recentHistoryStore,
   });
   private bufferedNavigationToastTimer: number | null = null;
   private queuedParsedNavigationDelta = 0;
@@ -374,7 +384,7 @@ export class ImageTrailPanel {
       this.pageAdapter.subscribeToSuccessfulLoads((target) => {
         if (target.projectionId && !this.projections.isActive(target.projectionId)) return;
         if (target.projectionId) this.projections.update(target.projectionId, { status: 'loaded' });
-        void this.addRecentHistory(target.url, target.thumbnail, {
+        void this.recordLibrary.addRecentHistory(target.url, target.thumbnail, {
           trustLoadedImage: target.trustedLoadedImage,
           width: target.width,
           height: target.height,
@@ -382,11 +392,11 @@ export class ImageTrailPanel {
         });
       }),
       this.pageAdapter.subscribeToBookmarkRequests((target) => {
-        this.enqueueBookmarkMutation(async () => {
+        this.recordLibrary.enqueueBookmarkMutation(async () => {
           const options = { trustLoadedImage: target.trustedLoadedImage, width: target.width, height: target.height };
-          const bookmarked = await this.bookmarkUrl(target.url, target.thumbnail, options);
+          const bookmarked = await this.recordLibrary.bookmarkUrl(target.url, target.thumbnail, options);
           if (bookmarked) {
-            await this.addRecentHistory(target.url, target.thumbnail, options);
+            await this.recordLibrary.addRecentHistory(target.url, target.thumbnail, options);
           }
         });
       }),
@@ -967,16 +977,16 @@ export class ImageTrailPanel {
       urlTemplateSettings: () => this.urlTemplateSettings,
       recallExport: () => this.recallExport,
       recallRestore: () => this.recallRestore,
-      bookmarkCurrentImage: () => this.bookmarkCurrentImage(),
-      removeRecentHistory: (id) => this.removeRecentHistory(id),
-      deleteRecentHistory: () => this.deleteRecentHistory(),
-      pinRecentHistory: (id) => this.pinRecentHistory(id),
-      loadBookmark: (id) => this.loadBookmark(id),
-      removeBookmark: (id) => this.removeBookmark(id),
+      bookmarkCurrentImage: () => this.recordLibrary.bookmarkCurrentImage(),
+      removeRecentHistory: (id) => this.recordLibrary.removeRecentHistory(id),
+      deleteRecentHistory: () => this.recordLibrary.deleteRecentHistory(),
+      pinRecentHistory: (id) => this.recordLibrary.pinRecentHistory(id),
+      loadBookmark: (id) => this.recordLibrary.loadBookmark(id),
+      removeBookmark: (id) => this.recordLibrary.removeBookmark(id),
       loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
-      refreshBookmarkThumbnails: () => this.refreshBookmarkThumbnails(),
-      deleteVisibleBookmarks: () => this.deleteVisibleBookmarks(),
-      deleteRecallBookmarks: () => this.deleteRecallBookmarks(),
+      refreshBookmarkThumbnails: () => this.recordLibrary.refreshBookmarkThumbnails(),
+      deleteVisibleBookmarks: () => this.recordLibrary.deleteVisibleBookmarks(),
+      deleteRecallBookmarks: () => this.recordLibrary.deleteRecallBookmarks(),
       updateVisibleBookmarkSoftMax: (value) => this.updateVisibleBookmarkSoftMax(value),
       updateRecentHistoryRetention: (input) => this.updateRecentHistoryRetention(input),
       updatePinSaveStoragePreference: (value) => this.updatePinSaveStoragePreference(value),
@@ -995,9 +1005,9 @@ export class ImageTrailPanel {
       enqueueFieldTransform: (action) => this.enqueueFieldTransform(action),
       enqueueSelectedUrlApply: (url) => this.enqueueSelectedUrlApply(url),
       rejectUrlEditorInput: () => this.rejectUrlEditorInput(),
-      captureImage: (url, sourceType, sourceRecordId) => this.captureImage(url, sourceType, sourceRecordId),
-      deleteCapturedBlob: (recordId, blobId) => this.deleteCapturedBlob(recordId, blobId),
-      cleanupOrphanedBlobs: () => this.cleanupOrphanedBlobs(),
+      captureImage: (url, sourceType, sourceRecordId) => this.capturedOriginals.captureImage(url, sourceType, sourceRecordId),
+      deleteCapturedBlob: (recordId, blobId) => this.capturedOriginals.deleteCapturedBlob(recordId, blobId),
+      cleanupOrphanedBlobs: () => this.capturedOriginals.cleanupOrphanedBlobs(),
       previewRecord: (url, blobId, scrollAnchorId) => this.previewRecord(url, blobId, scrollAnchorId),
       clearUrlReviewStatus: (scope) => this.clearUrlReviewStatus(scope),
       navigateBy: (delta) => this.navigateBy(delta),
@@ -1786,500 +1796,6 @@ export class ImageTrailPanel {
 
   private findSelectedImage(handleId: string): HTMLImageElement | null {
     return document.querySelector<HTMLImageElement>(`[data-image-trail-handle="${handleId}"]`);
-  }
-
-  private async bookmarkCurrentImage(): Promise<void> {
-    const url = this.state.target.selectedUrl;
-    if (!url) return;
-    const image = this.state.target.selectedHandleId ? this.findSelectedImage(this.state.target.selectedHandleId) : null;
-    const trustLoadedImage = image ? image.complete && image.naturalWidth > 0 && image.naturalHeight > 0 : false;
-    await this.bookmarkUrl(url, image ? ((await createThumbnailDataUrlFromImage(image)) ?? undefined) : undefined, {
-      trustLoadedImage,
-      width: image?.naturalWidth || undefined,
-      height: image?.naturalHeight || undefined,
-    });
-  }
-
-  private enqueueBookmarkMutation(work: () => Promise<void>): void {
-    this.bookmarkMutationQueue = this.bookmarkMutationQueue.then(work, work);
-    void this.bookmarkMutationQueue;
-  }
-
-  private async bookmarkUrl(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<boolean> {
-    const validation = await this.validateRecordUrlForAdd(url, options);
-    if (!validation.ok || !validation.sourceUrl) {
-      return false;
-    }
-    const sourceUrl = validation.sourceUrl;
-    const resolvedThumbnail = await this.resolveRecordThumbnail(sourceUrl, thumbnail, validation, options);
-    const draft = createDisplayRecord({
-      id: sourceUrl,
-      url: sourceUrl,
-      thumbnail: resolvedThumbnail,
-      width: options.width,
-      height: options.height,
-      source: 'bookmark',
-    });
-    const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
-    this.state = { ...this.state, message: bookmarkSaveMessage(bookmark), lastUpdatedAt: Date.now() };
-    await this.loadBookmarkPage(0, { render: false });
-    this.renderPanelAndRefreshRecall();
-    void this.refreshStorageUsage({ render: true });
-    return true;
-  }
-
-  private async addImportedImage(file: ImportedImageFile): Promise<boolean> {
-    if (!file.dataUrl.startsWith('data:image/')) return false;
-    const timestamp = new Date().toISOString();
-    const draft = createDisplayRecord({
-      id: `${timestamp}:${file.name}`,
-      url: file.dataUrl,
-      title: file.name,
-      label: file.name,
-      thumbnail: file.dataUrl,
-      timestamp,
-      source: 'bookmark',
-    });
-    const bookmark = this.bookmarkStore ? await this.bookmarkStore.save(draft) : draft;
-    const historyItem = createDisplayRecord({ ...draft, id: `${timestamp}:history:${file.name}`, source: 'history' });
-    const history = this.recentHistoryStore
-      ? await this.recentHistoryStore.add(historyItem, window.location.href)
-      : [historyItem, ...this.state.history];
-    this.state = {
-      ...this.state,
-      history: history.slice(0, 30),
-      message: bookmarkSaveMessage(bookmark, bookmark.label ?? file.name),
-      lastUpdatedAt: Date.now(),
-    };
-    await this.loadBookmarkPage(0, { render: false });
-    this.renderPanelAndRefreshRecall();
-    void this.refreshStorageUsage({ render: true });
-    return true;
-  }
-
-  private async addRecentHistory(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<void> {
-    if (options.projectionId && !this.projections.isActive(options.projectionId)) return;
-    const validation = await this.validateRecordUrlForAdd(url, options);
-    if (options.projectionId && !this.projections.isActive(options.projectionId)) return;
-    if (!validation.ok || !validation.sourceUrl) return;
-    const resolvedThumbnail = await this.resolveRecordThumbnail(validation.sourceUrl, thumbnail, validation, options);
-    if (options.projectionId && !this.projections.isActive(options.projectionId)) return;
-    const next = reducePanelAction(this.state, {
-      name: 'history/add-loaded',
-      url: validation.sourceUrl,
-      thumbnail: resolvedThumbnail,
-      width: options.width,
-      height: options.height,
-    }).history;
-    const item = next[0];
-    if (!item) return;
-    if (options.projectionId && !this.projections.isActive(options.projectionId)) return;
-    const history = this.recentHistoryStore ? await this.recentHistoryStore.add(item, window.location.href) : next;
-    if (options.projectionId && !this.projections.isActive(options.projectionId)) return;
-    this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
-    this.render();
-  }
-
-  private async pinRecentHistory(id: string): Promise<void> {
-    const record = this.state.history.find((item) => item.id === id);
-    if (!record) return;
-    const result = await this.saveRecentRecordAsBookmark(record, { render: false });
-    if (!result.ok) {
-      this.state = { ...this.state, message: result.message, status: 'error', lastUpdatedAt: Date.now() };
-      this.render();
-      return;
-    }
-    await this.markRecentHistoryRowPinned(id, result.record);
-    this.renderPanelAndRefreshRecall();
-  }
-
-  private async saveRecentRecordAsBookmark(
-    record: ImageDisplayRecord,
-    options: { readonly timestamp?: string; readonly render?: boolean } = {},
-  ): Promise<{ readonly ok: true; readonly record: ImageDisplayRecord } | { readonly ok: false; readonly message: string }> {
-    const timestamp = options.timestamp ?? new Date().toISOString();
-    const recordForBookmark = withoutRecentPinState(record);
-    const draft = createDisplayRecord({
-      ...recordForBookmark,
-      id: record.url.startsWith('data:image/') ? record.id : record.url,
-      timestamp,
-      source: 'bookmark',
-    });
-    if (!this.bookmarkStore) {
-      return { ok: false, message: 'Bookmark storage is unavailable.' };
-    }
-    const result = this.bookmarkStore.saveResult
-      ? await this.bookmarkStore.saveResult(draft)
-      : { ok: true as const, record: await this.bookmarkStore.save(draft) };
-    if (!result.ok) return result;
-    const bookmark = result.record;
-    this.state = { ...this.state, message: bookmarkSaveMessage(bookmark, bookmark.label), lastUpdatedAt: Date.now() };
-    await this.loadBookmarkPage(0, { render: false });
-    if (options.render !== false) this.renderPanelAndRefreshRecall();
-    void this.refreshStorageUsage({ render: options.render !== false });
-    return { ok: true, record: bookmark };
-  }
-
-  private async markRecentHistoryRowPinned(id: string, bookmark: ImageDisplayRecord): Promise<void> {
-    this.state = reducePanelAction(this.state, {
-      name: 'history/mark-pinned',
-      id,
-      pinnedAt: bookmark.timestamp,
-      pinnedRecordId: bookmark.id,
-    });
-    const updatedHistory = this.state.history.find((item) => item.id === id);
-    if (!updatedHistory) return;
-    const history = this.recentHistoryStore ? await this.recentHistoryStore.add(updatedHistory, window.location.href) : this.state.history;
-    this.state = {
-      ...this.state,
-      history,
-      selectedHistoryIds: this.state.selectedHistoryIds.filter((selectedId) => history.some((item) => item.id === selectedId)),
-      lastUpdatedAt: Date.now(),
-    };
-  }
-
-  private async resolveRecordThumbnail(
-    sourceUrl: string,
-    thumbnail: string | undefined,
-    validation: ValidatedRecordUrl,
-    options: RecordAddOptions,
-  ): Promise<string | undefined> {
-    if (thumbnail && !isTransientBlobUrl(thumbnail)) return thumbnail;
-    if (thumbnail && isTransientBlobUrl(thumbnail)) {
-      const durableThumbnail = await createThumbnailDataUrlFromUrl(thumbnail);
-      if (durableThumbnail) return durableThumbnail;
-    }
-    if (validation.preloadDataUrl) return (await createThumbnailDataUrlFromDataUrl(validation.preloadDataUrl)) ?? undefined;
-    if (!options.trustLoadedImage) return undefined;
-    return (await createThumbnailDataUrlFromUrl(sourceUrl)) ?? sourceUrl;
-  }
-
-  private async validateRecordUrlForAdd(url: string, options: RecordAddOptions = {}): Promise<ValidatedRecordUrl> {
-    const validation = options.trustLoadedImage ? this.validateLoadedImageUrl(url) : this.validateRecordUrl(url);
-    if (!validation.ok || !validation.sourceUrl) return validation;
-    if (validation.sourceUrl.startsWith('data:image/')) return validation;
-    if (options.trustLoadedImage) return validation;
-    const fetchResult = await fetchThumbnailSource(validation.sourceUrl);
-    if (fetchResult.ok) return { ...validation, preloadDataUrl: fetchResult.dataUrl };
-
-    this.state = {
-      ...this.state,
-      message: `Image Trail could not save this URL because the image failed to load: ${fetchResult.message}`,
-      status: 'error',
-      lastUpdatedAt: Date.now(),
-    };
-    this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'status');
-    this.render();
-    return { ok: false, message: this.state.message };
-  }
-
-  private validateRecordUrl(url: string): ReturnType<typeof validateImageRecordUrl> {
-    const validation = validateImageRecordUrl(url);
-    if (!validation.ok) {
-      this.state = {
-        ...this.state,
-        message: validation.message ?? 'Image Trail could not save this URL.',
-        status: 'error',
-        lastUpdatedAt: Date.now(),
-      };
-      this.render();
-    }
-    return validation;
-  }
-
-  private validateLoadedImageUrl(url: string): ImageRecordUrlValidation {
-    let sourceUrl: URL;
-    try {
-      sourceUrl = new URL(url, document.baseURI);
-    } catch {
-      return { ok: false, message: 'Image Trail could not save this URL because it is not a valid URL.' };
-    }
-
-    if (sourceUrl.protocol !== 'http:' && sourceUrl.protocol !== 'https:') {
-      return { ok: false, message: 'Only http(s) image URLs can be saved to Image Trail.' };
-    }
-
-    return { ok: true, sourceUrl: sourceUrl.href };
-  }
-
-  private async removeRecentHistory(id: string): Promise<void> {
-    const existing = this.state.history.find((item) => item.id === id);
-    const blobId = existing ? encryptedBlobIdForRecord(existing) : undefined;
-    const history = this.recentHistoryStore
-      ? await this.recentHistoryStore.remove(id, window.location.href)
-      : reducePanelAction(this.state, { name: 'history/remove', id }).history;
-    this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
-    this.render();
-    if (blobId) await this.removeCapturedBlobReference(blobId, { render: true });
-  }
-
-  private async deleteRecentHistory(): Promise<void> {
-    const records = this.state.history;
-    if (records.length === 0) return;
-    if (this.recentHistoryStore) {
-      for (const record of records) {
-        await this.recentHistoryStore.remove(record.id, window.location.href);
-      }
-    }
-    this.state = reducePanelAction(this.state, { name: 'history/delete-all' });
-    this.render();
-    let removedCapturedBlob = false;
-    for (const record of records) {
-      const blobId = encryptedBlobIdForRecord(record);
-      if (blobId) {
-        await this.removeCapturedBlobReference(blobId, { render: false });
-        removedCapturedBlob = true;
-      }
-    }
-    if (removedCapturedBlob) await this.refreshStorageUsage({ render: true });
-  }
-
-  private async loadBookmark(id: string): Promise<void> {
-    const bookmark = this.state.bookmarks.find((item) => item.id === id);
-    if (!bookmark) return;
-    await this.applySelectedUrl(bookmark.url, [], { reason: 'bookmark-load' });
-  }
-
-  private async removeBookmark(id: string): Promise<void> {
-    const bookmark = this.state.bookmarks.find((item) => item.id === id);
-    if (!bookmark) return;
-    await this.bookmarkStore?.remove(bookmark);
-    this.state = reducePanelAction(this.state, { name: 'bookmark/remove', id });
-    await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
-    this.renderPanelAndRefreshRecall();
-    void this.refreshStorageUsage({ render: true });
-  }
-
-  private async deleteVisibleBookmarks(): Promise<void> {
-    if (!this.bookmarkStore || this.state.bookmarks.length === 0) return;
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const result = await this.bookmarkStore.removeMany(this.state.bookmarks.map((bookmark) => bookmark.id));
-    await this.loadBookmarkPage(0, { render: false });
-    this.state = reducePanelAction(this.state, {
-      name: 'import-export/complete',
-      message: `Deleted ${result.removedCount} queue item${result.removedCount === 1 ? '' : 's'}.`,
-    });
-    this.renderPanelAndRefreshRecall();
-    void this.refreshStorageUsage({ render: true });
-  }
-
-  private async deleteRecallBookmarks(): Promise<void> {
-    if (!this.bookmarkStore) return;
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const result = await this.bookmarkStore.removeRecallPage({
-      offset: this.state.bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
-      scope: this.state.bookmarkVisibilityScope,
-      currentPageUrl: window.location.href,
-    });
-    await this.loadBookmarkPage(0, { render: false });
-    this.state = reducePanelAction(this.state, {
-      name: 'import-export/complete',
-      message: `Deleted ${result.removedCount} Recall item${result.removedCount === 1 ? '' : 's'}.`,
-    });
-    this.renderPanelAndRefreshRecall();
-    void this.refreshStorageUsage({ render: true });
-  }
-
-  private async removeCapturedBlobReference(blobId: string, options: { readonly render?: boolean } = {}): Promise<void> {
-    if (!this.captureStore) return;
-    try {
-      const { usage } = await this.captureStore.requestDeleteBlob(blobId);
-      this.applyStorageUsage(usage);
-      if (options.render) this.render();
-    } catch {
-      void this.refreshStorageUsage({ render: options.render });
-    }
-  }
-
-  private async cleanupOrphanedBlobs(): Promise<void> {
-    if (!this.captureStore) return;
-    const { deletedCount, usage } = await this.captureStore.requestCleanupOrphanedBlobs();
-    this.state = reducePanelAction(
-      {
-        ...this.state,
-        message: `Cleaned up ${deletedCount} unused original${deletedCount === 1 ? '' : 's'}.`,
-        status: 'ready',
-        lastUpdatedAt: Date.now(),
-      },
-      { name: 'storage/update', usage },
-    );
-    this.storageUsageRequestId += 1;
-    this.render({ includeRecall: false });
-  }
-
-  private async refreshBookmarkThumbnails(): Promise<void> {
-    if (!this.bookmarkStore) return;
-    const bookmarks = this.state.bookmarks;
-    if (bookmarks.length === 0) return;
-
-    this.state = { ...this.state, message: `Refreshing ${bookmarks.length} visible bookmark thumbnail(s)...`, lastUpdatedAt: Date.now() };
-    this.render();
-
-    let refreshed = 0;
-    let unavailable = 0;
-    for (const bookmark of bookmarks) {
-      const thumbnail = await createThumbnailDataUrlFromUrl(bookmark.url);
-      if (!thumbnail) {
-        unavailable += 1;
-        continue;
-      }
-      await this.bookmarkStore.save({ ...bookmark, thumbnail });
-      refreshed += 1;
-    }
-
-    await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
-    this.state = {
-      ...this.state,
-      message: `Refreshed ${refreshed} thumbnail${refreshed === 1 ? '' : 's'}${unavailable ? `; ${unavailable} unavailable` : ''}.`,
-      lastUpdatedAt: Date.now(),
-    };
-    this.renderPanelAndRefreshRecall();
-  }
-
-  private async captureImage(url: string, sourceType: 'target' | 'history' | 'bookmark', sourceRecordId?: string): Promise<void> {
-    if (!this.captureStore) return;
-    if (this.state.captureInProgress) return;
-    const isImportedImage = url.startsWith('data:image/');
-    if (!isImportedImage && !isDurableImageSourceUrl(url)) {
-      const lastUpdatedAt = Date.now();
-      this.state = {
-        ...this.state,
-        message: 'Only http(s) image URLs can be captured as encrypted originals.',
-        status: 'error',
-        lastUpdatedAt,
-      };
-      this.render();
-      this.scheduleFiniteCaptureErrorReset(lastUpdatedAt, 'status');
-      return;
-    }
-    this.state = reducePanelAction(this.state, { name: 'capture/start' });
-    this.render();
-    const result = await this.captureStore.requestCapture(url, sourceType, sourceRecordId);
-    this.state = reducePanelAction(this.state, { name: 'capture/complete', result, sourceRecordId });
-    let queueChanged = false;
-    const finiteCaptureResultError =
-      (result.status === 'failed' || result.status === 'remote-only') &&
-      (result.reason === 'encryption-locked' || result.reason === 'auth-required');
-    if ((result.status === 'failed' || result.status === 'remote-only') && result.reason === 'encryption-locked') {
-      await this.recallExport.refreshBlobKeyStatus();
-    }
-    if (isCapturedResult(result) && sourceType === 'history' && sourceRecordId) {
-      const updatedHistory = this.state.history.find((item) => item.id === sourceRecordId);
-      if (updatedHistory) {
-        const saved = await this.saveRecentRecordAsBookmark(updatedHistory, { render: false });
-        if (saved.ok) {
-          await this.markRecentHistoryRowPinned(sourceRecordId, saved.record);
-          this.state = {
-            ...this.state,
-            message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image. ${bookmarkSaveMessage(saved.record, saved.record.label)}`,
-            lastUpdatedAt: Date.now(),
-          };
-          queueChanged = true;
-        } else {
-          const history = this.recentHistoryStore
-            ? await this.recentHistoryStore.add(updatedHistory, window.location.href)
-            : this.state.history;
-          this.state = {
-            ...this.state,
-            history,
-            message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image, but the recent row was not pinned: ${saved.message}`,
-            status: 'error',
-            lastUpdatedAt: Date.now(),
-          };
-        }
-      }
-    }
-    if (isCapturedResult(result) && sourceType === 'target') {
-      const capturedAt = new Date().toISOString();
-      const dimensions = parseDimensionText(this.state.target.selectedDimensions);
-      const draft = createDisplayRecord({
-        id: url,
-        url,
-        timestamp: capturedAt,
-        width: dimensions.width,
-        height: dimensions.height,
-        source: 'bookmark',
-        capturedAt,
-        captureStatus: 'captured',
-        blobId: result.blobId,
-        storedOriginal: {
-          blobId: result.blobId,
-          mimeType: result.mimeType,
-          byteLength: result.byteLength,
-          capturedAt,
-        },
-      });
-      if (!this.bookmarkStore) {
-        await this.removeCapturedBlobReference(result.blobId);
-        this.state = {
-          ...this.state,
-          message: 'Captured original was discarded because bookmark storage is unavailable.',
-          status: 'error',
-          lastUpdatedAt: Date.now(),
-        };
-      } else {
-        const saved = this.bookmarkStore.saveResult
-          ? await this.bookmarkStore.saveResult(draft)
-          : { ok: true as const, record: await this.bookmarkStore.save(draft) };
-        if (saved.ok) {
-          await this.loadBookmarkPage(0, { render: false });
-          this.state = {
-            ...this.state,
-            message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image. ${bookmarkSaveMessage(saved.record, saved.record.label)}`,
-            lastUpdatedAt: Date.now(),
-          };
-          queueChanged = true;
-        } else {
-          await this.removeCapturedBlobReference(result.blobId);
-          this.state = {
-            ...this.state,
-            message: `Captured original was discarded because the target pin was not saved: ${saved.message}`,
-            status: 'error',
-            lastUpdatedAt: Date.now(),
-          };
-        }
-      }
-    }
-    if (isCapturedResult(result) && sourceType === 'bookmark' && sourceRecordId && this.bookmarkStore) {
-      const updatedBookmark = this.state.bookmarks.find((b) => b.id === sourceRecordId);
-      if (updatedBookmark) {
-        await this.bookmarkStore.save(updatedBookmark);
-        await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
-        queueChanged = true;
-      }
-    }
-    await this.refreshStorageUsage();
-    if (finiteCaptureResultError) this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'capture-result');
-    if (queueChanged) {
-      this.renderPanelAndRefreshRecall();
-    } else {
-      this.render();
-    }
-  }
-
-  private async deleteCapturedBlob(recordId: string, blobId: string): Promise<void> {
-    if (!this.captureStore) return;
-    this.state = reducePanelAction(this.state, { name: 'capture/delete', id: recordId, blobId });
-    const updatedHistory = this.state.history.find((b) => b.id === recordId);
-    if (updatedHistory && this.recentHistoryStore) {
-      const history = await this.recentHistoryStore.add(updatedHistory, window.location.href);
-      this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
-    }
-    const updatedBookmark = this.state.bookmarks.find((bookmark) => bookmark.id === recordId || recordHasBlobId(bookmark, blobId));
-    let queueChanged = false;
-    if (updatedBookmark && this.bookmarkStore) {
-      await this.bookmarkStore.save(updatedBookmark);
-      await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
-      queueChanged = true;
-    }
-    if (queueChanged) {
-      this.renderPanelAndRefreshRecall();
-    } else {
-      this.render();
-    }
-    void this.removeCapturedBlobReference(blobId, { render: true });
   }
 
   private async previewRecord(url: string, blobId?: string, scrollAnchorId?: string): Promise<void> {
