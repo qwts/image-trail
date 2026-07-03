@@ -7,3 +7,5 @@ storybook-static/
 
 .test-dist/
 coverage/
+playwright-report/
+test-results/
