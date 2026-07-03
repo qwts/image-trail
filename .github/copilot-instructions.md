@@ -40,7 +40,8 @@ general TypeScript style.
 
 ## GitHub And Branch Workflow
 
-- The integration branch is `codex/dev`; do not assume `main` is the active base.
+- Development is trunk-based on `main`: cut short-lived branches from latest
+  `main` and merge back via PR. There is no separate `dev` integration branch.
 - Tracked work should link the pull request to its issue and include an explicit
   closing reference such as `Closes #123` when the PR completes the issue.
 - Branch linkage is only a claim signal. The PR relationship and closing

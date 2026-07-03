@@ -9,8 +9,7 @@ const CLOSING_REFERENCE_RE =
 const ISSUE_REFERENCE_RE = /(?:(?<owner>[a-z0-9_.-]+)\/(?<repo>[a-z0-9_.-]+))?#(?<number>\d+)/giu;
 
 // Must match the `branches:`/`base.ref` filter in .github/workflows/close-linked-issues.yml.
-// Both are live integration branches that get cherry-picked into main.
-export const TARGET_BASE_REFS = ['claude/dev', 'codex/dev'];
+export const TARGET_BASE_REFS = ['main'];
 
 export function shouldProcessMergedPullRequest(pullRequest) {
   return pullRequest?.merged === true && TARGET_BASE_REFS.includes(pullRequest.base?.ref);

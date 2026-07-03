@@ -5,8 +5,7 @@ on:
     types:
       - closed
     branches:
-      - claude/dev
-      - codex/dev
+      - main
 
 permissions:
   contents: read
@@ -19,7 +18,7 @@ jobs:
     # Keep in sync with TARGET_BASE_REFS in scripts/close-linked-issues.mjs.
     if: |
       github.event.pull_request.merged == true &&
-      (github.event.pull_request.base.ref == 'claude/dev' || github.event.pull_request.base.ref == 'codex/dev')
+      github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

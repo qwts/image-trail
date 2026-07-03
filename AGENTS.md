@@ -72,7 +72,8 @@ can carry a stale copy until rebased or restarted from the main repo.
 
 ## Branch And GitHub Hygiene
 
-- Base work on latest `codex/dev`; do not use `main` as the base.
+- Development is trunk-based: base work on a short-lived branch cut from latest
+  `main` and merge back via PR. There is no separate `dev` integration branch.
 - Check `git status` before changing anything and preserve unrelated user work.
 - For issue work, follow the wiki branch-link/claim-comment flow; post progress
   on the active issue as you implement. Do not add agent identity labels unless
