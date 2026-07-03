@@ -92,6 +92,9 @@ import { PanelMount } from './panel/panel-mount.js';
 import { RecallExportController } from './panel/recall-export-controller.js';
 import { RecallRestoreController } from './panel/recall-restore-controller.js';
 import { UrlTemplateSettingsController } from './panel/url-template-settings-controller.js';
+import { dispatchPanelAction } from './panel/action-dispatch.js';
+import { buildPanelActionRegistry } from './panel/actions/registry.js';
+import type { PanelActionDeps } from './panel/actions/deps.js';
 import { delay, isFocusablePanelControl } from './panel/export-download.js';
 import {
   bookmarkSaveMessage,
@@ -938,509 +941,72 @@ export class ImageTrailPanel {
     this.renderPanelAndRefreshRecall();
   }
 
-  private dispatch = (action: PanelAction): void => {
-    if (action.name === 'start-target-picker') {
-      this.state = reducePanelAction(this.state, action);
-      this.pageAdapter.startPickMode();
-      return;
-    }
-
-    if (action.name === 'stop-target-picker') {
-      this.state = reducePanelAction(this.state, action);
-      this.pageAdapter.stopPickMode();
-      return;
-    }
-
-    if (action.name === 'grab-mode/start') {
-      this.state = reducePanelAction(this.state, action);
-      this.state = setTargetState(this.state, toTargetState(this.pageAdapter.startGrabMode()));
-      this.render();
-      return;
-    }
-
-    if (action.name === 'grab-mode/stop') {
-      this.state = reducePanelAction(this.state, action);
-      this.state = setTargetState(this.state, toTargetState(this.pageAdapter.stopGrabMode()));
-      this.render();
-      return;
-    }
-
-    if (action.name === 'target/release') {
-      const snapshot = this.pageAdapter.releaseSelectedTarget();
-      this.state = setTargetState(this.state, toTargetState(snapshot));
-      this.render();
-      return;
-    }
-
-    if (action.name === 'target/fill-screen') {
-      const snapshot = this.pageAdapter.setSelectedFillScreen(action.enabled);
-      this.state = setTargetState(this.state, toTargetState(snapshot));
-      this.saveLocalSettings({ ...this.localSettings, previewFillScreen: snapshot.fillScreen });
-      this.render();
-      return;
-    }
-
-    if (action.name === 'target/set-object-fit') {
-      const snapshot = this.pageAdapter.setSelectedObjectFit(action.mode);
-      this.state = setTargetState(this.state, toTargetState(snapshot));
-      this.saveLocalSettings({ ...this.localSettings, previewObjectFit: snapshot.objectFit });
-      this.render();
-      return;
-    }
-
-    if (action.name === 'panel/secondary-controls-open') {
-      if (this.state.secondaryControlsOpen === action.open) return;
-      this.state = reducePanelAction(this.state, action);
-      this.saveLocalSettings({ ...this.localSettings, secondaryControlsOpen: action.open });
-      this.render();
-      return;
-    }
-
-    if (action.name === 'pin/current' || action.name === 'bookmark/current') {
-      void this.bookmarkCurrentImage();
-      return;
-    }
-
-    if (action.name === 'history/remove') {
-      void this.removeRecentHistory(action.id);
-      return;
-    }
-
-    if (action.name === 'history/delete-all') {
-      void this.deleteRecentHistory();
-      return;
-    }
-
-    if (action.name === 'bookmark/load') {
-      void this.loadBookmark(action.id);
-      return;
-    }
-
-    if (action.name === 'bookmark/remove') {
-      void this.removeBookmark(action.id);
-      return;
-    }
-
-    if (action.name === 'bookmark/clear' || action.name === 'bookmarks/clear-visible') {
-      this.state = reducePanelAction(this.state, action);
-      this.renderPanelAndRefreshRecall();
-      return;
-    }
-
-    if (action.name === 'bookmarks/older') {
-      void this.loadBookmarkPage(this.state.bookmarkOffset + this.state.bookmarkLimit);
-      return;
-    }
-
-    if (action.name === 'bookmarks/newer') {
-      void this.loadBookmarkPage(Math.max(0, this.state.bookmarkOffset - this.state.bookmarkLimit));
-      return;
-    }
-
-    if (action.name === 'bookmarks/toggle-scope') {
-      this.state = reducePanelAction(this.state, action);
-      this.saveLocalSettings({ ...this.localSettings, bookmarkVisibilityScope: this.state.bookmarkVisibilityScope });
-      void this.loadBookmarkPage(0, { render: false }).then(() => this.renderPanelAndRefreshRecall());
-      return;
-    }
-
-    if (action.name === 'settings/update-visible-bookmark-soft-max') {
-      void this.updateVisibleBookmarkSoftMax(action.value);
-      return;
-    }
-
-    if (action.name === 'settings/update-recent-history-retention') {
-      void this.updateRecentHistoryRetention({ limit: action.limit, overflowBehavior: action.overflowBehavior });
-      return;
-    }
-
-    if (action.name === 'settings/update-pin-save-storage-preference') {
-      this.updatePinSaveStoragePreference(action.value);
-      return;
-    }
-
-    if (action.name === 'settings/update-privacy-mode') {
-      this.state = reducePanelAction(this.state, action);
-      this.saveLocalSettings({ ...this.localSettings, privacyModeEnabled: action.enabled });
-      this.render();
-      this.refreshRecallIfOpen();
-      return;
-    }
-
-    if (action.name === 'settings/update-url-review-status-retention') {
-      void this.updateUrlReviewStatusRetention(action.limit, action.clearAfterExport);
-      return;
-    }
-
-    if (action.name === 'settings/update-request-throttle') {
-      this.updateRequestThrottle(action.minimumIntervalMs, action.maxRequests, action.windowMs);
-      return;
-    }
-
-    if (action.name === 'settings/update-neighbor-preload') {
-      this.updateNeighborPreload(action.enabled, action.radius, action.cacheLimit, action.probeMethod);
-      return;
-    }
-
-    if (action.name === 'neighbor-preload/manual') {
-      this.preloadMoreNeighbors(action.radius, action.cacheLimit);
-      return;
-    }
-
-    if (action.name === 'settings/reset-panel-position') {
-      void this.resetPanelPosition();
-      return;
-    }
-
-    if (action.name === 'settings/toggle') {
-      this.state = reducePanelAction(this.state, action);
-      this.render();
-      if (this.state.settingsOpen) void this.refreshStorageUsage({ render: true });
-      return;
-    }
-
-    if (action.name === 'panel/minimize' || action.name === 'panel/expand') {
-      if (action.name === 'panel/minimize') void this.fieldStateSync.save();
-      this.state = reducePanelAction(this.state, action);
-      this.panelMount.mount();
-      this.keyboard.enable();
-      this.pageAdapter.enableBookmarkShortcut();
-      this.render();
-      if (action.name === 'panel/expand') this.restoreParsedFieldStateForCurrentPanel();
-      return;
-    }
-
-    if (action.name === 'url-template/remove') {
-      void this.urlTemplateSettings.removeUrlTemplate(action.id);
-      return;
-    }
-
-    if (action.name === 'url-template/update-settings') {
-      void this.urlTemplateSettings.updateUrlTemplateSettings(action.id, action);
-      return;
-    }
-
-    if (action.name === 'grab-source-pattern/update-settings') {
-      void this.urlTemplateSettings.updateGrabSourcePattern(action.id, action);
-      return;
-    }
-
-    if (action.name === 'grab-source-pattern/remove') {
-      void this.urlTemplateSettings.removeGrabSourcePattern(action.id);
-      return;
-    }
-
-    if (action.name === 'url-template/update-fields') {
-      void this.urlTemplateSettings.updateUrlTemplateFields(action.id, action);
-      return;
-    }
-
-    if (action.name === 'bookmarks/reload') {
-      void this.loadBookmarkPage(0, { render: false }).then(() => this.renderPanelAndRefreshRecall());
-      return;
-    }
-
-    if (action.name === 'bookmarks/refresh-thumbnails') {
-      void this.refreshBookmarkThumbnails();
-      return;
-    }
-
-    if (action.name === 'bookmarks/delete-visible') {
-      void this.deleteVisibleBookmarks();
-      return;
-    }
-
-    if (action.name === 'recall/delete-all') {
-      void this.deleteRecallBookmarks();
-      return;
-    }
-
-    if (
-      action.name === 'selection/select-visible' ||
-      action.name === 'history-selection/toggle' ||
-      action.name === 'history-selection/select' ||
-      action.name === 'history-selection/clear' ||
-      action.name === 'bookmark-selection/toggle' ||
-      action.name === 'bookmark-selection/single' ||
-      action.name === 'bookmark-selection/select' ||
-      action.name === 'bookmark-selection/clear'
-    ) {
-      this.state = reducePanelAction(this.state, action);
-      this.render();
-      return;
-    }
-
-    if (action.name === 'recall/open') {
-      if (this.state.recall.open) {
-        this.clearRecallMessageTimer();
-        this.state = reducePanelAction(this.state, { name: 'recall/close' });
-        this.render();
-        return;
-      }
-      void this.openRecallDrawer();
-      return;
-    }
-
-    if (action.name === 'recall/close') {
-      this.clearRecallMessageTimer();
-      this.state = reducePanelAction(this.state, action);
-      this.render();
-      return;
-    }
-
-    if (
-      action.name === 'recall-selection/toggle' ||
-      action.name === 'recall-selection/select' ||
-      action.name === 'recall-selection/clear' ||
-      action.name === 'recall/clear-results'
-    ) {
-      this.state = reducePanelAction(this.state, action);
-      this.render();
-      return;
-    }
-
-    if (action.name === 'recall/load-more') {
-      if (!this.state.recall.busy && this.state.recall.hasMore) {
-        void this.loadRecallCandidates({ offset: this.state.recall.nextOffset, append: true });
-      }
-      return;
-    }
-
-    if (action.name === 'recall/selected') {
-      void this.recallSelectedRecords();
-      return;
-    }
-
-    if (action.name === 'field/transform') {
-      this.enqueueFieldTransform(action);
-      return;
-    }
-
-    if (action.name === 'active-field/set') {
-      this.applyPanelState(reducePanelAction(this.state, action), { saveParsedFieldState: true, render: true });
-      return;
-    }
-
-    if (action.name === 'field-unlock/toggle') {
-      const updated = this.applyPanelState(reducePanelAction(this.state, action), { saveParsedFieldState: true });
-      if (!updated) return;
-      void this.urlTemplateSettings.saveUrlTemplateFromCurrentFields().then(() => {
-        this.bufferedNav.prime();
-        this.render();
-      });
-      return;
-    }
-
-    if (action.name === 'selected-url/apply') {
-      this.enqueueSelectedUrlApply(action.url);
-      return;
-    }
-
-    if (action.name === 'selected-url/reject-unsupported-input') {
-      this.rejectUrlEditorInput();
-      return;
-    }
-
-    if (action.name === 'history/pin') {
-      void this.pinRecentHistory(action.id);
-      return;
-    }
-
-    if (action.name === 'capture/request') {
-      void this.captureImage(action.url, action.sourceType, action.sourceRecordId);
-      return;
-    }
-
-    if (action.name === 'capture/delete') {
-      void this.deleteCapturedBlob(action.id, action.blobId);
-      return;
-    }
-
-    if (action.name === 'capture/cleanup-orphans') {
-      void this.cleanupOrphanedBlobs();
-      return;
-    }
-
-    if (action.name === 'capture/preview') {
-      void this.previewRecord(action.url, action.blobId, action.scrollAnchorId);
-      return;
-    }
-
-    if (action.name === 'blob-key/setup') {
-      void this.recallExport.setupBlobKey(action.password);
-      return;
-    }
-
-    if (action.name === 'blob-key/unlock') {
-      void this.recallExport.unlockBlobKey(action.password);
-      return;
-    }
-
-    if (action.name === 'blob-key/clear') {
-      void this.recallExport.clearBlobKey();
-      return;
-    }
-
-    if (action.name === 'blob-key/export') {
-      void this.recallExport.exportBlobKeyBackup(action.password);
-      return;
-    }
-
-    if (action.name === 'blob-key/import') {
-      void this.recallExport.importBlobKeyBackup(action.fileContent, action.password);
-      return;
-    }
-
-    if (action.name === 'cloud-backup/connect' || action.name === 'cloud-backup/retry') {
-      void this.recallExport.connectPCloudBackup();
-      return;
-    }
-
-    if (action.name === 'cloud-backup/disconnect') {
-      void this.recallExport.disconnectPCloudBackup();
-      return;
-    }
-
-    if (action.name === 'cloud-backup/backup-now') {
-      void this.recallExport.backupPCloudNow(action.password);
-      return;
-    }
-
-    if (action.name === 'cloud-backup/choose-restore') {
-      void this.recallRestore.choosePCloudRestoreFile();
-      return;
-    }
-
-    if (action.name === 'cloud-backup/preview-restore') {
-      void this.recallRestore.previewPCloudRestoreFile(action.fileId, action.fileName, action.password);
-      return;
-    }
-
-    if (action.name === 'export/history') {
-      void this.recallExport.exportHistory(action.password, action.plaintext);
-      return;
-    }
-
-    if (action.name === 'export/bookmarks') {
-      void this.recallExport.exportBookmarks(action.password, action.plaintext);
-      return;
-    }
-
-    if (action.name === 'export/image') {
-      void this.recallExport.exportImage(action.saveAs === true);
-      return;
-    }
-
-    if (action.name === 'export/encrypted-image') {
-      void this.recallExport.exportEncryptedImages();
-      return;
-    }
-
-    if (action.name === 'export/url-review-status') {
-      void this.recallExport.exportUrlReviewStatus();
-      return;
-    }
-
-    if (action.name === 'clear/url-review-status') {
-      void this.clearUrlReviewStatus(action.scope ?? 'hostname');
-      return;
-    }
-
-    if (action.name === 'import/history') {
-      void this.recallRestore.previewHistoryImport(action.fileContent, action.password, action.fileName);
-      return;
-    }
-
-    if (action.name === 'import/bookmarks') {
-      void this.recallRestore.previewBookmarksImport(action.fileContent, action.password, action.fileName);
-      return;
-    }
-
-    if (action.name === 'import/url-review-status') {
-      this.recallRestore.previewUrlReviewStatusImport(action.fileContent, action.fileName);
-      return;
-    }
-
-    if (action.name === 'import/confirm-restore-preview') {
-      void this.recallRestore.confirmRestorePreview();
-      return;
-    }
-
-    if (action.name === 'import/cancel-restore-preview') {
-      this.recallRestore.cancelRestorePreview();
-      return;
-    }
-
-    if (action.name === 'import/image') {
-      void this.recallRestore.importImages(action.files);
-      return;
-    }
-
-    if (action.name === 'import/encrypted-image') {
-      void this.recallRestore.importEncryptedImages(action.files);
-      return;
-    }
-
-    if (action.name === 'slideshow-start') {
-      this.state = reducePanelAction(this.state, action);
-      this.slideshow.start();
-      this.render();
-      return;
-    }
-
-    if (action.name === 'slideshow-stop') {
-      this.state = reducePanelAction(this.state, action);
-      this.slideshow.stop();
-      this.render();
-      return;
-    }
-
-    if (action.name === 'slideshow-pause') {
-      this.state = reducePanelAction(this.state, action);
-      this.slideshow.pause();
-      this.render();
-      return;
-    }
-
-    if (action.name === 'slideshow-resume') {
-      this.state = reducePanelAction(this.state, action);
-      this.slideshow.resume();
-      this.render();
-      return;
-    }
-
-    if (action.name === 'retry-start') {
-      this.state = reducePanelAction(this.state, action);
-      this.retry.start();
-      this.render();
-      return;
-    }
-
-    if (action.name === 'retry-stop') {
-      this.state = reducePanelAction(this.state, action);
-      this.retry.stop();
-      this.render();
-      return;
-    }
-
-    if (action.name === 'stop-all') {
-      this.slideshow.stop();
-      this.retry.stop();
-      this.state = reducePanelAction(this.state, action);
-      this.render();
-      return;
-    }
-
-    if (action.name === 'navigate-next') {
-      this.navigateBy(1);
-      return;
-    }
-
-    if (action.name === 'navigate-previous') {
-      this.navigateBy(-1);
-      return;
-    }
-
+  private createActionDeps(): PanelActionDeps {
+    return {
+      getState: () => this.state,
+      reduce: (action) => {
+        this.state = reducePanelAction(this.state, action);
+      },
+      applyPanelState: (nextState, options) => this.applyPanelState(nextState, options),
+      syncTargetState: (snapshot) => {
+        this.state = setTargetState(this.state, toTargetState(snapshot));
+      },
+      render: (options) => this.render(options),
+      renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+      refreshRecallIfOpen: () => this.refreshRecallIfOpen(),
+      clearRecallMessageTimer: () => this.clearRecallMessageTimer(),
+      getLocalSettings: () => this.localSettings,
+      saveLocalSettings: (settings) => this.saveLocalSettings(settings),
+      pageAdapter: () => this.pageAdapter,
+      panelMount: () => this.panelMount,
+      keyboard: () => this.keyboard,
+      slideshow: () => this.slideshow,
+      retry: () => this.retry,
+      fieldStateSync: () => this.fieldStateSync,
+      bufferedNav: () => this.bufferedNav,
+      urlTemplateSettings: () => this.urlTemplateSettings,
+      recallExport: () => this.recallExport,
+      recallRestore: () => this.recallRestore,
+      bookmarkCurrentImage: () => this.bookmarkCurrentImage(),
+      removeRecentHistory: (id) => this.removeRecentHistory(id),
+      deleteRecentHistory: () => this.deleteRecentHistory(),
+      pinRecentHistory: (id) => this.pinRecentHistory(id),
+      loadBookmark: (id) => this.loadBookmark(id),
+      removeBookmark: (id) => this.removeBookmark(id),
+      loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
+      refreshBookmarkThumbnails: () => this.refreshBookmarkThumbnails(),
+      deleteVisibleBookmarks: () => this.deleteVisibleBookmarks(),
+      deleteRecallBookmarks: () => this.deleteRecallBookmarks(),
+      updateVisibleBookmarkSoftMax: (value) => this.updateVisibleBookmarkSoftMax(value),
+      updateRecentHistoryRetention: (input) => this.updateRecentHistoryRetention(input),
+      updatePinSaveStoragePreference: (value) => this.updatePinSaveStoragePreference(value),
+      updateUrlReviewStatusRetention: (limit, clearAfterExport) => this.updateUrlReviewStatusRetention(limit, clearAfterExport),
+      updateRequestThrottle: (minimumIntervalMs, maxRequests, windowMs) =>
+        this.updateRequestThrottle(minimumIntervalMs, maxRequests, windowMs),
+      updateNeighborPreload: (enabled, radius, cacheLimit, probeMethod) =>
+        this.updateNeighborPreload(enabled, radius, cacheLimit, probeMethod),
+      preloadMoreNeighbors: (radius, cacheLimit) => this.preloadMoreNeighbors(radius, cacheLimit),
+      resetPanelPosition: () => this.resetPanelPosition(),
+      refreshStorageUsage: (options) => this.refreshStorageUsage(options),
+      restoreParsedFieldStateForCurrentPanel: () => this.restoreParsedFieldStateForCurrentPanel(),
+      openRecallDrawer: () => this.openRecallDrawer(),
+      loadRecallCandidates: (input) => this.loadRecallCandidates(input),
+      recallSelectedRecords: () => this.recallSelectedRecords(),
+      enqueueFieldTransform: (action) => this.enqueueFieldTransform(action),
+      enqueueSelectedUrlApply: (url) => this.enqueueSelectedUrlApply(url),
+      rejectUrlEditorInput: () => this.rejectUrlEditorInput(),
+      captureImage: (url, sourceType, sourceRecordId) => this.captureImage(url, sourceType, sourceRecordId),
+      deleteCapturedBlob: (recordId, blobId) => this.deleteCapturedBlob(recordId, blobId),
+      cleanupOrphanedBlobs: () => this.cleanupOrphanedBlobs(),
+      previewRecord: (url, blobId, scrollAnchorId) => this.previewRecord(url, blobId, scrollAnchorId),
+      clearUrlReviewStatus: (scope) => this.clearUrlReviewStatus(scope),
+      navigateBy: (delta) => this.navigateBy(delta),
+    };
+  }
+
+  // The former dispatch chain's fall-through tail, kept verbatim: `toggle-panel`/`close-panel` and
+  // any unregistered action reduce first, then remount or tear down based on post-reduce visibility.
+  private readonly handleDefaultAction = (action: PanelAction): void => {
     this.state = reducePanelAction(this.state, action);
     if (!this.state.visible) {
       void this.fieldStateSync.save();
@@ -1456,6 +1022,14 @@ export class ImageTrailPanel {
     this.pageAdapter.enableBookmarkShortcut();
     this.pageAdapter.autoSelectSingleImage();
     this.render();
+  };
+
+  // Built in a field initializer; safe because every deps member is a lazy closure, so nothing
+  // dereferences the constructor-assigned collaborators (keyboard/slideshow/retry) until a handler runs.
+  private readonly actionRegistry = buildPanelActionRegistry(this.createActionDeps());
+
+  private dispatch = (action: PanelAction): void => {
+    dispatchPanelAction(this.actionRegistry, action, this.handleDefaultAction);
   };
 
   private handleKeyAction(action: string): void {

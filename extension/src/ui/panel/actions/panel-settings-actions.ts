@@ -1,0 +1,101 @@
+import type { ActionEntries, AnyActionDef } from '../action-dispatch.js';
+import type { PanelActionDeps } from './deps.js';
+
+export type PanelSettingsActionName =
+  | 'panel/secondary-controls-open'
+  | 'panel/minimize'
+  | 'panel/expand'
+  | 'settings/toggle'
+  | 'settings/update-visible-bookmark-soft-max'
+  | 'settings/update-recent-history-retention'
+  | 'settings/update-pin-save-storage-preference'
+  | 'settings/update-privacy-mode'
+  | 'settings/update-url-review-status-retention'
+  | 'settings/update-request-throttle'
+  | 'settings/update-neighbor-preload'
+  | 'neighbor-preload/manual'
+  | 'settings/reset-panel-position';
+
+/** Panel chrome (minimize/expand, secondary controls) and the settings drawer. Bodies moved verbatim from the panel dispatch chain. */
+export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEntries<PanelSettingsActionName> {
+  // Shared by minimize/expand; the per-name conditionals around the common remount sequence are
+  // preserved from the chain (minimize saves field state first, expand restores it last).
+  const minimizeOrExpand: AnyActionDef = {
+    handle(action) {
+      if (action.name === 'panel/minimize') void deps.fieldStateSync().save();
+      deps.reduce(action);
+      deps.panelMount().mount();
+      deps.keyboard().enable();
+      deps.pageAdapter().enableBookmarkShortcut();
+      deps.render();
+      if (action.name === 'panel/expand') deps.restoreParsedFieldStateForCurrentPanel();
+    },
+  };
+  return {
+    'panel/secondary-controls-open': {
+      handle(action) {
+        if (deps.getState().secondaryControlsOpen === action.open) return;
+        deps.reduce(action);
+        deps.saveLocalSettings({ ...deps.getLocalSettings(), secondaryControlsOpen: action.open });
+        deps.render();
+      },
+    },
+    'panel/minimize': minimizeOrExpand,
+    'panel/expand': minimizeOrExpand,
+    'settings/toggle': {
+      handle(action) {
+        deps.reduce(action);
+        deps.render();
+        if (deps.getState().settingsOpen) void deps.refreshStorageUsage({ render: true });
+      },
+    },
+    'settings/update-visible-bookmark-soft-max': {
+      handle(action) {
+        void deps.updateVisibleBookmarkSoftMax(action.value);
+      },
+    },
+    'settings/update-recent-history-retention': {
+      handle(action) {
+        void deps.updateRecentHistoryRetention({ limit: action.limit, overflowBehavior: action.overflowBehavior });
+      },
+    },
+    'settings/update-pin-save-storage-preference': {
+      handle(action) {
+        deps.updatePinSaveStoragePreference(action.value);
+      },
+    },
+    'settings/update-privacy-mode': {
+      handle(action) {
+        deps.reduce(action);
+        deps.saveLocalSettings({ ...deps.getLocalSettings(), privacyModeEnabled: action.enabled });
+        deps.render();
+        deps.refreshRecallIfOpen();
+      },
+    },
+    'settings/update-url-review-status-retention': {
+      handle(action) {
+        void deps.updateUrlReviewStatusRetention(action.limit, action.clearAfterExport);
+      },
+    },
+    'settings/update-request-throttle': {
+      handle(action) {
+        deps.updateRequestThrottle(action.minimumIntervalMs, action.maxRequests, action.windowMs);
+      },
+    },
+    'settings/update-neighbor-preload': {
+      handle(action) {
+        deps.updateNeighborPreload(action.enabled, action.radius, action.cacheLimit, action.probeMethod);
+      },
+    },
+    'neighbor-preload/manual': {
+      handle(action) {
+        deps.preloadMoreNeighbors(action.radius, action.cacheLimit);
+      },
+    },
+    'settings/reset-panel-position': {
+      handle() {
+        void deps.resetPanelPosition();
+      },
+    },
+  };
+}
