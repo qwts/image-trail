@@ -69,13 +69,21 @@ export function buildAutomationActionEntries(deps: PanelActionDeps): ActionEntri
     },
     'navigate-next': {
       handle() {
+        stopOppositeRunningSlideshow(deps, 1);
         deps.navigateBy(1);
       },
     },
     'navigate-previous': {
       handle() {
+        stopOppositeRunningSlideshow(deps, -1);
         deps.navigateBy(-1);
       },
     },
   };
+}
+
+function stopOppositeRunningSlideshow(deps: PanelActionDeps, direction: 1 | -1): void {
+  const slideshow = deps.slideshow();
+  if (slideshow.currentPhase !== 'running' || slideshow.currentDirection === direction) return;
+  slideshow.stop();
 }

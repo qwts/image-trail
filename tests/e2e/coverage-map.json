@@ -4,6 +4,18 @@
   "description": "Manual acceptance coverage map for the maintained Playwright E2E gate. Each entry links a canonical acceptance flow to automated coverage, intentional manual coverage, or a deferred issue.",
   "entries": [
     {
+      "id": "automation-keybindings-and-request-governance",
+      "acceptance": "M08 automation, keybindings, and request governance",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/User-Story-M08-Automation-Keybindings-And-Request-Governance",
+      "coverage": [
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/automation-governance.spec.ts",
+          "notes": "Covers typing-target keyboard preservation, global image export shortcut interception, slideshow start/pause/resume/stop, opposite-direction manual interruption, retry control reachability, and visible request-governor capping under automated navigation."
+        }
+      ]
+    },
+    {
       "id": "extension-smoke",
       "acceptance": "Extension port acceptance baseline",
       "wiki": "https://github.com/qwtm/image-trail/wiki/Extension-Port-Acceptance-Baseline",

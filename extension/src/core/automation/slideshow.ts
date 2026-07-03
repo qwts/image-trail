@@ -25,6 +25,10 @@ export class Slideshow {
     return this.count;
   }
 
+  get currentDirection(): 1 | -1 {
+    return this.config.direction;
+  }
+
   start(config?: Partial<SlideshowConfig>): void {
     if (this.phase === 'running') return;
     if (config) this.config = { ...this.config, ...config };
