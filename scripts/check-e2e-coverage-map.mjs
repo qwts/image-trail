@@ -9,8 +9,14 @@ const coverageMapPath = path.join(rootDirectory, 'tests/e2e/coverage-map.json');
 const allowedCoverageTypes = new Set(['playwright-e2e', 'storybook', 'unit-dom', 'manual', 'deferred']);
 
 async function pathExists(relativePath) {
+  if (path.isAbsolute(relativePath)) return false;
+  const absolutePath = path.resolve(rootDirectory, relativePath);
+  if (absolutePath !== rootDirectory && !absolutePath.startsWith(`${rootDirectory}${path.sep}`)) {
+    return false;
+  }
+
   try {
-    await stat(path.join(rootDirectory, relativePath));
+    await stat(absolutePath);
     return true;
   } catch (error) {
     if (error?.code === 'ENOENT') return false;
