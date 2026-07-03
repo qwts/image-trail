@@ -99,6 +99,10 @@ can carry a stale copy until rebased or restarted from the main repo.
   `npm run test:stories` against a dev server on port 6006, or standalone with
   `npm run test:stories:ci` (builds and serves a static Storybook); CI runs the
   latter.
+- CI enforces a coverage gate: `npm run test:cov` runs the unit + DOM suites under
+  `c8` and fails below the ratcheting thresholds in `.c8rc.json` (currently lines 62 /
+  branches 80), writing `coverage/lcov.info` (uploaded as a CI artifact). Raise the
+  floor over time as coverage improves; do not lower it to make a change pass.
 - Every change summary (chat reply, issue comment, PR body) must end with:
   - **Working path:** output of `pwd` — the directory actually edited (Codex
     worktrees are often under `~/.codex/worktrees/`, not the main checkout).

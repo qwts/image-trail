@@ -45,3 +45,7 @@ npm run lint && npm run format:check && npm test && npm run build
 `npm test` includes the happy-dom DOM suite (`npm run test:dom`). Storybook
 interaction (`play`) tests are separate: `npm run test:stories` against a dev
 server, or `npm run test:stories:ci` (CI runs the latter).
+
+CI additionally runs `npm run test:cov` — a `c8` coverage gate over the unit +
+DOM suites that fails below the `.c8rc.json` thresholds (lines/branches) and
+writes `coverage/lcov.info`. Treat the thresholds as a ratchet: only raise them.

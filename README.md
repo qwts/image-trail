@@ -21,8 +21,12 @@ files. Update the wiki page linked from a stub, not the stub itself.
 npm run lint
 npm run format:check
 npm test
+npm run test:cov
 npm run build
 ```
+
+`npm run test:cov` runs the test suites under `c8` and enforces the coverage
+thresholds in `.c8rc.json`; CI runs it and uploads `coverage/lcov.info`.
 
 ## Extension Build
 
