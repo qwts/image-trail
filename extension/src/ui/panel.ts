@@ -1,5 +1,4 @@
 import type { CaptureStore } from '../content/capture-controller.js';
-import { requestEncryptedImageImport } from '../content/download-controller.js';
 import type { RecallStore } from '../content/recall-store.js';
 import type { RecentHistoryStore } from '../content/recent-history-store.js';
 import {
@@ -33,7 +32,6 @@ import type { BuildIdentity } from '../core/build-info.js';
 import { createInitialPanelState, setAutomationState, setTargetState } from '../core/state.js';
 import type {
   BookmarkStore,
-  ImportedEncryptedImageFile,
   ImportedImageFile,
   PanelAction,
   PanelPosition,
@@ -48,7 +46,6 @@ import type {
   UrlReviewStatusStore,
 } from '../core/types.js';
 import { isCapturedResult } from '../core/image/capture-result.js';
-import { selectImageDownloadUrls } from '../core/image/downloads.js';
 import type { ImageRequestIntent } from '../core/image/request-policy.js';
 import { imageResourceUrlsEqual, pushVisibleUrlWhenSameOrigin } from '../core/image/image-navigation.js';
 import {
@@ -92,62 +89,18 @@ import { BufferedNavigationController } from './panel/buffered-navigation-contro
 import { NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT, NeighborPreloadController } from './panel/neighbor-preload-controller.js';
 import { ParsedFieldStateSync } from './panel/parsed-field-state-sync.js';
 import { PanelMount } from './panel/panel-mount.js';
+import { RecallExportController } from './panel/recall-export-controller.js';
+import { RecallRestoreController } from './panel/recall-restore-controller.js';
 import { UrlTemplateSettingsController } from './panel/url-template-settings-controller.js';
+import { delay, isFocusablePanelControl } from './panel/export-download.js';
 import {
-  delay,
-  downloadTextFile,
-  downloadUrlsInSeries,
-  encryptedImageExportResultMessage,
-  exportEncryptedImagesInSeries,
-  filenameForExportedImage,
-  filenameForExportedImageRecord,
-  imageDownloadResultMessage,
-  isFocusablePanelControl,
-} from './panel/export-download.js';
-import {
-  bookmarkRecordToExportEntry,
   bookmarkSaveMessage,
-  historyRecordToExportEntry,
-  isLockedPrivatePin,
-  originalBlobIdsForFullBackup,
-  pcloudBackupFileName,
-  pcloudBackupUploadMessage,
-  PRIVATE_PIN_EXPORT_LOCKED_MESSAGE,
   recordHasBlobId,
-  selectedRecords,
   urlReviewStatusClearScopeLabel,
   withoutRecentPinState,
 } from './panel/record-export-helpers.js';
-import {
-  bookmarkEntriesOriginalReferenceCount,
-  bookmarkPayloadToDisplayRecord,
-  createBookmarksRestorePreview,
-  createHistoryRestorePreview,
-  createRestoreDuplicateSummary,
-  createUrlReviewStatusRestorePreview,
-  fullBackupRestoreDetail,
-  historyPayloadToDisplayRecord,
-  restoreImportCompleteMessage,
-  type BookmarkImportResult,
-  type HistoryImportResult,
-  type UrlReviewStatusImportResult,
-} from './panel/restore-import-preview.js';
-import {
-  DEFAULT_LOCAL_SETTINGS,
-  exportEncryptedBookmarks,
-  exportEncryptedFullBackup,
-  exportEncryptedHistory,
-  exportPlainBookmarks,
-  exportPlainHistory,
-  exportUrlReviewStatus as exportUrlReviewStatusFile,
-  importBookmarks as importBookmarkRecords,
-  importEncryptedHistory,
-  importUrlReviewStatus as importUrlReviewStatusFile,
-  storedBlobRecordFromPortable,
-  type LocalSettingsStore,
-  type PlaintextLocalSettings,
-  type FullBackupBlobKeyBackup,
-} from '../content/panel-services.js';
+import { type BookmarkImportResult, type HistoryImportResult, type UrlReviewStatusImportResult } from './panel/restore-import-preview.js';
+import { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../content/panel-services.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
 import { isUnsupportedUrlEditorInput } from './components/url-editor-view.js';
 import { clampPanelPosition, hostnameFromLocation } from './panel-position.js';
@@ -354,6 +307,45 @@ export class ImageTrailPanel {
     setGrabSourcePatterns: (patterns) => this.pageAdapter.setGrabSourcePatterns(patterns),
     loadGrabSettings: (options) => this.loadGrabSettings(options),
   });
+  private readonly recallExport = new RecallExportController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
+    getLocalSettings: () => this.localSettings,
+    findSelectedImage: (handleId) => this.findSelectedImage(handleId),
+    bookmarkStore: () => this.bookmarkStore,
+    captureStore: () => this.captureStore,
+    urlReviewStatusStore: () => this.urlReviewStatusStore,
+    loadPCloudProviderStatus: (...args) => loadPCloudProviderStatus(...args),
+    connectPCloudProvider: (...args) => connectPCloudProvider(...args),
+    disconnectPCloudProvider: (...args) => disconnectPCloudProvider(...args),
+    uploadPCloudBackup: (input) => uploadPCloudBackup(input),
+  });
+  private readonly recallRestore = new RecallRestoreController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
+    loadRecentHistory: (options) => this.loadRecentHistory(options),
+    refreshStorageUsage: (options) => this.refreshStorageUsage(options),
+    addImportedImage: (file) => this.addImportedImage(file),
+    getLocalSettings: () => this.localSettings,
+    bookmarkStore: () => this.bookmarkStore,
+    captureStore: () => this.captureStore,
+    recentHistoryStore: () => this.recentHistoryStore,
+    urlReviewStatusStore: () => this.urlReviewStatusStore,
+    listPCloudBackups: (...args) => listPCloudBackups(...args),
+    downloadPCloudBackup: (input) => downloadPCloudBackup(input),
+    loadAllBookmarks: () => this.recallExport.loadAllBookmarksForExport(),
+    refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
+  });
   private bufferedNavigationToastTimer: number | null = null;
   private queuedParsedNavigationDelta = 0;
   private parsedNavigationQueueRunning = false;
@@ -414,8 +406,8 @@ export class ImageTrailPanel {
     void this.loadSettingsBookmarksAndRecents();
     void this.loadGrabSettings().then(() => this.fieldStateSync.restore());
     void this.refreshStorageUsage();
-    void this.refreshBlobKeyStatus();
-    void this.refreshPCloudProviderStatus({ render: false });
+    void this.recallExport.refreshBlobKeyStatus();
+    void this.recallExport.refreshPCloudProviderStatus({ render: false });
 
     this.keyboard = new KeyboardRouter((action) => this.handleKeyAction(action));
 
@@ -852,7 +844,7 @@ export class ImageTrailPanel {
     await this.waitForRecallOpening();
     if (!result.ok) {
       this.clearRecallMessageTimer();
-      if (result.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
+      if (result.reason === 'encryption-locked') await this.recallExport.refreshBlobKeyStatus();
       this.state = reducePanelAction(this.state, { name: 'recall/error', message: result.message });
       renderUpdatedRecall();
       return;
@@ -943,7 +935,7 @@ export class ImageTrailPanel {
     this.renderRecallOnly();
     const result = await this.recallStore.recall(this.state.recall.selectedIds);
     if (!result.ok) {
-      if (result.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
+      if (result.reason === 'encryption-locked') await this.recallExport.refreshBlobKeyStatus();
       this.state = reducePanelAction(this.state, { name: 'recall/error', message: result.message });
       this.renderRecallOnly();
       return;
@@ -1287,77 +1279,77 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'blob-key/setup') {
-      void this.setupBlobKey(action.password);
+      void this.recallExport.setupBlobKey(action.password);
       return;
     }
 
     if (action.name === 'blob-key/unlock') {
-      void this.unlockBlobKey(action.password);
+      void this.recallExport.unlockBlobKey(action.password);
       return;
     }
 
     if (action.name === 'blob-key/clear') {
-      void this.clearBlobKey();
+      void this.recallExport.clearBlobKey();
       return;
     }
 
     if (action.name === 'blob-key/export') {
-      void this.exportBlobKeyBackup(action.password);
+      void this.recallExport.exportBlobKeyBackup(action.password);
       return;
     }
 
     if (action.name === 'blob-key/import') {
-      void this.importBlobKeyBackup(action.fileContent, action.password);
+      void this.recallExport.importBlobKeyBackup(action.fileContent, action.password);
       return;
     }
 
     if (action.name === 'cloud-backup/connect' || action.name === 'cloud-backup/retry') {
-      void this.connectPCloudBackup();
+      void this.recallExport.connectPCloudBackup();
       return;
     }
 
     if (action.name === 'cloud-backup/disconnect') {
-      void this.disconnectPCloudBackup();
+      void this.recallExport.disconnectPCloudBackup();
       return;
     }
 
     if (action.name === 'cloud-backup/backup-now') {
-      void this.backupPCloudNow(action.password);
+      void this.recallExport.backupPCloudNow(action.password);
       return;
     }
 
     if (action.name === 'cloud-backup/choose-restore') {
-      void this.choosePCloudRestoreFile();
+      void this.recallRestore.choosePCloudRestoreFile();
       return;
     }
 
     if (action.name === 'cloud-backup/preview-restore') {
-      void this.previewPCloudRestoreFile(action.fileId, action.fileName, action.password);
+      void this.recallRestore.previewPCloudRestoreFile(action.fileId, action.fileName, action.password);
       return;
     }
 
     if (action.name === 'export/history') {
-      void this.exportHistory(action.password, action.plaintext);
+      void this.recallExport.exportHistory(action.password, action.plaintext);
       return;
     }
 
     if (action.name === 'export/bookmarks') {
-      void this.exportBookmarks(action.password, action.plaintext);
+      void this.recallExport.exportBookmarks(action.password, action.plaintext);
       return;
     }
 
     if (action.name === 'export/image') {
-      void this.exportImage(action.saveAs === true);
+      void this.recallExport.exportImage(action.saveAs === true);
       return;
     }
 
     if (action.name === 'export/encrypted-image') {
-      void this.exportEncryptedImages();
+      void this.recallExport.exportEncryptedImages();
       return;
     }
 
     if (action.name === 'export/url-review-status') {
-      void this.exportUrlReviewStatus();
+      void this.recallExport.exportUrlReviewStatus();
       return;
     }
 
@@ -1367,37 +1359,37 @@ export class ImageTrailPanel {
     }
 
     if (action.name === 'import/history') {
-      void this.previewHistoryImport(action.fileContent, action.password, action.fileName);
+      void this.recallRestore.previewHistoryImport(action.fileContent, action.password, action.fileName);
       return;
     }
 
     if (action.name === 'import/bookmarks') {
-      void this.previewBookmarksImport(action.fileContent, action.password, action.fileName);
+      void this.recallRestore.previewBookmarksImport(action.fileContent, action.password, action.fileName);
       return;
     }
 
     if (action.name === 'import/url-review-status') {
-      this.previewUrlReviewStatusImport(action.fileContent, action.fileName);
+      this.recallRestore.previewUrlReviewStatusImport(action.fileContent, action.fileName);
       return;
     }
 
     if (action.name === 'import/confirm-restore-preview') {
-      void this.confirmRestorePreview();
+      void this.recallRestore.confirmRestorePreview();
       return;
     }
 
     if (action.name === 'import/cancel-restore-preview') {
-      this.cancelRestorePreview();
+      this.recallRestore.cancelRestorePreview();
       return;
     }
 
     if (action.name === 'import/image') {
-      void this.importImages(action.files);
+      void this.recallRestore.importImages(action.files);
       return;
     }
 
     if (action.name === 'import/encrypted-image') {
-      void this.importEncryptedImages(action.files);
+      void this.recallRestore.importEncryptedImages(action.files);
       return;
     }
 
@@ -2609,7 +2601,7 @@ export class ImageTrailPanel {
       (result.status === 'failed' || result.status === 'remote-only') &&
       (result.reason === 'encryption-locked' || result.reason === 'auth-required');
     if ((result.status === 'failed' || result.status === 'remote-only') && result.reason === 'encryption-locked') {
-      await this.refreshBlobKeyStatus();
+      await this.recallExport.refreshBlobKeyStatus();
     }
     if (isCapturedResult(result) && sourceType === 'history' && sourceRecordId) {
       const updatedHistory = this.state.history.find((item) => item.id === sourceRecordId);
@@ -2750,7 +2742,7 @@ export class ImageTrailPanel {
       const retrieved = await this.captureStore.requestRetrieveBlob(blobId);
       if (!this.isCurrentProjectionSession(session)) return;
       if (!retrieved.ok) {
-        if (retrieved.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
+        if (retrieved.reason === 'encryption-locked') await this.recallExport.refreshBlobKeyStatus();
         if (!this.isCurrentProjectionSession(session)) return;
         this.projections.update(session, { status: 'failed' });
         this.state = { ...this.state, message: retrieved.message, status: 'error', lastUpdatedAt: Date.now() };
@@ -2850,353 +2842,12 @@ export class ImageTrailPanel {
     return true;
   }
 
-  private async setupBlobKey(password: string): Promise<void> {
-    if (!this.captureStore) return;
-    const result = await this.captureStore.setupBlobKey(password);
-    this.state = reducePanelAction(
-      { ...this.state, message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() },
-      { name: 'blob-key/status', unlocked: result.ok, keyReference: result.ok ? result.keyReference : null, hasKey: result.ok },
-    );
-    if (result.ok) {
-      await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
-      this.renderPanelAndRefreshRecall();
-      return;
-    }
-    this.render();
-  }
-
-  private async unlockBlobKey(password: string): Promise<void> {
-    if (!this.captureStore) return;
-    const result = await this.captureStore.unlockBlobKey(password);
-    this.state = reducePanelAction(
-      { ...this.state, message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() },
-      {
-        name: 'blob-key/status',
-        unlocked: result.ok,
-        keyReference: result.ok ? result.keyReference : null,
-        hasKey: this.state.blobKeyAvailable,
-      },
-    );
-    if (result.ok) {
-      await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
-      this.renderPanelAndRefreshRecall();
-      return;
-    }
-    this.render();
-  }
-
-  private async clearBlobKey(): Promise<void> {
-    if (!this.captureStore) return;
-    const result = await this.captureStore.clearBlobKey();
-    this.state = reducePanelAction(
-      { ...this.state, message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() },
-      { name: 'blob-key/status', unlocked: false, keyReference: null, hasKey: false },
-    );
-    this.render();
-  }
-
-  private async refreshBlobKeyStatus(): Promise<void> {
-    if (!this.captureStore) return;
-    const result = await this.captureStore.requestBlobKeyStatus();
-    this.state = reducePanelAction(this.state, {
-      name: 'blob-key/status',
-      unlocked: result.unlocked,
-      keyReference: result.keyReference,
-      hasKey: result.hasKey,
-    });
-    this.render();
-  }
-
-  private async refreshPCloudProviderStatus(options: { readonly render?: boolean } = {}): Promise<void> {
-    const status = await loadPCloudProviderStatus();
-    this.state = reducePanelAction(this.state, { name: 'pcloud-backup/status', status });
-    if (options.render !== false) this.render();
-  }
-
-  private async connectPCloudBackup(): Promise<void> {
-    this.state = reducePanelAction(this.state, {
-      name: 'pcloud-backup/busy',
-      pendingOperation: 'connecting',
-      message: 'Opening pCloud authorization...',
-    });
-    this.render();
-    const result = await connectPCloudProvider();
-    this.state = reducePanelAction(this.state, { name: 'pcloud-backup/status', status: result.status });
-    if (!result.ok) {
-      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/error', message: result.message });
-    }
-    this.render();
-  }
-
-  private async disconnectPCloudBackup(): Promise<void> {
-    this.state = reducePanelAction(this.state, {
-      name: 'pcloud-backup/busy',
-      pendingOperation: 'disconnecting',
-      message: 'Disconnecting pCloud...',
-    });
-    this.render();
-    const result = await disconnectPCloudProvider();
-    this.state = reducePanelAction(this.state, { name: 'pcloud-backup/status', status: result.status });
-    if (!result.ok) {
-      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/error', message: result.message });
-    }
-    this.render();
-  }
-
-  private async backupPCloudNow(password: string): Promise<void> {
-    if (this.state.pcloudBackup.connectionState === 'busy') return;
-    if (password.length < 4) {
-      this.state = reducePanelAction(this.state, {
-        name: 'pcloud-backup/upload-error',
-        message: 'Enter a cloud backup password with at least 4 characters before uploading.',
-      });
-      this.render();
-      return;
-    }
-
-    this.state = reducePanelAction(this.state, {
-      name: 'pcloud-backup/busy',
-      pendingOperation: 'backing-up',
-      message: 'Creating encrypted backup...',
-    });
-    this.render();
-
-    const bookmarks = await this.loadAllBookmarksForExport();
-    if (bookmarks.some(isLockedPrivatePin)) {
-      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/upload-error', message: PRIVATE_PIN_EXPORT_LOCKED_MESSAGE });
-      this.render();
-      return;
-    }
-    if (bookmarks.length === 0) {
-      this.state = reducePanelAction(this.state, {
-        name: 'pcloud-backup/upload-error',
-        message: 'No durable pins or bookmarks to back up.',
-      });
-      this.render();
-      return;
-    }
-
-    const originalBlobIds = originalBlobIdsForFullBackup(bookmarks);
-    const originalBlobResult =
-      originalBlobIds.length > 0 && this.captureStore
-        ? await this.captureStore.requestOriginalBlobRecords(originalBlobIds)
-        : { ok: true as const, records: [], missingBlobIds: originalBlobIds };
-    if (!originalBlobResult.ok) {
-      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/upload-error', message: originalBlobResult.message });
-      this.render();
-      return;
-    }
-    const originalBlobRecords = originalBlobResult.records.map(storedBlobRecordFromPortable);
-
-    const blobKeyBackupResult = await this.exportBlobKeyBackupsForOriginalRecords(originalBlobRecords, password);
-    if (!blobKeyBackupResult.ok) {
-      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/upload-error', message: blobKeyBackupResult.message });
-      this.render();
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const exportResult = await exportEncryptedFullBackup({
-      bookmarks: bookmarks.map(bookmarkRecordToExportEntry),
-      originalBlobs: originalBlobRecords,
-      blobKeyBackups: blobKeyBackupResult.backups,
-      missingOriginalBlobIds: originalBlobResult.missingBlobIds,
-      password,
-      now,
-    });
-    if (!exportResult.status.ok || !exportResult.fileContent) {
-      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/upload-error', message: exportResult.status.message });
-      this.render();
-      return;
-    }
-
-    this.state = reducePanelAction(this.state, {
-      name: 'pcloud-backup/busy',
-      pendingOperation: 'backing-up',
-      message: 'Uploading encrypted backup to pCloud...',
-    });
-    this.render();
-
-    const upload = await uploadPCloudBackup({
-      fileName: pcloudBackupFileName(now),
-      fileContent: exportResult.fileContent,
-    });
-    if (!upload.ok) {
-      this.state = reducePanelAction(this.state, { name: 'pcloud-backup/upload-error', message: upload.message, status: upload.status });
-      this.render();
-      return;
-    }
-    const originalBytes = originalBlobRecords.reduce((total, record) => total + record.encryptedByteLength, 0);
-    this.state = reducePanelAction(this.state, {
-      name: 'pcloud-backup/upload-complete',
-      fileName: upload.fileName,
-      folderPath: upload.folderPath,
-      apiHost: upload.apiHost,
-      sizeBytes: upload.sizeBytes,
-      sha256: upload.sha256,
-      originalCount: originalBlobRecords.length,
-      originalBytes,
-      missingOriginalCount: originalBlobResult.missingBlobIds.length,
-      uploadedAt: upload.uploadedAt,
-      message: pcloudBackupUploadMessage(
-        upload.message,
-        originalBlobRecords.length,
-        originalBytes,
-        originalBlobResult.missingBlobIds.length,
-      ),
-    });
-    this.render();
-  }
-
-  private async exportBlobKeyBackupsForOriginalRecords(
-    originalBlobRecords: readonly ReturnType<typeof storedBlobRecordFromPortable>[],
-    password: string,
-  ): Promise<
-    { readonly ok: true; readonly backups: readonly FullBackupBlobKeyBackup[] } | { readonly ok: false; readonly message: string }
-  > {
-    if (originalBlobRecords.length === 0) return { ok: true, backups: [] };
-    if (!this.captureStore) return { ok: false, message: 'Encrypted original storage is unavailable; no bookmarks were backed up.' };
-
-    const backups: FullBackupBlobKeyBackup[] = [];
-    const keyReferences = [...new Set(originalBlobRecords.map((record) => record.key.reference))].sort();
-    for (const keyReference of keyReferences) {
-      const backup = await this.captureStore.exportBlobKeyBackup(password, keyReference);
-      if (!backup.ok) return { ok: false, message: backup.message };
-      backups.push({ keyReference: backup.keyReference, fileContent: backup.fileContent });
-    }
-    return { ok: true, backups };
-  }
-
-  private async choosePCloudRestoreFile(): Promise<void> {
-    if (this.state.pcloudBackup.connectionState === 'busy') return;
-    this.state = reducePanelAction(this.state, {
-      name: 'pcloud-backup/busy',
-      pendingOperation: 'restoring',
-      message: 'Checking pCloud backups...',
-    });
-    this.render();
-
-    const result = await listPCloudBackups();
-    if (!result.ok) {
-      this.state = reducePanelAction(this.state, {
-        name: 'pcloud-backup/restore-error',
-        message: result.message,
-        status: result.status,
-      });
-      this.render();
-      return;
-    }
-
-    this.state = reducePanelAction(this.state, {
-      name: 'pcloud-backup/restore-candidates-loaded',
-      candidates: result.candidates,
-      folderPath: result.folderPath,
-      apiHost: result.apiHost,
-      message: result.message,
-    });
-    this.render();
-  }
-
-  private async previewPCloudRestoreFile(fileId: number, fileName: string, password: string): Promise<void> {
-    if (this.state.pcloudBackup.connectionState === 'busy') return;
-    if (password.length < 4) {
-      this.state = reducePanelAction(this.state, {
-        name: 'pcloud-backup/restore-error',
-        message: 'Enter the cloud backup password before previewing this restore file.',
-      });
-      this.render();
-      return;
-    }
-
-    this.state = reducePanelAction(this.state, {
-      name: 'pcloud-backup/busy',
-      pendingOperation: 'restoring',
-      message: 'Downloading encrypted pCloud backup...',
-    });
-    this.render();
-
-    const result = await downloadPCloudBackup({ fileId, fileName });
-    if (!result.ok) {
-      this.state = reducePanelAction(this.state, {
-        name: 'pcloud-backup/restore-error',
-        message: result.message,
-        status: result.status,
-      });
-      this.render();
-      return;
-    }
-
-    this.state = reducePanelAction(this.state, {
-      name: 'pcloud-backup/restore-downloaded',
-      fileName: result.fileName,
-      folderPath: result.folderPath,
-      apiHost: result.apiHost,
-      sizeBytes: result.sizeBytes,
-      sha256: result.sha256,
-      downloadedAt: result.downloadedAt,
-      message: result.message,
-    });
-    await this.previewBookmarksImport(result.fileContent, password, result.fileName);
-    this.render();
-  }
-
   private showPCloudBackupPlaceholder(kind: 'backup' | 'restore'): void {
     const message =
       kind === 'backup'
         ? 'pCloud is connected. Backup upload is the next implementation slice.'
         : 'pCloud is connected. Restore file selection is the next implementation slice.';
     this.state = reducePanelAction(this.state, { name: 'pcloud-backup/message', message });
-    this.render();
-  }
-
-  private async exportHistory(password: string, plaintext: boolean): Promise<void> {
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const history = selectedRecords(this.state.history, this.state.selectedHistoryIds);
-    const entries = history.map(historyRecordToExportEntry);
-    const result = plaintext ? exportPlainHistory({ entries }) : await exportEncryptedHistory({ entries, password });
-    this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
-  }
-
-  private async exportBookmarks(password: string, plaintext: boolean): Promise<void> {
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const selectedBookmarks = [
-      ...(this.state.selectedBookmarkIds.length > 0 ? selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds) : []),
-      ...(this.state.recall.selectedIds.length > 0 ? this.selectedRecallRecords() : []),
-    ];
-    const bookmarks = selectedBookmarks.length > 0 ? selectedBookmarks : await this.loadAllBookmarksForExport();
-    if (bookmarks.some(isLockedPrivatePin)) {
-      this.finishExport(
-        undefined,
-        undefined,
-        'Unlock encrypted storage before exporting private pins so the backup includes their metadata and thumbnails.',
-        false,
-      );
-      return;
-    }
-    const entries = bookmarks.map(bookmarkRecordToExportEntry);
-    const result = plaintext ? exportPlainBookmarks({ entries }) : await exportEncryptedBookmarks({ entries, password });
-    this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
-  }
-
-  private async exportUrlReviewStatus(): Promise<void> {
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const hostname = hostnameFromLocation();
-    const records = hostname && this.urlReviewStatusStore ? await this.urlReviewStatusStore.list(hostname) : [];
-    const result = exportUrlReviewStatusFile({ records });
-    if (!result.status.ok || !result.fileContent || !result.fileName) {
-      this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
-      return;
-    }
-    downloadTextFile(result.fileContent, result.fileName);
-    let message = result.status.message;
-    if (this.localSettings.clearUrlReviewStatusAfterExport && hostname && this.urlReviewStatusStore) {
-      const deletedCount = await this.urlReviewStatusStore.clear({ scope: 'hostname', hostname });
-      message = `${message} Cleared ${deletedCount} current-site record${deletedCount === 1 ? '' : 's'} after export.`;
-    }
-    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message });
     this.render();
   }
 
@@ -3220,477 +2871,6 @@ export class ImageTrailPanel {
     if (scope === 'page') return { scope: 'page', hostname, pageUrl: this.fieldStateSync.pageUrl() };
     const sourceUrl = this.state.draftUrl ?? this.state.target.selectedUrl;
     return sourceUrl ? { scope: 'source', hostname, sourceUrl } : null;
-  }
-
-  private finishExport(fileContent: string | undefined, fileName: string | undefined, message: string, ok: boolean): void {
-    if (!ok || !fileContent || !fileName) {
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message });
-      this.render();
-      return;
-    }
-    downloadTextFile(fileContent, fileName);
-    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message });
-    this.render();
-  }
-
-  private async exportBlobKeyBackup(password: string): Promise<void> {
-    if (!this.captureStore || this.state.importExportBusy) return;
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const result = await this.captureStore.exportBlobKeyBackup(password, this.state.blobKeyReference ?? undefined);
-    this.finishExport(result.ok ? result.fileContent : undefined, result.ok ? result.fileName : undefined, result.message, result.ok);
-  }
-
-  private async importBlobKeyBackup(fileContent: string, password: string): Promise<void> {
-    if (!this.captureStore || this.state.importExportBusy) return;
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const result = await this.captureStore.importBlobKeyBackup(fileContent, password);
-    if (!result.ok) {
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.message });
-      this.render();
-      return;
-    }
-    await this.refreshBlobKeyStatus();
-    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message: result.message });
-    await this.loadBookmarkPage(this.state.bookmarkOffset, { render: false });
-    this.renderPanelAndRefreshRecall();
-  }
-
-  private async exportImage(saveAs: boolean): Promise<void> {
-    if (this.state.importExportBusy) return;
-    const selectedRecordsForDownload = this.selectedImageDownloadRecords();
-    if (selectedRecordsForDownload.some(isLockedPrivatePin)) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/error',
-        message: PRIVATE_PIN_EXPORT_LOCKED_MESSAGE,
-      });
-      this.render();
-      return;
-    }
-    const urls =
-      selectedRecordsForDownload.length > 0
-        ? []
-        : selectImageDownloadUrls({
-            history: this.state.history,
-            bookmarks: this.state.bookmarks,
-            selectedHistoryIds: this.state.selectedHistoryIds,
-            selectedBookmarkIds: this.state.selectedBookmarkIds,
-            currentImageUrl: this.selectedImageExportUrl(),
-          });
-    if (selectedRecordsForDownload.length === 0 && urls.length === 0) {
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: 'Select an image before exporting.' });
-      this.render();
-      return;
-    }
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const downloads =
-      selectedRecordsForDownload.length > 0
-        ? await this.selectedRecordImageDownloads(selectedRecordsForDownload)
-        : urls.map((url) => ({ url, fileName: filenameForExportedImage(url) }));
-    const result = await downloadUrlsInSeries(downloads, saveAs);
-    const message = imageDownloadResultMessage(result);
-    if (result.started === 0) {
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message });
-      this.render();
-      return;
-    }
-    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message });
-    this.render();
-  }
-
-  private selectedImageDownloadRecords(): readonly ImageDisplayRecord[] {
-    return [
-      ...(this.state.selectedHistoryIds.length > 0 ? selectedRecords(this.state.history, this.state.selectedHistoryIds) : []),
-      ...(this.state.selectedBookmarkIds.length > 0 ? selectedRecords(this.state.bookmarks, this.state.selectedBookmarkIds) : []),
-      ...(this.state.recall.selectedIds.length > 0 ? this.selectedRecallRecords() : []),
-    ];
-  }
-
-  private selectedRecallRecords(): readonly ImageDisplayRecord[] {
-    return selectedRecords(this.state.recall.candidates, this.state.recall.selectedIds);
-  }
-
-  private async selectedRecordImageDownloads(
-    records: readonly ImageDisplayRecord[],
-  ): Promise<readonly { readonly url: string; readonly fileName: string }[]> {
-    const downloads: { readonly url: string; readonly fileName: string }[] = [];
-    for (const record of records) {
-      downloads.push({
-        url: await this.recordImageDownloadUrl(record),
-        fileName: filenameForExportedImageRecord(record),
-      });
-    }
-    return downloads;
-  }
-
-  private async recordImageDownloadUrl(record: ImageDisplayRecord): Promise<string> {
-    const blobId = encryptedBlobIdForRecord(record);
-    if (!blobId || !this.captureStore || !this.state.blobKeyUnlocked) return record.url;
-    const retrieved = await this.captureStore.requestRetrieveBlob(blobId);
-    if (!retrieved.ok && retrieved.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
-    return retrieved.ok ? retrieved.dataUrl : record.url;
-  }
-
-  private async exportEncryptedImages(): Promise<void> {
-    if (this.state.importExportBusy) return;
-    if (!this.state.blobKeyUnlocked) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/error',
-        message: 'Unlock encrypted originals before exporting encrypted images.',
-      });
-      this.render();
-      return;
-    }
-    if (this.selectedImageDownloadRecords().some(isLockedPrivatePin)) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/error',
-        message: PRIVATE_PIN_EXPORT_LOCKED_MESSAGE,
-      });
-      this.render();
-      return;
-    }
-    const targets = this.encryptedImageExportTargets();
-    if (targets.length === 0) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/error',
-        message: 'Select an image before exporting encrypted images.',
-      });
-      this.render();
-      return;
-    }
-
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const result = await exportEncryptedImagesInSeries(targets);
-    if (result.encryptionLocked) await this.refreshBlobKeyStatus();
-    const message = encryptedImageExportResultMessage(result);
-    if (result.started === 0) {
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message });
-      this.render();
-      return;
-    }
-    this.state = reducePanelAction(this.state, { name: 'import-export/complete', message });
-    this.render();
-  }
-
-  private encryptedImageExportTargets(): readonly { readonly url: string; readonly fileName: string; readonly blobId?: string }[] {
-    const selected = this.selectedImageDownloadRecords();
-    if (selected.length > 0) {
-      return selected.map((record) => ({
-        url: record.url,
-        fileName: filenameForExportedImageRecord(record),
-        blobId: encryptedBlobIdForRecord(record),
-      }));
-    }
-    const urls = selectImageDownloadUrls({
-      history: this.state.history,
-      bookmarks: this.state.bookmarks,
-      selectedHistoryIds: this.state.selectedHistoryIds,
-      selectedBookmarkIds: this.state.selectedBookmarkIds,
-      currentImageUrl: this.selectedImageExportUrl(),
-    });
-    return urls.map((url) => ({ url, fileName: filenameForExportedImage(url) }));
-  }
-
-  private selectedImageExportUrl(): string | null {
-    const selectedUrl = this.state.target.selectedUrl;
-    if (selectedUrl && selectedUrl !== 'data:') return selectedUrl;
-    const image = this.state.target.selectedHandleId ? this.findSelectedImage(this.state.target.selectedHandleId) : null;
-    return image?.currentSrc || image?.src || null;
-  }
-
-  private async importImages(files: readonly ImportedImageFile[]): Promise<void> {
-    if (files.length === 0) {
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: 'Choose one or more image files to import.' });
-      this.render();
-      return;
-    }
-
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    let imported = 0;
-    for (const file of files) {
-      if (await this.addImportedImage(file)) imported += 1;
-    }
-
-    if (imported === 0) {
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: 'No selected image files could be imported.' });
-    } else {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/complete',
-        message: `Imported ${imported} image${imported === 1 ? '' : 's'} into bookmarks and recent history.`,
-      });
-    }
-    this.render();
-  }
-
-  private async importEncryptedImages(files: readonly ImportedEncryptedImageFile[]): Promise<void> {
-    if (files.length === 0) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/error',
-        message: 'Choose one or more encrypted image files to import.',
-      });
-      this.render();
-      return;
-    }
-    if (!this.state.blobKeyUnlocked) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/error',
-        message: 'Unlock encrypted originals before importing encrypted images.',
-      });
-      this.render();
-      return;
-    }
-
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    let imported = 0;
-    let failed = 0;
-    let firstFailureMessage: string | null = null;
-    for (const file of files) {
-      const result = await requestEncryptedImageImport(file.fileContent);
-      if (!result.ok) {
-        if (result.reason === 'encryption-locked') await this.refreshBlobKeyStatus();
-        firstFailureMessage ??= result.message;
-        failed += 1;
-        continue;
-      }
-      if (await this.addImportedImage({ name: result.fileName || file.name, dataUrl: result.dataUrl })) imported += 1;
-    }
-
-    if (imported === 0) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/error',
-        message: firstFailureMessage ?? 'No encrypted image files could be imported.',
-      });
-    } else if (failed > 0) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/complete',
-        message: `Imported ${imported} encrypted image${imported === 1 ? '' : 's'}. ${failed} failed.`,
-      });
-    } else {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/complete',
-        message: `Imported ${imported} encrypted image${imported === 1 ? '' : 's'} into bookmarks and recent history.`,
-      });
-    }
-    this.render();
-  }
-
-  private async previewHistoryImport(fileContent: string, password: string, fileName?: string): Promise<void> {
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const result = await importEncryptedHistory(fileContent, password);
-    if (!result.status.ok) {
-      this.pendingRestoreImport = null;
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.status.message });
-      this.render();
-      return;
-    }
-    const duplicateSummary = createRestoreDuplicateSummary(result.entries, await this.loadRetainedRecentHistoryForRestoreDuplicateCheck());
-    this.pendingRestoreImport = {
-      kind: 'history',
-      result: { ...result, entries: duplicateSummary.uniqueEntries },
-      duplicateCount: duplicateSummary.duplicateCount,
-    };
-    this.state = reducePanelAction(this.state, {
-      name: 'import/restore-preview-ready',
-      preview: createHistoryRestorePreview(result, fileName, duplicateSummary),
-    });
-    this.render();
-  }
-
-  private async importHistory(result: HistoryImportResult, duplicateCount: number): Promise<void> {
-    if (!this.recentHistoryStore) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/error',
-        message: 'Recent history storage is unavailable; no records were imported.',
-      });
-      this.render();
-      return;
-    }
-    let importedCount = 0;
-    for (const entry of result.entries) {
-      const record = historyPayloadToDisplayRecord(entry.uuid, entry.payload);
-      await this.recentHistoryStore.add(record, window.location.href);
-      importedCount += 1;
-    }
-    await this.loadRecentHistory();
-    this.state = reducePanelAction(this.state, {
-      name: 'import-export/complete',
-      message: restoreImportCompleteMessage(
-        'record',
-        importedCount,
-        duplicateCount,
-        result.skipped.length,
-        result.plaintext,
-        'reloaded into extension state',
-      ),
-    });
-    this.render();
-  }
-
-  private async previewBookmarksImport(fileContent: string, password: string, fileName?: string): Promise<void> {
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const result = await importBookmarkRecords(fileContent, password);
-    if (!result.status.ok) {
-      this.pendingRestoreImport = null;
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.status.message });
-      this.render();
-      return;
-    }
-    const duplicateSummary = createRestoreDuplicateSummary(result.entries, await this.loadAllBookmarksForExport());
-    this.pendingRestoreImport = {
-      kind: 'bookmarks',
-      result: {
-        ...result,
-        entries: duplicateSummary.uniqueEntries,
-        externalOriginalCount: bookmarkEntriesOriginalReferenceCount(duplicateSummary.uniqueEntries),
-      },
-      duplicateCount: duplicateSummary.duplicateCount,
-      password,
-    };
-    this.state = reducePanelAction(this.state, {
-      name: 'import/restore-preview-ready',
-      preview: createBookmarksRestorePreview(result, fileName, duplicateSummary),
-    });
-    this.render();
-  }
-
-  private async importBookmarks(result: BookmarkImportResult, duplicateCount: number, password: string): Promise<void> {
-    if (!this.bookmarkStore) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/error',
-        message: 'Bookmark storage is unavailable; no bookmarks were imported.',
-      });
-      this.render();
-      return;
-    }
-    const fullBackupOriginalRestore = await this.restoreFullBackupOriginals(result, password);
-    if (!fullBackupOriginalRestore.ok) {
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: fullBackupOriginalRestore.message });
-      this.render();
-      return;
-    }
-    let importedCount = 0;
-    for (const entry of result.entries) {
-      await this.bookmarkStore.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
-      importedCount += 1;
-    }
-    await this.loadBookmarkPage(0, { render: false });
-    this.state = reducePanelAction(this.state, {
-      name: 'import-export/complete',
-      message: restoreImportCompleteMessage(
-        'bookmark',
-        importedCount,
-        duplicateCount,
-        result.skipped.length,
-        result.plaintext,
-        result.fullBackup ? fullBackupRestoreDetail(fullBackupOriginalRestore.importedOriginalCount) : 'encrypted into bookmark storage',
-      ),
-    });
-    this.renderPanelAndRefreshRecall();
-  }
-
-  private async restoreFullBackupOriginals(
-    result: BookmarkImportResult,
-    password: string,
-  ): Promise<{ readonly ok: true; readonly importedOriginalCount: number } | { readonly ok: false; readonly message: string }> {
-    if (!result.fullBackup || result.externalOriginalCount === 0) return { ok: true, importedOriginalCount: 0 };
-    if (!this.captureStore) {
-      return { ok: false, message: 'Encrypted original storage is unavailable; no bookmarks were imported.' };
-    }
-    for (const backup of result.blobKeyBackups) {
-      const imported = await this.captureStore.importBlobKeyBackup(backup.fileContent, password);
-      if (!imported.ok) return { ok: false, message: imported.message };
-    }
-    const blobImport = await this.captureStore.importOriginalBlobRecords(result.originalBlobs);
-    if (!blobImport.ok) return { ok: false, message: blobImport.message };
-    await this.refreshBlobKeyStatus();
-    await this.refreshStorageUsage();
-    return { ok: true, importedOriginalCount: blobImport.importedCount };
-  }
-
-  private previewUrlReviewStatusImport(fileContent: string, fileName?: string): void {
-    const result = importUrlReviewStatusFile(fileContent);
-    if (!result.status.ok) {
-      this.pendingRestoreImport = null;
-      this.state = reducePanelAction(this.state, { name: 'import-export/error', message: result.status.message });
-      this.render();
-      return;
-    }
-    this.pendingRestoreImport = { kind: 'url-review-status', result };
-    this.state = reducePanelAction(this.state, {
-      name: 'import/restore-preview-ready',
-      preview: createUrlReviewStatusRestorePreview(result, fileName),
-    });
-    this.render();
-  }
-
-  private async importUrlReviewStatus(result: ReturnType<typeof importUrlReviewStatusFile>): Promise<void> {
-    const importedCount = await this.urlReviewStatusStore?.importMany(result.records, {
-      maxRecordsPerHost: this.localSettings.urlReviewStatusLimit,
-    });
-    this.state = reducePanelAction(this.state, {
-      name: 'import-export/complete',
-      message: `${result.status.message} ${importedCount ?? 0} saved to extension state.`,
-    });
-    this.render();
-  }
-
-  private async confirmRestorePreview(): Promise<void> {
-    const pending = this.pendingRestoreImport;
-    if (!pending) {
-      this.state = reducePanelAction(this.state, {
-        name: 'import-export/error',
-        message: 'Choose an import file before confirming restore.',
-      });
-      this.render();
-      return;
-    }
-
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-
-    switch (pending.kind) {
-      case 'history':
-        await this.importHistory(pending.result, pending.duplicateCount);
-        break;
-      case 'bookmarks':
-        await this.importBookmarks(pending.result, pending.duplicateCount, pending.password);
-        break;
-      case 'url-review-status':
-        await this.importUrlReviewStatus(pending.result);
-        break;
-    }
-    this.pendingRestoreImport = null;
-  }
-
-  private cancelRestorePreview(): void {
-    this.pendingRestoreImport = null;
-    this.state = reducePanelAction(this.state, { name: 'import/cancel-restore-preview' });
-    this.render();
-  }
-
-  private async loadAllBookmarksForExport(): Promise<readonly ImageDisplayRecord[]> {
-    if (!this.bookmarkStore) return this.state.bookmarks;
-    const all: ImageDisplayRecord[] = [];
-    let offset = 0;
-    const limit = 100;
-    for (;;) {
-      const page = await this.bookmarkStore.loadPage({ offset, limit, scope: 'global', currentPageUrl: window.location.href });
-      all.push(...page.items);
-      if (!page.hasOlder) return all;
-      offset = page.offset + page.limit;
-    }
-  }
-
-  private async loadRetainedRecentHistoryForRestoreDuplicateCheck(): Promise<readonly ImageDisplayRecord[]> {
-    if (!this.recentHistoryStore) return this.state.history;
-    return this.recentHistoryStore.load(window.location.href, { includeRetained: true });
   }
 
   private async refreshStorageUsage(options: { readonly render?: boolean } = {}): Promise<void> {
