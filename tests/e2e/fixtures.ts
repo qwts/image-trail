@@ -34,7 +34,13 @@ function buildExtension(): void {
 }
 
 async function waitForServiceWorker(context: BrowserContext): Promise<Worker> {
-  return context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+  const worker = context.serviceWorkers().find((candidate) => candidate.url().startsWith('chrome-extension://'));
+  if (worker) return worker;
+
+  while (true) {
+    const candidate = await context.waitForEvent('serviceworker');
+    if (candidate.url().startsWith('chrome-extension://')) return candidate;
+  }
 }
 
 function extensionIdFromWorker(worker: Worker): string {
@@ -94,15 +100,40 @@ export async function togglePanelFromExtensionAction(page: Page, serviceWorker: 
   await page.bringToFront();
   const url = page.url();
   const result = await serviceWorker.evaluate(async (activeUrl) => {
-    const tabs = await chrome.tabs.query({ currentWindow: true });
-    const tab = tabs.find((candidate) => candidate.url === activeUrl);
-    if (typeof tab?.id !== 'number') throw new Error(`Could not find tab for ${activeUrl}`);
+    const findTargetTab = async (): Promise<chrome.tabs.Tab | undefined> => {
+      const tabs = await chrome.tabs.query({ currentWindow: true });
+      return (
+        tabs.find((candidate) => candidate.url === activeUrl) ??
+        tabs.find((candidate) => candidate.active && candidate.url?.startsWith('http'))
+      );
+    };
 
-    const response = await chrome.tabs.sendMessage(tab.id, {
-      type: 'imageTrail.togglePanel',
-      version: 1,
-      payload: { source: 'browserAction' },
-    });
+    const sendStatusMessage = async (tabId: number, type: 'imageTrail.ping' | 'imageTrail.togglePanel') => {
+      return chrome.tabs.sendMessage(tabId, {
+        type,
+        version: 1,
+        payload: type === 'imageTrail.ping' ? { sentAt: Date.now() } : { source: 'browserAction' },
+      });
+    };
+
+    const sleep = (delayMs: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, delayMs));
+    let tabId: number | undefined;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const tab = await findTargetTab();
+      tabId = tab?.id;
+      if (typeof tabId === 'number') {
+        try {
+          const response = await sendStatusMessage(tabId, 'imageTrail.ping');
+          if (response?.type === 'imageTrail.status') break;
+        } catch {
+          // Content script is declared at document_idle; keep polling until its listener is ready.
+        }
+      }
+      await sleep(100);
+    }
+
+    if (typeof tabId !== 'number') throw new Error(`Could not find tab for ${activeUrl}`);
+    const response = await sendStatusMessage(tabId, 'imageTrail.togglePanel');
     return response;
   }, url);
 
