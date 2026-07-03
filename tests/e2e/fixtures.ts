@@ -17,6 +17,7 @@ interface ExtensionWorkerFixtures {
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const extensionPath = path.join(repoRoot, 'extension/dist');
+const fixtureBaseUrl = 'http://127.0.0.1:4173';
 const fixturePaths = {
   singleImage: '/single-image.html',
   multipleImages: '/multiple-images.html',
@@ -85,7 +86,7 @@ export const test = base.extend<ExtensionFixtures, ExtensionWorkerFixtures>({
 export { expect, fixturePaths };
 
 export async function openFixturePage(page: Page, fixturePath: (typeof fixturePaths)[keyof typeof fixturePaths]): Promise<void> {
-  await page.goto(fixturePath);
+  await page.goto(new URL(fixturePath, fixtureBaseUrl).href);
   await page.waitForLoadState('domcontentloaded');
 }
 
