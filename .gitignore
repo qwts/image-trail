@@ -6,3 +6,4 @@ storybook-static/
 .env.*
 
 .test-dist/
+coverage/

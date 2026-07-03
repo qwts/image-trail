@@ -4,7 +4,8 @@
     "rootDir": ".",
     "outDir": ".test-dist",
     "types": ["chrome", "node"],
-    "noEmit": false
+    "noEmit": false,
+    "sourceMap": true
   },
   "include": ["extension/src/**/*.ts", "tests/**/*.ts"],
   "exclude": ["extension/src/test-fixtures/**/*.ts", "extension/src/**/*.stories.ts", "extension/src/ui/stories/**/*.ts"]
