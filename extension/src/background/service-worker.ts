@@ -6,8 +6,8 @@ import { IndexedDbPanelPositionStore } from '../data/panel-position-controller.j
 import { IndexedDbParsedFieldStateStore } from '../data/parsed-field-state-controller.js';
 import { IndexedDbUrlTemplateStore } from '../data/url-template-controller.js';
 import { IndexedDbUrlReviewStatusStore } from '../data/url-review-status-controller.js';
+import { RecentHistoryCache } from './recent-history-cache.js';
 import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, migrateLocalSettings } from '../data/local-settings.js';
-import type { PlaintextLocalSettings } from '../data/local-settings.js';
 import { getActiveBlobKey, lockBlobKey } from '../data/crypto/blob-keyring.js';
 import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
@@ -192,8 +192,7 @@ const panelPositionStore = new IndexedDbPanelPositionStore();
 const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
 const urlReviewStatusStore = new IndexedDbUrlReviewStatusStore();
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
-const recentHistoryBySite = new Map<string, readonly import('../core/display-records.js').ImageDisplayRecord[]>();
-const MAX_RECENT_HISTORY_ITEMS = 200;
+const recentHistoryCache = new RecentHistoryCache();
 
 async function requestStatus(tabId: number): Promise<boolean> {
   try {
@@ -231,14 +230,6 @@ function getDb(): Promise<IDBDatabase | null> {
   return dbPromise;
 }
 
-function recentHistoryKey(pageUrl: string): string {
-  try {
-    return new URL(pageUrl).hostname;
-  } catch {
-    return 'unknown';
-  }
-}
-
 function normalizeHostname(hostname: string): string | null {
   const normalized = hostname.trim().toLowerCase();
   return normalized || null;
@@ -246,7 +237,7 @@ function normalizeHostname(hostname: string): string | null {
 
 async function referencedBlobIds(): Promise<Set<string>> {
   const referenced = new Set(await bookmarkStore.loadOriginalBlobIds());
-  for (const history of recentHistoryBySite.values()) {
+  for (const history of recentHistoryCache.values()) {
     for (const item of history) {
       if (item.blobId) referenced.add(item.blobId);
     }
@@ -841,7 +832,7 @@ async function handleSaveLocalSettings(
 ): Promise<import('./messages.js').SaveLocalSettingsResultMessage['payload']> {
   const settings = migrateLocalSettings(message.payload.settings);
   await chrome.storage.local.set({ [LOCAL_SETTINGS_KEY]: settings });
-  pruneRecentHistoryForSettings(settings);
+  recentHistoryCache.pruneForSettings(settings);
   return { ok: true };
 }
 
@@ -849,54 +840,21 @@ async function handleLoadRecentHistory(
   message: LoadRecentHistoryMessage,
 ): Promise<import('./messages.js').LoadRecentHistoryResultMessage['payload']> {
   const settings = await loadLocalSettings();
-  const retained = recentHistoryBySite.get(recentHistoryKey(message.payload.pageUrl)) ?? [];
-  return { items: message.payload.includeRetained ? retained : visibleRecentHistory(retained, settings) };
+  return { items: recentHistoryCache.load(message.payload.pageUrl, settings, message.payload.includeRetained ?? false) };
 }
 
 async function handleAddRecentHistory(
   message: AddRecentHistoryMessage,
 ): Promise<import('./messages.js').AddRecentHistoryResultMessage['payload']> {
   const settings = await loadLocalSettings();
-  const key = recentHistoryKey(message.payload.pageUrl);
-  const item = message.payload.item;
-  const next = retainedRecentHistory(
-    [item, ...(recentHistoryBySite.get(key) ?? []).filter((entry) => entry.url !== item.url && entry.id !== item.id)],
-    settings,
-  );
-  recentHistoryBySite.set(key, next);
-  return { items: visibleRecentHistory(next, settings) };
+  return { items: recentHistoryCache.add(message.payload.pageUrl, message.payload.item, settings) };
 }
 
 async function handleRemoveRecentHistory(
   message: RemoveRecentHistoryMessage,
 ): Promise<import('./messages.js').RemoveRecentHistoryResultMessage['payload']> {
   const settings = await loadLocalSettings();
-  const key = recentHistoryKey(message.payload.pageUrl);
-  const next = (recentHistoryBySite.get(key) ?? []).filter((entry) => entry.id !== message.payload.id);
-  recentHistoryBySite.set(key, next);
-  return { items: visibleRecentHistory(next, settings) };
-}
-
-function retainedRecentHistory(
-  items: readonly import('../core/display-records.js').ImageDisplayRecord[],
-  settings: PlaintextLocalSettings,
-): readonly import('../core/display-records.js').ImageDisplayRecord[] {
-  const limit = settings.recentHistoryOverflowBehavior === 'drop-oldest' ? settings.recentHistoryLimit : MAX_RECENT_HISTORY_ITEMS;
-  return items.slice(0, limit);
-}
-
-function visibleRecentHistory(
-  items: readonly import('../core/display-records.js').ImageDisplayRecord[],
-  settings: PlaintextLocalSettings,
-): readonly import('../core/display-records.js').ImageDisplayRecord[] {
-  return items.slice(0, settings.recentHistoryLimit);
-}
-
-function pruneRecentHistoryForSettings(settings: PlaintextLocalSettings): void {
-  if (settings.recentHistoryOverflowBehavior !== 'drop-oldest') return;
-  for (const [key, items] of recentHistoryBySite) {
-    recentHistoryBySite.set(key, retainedRecentHistory(items, settings));
-  }
+  return { items: recentHistoryCache.remove(message.payload.pageUrl, message.payload.id, settings) };
 }
 
 async function handleLoadRecallCandidates(

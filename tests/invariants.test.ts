@@ -68,9 +68,15 @@ function encryptedBookmarkRecord(input: {
 // ---------------------------------------------------------------------------
 
 test('invariant: the recents layer exposes no durable IndexedDB write path', () => {
-  // The recents store (content proxy) and the runtime-history reducer must never reach durable
-  // storage — recents are transient session state (AGENTS.md "Product Model").
-  const recentsModules = ['extension/src/content/recent-history-store.ts', 'extension/src/data/runtime/runtime-history.ts'];
+  // The recents store (content proxy), the runtime-history reducer, and the background cache that
+  // actually owns and mutates the retained rows must never reach durable storage — recents are
+  // transient session state (AGENTS.md "Product Model"). Scanning only the proxy/reducer would miss
+  // a regression at the real write owner, extension/src/background/recent-history-cache.ts.
+  const recentsModules = [
+    'extension/src/content/recent-history-store.ts',
+    'extension/src/data/runtime/runtime-history.ts',
+    'extension/src/background/recent-history-cache.ts',
+  ];
   const forbidden: readonly (readonly [RegExp, string])[] = [
     [/\bindexedDB\b/, 'indexedDB'],
     [/chrome\.storage/, 'chrome.storage'],
