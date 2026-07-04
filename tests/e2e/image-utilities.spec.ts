@@ -17,6 +17,7 @@ import {
   readDownloadRequestLog,
   test,
   togglePanelFromExtensionAction,
+  type ExtensionDownloadRequest,
 } from './fixtures.js';
 
 const primaryImage = '#fixture-primary-image';
@@ -119,8 +120,14 @@ async function importEncryptedImage(page: Page, fileContent: string, fileName = 
 }
 
 async function waitForDownloadRequests(serviceWorker: Worker, count: number) {
-  await expect.poll(() => readDownloadRequestLog(serviceWorker)).toHaveLength(count);
-  return readDownloadRequestLog(serviceWorker);
+  let snapshot: ExtensionDownloadRequest[] = [];
+  await expect
+    .poll(async () => {
+      snapshot = await readDownloadRequestLog(serviceWorker);
+      return snapshot.length;
+    })
+    .toBe(count);
+  return snapshot;
 }
 
 test('exports the current host image and records shifted Save As metadata', async ({ page, serviceWorker }) => {
@@ -220,15 +227,19 @@ test('captures originals, prefers stored bytes for export, and round-trips encry
   const imported = await imageNavigationSnapshot(page, primaryImage);
   expect(imported.src).toMatch(/^data:image\/svg\+xml;base64,/u);
 
+  const historyCountBeforeWrongType = await page.locator('.image-trail-panel__history-item').count();
   await importEncryptedImage(page, JSON.stringify({ header: { payloadType: 'bookmarks' }, payload: '' }), 'wrong-type.json');
   await expectPanelStatusMessage(page, /Invalid export file|Unexpected payload type/u);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(bookmarkCountAfterImport);
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(historyCountBeforeWrongType);
 
   await deleteVisibleQueueRows(page);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
   await clearEncryptedOriginalsKey(page);
   await setupEncryptedOriginals(page, wrongPassword);
+  const historyCountBeforeWrongKey = await page.locator('.image-trail-panel__history-item').count();
   await importEncryptedImage(page, fileContent);
   await expectPanelStatusMessage(page, /Unlock blob:[a-f0-9-]+ before importing this encrypted image\./u);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(historyCountBeforeWrongKey);
 });
