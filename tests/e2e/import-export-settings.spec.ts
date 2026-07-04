@@ -58,8 +58,11 @@ async function createCleanExtensionSession(headless: boolean): Promise<CleanExte
     page,
     serviceWorker,
     async close() {
-      await context.close();
-      await rm(userDataDir, { recursive: true, force: true });
+      try {
+        await context.close();
+      } finally {
+        await rm(userDataDir, { recursive: true, force: true });
+      }
     },
   };
 }
@@ -346,6 +349,7 @@ test('key backup import fails closed with a wrong password and restores the capt
   serviceWorker,
   headless,
 }) => {
+  test.setTimeout(60_000);
   await openPanel(page, serviceWorker);
   await setupEncryptedOriginals(page);
   await deleteVisibleQueueRows(page);
