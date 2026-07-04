@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: read
+  # The acceptance-coverage check reads the PR's changed files, body, and labels.
+  pull-requests: read
 
 jobs:
   ci:
@@ -74,6 +76,15 @@ jobs:
 
       - name: Storybook interaction tests
         run: npm run test:stories:ci
+
+      # Forcing function (#343): a PR touching user-facing source (ui/ or content/) must also
+      # update tests/e2e/coverage-map.json, or opt out with "no-acceptance-impact". Runs last and
+      # with !cancelled() so it always reports its verdict, and is part of the required CI check.
+      - name: Acceptance coverage check
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run check:acceptance-coverage
 
   # Publishes the Playwright HTML report to GitHub Pages at a stable per-PR URL:
   #   https://qwtm.github.io/image-trail/reports/pr-<number>/
