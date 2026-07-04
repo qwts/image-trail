@@ -22,14 +22,10 @@ import type {
   PanelAction,
   PanelPositionStore,
   PanelState,
-  ParsedFieldStateRecord,
   ParsedFieldStateStore,
-  UrlReviewStatusClearFilter,
   UrlTemplateStore,
-  UrlReviewStatus,
   UrlReviewStatusStore,
 } from '../core/types.js';
-import { imageResourceUrlsEqual } from '../core/image/image-navigation.js';
 import { applyFieldSplitSpecs } from '../core/url/field-splits.js';
 import { applyFieldDigitWidthSpecs } from '../core/url/field-widths.js';
 import { parseUrl } from '../core/url/parse-url.js';
@@ -51,6 +47,10 @@ import { ParsedFieldNavigationController } from './panel/parsed-field-navigation
 import { ParsedFieldStateSync } from './panel/parsed-field-state-sync.js';
 import { PanelMount } from './panel/panel-mount.js';
 import { PanelPositionController } from './panel/panel-position-controller.js';
+import { PanelRenderController } from './panel/panel-render-controller.js';
+import { ParsedFieldStateRecordController } from './panel/parsed-field-state-record-controller.js';
+import { UrlReviewStatusController } from './panel/url-review-status-controller.js';
+import { PanelDataLoadController } from './panel/panel-data-load-controller.js';
 import { PanelSettingsController } from './panel/panel-settings-controller.js';
 import { RecallDrawerController } from './panel/recall-drawer-controller.js';
 import { RecallExportController } from './panel/recall-export-controller.js';
@@ -62,13 +62,8 @@ import { ProjectionApplicationController, toTargetState } from './panel/projecti
 import { dispatchPanelAction } from './panel/action-dispatch.js';
 import { buildPanelActionRegistry } from './panel/actions/registry.js';
 import type { PanelActionDeps } from './panel/actions/deps.js';
-import { isFocusablePanelControl } from './panel/export-download.js';
-import { urlReviewStatusClearScopeLabel } from './panel/record-export-helpers.js';
 import { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../content/panel-services.js';
-import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
 import { hostnameFromLocation } from './panel-position.js';
-
-const FINITE_CAPTURE_ERROR_MS = 2400;
 
 function addItems(items: readonly string[], nextItems: readonly string[]): readonly string[] {
   return [...items, ...nextItems.filter((item) => !items.includes(item))];
@@ -109,22 +104,17 @@ export class ImageTrailPanel {
   private readonly slideshow: Slideshow;
   private readonly retry: Retry404;
   private localSettings: PlaintextLocalSettings = DEFAULT_LOCAL_SETTINGS;
-  private storageUsageRequestId = 0;
-  private get panelStylesReady(): boolean {
-    return this.panelMount.panelStylesReady;
-  }
-  private finiteCaptureErrorTimer: number | null = null;
   private readonly fieldStateSync = new ParsedFieldStateSync({
     store: () => this.parsedFieldStateStore,
-    hostname: () => this.parsedFieldStateHostname(),
+    hostname: () => hostnameFromLocation(),
     currentPageHref: () => window.location.href,
     currentSelectedUrl: () => this.currentSelectedUrl(),
     selectedHandleId: () => this.state.target.selectedHandleId,
     syncTargetStateFromSnapshot: () => {
       this.state = setTargetState(this.state, toTargetState(this.pageAdapter.getSnapshot()));
     },
-    createRecord: () => this.createParsedFieldStateRecord(),
-    applyRestoredRecord: (record, ctx) => this.applyRestoredParsedFieldState(record, ctx),
+    createRecord: () => this.parsedFieldStateRecord.createParsedFieldStateRecord(),
+    applyRestoredRecord: (record, ctx) => this.parsedFieldStateRecord.applyRestoredParsedFieldState(record, ctx),
   });
   private readonly bufferedNav = new BufferedNavigationController({
     getLocalSettings: () => this.localSettings,
@@ -138,7 +128,7 @@ export class ImageTrailPanel {
       this.parsedFieldNavigation.applyBufferedNavigationUrl(nextUrl, displayUrl, sha256, attemptedFieldIds),
     createPlaceholderImage: () => new Image(),
     scheduleRevoke: (blobUrl) => window.setTimeout(() => URL.revokeObjectURL(blobUrl), 500),
-    onToast: (message) => this.showBufferedNavigationToast(message),
+    onToast: (message) => this.panelRender.showBufferedNavigationToast(message),
     onSkipCapReached: (message) => {
       this.state = {
         ...this.state,
@@ -148,9 +138,9 @@ export class ImageTrailPanel {
         lastUpdatedAt: Date.now(),
       };
       this.render();
-      this.showBufferedNavigationToast(message);
+      this.panelRender.showBufferedNavigationToast(message);
     },
-    onDebugChanged: () => this.renderBufferedDebugOverlay(),
+    onDebugChanged: () => this.panelRender.renderBufferedDebugOverlay(),
     checkRequestPolicy: (url, options) => checkImageRequestPolicy(url, options),
     probeImage: (url, timeoutMs, options) => probeBufferedImageSource(url, timeoutMs, options),
     fetchDecodedImage: (url, options) => fetchDecodedBufferedImageSource(url, options),
@@ -181,7 +171,7 @@ export class ImageTrailPanel {
     currentUrlModel: () => this.currentUrlModel(),
     setUrlTemplates: (templates, activeId) => this.pageAdapter.setUrlTemplates(templates, activeId),
     setGrabSourcePatterns: (patterns) => this.pageAdapter.setGrabSourcePatterns(patterns),
-    loadGrabSettings: (options) => this.loadGrabSettings(options),
+    loadGrabSettings: (options) => this.panelDataLoad.loadGrabSettings(options),
   });
   private readonly recallExport = new RecallExportController({
     getState: () => this.state,
@@ -190,7 +180,7 @@ export class ImageTrailPanel {
     },
     render: () => this.render(),
     renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
-    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
+    loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     getLocalSettings: () => this.localSettings,
     findSelectedImage: (handleId) => this.findSelectedImage(handleId),
     bookmarkStore: () => this.bookmarkStore,
@@ -208,9 +198,9 @@ export class ImageTrailPanel {
     },
     render: () => this.render(),
     renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
-    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
-    loadRecentHistory: (options) => this.loadRecentHistory(options),
-    refreshStorageUsage: (options) => this.refreshStorageUsage(options),
+    loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
+    loadRecentHistory: (options) => this.panelDataLoad.loadRecentHistory(options),
+    refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
     addImportedImage: (file) => this.recordLibrary.addImportedImage(file),
     getLocalSettings: () => this.localSettings,
     bookmarkStore: () => this.bookmarkStore,
@@ -229,8 +219,8 @@ export class ImageTrailPanel {
     },
     render: () => this.render(),
     renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
-    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
-    refreshStorageUsage: (options) => this.refreshStorageUsage(options),
+    loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
+    refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
     scheduleFiniteCaptureErrorReset: (updatedAt, mode) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode),
     findSelectedImage: (handleId) => this.findSelectedImage(handleId),
     isProjectionActive: (projectionId) => this.projections.isActive(projectionId),
@@ -250,12 +240,10 @@ export class ImageTrailPanel {
     },
     render: (options) => this.render(options),
     renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
-    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
-    refreshStorageUsage: (options) => this.refreshStorageUsage(options),
-    applyStorageUsage: (usage) => this.applyStorageUsage(usage),
-    invalidateStorageUsageRequests: () => {
-      this.storageUsageRequestId += 1;
-    },
+    loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
+    refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
+    applyStorageUsage: (usage) => this.panelDataLoad.applyStorageUsage(usage),
+    invalidateStorageUsageRequests: () => this.panelDataLoad.invalidateStorageUsageRequests(),
     scheduleFiniteCaptureErrorReset: (updatedAt, mode) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode),
     refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
     saveRecentRecordAsBookmark: (record, options) => this.recordLibrary.saveRecentRecordAsBookmark(record, options),
@@ -270,14 +258,15 @@ export class ImageTrailPanel {
       this.state = state;
     },
     render: () => this.render(),
-    loadGrabSettings: () => this.loadGrabSettings(),
+    loadGrabSettings: () => this.panelDataLoad.loadGrabSettings(),
     scheduleFiniteCaptureErrorReset: (updatedAt, mode, durationMs) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode, durationMs),
     saveFieldState: () => this.fieldStateSync.save(),
     setExtensionProjectedPageUrl: (pageUrl) => this.fieldStateSync.setExtensionProjectedPageUrl(pageUrl),
     refreshBufferedNavPreloads: () => this.bufferedNav.refreshPreloads(),
     primeBufferedNav: () => this.bufferedNav.prime(),
     refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
-    saveUrlReviewStatus: (status, sourceUrl, fieldIds, reason) => this.saveUrlReviewStatus(status, sourceUrl, fieldIds, reason),
+    saveUrlReviewStatus: (status, sourceUrl, fieldIds, reason) =>
+      this.urlReviewStatus.saveUrlReviewStatus(status, sourceUrl, fieldIds, reason),
     currentKnownImageFingerprint: () => this.currentKnownImageFingerprint(),
     applyFieldLoadResult: (state, attemptedFieldIds, nextFingerprint, previousFingerprint) =>
       this.applyFieldLoadResult(state, attemptedFieldIds, nextFingerprint, previousFingerprint),
@@ -311,7 +300,7 @@ export class ImageTrailPanel {
     render: () => this.render(),
     renderRecallOnly: () => this.renderRecallOnly(),
     renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
-    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
+    loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     ensurePanelPositionRestored: () => this.panelPosition.ensurePanelPositionRestored(),
     refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
     root: () => this.root,
@@ -328,8 +317,8 @@ export class ImageTrailPanel {
     },
     render: () => this.render(),
     renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
-    loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
-    loadRecentHistory: (options) => this.loadRecentHistory(options),
+    loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
+    loadRecentHistory: (options) => this.panelDataLoad.loadRecentHistory(options),
     currentNavigationBaseModel: () => this.currentNavigationBaseModel(),
     includedNavigationFields: (fields) => this.parsedFieldNavigation.includedNavigationFields(fields),
     localSettingsStore: () => this.localSettingsStore,
@@ -343,7 +332,7 @@ export class ImageTrailPanel {
       this.state = state;
     },
     render: () => this.render(),
-    loadGrabSettings: () => this.loadGrabSettings(),
+    loadGrabSettings: () => this.panelDataLoad.loadGrabSettings(),
     saveFieldState: () => this.fieldStateSync.save(),
     saveUrlTemplateFromCurrentFields: () => this.urlTemplateSettings.saveUrlTemplateFromCurrentFields(),
     currentNavigationBaseModel: () => this.currentNavigationBaseModel(),
@@ -351,7 +340,8 @@ export class ImageTrailPanel {
     currentKnownImageFingerprint: () => this.currentKnownImageFingerprint(),
     applyFieldLoadResult: (state, attemptedFieldIds, nextFingerprint, previousFingerprint) =>
       this.applyFieldLoadResult(state, attemptedFieldIds, nextFingerprint, previousFingerprint),
-    saveUrlReviewStatus: (status, sourceUrl, fieldIds, reason) => this.saveUrlReviewStatus(status, sourceUrl, fieldIds, reason),
+    saveUrlReviewStatus: (status, sourceUrl, fieldIds, reason) =>
+      this.urlReviewStatus.saveUrlReviewStatus(status, sourceUrl, fieldIds, reason),
     isNavigableQueryField: (field) => this.isNavigableQueryField(field),
     governor: () => this.governor,
     bufferedNav: () => this.bufferedNav,
@@ -375,12 +365,64 @@ export class ImageTrailPanel {
     saveUrlTemplateFromCurrentFields: () => this.urlTemplateSettings.saveUrlTemplateFromCurrentFields(),
     applySelectedUrl: (url, attemptedFieldIds, options) => this.projectionApplication.applySelectedUrl(url, attemptedFieldIds, options),
   });
-  private bufferedNavigationToastTimer: number | null = null;
-  private readonly layoutState: PanelLayoutState = {
-    fieldsPanelOpen: false,
-    fieldsPanelBlockSize: null,
-    historyListBlockSize: null,
-  };
+  private readonly panelRender: PanelRenderController = new PanelRenderController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    dispatch: (action) => this.dispatch(action),
+    root: () => this.root,
+    recallRoot: () => this.recallRoot,
+    toastRoot: () => this.toastRoot,
+    panelStylesReady: () => this.panelMount.panelStylesReady,
+    previewScrollAnchorId: () => this.projectionApplication.previewScrollAnchorId,
+    handlePanelDragStart: (event) => this.panelPosition.handlePanelDragStart(event),
+    queuePanelPositionRestore: () => this.panelPosition.queuePanelPositionRestore(),
+    applyRestoredPanelPosition: () => this.panelPosition.applyRestoredPanelPosition(),
+    bufferedNavDebugSnapshot: () => this.bufferedNav.getDebugSnapshot(),
+    refreshRecallIfOpen: () => this.recallDrawer.refreshRecallIfOpen(),
+  });
+  private readonly parsedFieldStateRecord: ParsedFieldStateRecordController = new ParsedFieldStateRecordController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    currentRawUrl: () => this.currentRawUrl(),
+    applySelectedUrl: (url, attemptedFieldIds, options) => this.projectionApplication.applySelectedUrl(url, attemptedFieldIds, options),
+    syncGrabSettings: () => this.urlTemplateSettings.syncGrabSettings(),
+    loadGrabSettings: (options) => this.panelDataLoad.loadGrabSettings(options),
+    fieldStatePageUrl: () => this.fieldStateSync.pageUrl(),
+    nextFieldStateUpdatedAt: () => this.fieldStateSync.nextUpdatedAt(),
+    saveFieldState: () => this.fieldStateSync.save(),
+    restoreFieldState: (options) => this.fieldStateSync.restore(options),
+  });
+  private readonly urlReviewStatus: UrlReviewStatusController = new UrlReviewStatusController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    urlReviewStatusStore: () => this.urlReviewStatusStore,
+    urlReviewStatusLimit: () => this.localSettings.urlReviewStatusLimit,
+    fieldStatePageUrl: () => this.fieldStateSync.pageUrl(),
+  });
+  private readonly panelDataLoad: PanelDataLoadController = new PanelDataLoadController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    bookmarkStore: () => this.bookmarkStore,
+    recentHistoryStore: () => this.recentHistoryStore,
+    captureStore: () => this.captureStore,
+    urlTemplateStore: () => this.urlTemplateStore,
+    loadLocalSettings: (options) => this.panelSettings.loadLocalSettings(options),
+    currentUrlTemplateHostname: () => this.urlTemplateSettings.currentUrlTemplateHostname(),
+    activeTemplateIdForCurrentUrl: (templates) => this.urlTemplateSettings.activeTemplateIdForCurrentUrl(templates),
+    syncGrabSettings: () => this.urlTemplateSettings.syncGrabSettings(),
+    primeBufferedNav: () => this.bufferedNav.prime(),
+  });
 
   constructor(
     private readonly pageAdapter: PageAdapter,
@@ -398,7 +440,7 @@ export class ImageTrailPanel {
       this.pageAdapter.subscribe((snapshot) => {
         this.state = setTargetState(this.state, toTargetState(snapshot));
         this.render();
-        void this.loadGrabSettings().then(() => this.fieldStateSync.restore());
+        void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore());
       }),
       this.pageAdapter.subscribeToSuccessfulLoads((target) => {
         if (target.projectionId && !this.projections.isActive(target.projectionId)) return;
@@ -423,9 +465,9 @@ export class ImageTrailPanel {
         void this.urlTemplateSettings.learnGrabSourcePattern(url);
       }),
     ]);
-    void this.loadSettingsBookmarksAndRecents();
-    void this.loadGrabSettings().then(() => this.fieldStateSync.restore());
-    void this.refreshStorageUsage();
+    void this.panelDataLoad.loadSettingsBookmarksAndRecents();
+    void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore());
+    void this.panelDataLoad.refreshStorageUsage();
     void this.recallExport.refreshBlobKeyStatus();
     void this.recallExport.refreshPCloudProviderStatus({ render: false });
 
@@ -465,7 +507,7 @@ export class ImageTrailPanel {
   toggle(): PanelState {
     const wasVisible = this.state.visible;
     this.dispatch({ name: 'toggle-panel' });
-    if (!wasVisible && this.state.visible) this.restoreParsedFieldStateForCurrentPanel();
+    if (!wasVisible && this.state.visible) this.parsedFieldStateRecord.restoreParsedFieldStateForCurrentPanel();
     return this.state;
   }
 
@@ -488,7 +530,7 @@ export class ImageTrailPanel {
     this.panelMount.teardown();
     this.panelPosition.invalidateRestore();
     this.recallDrawer.clearRecallMessageTimer();
-    this.clearFiniteCaptureErrorTimer();
+    this.panelRender.clearFiniteCaptureErrorTimer();
   }
 
   disconnect(): void {
@@ -496,167 +538,12 @@ export class ImageTrailPanel {
     this.panelMount.disposeSubscriptions();
   }
 
-  private loadBookmarks = async (options: { readonly render?: boolean } = {}): Promise<void> => {
-    if (!this.bookmarkStore) return;
-    await this.loadBookmarkPage(0, options);
-  };
-
-  private loadSettingsBookmarksAndRecents = async (): Promise<void> => {
-    await this.panelSettings.loadLocalSettings({ render: false });
-    await Promise.all([this.loadBookmarks({ render: false }), this.loadRecentHistory({ render: false })]);
-    this.render();
-  };
-
-  private async loadGrabSettings(options: { readonly render?: boolean } = {}): Promise<void> {
-    if (!this.urlTemplateStore) return;
-    const hostname = this.urlTemplateSettings.currentUrlTemplateHostname();
-    if (!hostname) return;
-    const [templates, grabSourcePatterns] = await Promise.all([
-      this.urlTemplateStore.load(hostname),
-      this.urlTemplateStore.loadGrabSourcePatterns(hostname),
-    ]);
-    this.state = reducePanelAction(this.state, {
-      name: 'url-templates/load',
-      templates,
-      activeTemplateId: this.urlTemplateSettings.activeTemplateIdForCurrentUrl(templates),
-    });
-    this.state = reducePanelAction(this.state, {
-      name: 'grab-source-patterns/load',
-      patterns: grabSourcePatterns,
-    });
-    this.urlTemplateSettings.syncGrabSettings();
-    this.bufferedNav.prime();
-    if (options.render !== false) this.render();
-  }
-
-  private parsedFieldStateHostname(): string | null {
-    return hostnameFromLocation();
-  }
-
-  private createParsedFieldStateRecord(): ParsedFieldStateRecord | null {
-    const hostname = this.parsedFieldStateHostname();
-    if (!hostname) return null;
-    if (!this.state.target.selectedUrl && !this.state.draftUrl) return null;
-    return {
-      schemaVersion: 1,
-      hostname,
-      pageUrl: this.fieldStateSync.pageUrl(),
-      sourceUrl: this.currentRawUrl(),
-      selectedUrl: this.state.target.selectedUrl,
-      selectedHandleId: this.state.target.selectedHandleId,
-      activeFieldId: this.state.activeFieldId,
-      failedFieldId: this.state.failedFieldId,
-      successfulFieldIds: this.state.successfulFieldIds,
-      unchangedFieldIds: this.state.unchangedFieldIds,
-      unlockedFieldIds: this.state.unlockedFieldIds,
-      manuallyExcludedFieldIds: this.state.manuallyExcludedFieldIds,
-      fieldSplitSpecs: this.state.fieldSplitSpecs,
-      fieldDigitWidthSpecs: this.state.fieldDigitWidthSpecs,
-      activeUrlTemplateId: this.state.activeUrlTemplateId,
-      updatedAt: this.fieldStateSync.nextUpdatedAt(),
-    };
-  }
-
-  private async applyRestoredParsedFieldState(
-    record: ParsedFieldStateRecord,
-    ctx: { readonly sameSource: boolean; readonly projectSavedSource: boolean },
-  ): Promise<void> {
-    if (ctx.projectSavedSource && !ctx.sameSource) {
-      const projected = await this.projectionApplication.applySelectedUrl(record.sourceUrl, [], { reason: 'parsed-field-restore' });
-      if (!projected && !imageResourceUrlsEqual(record.sourceUrl, this.currentRawUrl(), window.location.href)) return;
-    }
-    this.state = reducePanelAction(this.state, {
-      name: 'parsed-field-state/restore',
-      record: this.filterParsedFieldStateForCurrentUrl(record),
-    });
-    this.urlTemplateSettings.syncGrabSettings();
-    void this.fieldStateSync.save();
-    this.render();
-  }
-
-  private restoreParsedFieldStateForCurrentPanel(): void {
-    void this.loadGrabSettings({ render: false }).then(() => this.fieldStateSync.restore({ projectSavedSource: true }));
-  }
-
-  private filterParsedFieldStateForCurrentUrl(record: ParsedFieldStateRecord): ParsedFieldStateRecord {
-    try {
-      const model = applyFieldDigitWidthSpecs(
-        applyFieldSplitSpecs(parseUrl(record.sourceUrl), record.fieldSplitSpecs),
-        record.fieldDigitWidthSpecs ?? [],
-      );
-      const fieldIds = new Set(collectUrlFields(model).map((field) => field.id));
-      const keep = (ids: readonly string[]): readonly string[] => ids.filter((id) => fieldIds.has(id));
-      return {
-        ...record,
-        activeFieldId: record.activeFieldId && fieldIds.has(record.activeFieldId) ? record.activeFieldId : null,
-        failedFieldId: record.failedFieldId && fieldIds.has(record.failedFieldId) ? record.failedFieldId : null,
-        successfulFieldIds: keep(record.successfulFieldIds),
-        unchangedFieldIds: keep(record.unchangedFieldIds),
-        unlockedFieldIds: keep(record.unlockedFieldIds),
-        manuallyExcludedFieldIds: keep(record.manuallyExcludedFieldIds),
-        fieldDigitWidthSpecs: (record.fieldDigitWidthSpecs ?? []).filter((spec) => fieldIds.has(spec.fieldId)),
-      };
-    } catch {
-      return { ...record, activeFieldId: null, failedFieldId: null };
-    }
-  }
-
-  private loadRecentHistory = async (options: { readonly render?: boolean } = {}): Promise<void> => {
-    if (!this.recentHistoryStore) return;
-    const history = await this.recentHistoryStore.load(window.location.href);
-    this.state = { ...this.state, history, lastUpdatedAt: Date.now() };
-    if (options.render !== false) this.render();
-  };
-
-  private loadBookmarkPage = async (offset: number, options: { readonly render?: boolean } = {}): Promise<void> => {
-    if (!this.bookmarkStore) return;
-    const page = await this.bookmarkStore.loadPage({
-      offset,
-      limit: this.state.bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
-      scope: this.state.bookmarkVisibilityScope,
-      currentPageUrl: window.location.href,
-    });
-    this.state = reducePanelAction(this.state, {
-      name: 'bookmarks/page-loaded',
-      bookmarks: page.items,
-      offset: page.offset,
-      limit: page.limit,
-      total: page.total,
-      hasOlder: page.hasOlder,
-      hasNewer: page.hasNewer,
-    });
-    if (options.render !== false) this.render();
-  };
-
-  private scheduleFiniteCaptureErrorReset(
-    updatedAt: number,
-    mode: 'status' | 'capture-result',
-    durationMs: number = FINITE_CAPTURE_ERROR_MS,
-  ): void {
-    this.clearFiniteCaptureErrorTimer();
-    this.finiteCaptureErrorTimer = window.setTimeout(() => {
-      this.finiteCaptureErrorTimer = null;
-      if (this.state.lastUpdatedAt !== updatedAt) return;
-      if (mode === 'status') {
-        if (this.state.status !== 'error') return;
-        this.state = { ...this.state, status: 'ready', message: 'Image Trail is ready.', lastUpdatedAt: Date.now() };
-      } else {
-        if (this.state.captureResult === null || this.state.captureResult.status === 'captured') return;
-        this.state = { ...reducePanelAction(this.state, { name: 'capture/clear' }), message: 'Image Trail is ready.' };
-      }
-      this.render();
-    }, durationMs);
-  }
-
-  private clearFiniteCaptureErrorTimer(): void {
-    if (this.finiteCaptureErrorTimer === null) return;
-    window.clearTimeout(this.finiteCaptureErrorTimer);
-    this.finiteCaptureErrorTimer = null;
+  private scheduleFiniteCaptureErrorReset(updatedAt: number, mode: 'status' | 'capture-result', durationMs?: number): void {
+    this.panelRender.scheduleFiniteCaptureErrorReset(updatedAt, mode, durationMs);
   }
 
   private renderPanelAndRefreshRecall(): void {
-    this.render({ includeRecall: false });
-    this.recallDrawer.refreshRecallIfOpen();
+    this.panelRender.renderPanelAndRefreshRecall();
   }
 
   private createActionDeps(): PanelActionDeps {
@@ -691,7 +578,7 @@ export class ImageTrailPanel {
       pinRecentHistory: (id) => this.recordLibrary.pinRecentHistory(id),
       loadBookmark: (id) => this.recordLibrary.loadBookmark(id),
       removeBookmark: (id) => this.recordLibrary.removeBookmark(id),
-      loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
+      loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
       refreshBookmarkThumbnails: () => this.recordLibrary.refreshBookmarkThumbnails(),
       deleteVisibleBookmarks: () => this.recordLibrary.deleteVisibleBookmarks(),
       deleteRecallBookmarks: () => this.recordLibrary.deleteRecallBookmarks(),
@@ -706,8 +593,8 @@ export class ImageTrailPanel {
         this.panelSettings.updateNeighborPreload(enabled, radius, cacheLimit, probeMethod),
       preloadMoreNeighbors: (radius, cacheLimit) => this.panelSettings.preloadMoreNeighbors(radius, cacheLimit),
       resetPanelPosition: () => this.panelPosition.resetPanelPosition(),
-      refreshStorageUsage: (options) => this.refreshStorageUsage(options),
-      restoreParsedFieldStateForCurrentPanel: () => this.restoreParsedFieldStateForCurrentPanel(),
+      refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
+      restoreParsedFieldStateForCurrentPanel: () => this.parsedFieldStateRecord.restoreParsedFieldStateForCurrentPanel(),
       openRecallDrawer: () => this.recallDrawer.openRecallDrawer(),
       loadRecallCandidates: (input) => this.recallDrawer.loadRecallCandidates(input),
       recallSelectedRecords: () => this.recallDrawer.recallSelectedRecords(),
@@ -718,7 +605,7 @@ export class ImageTrailPanel {
       deleteCapturedBlob: (recordId, blobId) => this.capturedOriginals.deleteCapturedBlob(recordId, blobId),
       cleanupOrphanedBlobs: () => this.capturedOriginals.cleanupOrphanedBlobs(),
       previewRecord: (url, blobId, scrollAnchorId) => this.projectionApplication.previewRecord(url, blobId, scrollAnchorId),
-      clearUrlReviewStatus: (scope) => this.clearUrlReviewStatus(scope),
+      clearUrlReviewStatus: (scope) => this.urlReviewStatus.clearUrlReviewStatus(scope),
       navigateBy: (delta) => this.parsedFieldNavigation.navigateBy(delta),
       cancelQueuedSlideshowNavigation: () => this.parsedFieldNavigation.cancelQueuedSlideshowNavigation(),
     };
@@ -911,31 +798,6 @@ export class ImageTrailPanel {
     return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
   }
 
-  private async saveUrlReviewStatus(
-    status: UrlReviewStatus,
-    sourceUrl: string,
-    fieldIds: readonly string[],
-    reason?: string,
-  ): Promise<void> {
-    if (!this.urlReviewStatusStore || fieldIds.length === 0) return;
-    const hostname = hostnameFromLocation();
-    if (!hostname) return;
-    await this.urlReviewStatusStore.save(
-      {
-        schemaVersion: 1,
-        hostname,
-        pageUrl: this.fieldStateSync.pageUrl(),
-        sourceUrl,
-        status,
-        fieldIds,
-        activeFieldId: this.state.activeFieldId,
-        reason,
-        updatedAt: new Date().toISOString(),
-      },
-      { maxRecordsPerHost: this.localSettings.urlReviewStatusLimit },
-    );
-  }
-
   private async tryReloadCurrent(): Promise<boolean> {
     const snapshot = this.pageAdapter.getSnapshot();
     if (!snapshot.selected) return false;
@@ -965,236 +827,11 @@ export class ImageTrailPanel {
     return document.querySelector<HTMLImageElement>(`[data-image-trail-handle="${handleId}"]`);
   }
 
-  private showPCloudBackupPlaceholder(kind: 'backup' | 'restore'): void {
-    const message =
-      kind === 'backup'
-        ? 'pCloud is connected. Backup upload is the next implementation slice.'
-        : 'pCloud is connected. Restore file selection is the next implementation slice.';
-    this.state = reducePanelAction(this.state, { name: 'pcloud-backup/message', message });
-    this.render();
-  }
-
-  private async clearUrlReviewStatus(scope: 'hostname' | 'page' | 'source' | 'all'): Promise<void> {
-    this.state = reducePanelAction(this.state, { name: 'import-export/start' });
-    this.render();
-    const filter = this.urlReviewStatusClearFilter(scope);
-    const deletedCount = filter && this.urlReviewStatusStore ? await this.urlReviewStatusStore.clear(filter) : 0;
-    this.state = reducePanelAction(this.state, {
-      name: 'import-export/complete',
-      message: `Cleared ${deletedCount} URL review status record${deletedCount === 1 ? '' : 's'} for ${urlReviewStatusClearScopeLabel(scope)}.`,
-    });
-    this.render();
-  }
-
-  private urlReviewStatusClearFilter(scope: 'hostname' | 'page' | 'source' | 'all'): UrlReviewStatusClearFilter | null {
-    if (scope === 'all') return { scope: 'all' };
-    const hostname = hostnameFromLocation();
-    if (!hostname) return null;
-    if (scope === 'hostname') return { scope: 'hostname', hostname };
-    if (scope === 'page') return { scope: 'page', hostname, pageUrl: this.fieldStateSync.pageUrl() };
-    const sourceUrl = this.state.draftUrl ?? this.state.target.selectedUrl;
-    return sourceUrl ? { scope: 'source', hostname, sourceUrl } : null;
-  }
-
-  private async refreshStorageUsage(options: { readonly render?: boolean } = {}): Promise<void> {
-    if (!this.captureStore) return;
-    const requestId = (this.storageUsageRequestId += 1);
-    try {
-      const usage = await this.captureStore.requestStorageUsage();
-      if (requestId !== this.storageUsageRequestId) return;
-      this.applyStorageUsage(usage, { preserveRequestId: true });
-      if (options.render || this.state.settingsOpen) this.render();
-    } catch {
-      // Storage health is informational; it must not break row actions.
-    }
-  }
-
-  private applyStorageUsage(usage: NonNullable<PanelState['storageUsage']>, options: { readonly preserveRequestId?: boolean } = {}): void {
-    if (!options.preserveRequestId) this.storageUsageRequestId += 1;
-    this.state = reducePanelAction(this.state, { name: 'storage/update', usage });
-  }
-
   private render(options: { readonly includeRecall?: boolean } = {}): void {
-    if (this.root) {
-      const focusedControl = this.captureFocusedPanelControl();
-      renderPanel(
-        {
-          root: this.root,
-          recallRoot: this.recallRoot,
-          toastRoot: this.toastRoot,
-          dispatch: this.dispatch,
-          layoutState: this.layoutState,
-          scrollAnchorId: this.projectionApplication.previewScrollAnchorId,
-          onPanelDragStart: this.panelPosition.handlePanelDragStart,
-        },
-        this.state,
-        { renderRecall: options.includeRecall !== false },
-      );
-      this.restoreFocusedPanelControl(focusedControl);
-      if (!this.state.minimized && this.panelStylesReady) {
-        this.panelPosition.queuePanelPositionRestore();
-        this.panelPosition.applyRestoredPanelPosition();
-      }
-      this.renderBufferedDebugOverlay();
-    }
-  }
-
-  private renderBufferedDebugOverlay(): void {
-    if (!this.root) return;
-    const existing = this.root.querySelector('.image-trail-panel__buffer-debug');
-    const snapshot = this.bufferedNav.getDebugSnapshot();
-    if (!snapshot) {
-      existing?.remove();
-      return;
-    }
-    const overlay = existing instanceof HTMLElement ? existing : document.createElement('div');
-    overlay.className = 'image-trail-panel__buffer-debug';
-    const { cursor, bufferN, indices } = snapshot;
-    const cells: HTMLElement[] = [];
-    for (let index = cursor - bufferN; index <= cursor + bufferN; index += 1) {
-      const entry = indices.get(index);
-      const cell = document.createElement('span');
-      cell.className = 'image-trail-panel__buffer-debug-cell';
-      cell.dataset.status = entry ? `${entry.manifest}:${entry.image}` : 'UNKNOWN';
-      if (index === cursor) cell.classList.add('is-current');
-      cell.title = `${index}: ${entry?.manifest ?? 'UNKNOWN'} / ${entry?.image ?? 'UNKNOWN'}`;
-      cell.textContent = String(index);
-      cells.push(cell);
-    }
-    overlay.replaceChildren(...cells);
-    if (!existing) this.root.append(overlay);
-  }
-
-  private showBufferedNavigationToast(message: string): void {
-    if (!this.root || !this.toastRoot) return;
-    if (this.bufferedNavigationToastTimer !== null) {
-      window.clearTimeout(this.bufferedNavigationToastTimer);
-      this.bufferedNavigationToastTimer = null;
-    }
-    this.root.classList.remove('has-buffered-skip-pulse');
-    void this.root.offsetWidth;
-    this.root.classList.add('has-buffered-skip-pulse');
-
-    this.toastRoot.replaceChildren();
-    this.toastRoot.className = 'image-trail-panel-root image-trail-panel__toast-root has-buffered-skip-pulse';
-
-    const toast = document.createElement('aside');
-    toast.className = 'image-trail-panel__toast image-trail-panel__buffered-skip-toast';
-    toast.setAttribute('role', 'status');
-    toast.setAttribute('aria-live', 'polite');
-
-    const label = document.createElement('span');
-    label.className = 'image-trail-panel__toast-label';
-    label.textContent = 'Skipped';
-
-    const copy = document.createElement('span');
-    copy.className = 'image-trail-panel__toast-message';
-    copy.textContent = message;
-    copy.title = message;
-
-    toast.append(label, copy);
-    this.toastRoot.append(toast);
-    this.bufferedNavigationToastTimer = window.setTimeout(() => {
-      this.root?.classList.remove('has-buffered-skip-pulse');
-      if (this.toastRoot) {
-        this.toastRoot.replaceChildren();
-        this.toastRoot.className = 'image-trail-panel-root image-trail-panel__toast-root';
-      }
-      this.bufferedNavigationToastTimer = null;
-    }, 1800);
-  }
-
-  private captureFocusedPanelControl(): {
-    readonly index: number;
-    readonly tagName: string;
-    readonly inputType?: string;
-    readonly value?: string;
-    readonly selectionStart?: number | null;
-    readonly selectionEnd?: number | null;
-  } | null {
-    if (!this.root) return null;
-    const rootNode = this.root.getRootNode();
-    const activeElement = rootNode instanceof ShadowRoot ? rootNode.activeElement : document.activeElement;
-    if (!(activeElement instanceof HTMLElement) || !this.root.contains(activeElement)) return null;
-    if (!isFocusablePanelControl(activeElement)) return null;
-    const controls = this.focusablePanelControls();
-    const index = controls.indexOf(activeElement);
-    if (index < 0) return null;
-    if (activeElement instanceof HTMLInputElement) {
-      if (activeElement.type === 'file') return { index, tagName: activeElement.tagName, inputType: activeElement.type };
-      return {
-        index,
-        tagName: activeElement.tagName,
-        inputType: activeElement.type,
-        value: activeElement.value,
-        selectionStart: activeElement.selectionStart,
-        selectionEnd: activeElement.selectionEnd,
-      };
-    }
-    if (activeElement instanceof HTMLTextAreaElement) {
-      return {
-        index,
-        tagName: activeElement.tagName,
-        value: activeElement.value,
-        selectionStart: activeElement.selectionStart,
-        selectionEnd: activeElement.selectionEnd,
-      };
-    }
-    return { index, tagName: activeElement.tagName };
-  }
-
-  private restoreFocusedPanelControl(
-    focusedControl: {
-      readonly index: number;
-      readonly tagName: string;
-      readonly inputType?: string;
-      readonly value?: string;
-      readonly selectionStart?: number | null;
-      readonly selectionEnd?: number | null;
-    } | null,
-  ): void {
-    if (!this.root || !focusedControl) return;
-    const nextControl = this.focusablePanelControls()[focusedControl.index];
-    if (!nextControl || nextControl.tagName !== focusedControl.tagName) return;
-    if (
-      focusedControl.inputType !== undefined &&
-      (!(nextControl instanceof HTMLInputElement) || nextControl.type !== focusedControl.inputType)
-    ) {
-      return;
-    }
-    if (nextControl instanceof HTMLInputElement && nextControl.type === 'file') {
-      nextControl.focus();
-      return;
-    }
-    if (focusedControl.value !== undefined && (nextControl instanceof HTMLInputElement || nextControl instanceof HTMLTextAreaElement)) {
-      nextControl.value = focusedControl.value;
-      try {
-        nextControl.setSelectionRange(focusedControl.selectionStart ?? null, focusedControl.selectionEnd ?? null);
-      } catch {
-        // Some input types, such as number, do not support selection ranges.
-      }
-    }
-    nextControl.focus();
-  }
-
-  private focusablePanelControls(): HTMLElement[] {
-    if (!this.root) return [];
-    return Array.from(this.root.querySelectorAll<HTMLElement>('button, input, select, textarea'));
+    this.panelRender.render(options);
   }
 
   private renderRecallOnly(): void {
-    if (!this.root || !this.recallRoot) return;
-    renderRecallDrawer(
-      {
-        root: this.root,
-        recallRoot: this.recallRoot,
-        toastRoot: this.toastRoot,
-        dispatch: this.dispatch,
-        layoutState: this.layoutState,
-        scrollAnchorId: this.projectionApplication.previewScrollAnchorId,
-        onPanelDragStart: this.panelPosition.handlePanelDragStart,
-      },
-      this.state,
-    );
+    this.panelRender.renderRecallOnly();
   }
 }
