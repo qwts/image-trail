@@ -16,11 +16,15 @@ const rootDirectory = process.cwd();
 const AUTOMATED_COVERAGE_TYPES = new Set(['playwright-e2e', 'unit-dom', 'storybook']);
 
 async function readJson(relativePath) {
+  // Never throw: a missing OR malformed input degrades to null so this reporter can't become a
+  // gate. A malformed coverage-map.json is the check-e2e-coverage-map.mjs validator's job to report.
   try {
     return JSON.parse(await readFile(path.join(rootDirectory, relativePath), 'utf8'));
   } catch (error) {
-    if (error?.code === 'ENOENT') return null;
-    throw error;
+    if (error?.code !== 'ENOENT') {
+      console.warn(`Coverage summary: could not read ${relativePath} (${error?.message ?? error}); skipping it.`);
+    }
+    return null;
   }
 }
 
@@ -42,11 +46,7 @@ function coverageRow(label, metric, floor) {
 
 function renderCoverageSection(summary, thresholds) {
   if (!summary?.total) {
-    return [
-      '### Code coverage',
-      '',
-      '_No `coverage/coverage-summary.json` found — the coverage step may not have run._',
-    ];
+    return ['### Code coverage', '', '_No `coverage/coverage-summary.json` found — the coverage step may not have run._'];
   }
   const { total } = summary;
   return [
@@ -72,7 +72,9 @@ function renderCoverageMapSection(coverageMap) {
   const distribution = new Map();
   const unautomated = [];
   for (const entry of entries) {
-    const types = new Set((entry.coverage ?? []).map((coverage) => coverage.type));
+    // Guard against a malformed entry (coverage not an array) — degrade, don't throw.
+    const coverages = Array.isArray(entry.coverage) ? entry.coverage : [];
+    const types = new Set(coverages.map((coverage) => coverage.type));
     for (const type of types) distribution.set(type, (distribution.get(type) ?? 0) + 1);
     const hasAutomated = [...types].some((type) => AUTOMATED_COVERAGE_TYPES.has(type));
     if (!hasAutomated) unautomated.push({ id: entry.id, types: [...types].sort() });
@@ -86,7 +88,7 @@ function renderCoverageMapSection(coverageMap) {
   const lines = [
     '### Acceptance coverage map',
     '',
-    `${entries.length} canonical flows — flows by coverage source: ${distributionLine}`,
+    `${entries.length} canonical flows — flow count per coverage source (a flow may use several, so these can sum to more than ${entries.length}): ${distributionLine}`,
     '',
   ];
   if (unautomated.length === 0) {
@@ -122,9 +124,15 @@ const markdown = [
 
 const summaryPath = process.env.GITHUB_STEP_SUMMARY;
 if (summaryPath) {
-  const { appendFile } = await import('node:fs/promises');
-  await appendFile(summaryPath, `${markdown}\n`);
-  console.log('Wrote coverage summary to the GitHub step summary.');
+  try {
+    const { appendFile } = await import('node:fs/promises');
+    await appendFile(summaryPath, `${markdown}\n`);
+    console.log('Wrote coverage summary to the GitHub step summary.');
+  } catch (error) {
+    // Fall back to stdout rather than failing the step — this is a reporter, never a gate.
+    console.warn(`Coverage summary: could not write the step summary (${error?.message ?? error}); printing instead.`);
+    console.log(markdown);
+  }
 } else {
   console.log(markdown);
 }
