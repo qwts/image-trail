@@ -92,9 +92,11 @@ can carry a stale copy until rebased or restarted from the main repo.
   instruction files (`AGENTS.md`, `CLAUDE.md` files, `.github/copilot-instructions.md`),
   `CONTRIBUTING.md`, and root `README.md`.
 - Before claiming done on any change (code, docs, or config), run `npm run lint`,
-  `npm run format:check`, `npm test`, and `npm run build` — or `npm run ci`, which
-  chains exactly these four in order as the documented local pre-push gate. CI runs
-  the same gates; do not skip them locally. Do not report a build you did not run;
+  `npm run format:check`, `npm test`, and `npm run build` for the fast inner loop.
+  Before pushing, run `npm run ci`, which chains lint → format:check → `test:cov`
+  → build — the same gates CI enforces, including the `.c8rc.json` coverage floor,
+  so a coverage drop fails locally instead of on the PR. (`npm test` skips the c8
+  gate for speed; `npm run ci` does not.) Do not report a build you did not run;
   do not break the build.
 - `npm test` includes the happy-dom suite (`npm run test:dom`, files under
   `tests/dom/`), which runs `node:test` with a real DOM registered via

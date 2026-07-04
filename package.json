@@ -10,7 +10,7 @@
     "lint:cycles": "madge --circular --extensions ts extension/src",
     "lint:dead": "knip",
     "typecheck": "tsc --noEmit",
-    "ci": "npm run lint && npm run format:check && npm test && npm run build",
+    "ci": "npm run lint && npm run format:check && npm run test:cov && npm run build",
     "storybook": "storybook dev -p 6006",
     "build:storybook": "storybook build",
     "build": "npm run clean && tsc -p tsconfig.json && node scripts/build-content-script.mjs && node scripts/build-service-worker.mjs && node scripts/copy-extension-assets.mjs",
