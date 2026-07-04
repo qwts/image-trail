@@ -89,9 +89,9 @@
           "path": "extension/src/ui/components/fields-view.stories.ts"
         },
         {
-          "type": "deferred",
-          "issue": 306,
-          "notes": "Browser-level URL editor, parsed field, navigation, and restore flows."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
+          "notes": "Covers URL editor apply, parsed numeric field increment/decrement, failed parsed-field loads without Recent rows, included-field Previous/Next navigation, learned template visibility, and close/reopen parsed-field restore for the same selected image context."
         }
       ]
     },
@@ -106,9 +106,9 @@
           "paths": ["tests/import-export.test.ts", "tests/restore-import-preview.test.ts"]
         },
         {
-          "type": "deferred",
-          "issue": 306,
-          "notes": "End-to-end import/export round trip and clean side-effect assertions."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
+          "notes": "Covers passed and failed URL review status records, JSON export/import restore preview, confirm import, and no Recents, pins/bookmarks, Recall, or encrypted-original side effects."
         }
       ]
     },
