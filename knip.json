@@ -1,0 +1,21 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "extension/src/background/service-worker.ts",
+    "extension/src/content/content-script.ts",
+    "extension/src/ui/**/*.stories.ts",
+    "tests/**/*.test.ts",
+    "tests/dom/register.ts",
+    "tests/e2e/**/*.spec.ts",
+    "scripts/*.mjs"
+  ],
+  "project": ["extension/src/**/*.ts", "scripts/**/*.mjs"],
+  "ignore": [
+    "extension/src/core/automation/navigation-queue.ts",
+    "extension/src/data/import-export/key-import.ts",
+    "extension/src/ui/components/lock-view.ts"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "ignoreBinaries": ["gh"],
+  "ignoreDependencies": ["@typescript-eslint/eslint-plugin", "@typescript-eslint/parser"]
+}

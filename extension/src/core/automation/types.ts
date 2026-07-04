@@ -1,13 +1,5 @@
 export type AutomationPhase = 'idle' | 'running' | 'paused' | 'stopped' | 'error' | 'exhausted';
 
-export interface AutomationStatus {
-  readonly phase: AutomationPhase;
-  readonly message: string;
-  readonly retriesUsed?: number;
-  readonly retriesMax?: number;
-  readonly slidesShown?: number;
-}
-
 export interface SlideshowConfig {
   readonly intervalMs: number;
   readonly direction: 1 | -1;
@@ -41,5 +33,3 @@ export const DEFAULT_GOVERNOR_CONFIG: RequestGovernorConfig = {
   maxRequests: 60,
   windowMs: 60_000,
 };
-
-export type AutomationCommand = 'start' | 'stop' | 'pause' | 'resume';

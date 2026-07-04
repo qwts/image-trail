@@ -1132,7 +1132,6 @@ export type ExtensionResponse =
   | ListGrabSourcePatternsResultMessage
   | SaveGrabSourcePatternResultMessage
   | DeleteGrabSourcePatternResultMessage;
-export type ExtensionMessage = ExtensionRequest | ExtensionResponse;
 
 /**
  * Single runtime source of truth for whether a message type is a request or a

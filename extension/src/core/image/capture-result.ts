@@ -43,7 +43,6 @@ export interface StorageUsageSummary {
 }
 
 export const DEFAULT_MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;
-export const HARD_MAX_ORIGINAL_BYTES = 100 * 1024 * 1024;
 
 export function isCapturedResult(result: CaptureResult): result is CaptureResult & { status: 'captured' } {
   return result.status === 'captured';
