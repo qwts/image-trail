@@ -48,6 +48,29 @@ test('ignores test and story files as non-flow changes', () => {
   assert.deepEqual(result.acceptanceFiles, []);
 });
 
+test('ignores Storybook-only harness files under ui/stories (excluded from the build)', () => {
+  const result = evaluateAcceptanceCoverage({
+    changedFiles: ['extension/src/ui/stories/harness.ts', 'extension/src/ui/stories/fixtures.ts'],
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.acceptanceFiles, []);
+});
+
+test('treats a UI stylesheet change as acceptance-relevant (CSS drives visible states)', () => {
+  const result = evaluateAcceptanceCoverage({
+    changedFiles: ['extension/src/ui/styles/panel.css'],
+  });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.acceptanceFiles, ['extension/src/ui/styles/panel.css']);
+});
+
+test('a UI stylesheet change passes when the coverage map is updated too', () => {
+  const result = evaluateAcceptanceCoverage({
+    changedFiles: ['extension/src/ui/styles/panel.css', 'tests/e2e/coverage-map.json'],
+  });
+  assert.equal(result.ok, true);
+});
+
 test('opts out via the no-acceptance-impact token in the PR body', () => {
   const result = evaluateAcceptanceCoverage({
     changedFiles: ['extension/src/ui/render.ts'],
