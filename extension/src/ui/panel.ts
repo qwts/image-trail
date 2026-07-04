@@ -12,7 +12,7 @@ import {
 import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
 import type { PageAdapter } from '../content/page-adapter.js';
-import { applyFieldSplitSpecToState, pruneInvalidFieldSplitSpecsFromState, reducePanelAction } from '../core/actions.js';
+import { pruneInvalidFieldSplitSpecsFromState, reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
 import type { BuildIdentity } from '../core/build-info.js';
@@ -31,14 +31,7 @@ import type {
 } from '../core/types.js';
 import { imageResourceUrlsEqual } from '../core/image/image-navigation.js';
 import { applyFieldSplitSpecs } from '../core/url/field-splits.js';
-import { applyFieldDigitWidthSpecs, fieldDigitWidthSpecsEqual } from '../core/url/field-widths.js';
-import {
-  applyFieldDigitWidthTransform,
-  applyFieldSplitTransform,
-  applySetFieldValueTransform,
-  applyStepFieldValueTransform,
-  clearFieldSplitTransform,
-} from '../core/url/field-transforms.js';
+import { applyFieldDigitWidthSpecs } from '../core/url/field-widths.js';
 import { parseUrl } from '../core/url/parse-url.js';
 import { collectUrlFields } from '../core/url/tokenize-fields.js';
 import { ProjectionSessionController } from '../core/projection-session.js';
@@ -52,6 +45,7 @@ import {
 import { fetchDecodedBufferedImageSource, probeBufferedImageSource } from '../content/buffered-image-source.js';
 import { checkImageRequestPolicy } from '../content/image-request-policy.js';
 import { BufferedNavigationController } from './panel/buffered-navigation-controller.js';
+import { FieldEditorController } from './panel/field-editor-controller.js';
 import { NeighborPreloadController } from './panel/neighbor-preload-controller.js';
 import { ParsedFieldNavigationController } from './panel/parsed-field-navigation-controller.js';
 import { ParsedFieldStateSync } from './panel/parsed-field-state-sync.js';
@@ -72,21 +66,9 @@ import { isFocusablePanelControl } from './panel/export-download.js';
 import { urlReviewStatusClearScopeLabel } from './panel/record-export-helpers.js';
 import { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../content/panel-services.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
-import { isUnsupportedUrlEditorInput } from './components/url-editor-view.js';
 import { hostnameFromLocation } from './panel-position.js';
 
 const FINITE_CAPTURE_ERROR_MS = 2400;
-
-type FieldEditorEffect =
-  | { readonly kind: 'noop' }
-  | { readonly kind: 'state'; readonly state: PanelState; readonly saveParsedFieldState?: boolean; readonly render?: boolean }
-  | {
-      readonly kind: 'project';
-      readonly state?: PanelState;
-      readonly url: string;
-      readonly attemptedFieldIds: readonly string[];
-      readonly saveTemplateOnLoad: 'always' | 'when-unlocked';
-    };
 
 function addItems(items: readonly string[], nextItems: readonly string[]): readonly string[] {
   return [...items, ...nextItems.filter((item) => !items.includes(item))];
@@ -376,6 +358,22 @@ export class ImageTrailPanel {
     neighborPreload: () => this.neighborPreload,
     projectionApplication: () => this.projectionApplication,
     pageAdapter: () => this.pageAdapter,
+  });
+  private readonly fieldEditor: FieldEditorController = new FieldEditorController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    scheduleFiniteCaptureErrorReset: (updatedAt, mode) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode),
+    currentRawUrl: () => this.currentRawUrl(),
+    currentUrlModel: () => this.currentUrlModel(),
+    pruneInvalidFieldSplitSpecsForUrl: (state, url, options) => this.pruneInvalidFieldSplitSpecsForUrl(state, url, options),
+    applyPanelState: (nextState, options) => this.applyPanelState(nextState, options),
+    enqueueFieldInteraction: (run) => this.fieldStateSync.enqueueFieldInteraction(run),
+    saveFieldState: () => this.fieldStateSync.save(),
+    saveUrlTemplateFromCurrentFields: () => this.urlTemplateSettings.saveUrlTemplateFromCurrentFields(),
+    applySelectedUrl: (url, attemptedFieldIds, options) => this.projectionApplication.applySelectedUrl(url, attemptedFieldIds, options),
   });
   private bufferedNavigationToastTimer: number | null = null;
   private readonly layoutState: PanelLayoutState = {
@@ -713,9 +711,9 @@ export class ImageTrailPanel {
       openRecallDrawer: () => this.recallDrawer.openRecallDrawer(),
       loadRecallCandidates: (input) => this.recallDrawer.loadRecallCandidates(input),
       recallSelectedRecords: () => this.recallDrawer.recallSelectedRecords(),
-      enqueueFieldTransform: (action) => this.enqueueFieldTransform(action),
-      enqueueSelectedUrlApply: (url) => this.enqueueSelectedUrlApply(url),
-      rejectUrlEditorInput: () => this.rejectUrlEditorInput(),
+      enqueueFieldTransform: (action) => this.fieldEditor.enqueueFieldTransform(action),
+      enqueueSelectedUrlApply: (url) => this.fieldEditor.enqueueSelectedUrlApply(url),
+      rejectUrlEditorInput: () => this.fieldEditor.rejectUrlEditorInput(),
       captureImage: (url, sourceType, sourceRecordId) => this.capturedOriginals.captureImage(url, sourceType, sourceRecordId),
       deleteCapturedBlob: (recordId, blobId) => this.capturedOriginals.deleteCapturedBlob(recordId, blobId),
       cleanupOrphanedBlobs: () => this.capturedOriginals.cleanupOrphanedBlobs(),
@@ -803,24 +801,12 @@ export class ImageTrailPanel {
     return this.urlModelFromRawUrl(this.currentRawUrl());
   }
 
-  private currentUrlModelWithoutDigitWidthSpecs(): ParsedUrlModel {
-    return applyFieldSplitSpecs(parseUrl(this.currentRawUrl()), this.state.fieldSplitSpecs);
-  }
-
   private currentNavigationBaseModel(): ParsedUrlModel {
     return this.urlModelFromRawUrl(this.currentNavigationBaseRawUrl());
   }
 
   private urlModelFromRawUrl(url: string): ParsedUrlModel {
     return this.applyCurrentFieldDigitWidthSpecs(applyFieldSplitSpecs(parseUrl(url), this.state.fieldSplitSpecs));
-  }
-
-  private pruneInvalidFieldSplitSpecsForCurrentUrl(): boolean {
-    const nextState = this.pruneInvalidFieldSplitSpecsForUrl(this.state, this.currentRawUrl());
-    if (nextState === this.state) return false;
-    this.state = nextState;
-    void this.fieldStateSync.save();
-    return true;
   }
 
   private pruneInvalidFieldSplitSpecsForUrl(
@@ -880,151 +866,6 @@ export class ImageTrailPanel {
     if (options.saveParsedFieldState) void this.fieldStateSync.save();
     if (options.render) this.render();
     return true;
-  }
-
-  private enqueueFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): void {
-    this.enqueueFieldInteraction(() => this.applyFieldTransform(action));
-  }
-
-  private enqueueSelectedUrlApply(url: string): void {
-    this.enqueueFieldInteraction(() => this.applyUrlEditorUrl(url));
-  }
-
-  private enqueueFieldInteraction(run: () => Promise<void>): void {
-    this.fieldStateSync.enqueueFieldInteraction(run);
-  }
-
-  private async applyUrlEditorUrl(url: string): Promise<void> {
-    if (isUnsupportedUrlEditorInput(url)) {
-      this.rejectUrlEditorInput();
-      return;
-    }
-
-    await this.projectionApplication.applySelectedUrl(url, [], { pushVisibleUrl: true, resetFieldState: url !== this.currentRawUrl() });
-  }
-
-  private rejectUrlEditorInput(): void {
-    this.state = {
-      ...this.state,
-      status: 'error',
-      message: 'URL editor cannot use data URLs. Paste an http or https image URL.',
-      lastUpdatedAt: Date.now(),
-    };
-    this.scheduleFiniteCaptureErrorReset(this.state.lastUpdatedAt, 'status');
-    this.render();
-  }
-
-  private async applyFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): Promise<void> {
-    const prunedInvalidSplitSpecs = action.transformId !== 'split-clear' && this.pruneInvalidFieldSplitSpecsForCurrentUrl();
-    const effect = this.fieldEditorEffect(action);
-    if (effect.kind === 'noop') {
-      if (prunedInvalidSplitSpecs) this.render();
-      return;
-    }
-    await this.runFieldEditorEffect(effect);
-  }
-
-  private fieldEditorEffect(action: Extract<PanelAction, { readonly name: 'field/transform' }>): FieldEditorEffect {
-    if (action.transformId === 'digit-width') {
-      const baseModel = this.currentUrlModelWithoutDigitWidthSpecs();
-      if (!collectUrlFields(baseModel).some((field) => field.id === action.fieldId)) {
-        return { kind: 'noop' };
-      }
-      const transform = applyFieldDigitWidthTransform(baseModel, action.fieldId, action.value, this.state.fieldDigitWidthSpecs);
-      if (!transform.ok) {
-        return { kind: 'state', state: { ...this.state, status: 'error', message: transform.message, lastUpdatedAt: Date.now() } };
-      }
-
-      const fieldDigitWidthSpecsChanged = !fieldDigitWidthSpecsEqual(transform.fieldDigitWidthSpecs, this.state.fieldDigitWidthSpecs);
-      const state = {
-        ...this.state,
-        activeFieldId: action.fieldId,
-        fieldDigitWidthSpecs: transform.fieldDigitWidthSpecs,
-        lastUpdatedAt: Date.now(),
-      };
-
-      if (transform.url === this.currentRawUrl()) {
-        return this.state.activeFieldId === action.fieldId && !fieldDigitWidthSpecsChanged ? { kind: 'noop' } : { kind: 'state', state };
-      }
-
-      return {
-        kind: 'project',
-        state,
-        url: transform.url,
-        attemptedFieldIds: transform.attemptedFieldIds,
-        saveTemplateOnLoad: 'when-unlocked',
-      };
-    }
-
-    if (action.transformId === 'split-clear') {
-      const transform = clearFieldSplitTransform(action.fieldId);
-      if (!transform.ok) return { kind: 'noop' };
-      return { kind: 'state', state: reducePanelAction(this.state, action) };
-    }
-
-    let model: ParsedUrlModel;
-    try {
-      model = this.currentUrlModel();
-    } catch {
-      if (action.transformId !== 'split-apply') return { kind: 'noop' };
-      return {
-        kind: 'state',
-        state: {
-          ...this.state,
-          status: 'error',
-          message: 'Current URL could not be parsed for splitting.',
-          lastUpdatedAt: Date.now(),
-        },
-      };
-    }
-
-    const field = collectUrlFields(model).find((item) => item.id === action.fieldId);
-    if (!field) return { kind: 'noop' };
-
-    if (action.transformId === 'split-apply') {
-      const transform = applyFieldSplitTransform(field, action.pattern);
-      if (!transform.ok) {
-        return { kind: 'state', state: { ...this.state, status: 'error', message: transform.message, lastUpdatedAt: Date.now() } };
-      }
-
-      return { kind: 'state', state: applyFieldSplitSpecToState(this.state, transform.splitSpec) };
-    }
-
-    const transform =
-      action.transformId === 'set-value'
-        ? applySetFieldValueTransform(model, field, action.value)
-        : applyStepFieldValueTransform(model, field, action.delta);
-
-    const state =
-      action.transformId === 'step' ? reducePanelAction(this.state, { name: 'active-field/set', id: action.fieldId }) : this.state;
-
-    if (transform.url === this.currentRawUrl()) {
-      return state === this.state ? { kind: 'noop' } : { kind: 'state', state };
-    }
-
-    return {
-      kind: 'project',
-      state,
-      url: transform.url,
-      attemptedFieldIds: transform.attemptedFieldIds,
-      saveTemplateOnLoad: action.transformId === 'step' ? 'always' : 'when-unlocked',
-    };
-  }
-
-  private async runFieldEditorEffect(effect: FieldEditorEffect): Promise<boolean> {
-    if (effect.kind === 'noop') return false;
-    if (effect.kind === 'state') {
-      return this.applyPanelState(effect.state, {
-        saveParsedFieldState: effect.saveParsedFieldState ?? true,
-        render: effect.render ?? true,
-      });
-    }
-    if (effect.state) this.applyPanelState(effect.state);
-    const loaded = await this.projectionApplication.applySelectedUrl(effect.url, effect.attemptedFieldIds);
-    if (loaded && (effect.saveTemplateOnLoad === 'always' || this.state.unlockedFieldIds.length > 0)) {
-      await this.urlTemplateSettings.saveUrlTemplateFromCurrentFields();
-    }
-    return loaded;
   }
 
   private currentKnownImageFingerprint(): string | null {
