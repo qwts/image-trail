@@ -35,7 +35,14 @@ jobs:
       - name: Test
         run: npm run test:cov
 
+      # Render c8 totals vs. the floor and the coverage-map state into the run summary. Runs even
+      # when test:cov failed (dropped below the floor) — that is when the numbers matter most.
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: npm run coverage:summary
+
       - name: Upload coverage
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: coverage

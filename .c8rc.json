@@ -3,7 +3,7 @@
   "include": ["extension/src/**"],
   "exclude": ["tests/**", "**/*.test.ts", "**/*.stories.ts", "extension/src/test-fixtures/**", "extension/src/ui/stories/**"],
   "excludeAfterRemap": true,
-  "reporter": ["text", "lcov"],
+  "reporter": ["text", "lcov", "json-summary"],
   "reports-dir": "coverage",
   "check-coverage": true,
   "lines": 54,
