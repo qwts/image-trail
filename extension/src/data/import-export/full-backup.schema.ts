@@ -1,7 +1,6 @@
 import * as v from 'valibot';
 import { keyReferenceForKind } from '../crypto/types.schema.js';
-import { durableBookmarkPayloadSchema } from '../types.schema.js';
-import type { FullBackupBlobKeyBackup, FullBackupBookmarkEntry, FullBackupPayloadV1, PortableStoredBlobRecord } from './full-backup.js';
+import type { FullBackupBlobKeyBackup, FullBackupPayloadV1, PortableStoredBlobRecord } from './full-backup.js';
 
 const nonNegativeNumber = v.pipe(v.number(), v.finite(), v.minValue(0));
 
@@ -23,12 +22,6 @@ export const fullBackupBlobKeyBackupSchema = v.object({
   keyReference: v.pipe(v.string(), v.startsWith('blob:')),
   fileContent: v.string(),
 }) as v.GenericSchema<unknown, FullBackupBlobKeyBackup>;
-
-/** Documents the canonical bookmark-entry shape; entries are validated per-item downstream with skip semantics. */
-export const fullBackupBookmarkEntrySchema = v.object({
-  uuid: v.string(),
-  payload: durableBookmarkPayloadSchema,
-}) as v.GenericSchema<unknown, FullBackupBookmarkEntry>;
 
 /**
  * Envelope-level schema. `originalBlobs`/`blobKeyBackups` are validated element

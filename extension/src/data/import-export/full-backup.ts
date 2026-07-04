@@ -156,10 +156,6 @@ function storedBlobCiphertextBytes(record: StoredBlobRecord): Uint8Array {
   throw new Error('Encrypted original bytes were not available for backup.');
 }
 
-export function bookmarksFromFullBackupPayload(value: unknown): readonly FullBackupBookmarkEntry[] | null {
-  return fullBackupPayloadFromUnknown(value)?.bookmarks ?? null;
-}
-
 export type FullBackupParseResult =
   | { readonly ok: true; readonly payload: FullBackupPayloadV1 }
   | { readonly ok: false; readonly reason: string; readonly issues: readonly string[] };

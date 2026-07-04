@@ -10,35 +10,6 @@
  * modules exist in extension/src/core/url/.
  */
 
-export interface UrlToken {
-  kind: 'int' | 'hex' | 'text';
-  value: string;
-  width?: number;
-}
-
-export interface PathSegment {
-  type: 'segment' | 'sep';
-  raw: string;
-  tokens?: UrlToken[];
-}
-
-export interface QueryField {
-  type: 'query';
-  index: number;
-  hasEquals: boolean;
-  key: string;
-  valueTokens: UrlToken[];
-}
-
-export interface ParsedModel {
-  protocol: string;
-  host: string;
-  hash: string;
-  pathParts: PathSegment[];
-  queryPrefix: string;
-  queryFields: QueryField[];
-}
-
 export interface UrlFixture {
   /** Human-readable label for the test case. */
   label: string;

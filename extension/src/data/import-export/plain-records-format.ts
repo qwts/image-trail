@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import type { DurableBookmarkPayloadV1, DurableHistoryPayloadV1, RecoverableDataStatus } from '../types.js';
+import type { DurableBookmarkPayloadV1, DurableHistoryPayloadV1 } from '../types.js';
 
 export const PLAIN_RECORDS_FORMAT = 'image-trail.records';
 export const PLAIN_RECORDS_FORMAT_VERSION = 1;
@@ -15,12 +15,6 @@ export interface PlainRecordsExportEnvelope<TEntry = PlainHistoryExportEntry | P
   readonly createdAt: string;
   readonly recordCount: number;
   readonly entries: readonly TEntry[];
-}
-
-export interface PlainRecordsImportResult<TEntry> {
-  readonly status: RecoverableDataStatus;
-  readonly entries: readonly TEntry[];
-  readonly skipped: readonly string[];
 }
 
 export function serializePlainRecordsExport<TEntry>(input: {
