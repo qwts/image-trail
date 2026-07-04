@@ -15,8 +15,7 @@ const noDocumentElementAppend = {
 // queue by it is the footgun. Scope the ban to `.envelope.updatedAt` reached inside a `.sort(...)`
 // callback so legitimate preserve/backfill reads stay clean.
 const noEnvelopeUpdatedAtSort = {
-  selector:
-    'CallExpression[callee.property.name="sort"] MemberExpression[property.name="updatedAt"][object.property.name="envelope"]',
+  selector: 'CallExpression[callee.property.name="sort"] MemberExpression[property.name="updatedAt"][object.property.name="envelope"]',
   message: 'Queue order must use queueUpdatedAt, not envelope.updatedAt (AGENTS.md "Storage Rules").',
 };
 
@@ -125,9 +124,10 @@ export default tseslint.config(
   },
   ...Object.values(layerBoundaryRules),
   {
-    // Size tripwire for the decomposed panel collaborators so they can never regrow toward the
-    // 5k-line ImageTrailPanel god object they were extracted from (epic #265).
-    files: ['extension/src/ui/panel/**/*.ts'],
+    // Size tripwire for the panel orchestrator and its decomposed collaborators so they can never
+    // regrow toward the 5k-line ImageTrailPanel god object they were extracted from (epics #265,
+    // #290). #290 drove `panel.ts` itself under 800 lines, so the tripwire now covers it too.
+    files: ['extension/src/ui/panel.ts', 'extension/src/ui/panel/**/*.ts'],
     rules: {
       'max-lines': ['error', { max: 800, skipBlankLines: true, skipComments: true }],
     },
