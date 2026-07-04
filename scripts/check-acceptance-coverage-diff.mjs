@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 // Diff-aware forcing function for the acceptance coverage map (#343). When a PR changes user-facing
-// source (extension/src/ui or extension/src/content, excluding tests/stories) it must also touch
-// tests/e2e/coverage-map.json — i.e. account for the change's acceptance impact by adding/updating
-// an entry (automated, or manual/deferred with justification). A change with genuinely no
+// source — the .ts and .css under extension/src/ui or extension/src/content (CSS drives visible
+// selection/status states) — it must also touch tests/e2e/coverage-map.json, i.e. account for the
+// change's acceptance impact by adding/updating an entry (automated, or manual/deferred with
+// justification). Excluded as non-shipping: *.test.ts, *.stories.ts, and the Storybook-only
+// extension/src/ui/stories/ tree (excluded from the extension build). A change with genuinely no
 // acceptance impact opts out with a `no-acceptance-impact` token in the PR body or a label of the
 // same name.
 //
@@ -21,15 +23,22 @@ import { pathToFileURL } from 'node:url';
 
 const COVERAGE_MAP_PATH = 'tests/e2e/coverage-map.json';
 const ACK_TOKEN = 'no-acceptance-impact';
-const ACCEPTANCE_SOURCE = /^extension\/src\/(ui|content)\/.*\.ts$/u;
+const ACCEPTANCE_SOURCE = /^extension\/src\/(ui|content)\/.*\.(ts|css)$/u;
 const NON_FLOW = /(\.test\.ts|\.stories\.ts)$/u;
+// Storybook-only harness/fixtures live here and are excluded from the extension build (tsconfig
+// and .c8rc.json), so they never reach users — don't gate on them.
+const STORYBOOK_ONLY = /^extension\/src\/ui\/stories\//u;
+
+function isAcceptanceSource(file) {
+  return ACCEPTANCE_SOURCE.test(file) && !NON_FLOW.test(file) && !STORYBOOK_ONLY.test(file);
+}
 
 /**
  * Pure decision: given the PR's changed files and opt-out signals, decide whether the acceptance
  * coverage map has been accounted for. Returns { ok, acceptanceFiles, reason }.
  */
 export function evaluateAcceptanceCoverage({ changedFiles, body = '', labels = [] }) {
-  const acceptanceFiles = changedFiles.filter((file) => ACCEPTANCE_SOURCE.test(file) && !NON_FLOW.test(file));
+  const acceptanceFiles = changedFiles.filter(isAcceptanceSource);
   if (acceptanceFiles.length === 0) {
     return { ok: true, acceptanceFiles, reason: 'no acceptance-relevant source changed' };
   }
