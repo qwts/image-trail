@@ -20,8 +20,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # Single source of truth: CI uses the exact Node version pinned in .nvmrc, so a green
-          # local `npm run ci` matches CI. Bump .nvmrc to move both together.
+          # Single source of truth: CI and local resolve Node from the same .nvmrc, so versions
+          # never drift. `npm run ci` runs the non-browser gates (lint, format:check, test:cov,
+          # build); CI additionally runs the Playwright and Storybook suites. Bump .nvmrc to move
+          # both together.
           node-version-file: .nvmrc
           cache: npm
 
