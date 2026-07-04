@@ -114,7 +114,33 @@ async function ensureQueryFrameIncluded(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: /Exclude .*frame/u })).toBeVisible();
 }
 
-async function exportUrlReviewStatus(page: Page): Promise<{ readonly download: Download; readonly fileContent: string }> {
+type UrlReviewStatusRecord = {
+  readonly activeFieldId: string | null;
+  readonly fieldIds: readonly string[];
+  readonly hostname: string;
+  readonly pageUrl: string;
+  readonly status: string;
+  readonly sourceUrl: string;
+  readonly updatedAt: string;
+};
+
+function normalizeUrlReviewRecords(records: readonly UrlReviewStatusRecord[]): UrlReviewStatusRecord[] {
+  return records
+    .map((record) => ({
+      activeFieldId: record.activeFieldId,
+      fieldIds: [...record.fieldIds].sort(),
+      hostname: record.hostname,
+      pageUrl: record.pageUrl,
+      status: record.status,
+      sourceUrl: record.sourceUrl,
+      updatedAt: record.updatedAt,
+    }))
+    .sort((a, b) => a.status.localeCompare(b.status) || a.sourceUrl.localeCompare(b.sourceUrl));
+}
+
+async function exportUrlReviewStatus(
+  page: Page,
+): Promise<{ readonly download: Download; readonly fileContent: string; readonly records: UrlReviewStatusRecord[] }> {
   await openImportExport(page);
   const [download] = await Promise.all([
     page.waitForEvent('download'),
@@ -124,7 +150,8 @@ async function exportUrlReviewStatus(page: Page): Promise<{ readonly download: D
   expect(filePath).not.toBeNull();
   const fileContent = await readFile(filePath!, 'utf8');
   await expectPanelStatusMessage(page, /Exported \d+ URL review status record\(s\)\./u);
-  return { download, fileContent };
+  const exported = JSON.parse(fileContent) as { readonly records: readonly UrlReviewStatusRecord[] };
+  return { download, fileContent, records: normalizeUrlReviewRecords(exported.records) };
 }
 
 async function importUrlReviewStatus(page: Page, fileContent: string): Promise<void> {
@@ -215,10 +242,15 @@ test('URL review status export/import round trips without image-record side effe
   await page.getByLabel(/Edit .*frame/u).press('Enter');
   await expectPanelStatusMessage(page, /HTTP 404/u);
 
-  const { download, fileContent } = await exportUrlReviewStatus(page);
+  const recentCountBeforeExport = await page.locator('.image-trail-panel__history-item').count();
+  const { download, fileContent, records: exportedRecords } = await exportUrlReviewStatus(page);
   expect(download.suggestedFilename()).toMatch(/^image-trail-url-review-status-\d{4}-\d{2}-\d{2}\.json$/u);
-  const exported = JSON.parse(fileContent) as { readonly records: readonly { readonly status: string }[] };
-  expect(exported.records.map((record) => record.status).sort()).toEqual(['failed', 'passed']);
+  expect(exportedRecords.map((record) => record.status)).toEqual(['failed', 'passed']);
+  expect(exportedRecords.map((record) => record.sourceUrl).sort()).toEqual([
+    fixtureUrl('/dynamic-image.svg?frame=2'),
+    fixtureUrl('/dynamic-image.svg?frame=404'),
+  ]);
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(recentCountBeforeExport);
 
   await clearAllUrlReviewStatus(page);
   await deleteVisibleRecents(page);
@@ -245,4 +277,9 @@ test('URL review status export/import round trips without image-record side effe
     page.getByRole('button', { name: 'Export URL review status' }).click(),
   ]);
   expect(roundTripDownload.suggestedFilename()).toMatch(/^image-trail-url-review-status-\d{4}-\d{2}-\d{2}\.json$/u);
+  const roundTripPath = await roundTripDownload.path();
+  expect(roundTripPath).not.toBeNull();
+  const roundTripContent = await readFile(roundTripPath!, 'utf8');
+  const roundTripped = JSON.parse(roundTripContent) as { readonly records: readonly UrlReviewStatusRecord[] };
+  expect(normalizeUrlReviewRecords(roundTripped.records)).toEqual(exportedRecords);
 });
