@@ -19,10 +19,14 @@ const noEnvelopeUpdatedAtSort = {
   message: 'Queue order must use queueUpdatedAt, not envelope.updatedAt (AGENTS.md "Storage Rules").',
 };
 
-// Layer import boundaries: the import direction is core -> data -> background -> content -> ui, so
-// each layer may only reach modules to its left. `forbids` is everything to its right; the two
-// generated glob depths (`../x/*`, `../../x/*`) cover sibling and nested source files. Data-driven
-// so the rule lives in one place instead of four near-identical `no-restricted-imports` blocks.
+// Layer import boundaries. Each entry names a source layer and the layers it must not import,
+// generated into the four `no-restricted-imports` blocks that previously lived here by hand. These
+// are the specific restrictions enforced today, not a single linear order: `core` stays pure (no
+// app-layer imports); `data` builds on core only; `background` must not reach the DOM layers
+// (content/ui); `ui` routes through `content` controllers rather than importing `background`/`data`
+// directly. `content` is intentionally unrestricted — it is the page bridge that mounts the panel
+// (e.g. content-script imports ui/panel), so it has no entry. The two generated glob depths
+// (`../x/*`, `../../x/*`) cover sibling and nested source files.
 const layerImportBoundaries = [
   {
     layer: 'core',
