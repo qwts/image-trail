@@ -76,8 +76,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    # All e2e-report runs push to the same gh-pages branch, so serialize them across the whole
+    # workflow (not per PR) to avoid non-fast-forward push races between concurrent PRs.
     concurrency:
-      group: e2e-report-pr-${{ github.event.pull_request.number }}
+      group: e2e-report-gh-pages
       cancel-in-progress: false
     steps:
       - name: Download Playwright report
@@ -88,8 +90,25 @@ jobs:
           name: playwright-report
           path: playwright-report
 
-      - name: Deploy report to GitHub Pages
+      # Concurrency ordering within a group is not guaranteed, so an older run finishing late
+      # could overwrite the stable per-PR URL with stale results. Only deploy when this run's
+      # commit is still the PR's current head.
+      - name: Check this run is for the PR's current head
+        id: freshness
         if: ${{ steps.download.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" --jq .head.sha)
+          if [ "$current" = "${{ github.event.pull_request.head.sha }}" ]; then
+            echo "fresh=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fresh=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping deploy: this run is for ${{ github.event.pull_request.head.sha }} but the PR head is now $current."
+          fi
+
+      - name: Deploy report to GitHub Pages
+        if: ${{ steps.download.outcome == 'success' && steps.freshness.outputs.fresh == 'true' }}
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -98,7 +117,7 @@ jobs:
           commit_message: 'E2E report for PR #${{ github.event.pull_request.number }} (run ${{ github.run_id }})'
 
       - name: Link report in run summary
-        if: ${{ steps.download.outcome == 'success' }}
+        if: ${{ steps.download.outcome == 'success' && steps.freshness.outputs.fresh == 'true' }}
         run: |
           {
             echo "### Playwright E2E report"
