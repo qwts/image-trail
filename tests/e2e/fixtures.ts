@@ -189,14 +189,15 @@ export async function installDownloadRequestLog(serviceWorker: Worker): Promise<
     }
     globalScope.__imageTrailDownloadLog = [];
     globalScope.__imageTrailOriginalDownload = chrome.downloads.download.bind(chrome.downloads);
-    chrome.downloads.download = ((options: chrome.downloads.DownloadOptions) => {
+    chrome.downloads.download = ((...args: Parameters<typeof chrome.downloads.download>) => {
+      const [options] = args;
       globalScope.__imageTrailDownloadLog?.push({
         url: options.url,
         filename: options.filename,
         saveAs: options.saveAs,
         conflictAction: options.conflictAction,
       });
-      return globalScope.__imageTrailOriginalDownload!(options);
+      return globalScope.__imageTrailOriginalDownload!(...args);
     }) as typeof chrome.downloads.download;
   });
 }
