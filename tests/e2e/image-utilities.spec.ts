@@ -130,6 +130,13 @@ async function waitForDownloadRequests(serviceWorker: Worker, count: number) {
   return snapshot;
 }
 
+async function clearSelectedQueueRows(page: Page) {
+  const selectedQueueRows = page.locator('.image-trail-panel__bookmark-item.is-selected');
+  while ((await selectedQueueRows.count()) > 0) {
+    await selectedQueueRows.first().dispatchEvent('click', { bubbles: true, cancelable: true, ctrlKey: true });
+  }
+}
+
 test('exports the current host image and records shifted Save As metadata', async ({ page, serviceWorker }) => {
   await installDownloadRequestLog(serviceWorker);
   await openPanel(page, serviceWorker);
@@ -174,6 +181,8 @@ test('exports selected recents, queue rows, and Recall rows in UI order', async 
   await exportImages(page, serviceWorker);
   downloads = await waitForDownloadRequests(serviceWorker, 2);
   expect(downloads.map((download) => download.filename)).toEqual(['asset-two.svg', 'asset-three.svg']);
+  await clearSelectedQueueRows(page);
+  await expect(page.locator('.image-trail-panel__bookmark-item.is-selected')).toHaveCount(0);
 
   await setVisiblePins(page, '1', 1);
   await page.getByRole('button', { name: 'Recall' }).click();
@@ -181,7 +190,7 @@ test('exports selected recents, queue rows, and Recall rows in UI order', async 
   await page.getByRole('button', { name: 'Select all Recall' }).click();
   await exportImages(page, serviceWorker);
   downloads = await waitForDownloadRequests(serviceWorker, 1);
-  expect(downloads.map((download) => download.filename)).toEqual(['asset-two.svg']);
+  expect(downloads.map((download) => download.filename)).toEqual(['asset-three.svg']);
 
   await page.getByRole('dialog', { name: 'Recall' }).getByRole('button', { name: 'Close' }).click();
   await expect(page.getByRole('dialog', { name: 'Recall' })).toHaveCount(0);
