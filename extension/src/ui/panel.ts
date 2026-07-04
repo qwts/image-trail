@@ -40,11 +40,6 @@ import {
   clearFieldSplitTransform,
 } from '../core/url/field-transforms.js';
 import { parseUrl } from '../core/url/parse-url.js';
-import {
-  adjacentParsedFieldUrlCandidates,
-  type AdjacentParsedFieldUrlCandidate,
-  type NeighborPreloadDirection,
-} from '../core/url/preload-neighbors.js';
 import { collectUrlFields } from '../core/url/tokenize-fields.js';
 import { ProjectionSessionController } from '../core/projection-session.js';
 import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
@@ -57,7 +52,8 @@ import {
 import { fetchDecodedBufferedImageSource, probeBufferedImageSource } from '../content/buffered-image-source.js';
 import { checkImageRequestPolicy } from '../content/image-request-policy.js';
 import { BufferedNavigationController } from './panel/buffered-navigation-controller.js';
-import { NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT, NeighborPreloadController } from './panel/neighbor-preload-controller.js';
+import { NeighborPreloadController } from './panel/neighbor-preload-controller.js';
+import { ParsedFieldNavigationController } from './panel/parsed-field-navigation-controller.js';
 import { ParsedFieldStateSync } from './panel/parsed-field-state-sync.js';
 import { PanelMount } from './panel/panel-mount.js';
 import { PanelPositionController } from './panel/panel-position-controller.js';
@@ -68,11 +64,11 @@ import { RecallRestoreController } from './panel/recall-restore-controller.js';
 import { RecordLibraryController } from './panel/record-library-controller.js';
 import { CapturedOriginalsController } from './panel/captured-originals-controller.js';
 import { UrlTemplateSettingsController } from './panel/url-template-settings-controller.js';
-import { ProjectionApplicationController, toTargetState, urlReviewStatusForLoadResult } from './panel/projection-application-controller.js';
+import { ProjectionApplicationController, toTargetState } from './panel/projection-application-controller.js';
 import { dispatchPanelAction } from './panel/action-dispatch.js';
 import { buildPanelActionRegistry } from './panel/actions/registry.js';
 import type { PanelActionDeps } from './panel/actions/deps.js';
-import { delay, isFocusablePanelControl } from './panel/export-download.js';
+import { isFocusablePanelControl } from './panel/export-download.js';
 import { urlReviewStatusClearScopeLabel } from './panel/record-export-helpers.js';
 import { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../content/panel-services.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from './render.js';
@@ -91,17 +87,6 @@ type FieldEditorEffect =
       readonly attemptedFieldIds: readonly string[];
       readonly saveTemplateOnLoad: 'always' | 'when-unlocked';
     };
-
-const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
-
-// Hard cap on how many neighbor candidates a single navigation drain will probe past (skipping
-// failed/unavailable URLs) before giving up. Bounds the "skip to next good image" auto-advance so a
-// run of bad URLs can never hammer the network indefinitely, regardless of how the navigation base
-// moves between steps.
-const MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS = 50;
-
-type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
-type ParsedNavigationSource = 'manual' | 'slideshow' | 'retry';
 
 function addItems(items: readonly string[], nextItems: readonly string[]): readonly string[] {
   return [...items, ...nextItems.filter((item) => !items.includes(item))];
@@ -163,12 +148,12 @@ export class ImageTrailPanel {
     getLocalSettings: () => this.localSettings,
     currentNavigationBaseRawUrl: () => this.currentNavigationBaseRawUrl(),
     currentNavigationBaseModel: () => this.currentNavigationBaseModel(),
-    includedNavigationFields: (fields) => this.includedNavigationFields(fields),
+    includedNavigationFields: (fields) => this.parsedFieldNavigation.includedNavigationFields(fields),
     currentKnownImageFingerprint: () => this.currentKnownImageFingerprint(),
     hasSelectedTarget: () => Boolean(this.pageAdapter.getSnapshot().selected?.url),
     currentPageHref: () => window.location.href,
     applyLandedUrl: (nextUrl, displayUrl, sha256, attemptedFieldIds) =>
-      this.applyBufferedNavigationUrl(nextUrl, displayUrl, sha256, attemptedFieldIds),
+      this.parsedFieldNavigation.applyBufferedNavigationUrl(nextUrl, displayUrl, sha256, attemptedFieldIds),
     createPlaceholderImage: () => new Image(),
     scheduleRevoke: (blobUrl) => window.setTimeout(() => URL.revokeObjectURL(blobUrl), 500),
     onToast: (message) => this.showBufferedNavigationToast(message),
@@ -316,7 +301,7 @@ export class ImageTrailPanel {
       this.applyFieldLoadResult(state, attemptedFieldIds, nextFingerprint, previousFingerprint),
     pruneInvalidFieldSplitSpecsForUrl: (state, url, options) => this.pruneInvalidFieldSplitSpecsForUrl(state, url, options),
     parsedFieldRequestContextKey: (attemptedFieldIds, direction, runId) =>
-      this.parsedFieldRequestContextKey(attemptedFieldIds, direction, runId),
+      this.parsedFieldNavigation.parsedFieldRequestContextKey(attemptedFieldIds, direction, runId),
     currentSelectedUrl: () => this.currentSelectedUrl(),
     projectedSourceUrl: () => this.projectedSourceUrl(),
     findSelectedImage: (handleId) => this.findSelectedImage(handleId),
@@ -364,26 +349,35 @@ export class ImageTrailPanel {
     loadBookmarkPage: (offset, options) => this.loadBookmarkPage(offset, options),
     loadRecentHistory: (options) => this.loadRecentHistory(options),
     currentNavigationBaseModel: () => this.currentNavigationBaseModel(),
-    includedNavigationFields: (fields) => this.includedNavigationFields(fields),
+    includedNavigationFields: (fields) => this.parsedFieldNavigation.includedNavigationFields(fields),
     localSettingsStore: () => this.localSettingsStore,
     governor: () => this.governor,
     neighborPreload: () => this.neighborPreload,
     pageAdapter: () => this.pageAdapter,
   });
+  private readonly parsedFieldNavigation: ParsedFieldNavigationController = new ParsedFieldNavigationController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    loadGrabSettings: () => this.loadGrabSettings(),
+    saveFieldState: () => this.fieldStateSync.save(),
+    saveUrlTemplateFromCurrentFields: () => this.urlTemplateSettings.saveUrlTemplateFromCurrentFields(),
+    currentNavigationBaseModel: () => this.currentNavigationBaseModel(),
+    currentNavigationBaseRawUrl: () => this.currentNavigationBaseRawUrl(),
+    currentKnownImageFingerprint: () => this.currentKnownImageFingerprint(),
+    applyFieldLoadResult: (state, attemptedFieldIds, nextFingerprint, previousFingerprint) =>
+      this.applyFieldLoadResult(state, attemptedFieldIds, nextFingerprint, previousFingerprint),
+    saveUrlReviewStatus: (status, sourceUrl, fieldIds, reason) => this.saveUrlReviewStatus(status, sourceUrl, fieldIds, reason),
+    isNavigableQueryField: (field) => this.isNavigableQueryField(field),
+    governor: () => this.governor,
+    bufferedNav: () => this.bufferedNav,
+    neighborPreload: () => this.neighborPreload,
+    projectionApplication: () => this.projectionApplication,
+    pageAdapter: () => this.pageAdapter,
+  });
   private bufferedNavigationToastTimer: number | null = null;
-  private readonly queuedParsedNavigationDeltas: Record<ParsedNavigationSource, number> = {
-    manual: 0,
-    retry: 0,
-    slideshow: 0,
-  };
-  private parsedNavigationQueueRunning = false;
-  // URLs skipped (failed to load) during the CURRENT navigation drain session. Scoped to the drain,
-  // not to the navigation base — the base can advance to a just-failed URL between steps (e.g. the
-  // manual "next" button with no stable selected target sets draftUrl to the failed URL), so a
-  // base-keyed guard would reset every step and never bound the walk. Combined with
-  // MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS this guarantees a run of bad URLs terminates instead of
-  // hammering the network forever, while still letting navigation skip forward to the next good image.
-  private readonly navigationSessionSkippedUrls = new Set<string>();
   private readonly layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
     fieldsPanelBlockSize: null,
@@ -440,7 +434,7 @@ export class ImageTrailPanel {
     this.keyboard = new KeyboardRouter((action) => this.handleKeyAction(action));
 
     this.slideshow = new Slideshow(
-      (direction) => this.navigateBy(direction, 'slideshow'),
+      (direction) => this.parsedFieldNavigation.navigateBy(direction, 'slideshow'),
       (phase, count) => {
         this.state = setAutomationState(this.state, { slideshowPhase: phase, slideshowCount: count });
         this.render();
@@ -449,7 +443,7 @@ export class ImageTrailPanel {
 
     this.retry = new Retry404(
       () => this.tryReloadCurrent(),
-      (direction) => this.navigateBy(direction, 'retry'),
+      (direction) => this.parsedFieldNavigation.navigateBy(direction, 'retry'),
       (phase, attempt, max) => {
         this.state = setAutomationState(this.state, { retryPhase: phase, retriesUsed: attempt, retriesMax: max });
         this.render();
@@ -727,8 +721,8 @@ export class ImageTrailPanel {
       cleanupOrphanedBlobs: () => this.capturedOriginals.cleanupOrphanedBlobs(),
       previewRecord: (url, blobId, scrollAnchorId) => this.projectionApplication.previewRecord(url, blobId, scrollAnchorId),
       clearUrlReviewStatus: (scope) => this.clearUrlReviewStatus(scope),
-      navigateBy: (delta) => this.navigateBy(delta),
-      cancelQueuedSlideshowNavigation: () => this.cancelQueuedSlideshowNavigation(),
+      navigateBy: (delta) => this.parsedFieldNavigation.navigateBy(delta),
+      cancelQueuedSlideshowNavigation: () => this.parsedFieldNavigation.cancelQueuedSlideshowNavigation(),
     };
   }
 
@@ -1033,227 +1027,6 @@ export class ImageTrailPanel {
     return loaded;
   }
 
-  private navigateBy(delta: 1 | -1, source: ParsedNavigationSource = 'manual'): void {
-    this.queuedParsedNavigationDeltas[source] += delta;
-    this.normalizeQueuedParsedNavigationDeltas();
-    void this.drainQueuedParsedNavigation();
-  }
-
-  private cancelQueuedSlideshowNavigation(): void {
-    this.queuedParsedNavigationDeltas.slideshow = 0;
-  }
-
-  private async drainQueuedParsedNavigation(): Promise<void> {
-    if (this.parsedNavigationQueueRunning) return;
-    this.parsedNavigationQueueRunning = true;
-    this.navigationSessionSkippedUrls.clear();
-    try {
-      while (this.queuedParsedNavigationDelta() !== 0) {
-        const delta = this.queuedParsedNavigationDelta() > 0 ? 1 : -1;
-        const source = this.nextQueuedParsedNavigationSource(delta);
-        if (!source) break;
-        const result = await this.runQueuedParsedNavigationStep(delta);
-        if (result === 'blocked') {
-          this.clearQueuedParsedNavigation();
-          break;
-        }
-        if (result === 'wait') {
-          const delayMs = Math.max(PARSED_NAVIGATION_RETRY_MIN_DELAY_MS, this.governor.nextReadyDelayMs());
-          await delay(delayMs);
-          continue;
-        }
-        if (result === 'retry') {
-          await delay(PARSED_NAVIGATION_RETRY_MIN_DELAY_MS);
-          continue;
-        }
-        if (result === 'loaded' && Math.sign(this.queuedParsedNavigationDeltas[source]) === delta) {
-          this.queuedParsedNavigationDeltas[source] -= delta;
-          this.normalizeQueuedParsedNavigationDeltas();
-        }
-      }
-    } finally {
-      this.parsedNavigationQueueRunning = false;
-      if (this.queuedParsedNavigationDelta() !== 0) void this.drainQueuedParsedNavigation();
-    }
-  }
-
-  private queuedParsedNavigationDelta(): number {
-    return this.queuedParsedNavigationDeltas.manual + this.queuedParsedNavigationDeltas.retry + this.queuedParsedNavigationDeltas.slideshow;
-  }
-
-  private clearQueuedParsedNavigation(): void {
-    this.queuedParsedNavigationDeltas.manual = 0;
-    this.queuedParsedNavigationDeltas.retry = 0;
-    this.queuedParsedNavigationDeltas.slideshow = 0;
-  }
-
-  private normalizeQueuedParsedNavigationDeltas(): void {
-    if (this.queuedParsedNavigationDelta() === 0) this.clearQueuedParsedNavigation();
-  }
-
-  private nextQueuedParsedNavigationSource(delta: 1 | -1): ParsedNavigationSource | null {
-    const sources: readonly ParsedNavigationSource[] = ['manual', 'retry', 'slideshow'];
-    return sources.find((source) => Math.sign(this.queuedParsedNavigationDeltas[source]) === delta) ?? null;
-  }
-
-  private async runQueuedParsedNavigationStep(delta: 1 | -1): Promise<QueuedParsedNavigationStepResult> {
-    const snapshot = this.pageAdapter.getSnapshot();
-    if (!snapshot.selected?.url) return 'blocked';
-    const model = this.currentNavigationBaseModel();
-    const fields = collectUrlFields(model);
-    const navigableFields = this.includedNavigationFields(fields);
-    if (navigableFields.length === 0) return 'blocked';
-    if (this.neighborPreload.isActive) {
-      const buffered = await this.bufferedNav.step(model, navigableFields, delta);
-      if (buffered === 'loaded') {
-        void this.urlTemplateSettings.saveUrlTemplateFromCurrentFields();
-        this.state = setAutomationState(this.state, {
-          governorStatus: 'ready',
-          requestsInWindow: this.governor.requestsInWindow(),
-        });
-        this.render();
-        return 'loaded';
-      }
-      // buffered === 'blocked': the preloaded window held no landable image (failed/unknown
-      // neighbors). Fall through to the candidate scan below instead of stopping — it skips URLs
-      // already known to have failed (the buffered preload records them in the shared request-policy
-      // cache, so no re-probe) and advances to the next good image, giving preload-on navigation the
-      // same smooth skip-to-next-good behavior as the plain path.
-    }
-    const candidate = await this.nextParsedFieldNavigationCandidate(model, navigableFields, delta);
-    if (!candidate) {
-      const skipped = this.navigationSessionSkippedUrls.size;
-      this.state = {
-        ...this.state,
-        status: 'ready',
-        message:
-          skipped > 0
-            ? `Stopped after skipping ${skipped} unavailable image${skipped === 1 ? '' : 's'}; no loadable image found in that direction.`
-            : 'No non-failed parsed-field neighbor candidate found in that direction.',
-        lastUpdatedAt: Date.now(),
-      };
-      this.render();
-      return 'blocked';
-    }
-    const nextUrl = candidate.url;
-    const shouldStartNetworkRequest = !nextUrl.startsWith('data:image/');
-    if (shouldStartNetworkRequest) {
-      const request = this.governor.request(() => undefined);
-      if (request.status !== 'ok') {
-        this.state = setAutomationState(this.state, {
-          governorStatus: request.status,
-          requestsInWindow: this.governor.requestsInWindow(),
-        });
-        this.render();
-        return 'wait';
-      }
-    }
-
-    const loaded = await this.projectionApplication.applySelectedUrl(
-      nextUrl,
-      navigableFields.map((field) => field.id),
-      { preloadDirection: delta, quietFailure: true },
-    );
-    if (loaded) {
-      void this.urlTemplateSettings.saveUrlTemplateFromCurrentFields();
-      // Progress made — the next segment of this drain gets a fresh skip budget.
-      this.navigationSessionSkippedUrls.clear();
-    } else {
-      this.navigationSessionSkippedUrls.add(nextUrl);
-    }
-
-    this.state = setAutomationState(this.state, {
-      governorStatus: 'ready',
-      requestsInWindow: this.governor.requestsInWindow(),
-    });
-    this.render();
-    return loaded ? 'loaded' : 'retry';
-  }
-
-  private async nextParsedFieldNavigationCandidate(
-    model: ParsedUrlModel,
-    fields: readonly UrlField[],
-    direction: NeighborPreloadDirection,
-  ): Promise<AdjacentParsedFieldUrlCandidate | null> {
-    // Give up once this drain has skipped past the cap of failed candidates, so a run of bad URLs
-    // stops instead of chasing the frontier forever (the base can advance to each failed URL).
-    if (this.navigationSessionSkippedUrls.size >= MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS) return null;
-    const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT)
-      .filter((candidate) => candidate.direction === direction)
-      .sort((a, b) => a.distance - b.distance);
-    for (const candidate of candidates) {
-      if (this.navigationSessionSkippedUrls.has(candidate.url)) continue;
-      const policy = await checkImageRequestPolicy(candidate.url, {
-        intent: 'field-active-navigation',
-        contextKey: this.parsedFieldRequestContextKey(
-          fields.map((field) => field.id),
-          direction,
-          this.neighborPreload.runId,
-        ),
-      });
-      if (policy.status === 'skippable-failed') continue;
-      return candidate;
-    }
-    return null;
-  }
-
-  private async applyBufferedNavigationUrl(
-    nextUrl: string,
-    displayUrl: string,
-    sha256: string | null,
-    attemptedFieldIds: readonly string[],
-  ): Promise<boolean> {
-    const session = this.projectionApplication.beginProjectionSession('parsed-field-navigation', nextUrl);
-    if (!session) return false;
-    const baselineFingerprint = this.currentKnownImageFingerprint();
-    const reviewStatus = urlReviewStatusForLoadResult(sha256, baselineFingerprint);
-    const snapshot = this.pageAdapter.getSnapshot();
-    if (snapshot.selected) {
-      const nextSnapshot = this.projectionApplication.applyProjectionToSelectedImage(session, displayUrl);
-      if (!nextSnapshot) return false;
-      if (!this.projectionApplication.isCurrentProjectionSession(session)) return false;
-      this.state = { ...setTargetState(this.state, toTargetState(nextSnapshot)), draftUrl: null };
-    }
-    this.state = this.applyFieldLoadResult(this.state, attemptedFieldIds, sha256, baselineFingerprint);
-    if (reviewStatus === 'passed') void this.saveUrlReviewStatus(reviewStatus, nextUrl, attemptedFieldIds);
-    void this.fieldStateSync.save();
-    this.render();
-    void this.loadGrabSettings();
-    return true;
-  }
-
-  private mostRecentSuccessfulNavigableField(fields: readonly UrlField[]): UrlField | null {
-    for (let index = this.state.successfulFieldIds.length - 1; index >= 0; index -= 1) {
-      const field = fields.find((candidate) => candidate.id === this.state.successfulFieldIds[index]);
-      if (field && this.isNavigableQueryField(field)) return field;
-    }
-    return null;
-  }
-
-  private includedNavigationFields(fields: readonly UrlField[]): readonly UrlField[] {
-    const includedFields = fields.filter((field) => this.isUnlockedNavigableField(field));
-    if (includedFields.length === 0) return [];
-    const mostRecentSuccessfulIncluded = this.mostRecentSuccessfulNavigableField(includedFields);
-    return mostRecentSuccessfulIncluded ? [mostRecentSuccessfulIncluded] : includedFields;
-  }
-
-  private parsedFieldRequestContextKey(
-    attemptedFieldIds: readonly string[],
-    direction: NeighborPreloadDirection | undefined,
-    runId: number,
-  ): string {
-    return [
-      'parsed-field-navigation',
-      String(runId),
-      this.currentNavigationBaseRawUrl(),
-      attemptedFieldIds.join(','),
-      this.state.fieldSplitSpecs.map((spec) => `${spec.baseFieldId}:${spec.pattern}`).join('|'),
-      this.state.fieldDigitWidthSpecs.map((spec) => `${spec.fieldId}:${spec.width}:${spec.sourceWidth ?? ''}`).join('|'),
-      this.state.target.selectedHandleId ?? '',
-      direction === undefined ? '' : String(direction),
-    ].join('\n');
-  }
-
   private currentKnownImageFingerprint(): string | null {
     if (this.state.currentImageFingerprint) return this.state.currentImageFingerprint;
     const currentUrl = this.state.target.selectedUrl;
@@ -1285,10 +1058,6 @@ export class ImageTrailPanel {
       unlockedFieldIds: changed ? addItems(removeItems(state.unlockedFieldIds, attemptedFieldIds), autoUnlocked) : state.unlockedFieldIds,
       currentImageFingerprint: nextFingerprint ?? state.currentImageFingerprint,
     };
-  }
-
-  private isUnlockedNavigableField(field: UrlField): boolean {
-    return this.state.unlockedFieldIds.includes(field.id) && this.isNavigableQueryField(field);
   }
 
   private isAutoUnlockableField(fieldId: string): boolean {
