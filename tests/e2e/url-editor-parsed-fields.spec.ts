@@ -108,10 +108,23 @@ async function clearAllUrlReviewStatus(page: Page): Promise<void> {
   await expectPanelStatusMessage(page, /Cleared \d+ URL review status records? for all sites\./u);
 }
 
-async function ensureQueryFrameIncluded(page: Page): Promise<void> {
-  const include = page.getByRole('button', { name: /Include .*frame/u });
+async function ensureQueryFieldIncluded(page: Page, fieldName: string): Promise<void> {
+  const include = page.getByRole('button', { name: new RegExp(`Include .*${fieldName}`, 'u') });
   if ((await include.count()) > 0) await include.click();
-  await expect(page.getByRole('button', { name: /Exclude .*frame/u })).toBeVisible();
+  await expect(page.getByRole('button', { name: new RegExp(`Exclude .*${fieldName}`, 'u') })).toBeVisible();
+}
+
+async function ensureQueryFrameIncluded(page: Page): Promise<void> {
+  await ensureQueryFieldIncluded(page, 'frame');
+}
+
+// Serves any /dynamic-image.svg?... URL (multiple query params), rendering from the frame param.
+async function installMultiParamImageRoute(page: Page): Promise<void> {
+  await page.context().route(/\/dynamic-image\.svg\?/u, async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    const frame = `${params.get('set') ?? ''}-${params.get('frame') ?? ''}`;
+    await route.fulfill({ status: 200, contentType: 'image/svg+xml', body: dynamicSvg(frame.replace(/\D/gu, '') || '0') });
+  });
 }
 
 type UrlReviewStatusRecord = {
@@ -224,6 +237,40 @@ test('URL editor and parsed fields load, fail closed, navigate, learn templates,
   await closeSettingsIfOpen(page);
   await openParsedFields(page);
   await expect(page.getByLabel(/Edit .*frame/u)).toHaveValue('2');
+});
+
+test('Prev/Next steps every included field together into one combined URL', async ({ page, serviceWorker }) => {
+  // #263: prev/next (and arrows) are the automation tier — one press applies the same ±1 step to
+  // ALL included fields at once, the same result as clicking each field's +/- individually.
+  await installMultiParamImageRoute(page);
+  await openPanel(page, serviceWorker);
+  await setRequestThrottle(page, { minimumIntervalMs: '0', maxRequests: '100', windowMs: '1000' });
+  await closeSettingsIfOpen(page);
+
+  await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?set=3&frame=7'));
+  await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?set=3&frame=7/u);
+
+  // Discovery phase: step each field once with its "+" — a successful stepped load is what makes a
+  // field lockable (the Include control only renders for successful fields).
+  await openParsedFields(page);
+  await page.getByRole('button', { name: /Increment .*set/u }).click();
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?set=4&frame=7/u);
+  await page.getByRole('button', { name: /Increment .*frame/u }).click();
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?set=4&frame=8/u);
+
+  // Lock both fields into the trail.
+  await ensureQueryFieldIncluded(page, 'set');
+  await ensureQueryFieldIncluded(page, 'frame');
+
+  // One press steps BOTH included fields together in a single combined URL.
+  await openManualControls(page);
+  await page.getByRole('button', { name: '◀ Prev' }).click();
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?set=3&frame=7/u);
+  await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl('/dynamic-image.svg?set=3&frame=7'));
+
+  await page.getByRole('button', { name: 'Next ▶' }).click();
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?set=4&frame=8/u);
+  await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl('/dynamic-image.svg?set=4&frame=8'));
 });
 
 test('URL review status export/import round trips without image-record side effects', async ({ page, serviceWorker }) => {

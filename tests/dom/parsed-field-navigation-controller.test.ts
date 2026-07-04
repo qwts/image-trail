@@ -56,6 +56,7 @@ interface ApplyCall {
 }
 
 interface HarnessOptions {
+  readonly baseUrl?: string;
   readonly applyResult?: (url: string, callIndex: number) => boolean;
   readonly requestResult?: (callIndex: number) => 'ok' | 'throttled';
 }
@@ -90,8 +91,8 @@ function createHarness(options: HarnessOptions = {}): Harness {
     saveUrlTemplateFromCurrentFields: async () => {
       log.push('saveUrlTemplate');
     },
-    currentNavigationBaseModel: () => baseModel(),
-    currentNavigationBaseRawUrl: () => BASE_URL,
+    currentNavigationBaseModel: () => (options.baseUrl ? parseUrl(options.baseUrl) : baseModel()),
+    currentNavigationBaseRawUrl: () => options.baseUrl ?? BASE_URL,
     currentKnownImageFingerprint: () => null,
     applyFieldLoadResult: (input) => input,
     saveUrlReviewStatus: async () => {},
@@ -127,7 +128,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
       isCurrentProjectionSession: () => true,
     }),
     pageAdapter: () => ({
-      getSnapshot: () => makeSnapshot({ url: BASE_URL, handleId: 'handle-1' }),
+      getSnapshot: () => makeSnapshot({ url: options.baseUrl ?? BASE_URL, handleId: 'handle-1' }),
     }),
   };
 
@@ -162,6 +163,28 @@ test('the candidate scan applies the nearest neighbor as a quiet, direction-tagg
   assert.deepEqual(harness.applyCalls[0]!.attemptedFieldIds, [intFieldId()]);
   assert.deepEqual(harness.applyCalls[0]!.options, { preloadDirection: 1, quietFailure: true });
   assert.ok(harness.log.includes('saveUrlTemplate'));
+});
+
+test('one press steps every included field into a single combined URL (the image-trail walk)', async () => {
+  // Two navigable int query fields, both included; success history on only one of them must not
+  // shrink the step to that field (#263).
+  const twoFieldUrl = 'https://example.test/gallery?album=3&image=10';
+  const harness = createHarness({ baseUrl: twoFieldUrl });
+  const fieldIds = collectUrlFields(parseUrl(twoFieldUrl))
+    .filter(navigableQueryField)
+    .map((f) => f.id);
+  assert.equal(fieldIds.length, 2, 'expected two navigable int query fields');
+  harness.patchState({ unlockedFieldIds: fieldIds, successfulFieldIds: [fieldIds[1]!] });
+
+  harness.controller.navigateBy(1);
+  await until(() => harness.applyCalls.length >= 1);
+
+  assert.equal(harness.applyCalls.length, 1);
+  // Both fields advanced together in one combined URL — same result as clicking each field's "+".
+  assert.equal(harness.applyCalls[0]!.url, 'https://example.test/gallery?album=4&image=11');
+  assert.deepEqual([...harness.applyCalls[0]!.attemptedFieldIds].sort(), [...fieldIds].sort());
+  // Automation navigation stays quiet on failures; they land in URL history, not a red status.
+  assert.deepEqual(harness.applyCalls[0]!.options, { preloadDirection: 1, quietFailure: true });
 });
 
 test('a throttled governor makes the drain wait and retry instead of dropping the step', async () => {

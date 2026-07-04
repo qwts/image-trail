@@ -91,7 +91,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
-          "notes": "Covers URL editor apply, parsed numeric field increment/decrement, failed parsed-field loads without Recent rows, included-field Previous/Next navigation, learned template visibility, and close/reopen parsed-field restore for the same selected image context."
+          "notes": "Covers URL editor apply, parsed numeric field increment/decrement, failed parsed-field loads without Recent rows, included-field Previous/Next navigation (including stepping ALL included fields together into one combined URL, #263), learned template visibility, and close/reopen parsed-field restore for the same selected image context."
         }
       ]
     },

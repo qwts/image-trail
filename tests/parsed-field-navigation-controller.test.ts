@@ -74,6 +74,7 @@ interface ApplySelectedUrlCall {
 }
 
 interface HarnessOptions {
+  readonly baseUrl?: string;
   readonly snapshot?: TargetSelectionSnapshot;
   readonly neighborPreloadActive?: boolean;
   readonly bufferedStep?: (call: BufferedStepCall) => Promise<'loaded' | 'blocked'>;
@@ -114,8 +115,8 @@ function createHarness(options: HarnessOptions = {}): Harness {
     saveUrlTemplateFromCurrentFields: async () => {
       log.push('saveUrlTemplate');
     },
-    currentNavigationBaseModel: () => baseModel(),
-    currentNavigationBaseRawUrl: () => BASE_URL,
+    currentNavigationBaseModel: () => (options.baseUrl ? parseUrl(options.baseUrl) : baseModel()),
+    currentNavigationBaseRawUrl: () => options.baseUrl ?? BASE_URL,
     currentKnownImageFingerprint: options.currentKnownImageFingerprint ?? (() => null),
     applyFieldLoadResult: (input, attemptedFieldIds, nextFingerprint, previousFingerprint) => {
       log.push(`applyFieldLoadResult:${attemptedFieldIds.join(',')}:${nextFingerprint}:${previousFingerprint}`);
@@ -196,16 +197,40 @@ test('includedNavigationFields keeps only unlocked navigable fields and is empty
   );
 });
 
-test('includedNavigationFields collapses to the most recent successful navigable field', () => {
+test('includedNavigationFields keeps every included navigable field regardless of success history', () => {
   const harness = createHarness();
   const fields = [field('a'), field('b'), field('c')];
   harness.patchState({ unlockedFieldIds: ['a', 'b', 'c'], successfulFieldIds: ['a', 'c'] });
 
-  // Both 'a' and 'c' are successful; the most recent (last in successfulFieldIds) wins.
+  // Prev/next steps ALL included fields together — the "image trail" walk (#263). Success history
+  // must not collapse the set to a single field.
   assert.deepEqual(
     harness.controller.includedNavigationFields(fields).map((f) => f.id),
-    ['c'],
+    ['a', 'b', 'c'],
   );
+});
+
+test('navigateBy hands every included field to the buffered step so one press walks the whole trail', async () => {
+  // Two navigable int query fields, both included ("locked").
+  const twoFieldUrl = 'https://example.test/gallery?album=3&image=10';
+  const harness = createHarness({
+    baseUrl: twoFieldUrl,
+    snapshot: makeSnapshot({ url: twoFieldUrl, handleId: 'handle-1' }),
+    neighborPreloadActive: true,
+    bufferedStep: async () => 'loaded',
+  });
+  const fieldIds = collectUrlFields(parseUrl(twoFieldUrl))
+    .filter(navigableQueryField)
+    .map((f) => f.id);
+  assert.equal(fieldIds.length, 2, 'expected two navigable int query fields');
+  harness.patchState({ unlockedFieldIds: fieldIds, successfulFieldIds: [fieldIds[0]] });
+
+  harness.controller.navigateBy(1);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(harness.bufferedStepCalls.length, 1);
+  // Both included fields step together — not just the most recently successful one.
+  assert.deepEqual(harness.bufferedStepCalls[0].fields.map((f) => f.id).sort(), [...fieldIds].sort());
 });
 
 test('parsedFieldRequestContextKey composes the navigation cache key from base url, specs, handle and direction', () => {
