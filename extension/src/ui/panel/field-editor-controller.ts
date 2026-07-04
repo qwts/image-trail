@@ -32,7 +32,9 @@ export interface FieldEditorControllerDeps {
   getState(): PanelState;
   setState(state: PanelState): void;
   render(): void;
-  scheduleFiniteCaptureErrorReset(updatedAt: number, mode: 'status', durationMs?: number): void;
+  // `rejectUrlEditorInput` always uses the panel's default reset duration, so this seam intentionally
+  // omits the optional `durationMs` the panel method accepts — keep the contract to what's actually used.
+  scheduleFiniteCaptureErrorReset(updatedAt: number, mode: 'status'): void;
   // Shared URL-base / URL-model / split-prune helpers stay panel-owned (the parsed-field navigation
   // queue and the projection controller consume them too); the editor injects them.
   currentRawUrl(): string;
