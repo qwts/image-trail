@@ -126,6 +126,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
       log.push(`saveUrlReviewStatus:${status}:${sourceUrl}:${fieldIds.join(',')}`);
     },
     isNavigableQueryField: navigableQueryField,
+    neighborPreloadRadius: () => 3,
     governor: () => ({
       request: <T>(operation: () => T) =>
         options.requestStatus === 'throttled'

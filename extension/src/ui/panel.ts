@@ -343,6 +343,7 @@ export class ImageTrailPanel {
     saveUrlReviewStatus: (status, sourceUrl, fieldIds, reason) =>
       this.urlReviewStatus.saveUrlReviewStatus(status, sourceUrl, fieldIds, reason),
     isNavigableQueryField: (field) => this.isNavigableQueryField(field),
+    neighborPreloadRadius: () => this.localSettings.neighborPreloadRadius,
     governor: () => this.governor,
     bufferedNav: () => this.bufferedNav,
     neighborPreload: () => this.neighborPreload,

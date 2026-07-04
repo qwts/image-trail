@@ -59,6 +59,7 @@ interface HarnessOptions {
   readonly baseUrl?: string;
   readonly applyResult?: (url: string, callIndex: number) => boolean;
   readonly requestResult?: (callIndex: number) => 'ok' | 'throttled';
+  readonly neighborPreloadRadius?: number;
 }
 
 interface Harness {
@@ -97,6 +98,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
     applyFieldLoadResult: (input) => input,
     saveUrlReviewStatus: async () => {},
     isNavigableQueryField: navigableQueryField,
+    neighborPreloadRadius: () => options.neighborPreloadRadius ?? 3,
     governor: () => ({
       request: <T>(operation: () => T) => {
         requestCalls += 1;
@@ -213,19 +215,63 @@ test('a failed candidate is skipped and the drain advances to the next loadable 
   assert.ok(harness.log.includes('saveUrlTemplate'), 'the eventual load still saves the URL template');
 });
 
-test('a run of unloadable candidates terminates under the skip budget instead of hammering forever', async () => {
+// Poll until the bounded drain has parked itself (message set, no loads pending).
+async function untilStopped(harness: Harness, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!harness.getState().message.startsWith('Stopped after skipping') && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+test('a dead run short-circuits after a few consecutive misses instead of walking the scan window (#287)', async () => {
   const harness = createHarness({ applyResult: () => false });
   harness.patchState({ unlockedFieldIds: [intFieldId()] });
 
   harness.controller.navigateBy(1);
-  // Poll until the bounded drain has parked itself (message set, no loads pending).
-  for (let i = 0; i < 200 && !harness.getState().message.startsWith('Stopped after skipping'); i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
+  await untilStopped(harness);
 
-  assert.match(harness.getState().message, /^Stopped after skipping \d+ unavailable images?; no loadable image found in that direction\.$/);
-  // Bounded: every attempt is a distinct neighbor, capped by the fill-scan window (no infinite retry).
-  assert.ok(harness.applyCalls.length > 0 && harness.applyCalls.length <= 50, `bounded attempts, got ${harness.applyCalls.length}`);
+  // Every miss is a real remote request, so the drain gives up after the small consecutive-miss
+  // threshold (3 at the default preload radius), not the 50-candidate scan window.
+  assert.equal(harness.applyCalls.length, 3, `short-circuits after 3 consecutive misses, got ${harness.applyCalls.length}`);
+  assert.equal(harness.getState().message, 'Stopped after skipping 3 unavailable images; no loadable image found in that direction.');
   const urls = new Set(harness.applyCalls.map((call) => call.url));
   assert.equal(urls.size, harness.applyCalls.length, 'each attempt is a distinct URL');
+});
+
+test('a larger neighbor-preload radius raises the consecutive-miss threshold with it', async () => {
+  const harness = createHarness({ applyResult: () => false, neighborPreloadRadius: 8 });
+  harness.patchState({ unlockedFieldIds: [intFieldId()] });
+
+  harness.controller.navigateBy(1);
+  await untilStopped(harness);
+
+  // A user who asked for a deeper preload buffer has opted into probing that far.
+  assert.equal(harness.applyCalls.length, 8, `threshold follows the radius, got ${harness.applyCalls.length}`);
+});
+
+test('a successful load resets the consecutive-miss budget so sparse galleries keep navigating', async () => {
+  // Misses at call indexes 0,1 and 3,4; loads at 2 and 5 — two queued steps across two gaps of 2.
+  const harness = createHarness({ applyResult: (_url, callIndex) => callIndex % 3 === 2 });
+  harness.patchState({ unlockedFieldIds: [intFieldId()] });
+
+  harness.controller.navigateBy(1);
+  harness.controller.navigateBy(1);
+  await until(() => harness.applyCalls.filter((_, index) => index % 3 === 2).length >= 2, 5000);
+
+  assert.equal(harness.applyCalls.length, 6, 'both steps land after skipping 2-wide gaps');
+  assert.ok(!harness.getState().message.startsWith('Stopped after skipping'), 'no stop message — the drain finished by loading');
+});
+
+test('the outer safety net caps TOTAL skips per drain even when successes keep resetting the budget', async () => {
+  // Repeating miss,miss,load pattern: consecutive misses never reach 3, but total skips climb by 2
+  // per loaded image. A long queued burst must still park at the 50-skip outer net.
+  const harness = createHarness({ applyResult: (_url, callIndex) => callIndex % 3 === 2 });
+  harness.patchState({ unlockedFieldIds: [intFieldId()] });
+
+  for (let press = 0; press < 30; press += 1) harness.controller.navigateBy(1);
+  await untilStopped(harness, 15000);
+
+  assert.equal(harness.getState().message, 'Stopped after skipping 50 unavailable images; no loadable image found in that direction.');
+  const misses = harness.applyCalls.filter((_, index) => index % 3 !== 2).length;
+  assert.equal(misses, 50, `the drain stops at 50 total skips, got ${misses}`);
 });

@@ -17,10 +17,16 @@ import { toTargetState, urlReviewStatusForLoadResult, type ProjectionApplication
 
 const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
 
-// Hard cap on how many neighbor candidates a single navigation drain will probe past (skipping
-// failed/unavailable URLs) before giving up. Bounds the "skip to next good image" auto-advance so a
-// run of bad URLs can never hammer the network indefinitely, regardless of how the navigation base
-// moves between steps.
+// Primary stop for the "skip to next good image" auto-advance: a dead run ends after this many
+// CONSECUTIVE misses (or the user's neighbor-preload radius, whichever is larger — a user who asked
+// for a deeper buffer has opted into probing that far). Each miss is a real remote request, so a
+// keypress into a gap must give up after a few probes, not walk the whole scan window (#287).
+const MIN_CONSECUTIVE_MISS_SHORT_CIRCUIT = 3;
+
+// Outer safety net: the TOTAL number of skips a single navigation drain may accumulate, counted
+// across successes (unlike the consecutive budget, which resets on each loaded image). Bounds a
+// long queued burst over a sparse gallery so one drain can never hammer the network indefinitely,
+// regardless of how the navigation base moves between steps.
 const MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS = 50;
 
 type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
@@ -45,6 +51,8 @@ export interface ParsedFieldNavigationControllerDeps {
   ): PanelState;
   saveUrlReviewStatus(status: UrlReviewStatus, sourceUrl: string, fieldIds: readonly string[], reason?: string): Promise<void>;
   isNavigableQueryField(field: UrlField): boolean;
+  // The user's neighbor-preload radius; raises the consecutive-miss short-circuit above its floor.
+  neighborPreloadRadius(): number;
   // Collaborators are Pick-typed so test fakes compile despite the classes' private members.
   governor(): Pick<RequestGovernor, 'request' | 'nextReadyDelayMs' | 'requestsInWindow'>;
   bufferedNav(): Pick<BufferedNavigationController, 'step'>;
@@ -74,13 +82,15 @@ export class ParsedFieldNavigationController {
     slideshow: 0,
   };
   private parsedNavigationQueueRunning = false;
-  // URLs skipped (failed to load) during the CURRENT navigation drain session. Scoped to the drain,
-  // not to the navigation base — the base can advance to a just-failed URL between steps (e.g. the
-  // manual "next" button with no stable selected target sets draftUrl to the failed URL), so a
-  // base-keyed guard would reset every step and never bound the walk. Combined with
-  // MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS this guarantees a run of bad URLs terminates instead of
-  // hammering the network forever, while still letting navigation skip forward to the next good image.
+  // URLs skipped (failed to load) since the last successful load of the CURRENT navigation drain
+  // session — i.e. its size is the consecutive-miss count. Scoped to the drain, not to the
+  // navigation base — the base can advance to a just-failed URL between steps (e.g. the manual
+  // "next" button with no stable selected target sets draftUrl to the failed URL), so a base-keyed
+  // guard would reset every step and never bound the walk. The consecutive-miss short-circuit ends
+  // a dead run after a few probes, while still letting navigation skip forward to the next good image.
   private readonly navigationSessionSkippedUrls = new Set<string>();
+  // Total skips across the whole drain (never reset on success) — feeds the outer safety net.
+  private navigationSessionTotalSkips = 0;
 
   constructor(private readonly deps: ParsedFieldNavigationControllerDeps) {}
 
@@ -98,6 +108,7 @@ export class ParsedFieldNavigationController {
     if (this.parsedNavigationQueueRunning) return;
     this.parsedNavigationQueueRunning = true;
     this.navigationSessionSkippedUrls.clear();
+    this.navigationSessionTotalSkips = 0;
     try {
       while (this.queuedParsedNavigationDelta() !== 0) {
         const delta = this.queuedParsedNavigationDelta() > 0 ? 1 : -1;
@@ -176,7 +187,7 @@ export class ParsedFieldNavigationController {
     }
     const candidate = await this.nextParsedFieldNavigationCandidate(model, navigableFields, delta);
     if (!candidate) {
-      const skipped = this.navigationSessionSkippedUrls.size;
+      const skipped = this.navigationSessionTotalSkips;
       this.deps.setState({
         ...this.deps.getState(),
         status: 'ready',
@@ -212,10 +223,12 @@ export class ParsedFieldNavigationController {
     );
     if (loaded) {
       void this.deps.saveUrlTemplateFromCurrentFields();
-      // Progress made — the next segment of this drain gets a fresh skip budget.
+      // Progress made — the next segment of this drain gets a fresh consecutive-miss budget
+      // (the total-skip safety net keeps counting).
       this.navigationSessionSkippedUrls.clear();
     } else {
       this.navigationSessionSkippedUrls.add(nextUrl);
+      this.navigationSessionTotalSkips += 1;
     }
 
     this.deps.setState(
@@ -228,14 +241,21 @@ export class ParsedFieldNavigationController {
     return loaded ? 'loaded' : 'retry';
   }
 
+  private consecutiveMissShortCircuit(): number {
+    return Math.max(MIN_CONSECUTIVE_MISS_SHORT_CIRCUIT, this.deps.neighborPreloadRadius());
+  }
+
   private async nextParsedFieldNavigationCandidate(
     model: ParsedUrlModel,
     fields: readonly UrlField[],
     direction: NeighborPreloadDirection,
   ): Promise<AdjacentParsedFieldUrlCandidate | null> {
-    // Give up once this drain has skipped past the cap of failed candidates, so a run of bad URLs
-    // stops instead of chasing the frontier forever (the base can advance to each failed URL).
-    if (this.navigationSessionSkippedUrls.size >= MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS) return null;
+    // Primary stop: a dead run ends after a few consecutive misses instead of probing the whole
+    // scan window — each miss is a real remote request (#287). The outer total cap bounds the
+    // drain as a whole, so a run of bad URLs stops instead of chasing the frontier forever (the
+    // base can advance to each failed URL).
+    if (this.navigationSessionSkippedUrls.size >= this.consecutiveMissShortCircuit()) return null;
+    if (this.navigationSessionTotalSkips >= MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS) return null;
     const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT)
       .filter((candidate) => candidate.direction === direction)
       .sort((a, b) => a.distance - b.distance);
