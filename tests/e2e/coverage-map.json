@@ -220,9 +220,9 @@
           "paths": ["tests/data-crypto.test.ts", "tests/indexeddb-data.test.ts"]
         },
         {
-          "type": "deferred",
-          "issue": 309,
-          "notes": "Clean-context browser restore and plaintext-storage assertions."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/import-export-settings.spec.ts",
+          "notes": "Covers key backup export, wrong-password fail-closed import, key backup restore, and unlocking captured originals after key restore without exposing the encryption password or raw CryptoKey material in the backup JSON."
         }
       ]
     },
@@ -237,9 +237,9 @@
           "path": "extension/src/ui/components/import-export-view.stories.ts"
         },
         {
-          "type": "deferred",
-          "issue": 309,
-          "notes": "Browser-level settings reachability and persistence."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/import-export-settings.spec.ts",
+          "notes": "Covers Settings-only reachability for Encrypted originals, Image utilities, Import / Export, and pCloud, utility-section open/closed persistence across settings rerenders, hiding utilities when Settings closes, and history/bookmark export/import preview access."
         }
       ]
     },
@@ -258,9 +258,9 @@
           "reason": "Live pCloud OAuth and backup/restore proof requires user-controlled provider credentials."
         },
         {
-          "type": "deferred",
-          "issue": 309,
-          "notes": "Mocked browser pCloud boundary coverage without real secrets."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/import-export-settings.spec.ts",
+          "notes": "Covers mocked pCloud connect, token-hiding UI boundary, manual encrypted backup upload metadata, restore candidate listing, restore preview, and disconnect without real pCloud secrets."
         }
       ]
     },
@@ -275,9 +275,9 @@
           "reason": "Provider API spike remains an operator-run proof with local OAuth callback and cleanup controls."
         },
         {
-          "type": "deferred",
-          "issue": 309,
-          "notes": "Product UI boundary coverage is separate from live provider proof."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/import-export-settings.spec.ts",
+          "notes": "Covers product UI boundary behavior with mocked pCloud provider responses while live provider proof remains intentionally manual."
         }
       ]
     },
