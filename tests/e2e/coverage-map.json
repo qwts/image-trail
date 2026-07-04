@@ -142,7 +142,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/recents-queue-recall.spec.ts",
-          "notes": "Covers visible Recents being populated only by successful image loads and failed loads being excluded from the transient recent list."
+          "notes": "Covers visible Recents being populated only by successful image loads, failed loads being excluded from the transient recent list, Visible recents limiting, Keep hidden this session retention, and Show hidden recents reveal behavior."
         }
       ]
     },

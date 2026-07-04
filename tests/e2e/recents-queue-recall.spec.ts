@@ -35,10 +35,7 @@ async function openSettingsGroup(page: Page, name: string): Promise<void> {
 }
 
 async function openImageUtilities(page: Page): Promise<void> {
-  await showSettings(page);
-  const group = page.getByRole('heading', { name: 'Image utilities' }).locator('xpath=ancestor::details[1]');
-  if (!(await group.evaluate((element) => element.hasAttribute('open'))))
-    await page.getByRole('heading', { name: 'Image utilities' }).click();
+  await openSettingsGroup(page, 'Image utilities');
 }
 
 async function openQueueMenu(page: Page): Promise<void> {
@@ -56,6 +53,28 @@ async function setVisiblePins(page: Page, value: string, expectedVisibleCount?: 
   if (expectedVisibleCount !== undefined) {
     await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(expectedVisibleCount);
   }
+}
+
+async function setVisibleRecents(
+  page: Page,
+  input: { readonly limit: string; readonly overflow: 'Drop oldest' | 'Keep hidden this session'; readonly expectedVisibleCount?: number },
+): Promise<void> {
+  await openSettingsGroup(page, 'Display');
+  const recents = page
+    .getByRole('heading', { name: 'Recents' })
+    .locator('xpath=ancestor::div[contains(@class, "image-trail-panel__settings-templates")][1]');
+  await recents.locator('input[type="number"]').fill(input.limit);
+  await recents.locator('select').selectOption({ label: input.overflow });
+  await recents.locator('button', { hasText: 'Apply' }).click();
+  if (input.expectedVisibleCount !== undefined) {
+    await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(input.expectedVisibleCount);
+  }
+}
+
+async function showHiddenRecents(page: Page, expectedVisibleCount: number): Promise<void> {
+  await openSettingsGroup(page, 'Display');
+  await page.getByRole('button', { name: 'Show hidden recents' }).click();
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(expectedVisibleCount);
 }
 
 async function deleteVisibleRecents(page: Page): Promise<void> {
@@ -116,6 +135,18 @@ async function clearSelectedRecentRows(page: Page): Promise<void> {
   }
 }
 
+function escapedFilenameFromAssetPath(assetPath: string): string {
+  const filename = assetPath.split('/').pop();
+  if (!filename) throw new Error(`Could not resolve filename from ${assetPath}`);
+  return filename.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+}
+
+function filenameFromAssetPath(assetPath: string): string {
+  const filename = assetPath.split('/').pop();
+  if (!filename) throw new Error(`Could not resolve filename from ${assetPath}`);
+  return filename;
+}
+
 test('successful loads add Recents while failed loads do not', async ({ page, serviceWorker }) => {
   await openPanel(page, serviceWorker);
   await deleteVisibleRecents(page);
@@ -134,6 +165,24 @@ test('successful loads add Recents while failed loads do not', async ({ page, se
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(2);
 });
 
+test('Recents retention settings hide overflow rows without persisting them', async ({ page, serviceWorker }) => {
+  await openPanel(page, serviceWorker);
+  await deleteVisibleRecents(page);
+  await setVisibleRecents(page, { limit: '2', overflow: 'Keep hidden this session' });
+
+  for (const assetPath of [fixtureAssetPaths.assetOne, fixtureAssetPaths.assetTwo, fixtureAssetPaths.assetThree]) {
+    await applyUrlInEditor(page, fixtureUrl(assetPath));
+    await expectPanelStatusMessage(page, new RegExp(`Loaded .*${escapedFilenameFromAssetPath(assetPath)}`, 'u'));
+  }
+
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(2);
+  await expect(page.locator('.image-trail-panel__history-item').first()).toContainText('asset-three.svg');
+  await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' })).toHaveCount(0);
+
+  await showHiddenRecents(page, 3);
+  await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' })).toHaveCount(1);
+});
+
 test('pins persist across panel reopen and Recall recalls offscreen durable rows to the capped queue', async ({ page, serviceWorker }) => {
   test.setTimeout(60_000);
   await openPanel(page, serviceWorker);
@@ -143,8 +192,8 @@ test('pins persist across panel reopen and Recall recalls offscreen durable rows
 
   for (const assetPath of [fixtureAssetPaths.assetOne, fixtureAssetPaths.assetTwo, fixtureAssetPaths.assetThree]) {
     await applyUrlInEditor(page, fixtureUrl(assetPath));
-    await expectPanelStatusMessage(page, new RegExp(`Loaded .*${assetPath.split('/').pop()}`, 'u'));
-    await pinCurrent(page, assetPath.split('/').pop()!);
+    await expectPanelStatusMessage(page, new RegExp(`Loaded .*${escapedFilenameFromAssetPath(assetPath)}`, 'u'));
+    await pinCurrent(page, filenameFromAssetPath(assetPath));
   }
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(3);
 
@@ -187,7 +236,7 @@ test('select-all scopes export to visible Recents, visible queue rows, and loade
 
   for (const assetPath of [fixtureAssetPaths.assetOne, fixtureAssetPaths.assetTwo, fixtureAssetPaths.assetThree]) {
     await applyUrlInEditor(page, fixtureUrl(assetPath));
-    await expectPanelStatusMessage(page, new RegExp(`Loaded .*${assetPath.split('/').pop()}`, 'u'));
+    await expectPanelStatusMessage(page, new RegExp(`Loaded .*${escapedFilenameFromAssetPath(assetPath)}`, 'u'));
   }
 
   await page.getByRole('button', { name: 'Select all recents' }).click();
