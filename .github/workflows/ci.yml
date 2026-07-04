@@ -76,6 +76,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # actions: write lets the verify step rerun GitHub's managed "pages build and deployment"
+      # workflow when it flakes ("Deployment failed, try again later"), instead of leaving a red
+      # run for a human to retry.
+      actions: write
     # All e2e-report runs push to the same gh-pages branch, so serialize them across the whole
     # workflow (not per PR) to avoid non-fast-forward push races between concurrent PRs.
     concurrency:
@@ -116,8 +120,48 @@ jobs:
           destination_dir: reports/pr-${{ github.event.pull_request.number }}
           commit_message: 'E2E report for PR #${{ github.event.pull_request.number }} (run ${{ github.run_id }})'
 
-      - name: Link report in run summary
+      # The peaceiris step only pushes to gh-pages; GitHub's managed "pages build and deployment"
+      # workflow then publishes the branch, and it occasionally flakes server-side ("Deployment
+      # failed, try again later"). Verify the latest Pages build is `built` and includes the
+      # commit we just pushed; on a failed managed run, rerun it once (which also turns that red
+      # run green) and keep polling. Fails honestly if the site never picks up the deploy.
+      - name: Verify Pages picked up the deploy (self-heal once)
+        id: verify
         if: ${{ steps.download.outcome == 'success' && steps.freshness.outputs.fresh == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          ours=$(gh api "repos/$REPO/branches/gh-pages" --jq .commit.sha)
+          echo "Pushed gh-pages commit: $ours"
+          healed=false
+          for i in $(seq 1 30); do
+            status=$(gh api "repos/$REPO/pages/builds/latest" --jq .status || echo unknown)
+            built=$(gh api "repos/$REPO/pages/builds/latest" --jq .commit || echo "")
+            if [ "$status" = "built" ] && [ -n "$built" ]; then
+              # Success if the built commit is ours or a descendant of ours (another PR may have
+              # deployed after us; the branch history still contains our report directory).
+              relation=$(gh api "repos/$REPO/compare/$ours...$built" --jq .status 2>/dev/null || echo unrelated)
+              if [ "$built" = "$ours" ] || [ "$relation" = "ahead" ] || [ "$relation" = "identical" ]; then
+                echo "Pages build $built is live and includes our deploy."
+                exit 0
+              fi
+            fi
+            if [ "$healed" = "false" ]; then
+              failed_run=$(gh api "repos/$REPO/actions/runs?per_page=10" \
+                --jq "[.workflow_runs[] | select(.name == \"pages build and deployment\" and .conclusion == \"failure\" and .head_sha == \"$ours\")][0].id // empty")
+              if [ -n "$failed_run" ]; then
+                echo "Managed Pages deployment $failed_run failed; rerunning it once."
+                gh run rerun "$failed_run" --failed --repo "$REPO" && healed=true
+              fi
+            fi
+            sleep 10
+          done
+          echo "Pages never confirmed the deploy (last status: $status, commit: $built)." >&2
+          exit 1
+
+      - name: Link report in run summary
+        if: ${{ steps.verify.outcome == 'success' }}
         run: |
           {
             echo "### Playwright E2E report"
