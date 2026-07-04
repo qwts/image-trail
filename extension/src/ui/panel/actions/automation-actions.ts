@@ -85,5 +85,6 @@ export function buildAutomationActionEntries(deps: PanelActionDeps): ActionEntri
 function stopOppositeRunningSlideshow(deps: PanelActionDeps, direction: 1 | -1): void {
   const slideshow = deps.slideshow();
   if (slideshow.currentPhase !== 'running' || slideshow.currentDirection === direction) return;
+  deps.cancelQueuedSlideshowNavigation();
   slideshow.stop();
 }

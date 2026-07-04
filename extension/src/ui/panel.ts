@@ -101,6 +101,7 @@ const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
 const MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS = 50;
 
 type QueuedParsedNavigationStepResult = 'blocked' | 'loaded' | 'retry' | 'wait';
+type ParsedNavigationSource = 'manual' | 'slideshow' | 'retry';
 
 function addItems(items: readonly string[], nextItems: readonly string[]): readonly string[] {
   return [...items, ...nextItems.filter((item) => !items.includes(item))];
@@ -370,7 +371,11 @@ export class ImageTrailPanel {
     pageAdapter: () => this.pageAdapter,
   });
   private bufferedNavigationToastTimer: number | null = null;
-  private queuedParsedNavigationDelta = 0;
+  private readonly queuedParsedNavigationDeltas: Record<ParsedNavigationSource, number> = {
+    manual: 0,
+    retry: 0,
+    slideshow: 0,
+  };
   private parsedNavigationQueueRunning = false;
   // URLs skipped (failed to load) during the CURRENT navigation drain session. Scoped to the drain,
   // not to the navigation base — the base can advance to a just-failed URL between steps (e.g. the
@@ -435,7 +440,7 @@ export class ImageTrailPanel {
     this.keyboard = new KeyboardRouter((action) => this.handleKeyAction(action));
 
     this.slideshow = new Slideshow(
-      (direction) => this.navigateBy(direction),
+      (direction) => this.navigateBy(direction, 'slideshow'),
       (phase, count) => {
         this.state = setAutomationState(this.state, { slideshowPhase: phase, slideshowCount: count });
         this.render();
@@ -444,7 +449,7 @@ export class ImageTrailPanel {
 
     this.retry = new Retry404(
       () => this.tryReloadCurrent(),
-      (direction) => this.navigateBy(direction),
+      (direction) => this.navigateBy(direction, 'retry'),
       (phase, attempt, max) => {
         this.state = setAutomationState(this.state, { retryPhase: phase, retriesUsed: attempt, retriesMax: max });
         this.render();
@@ -723,6 +728,7 @@ export class ImageTrailPanel {
       previewRecord: (url, blobId, scrollAnchorId) => this.projectionApplication.previewRecord(url, blobId, scrollAnchorId),
       clearUrlReviewStatus: (scope) => this.clearUrlReviewStatus(scope),
       navigateBy: (delta) => this.navigateBy(delta),
+      cancelQueuedSlideshowNavigation: () => this.cancelQueuedSlideshowNavigation(),
     };
   }
 
@@ -1027,9 +1033,14 @@ export class ImageTrailPanel {
     return loaded;
   }
 
-  private navigateBy(delta: 1 | -1): void {
-    this.queuedParsedNavigationDelta += delta;
+  private navigateBy(delta: 1 | -1, source: ParsedNavigationSource = 'manual'): void {
+    this.queuedParsedNavigationDeltas[source] += delta;
+    this.normalizeQueuedParsedNavigationDeltas();
     void this.drainQueuedParsedNavigation();
+  }
+
+  private cancelQueuedSlideshowNavigation(): void {
+    this.queuedParsedNavigationDeltas.slideshow = 0;
   }
 
   private async drainQueuedParsedNavigation(): Promise<void> {
@@ -1037,11 +1048,13 @@ export class ImageTrailPanel {
     this.parsedNavigationQueueRunning = true;
     this.navigationSessionSkippedUrls.clear();
     try {
-      while (this.queuedParsedNavigationDelta !== 0) {
-        const delta = this.queuedParsedNavigationDelta > 0 ? 1 : -1;
+      while (this.queuedParsedNavigationDelta() !== 0) {
+        const delta = this.queuedParsedNavigationDelta() > 0 ? 1 : -1;
+        const source = this.nextQueuedParsedNavigationSource(delta);
+        if (!source) break;
         const result = await this.runQueuedParsedNavigationStep(delta);
         if (result === 'blocked') {
-          this.queuedParsedNavigationDelta = 0;
+          this.clearQueuedParsedNavigation();
           break;
         }
         if (result === 'wait') {
@@ -1053,12 +1066,34 @@ export class ImageTrailPanel {
           await delay(PARSED_NAVIGATION_RETRY_MIN_DELAY_MS);
           continue;
         }
-        if (result === 'loaded') this.queuedParsedNavigationDelta -= delta;
+        if (result === 'loaded' && Math.sign(this.queuedParsedNavigationDeltas[source]) === delta) {
+          this.queuedParsedNavigationDeltas[source] -= delta;
+          this.normalizeQueuedParsedNavigationDeltas();
+        }
       }
     } finally {
       this.parsedNavigationQueueRunning = false;
-      if (this.queuedParsedNavigationDelta !== 0) void this.drainQueuedParsedNavigation();
+      if (this.queuedParsedNavigationDelta() !== 0) void this.drainQueuedParsedNavigation();
     }
+  }
+
+  private queuedParsedNavigationDelta(): number {
+    return this.queuedParsedNavigationDeltas.manual + this.queuedParsedNavigationDeltas.retry + this.queuedParsedNavigationDeltas.slideshow;
+  }
+
+  private clearQueuedParsedNavigation(): void {
+    this.queuedParsedNavigationDeltas.manual = 0;
+    this.queuedParsedNavigationDeltas.retry = 0;
+    this.queuedParsedNavigationDeltas.slideshow = 0;
+  }
+
+  private normalizeQueuedParsedNavigationDeltas(): void {
+    if (this.queuedParsedNavigationDelta() === 0) this.clearQueuedParsedNavigation();
+  }
+
+  private nextQueuedParsedNavigationSource(delta: 1 | -1): ParsedNavigationSource | null {
+    const sources: readonly ParsedNavigationSource[] = ['manual', 'retry', 'slideshow'];
+    return sources.find((source) => Math.sign(this.queuedParsedNavigationDeltas[source]) === delta) ?? null;
   }
 
   private async runQueuedParsedNavigationStep(delta: 1 | -1): Promise<QueuedParsedNavigationStepResult> {

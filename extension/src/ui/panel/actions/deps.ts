@@ -89,4 +89,5 @@ export interface PanelActionDeps {
   previewRecord(url: string, blobId?: string, scrollAnchorId?: string): Promise<void>;
   clearUrlReviewStatus(scope: 'hostname' | 'page' | 'source' | 'all'): Promise<void>;
   navigateBy(delta: 1 | -1): void;
+  cancelQueuedSlideshowNavigation(): void;
 }

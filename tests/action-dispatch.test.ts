@@ -37,7 +37,13 @@ interface Harness {
 // `reduce` runs the REAL reducer over a state box so guard branches (secondary-controls no-op,
 // recall/open toggle, recall/load-more gating) behave as they do in the panel. Collaborator stubs
 // implement only the methods the handlers touch and are cast, matching the controller-test style.
-function createHarness(options: { readonly applyPanelStateResult?: boolean } = {}): Harness {
+function createHarness(
+  options: {
+    readonly applyPanelStateResult?: boolean;
+    readonly slideshowPhase?: Slideshow['currentPhase'];
+    readonly slideshowDirection?: 1 | -1;
+  } = {},
+): Harness {
   let state = createInitialPanelState(0);
   const log: string[] = [];
   const record = (name: string) => {
@@ -137,6 +143,12 @@ function createHarness(options: { readonly applyPanelStateResult?: boolean } = {
     keyboard: () => ({ enable: () => record('keyboard.enable') }) as unknown as KeyboardRouter,
     slideshow: () =>
       ({
+        get currentPhase() {
+          return options.slideshowPhase ?? 'idle';
+        },
+        get currentDirection() {
+          return options.slideshowDirection ?? 1;
+        },
         start: () => record('slideshow.start'),
         stop: () => record('slideshow.stop'),
         pause: () => record('slideshow.pause'),
@@ -184,6 +196,7 @@ function createHarness(options: { readonly applyPanelStateResult?: boolean } = {
     previewRecord: () => recordAsync('previewRecord'),
     clearUrlReviewStatus: (scope) => recordAsync(`clearUrlReviewStatus:${scope}`),
     navigateBy: (delta) => record(`navigateBy:${delta}`),
+    cancelQueuedSlideshowNavigation: () => record('cancelQueuedSlideshowNavigation'),
   };
   return {
     deps,
@@ -451,6 +464,20 @@ test('stop-all halts the collaborators before reducing, unlike slideshow-start',
   harness.log.length = 0;
   dispatchPanelAction(registry, { name: 'slideshow-start' }, () => assert.fail('unexpected fallback'));
   assert.deepEqual(harness.log, ['reduce', 'slideshow.start', 'render']);
+});
+
+test('opposite manual navigation cancels queued slideshow navigation before enqueueing the manual step', () => {
+  const harness = createHarness({ slideshowPhase: 'running', slideshowDirection: 1 });
+  const registry = buildPanelActionRegistry(harness.deps);
+  dispatchPanelAction(registry, { name: 'navigate-previous' }, () => assert.fail('unexpected fallback'));
+  assert.deepEqual(harness.log, ['cancelQueuedSlideshowNavigation', 'slideshow.stop', 'navigateBy:-1']);
+});
+
+test('same-direction manual navigation leaves the running slideshow queue intact', () => {
+  const harness = createHarness({ slideshowPhase: 'running', slideshowDirection: 1 });
+  const registry = buildPanelActionRegistry(harness.deps);
+  dispatchPanelAction(registry, { name: 'navigate-next' }, () => assert.fail('unexpected fallback'));
+  assert.deepEqual(harness.log, ['navigateBy:1']);
 });
 
 test('field-unlock/toggle stops after a rejected state application', () => {

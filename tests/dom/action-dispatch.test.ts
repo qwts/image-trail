@@ -112,6 +112,7 @@ function createHarness(): Harness {
     previewRecord: noopAsync,
     clearUrlReviewStatus: noopAsync,
     navigateBy: noop,
+    cancelQueuedSlideshowNavigation: noop,
   };
   return { deps, log, panelMount };
 }
