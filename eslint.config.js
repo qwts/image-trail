@@ -112,8 +112,9 @@ export default tseslint.config(
   {
     // Size tripwire for the panel orchestrator and its decomposed collaborators so they can never
     // regrow toward the 5k-line ImageTrailPanel god object they were extracted from (epics #265,
-    // #290). #290 drove `panel.ts` itself under 800 lines, so the tripwire now covers it too. This
-    // escalates the global `max-lines` warning above to an error for these already-split files.
+    // #290). #290 drove `panel.ts` under this rule's 800-line budget (which skips blank lines and
+    // comments, so ~786 counted vs 837 physical), so the tripwire now covers it too. This escalates
+    // the global `max-lines` warning above to an error for these already-split files.
     files: ['extension/src/ui/panel.ts', 'extension/src/ui/panel/**/*.ts'],
     rules: {
       'max-lines': ['error', { max: 800, skipBlankLines: true, skipComments: true }],
