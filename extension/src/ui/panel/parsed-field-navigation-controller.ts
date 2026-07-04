@@ -281,20 +281,13 @@ export class ParsedFieldNavigationController {
     return true;
   }
 
-  private mostRecentSuccessfulNavigableField(fields: readonly UrlField[]): UrlField | null {
-    const state = this.deps.getState();
-    for (let index = state.successfulFieldIds.length - 1; index >= 0; index -= 1) {
-      const field = fields.find((candidate) => candidate.id === state.successfulFieldIds[index]);
-      if (field && this.deps.isNavigableQueryField(field)) return field;
-    }
-    return null;
-  }
-
+  // Every included ("locked") navigable field participates in prev/next/arrow navigation: one press
+  // steps them ALL together into a single combined URL, the same result as clicking each field's
+  // +/- once (#263). Non-navigable included fields (e.g. text tokens) simply don't participate.
+  // Candidate generation and preload receive the same set, so the buffered window warms the
+  // combined trail rather than a single field's neighbors.
   includedNavigationFields(fields: readonly UrlField[]): readonly UrlField[] {
-    const includedFields = fields.filter((field) => this.isUnlockedNavigableField(field));
-    if (includedFields.length === 0) return [];
-    const mostRecentSuccessfulIncluded = this.mostRecentSuccessfulNavigableField(includedFields);
-    return mostRecentSuccessfulIncluded ? [mostRecentSuccessfulIncluded] : includedFields;
+    return fields.filter((field) => this.isUnlockedNavigableField(field));
   }
 
   parsedFieldRequestContextKey(
