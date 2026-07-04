@@ -11,6 +11,13 @@ interface ExtensionFixtures {
   page: Page;
 }
 
+export interface ExtensionDownloadRequest {
+  readonly url: string;
+  readonly filename?: string;
+  readonly saveAs?: boolean;
+  readonly conflictAction?: string;
+}
+
 interface ExtensionWorkerFixtures {
   extensionContext: BrowserContext;
 }
@@ -168,6 +175,44 @@ export function panelStatus(page: Page) {
 
 export async function expectPanelStatusMessage(page: Page, message: string | RegExp): Promise<void> {
   await expect(panelStatus(page)).toHaveAttribute('title', message);
+}
+
+export async function installDownloadRequestLog(serviceWorker: Worker): Promise<void> {
+  await serviceWorker.evaluate(() => {
+    const globalScope = globalThis as typeof globalThis & {
+      __imageTrailDownloadLog?: unknown[];
+      __imageTrailOriginalDownload?: typeof chrome.downloads.download;
+    };
+    if (globalScope.__imageTrailOriginalDownload) {
+      globalScope.__imageTrailDownloadLog = [];
+      return;
+    }
+    globalScope.__imageTrailDownloadLog = [];
+    globalScope.__imageTrailOriginalDownload = chrome.downloads.download.bind(chrome.downloads);
+    chrome.downloads.download = ((options: chrome.downloads.DownloadOptions) => {
+      globalScope.__imageTrailDownloadLog?.push({
+        url: options.url,
+        filename: options.filename,
+        saveAs: options.saveAs,
+        conflictAction: options.conflictAction,
+      });
+      return globalScope.__imageTrailOriginalDownload!(options);
+    }) as typeof chrome.downloads.download;
+  });
+}
+
+export async function clearDownloadRequestLog(serviceWorker: Worker): Promise<void> {
+  await serviceWorker.evaluate(() => {
+    const globalScope = globalThis as typeof globalThis & { __imageTrailDownloadLog?: unknown[] };
+    globalScope.__imageTrailDownloadLog = [];
+  });
+}
+
+export async function readDownloadRequestLog(serviceWorker: Worker): Promise<ExtensionDownloadRequest[]> {
+  return serviceWorker.evaluate(() => {
+    const globalScope = globalThis as typeof globalThis & { __imageTrailDownloadLog?: unknown[] };
+    return (globalScope.__imageTrailDownloadLog ?? []) as ExtensionDownloadRequest[];
+  });
 }
 
 export async function applyUrlInEditor(page: Page, url: string): Promise<void> {

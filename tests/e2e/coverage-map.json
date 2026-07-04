@@ -157,14 +157,9 @@
           "path": "tests/panel-state.test.ts"
         },
         {
-          "type": "deferred",
-          "issue": 307,
-          "notes": "Selection ordering across Recents, visible queue, and Recall."
-        },
-        {
-          "type": "deferred",
-          "issue": 308,
-          "notes": "Browser download metadata and export behavior."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/image-utilities.spec.ts",
+          "notes": "Covers current selected host-image export fallback, shifted Save As metadata, and selected Recents, visible queue, and Recall image export order."
         }
       ]
     },
@@ -179,9 +174,9 @@
           "paths": ["tests/indexeddb-data.test.ts", "tests/encrypted-blobs.test.ts"]
         },
         {
-          "type": "deferred",
-          "issue": 308,
-          "notes": "Browser encrypted image export/import and failure behavior."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/image-utilities.spec.ts",
+          "notes": "Covers encrypted image JSON export, clean imported-image restore after unlock, and wrong-key or wrong-import-type failures without adding plaintext rows."
         }
       ]
     },
@@ -196,9 +191,9 @@
           "paths": ["tests/indexeddb-data.test.ts", "tests/encrypted-blobs.test.ts"]
         },
         {
-          "type": "deferred",
-          "issue": 308,
-          "notes": "Browser capture indicator, remote-loss, and preferred-original export assertions."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/image-utilities.spec.ts",
+          "notes": "Covers encrypted original setup, capture from a queue row, stored-original indicator, and selected-record export preferring stored original bytes when unlocked."
         }
       ]
     },
@@ -211,11 +206,6 @@
         {
           "type": "unit-dom",
           "paths": ["tests/encrypted-blobs.test.ts", "tests/image-request-manager.test.ts"]
-        },
-        {
-          "type": "deferred",
-          "issue": 308,
-          "notes": "Browser-level oversized original capture/export boundaries."
         }
       ]
     },
