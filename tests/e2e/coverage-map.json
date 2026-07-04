@@ -123,9 +123,9 @@
           "paths": ["tests/invariants.test.ts", "tests/panel-state.test.ts", "tests/dom/recall-restore-controller.test.ts"]
         },
         {
-          "type": "deferred",
-          "issue": 307,
-          "notes": "Browser-level Recents, queue, Recall, selection, and clear behavior."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/recents-queue-recall.spec.ts",
+          "notes": "Covers successful image loads adding Recents, failed loads not adding Recents, durable pins persisting across panel close/reopen, Recall loading offscreen queue rows, recalled rows moving to the capped visible queue, Select all scoped to visible Recents/queue/Recall rows, and Clear results hiding Recall rows without deleting durable queue records."
         }
       ]
     },
@@ -140,9 +140,9 @@
           "paths": ["tests/invariants.test.ts", "tests/panel-state.test.ts"]
         },
         {
-          "type": "deferred",
-          "issue": 307,
-          "notes": "Browser-level transient Recents assertions."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/recents-queue-recall.spec.ts",
+          "notes": "Covers visible Recents being populated only by successful image loads and failed loads being excluded from the transient recent list."
         }
       ]
     },
