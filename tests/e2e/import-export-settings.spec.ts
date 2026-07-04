@@ -1,6 +1,9 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import type { Download, Page, Worker } from '@playwright/test';
+import { chromium, type BrowserContext, type Download, type Page, type Worker } from '@playwright/test';
 
 import {
   applyUrlInEditor,
@@ -20,6 +23,46 @@ const primaryImage = '#fixture-primary-image';
 const encryptionPassword = 'correct horse battery staple';
 const backupPassword = 'portable key backup';
 const wrongPassword = 'wrong key backup';
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const extensionPath = path.join(repoRoot, 'extension/dist');
+
+interface CleanExtensionSession {
+  readonly context: BrowserContext;
+  readonly page: Page;
+  readonly serviceWorker: Worker;
+  close(): Promise<void>;
+}
+
+async function waitForExtensionServiceWorker(context: BrowserContext): Promise<Worker> {
+  const existingWorker = context.serviceWorkers().find((candidate) => candidate.url().startsWith('chrome-extension://'));
+  if (existingWorker) return existingWorker;
+
+  while (true) {
+    const candidate = await context.waitForEvent('serviceworker');
+    if (candidate.url().startsWith('chrome-extension://')) return candidate;
+  }
+}
+
+async function createCleanExtensionSession(headless: boolean): Promise<CleanExtensionSession> {
+  const userDataDir = await mkdtemp(path.join(tmpdir(), 'image-trail-e2e-clean-'));
+  const context = await chromium.launchPersistentContext(userDataDir, {
+    channel: 'chromium',
+    headless,
+    args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
+  });
+  const serviceWorker = await waitForExtensionServiceWorker(context);
+  const page = await context.newPage();
+
+  return {
+    context,
+    page,
+    serviceWorker,
+    async close() {
+      await context.close();
+      await rm(userDataDir, { recursive: true, force: true });
+    },
+  };
+}
 
 async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await openFixturePage(page, fixturePaths.singleImage);
@@ -250,6 +293,25 @@ async function installPCloudMock(serviceWorker: Worker): Promise<void> {
   });
 }
 
+async function uninstallPCloudMock(serviceWorker: Worker): Promise<void> {
+  await serviceWorker.evaluate(() => {
+    const scope = globalThis as typeof globalThis & {
+      __imageTrailPCloudMock?: unknown;
+      __imageTrailOriginalFetch?: typeof fetch;
+      __imageTrailOriginalLaunchWebAuthFlow?: typeof chrome.identity.launchWebAuthFlow;
+    };
+    if (scope.__imageTrailOriginalFetch) {
+      globalThis.fetch = scope.__imageTrailOriginalFetch;
+      delete scope.__imageTrailOriginalFetch;
+    }
+    if (scope.__imageTrailOriginalLaunchWebAuthFlow) {
+      chrome.identity.launchWebAuthFlow = scope.__imageTrailOriginalLaunchWebAuthFlow;
+      delete scope.__imageTrailOriginalLaunchWebAuthFlow;
+    }
+    delete scope.__imageTrailPCloudMock;
+  });
+}
+
 test('history and bookmark exports restore through preview without durable side effects', async ({ page, serviceWorker }) => {
   await openPanel(page, serviceWorker);
   await deleteVisibleRecents(page);
@@ -279,7 +341,11 @@ test('history and bookmark exports restore through preview without durable side 
   await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-two.svg' })).toBeVisible();
 });
 
-test('key backup import fails closed with a wrong password and restores the captured original key', async ({ page, serviceWorker }) => {
+test('key backup import fails closed with a wrong password and restores the captured original key', async ({
+  page,
+  serviceWorker,
+  headless,
+}) => {
   await openPanel(page, serviceWorker);
   await setupEncryptedOriginals(page);
   await deleteVisibleQueueRows(page);
@@ -294,6 +360,19 @@ test('key backup import fails closed with a wrong password and restores the capt
   const backup = JSON.parse(fileContent) as Record<string, unknown>;
   expect(JSON.stringify(backup)).not.toContain(encryptionPassword);
   expect(JSON.stringify(backup)).not.toContain('CryptoKey');
+
+  const cleanSession = await createCleanExtensionSession(headless);
+  try {
+    await openPanel(cleanSession.page, cleanSession.serviceWorker);
+    await importKeyBackup(cleanSession.page, fileContent, wrongPassword);
+    await expectPanelStatusMessage(cleanSession.page, /Failed to unwrap key backup|Key backup import failed|decrypt/u);
+    await expect(cleanSession.page.locator('.image-trail-panel__encryption-badge')).toHaveText('AES-GCM');
+    await importKeyBackup(cleanSession.page, fileContent, backupPassword);
+    await expectPanelStatusMessage(cleanSession.page, /Imported key backup for blob:[a-f0-9-]+\./u);
+    await unlockEncryptedOriginals(cleanSession.page);
+  } finally {
+    await cleanSession.close();
+  }
 
   await clearEncryptedOriginalsKey(page);
   await importKeyBackup(page, fileContent, wrongPassword);
@@ -340,25 +419,31 @@ test('settings utilities persist through rerenders and pCloud remains a mocked m
   await openPCloud(page);
 
   await installPCloudMock(serviceWorker);
-  await page.getByRole('button', { name: 'Connect pCloud' }).click();
-  await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText('pCloud is connected.');
-  await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText('api.pcloud.com');
-  await expect(page.locator('.image-trail-panel__cloud-provider')).not.toContainText('e2e-pcloud-token');
+  try {
+    await page.getByRole('button', { name: 'Connect pCloud' }).click();
+    await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText('pCloud is connected.');
+    await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText('api.pcloud.com');
+    await expect(page.locator('.image-trail-panel__cloud-provider')).not.toContainText('e2e-pcloud-token');
 
-  await page.getByLabel('Cloud backup password').fill(backupPassword);
-  await page.getByRole('button', { name: 'Back up now' }).click();
-  await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText(/Uploaded and verified .*\.image-trail-encrypted\.json/u);
-  await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText('/Image Trail/backups');
+    await page.getByLabel('Cloud backup password').fill(backupPassword);
+    await page.getByRole('button', { name: 'Back up now' }).click();
+    await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText(
+      /Uploaded and verified .*\.image-trail-encrypted\.json/u,
+    );
+    await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText('/Image Trail/backups');
 
-  await page.getByRole('button', { name: 'Choose restore file' }).click();
-  await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText('Found 1 encrypted pCloud backup.');
-  await page.getByLabel('Cloud backup password').fill(backupPassword);
-  await page.locator('.image-trail-panel__cloud-restore-row').click();
-  const cloudProvider = page.locator('.image-trail-panel__cloud-provider');
-  await expect(cloudProvider.locator('.image-trail-panel__restore-preview')).toContainText('Bookmarks');
-  await cloudProvider.getByRole('button', { name: 'Cancel' }).click();
-  await page.getByRole('button', { name: 'Disconnect' }).click();
-  await expect(cloudProvider).toContainText('pCloud disconnected.');
+    await page.getByRole('button', { name: 'Choose restore file' }).click();
+    await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText('Found 1 encrypted pCloud backup.');
+    await page.getByLabel('Cloud backup password').fill(backupPassword);
+    await page.locator('.image-trail-panel__cloud-restore-row').click();
+    const cloudProvider = page.locator('.image-trail-panel__cloud-provider');
+    await expect(cloudProvider.locator('.image-trail-panel__restore-preview')).toContainText('Bookmarks');
+    await cloudProvider.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('button', { name: 'Disconnect' }).click();
+    await expect(cloudProvider).toContainText('pCloud disconnected.');
+  } finally {
+    await uninstallPCloudMock(serviceWorker);
+  }
 
   const selected = await imageNavigationSnapshot(page, primaryImage);
   expect(selected.propertySrc).toBe(fixtureUrl(fixtureAssetPaths.assetOne));
