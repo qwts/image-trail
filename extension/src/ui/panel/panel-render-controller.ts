@@ -12,6 +12,7 @@ export interface PanelRenderControllerDeps {
   dispatch(action: PanelAction): void;
   root(): HTMLElement | null;
   recallRoot(): HTMLElement | null;
+  detachedRoot(): HTMLElement | null;
   toastRoot(): HTMLElement | null;
   panelStylesReady(): boolean;
   // The active preview scroll anchor + drag handler live on their own controllers; the render path
@@ -55,6 +56,7 @@ export class PanelRenderController {
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
+    detachedWindowPositions: new Map(),
   };
 
   constructor(private readonly deps: PanelRenderControllerDeps) {}
@@ -99,6 +101,7 @@ export class PanelRenderController {
         {
           root,
           recallRoot: this.deps.recallRoot(),
+          detachedRoot: this.deps.detachedRoot(),
           toastRoot: this.deps.toastRoot(),
           dispatch: this.deps.dispatch,
           layoutState: this.layoutState,

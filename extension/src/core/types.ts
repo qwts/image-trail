@@ -165,6 +165,13 @@ export interface PCloudBackupState {
   readonly messageIsError?: boolean | undefined;
 }
 
+/**
+ * Panel subsections that can detach into a floating extension-owned window (issue #215). Grows as
+ * more sections adopt the detachable-section pattern; keep entries aligned with the renderer map in
+ * `ui/render.ts`.
+ */
+export type DetachableSectionId = 'history';
+
 export interface PanelState {
   readonly visible: boolean;
   readonly minimized: boolean;
@@ -195,6 +202,7 @@ export interface PanelState {
   readonly neighborPreloadCacheLimit: number;
   readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly secondaryControlsOpen: boolean;
+  readonly detachedSections: readonly DetachableSectionId[];
   readonly hasOlderBookmarks: boolean;
   readonly hasNewerBookmarks: boolean;
   readonly captureInProgress: boolean;
@@ -268,6 +276,8 @@ export type PanelActionName =
   | 'panel/minimize'
   | 'panel/expand'
   | 'panel/secondary-controls-open'
+  | 'section/detach'
+  | 'section/restore'
   | 'start-target-picker'
   | 'stop-target-picker'
   | 'grab-mode/start'
@@ -432,6 +442,8 @@ export type PanelAction =
         | 'target/fill-screen'
         | 'target/set-object-fit'
         | 'panel/secondary-controls-open'
+        | 'section/detach'
+        | 'section/restore'
         | 'active-field/set'
         | 'field-unlock/toggle'
         | 'bookmark/load'
@@ -536,6 +548,7 @@ export type PanelAction =
     }
   | { readonly name: 'history/load' | 'history/download' }
   | { readonly name: 'panel/secondary-controls-open'; readonly open: boolean }
+  | { readonly name: 'section/detach' | 'section/restore'; readonly sectionId: DetachableSectionId }
   | { readonly name: 'settings/update-visible-bookmark-soft-max'; readonly value: number }
   | {
       readonly name: 'settings/update-recent-history-retention';

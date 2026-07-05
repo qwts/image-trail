@@ -67,6 +67,10 @@ export const SecondaryControlsCollapsed: Story = {
   render: () => panelLayoutStory({ secondaryControlsOpen: false }),
 };
 
+export const HistoryDetachedPlaceholder: Story = {
+  render: () => panelLayoutStory({ history: recentFixtures, detachedSections: ['history'] }),
+};
+
 export const SecondaryControlsExpanded: Story = {
   render: () => panelLayoutStory({ secondaryControlsOpen: true }),
 };
@@ -85,6 +89,7 @@ function panelLayoutStory(overrides: Partial<PanelState> = {}): HTMLElement {
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
+    detachedWindowPositions: new Map(),
   };
 
   renderPanel(
@@ -141,6 +146,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     neighborPreloadCacheLimit: 20,
     neighborPreloadProbeMethod: 'get',
     secondaryControlsOpen: false,
+    detachedSections: [],
     hasOlderBookmarks: false,
     hasNewerBookmarks: false,
     captureInProgress: false,

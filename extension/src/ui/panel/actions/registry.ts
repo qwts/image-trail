@@ -2,6 +2,7 @@ import type { PanelAction } from '../../../core/types.js';
 import type { AnyActionDef } from '../action-dispatch.js';
 import { buildAutomationActionEntries, type AutomationActionName } from './automation-actions.js';
 import type { PanelActionDeps } from './deps.js';
+import { buildDetachableSectionActionEntries, type DetachableSectionActionName } from './detach-actions.js';
 import { buildFieldActionEntries, type FieldActionName } from './field-actions.js';
 import { buildLibraryActionEntries, type LibraryActionName } from './library-actions.js';
 import { buildPanelSettingsActionEntries, type PanelSettingsActionName } from './panel-settings-actions.js';
@@ -75,6 +76,7 @@ export function buildPanelActionRegistry(deps: PanelActionDeps) {
     ...buildFieldActionEntries(deps),
     ...buildTransferActionEntries(deps),
     ...buildAutomationActionEntries(deps),
+    ...buildDetachableSectionActionEntries(deps),
   } satisfies Record<RegisteredPanelActionName, AnyActionDef>;
 }
 
@@ -88,6 +90,7 @@ type GroupActionName =
   | RecallActionName
   | FieldActionName
   | TransferActionName
-  | AutomationActionName;
+  | AutomationActionName
+  | DetachableSectionActionName;
 type _AssertNever<T extends never> = T;
 type _NoGroupNameOutsideRegistry = _AssertNever<Exclude<GroupActionName, RegisteredPanelActionName>>;

@@ -18,6 +18,8 @@ interface HistoryViewOptions {
   readonly listBlockSize: number | null;
   readonly onListResize: (blockSize: number) => void;
   readonly privacyMode?: boolean;
+  /** Extra control rendered beside the section heading (e.g. the detach-to-window button). */
+  readonly headerAccessory?: HTMLElement;
 }
 
 export function createHistoryView(
@@ -33,6 +35,10 @@ export function createHistoryView(
 
   const heading = document.createElement('h3');
   heading.textContent = 'Recent history';
+  const header = document.createElement('div');
+  header.className = 'image-trail-panel__section-header';
+  header.append(heading);
+  if (options?.headerAccessory) header.append(options.headerAccessory);
 
   const toolbar = document.createElement('div');
   toolbar.className = 'image-trail-panel__history-toolbar';
@@ -234,7 +240,7 @@ export function createHistoryView(
     selectedIds.length > 0
       ? `${selectedIds.length} recent item(s) selected for export.`
       : 'Cmd/Ctrl-click rows to select recent items for export. Shift-click selects a range.';
-  section.append(heading, toolbar, items.length ? selectionMeta : empty);
+  section.append(header, toolbar, items.length ? selectionMeta : empty);
   if (items.length) section.append(list);
   return section;
 }
