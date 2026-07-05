@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare": "husky",
+    "changeset": "changeset",
+    "changeset:version": "changeset version && node scripts/sync-manifest-version.mjs",
     "clean": "rm -rf dist extension/dist",
     "lint:package": "node scripts/check-package-pins.mjs",
     "lint": "npm run lint:package && eslint . && npm run lint:cycles && npm run lint:dead && npm run lint:types",
@@ -35,6 +38,7 @@
     "format": "prettier --write \"**/*.{ts,json,md,css,yml,yaml}\" \".prettierrc.json\""
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@eslint/js": "^10.0.1",
     "@happy-dom/global-registrator": "^20.10.6",
     "@playwright/test": "^1.61.1",
@@ -50,7 +54,9 @@
     "eslint": "^10.5.0",
     "fake-indexeddb": "^6.2.5",
     "http-server": "^14.1.1",
+    "husky": "^9.1.7",
     "knip": "^6.24.0",
+    "lint-staged": "^16.4.0",
     "madge": "^8.0.0",
     "prettier": "^3.8.4",
     "storybook": "^10.4.6",
@@ -66,5 +72,14 @@
     "madge": {
       "typescript": "$typescript"
     }
+  },
+  "lint-staged": {
+    "*.{ts,mjs}": [
+      "eslint --fix --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{json,md,css,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }
