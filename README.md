@@ -73,8 +73,8 @@ Canonical long-lived documentation lives in the GitHub wiki:
 - [Versioning automation planning](https://github.com/qwtm/image-trail/issues/387)
 
 Repository markdown files are pointer stubs unless they are agent instruction
-files, `README.md`, `CONTRIBUTING.md`, or GitHub workflow templates. Update the
-wiki page linked from a stub, not the stub itself.
+files, `README.md`, `CONTRIBUTING.md`, or GitHub issue and pull request
+templates. Update the wiki page linked from a stub, not the stub itself.
 
 ## Validation
 
