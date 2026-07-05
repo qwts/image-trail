@@ -9,12 +9,13 @@ result. Do not skip a step; if a gate fails, stop and surface the failure verbat
 ## 1. Run the gates (in order)
 
 ```sh
-npm run lint          # includes lint:package (no "latest" pins) + eslint (incl. the envelope.updatedAt sort rule)
+npm run lint                      # includes lint:package (no "latest" pins) + eslint (incl. the envelope.updatedAt sort rule)
 npm run format:check
-npm test              # typecheck + compile + unit + DOM suites (includes tests/invariants.test.ts)
+npm test                          # typecheck + compile + unit + DOM suites (includes tests/invariants.test.ts)
 npm run build
-npm run test:e2e      # validates tests/e2e/coverage-map.json, then runs the Playwright extension smoke gate
-npm run test:cov      # c8 coverage gate; must stay at/above the .c8rc.json floor
+npm run check:acceptance-coverage # diffs changed files against origin/main; flags ui/content changes with no coverage-map.json update
+npm run test:e2e                  # validates tests/e2e/coverage-map.json schema, then runs the Playwright extension smoke gate
+npm run test:cov                  # c8 coverage gate; must stay at/above the .c8rc.json floor
 ```
 
 ## 2. Confirm the product invariants (from `tests/invariants.test.ts`)
@@ -35,7 +36,8 @@ already runs them; call out each one by name so a regression is impossible to mi
 
 State, explicitly:
 
-- ✅/❌ per gate (lint, format:check, test, build, test:e2e, test:cov), with the failing output if any.
+- ✅/❌ per gate (lint, format:check, test, build, check:acceptance-coverage, test:e2e, test:cov), with
+  the failing output if any.
 - ✅/❌ per invariant above. If `tests/invariants.test.ts` failed, name which invariant regressed and
   quote the assertion message.
 - Any `no-restricted-syntax` violation reported by `eslint` (the envelope.updatedAt sort footgun).
