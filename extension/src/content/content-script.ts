@@ -130,6 +130,10 @@ function createController(): ImageTrailContentController {
 
   const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
     if (isShortcutActionMessage(message)) {
+      if (!panel.visible) {
+        sendResponse(createStatusMessage(false, 'Panel is closed.'));
+        return false;
+      }
       panel.handleShortcutAction(message.payload.action);
       sendResponse(createStatusMessage(panel.visible, panel.statusMessage));
       return false;
