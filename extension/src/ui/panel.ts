@@ -481,7 +481,7 @@ export class ImageTrailPanel {
     void this.recallExport.refreshBlobKeyStatus();
     void this.recallExport.refreshPCloudProviderStatus({ render: false });
 
-    this.keyboard = new KeyboardRouter((action) => this.handleKeyAction(action));
+    this.keyboard = new KeyboardRouter((action) => this.handleShortcutAction(action));
 
     this.slideshow = new Slideshow(
       (direction) => this.parsedFieldNavigation.navigateBy(direction, 'slideshow'),
@@ -654,49 +654,30 @@ export class ImageTrailPanel {
     dispatchPanelAction(this.actionRegistry, action, this.handleDefaultAction);
   };
 
-  private handleKeyAction(action: string): void {
-    switch (action) {
-      case 'next':
-        this.dispatch({ name: 'navigate-next' });
-        break;
-      case 'previous':
-        this.dispatch({ name: 'navigate-previous' });
-        break;
-      case 'slideshow-toggle':
-        if (this.slideshow.currentPhase === 'running') {
-          this.dispatch({ name: 'slideshow-pause' });
-        } else if (this.slideshow.currentPhase === 'paused') {
-          this.dispatch({ name: 'slideshow-resume' });
-        } else {
-          this.dispatch({ name: 'slideshow-start' });
-        }
-        break;
-      case 'buffer-debug-toggle':
-        this.bufferedNav.toggleDebugVisible();
-        break;
-      case 'stop':
-        this.dispatch({ name: 'stop-all' });
-        break;
-      case 'panel-toggle':
-        this.dispatch({ name: 'toggle-panel' });
-        break;
-      case 'grab-mode-toggle':
-        this.dispatch({ name: this.state.target.grabModeActive ? 'grab-mode/stop' : 'grab-mode/start' });
-        break;
-      case 'retry':
-        this.dispatch({ name: 'retry-start' });
-        break;
-      case 'download':
-        if (this.state.importExportBusy) return;
-        this.dispatch({ name: 'export/image', saveAs: false });
-        break;
-      case 'download-save-as':
-        if (this.state.importExportBusy) return;
-        this.dispatch({ name: 'export/image', saveAs: true });
-        break;
-      default:
-        break;
-    }
+  handleShortcutAction(action: string): void {
+    const handlers: Record<string, () => void> = {
+      next: () => this.dispatch({ name: 'navigate-next' }),
+      previous: () => this.dispatch({ name: 'navigate-previous' }),
+      'slideshow-toggle': () => this.dispatch({ name: this.shortcutSlideshowAction() }),
+      'buffer-debug-toggle': () => this.bufferedNav.toggleDebugVisible(),
+      stop: () => this.dispatch({ name: 'stop-all' }),
+      'panel-toggle': () => this.dispatch({ name: 'toggle-panel' }),
+      'grab-mode-toggle': () => this.dispatch({ name: this.state.target.grabModeActive ? 'grab-mode/stop' : 'grab-mode/start' }),
+      retry: () => this.dispatch({ name: 'retry-start' }),
+      download: () => {
+        if (!this.state.importExportBusy) this.dispatch({ name: 'export/image', saveAs: false });
+      },
+      'download-save-as': () => {
+        if (!this.state.importExportBusy) this.dispatch({ name: 'export/image', saveAs: true });
+      },
+    };
+    handlers[action]?.();
+  }
+
+  private shortcutSlideshowAction(): 'slideshow-pause' | 'slideshow-resume' | 'slideshow-start' {
+    if (this.slideshow.currentPhase === 'running') return 'slideshow-pause';
+    if (this.slideshow.currentPhase === 'paused') return 'slideshow-resume';
+    return 'slideshow-start';
   }
 
   private currentUrlModel(): ParsedUrlModel {

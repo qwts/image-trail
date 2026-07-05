@@ -7,6 +7,33 @@
     "default_title": "Toggle Image Trail"
   },
   "commands": {
+    "_execute_action": {
+      "description": "Open or hide Image Trail panel"
+    },
+    "shortcut-next": {
+      "description": "Next trail step"
+    },
+    "shortcut-previous": {
+      "description": "Previous trail step"
+    },
+    "shortcut-download": {
+      "description": "Download image"
+    },
+    "shortcut-download-save-as": {
+      "description": "Download with Save As"
+    },
+    "shortcut-slideshow-toggle": {
+      "description": "Slideshow"
+    },
+    "shortcut-stop": {
+      "description": "Stop automation"
+    },
+    "shortcut-grab-mode-toggle": {
+      "description": "Grab mode"
+    },
+    "shortcut-retry": {
+      "description": "Retry navigation"
+    },
     "toggle-build-info-overlay": {
       "suggested_key": {
         "default": "Alt+Shift+B",

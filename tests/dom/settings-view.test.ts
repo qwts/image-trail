@@ -83,6 +83,45 @@ test('recents settings dispatches visible and max kept limits', () => {
   });
 });
 
+test('settings exposes browser, panel, and legacy shortcut decisions', () => {
+  const view = createSettingsView(
+    30,
+    { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session' },
+    false,
+    [],
+    [],
+    null,
+    [],
+    { pinSaveStoragePreference: 'encrypted', blobKeyUnlocked: false, blobKeyAvailable: false },
+    { visibleQueueCount: 0, recallCount: 0, busy: false },
+    null,
+    { identity: null, overlayVisible: true },
+    { limit: 5_000, clearAfterExport: false },
+    { minimumIntervalMs: 0, maxRequests: 3, windowMs: 10_000 },
+    { enabled: false, radius: 3, cacheLimit: 24, probeMethod: 'get' },
+    [],
+    () => {},
+  );
+
+  const text = view.textContent ?? '';
+  assert.match(text, /Shortcuts/);
+  assert.doesNotMatch(text, /Keyboard shortcuts/);
+  assert.match(text, /Open or hide panel/);
+  assert.match(text, /P/);
+  assert.match(text, /Hide panel/);
+  assert.match(text, /Legacy field jumps not assigned/);
+  assert.match(text, /Legacy grayscale hide not assigned/);
+
+  const shortcuts = Array.from(view.querySelectorAll<HTMLElement>('.image-trail-panel__shortcut-row'));
+  assert.ok(shortcuts.length >= 20, 'shortcut reference should render shortcut rows');
+  assert.ok(view.querySelector('.image-trail-panel__shortcut-keys kbd'), 'shortcut keys should render as stable key chips');
+
+  const subheadings = Array.from(view.querySelectorAll('h5')).map((heading) => heading.textContent);
+  assert.ok(subheadings.includes('Browser shortcuts'));
+  assert.ok(subheadings.includes('Panel shortcuts'));
+  assert.ok(subheadings.includes('Legacy keys'));
+});
+
 function recentsSettings(view: HTMLElement): HTMLElement {
   for (const heading of view.querySelectorAll('h4')) {
     if (heading.textContent === 'Recents') {

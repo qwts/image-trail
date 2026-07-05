@@ -16,12 +16,22 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
-          "notes": "Covers Chromium command registration for the build-info overlay toggle via chrome.commands.getAll and the Settings checkbox that hides/shows the overlay."
+          "notes": "Covers Chromium command registration for the build-info overlay toggle and assignable Image Trail action commands via chrome.commands.getAll, hidden-panel browser shortcut no-op behavior, plus the Settings checkbox that hides/shows the overlay."
         },
         {
           "type": "unit-dom",
           "path": "tests/manifest-commands.test.ts",
-          "notes": "Covers the manifest command metadata and suggested Alt/Option+Shift+B binding for the build-info overlay toggle."
+          "notes": "Covers manifest command metadata for the browser action shortcut entry, assignable Image Trail action commands, and the suggested Alt/Option+Shift+B binding for the build-info overlay toggle."
+        },
+        {
+          "type": "unit-dom",
+          "paths": ["tests/keyboard.test.ts", "tests/dom/settings-view.test.ts"],
+          "notes": "Covers the page-level shortcut binding table, the Settings shortcut reference row layout, and the intentional legacy a-z/h parity gaps."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/shortcut-settings-view.stories.ts",
+          "notes": "Covers the shortcut reference at standard and narrow panel widths with row overflow assertions."
         }
       ]
     },

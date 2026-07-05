@@ -6,6 +6,7 @@ import {
   isExtensionRequest,
   MessageType,
 } from '../background/messages.js';
+import { isShortcutActionMessage } from '../background/shortcut-action-message.js';
 import { isNonProductionBuildIdentity, type BuildIdentity } from '../core/build-info.js';
 import { PageAdapter } from './page-adapter.js';
 import { BuildIdentityOverlay } from './build-identity-overlay.js';
@@ -128,6 +129,16 @@ function createController(): ImageTrailContentController {
   }
 
   const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
+    if (isShortcutActionMessage(message)) {
+      if (!panel.visible) {
+        sendResponse(createStatusMessage(false, 'Panel is closed.'));
+        return false;
+      }
+      panel.handleShortcutAction(message.payload.action);
+      sendResponse(createStatusMessage(panel.visible, panel.statusMessage));
+      return false;
+    }
+
     if (!isExtensionRequest(message)) {
       sendResponse(createUnknownMessageResponse('Unsupported Image Trail message.'));
       return false;

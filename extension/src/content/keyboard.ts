@@ -1,3 +1,5 @@
+import { PAGE_SHORTCUTS } from '../core/keyboard-shortcuts.js';
+
 export type KeyTarget = 'typing' | 'button' | 'panel' | 'page';
 
 export interface KeyBinding {
@@ -18,20 +20,17 @@ export interface KeyCodeShortcut {
   readonly meta?: boolean;
 }
 
-export const DEFAULT_BINDINGS: KeyBinding[] = [
-  { key: 'ArrowRight', action: 'next' },
-  { key: 'ArrowLeft', action: 'previous' },
-  { key: 'ArrowDown', action: 'download' },
-  { key: ' ', action: 'slideshow-toggle' },
-  { key: 'Escape', action: 'stop' },
-  { key: 's', action: 'buffer-debug-toggle' },
-  { key: 'p', action: 'panel-toggle' },
-  { key: 'd', action: 'download' },
-  { key: 'D', shift: true, action: 'download-save-as' },
-  { key: 'G', shift: true, action: 'grab-mode-toggle' },
-  { key: 'Enter', shift: true, action: 'download-save-as' },
-  { key: 'r', action: 'retry' },
-];
+function shortcutBinding(shortcut: (typeof PAGE_SHORTCUTS)[number]): KeyBinding {
+  return {
+    key: shortcut.key,
+    ...(shortcut.shift === undefined ? {} : { shift: shortcut.shift }),
+    ...(shortcut.ctrl === undefined ? {} : { ctrl: shortcut.ctrl }),
+    ...(shortcut.alt === undefined ? {} : { alt: shortcut.alt }),
+    action: shortcut.action,
+  };
+}
+
+export const DEFAULT_BINDINGS: KeyBinding[] = PAGE_SHORTCUTS.map(shortcutBinding);
 
 export function classifyTarget(event: KeyboardEvent): KeyTarget {
   const composedPath = event.composedPath?.() ?? [];

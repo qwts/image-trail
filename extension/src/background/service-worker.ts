@@ -21,6 +21,7 @@ import { EncryptedPinsRepository } from '../data/repositories/encrypted-pins-rep
 import { EncryptedPinThumbnailsRepository } from '../data/repositories/encrypted-pin-thumbnails-repository.js';
 import type { StoredBlobRecord } from '../data/types.js';
 import type { UrlReviewStatusClearFilter } from '../core/types.js';
+import { BROWSER_COMMAND_SHORTCUTS } from '../core/keyboard-shortcuts.js';
 import { fetchImageBytes } from './fetch-image.js';
 import {
   MessageType,
@@ -106,9 +107,11 @@ import { createPCloudMessageRegistry } from './handlers/pcloud-handlers.js';
 import { createUrlTemplateMessageRegistry } from './handlers/url-template-handlers.js';
 import { normalizeHostname } from './handlers/hostname.js';
 import type { ServiceWorkerContext } from './service-worker-context.js';
+import { createShortcutActionMessage } from './shortcut-action-message.js';
 
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const TOGGLE_BUILD_IDENTITY_COMMAND = 'toggle-build-info-overlay';
+const BROWSER_COMMAND_ACTIONS = new Map(BROWSER_COMMAND_SHORTCUTS.map((shortcut) => [shortcut.command, shortcut.action]));
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
 const PREVIEW_TTL_MS = 60_000;
 const MAX_LINKED_PAGE_BYTES = 2 * 1024 * 1024;
@@ -177,6 +180,14 @@ async function sendToggleBuildIdentityOverlay(tabId: number): Promise<void> {
   const response = await chrome.tabs.sendMessage(tabId, createToggleBuildIdentityOverlayMessage());
   if (!isStatusMessage(response)) {
     console.warn('Image Trail received an unexpected build-info toggle response.', response);
+  }
+}
+
+async function sendShortcutAction(tabId: number, action: string): Promise<void> {
+  await ensureContentScript(tabId);
+  const response = await chrome.tabs.sendMessage(tabId, createShortcutActionMessage(action));
+  if (!isStatusMessage(response)) {
+    console.warn('Image Trail received an unexpected shortcut action response.', response);
   }
 }
 
@@ -1071,14 +1082,22 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 chrome.commands.onCommand.addListener((command, tab) => {
-  if (command !== TOGGLE_BUILD_IDENTITY_COMMAND) return;
+  const shortcutAction = BROWSER_COMMAND_ACTIONS.get(command);
+  if (!shortcutAction && command !== TOGGLE_BUILD_IDENTITY_COMMAND) return;
   if (!tab) {
-    console.warn('Image Trail build-info command did not include an active tab.');
+    console.warn('Image Trail command did not include an active tab.');
     return;
   }
   const tabId = supportedTabId(tab);
   if (tabId === null) {
-    console.warn('Image Trail build info can only be toggled on http(s) pages.');
+    console.warn('Image Trail commands can only run on http(s) pages.');
+    return;
+  }
+
+  if (shortcutAction) {
+    sendShortcutAction(tabId, shortcutAction).catch((error: unknown) => {
+      console.warn('Image Trail could not run the browser shortcut action.', error);
+    });
     return;
   }
 

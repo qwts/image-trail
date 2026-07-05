@@ -70,6 +70,17 @@ test('default keyboard bindings map d to download and shifted shortcuts to save-
   assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'Enter' && binding.shift === true && binding.action === 'download-save-as'));
 });
 
+test('default keyboard bindings keep legacy h and a-z field jumps unassigned', () => {
+  assert.equal(
+    DEFAULT_BINDINGS.some((binding) => binding.key === 'h'),
+    false,
+  );
+  assert.equal(
+    DEFAULT_BINDINGS.some((binding) => binding.action === 'field-jump'),
+    false,
+  );
+});
+
 test('key code shortcuts survive Option-modified Mac key values', () => {
   assert.equal(
     matchesKeyCodeShortcut(fakeEvent({ key: '∫', code: 'KeyB', shiftKey: true, altKey: true }), { code: 'KeyB', shift: true, alt: true }),

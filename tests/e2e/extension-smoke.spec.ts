@@ -76,6 +76,45 @@ test('registers the build-info keyboard command for Chromium shortcut settings',
   });
 });
 
+test('registers assignable action commands for Chromium shortcut settings', async ({ serviceWorker }) => {
+  const commandNames = await serviceWorker.evaluate(async () => {
+    return (await chrome.commands.getAll()).map((command) => command.name).sort();
+  });
+
+  expect(commandNames).toEqual(
+    expect.arrayContaining([
+      'shortcut-next',
+      'shortcut-previous',
+      'shortcut-download',
+      'shortcut-download-save-as',
+      'shortcut-slideshow-toggle',
+      'shortcut-stop',
+      'shortcut-grab-mode-toggle',
+      'shortcut-retry',
+    ]),
+  );
+});
+
+test('ignores browser shortcut action messages while the panel is closed', async ({ page, serviceWorker }) => {
+  await openFixturePage(page, fixturePaths.singleImage);
+
+  const result = await serviceWorker.evaluate(async (activeUrl) => {
+    const [tab] = await chrome.tabs.query({ url: activeUrl });
+    if (typeof tab?.id !== 'number') throw new Error('Fixture tab was not found.');
+    return chrome.tabs.sendMessage(tab.id, {
+      type: 'imageTrail.shortcutAction',
+      version: 1,
+      payload: { action: 'slideshow-toggle' },
+    });
+  }, page.url());
+
+  expect(result).toMatchObject({
+    type: 'imageTrail.status',
+    payload: { panelVisible: false, status: 'Panel is closed.' },
+  });
+  await expectPanelClosed(page);
+});
+
 test('surfaces the build-info overlay toggle in Settings', async ({ page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
