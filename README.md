@@ -62,7 +62,8 @@ ships the built MV3 service worker/content-script bundle from `extension/dist/`.
 
 ## Documentation
 
-Canonical long-lived documentation lives in the GitHub wiki:
+Canonical long-lived documentation lives in the GitHub wiki, with root
+`DESIGN.md` as the design-editor exception:
 
 - [Image Trail Wiki](https://github.com/qwtm/image-trail/wiki)
 - [Contributing](https://github.com/qwtm/image-trail/wiki/Contributing)
