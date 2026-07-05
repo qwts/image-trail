@@ -1566,6 +1566,79 @@ test('IndexedDbBookmarkStore preserves captured originals when pinning a recent 
   }
 });
 
+test('IndexedDbBookmarkStore finds saved rows by URL without moving queue order', async () => {
+  await deleteImageTrailDb();
+  const store = new IndexedDbBookmarkStore();
+  try {
+    await store.save(
+      createDisplayRecord({
+        id: 'https://example.test/older.jpg',
+        url: 'https://example.test/older.jpg',
+        label: 'older.jpg',
+        timestamp: '2026-06-19T00:00:00.000Z',
+        source: 'bookmark',
+      }),
+    );
+    await store.save(
+      createDisplayRecord({
+        id: 'https://example.test/newer.jpg',
+        url: 'https://example.test/newer.jpg',
+        label: 'newer.jpg',
+        timestamp: '2026-06-19T00:00:01.000Z',
+        source: 'bookmark',
+      }),
+    );
+    const before = await store.loadPage({ offset: 0, limit: 30 });
+
+    const found = await store.findByUrl('https://example.test/older.jpg');
+    const after = await store.loadPage({ offset: 0, limit: 30 });
+
+    assert.equal(found?.url, 'https://example.test/older.jpg');
+    assert.equal(found?.queueUpdatedAt, before.items[1]?.queueUpdatedAt);
+    assert.deepEqual(
+      after.items.map((item) => item.id),
+      before.items.map((item) => item.id),
+    );
+    assert.deepEqual(
+      after.items.map((item) => item.queueUpdatedAt),
+      before.items.map((item) => item.queueUpdatedAt),
+    );
+  } finally {
+    await store.close();
+  }
+});
+
+test('IndexedDbBookmarkStore finds protected saved rows by URL while unlocked', async () => {
+  await deleteImageTrailDb();
+  const { active } = await createAndActivateWrappedBlobKey({
+    password: 'find-protected-password',
+    uuid: 'find-protected-key',
+    now: '2026-06-21T00:00:00.000Z',
+  });
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  try {
+    const saved = await store.save(
+      createDisplayRecord({
+        id: 'https://secret.example.test/find-protected.jpg',
+        url: 'https://secret.example.test/find-protected.jpg',
+        label: 'find-protected.jpg',
+        timestamp: '2026-06-21T00:00:01.000Z',
+        source: 'bookmark',
+      }),
+    );
+
+    const found = await store.findByUrl(saved.url);
+
+    assert.equal(found?.id, saved.id);
+    assert.equal(found?.url, saved.url);
+    assert.equal(found?.privacyStatus, 'unlocked');
+    assert.equal(found?.protectedPin?.encryptedPinId, saved.protectedPin?.encryptedPinId);
+  } finally {
+    await store.close();
+    lockBlobKey();
+  }
+});
+
 test('PanelPositionRepository saves positions per hostname', async (t) => {
   const db = await openFreshImageTrailDb();
   t.after(() => db.close());

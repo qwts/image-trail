@@ -42,6 +42,7 @@ import {
   createExportEncryptedImageResultMessage,
   createFetchLinkedPageResultMessage,
   createFetchThumbnailSourceResultMessage,
+  createFindBookmarkByUrlResultMessage,
   createLoadBookmarksByIdsResultMessage,
   createLoadParsedFieldStateBySourceResultMessage,
   createImportEncryptedImageResultMessage,
@@ -102,6 +103,7 @@ import type {
   GrantPermissionAndCaptureMessage,
 } from './messages.js';
 import type {
+  FindBookmarkByUrlMessage,
   LoadBookmarksByIdsMessage,
   LoadBookmarksMessage,
   RemoveBookmarkMessage,
@@ -631,6 +633,12 @@ async function handleLoadBookmarksByIds(
   message: LoadBookmarksByIdsMessage,
 ): Promise<import('./messages.js').LoadBookmarksByIdsResultMessage['payload']> {
   return { items: await bookmarkStore.loadByIds(message.payload.ids) };
+}
+
+async function handleFindBookmarkByUrl(
+  message: FindBookmarkByUrlMessage,
+): Promise<import('./messages.js').FindBookmarkByUrlResultMessage['payload']> {
+  return { record: await bookmarkStore.findByUrl(message.payload.url) };
 }
 
 async function handleSaveBookmark(message: SaveBookmarkMessage): Promise<import('./messages.js').SaveBookmarkResultMessage['payload']> {
@@ -1251,6 +1259,12 @@ const messageRegistry = {
     handle: (message: LoadBookmarksByIdsMessage) => handleLoadBookmarksByIds(message),
     respond: (result) => createLoadBookmarksByIdsResultMessage(result),
     fallback: () => createLoadBookmarksByIdsResultMessage({ items: [] }),
+  }),
+  [MessageType.FindBookmarkByUrl]: defineMessage({
+    requestSchema: requestSchemas.findBookmarkByUrlRequestSchema,
+    handle: (message: FindBookmarkByUrlMessage) => handleFindBookmarkByUrl(message),
+    respond: (result) => createFindBookmarkByUrlResultMessage(result),
+    fallback: () => createFindBookmarkByUrlResultMessage({ record: null }),
   }),
   [MessageType.AddRecentHistory]: defineMessage({
     requestSchema: requestSchemas.addRecentHistoryRequestSchema,

@@ -97,6 +97,40 @@ export function encryptedBlobIdForRecord(record: Pick<ImageDisplayRecord, 'captu
   return record.captureStatus === 'captured' ? record.blobId : undefined;
 }
 
+export function recordHasStoredOriginal(record: Pick<ImageDisplayRecord, 'captureStatus' | 'storedOriginal' | 'protectedPin'>): boolean {
+  return record.captureStatus === 'captured' || !!record.storedOriginal || record.protectedPin?.hasStoredOriginal === true;
+}
+
+export function withDurableQueueState(record: ImageDisplayRecord, durable: ImageDisplayRecord): ImageDisplayRecord {
+  return {
+    ...record,
+    thumbnail: durable.thumbnail ?? record.thumbnail,
+    width: durable.width ?? record.width,
+    height: durable.height ?? record.height,
+    pinnedAt: durable.queueUpdatedAt ?? durable.timestamp,
+    pinnedRecordId: durable.id,
+    captureStatus: durable.captureStatus,
+    blobId: durable.blobId,
+    capturedAt: durable.capturedAt,
+    storedOriginal: durable.storedOriginal,
+    protectedPin: durable.protectedPin,
+  };
+}
+
+export function withoutStoredOriginal(record: ImageDisplayRecord): ImageDisplayRecord {
+  const protectedPin = record.protectedPin
+    ? { ...record.protectedPin, storedOriginalBlobId: undefined, hasStoredOriginal: false }
+    : undefined;
+  return {
+    ...record,
+    captureStatus: undefined,
+    blobId: undefined,
+    capturedAt: undefined,
+    storedOriginal: undefined,
+    protectedPin,
+  };
+}
+
 export function validateImageRecordUrl(url: string): ImageRecordUrlValidation {
   let sourceUrl: URL;
   try {

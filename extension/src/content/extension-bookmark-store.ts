@@ -1,10 +1,12 @@
 import {
+  createFindBookmarkByUrlMessage,
   createLoadBookmarksMessage,
   createLoadBookmarksByIdsMessage,
   createRemoveBookmarkMessage,
   createRemoveBookmarksMessage,
   createRemoveRecallBookmarksMessage,
   createSaveBookmarkMessage,
+  isFindBookmarkByUrlResultMessage,
   isLoadBookmarksResultMessage,
   isLoadBookmarksByIdsResultMessage,
   isRemoveBookmarkResultMessage,
@@ -74,6 +76,12 @@ export class ExtensionBookmarkStore implements BookmarkStore {
     const response = await sendRuntimeMessage(createLoadBookmarksByIdsMessage(ids));
     if (isLoadBookmarksByIdsResultMessage(response)) return response.payload.items;
     return [];
+  }
+
+  async findByUrl(url: string): Promise<ImageDisplayRecord | null> {
+    const response = await sendRuntimeMessage(createFindBookmarkByUrlMessage(url));
+    if (isFindBookmarkByUrlResultMessage(response)) return response.payload.record;
+    return null;
   }
 
   async remove(record: ImageDisplayRecord): Promise<void> {

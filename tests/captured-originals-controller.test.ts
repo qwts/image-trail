@@ -50,6 +50,8 @@ function createHarness(options: HarnessOptions = {}): Harness {
     },
   };
   const defaultBookmarkStore: Partial<BookmarkStore> = {
+    findByUrl: async () => null,
+    loadByIds: async () => [],
     save: async (record: ImageDisplayRecord) => {
       log.push(`bookmarkSave:${record.id}`);
       return record;
@@ -141,6 +143,51 @@ test('captureImage refreshes the blob-key status on an encryption-locked failure
   ]);
 });
 
+test('captureImage skips target capture when a saved row already has an original', async () => {
+  const existing = createDisplayRecord({
+    id: 'bookmark-existing',
+    url: 'https://example.test/pic.jpg',
+    label: 'pic.jpg',
+    source: 'bookmark',
+    captureStatus: 'captured',
+    blobId: 'blob-existing',
+    storedOriginal: {
+      blobId: 'blob-existing',
+      mimeType: 'image/jpeg',
+      byteLength: 4096,
+      capturedAt: '2026-06-19T00:00:01.000Z',
+    },
+  });
+  const harness = createHarness({ bookmarkStore: { findByUrl: async () => existing } });
+
+  await harness.controller.captureImage('https://example.test/pic.jpg', 'target');
+
+  assert.equal(harness.log.includes('requestCapture:https://example.test/pic.jpg:target'), false);
+  assert.equal(harness.getState().message, 'Original already stored for pic.jpg.');
+  assert.deepEqual(harness.log, ['loadBookmarkPage:0:false', 'renderPanelAndRefreshRecall']);
+});
+
+test('captureImage target flow updates an existing uncaptured saved row', async () => {
+  const existing = createDisplayRecord({ id: 'bookmark-existing', url: 'https://example.test/pic.jpg', source: 'bookmark' });
+  const savedDrafts: ImageDisplayRecord[] = [];
+  const harness = createHarness({
+    bookmarkStore: {
+      findByUrl: async () => existing,
+      saveResult: async (record) => {
+        savedDrafts.push(record);
+        return { ok: true as const, record: { ...record, id: existing.id } };
+      },
+    },
+  });
+
+  await harness.controller.captureImage('https://example.test/pic.jpg', 'target');
+
+  assert.ok(harness.log.includes('requestCapture:https://example.test/pic.jpg:target'));
+  assert.equal(savedDrafts[0]?.url, existing.url);
+  assert.equal(savedDrafts[0]?.storedOriginal?.blobId, 'blob-1');
+  assert.equal(harness.log.at(-1), 'renderPanelAndRefreshRecall');
+});
+
 test('captureImage target flow discards the captured blob when the pin cannot be saved', async () => {
   const harness = createHarness({
     bookmarkStore: { saveResult: async () => ({ ok: false as const, message: 'quota exceeded' }) },
@@ -189,6 +236,57 @@ test('captureImage bookmark flow re-saves the updated bookmark and re-pages the 
   assert.ok(harness.log.includes('bookmarkSave:bookmark-1'));
   assert.ok(harness.log.includes('loadBookmarkPage:24:false'));
   assert.equal(harness.log.at(-1), 'renderPanelAndRefreshRecall');
+});
+
+test('deleteCapturedBlob updates a linked saved row even when it is not visible', async () => {
+  const storedOriginal = {
+    blobId: 'blob-1',
+    mimeType: 'image/jpeg',
+    byteLength: 2048,
+    capturedAt: '2026-06-19T00:00:01.000Z',
+  };
+  const saved = createDisplayRecord({
+    id: 'bookmark-existing',
+    url: 'https://example.test/pic.jpg',
+    source: 'bookmark',
+    captureStatus: 'captured',
+    blobId: storedOriginal.blobId,
+    storedOriginal,
+  });
+  const savedDrafts: ImageDisplayRecord[] = [];
+  const harness = createHarness({
+    bookmarkStore: {
+      loadByIds: async () => [saved],
+      save: async (record) => {
+        savedDrafts.push(record);
+        return record;
+      },
+    },
+  });
+  harness.patchState({
+    history: [
+      createDisplayRecord({
+        id: 'history-1',
+        url: saved.url,
+        source: 'history',
+        pinnedRecordId: saved.id,
+        captureStatus: 'captured',
+        blobId: storedOriginal.blobId,
+        storedOriginal,
+      }),
+    ],
+    bookmarkOffset: 12,
+  });
+
+  await harness.controller.deleteCapturedBlob('history-1', 'blob-1');
+
+  assert.equal(savedDrafts.length, 1);
+  assert.equal(savedDrafts[0]?.id, saved.id);
+  assert.equal(savedDrafts[0]?.captureStatus, undefined);
+  assert.equal(savedDrafts[0]?.storedOriginal, undefined);
+  assert.ok(harness.log.includes('loadBookmarkPage:12:false'));
+  assert.ok(harness.log.includes('renderPanelAndRefreshRecall'));
+  assert.ok(harness.log.includes('requestDeleteBlob:blob-1'));
 });
 
 test('cleanupOrphanedBlobs applies the usage, invalidates in-flight refreshes, and renders panel-only', async () => {
