@@ -95,6 +95,26 @@ test('registers assignable action commands for Chromium shortcut settings', asyn
   );
 });
 
+test('ignores browser shortcut action messages while the panel is closed', async ({ page, serviceWorker }) => {
+  await openFixturePage(page, fixturePaths.singleImage);
+
+  const result = await serviceWorker.evaluate(async (activeUrl) => {
+    const [tab] = await chrome.tabs.query({ url: activeUrl });
+    if (typeof tab?.id !== 'number') throw new Error('Fixture tab was not found.');
+    return chrome.tabs.sendMessage(tab.id, {
+      type: 'imageTrail.shortcutAction',
+      version: 1,
+      payload: { action: 'slideshow-toggle' },
+    });
+  }, page.url());
+
+  expect(result).toMatchObject({
+    type: 'imageTrail.status',
+    payload: { panelVisible: false, status: 'Panel is closed.' },
+  });
+  await expectPanelClosed(page);
+});
+
 test('surfaces the build-info overlay toggle in Settings', async ({ page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
