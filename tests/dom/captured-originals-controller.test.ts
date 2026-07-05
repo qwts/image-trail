@@ -40,6 +40,8 @@ function createHarness(options: { readonly pinFails?: boolean } = {}): Harness {
     },
   } as unknown as CaptureStore;
   const bookmarkStore = {
+    findByUrl: async () => null,
+    loadByIds: async () => [],
     save: async (record: ImageDisplayRecord) => {
       log.push(`bookmarkSave:${record.id}`);
       return record;
@@ -130,8 +132,10 @@ test('captureImage history flow re-adds the row against the page URL when the pi
   await harness.controller.captureImage('https://images.example.test/history-1.jpg', 'history', 'history-1');
   assert.equal(harness.historyAddLog.length, 1);
   assert.equal(harness.historyAddLog[0]?.pageUrl, 'https://images.example.test/gallery');
+  assert.equal(harness.historyAddLog[0]?.record.captureStatus, undefined);
+  assert.ok(harness.log.includes('requestDeleteBlob:blob-1'));
   assert.equal(harness.getState().status, 'error');
-  assert.match(harness.getState().message, /but the recent row was not pinned: quota exceeded/);
+  assert.match(harness.getState().message, /discarded because the recent row was not pinned: quota exceeded/);
   assert.equal(harness.log.at(-1), 'render', 'a failed pin must not refresh the recall pipeline');
 });
 

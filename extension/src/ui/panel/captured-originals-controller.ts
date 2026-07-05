@@ -1,7 +1,12 @@
 import type { CaptureStore } from '../../content/capture-controller.js';
 import type { RecentHistoryStore } from '../../content/recent-history-store.js';
 import { reducePanelAction } from '../../core/actions.js';
-import { createDisplayRecord, isDurableImageSourceUrl } from '../../core/display-records.js';
+import {
+  createDisplayRecord,
+  isDurableImageSourceUrl,
+  recordHasStoredOriginal,
+  withoutStoredOriginal,
+} from '../../core/display-records.js';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
 import { isCapturedResult } from '../../core/image/capture-result.js';
 import type { BookmarkStore, CaptureSourceType, PanelState } from '../../core/types.js';
@@ -93,6 +98,11 @@ export class CapturedOriginalsController {
       this.deps.scheduleFiniteCaptureErrorReset(lastUpdatedAt, 'status');
       return;
     }
+    const existingSavedRecord = await this.findSavedRecordByUrl(url);
+    if (existingSavedRecord && recordHasStoredOriginal(existingSavedRecord)) {
+      await this.useExistingStoredOriginal(url, sourceType, sourceRecordId, existingSavedRecord);
+      return;
+    }
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'capture/start' }));
     this.deps.render();
     const result = await captureStore.requestCapture(url, sourceType, sourceRecordId);
@@ -117,14 +127,20 @@ export class CapturedOriginalsController {
           });
           queueChanged = true;
         } else {
+          this.deps.setState(
+            reducePanelAction(this.deps.getState(), { name: 'capture/delete', id: sourceRecordId, blobId: result.blobId }),
+          );
+          const clearedHistory = this.deps.getState().history.find((item) => item.id === sourceRecordId);
+          await this.removeCapturedBlobReference(result.blobId);
           const recentHistoryStore = this.deps.recentHistoryStore();
-          const history = recentHistoryStore
-            ? await recentHistoryStore.add(updatedHistory, window.location.href)
-            : this.deps.getState().history;
+          const history =
+            recentHistoryStore && clearedHistory
+              ? await recentHistoryStore.add(clearedHistory, window.location.href)
+              : this.deps.getState().history;
           this.deps.setState({
             ...this.deps.getState(),
             history,
-            message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image, but the recent row was not pinned: ${saved.message}`,
+            message: `Captured original was discarded because the recent row was not pinned: ${saved.message}`,
             status: 'error',
             lastUpdatedAt: Date.now(),
           });
@@ -203,6 +219,7 @@ export class CapturedOriginalsController {
 
   async deleteCapturedBlob(recordId: string, blobId: string): Promise<void> {
     if (!this.deps.captureStore()) return;
+    const sourceRecord = this.findRecordForDelete(recordId, blobId);
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'capture/delete', id: recordId, blobId }));
     const updatedHistory = this.deps.getState().history.find((b) => b.id === recordId);
     const recentHistoryStore = this.deps.recentHistoryStore();
@@ -210,9 +227,10 @@ export class CapturedOriginalsController {
       const history = await recentHistoryStore.add(updatedHistory, window.location.href);
       this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
     }
-    const updatedBookmark = this.deps
+    const visibleBookmark = this.deps
       .getState()
       .bookmarks.find((bookmark) => bookmark.id === recordId || recordHasBlobId(bookmark, blobId));
+    const updatedBookmark = visibleBookmark ?? (await this.findSavedRecordForDelete(sourceRecord, blobId));
     let queueChanged = false;
     const bookmarkStore = this.deps.bookmarkStore();
     if (updatedBookmark && bookmarkStore) {
@@ -226,5 +244,47 @@ export class CapturedOriginalsController {
       this.deps.render();
     }
     void this.removeCapturedBlobReference(blobId, { render: true });
+  }
+
+  private async findSavedRecordByUrl(url: string): Promise<ImageDisplayRecord | null> {
+    return (await this.deps.bookmarkStore()?.findByUrl(url)) ?? null;
+  }
+
+  private async useExistingStoredOriginal(
+    url: string,
+    sourceType: CaptureSourceType,
+    sourceRecordId: string | undefined,
+    savedRecord: ImageDisplayRecord,
+  ): Promise<void> {
+    if (sourceType === 'history' && sourceRecordId) {
+      await this.deps.markRecentHistoryRowPinned(sourceRecordId, savedRecord);
+    }
+    if (sourceType === 'target' || sourceType === 'history') {
+      await this.deps.loadBookmarkPage(0, { render: false });
+    } else {
+      await this.deps.loadBookmarkPage(this.deps.getState().bookmarkOffset, { render: false });
+    }
+    this.deps.setState({
+      ...this.deps.getState(),
+      message: `Original already stored for ${savedRecord.label ?? url}.`,
+      status: 'ready',
+      lastUpdatedAt: Date.now(),
+    });
+    this.deps.renderPanelAndRefreshRecall();
+  }
+
+  private findRecordForDelete(recordId: string, blobId: string): ImageDisplayRecord | undefined {
+    return [...this.deps.getState().history, ...this.deps.getState().bookmarks, ...this.deps.getState().recall.candidates].find(
+      (record) => record.id === recordId || recordHasBlobId(record, blobId),
+    );
+  }
+
+  private async findSavedRecordForDelete(sourceRecord: ImageDisplayRecord | undefined, blobId: string): Promise<ImageDisplayRecord | null> {
+    const bookmarkStore = this.deps.bookmarkStore();
+    if (!bookmarkStore || !sourceRecord) return null;
+    const linked = sourceRecord.pinnedRecordId ? (await bookmarkStore.loadByIds([sourceRecord.pinnedRecordId]))[0] : undefined;
+    const saved = linked ?? (await bookmarkStore.findByUrl(sourceRecord.url));
+    if (!saved || !recordHasBlobId(saved, blobId)) return null;
+    return withoutStoredOriginal(saved);
   }
 }

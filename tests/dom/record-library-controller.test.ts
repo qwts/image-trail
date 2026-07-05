@@ -28,6 +28,7 @@ function createHarness(options: { readonly findSelectedImage?: () => HTMLImageEl
   const historyAddLog: { record: ImageDisplayRecord; pageUrl: string }[] = [];
   let historyRows: ImageDisplayRecord[] = [];
   const bookmarkStore = {
+    findByUrl: async () => null,
     save: async (record: ImageDisplayRecord) => {
       savedBookmarks.push(record);
       return record;
@@ -139,6 +140,17 @@ test('removeRecentHistory removes the row first, then cleans up its encrypted bl
   ]);
 });
 
+test('removeRecentHistory leaves linked durable originals intact', async () => {
+  const harness = createHarness();
+  harness.patchState({
+    history: [capturedHistoryRecord('history-1', 'blob-1'), { ...capturedHistoryRecord('history-2', 'blob-2'), pinnedRecordId: 'pin-2' }],
+  });
+
+  await harness.controller.removeRecentHistory('history-2');
+
+  assert.deepEqual(harness.log, ['historyRemove:history-2:https://images.example.test/gallery', 'render']);
+});
+
 test('deleteRecentHistory cleans blobs without rendering and refreshes storage once at the end', async () => {
   const harness = createHarness();
   harness.patchState({ history: [capturedHistoryRecord('history-1', 'blob-1'), capturedHistoryRecord('history-2')] });
@@ -151,6 +163,23 @@ test('deleteRecentHistory cleans blobs without rendering and refreshes storage o
     'refreshStorageUsage:true',
   ]);
   assert.deepEqual(harness.getState().history, []);
+});
+
+test('deleteRecentHistory leaves linked durable originals intact', async () => {
+  const harness = createHarness();
+  harness.patchState({
+    history: [capturedHistoryRecord('history-1', 'blob-1'), { ...capturedHistoryRecord('history-2', 'blob-2'), pinnedRecordId: 'pin-2' }],
+  });
+
+  await harness.controller.deleteRecentHistory();
+
+  assert.deepEqual(harness.log, [
+    'historyRemove:history-1:https://images.example.test/gallery',
+    'historyRemove:history-2:https://images.example.test/gallery',
+    'render',
+    'removeCapturedBlobReference:blob-1:false',
+    'refreshStorageUsage:true',
+  ]);
 });
 
 test('markRecentHistoryRowPinned re-saves the pinned row and prunes stale selections', async () => {

@@ -72,6 +72,8 @@ export const loadRecentHistoryRequestSchema = v.object({
 
 export const loadBookmarksByIdsRequestSchema = v.object({ ids: stringArraySchema });
 
+export const findBookmarkByUrlRequestSchema = v.object({ url: v.string() });
+
 export const addRecentHistoryRequestSchema = v.object({
   pageUrl: v.string(),
   item: imageDisplayRecordSchema,
