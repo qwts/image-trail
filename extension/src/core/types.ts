@@ -182,7 +182,7 @@ export interface PCloudBackupState {
  * more sections adopt the detachable-section pattern; keep entries aligned with the renderer map in
  * `ui/render.ts`.
  */
-export type DetachableSectionId = 'history';
+export type DetachableSectionId = 'history' | 'settings';
 
 export interface PanelState {
   readonly visible: boolean;

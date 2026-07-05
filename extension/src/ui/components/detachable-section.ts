@@ -97,6 +97,10 @@ export function createDetachedSectionWindow(
     'keydown',
     (event) => {
       if (event.key !== 'Escape') return;
+      // Escape inside an editable control belongs to that control (cancel/blur an in-progress
+      // edit), not to the window — dense sections like Settings carry text inputs and textareas.
+      const origin = event.target;
+      if (origin instanceof HTMLInputElement || origin instanceof HTMLTextAreaElement || origin instanceof HTMLSelectElement) return;
       event.preventDefault();
       event.stopPropagation();
       dispatch({ name: 'section/restore', sectionId });

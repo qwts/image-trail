@@ -59,6 +59,69 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
   };
 }
 
+test('the Settings header renders a detach control that dispatches section/detach', () => {
+  const harness = createHarness();
+  harness.render(panelState({ settingsOpen: true }));
+
+  const detach = harness.root.querySelector<HTMLButtonElement>('[data-image-trail-detach="settings"]');
+  assert.ok(detach instanceof HTMLButtonElement, 'the detach control renders inside the Settings header');
+  assert.equal(harness.root.querySelector('.image-trail-panel__settings-section')?.contains(detach), true);
+
+  detach.click();
+  assert.deepEqual(harness.actions, [{ name: 'section/detach', sectionId: 'settings' }]);
+});
+
+test('detached Settings renders a placeholder and a wider window only while Settings is open', () => {
+  const harness = createHarness();
+  harness.render(panelState({ settingsOpen: true, detachedSections: ['settings'] }));
+
+  assert.equal(harness.root.querySelector('.image-trail-panel__settings-section'), null, 'Settings leaves the panel root');
+  assert.ok(harness.root.querySelector('[data-image-trail-detached-placeholder="settings"]'), 'a placeholder holds the Settings slot');
+  const windowEl = harness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="settings"]');
+  assert.ok(windowEl, 'the Settings window renders while Settings is open');
+  assert.equal(windowEl.getAttribute('aria-label'), 'Settings (detached)');
+  assert.ok(windowEl.querySelector('.image-trail-panel__settings-section'), 'the window hosts the Settings content');
+  assert.equal(windowEl.style.width, '420px', 'Settings gets the wider window default');
+
+  harness.render(panelState({ settingsOpen: false, detachedSections: ['settings'] }));
+
+  assert.equal(harness.root.querySelector('[data-image-trail-detached-placeholder="settings"]'), null, 'no placeholder while closed');
+  assert.equal(harness.detachedRoot.querySelector('[data-image-trail-detached-window="settings"]'), null, 'no window while closed');
+});
+
+test('a settings change dispatched from the detached window routes through the normal settings actions', () => {
+  const harness = createHarness();
+  harness.render(panelState({ settingsOpen: true, detachedSections: ['settings'] }));
+  const windowEl = harness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="settings"]');
+  assert.ok(windowEl);
+  const checkbox = windowEl.querySelector<HTMLInputElement>('.image-trail-panel__settings-checkbox input[type="checkbox"]');
+  assert.ok(checkbox instanceof HTMLInputElement, 'a settings checkbox renders inside the window');
+
+  checkbox.click();
+
+  assert.equal(harness.actions.length, 1);
+  const action = harness.actions[0] as { name: string };
+  assert.match(action.name, /^settings\//, 'the change dispatches a normal settings action');
+});
+
+test('Escape originating in an editable control does not restore the window', () => {
+  const harness = createHarness();
+  harness.render(panelState({ settingsOpen: true, detachedSections: ['settings'] }));
+  const windowEl = harness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="settings"]');
+  assert.ok(windowEl);
+  const input = windowEl.querySelector<HTMLInputElement>('input');
+  assert.ok(input instanceof HTMLInputElement, 'the Settings window contains an input');
+
+  const escapeFromInput = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+  input.dispatchEvent(escapeFromInput);
+
+  assert.equal(escapeFromInput.defaultPrevented, false, 'the window leaves Escape to the editable control');
+  assert.deepEqual(harness.actions, [], 'no restore dispatches from an editable control');
+
+  windowEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  assert.deepEqual(harness.actions, [{ name: 'section/restore', sectionId: 'settings' }]);
+});
+
 test('the history section header renders a keyboard-accessible detach control that dispatches section/detach', () => {
   const harness = createHarness();
   harness.render(panelState());

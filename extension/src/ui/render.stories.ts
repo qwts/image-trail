@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/html-vite';
+import { expect } from 'storybook/test';
 
 import type { PanelState } from '../core/types.js';
 import { renderPanel, type PanelLayoutState } from './render.js';
@@ -74,6 +75,65 @@ export const HistoryDetachedPlaceholder: Story = {
 export const SecondaryControlsExpanded: Story = {
   render: () => panelLayoutStory({ secondaryControlsOpen: true }),
 };
+
+export const SettingsDetached: Story = {
+  render: () => detachedPanelStory({ settingsOpen: true, detachedSections: ['settings'] }),
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector('.image-trail-panel')?.querySelector('.image-trail-panel__settings-section')).toBeNull();
+    await expect(canvasElement.querySelector('[data-image-trail-detached-placeholder="settings"]')).not.toBeNull();
+    const windowEl = canvasElement.querySelector<HTMLElement>('[data-image-trail-detached-window="settings"]');
+    await expect(windowEl).not.toBeNull();
+    await expect(windowEl?.querySelector('.image-trail-panel__settings-section')).not.toBeNull();
+  },
+};
+
+export const SettingsDetachedPrivacyMasked: Story = {
+  render: () => detachedPanelStory({ settingsOpen: true, detachedSections: ['settings'], privacyModeEnabled: true }),
+};
+
+/** Panel plus a detached-window root in one canvas; fixed windows become absolute for the story. */
+function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'relative';
+  wrapper.style.minInlineSize = '880px';
+  wrapper.style.minBlockSize = '700px';
+
+  const host = document.createElement('div');
+  host.className = 'image-trail-panel-root image-trail-panel';
+  host.style.position = 'absolute';
+  host.style.inset = 'auto';
+  host.style.left = '16px';
+  host.style.top = '16px';
+  host.style.width = '380px';
+  host.style.inlineSize = '380px';
+
+  const detachedRoot = document.createElement('div');
+  const layoutState: PanelLayoutState = {
+    fieldsPanelOpen: false,
+    fieldsPanelBlockSize: null,
+    historyListBlockSize: null,
+    fieldDisplayModes: new Map(),
+    detachedWindowPositions: new Map([['settings', { left: 420, top: 16 }]]),
+    detachedWindowMinimized: new Set(),
+  };
+  wrapper.append(host, detachedRoot);
+
+  renderPanel(
+    {
+      root: host,
+      detachedRoot,
+      dispatch: mockDispatch('panel layout story action'),
+      layoutState,
+    },
+    panelState(overrides),
+    { renderRecall: false },
+  );
+
+  for (const windowEl of Array.from(detachedRoot.querySelectorAll<HTMLElement>('.image-trail-panel__detached-window'))) {
+    windowEl.style.position = 'absolute';
+  }
+  return wrapper;
+}
 
 function panelLayoutStory(overrides: Partial<PanelState> = {}): HTMLElement {
   const host = document.createElement('div');

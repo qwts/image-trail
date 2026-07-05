@@ -746,7 +746,8 @@
   box-shadow: 0 0 0 1px rgb(88 166 255 / 70%);
 }
 
-.image-trail-panel-root .image-trail-panel__settings-section > h3 {
+.image-trail-panel-root .image-trail-panel__settings-section > h3,
+.image-trail-panel-root .image-trail-panel__settings-section > .image-trail-panel__section-header > h3 {
   color: #fff;
 }
 

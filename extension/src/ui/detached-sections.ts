@@ -5,12 +5,20 @@ import type { PanelRenderTarget } from './render.js';
 /** User-facing titles for detachable sections; shared by the header control, placeholder, and window. */
 export const DETACHABLE_SECTION_TITLES: Record<DetachableSectionId, string> = {
   history: 'Recent history',
+  settings: 'Settings',
 };
 
-/** Renders a detached section's content for the floating window; render.ts owns the assembly. */
-export type DetachableSectionContentRenderer = (target: PanelRenderTarget, state: PanelState) => HTMLElement;
+/**
+ * Renders a detached section's content for the floating window; render.ts owns the assembly.
+ * Returning null skips the window for this render (e.g. detached Settings while Settings is closed).
+ */
+export type DetachableSectionContentRenderer = (target: PanelRenderTarget, state: PanelState) => HTMLElement | null;
 
-const DETACHED_WINDOW_INLINE_SIZE = 340;
+/** Preferred window widths; Settings gets the panel's width for its dense forms and action groups. */
+const DETACHED_WINDOW_INLINE_SIZES: Record<DetachableSectionId, number> = {
+  history: 340,
+  settings: 420,
+};
 const DETACHED_WINDOW_GAP = 8;
 const DETACHED_WINDOW_EDGE_PADDING = 12;
 const DETACHED_WINDOW_STACK_OFFSET = 24;
@@ -51,12 +59,15 @@ export function renderDetachedSections(
   }
 
   detachedRoot.replaceChildren();
-  state.detachedSections.forEach((sectionId, index) => {
+  const visibleSections = state.detachedSections
+    .map((sectionId) => ({ sectionId, content: contentRenderers[sectionId](target, state) }))
+    .filter((entry): entry is { sectionId: DetachableSectionId; content: HTMLElement } => entry.content !== null);
+  visibleSections.forEach(({ sectionId, content }, index) => {
     const windowEl = createDetachedSectionWindow(
       {
         sectionId,
         sectionTitle: DETACHABLE_SECTION_TITLES[sectionId],
-        geometry: detachedWindowGeometry(target.root, target.layoutState.detachedWindowPositions.get(sectionId), index),
+        geometry: detachedWindowGeometry(target.root, sectionId, target.layoutState.detachedWindowPositions.get(sectionId), index),
         animate: !previousWindows.has(sectionId),
         minimized: target.layoutState.detachedWindowMinimized.has(sectionId),
         onPositionChange: (id, position) => {
@@ -67,7 +78,7 @@ export function renderDetachedSections(
           else target.layoutState.detachedWindowMinimized.delete(id);
         },
       },
-      contentRenderers[sectionId](target, state),
+      content,
       target.dispatch,
     );
     detachedRoot.append(windowEl);
@@ -83,11 +94,16 @@ export function renderDetachedSections(
   });
 }
 
-function detachedWindowGeometry(panelRoot: HTMLElement, stored: DetachedWindowPosition | undefined, index: number): DetachedWindowGeometry {
-  // Mirror the stylesheet's `width: min(340px, calc(100vw - 24px))` — never wider than the
+function detachedWindowGeometry(
+  panelRoot: HTMLElement,
+  sectionId: DetachableSectionId,
+  stored: DetachedWindowPosition | undefined,
+  index: number,
+): DetachedWindowGeometry {
+  // Mirror the stylesheet's `width: min(<preferred>, calc(100vw - 24px))` — never wider than the
   // viewport, since the inline width would otherwise override the CSS max-width.
   const availableInlineSize = Math.max(0, window.innerWidth - DETACHED_WINDOW_EDGE_PADDING * 2);
-  const inlineSize = Math.min(DETACHED_WINDOW_INLINE_SIZE, availableInlineSize);
+  const inlineSize = Math.min(DETACHED_WINDOW_INLINE_SIZES[sectionId], availableInlineSize);
   if (stored) return { ...stored, inlineSize };
   const rect = panelRoot.getBoundingClientRect();
   const stackOffset = index * DETACHED_WINDOW_STACK_OFFSET;

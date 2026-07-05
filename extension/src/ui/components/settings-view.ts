@@ -78,15 +78,20 @@ export function createSettingsView(
   },
   utilityChildren: readonly HTMLElement[],
   dispatch: (action: PanelAction) => void,
+  options: { readonly headerAccessory?: HTMLElement } = {},
 ): HTMLElement {
   const section = document.createElement('section');
   section.className = 'image-trail-panel__section image-trail-panel__settings-section';
 
   const heading = document.createElement('h3');
   heading.textContent = 'Settings';
+  const header = document.createElement('div');
+  header.className = 'image-trail-panel__section-header';
+  header.append(heading);
+  if (options.headerAccessory) header.append(options.headerAccessory);
 
   section.append(
-    heading,
+    header,
     createSettingsGroup('Display', 'display', [
       createVisiblePinsSettingsView(visibleBookmarkSoftMax, dispatch),
       createRecentsSettingsView(recentHistoryState, dispatch),
