@@ -29,6 +29,7 @@ export interface PlaintextLocalSettings {
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
+  readonly buildInfoOverlayVisible: boolean;
   readonly previewObjectFit: ObjectFitMode;
   readonly previewFillScreen: boolean;
   readonly urlReviewStatusLimit: number;
@@ -53,6 +54,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   bookmarkVisibilityScope: 'global',
   pinSaveStoragePreference: 'encrypted',
   privacyModeEnabled: false,
+  buildInfoOverlayVisible: true,
   previewObjectFit: DEFAULT_PREVIEW_OBJECT_FIT,
   previewFillScreen: true,
   urlReviewStatusLimit: DEFAULT_URL_REVIEW_STATUS_LIMIT,
@@ -121,6 +123,7 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
       ? input.pinSaveStoragePreference
       : DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference,
     privacyModeEnabled: input.privacyModeEnabled === true,
+    buildInfoOverlayVisible: input.buildInfoOverlayVisible !== false,
     previewObjectFit: isObjectFitMode(input.previewObjectFit) ? input.previewObjectFit : DEFAULT_LOCAL_SETTINGS.previewObjectFit,
     previewFillScreen: input.previewFillScreen !== false,
     urlReviewStatusLimit: isSafeUrlReviewStatusLimit(input.urlReviewStatusLimit)

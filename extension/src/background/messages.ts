@@ -2,145 +2,26 @@ import * as v from 'valibot';
 import { isBuildIdentity, type BuildIdentity } from '../core/build-info.js';
 import { storageUsageSummarySchema } from '../core/image/capture-result.schema.js';
 import type { ImageProbeMethod, ImageRequestIntent, ImageSourceProfile } from '../core/image/request-policy.js';
+import { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
+import type { MessageType as ProtocolMessageType } from './message-protocol.js';
 
-export const MESSAGE_PROTOCOL_VERSION = 1;
+export { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
 
 const deleteBlobResultPayloadSchema = v.object({
   deleted: v.boolean(),
   usage: storageUsageSummarySchema,
 });
 
-export const MessageType = {
-  TogglePanel: 'imageTrail.togglePanel',
-  Ping: 'imageTrail.ping',
-  LoadBuildIdentity: 'imageTrail.loadBuildIdentity',
-  LoadBuildIdentityResult: 'imageTrail.loadBuildIdentityResult',
-  Status: 'imageTrail.status',
-  Unknown: 'imageTrail.unknown',
-  CaptureImage: 'imageTrail.captureImage',
-  CaptureResult: 'imageTrail.captureResult',
-  DownloadImage: 'imageTrail.downloadImage',
-  DownloadImageResult: 'imageTrail.downloadImageResult',
-  ExportEncryptedImage: 'imageTrail.exportEncryptedImage',
-  ExportEncryptedImageResult: 'imageTrail.exportEncryptedImageResult',
-  ImportEncryptedImage: 'imageTrail.importEncryptedImage',
-  ImportEncryptedImageResult: 'imageTrail.importEncryptedImageResult',
-  StorageUsageRequest: 'imageTrail.storageUsageRequest',
-  StorageUsageResponse: 'imageTrail.storageUsageResponse',
-  DeleteBlob: 'imageTrail.deleteBlob',
-  DeleteBlobResult: 'imageTrail.deleteBlobResult',
-  CleanupOrphanedBlobs: 'imageTrail.cleanupOrphanedBlobs',
-  CleanupOrphanedBlobsResult: 'imageTrail.cleanupOrphanedBlobsResult',
-  RetrieveBlob: 'imageTrail.retrieveBlob',
-  RetrieveBlobResult: 'imageTrail.retrieveBlobResult',
-  ExportOriginalBlobs: 'imageTrail.exportOriginalBlobs',
-  ExportOriginalBlobsResult: 'imageTrail.exportOriginalBlobsResult',
-  ImportOriginalBlobs: 'imageTrail.importOriginalBlobs',
-  ImportOriginalBlobsResult: 'imageTrail.importOriginalBlobsResult',
-  CreateBlobPreview: 'imageTrail.createBlobPreview',
-  CreateDataUrlPreview: 'imageTrail.createDataUrlPreview',
-  CreateBlobPreviewResult: 'imageTrail.createBlobPreviewResult',
-  FetchThumbnailSource: 'imageTrail.fetchThumbnailSource',
-  FetchThumbnailSourceResult: 'imageTrail.fetchThumbnailSourceResult',
-  ProbeImageSource: 'imageTrail.probeImageSource',
-  ProbeImageSourceResult: 'imageTrail.probeImageSourceResult',
-  FetchBufferedImageSource: 'imageTrail.fetchBufferedImageSource',
-  FetchBufferedImageSourceResult: 'imageTrail.fetchBufferedImageSourceResult',
-  CheckImageRequestPolicy: 'imageTrail.checkImageRequestPolicy',
-  CheckImageRequestPolicyResult: 'imageTrail.checkImageRequestPolicyResult',
-  FetchLinkedPage: 'imageTrail.fetchLinkedPage',
-  FetchLinkedPageResult: 'imageTrail.fetchLinkedPageResult',
-  GrantPermissionAndCapture: 'imageTrail.grantPermissionAndCapture',
-  BlobKeyStatus: 'imageTrail.blobKeyStatus',
-  BlobKeyStatusResult: 'imageTrail.blobKeyStatusResult',
-  SetupBlobKey: 'imageTrail.setupBlobKey',
-  UnlockBlobKey: 'imageTrail.unlockBlobKey',
-  ClearBlobKey: 'imageTrail.clearBlobKey',
-  ExportBlobKeyBackup: 'imageTrail.exportBlobKeyBackup',
-  ExportBlobKeyBackupResult: 'imageTrail.exportBlobKeyBackupResult',
-  ImportBlobKeyBackup: 'imageTrail.importBlobKeyBackup',
-  ImportBlobKeyBackupResult: 'imageTrail.importBlobKeyBackupResult',
-  BlobKeyResult: 'imageTrail.blobKeyResult',
-  LoadBookmarks: 'imageTrail.loadBookmarks',
-  LoadBookmarksResult: 'imageTrail.loadBookmarksResult',
-  LoadBookmarksByIds: 'imageTrail.loadBookmarksByIds',
-  LoadBookmarksByIdsResult: 'imageTrail.loadBookmarksByIdsResult',
-  FindBookmarkByUrl: 'imageTrail.findBookmarkByUrl',
-  FindBookmarkByUrlResult: 'imageTrail.findBookmarkByUrlResult',
-  SaveBookmark: 'imageTrail.saveBookmark',
-  SaveBookmarkResult: 'imageTrail.saveBookmarkResult',
-  RemoveBookmark: 'imageTrail.removeBookmark',
-  RemoveBookmarkResult: 'imageTrail.removeBookmarkResult',
-  RemoveBookmarks: 'imageTrail.removeBookmarks',
-  RemoveBookmarksResult: 'imageTrail.removeBookmarksResult',
-  RemoveRecallBookmarks: 'imageTrail.removeRecallBookmarks',
-  RemoveRecallBookmarksResult: 'imageTrail.removeRecallBookmarksResult',
-  LoadRecentHistory: 'imageTrail.loadRecentHistory',
-  LoadRecentHistoryResult: 'imageTrail.loadRecentHistoryResult',
-  AddRecentHistory: 'imageTrail.addRecentHistory',
-  AddRecentHistoryResult: 'imageTrail.addRecentHistoryResult',
-  RemoveRecentHistory: 'imageTrail.removeRecentHistory',
-  RemoveRecentHistoryResult: 'imageTrail.removeRecentHistoryResult',
-  LoadRecallCandidates: 'imageTrail.loadRecallCandidates',
-  LoadRecallCandidatesResult: 'imageTrail.loadRecallCandidatesResult',
-  RecallRecords: 'imageTrail.recallRecords',
-  RecallRecordsResult: 'imageTrail.recallRecordsResult',
-  LoadPanelPosition: 'imageTrail.loadPanelPosition',
-  LoadPanelPositionResult: 'imageTrail.loadPanelPositionResult',
-  SavePanelPosition: 'imageTrail.savePanelPosition',
-  SavePanelPositionResult: 'imageTrail.savePanelPositionResult',
-  DeletePanelPosition: 'imageTrail.deletePanelPosition',
-  DeletePanelPositionResult: 'imageTrail.deletePanelPositionResult',
-  LoadParsedFieldState: 'imageTrail.loadParsedFieldState',
-  LoadParsedFieldStateResult: 'imageTrail.loadParsedFieldStateResult',
-  LoadParsedFieldStateBySource: 'imageTrail.loadParsedFieldStateBySource',
-  LoadParsedFieldStateBySourceResult: 'imageTrail.loadParsedFieldStateBySourceResult',
-  SaveParsedFieldState: 'imageTrail.saveParsedFieldState',
-  SaveParsedFieldStateResult: 'imageTrail.saveParsedFieldStateResult',
-  ListUrlReviewStatus: 'imageTrail.listUrlReviewStatus',
-  ListUrlReviewStatusResult: 'imageTrail.listUrlReviewStatusResult',
-  SaveUrlReviewStatus: 'imageTrail.saveUrlReviewStatus',
-  SaveUrlReviewStatusResult: 'imageTrail.saveUrlReviewStatusResult',
-  ImportUrlReviewStatus: 'imageTrail.importUrlReviewStatus',
-  ImportUrlReviewStatusResult: 'imageTrail.importUrlReviewStatusResult',
-  ClearUrlReviewStatus: 'imageTrail.clearUrlReviewStatus',
-  ClearUrlReviewStatusResult: 'imageTrail.clearUrlReviewStatusResult',
-  LoadLocalSettings: 'imageTrail.loadLocalSettings',
-  LoadLocalSettingsResult: 'imageTrail.loadLocalSettingsResult',
-  SaveLocalSettings: 'imageTrail.saveLocalSettings',
-  SaveLocalSettingsResult: 'imageTrail.saveLocalSettingsResult',
-  PCloudProviderStatus: 'imageTrail.pcloudProviderStatus',
-  PCloudProviderStatusResult: 'imageTrail.pcloudProviderStatusResult',
-  ConnectPCloudProvider: 'imageTrail.connectPCloudProvider',
-  ConnectPCloudProviderResult: 'imageTrail.connectPCloudProviderResult',
-  DisconnectPCloudProvider: 'imageTrail.disconnectPCloudProvider',
-  DisconnectPCloudProviderResult: 'imageTrail.disconnectPCloudProviderResult',
-  UploadPCloudBackup: 'imageTrail.uploadPCloudBackup',
-  UploadPCloudBackupResult: 'imageTrail.uploadPCloudBackupResult',
-  ListPCloudBackups: 'imageTrail.listPCloudBackups',
-  ListPCloudBackupsResult: 'imageTrail.listPCloudBackupsResult',
-  DownloadPCloudBackup: 'imageTrail.downloadPCloudBackup',
-  DownloadPCloudBackupResult: 'imageTrail.downloadPCloudBackupResult',
-  ListUrlTemplates: 'imageTrail.listUrlTemplates',
-  ListUrlTemplatesResult: 'imageTrail.listUrlTemplatesResult',
-  SaveUrlTemplate: 'imageTrail.saveUrlTemplate',
-  SaveUrlTemplateResult: 'imageTrail.saveUrlTemplateResult',
-  DeleteUrlTemplate: 'imageTrail.deleteUrlTemplate',
-  DeleteUrlTemplateResult: 'imageTrail.deleteUrlTemplateResult',
-  ListGrabSourcePatterns: 'imageTrail.listGrabSourcePatterns',
-  ListGrabSourcePatternsResult: 'imageTrail.listGrabSourcePatternsResult',
-  SaveGrabSourcePattern: 'imageTrail.saveGrabSourcePattern',
-  SaveGrabSourcePatternResult: 'imageTrail.saveGrabSourcePatternResult',
-  DeleteGrabSourcePattern: 'imageTrail.deleteGrabSourcePattern',
-  DeleteGrabSourcePatternResult: 'imageTrail.deleteGrabSourcePatternResult',
-} as const;
-
-export type MessageType = (typeof MessageType)[keyof typeof MessageType];
-
 export interface TogglePanelMessage {
   readonly type: typeof MessageType.TogglePanel;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload: { readonly source: 'browserAction' };
+}
+
+export interface ToggleBuildIdentityOverlayMessage {
+  readonly type: typeof MessageType.ToggleBuildIdentityOverlay;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly source: 'browserCommand' };
 }
 
 export interface PingMessage {
@@ -1036,6 +917,7 @@ export interface DeleteGrabSourcePatternResultMessage {
 
 export type ExtensionRequest =
   | TogglePanelMessage
+  | ToggleBuildIdentityOverlayMessage
   | PingMessage
   | LoadBuildIdentityMessage
   | CaptureImageMessage
@@ -1159,140 +1041,12 @@ export type ExtensionResponse =
   | SaveGrabSourcePatternResultMessage
   | DeleteGrabSourcePatternResultMessage;
 
-/**
- * Single runtime source of truth for whether a message type is a request or a
- * response. `satisfies Record<MessageType, …>` makes this exhaustive: adding a
- * MessageType without a direction (or an extra/typo key) is a compile error. The
- * request/response guards below derive from this map, replacing the two former
- * 60-clause `||` chains that had to be hand-synced with every new message.
- */
-export const MESSAGE_DIRECTION = {
-  [MessageType.TogglePanel]: 'request',
-  [MessageType.Ping]: 'request',
-  [MessageType.LoadBuildIdentity]: 'request',
-  [MessageType.LoadBuildIdentityResult]: 'response',
-  [MessageType.Status]: 'response',
-  [MessageType.Unknown]: 'response',
-  [MessageType.CaptureImage]: 'request',
-  [MessageType.CaptureResult]: 'response',
-  [MessageType.DownloadImage]: 'request',
-  [MessageType.DownloadImageResult]: 'response',
-  [MessageType.ExportEncryptedImage]: 'request',
-  [MessageType.ExportEncryptedImageResult]: 'response',
-  [MessageType.ImportEncryptedImage]: 'request',
-  [MessageType.ImportEncryptedImageResult]: 'response',
-  [MessageType.StorageUsageRequest]: 'request',
-  [MessageType.StorageUsageResponse]: 'response',
-  [MessageType.DeleteBlob]: 'request',
-  [MessageType.DeleteBlobResult]: 'response',
-  [MessageType.CleanupOrphanedBlobs]: 'request',
-  [MessageType.CleanupOrphanedBlobsResult]: 'response',
-  [MessageType.RetrieveBlob]: 'request',
-  [MessageType.RetrieveBlobResult]: 'response',
-  [MessageType.ExportOriginalBlobs]: 'request',
-  [MessageType.ExportOriginalBlobsResult]: 'response',
-  [MessageType.ImportOriginalBlobs]: 'request',
-  [MessageType.ImportOriginalBlobsResult]: 'response',
-  [MessageType.CreateBlobPreview]: 'request',
-  [MessageType.CreateDataUrlPreview]: 'request',
-  [MessageType.CreateBlobPreviewResult]: 'response',
-  [MessageType.FetchThumbnailSource]: 'request',
-  [MessageType.FetchThumbnailSourceResult]: 'response',
-  [MessageType.ProbeImageSource]: 'request',
-  [MessageType.ProbeImageSourceResult]: 'response',
-  [MessageType.FetchBufferedImageSource]: 'request',
-  [MessageType.FetchBufferedImageSourceResult]: 'response',
-  [MessageType.CheckImageRequestPolicy]: 'request',
-  [MessageType.CheckImageRequestPolicyResult]: 'response',
-  [MessageType.FetchLinkedPage]: 'request',
-  [MessageType.FetchLinkedPageResult]: 'response',
-  [MessageType.GrantPermissionAndCapture]: 'request',
-  [MessageType.BlobKeyStatus]: 'request',
-  [MessageType.BlobKeyStatusResult]: 'response',
-  [MessageType.SetupBlobKey]: 'request',
-  [MessageType.UnlockBlobKey]: 'request',
-  [MessageType.ClearBlobKey]: 'request',
-  [MessageType.ExportBlobKeyBackup]: 'request',
-  [MessageType.ExportBlobKeyBackupResult]: 'response',
-  [MessageType.ImportBlobKeyBackup]: 'request',
-  [MessageType.ImportBlobKeyBackupResult]: 'response',
-  [MessageType.BlobKeyResult]: 'response',
-  [MessageType.LoadBookmarks]: 'request',
-  [MessageType.LoadBookmarksResult]: 'response',
-  [MessageType.LoadBookmarksByIds]: 'request',
-  [MessageType.LoadBookmarksByIdsResult]: 'response',
-  [MessageType.FindBookmarkByUrl]: 'request',
-  [MessageType.FindBookmarkByUrlResult]: 'response',
-  [MessageType.SaveBookmark]: 'request',
-  [MessageType.SaveBookmarkResult]: 'response',
-  [MessageType.RemoveBookmark]: 'request',
-  [MessageType.RemoveBookmarkResult]: 'response',
-  [MessageType.RemoveBookmarks]: 'request',
-  [MessageType.RemoveBookmarksResult]: 'response',
-  [MessageType.RemoveRecallBookmarks]: 'request',
-  [MessageType.RemoveRecallBookmarksResult]: 'response',
-  [MessageType.LoadRecentHistory]: 'request',
-  [MessageType.LoadRecentHistoryResult]: 'response',
-  [MessageType.AddRecentHistory]: 'request',
-  [MessageType.AddRecentHistoryResult]: 'response',
-  [MessageType.RemoveRecentHistory]: 'request',
-  [MessageType.RemoveRecentHistoryResult]: 'response',
-  [MessageType.LoadRecallCandidates]: 'request',
-  [MessageType.LoadRecallCandidatesResult]: 'response',
-  [MessageType.RecallRecords]: 'request',
-  [MessageType.RecallRecordsResult]: 'response',
-  [MessageType.LoadPanelPosition]: 'request',
-  [MessageType.LoadPanelPositionResult]: 'response',
-  [MessageType.SavePanelPosition]: 'request',
-  [MessageType.SavePanelPositionResult]: 'response',
-  [MessageType.DeletePanelPosition]: 'request',
-  [MessageType.DeletePanelPositionResult]: 'response',
-  [MessageType.LoadParsedFieldState]: 'request',
-  [MessageType.LoadParsedFieldStateResult]: 'response',
-  [MessageType.LoadParsedFieldStateBySource]: 'request',
-  [MessageType.LoadParsedFieldStateBySourceResult]: 'response',
-  [MessageType.SaveParsedFieldState]: 'request',
-  [MessageType.SaveParsedFieldStateResult]: 'response',
-  [MessageType.ListUrlReviewStatus]: 'request',
-  [MessageType.ListUrlReviewStatusResult]: 'response',
-  [MessageType.SaveUrlReviewStatus]: 'request',
-  [MessageType.SaveUrlReviewStatusResult]: 'response',
-  [MessageType.ImportUrlReviewStatus]: 'request',
-  [MessageType.ImportUrlReviewStatusResult]: 'response',
-  [MessageType.ClearUrlReviewStatus]: 'request',
-  [MessageType.ClearUrlReviewStatusResult]: 'response',
-  [MessageType.LoadLocalSettings]: 'request',
-  [MessageType.LoadLocalSettingsResult]: 'response',
-  [MessageType.SaveLocalSettings]: 'request',
-  [MessageType.SaveLocalSettingsResult]: 'response',
-  [MessageType.PCloudProviderStatus]: 'request',
-  [MessageType.PCloudProviderStatusResult]: 'response',
-  [MessageType.ConnectPCloudProvider]: 'request',
-  [MessageType.ConnectPCloudProviderResult]: 'response',
-  [MessageType.DisconnectPCloudProvider]: 'request',
-  [MessageType.DisconnectPCloudProviderResult]: 'response',
-  [MessageType.UploadPCloudBackup]: 'request',
-  [MessageType.UploadPCloudBackupResult]: 'response',
-  [MessageType.ListPCloudBackups]: 'request',
-  [MessageType.ListPCloudBackupsResult]: 'response',
-  [MessageType.DownloadPCloudBackup]: 'request',
-  [MessageType.DownloadPCloudBackupResult]: 'response',
-  [MessageType.ListUrlTemplates]: 'request',
-  [MessageType.ListUrlTemplatesResult]: 'response',
-  [MessageType.SaveUrlTemplate]: 'request',
-  [MessageType.SaveUrlTemplateResult]: 'response',
-  [MessageType.DeleteUrlTemplate]: 'request',
-  [MessageType.DeleteUrlTemplateResult]: 'response',
-  [MessageType.ListGrabSourcePatterns]: 'request',
-  [MessageType.ListGrabSourcePatternsResult]: 'response',
-  [MessageType.SaveGrabSourcePattern]: 'request',
-  [MessageType.SaveGrabSourcePatternResult]: 'response',
-  [MessageType.DeleteGrabSourcePattern]: 'request',
-  [MessageType.DeleteGrabSourcePatternResult]: 'response',
-} as const satisfies Record<MessageType, 'request' | 'response'>;
-
 export function createTogglePanelMessage(): TogglePanelMessage {
   return { type: MessageType.TogglePanel, version: MESSAGE_PROTOCOL_VERSION, payload: { source: 'browserAction' } };
+}
+
+export function createToggleBuildIdentityOverlayMessage(): ToggleBuildIdentityOverlayMessage {
+  return { type: MessageType.ToggleBuildIdentityOverlay, version: MESSAGE_PROTOCOL_VERSION, payload: { source: 'browserCommand' } };
 }
 
 export function createPingMessage(): PingMessage {
@@ -1905,12 +1659,12 @@ function hasVersionedObjectShape(value: unknown): value is { type?: unknown; ver
 
 export function isExtensionRequest(value: unknown): value is ExtensionRequest {
   if (!hasVersionedObjectShape(value)) return false;
-  return MESSAGE_DIRECTION[value.type as MessageType] === 'request';
+  return MESSAGE_DIRECTION[value.type as ProtocolMessageType] === 'request';
 }
 
 export function isExtensionResponse(value: unknown): value is ExtensionResponse {
   if (!hasVersionedObjectShape(value)) return false;
-  return MESSAGE_DIRECTION[value.type as MessageType] === 'response';
+  return MESSAGE_DIRECTION[value.type as ProtocolMessageType] === 'response';
 }
 
 export function isBlobKeyResultMessage(value: unknown): value is BlobKeyResultMessage {

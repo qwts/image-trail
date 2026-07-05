@@ -70,6 +70,7 @@ function createHarness(): Harness {
     clearRecallMessageTimer: noop,
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
     saveLocalSettings: noop,
+    applyBuildInfoOverlayVisibility: noop,
     pageAdapter: () => ({ enableBookmarkShortcut: () => record('pageAdapter.enableBookmarkShortcut') }) as unknown as PageAdapter,
     panelMount: () => panelMount,
     keyboard: () => ({ enable: () => record('keyboard.enable') }) as unknown as KeyboardRouter,

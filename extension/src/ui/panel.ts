@@ -78,6 +78,10 @@ function removeItems(items: readonly string[], removedItems: readonly string[]):
 export { nextParsedFieldStatePageKey, shouldRestoreParsedFieldState } from './panel/parsed-field-state-sync.js';
 export { projectionSessionOwnsSelectedTarget, urlReviewStatusForLoadResult } from './panel/projection-application-controller.js';
 
+export interface ImageTrailPanelOptions {
+  readonly applyBuildInfoOverlayVisibility?: (visible: boolean) => void;
+}
+
 export class ImageTrailPanel {
   private readonly panelMount = new PanelMount({
     isPanelVisible: () => this.state.visible,
@@ -436,6 +440,7 @@ export class ImageTrailPanel {
     private readonly urlTemplateStore: UrlTemplateStore | null = null,
     private readonly parsedFieldStateStore: ParsedFieldStateStore | null = null,
     private readonly urlReviewStatusStore: UrlReviewStatusStore | null = null,
+    private readonly options: ImageTrailPanelOptions = {},
   ) {
     this.panelMount.registerSubscriptions([
       this.pageAdapter.subscribe((snapshot) => {
@@ -505,6 +510,10 @@ export class ImageTrailPanel {
     if (this.state.visible && this.state.settingsOpen) this.render();
   }
 
+  setBuildInfoOverlayVisible(visible: boolean): void {
+    this.dispatch({ name: 'settings/update-build-info-overlay-visibility', visible });
+  }
+
   toggle(): PanelState {
     const wasVisible = this.state.visible;
     this.dispatch({ name: 'toggle-panel' });
@@ -563,6 +572,7 @@ export class ImageTrailPanel {
       clearRecallMessageTimer: () => this.recallDrawer.clearRecallMessageTimer(),
       getLocalSettings: () => this.localSettings,
       saveLocalSettings: (settings) => this.panelSettings.saveLocalSettings(settings),
+      applyBuildInfoOverlayVisibility: (visible) => this.options.applyBuildInfoOverlayVisibility?.(visible),
       pageAdapter: () => this.pageAdapter,
       panelMount: () => this.panelMount,
       keyboard: () => this.keyboard,

@@ -114,6 +114,7 @@ import {
   createStatusMessage,
   createStorageUsageRequestMessage,
   createStorageUsageResponseMessage,
+  createToggleBuildIdentityOverlayMessage,
   createTogglePanelMessage,
   createUnknownMessageResponse,
   isCaptureResultMessage,
@@ -174,6 +175,7 @@ import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js'
 
 test('recognizes only versioned extension requests as requests', () => {
   assert.equal(isExtensionRequest(createTogglePanelMessage()), true);
+  assert.equal(isExtensionRequest(createToggleBuildIdentityOverlayMessage()), true);
   assert.equal(isExtensionRequest(createPingMessage()), true);
   assert.equal(isExtensionRequest(createStatusMessage(false, 'hidden')), false);
   assert.equal(isExtensionRequest({ type: MessageType.Ping, version: 0, payload: {} }), false);

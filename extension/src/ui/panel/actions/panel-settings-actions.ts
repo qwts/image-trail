@@ -10,6 +10,7 @@ export type PanelSettingsActionName =
   | 'settings/update-recent-history-retention'
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
+  | 'settings/update-build-info-overlay-visibility'
   | 'settings/update-url-review-status-retention'
   | 'settings/update-request-throttle'
   | 'settings/update-neighbor-preload'
@@ -70,6 +71,14 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
         deps.saveLocalSettings({ ...deps.getLocalSettings(), privacyModeEnabled: action.enabled });
         deps.render();
         deps.refreshRecallIfOpen();
+      },
+    },
+    'settings/update-build-info-overlay-visibility': {
+      handle(action) {
+        deps.reduce(action);
+        deps.saveLocalSettings({ ...deps.getLocalSettings(), buildInfoOverlayVisible: action.visible });
+        deps.applyBuildInfoOverlayVisibility(action.visible);
+        deps.render();
       },
     },
     'settings/update-url-review-status-retention': {

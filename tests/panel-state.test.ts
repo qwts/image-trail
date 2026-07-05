@@ -636,6 +636,28 @@ test('toggling privacy mode does not mutate rows or selections', () => {
   assert.deepEqual(updated.selectedBookmarkIds, ['bookmark-1']);
 });
 
+test('updating build info overlay visibility only changes the overlay setting', () => {
+  const state = {
+    ...createInitialPanelState(),
+    history: [
+      { id: 'history-1', url: 'https://example.test/history.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'history' as const },
+    ],
+    bookmarks: [
+      { id: 'bookmark-1', url: 'https://example.test/bookmark.jpg', timestamp: '2026-06-20T00:00:00.000Z', source: 'bookmark' as const },
+    ],
+    selectedHistoryIds: ['history-1'],
+    selectedBookmarkIds: ['bookmark-1'],
+  };
+
+  const updated = reducePanelAction(state, { name: 'settings/update-build-info-overlay-visibility', visible: false });
+
+  assert.equal(updated.buildInfoOverlayVisible, false);
+  assert.equal(updated.history, state.history);
+  assert.equal(updated.bookmarks, state.bookmarks);
+  assert.deepEqual(updated.selectedHistoryIds, ['history-1']);
+  assert.deepEqual(updated.selectedBookmarkIds, ['bookmark-1']);
+});
+
 test('updating URL review status retention settings only changes review policy state', () => {
   const state = {
     ...createInitialPanelState(),

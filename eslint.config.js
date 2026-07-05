@@ -110,6 +110,15 @@ export default tseslint.config(
   },
   ...layerBoundaryConfigs,
   {
+    // #356 split protocol constants out of messages.ts and ratcheted the physical line ceiling from
+    // the pre-split 2210-line baseline down to 1970. Count comments/blank lines for this file so the
+    // lint guard matches the documented `wc -l` acceptance check.
+    files: ['extension/src/background/messages.ts'],
+    rules: {
+      'max-lines': ['error', { max: 1970, skipBlankLines: false, skipComments: false }],
+    },
+  },
+  {
     // Size tripwire for the panel orchestrator and its decomposed collaborators so they can never
     // regrow toward the 5k-line ImageTrailPanel god object they were extracted from (epics #265,
     // #290). #290 drove `panel.ts` under this rule's 800-line budget (which skips blank lines and

@@ -58,6 +58,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     bookmarkVisibilityScope: 'global',
     pinSaveStoragePreference: 'encrypted',
     privacyModeEnabled: false,
+    buildInfoOverlayVisible: true,
     urlReviewStatusLimit: DEFAULT_URL_REVIEW_STATUS_LIMIT,
     clearUrlReviewStatusAfterExport: false,
     requestThrottleMs: DEFAULT_GOVERNOR_CONFIG.minimumIntervalMs,
