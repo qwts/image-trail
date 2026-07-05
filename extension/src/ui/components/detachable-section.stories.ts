@@ -120,6 +120,5 @@ function windowStory(
     content,
     dispatch,
   );
-  if (!options.minimized) windowEl.style.height = '420px';
   return drawerStory(windowEl);
 }

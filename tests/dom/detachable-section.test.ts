@@ -211,6 +211,24 @@ test('a minimized window stays minimized across rerenders and Escape still resto
   assert.deepEqual(harness.actions, [{ name: 'section/restore', sectionId: 'history' }]);
 });
 
+test('restoring a section clears its minimized flag so the next detach opens expanded', () => {
+  const harness = createHarness();
+  harness.render(panelState({ detachedSections: ['history'] }));
+  const minimize = harness.detachedRoot.querySelector<HTMLButtonElement>('[data-image-trail-minimize="history"]');
+  assert.ok(minimize instanceof HTMLButtonElement);
+  minimize.click();
+  assert.equal(harness.layoutState.detachedWindowMinimized.has('history'), true);
+
+  harness.render(panelState());
+
+  assert.equal(harness.layoutState.detachedWindowMinimized.has('history'), false, 'restore prunes the minimized flag');
+
+  harness.render(panelState({ detachedSections: ['history'] }));
+  const windowEl = harness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="history"]');
+  assert.ok(windowEl);
+  assert.equal(windowEl.classList.contains('is-minimized'), false, 're-detaching opens the window expanded');
+});
+
 test('minimizing the panel clears the detached root', () => {
   const harness = createHarness();
   harness.render(panelState({ detachedSections: ['history'] }));
