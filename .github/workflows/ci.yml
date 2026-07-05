@@ -4,6 +4,16 @@ on:
   pull_request:
     branches:
       - main
+  # Post-merge signal: merges land via admin bypass, so run the same gates on main itself.
+  push:
+    branches:
+      - main
+
+# Cancel superseded PR runs — a stacked push otherwise burns a full E2E run per commit. Main-push
+# runs are never cancelled: each merge commit keeps its own post-merge verdict.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -80,8 +90,9 @@ jobs:
       # Forcing function (#343): a PR touching user-facing source (ui/ or content/) must also
       # update tests/e2e/coverage-map.json, or opt out with "no-acceptance-impact". Runs last and
       # with !cancelled() so it always reports its verdict, and is part of the required CI check.
+      # PR-only: it reads the PR's changed files/body/labels, which a main-push run doesn't have.
       - name: Acceptance coverage check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: npm run check:acceptance-coverage
@@ -94,7 +105,8 @@ jobs:
   e2e-report:
     name: Publish E2E report
     needs: ci
-    if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository }}
+    # PR-only (the stable URL is per-PR); the event guard also keeps main-push runs out explicitly.
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

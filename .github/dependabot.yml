@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Grouped weekly npm updates: one PR for all devDependencies instead of a PR per package.
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    groups:
+      dev-deps:
+        patterns:
+          - '*'
+
+  # Keep the pinned action versions in .github/workflows current the same way.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - '*'

@@ -135,6 +135,12 @@ build` and paste **Built local** time plus commit, branch, and worktree when
 - Install with `npm ci`, then run the gate with `npm run ci` (equivalently the
   four commands from **Documentation And Validation**: `npm run lint`,
   `npm run format:check`, `npm test`, `npm run build`).
+- `npm ci` also installs the husky pre-commit hook (`.husky/pre-commit`), which
+  runs `lint-staged` (eslint --fix / prettier on staged files). Fix what it
+  flags rather than bypassing it; `git commit --no-verify` is for emergencies.
+- User-visible changes should include a changeset (`npx changeset`);
+  `npm run changeset:version` consumes them into `CHANGELOG.md` and bumps both
+  `package.json` and `extension/manifest.json` together.
 - Invoke tools through `PATH` (or `npx` for project binaries). Do not hardcode
   machine-specific absolute paths; `gh`, `gpg`, and other CLIs must resolve from
   the environment.
