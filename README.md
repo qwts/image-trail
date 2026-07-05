@@ -70,11 +70,13 @@ Canonical long-lived documentation lives in the GitHub wiki:
 - [Acceptance Tests](https://github.com/qwtm/image-trail/wiki/Acceptance-Tests)
 - [User Stories](https://github.com/qwtm/image-trail/wiki/User-Stories)
 - [Repo Documentation Pointer Map](https://github.com/qwtm/image-trail/wiki/Repo-Documentation-Pointer-Map)
+- [Design brief](DESIGN.md)
 - [Versioning automation planning](https://github.com/qwtm/image-trail/issues/387)
 
 Repository markdown files are pointer stubs unless they are agent instruction
-files, `README.md`, `CONTRIBUTING.md`, or GitHub issue and pull request
-templates. Update the wiki page linked from a stub, not the stub itself.
+files, `README.md`, `CONTRIBUTING.md`, root `DESIGN.md`, or GitHub issue and
+pull request templates. Update the wiki page linked from a stub, not the stub
+itself.
 
 ## Validation
 
