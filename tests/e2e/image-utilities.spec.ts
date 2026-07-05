@@ -8,6 +8,7 @@ import {
   applyUrlInEditor,
   clearDownloadRequestLog,
   expect,
+  expectPanelClosed,
   expectPanelOpen,
   expectPanelStatusMessage,
   fixtureAssetPaths,
@@ -108,6 +109,53 @@ async function clearEncryptedOriginalsKey(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Clear key' }).click();
   await page.getByRole('button', { name: 'Confirm clear key' }).click();
   await expectPanelStatusMessage(page, /Encrypted blob key cleared\. Import a key backup to recover encrypted originals\./u);
+}
+
+// Removes every stored blob key directly from the extension database. Used to reset
+// a key that a service-worker restart has left present-but-locked: the panel offers
+// no Clear key control in that state, so the UI cannot clear it. This is safe because
+// a locked key means no unlocked key is held in service-worker memory, so deleting the
+// stored record cannot desync an active in-memory key. Mirrors handleClearBlobKey,
+// which removes the same 'blob'-kind rows from the 'keys' store.
+async function clearStoredBlobKeys(serviceWorker: Worker): Promise<void> {
+  await serviceWorker.evaluate(
+    ({ dbName, storeName, indexName, kind }) =>
+      new Promise<void>((resolve, reject) => {
+        const openRequest = indexedDB.open(dbName);
+        openRequest.onerror = () => reject(openRequest.error);
+        openRequest.onsuccess = () => {
+          const db = openRequest.result;
+          if (!db.objectStoreNames.contains(storeName)) {
+            db.close();
+            resolve();
+            return;
+          }
+          const transaction = db.transaction(storeName, 'readwrite');
+          const cursorRequest = transaction.objectStore(storeName).index(indexName).openCursor(IDBKeyRange.only(kind));
+          cursorRequest.onsuccess = () => {
+            const cursor = cursorRequest.result;
+            if (!cursor) return;
+            cursor.delete();
+            cursor.continue();
+          };
+          transaction.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          transaction.onerror = () => reject(transaction.error);
+        };
+      }),
+    { dbName: 'image-trail', storeName: 'keys', indexName: 'keys.byKind', kind: 'blob' },
+  );
+}
+
+// Closes and reopens the panel so it re-queries blob-key status from the service
+// worker (the panel refreshes that status on open), reflecting a storage-level reset.
+async function reopenPanel(page: Page, serviceWorker: Worker): Promise<void> {
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelClosed(page);
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
 }
 
 async function exportImages(page: Page, serviceWorker: Worker, options: { readonly saveAs?: boolean } = {}): Promise<void> {
@@ -280,10 +328,18 @@ test('captures originals, prefers stored bytes for export, and round-trips encry
 test('refuses to store oversized originals and keeps stored-original usage bounded', async ({ page, serviceWorker }) => {
   test.setTimeout(60_000);
   await openPanel(page, serviceWorker);
-  // The extension context is shared across tests in this file: earlier tests can
-  // leave a key (locked with another password) and orphaned blobs behind.
+  // The extension context is shared across tests: earlier tests can leave a blob key
+  // (locked with another password) and orphaned blobs behind. If the key is still
+  // unlocked, the panel offers Clear key. If a service-worker restart has locked it,
+  // the panel shows only the unlock form with no Clear key control, so fall back to
+  // clearing the stored key directly and reopening the panel to refresh its status.
   await openEncryptedOriginals(page);
-  if ((await page.getByRole('button', { name: 'Clear key' }).count()) > 0) await clearEncryptedOriginalsKey(page);
+  if ((await page.getByRole('button', { name: 'Clear key' }).count()) > 0) {
+    await clearEncryptedOriginalsKey(page);
+  } else if ((await page.getByRole('button', { name: 'Unlock', exact: true }).count()) > 0) {
+    await clearStoredBlobKeys(serviceWorker);
+    await reopenPanel(page, serviceWorker);
+  }
   await setupEncryptedOriginals(page);
 
   await page.getByRole('button', { name: 'Pin current' }).click();
@@ -306,13 +362,21 @@ test('refuses to store oversized originals and keeps stored-original usage bound
   const oversizedRecent = page.locator('.image-trail-panel__history-item', { hasText: 'generated-oversized.svg' });
   await expect(oversizedRecent).toBeVisible();
 
-  await oversizedRecent.getByRole('button', { name: 'Capture', exact: true }).click();
+  // Pin the oversized image into a durable queue row and attempt the capture from
+  // there, so the refusal is exercised against a pinned queue record (matching the
+  // acceptance flow) and a regression that mutated or dropped the durable row on an
+  // oversized capture would be caught.
+  await page.getByRole('button', { name: 'Pin current' }).click();
+  const oversizedRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'generated-oversized.svg' });
+  await expect(oversizedRow).toBeVisible();
+
+  await oversizedRow.getByRole('button', { name: 'Capture' }).click();
   // Capture failures surface through the status toast, not the header status line.
   await expect(page.locator('.image-trail-panel__toast-message')).toHaveText(/exceeds limit|exceeds the 25 MB size limit/u);
-  // The refused record stays a valid recents row without a stored-original marker,
-  // and the originals count/bytes stay at the pre-attempt baseline.
-  await expect(oversizedRecent).toBeVisible();
-  await expect(oversizedRecent).not.toContainText('Captured original');
+  // The refused record stays a valid pinned queue row without a stored-original
+  // marker, and the originals count/bytes stay at the pre-attempt baseline.
+  await expect(oversizedRow).toBeVisible();
+  await expect(oversizedRow.locator('.image-trail-panel__stored-original-dot[title="Original stored"]')).toHaveCount(0);
   expect(await encryptedOriginalsStorageText(page)).toBe(baselineUsage);
 
   // The extension context is shared with later spec files: drop the queue rows
