@@ -29,6 +29,12 @@ export function renderDetachedSections(
 ): void {
   const detachedRoot = target.detachedRoot;
   if (!detachedRoot) return;
+  // A restored section must not reopen collapsed on its next detach: prune minimized flags for
+  // sections that are no longer detached. Window positions are intentionally kept — reopening at
+  // the last dragged spot is desired within a session.
+  for (const sectionId of Array.from(target.layoutState.detachedWindowMinimized)) {
+    if (!state.detachedSections.includes(sectionId)) target.layoutState.detachedWindowMinimized.delete(sectionId);
+  }
   if (state.minimized || state.detachedSections.length === 0) {
     detachedRoot.replaceChildren();
     return;
