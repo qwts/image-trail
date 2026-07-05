@@ -314,7 +314,12 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/neighbor-preload-controller.test.ts", "tests/buffered-navigation-controller.test.ts"]
+          "paths": [
+            "tests/neighbor-preload-controller.test.ts",
+            "tests/buffered-navigation-controller.test.ts",
+            "tests/dom/parsed-field-navigation-controller.test.ts"
+          ],
+          "notes": "Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts."
         },
         {
           "type": "deferred",
