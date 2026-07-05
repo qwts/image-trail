@@ -202,10 +202,13 @@ function focusedTextControlSnapshot(root: HTMLElement): FocusedTextControlSnapsh
     : null;
 }
 
-function restoreFocusedTextControl(root: HTMLElement, snapshot: FocusedTextControlSnapshot | null): void {
+function restoreFocusedTextControl(target: PanelRenderTarget, snapshot: FocusedTextControlSnapshot | null): void {
   if (!snapshot) return;
   if (snapshot.selector === '.image-trail-panel__full-url-input' && snapshot.value.startsWith('data:')) return;
-  const next = root.querySelector<HTMLInputElement | HTMLTextAreaElement>(snapshot.selector);
+  // The control may have been inside a detached-section window (same shadow root, separate root).
+  const next =
+    target.root.querySelector<HTMLInputElement | HTMLTextAreaElement>(snapshot.selector) ??
+    target.detachedRoot?.querySelector<HTMLInputElement | HTMLTextAreaElement>(snapshot.selector);
   if (!next) return;
   next.value = snapshot.value;
   queueMicrotask(() => {
@@ -612,8 +615,9 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     ),
   );
   restoreScrollSnapshots(target.root, scrollPositions);
-  restoreFocusedTextControl(target.root, focusedTextControl);
+  // Detached windows render before the focus restore so a control inside one can be re-found.
   renderDetachedSections(target, state, DETACHED_SECTION_RENDERERS);
+  restoreFocusedTextControl(target, focusedTextControl);
   if (options.renderRecall !== false) renderRecallDrawer(target, state);
 }
 

@@ -87,12 +87,18 @@ export function createDetachedSectionWindow(
   windowEl.style.left = `${geometry.left}px`;
   windowEl.style.top = `${geometry.top}px`;
   windowEl.style.width = `${geometry.inlineSize}px`;
-  windowEl.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
-    event.preventDefault();
-    event.stopPropagation();
-    dispatch({ name: 'section/restore', sectionId });
-  });
+  // Capture phase: section content stops keydown propagation on its row-action buttons
+  // (history-view's item-actions span), which would swallow a bubble-phase Escape.
+  windowEl.addEventListener(
+    'keydown',
+    (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      dispatch({ name: 'section/restore', sectionId });
+    },
+    { capture: true },
+  );
 
   const header = document.createElement('div');
   header.className = 'image-trail-panel__detached-header';

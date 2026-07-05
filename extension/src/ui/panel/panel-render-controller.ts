@@ -28,8 +28,10 @@ export interface PanelRenderControllerDeps {
 }
 
 // The captured active-element identity re-applied after a render swaps the panel DOM: the control is
-// re-found by structural index + tag, and text inputs restore their value and selection range.
+// re-found by structural index + tag within its root (panel or detached-section window), and text
+// inputs restore their value and selection range.
 type FocusedPanelControlSnapshot = {
+  readonly scope: 'panel' | 'detached';
   readonly index: number;
   readonly tagName: string;
   readonly inputType?: string;
@@ -194,14 +196,19 @@ export class PanelRenderController {
     if (!root) return null;
     const rootNode = root.getRootNode();
     const activeElement = rootNode instanceof ShadowRoot ? rootNode.activeElement : document.activeElement;
-    if (!(activeElement instanceof HTMLElement) || !root.contains(activeElement)) return null;
+    if (!(activeElement instanceof HTMLElement)) return null;
+    // The control may live in the panel root or in a detached-section window (same shadow root).
+    const detachedRoot = this.deps.detachedRoot();
+    const scope = root.contains(activeElement) ? 'panel' : detachedRoot?.contains(activeElement) ? 'detached' : null;
+    if (!scope) return null;
     if (!isFocusablePanelControl(activeElement)) return null;
-    const controls = this.focusablePanelControls();
+    const controls = this.focusablePanelControls(scope);
     const index = controls.indexOf(activeElement);
     if (index < 0) return null;
     if (activeElement instanceof HTMLInputElement) {
-      if (activeElement.type === 'file') return { index, tagName: activeElement.tagName, inputType: activeElement.type };
+      if (activeElement.type === 'file') return { scope, index, tagName: activeElement.tagName, inputType: activeElement.type };
       return {
+        scope,
         index,
         tagName: activeElement.tagName,
         inputType: activeElement.type,
@@ -212,6 +219,7 @@ export class PanelRenderController {
     }
     if (activeElement instanceof HTMLTextAreaElement) {
       return {
+        scope,
         index,
         tagName: activeElement.tagName,
         value: activeElement.value,
@@ -219,13 +227,13 @@ export class PanelRenderController {
         selectionEnd: activeElement.selectionEnd,
       };
     }
-    return { index, tagName: activeElement.tagName };
+    return { scope, index, tagName: activeElement.tagName };
   }
 
   private restoreFocusedPanelControl(focusedControl: FocusedPanelControlSnapshot | null): void {
     const root = this.deps.root();
     if (!root || !focusedControl) return;
-    const nextControl = this.focusablePanelControls()[focusedControl.index];
+    const nextControl = this.focusablePanelControls(focusedControl.scope)[focusedControl.index];
     if (!nextControl || nextControl.tagName !== focusedControl.tagName) return;
     if (
       focusedControl.inputType !== undefined &&
@@ -248,10 +256,10 @@ export class PanelRenderController {
     nextControl.focus();
   }
 
-  private focusablePanelControls(): HTMLElement[] {
-    const root = this.deps.root();
-    if (!root) return [];
-    return Array.from(root.querySelectorAll<HTMLElement>('button, input, select, textarea'));
+  private focusablePanelControls(scope: 'panel' | 'detached'): HTMLElement[] {
+    const container = scope === 'panel' ? this.deps.root() : this.deps.detachedRoot();
+    if (!container) return [];
+    return Array.from(container.querySelectorAll<HTMLElement>('button, input, select, textarea'));
   }
 
   renderRecallOnly(): void {

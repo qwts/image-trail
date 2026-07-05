@@ -16,6 +16,7 @@ interface Harness {
   readonly root: HTMLElement;
   readonly toastRoot: HTMLElement;
   readonly recallRoot: HTMLElement;
+  readonly detachedRoot: HTMLElement;
   readonly log: string[];
   getState(): PanelState;
   patchState(patch: Partial<PanelState>): void;
@@ -28,12 +29,14 @@ function createHarness(): Harness {
   const root = document.createElement('div');
   const toastRoot = document.createElement('div');
   const recallRoot = document.createElement('div');
-  document.body.append(root, toastRoot, recallRoot);
+  const detachedRoot = document.createElement('div');
+  document.body.append(root, toastRoot, recallRoot, detachedRoot);
   const harness: Harness = {
     controller: undefined as unknown as PanelRenderController,
     root,
     toastRoot,
     recallRoot,
+    detachedRoot,
     log,
     getState: () => state,
     patchState: (patch) => {
@@ -49,7 +52,7 @@ function createHarness(): Harness {
     dispatch: () => {},
     root: () => root,
     recallRoot: () => recallRoot,
-    detachedRoot: () => null,
+    detachedRoot: () => detachedRoot,
     toastRoot: () => toastRoot,
     panelStylesReady: () => true,
     previewScrollAnchorId: () => null,
@@ -115,6 +118,19 @@ test('render preserves focus on a button across a re-render (structural index)',
   assert.ok(active instanceof HTMLButtonElement, 'a button is refocused after the re-render');
   const newIndex = Array.from(harness.root.querySelectorAll('button, input, select, textarea')).indexOf(active);
   assert.equal(newIndex, index);
+});
+
+test('render preserves focus on a control inside a detached-section window across a re-render', () => {
+  const harness = createHarness();
+  harness.patchState({ visible: true, detachedSections: ['history'] });
+  harness.controller.render();
+  const restore = harness.detachedRoot.querySelector<HTMLButtonElement>('[data-image-trail-restore="history"]');
+  assert.ok(restore, 'the detached window renders its restore control');
+  restore.focus();
+  harness.controller.render();
+  const refocused = harness.detachedRoot.querySelector<HTMLButtonElement>('[data-image-trail-restore="history"]');
+  assert.ok(refocused, 'the detached window re-renders its restore control');
+  assert.equal(document.activeElement, refocused, 'focus stays inside the detached window across the re-render');
 });
 
 test('render restores a focused text input value and selection range across a re-render', () => {

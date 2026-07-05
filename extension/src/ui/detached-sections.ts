@@ -14,6 +14,8 @@ const DETACHED_WINDOW_INLINE_SIZE = 340;
 const DETACHED_WINDOW_GAP = 8;
 const DETACHED_WINDOW_EDGE_PADDING = 12;
 const DETACHED_WINDOW_STACK_OFFSET = 24;
+/** A default-positioned window keeps at least this much of itself above the viewport's bottom edge. */
+const DETACHED_WINDOW_MIN_VISIBLE_BLOCK_SIZE = 120;
 
 /**
  * Own render pass for detached-section windows, mirroring the recall drawer: a separate root under
@@ -71,13 +73,16 @@ export function renderDetachedSections(
 }
 
 function detachedWindowGeometry(panelRoot: HTMLElement, stored: DetachedWindowPosition | undefined, index: number): DetachedWindowGeometry {
-  const inlineSize = Math.min(DETACHED_WINDOW_INLINE_SIZE, Math.max(240, window.innerWidth - DETACHED_WINDOW_EDGE_PADDING * 2));
+  // Mirror the stylesheet's `width: min(340px, calc(100vw - 24px))` — never wider than the
+  // viewport, since the inline width would otherwise override the CSS max-width.
+  const availableInlineSize = Math.max(0, window.innerWidth - DETACHED_WINDOW_EDGE_PADDING * 2);
+  const inlineSize = Math.min(DETACHED_WINDOW_INLINE_SIZE, availableInlineSize);
   if (stored) return { ...stored, inlineSize };
   const rect = panelRoot.getBoundingClientRect();
   const stackOffset = index * DETACHED_WINDOW_STACK_OFFSET;
   const maxLeft = window.innerWidth - inlineSize - DETACHED_WINDOW_EDGE_PADDING;
   const left = Math.max(DETACHED_WINDOW_EDGE_PADDING, Math.min(rect.right + DETACHED_WINDOW_GAP + stackOffset, maxLeft));
-  const maxTop = window.innerHeight - DETACHED_WINDOW_EDGE_PADDING - 120;
+  const maxTop = window.innerHeight - DETACHED_WINDOW_EDGE_PADDING - DETACHED_WINDOW_MIN_VISIBLE_BLOCK_SIZE;
   const top = Math.max(DETACHED_WINDOW_EDGE_PADDING, Math.min(rect.top + stackOffset, maxTop));
   return { left, top, inlineSize };
 }

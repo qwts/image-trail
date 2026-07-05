@@ -99,6 +99,21 @@ test('the placeholder restore button dispatches section/restore', () => {
   assert.deepEqual(harness.actions, [{ name: 'section/restore', sectionId: 'history' }]);
 });
 
+test('Escape restores even from row action buttons that stop keydown propagation', () => {
+  const harness = createHarness();
+  harness.render(panelState({ detachedSections: ['history'] }));
+  const windowEl = harness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="history"]');
+  assert.ok(windowEl);
+  const rowAction = windowEl.querySelector<HTMLButtonElement>('.image-trail-panel__item-actions button');
+  assert.ok(rowAction instanceof HTMLButtonElement, 'expected a row action button inside the detached window');
+
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+  rowAction.dispatchEvent(escape);
+
+  assert.equal(escape.defaultPrevented, true);
+  assert.deepEqual(harness.actions, [{ name: 'section/restore', sectionId: 'history' }]);
+});
+
 test('the window restore button and Escape both dispatch section/restore', () => {
   const harness = createHarness();
   harness.render(panelState({ detachedSections: ['history'] }));
