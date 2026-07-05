@@ -6,7 +6,8 @@
   "scripts": {
     "clean": "rm -rf dist extension/dist",
     "lint:package": "node scripts/check-package-pins.mjs",
-    "lint": "npm run lint:package && eslint . && npm run lint:cycles && npm run lint:dead",
+    "lint": "npm run lint:package && eslint . && npm run lint:cycles && npm run lint:dead && npm run lint:types",
+    "lint:types": "type-coverage --at-least 99.8 --strict",
     "lint:cycles": "madge --circular --extensions ts extension/src",
     "lint:dead": "knip",
     "typecheck": "tsc --noEmit",
@@ -53,6 +54,7 @@
     "madge": "^8.0.0",
     "prettier": "^3.8.4",
     "storybook": "^10.4.6",
+    "type-coverage": "^2.29.7",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.1",
     "valibot": "^1.4.2",
