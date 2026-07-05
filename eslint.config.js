@@ -69,7 +69,19 @@ const layerBoundaryConfigs = layerImportBoundaries.map(({ layer, forbids, messag
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'extension/dist/**', '.test-dist/**', 'coverage/**', 'storybook-static/**', 'node_modules/**', 'deprecated/**'],
+    ignores: [
+      'dist/**',
+      'extension/dist/**',
+      '.test-dist/**',
+      'coverage/**',
+      'storybook-static/**',
+      'node_modules/**',
+      'deprecated/**',
+      // Agent worktrees carry in-progress copies of the repo; linting them from the
+      // main checkout breaks local gates on unrelated work (prettier already ignores
+      // .claude/ via .prettierignore).
+      '.claude/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
