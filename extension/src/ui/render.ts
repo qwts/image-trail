@@ -391,25 +391,9 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     state.detachedSections.includes('history')
       ? createDetachedSectionPlaceholder('history', DETACHABLE_SECTION_TITLES.history, target.dispatch)
       : createHistorySection(target, state, { detachable: true }),
-    createBookmarksView(
-      state.target.selectedUrl,
-      state.bookmarks,
-      state.selectedBookmarkIds,
-      state.captureInProgress,
-      state.blobKeyUnlocked,
-      state.blobKeyAvailable,
-      state.bookmarkVisibilityScope,
-      {
-        offset: state.bookmarkOffset,
-        limit: state.bookmarkLimit,
-        total: state.bookmarkTotal,
-        hasOlder: state.hasOlderBookmarks,
-        hasNewer: state.hasNewerBookmarks,
-      },
-      { recallOpen: state.recall.open },
-      { privacyMode: state.privacyModeEnabled },
-      target.dispatch,
-    ),
+    state.detachedSections.includes('bookmarks')
+      ? createDetachedSectionPlaceholder('bookmarks', DETACHABLE_SECTION_TITLES.bookmarks, target.dispatch)
+      : createBookmarksSection(target, state, { detachable: true }),
   );
   restoreScrollSnapshots(target.root, scrollPositions);
   // Detached windows render before the focus restore so a control inside one can be re-found.
@@ -424,6 +408,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
  */
 const DETACHED_SECTION_RENDERERS = {
   history: (target: PanelRenderTarget, state: PanelState) => createHistorySection(target, state, { detachable: false }),
+  bookmarks: (target: PanelRenderTarget, state: PanelState) => createBookmarksSection(target, state, { detachable: false }),
   settings: (target: PanelRenderTarget, state: PanelState) => {
     if (!state.settingsOpen) return null;
     const { fields, activeTemplate } = cachedActiveUrlFields(state);
@@ -439,10 +424,33 @@ function createHistorySection(target: PanelRenderTarget, state: PanelState, opti
       target.layoutState.historyListBlockSize = blockSize;
     },
     privacyMode: state.privacyModeEnabled,
-    ...(options.detachable
-      ? { headerAccessory: createSectionDetachControl('history', DETACHABLE_SECTION_TITLES.history, target.dispatch) }
-      : {}),
+    ...(options.detachable ? { headerAccessory: detachControl(target, 'history') } : {}),
   });
+}
+
+function createBookmarksSection(target: PanelRenderTarget, state: PanelState, options: { readonly detachable: boolean }): HTMLElement {
+  return createBookmarksView(
+    state.target.selectedUrl,
+    state.bookmarks,
+    state.selectedBookmarkIds,
+    state.captureInProgress,
+    state.blobKeyUnlocked,
+    state.blobKeyAvailable,
+    state.bookmarkVisibilityScope,
+    {
+      offset: state.bookmarkOffset,
+      limit: state.bookmarkLimit,
+      total: state.bookmarkTotal,
+      hasOlder: state.hasOlderBookmarks,
+      hasNewer: state.hasNewerBookmarks,
+    },
+    { recallOpen: state.recall.open },
+    {
+      privacyMode: state.privacyModeEnabled,
+      ...(options.detachable ? { headerAccessory: detachControl(target, 'bookmarks') } : {}),
+    },
+    target.dispatch,
+  );
 }
 
 function createAttachedSettingsSection(
@@ -452,7 +460,16 @@ function createAttachedSettingsSection(
   activeTemplateId: string | null,
 ): HTMLElement {
   return createSettingsSection(state, { fields, activeTemplateId }, target.dispatch, {
-    headerAccessory: createSectionDetachControl('settings', DETACHABLE_SECTION_TITLES.settings, target.dispatch),
+    headerAccessory: detachControl(target, 'settings'),
+  });
+}
+
+/** Detach control wired for drag-out: a drop seeds the window position before the detach dispatch. */
+function detachControl(target: PanelRenderTarget, sectionId: DetachableSectionId): HTMLElement {
+  return createSectionDetachControl(sectionId, DETACHABLE_SECTION_TITLES[sectionId], target.dispatch, {
+    onDragOutPosition: (id, position) => {
+      target.layoutState.detachedWindowPositions.set(id, position);
+    },
   });
 }
 

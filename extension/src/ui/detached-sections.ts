@@ -5,6 +5,7 @@ import type { PanelRenderTarget } from './render.js';
 /** User-facing titles for detachable sections; shared by the header control, placeholder, and window. */
 export const DETACHABLE_SECTION_TITLES: Record<DetachableSectionId, string> = {
   history: 'Recent history',
+  bookmarks: 'Queue',
   settings: 'Settings',
 };
 
@@ -17,6 +18,7 @@ export type DetachableSectionContentRenderer = (target: PanelRenderTarget, state
 /** Preferred window widths; Settings gets the panel's width for its dense forms and action groups. */
 const DETACHED_WINDOW_INLINE_SIZES: Record<DetachableSectionId, number> = {
   history: 340,
+  bookmarks: 340,
   settings: 420,
 };
 const DETACHED_WINDOW_GAP = 8;

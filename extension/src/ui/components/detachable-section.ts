@@ -12,19 +12,90 @@ export interface DetachedWindowGeometry extends DetachedWindowPosition {
 
 type DetachDispatch = (action: PanelAction) => void;
 
+const DRAG_OUT_THRESHOLD_PX = 6;
+const DRAG_GHOST_INLINE_SIZE = 340;
+const DRAG_GHOST_BLOCK_SIZE = 160;
+
 /**
- * Keyboard-accessible detach control rendered inside a section's own header. The floating window is
- * extension-owned; this only dispatches — window creation happens on the detached render pass.
+ * Keyboard-accessible detach control rendered inside a section's own header. Click (or Enter/Space)
+ * detaches at the default position; press-and-drag past a small threshold shows a drop ghost and
+ * detaches with the window opening where it was released (`onDragOutPosition` seeds the position
+ * before the dispatch). The floating window is extension-owned; this only dispatches — window
+ * creation happens on the detached render pass.
  */
-export function createSectionDetachControl(sectionId: DetachableSectionId, sectionTitle: string, dispatch: DetachDispatch): HTMLElement {
+export function createSectionDetachControl(
+  sectionId: DetachableSectionId,
+  sectionTitle: string,
+  dispatch: DetachDispatch,
+  options: { readonly onDragOutPosition?: (sectionId: DetachableSectionId, position: DetachedWindowPosition) => void } = {},
+): HTMLElement {
   const detach = document.createElement('button');
   detach.type = 'button';
   detach.className = 'image-trail-panel__icon-button image-trail-panel__section-detach';
   detach.textContent = '⧉';
   detach.dataset['imageTrailDetach'] = sectionId;
-  detach.setAttribute('aria-label', `Detach ${sectionTitle} into a floating window`);
-  detach.title = `Detach ${sectionTitle} into a floating window`;
-  detach.addEventListener('click', () => dispatch({ name: 'section/detach', sectionId }));
+  detach.setAttribute('aria-label', `Detach ${sectionTitle} into a floating window (drag to place)`);
+  detach.title = `Detach ${sectionTitle} into a floating window (drag to place)`;
+  let suppressClick = false;
+  detach.addEventListener('click', () => {
+    if (suppressClick) {
+      suppressClick = false;
+      return;
+    }
+    dispatch({ name: 'section/detach', sectionId });
+  });
+  detach.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || !options.onDragOutPosition) return;
+    // Capture immediately: once the pointer leaves this small button, move/up events would
+    // otherwise target whatever is under the cursor and the drag would never engage.
+    if (typeof detach.setPointerCapture === 'function') detach.setPointerCapture(event.pointerId);
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let ghost: HTMLElement | null = null;
+
+    const dropPosition = (move: PointerEvent): DetachedWindowPosition =>
+      clampPanelPosition(
+        { left: move.clientX - 24, top: move.clientY - 12 },
+        { width: DRAG_GHOST_INLINE_SIZE, height: DRAG_GHOST_BLOCK_SIZE },
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+    const onMove = (move: PointerEvent): void => {
+      if (!ghost) {
+        if (Math.abs(move.clientX - startX) < DRAG_OUT_THRESHOLD_PX && Math.abs(move.clientY - startY) < DRAG_OUT_THRESHOLD_PX) return;
+        ghost = document.createElement('div');
+        ghost.className = 'image-trail-panel__detach-ghost';
+        ghost.style.width = `${DRAG_GHOST_INLINE_SIZE}px`;
+        ghost.style.height = `${DRAG_GHOST_BLOCK_SIZE}px`;
+        const rootNode = detach.getRootNode();
+        (rootNode instanceof ShadowRoot ? rootNode : document.body).append(ghost);
+      }
+      const position = dropPosition(move);
+      ghost.style.left = `${position.left}px`;
+      ghost.style.top = `${position.top}px`;
+    };
+    const cleanup = (): void => {
+      detach.removeEventListener('pointermove', onMove);
+      detach.removeEventListener('pointerup', onUp);
+      detach.removeEventListener('pointercancel', onCancel);
+      if (typeof detach.releasePointerCapture === 'function') detach.releasePointerCapture(event.pointerId);
+      ghost?.remove();
+    };
+    const onUp = (up: PointerEvent): void => {
+      const dragged = ghost !== null;
+      cleanup();
+      if (!dragged) return;
+      suppressClick = true;
+      options.onDragOutPosition?.(sectionId, dropPosition(up));
+      dispatch({ name: 'section/detach', sectionId });
+    };
+    const onCancel = (): void => {
+      cleanup();
+      suppressClick = ghost !== null;
+    };
+    detach.addEventListener('pointermove', onMove);
+    detach.addEventListener('pointerup', onUp);
+    detach.addEventListener('pointercancel', onCancel);
+  });
   return detach;
 }
 

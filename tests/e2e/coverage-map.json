@@ -504,18 +504,18 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/detachable-sections.test.ts", "tests/dom/detachable-section.test.ts"],
-          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X). #217 Settings detach: detach control, window/placeholder conditional on settingsOpen, wider window default, settings-action routing from the window, and the Escape-in-editable-control guard."
+          "paths": ["tests/detachable-sections.test.ts", "tests/dom/detachable-section.test.ts", "tests/dom/settings-section.test.ts"],
+          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X). #217 Settings detach: detach control, window/placeholder conditional on settingsOpen, wider window default, settings-action routing from the window, and the Escape-in-editable-control guard. #215 completion: Queue (bookmarks) detach, drag-out gesture (threshold, ghost cleanup, drop-position seeding, click suppression), and settings-section state branches."
         },
         {
           "type": "storybook",
           "paths": ["extension/src/ui/components/detachable-section.stories.ts", "extension/src/ui/render.stories.ts"],
-          "notes": "Window/narrow/placeholder/control states with play tests for detach and restore dispatch; panel-layout story for the detached placeholder; minimized window state and a minimize-toggle play test; SettingsDetached (with play assertions) and SettingsDetachedPrivacyMasked panel stories."
+          "notes": "Window/narrow/placeholder/control states with play tests for detach and restore dispatch; panel-layout story for the detached placeholder; minimized window state and a minimize-toggle play test; SettingsDetached (with play assertions) and SettingsDetachedPrivacyMasked panel stories"
         },
         {
-          "type": "deferred",
-          "issue": 215,
-          "notes": "Browser-level detach/restore E2E lands with a later #215 slice (drag-out gesture) once the interaction surface is final; window chrome follow-up is #397."
+          "type": "playwright-e2e",
+          "path": "tests/e2e/detachable-sections.spec.ts",
+          "notes": "Browser-level detach/restore: floating dialog + placeholder, minimize/expand, close-to-restore with focus hand-off, drag-out placement at the drop point, Escape restore, and detached Settings following the gear toggle without duplication."
         }
       ]
     }
