@@ -166,7 +166,9 @@
           "type": "unit-dom",
           "paths": [
             "tests/messages.test.ts",
-            "tests/indexeddb-data.test.ts",
+            "tests/indexeddb-bookmark-store.test.ts",
+            "tests/indexeddb-recall-queue.test.ts",
+            "tests/indexeddb-protected-pins.test.ts",
             "tests/record-library-controller.test.ts",
             "tests/captured-originals-controller.test.ts",
             "tests/dom/record-library-controller.test.ts",
@@ -206,7 +208,7 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/indexeddb-data.test.ts", "tests/encrypted-blobs.test.ts"]
+          "paths": ["tests/indexeddb-protected-pins.test.ts", "tests/encrypted-blobs.test.ts"]
         },
         {
           "type": "playwright-e2e",
@@ -223,7 +225,7 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/indexeddb-data.test.ts", "tests/encrypted-blobs.test.ts"]
+          "paths": ["tests/indexeddb-protected-pins.test.ts", "tests/encrypted-blobs.test.ts"]
         },
         {
           "type": "playwright-e2e",
@@ -252,7 +254,7 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/data-crypto.test.ts", "tests/indexeddb-data.test.ts"]
+          "paths": ["tests/data-crypto.test.ts", "tests/indexeddb-protected-pins.test.ts"]
         },
         {
           "type": "playwright-e2e",
