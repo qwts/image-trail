@@ -15,8 +15,20 @@ import { createSettingsSection } from './settings-section.js';
 import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
 import { activeUrlFieldsForState } from './active-url-fields.js';
+
 import type { UrlField } from '../core/url/types.js';
 import { createParsedFieldsSection, type NumericFieldDisplayMode } from './parsed-fields-section.js';
+
+// PanelState is immutable per render, so the URL parse/tokenization is shared between the main
+// panel pass and the detached Settings renderer instead of running twice per render.
+const activeUrlFieldsCache = new WeakMap<PanelState, ReturnType<typeof activeUrlFieldsForState>>();
+function cachedActiveUrlFields(state: PanelState): ReturnType<typeof activeUrlFieldsForState> {
+  const cached = activeUrlFieldsCache.get(state);
+  if (cached) return cached;
+  const computed = activeUrlFieldsForState(state, window.location.href);
+  activeUrlFieldsCache.set(state, computed);
+  return computed;
+}
 
 export interface PanelRenderTarget {
   readonly root: HTMLElement;
@@ -275,7 +287,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
 
   target.root.replaceChildren();
 
-  const { activeUrl, fields, visibleFields, editableFields, activeTemplate } = activeUrlFieldsForState(state, window.location.href);
+  const { activeUrl, fields, visibleFields, editableFields, activeTemplate } = cachedActiveUrlFields(state);
 
   const dispatchActiveField = (delta: -1 | 1): void => {
     if (visibleFields.length === 0) return;
@@ -414,7 +426,7 @@ const DETACHED_SECTION_RENDERERS = {
   history: (target: PanelRenderTarget, state: PanelState) => createHistorySection(target, state, { detachable: false }),
   settings: (target: PanelRenderTarget, state: PanelState) => {
     if (!state.settingsOpen) return null;
-    const { fields, activeTemplate } = activeUrlFieldsForState(state, window.location.href);
+    const { fields, activeTemplate } = cachedActiveUrlFields(state);
     return createSettingsSection(state, { fields, activeTemplateId: activeTemplate?.id ?? state.activeUrlTemplateId }, target.dispatch);
   },
 } as const;

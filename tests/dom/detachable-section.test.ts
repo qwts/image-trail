@@ -71,6 +71,39 @@ test('the Settings header renders a detach control that dispatches section/detac
   assert.deepEqual(harness.actions, [{ name: 'section/detach', sectionId: 'settings' }]);
 });
 
+test('the detached window body scroll survives rerenders (Settings scrolls on the body, not a record list)', () => {
+  const harness = createHarness();
+  harness.render(panelState({ settingsOpen: true, detachedSections: ['settings'] }));
+  const body = harness.detachedRoot.querySelector<HTMLElement>(
+    '[data-image-trail-detached-window="settings"] .image-trail-panel__detached-body',
+  );
+  assert.ok(body, 'the Settings window renders a scrollable body');
+  body.scrollTop = 33;
+
+  harness.render(panelState({ settingsOpen: true, detachedSections: ['settings'] }));
+
+  const nextBody = harness.detachedRoot.querySelector<HTMLElement>(
+    '[data-image-trail-detached-window="settings"] .image-trail-panel__detached-body',
+  );
+  assert.ok(nextBody);
+  assert.equal(nextBody.scrollTop, 33, 'body scroll is preserved across the detached rerender');
+});
+
+test('a hidden detached neighbor does not shift another window’s default stack position', () => {
+  const openHarness = createHarness();
+  openHarness.render(panelState({ settingsOpen: true, detachedSections: ['settings', 'history'] }));
+  const withSettingsVisible = openHarness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="history"]');
+  assert.ok(withSettingsVisible);
+
+  const closedHarness = createHarness();
+  closedHarness.render(panelState({ settingsOpen: false, detachedSections: ['settings', 'history'] }));
+  const withSettingsHidden = closedHarness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="history"]');
+  assert.ok(withSettingsHidden, 'the history window renders even while the Settings window is hidden');
+
+  assert.equal(withSettingsHidden.style.left, withSettingsVisible.style.left, 'default left is stable');
+  assert.equal(withSettingsHidden.style.top, withSettingsVisible.style.top, 'default top is stable');
+});
+
 test('detached Settings renders a placeholder and a wider window only while Settings is open', () => {
   const harness = createHarness();
   harness.render(panelState({ settingsOpen: true, detachedSections: ['settings'] }));

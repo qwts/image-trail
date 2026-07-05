@@ -49,25 +49,32 @@ export function renderDetachedSections(
   }
 
   const previousWindows = new Set<string>();
-  const previousScroll = new Map<string, number>();
+  const previousListScroll = new Map<string, number>();
+  const previousBodyScroll = new Map<string, number>();
   for (const windowEl of Array.from(detachedRoot.querySelectorAll<HTMLElement>('[data-image-trail-detached-window]'))) {
     const sectionId = windowEl.dataset['imageTrailDetachedWindow'];
     if (!sectionId) continue;
     previousWindows.add(sectionId);
     const list = windowEl.querySelector<HTMLElement>('.image-trail-panel__record-list');
-    if (list) previousScroll.set(sectionId, list.scrollTop);
+    if (list) previousListScroll.set(sectionId, list.scrollTop);
+    const body = windowEl.querySelector<HTMLElement>('.image-trail-panel__detached-body');
+    if (body) previousBodyScroll.set(sectionId, body.scrollTop);
   }
 
   detachedRoot.replaceChildren();
   const visibleSections = state.detachedSections
     .map((sectionId) => ({ sectionId, content: contentRenderers[sectionId](target, state) }))
     .filter((entry): entry is { sectionId: DetachableSectionId; content: HTMLElement } => entry.content !== null);
-  visibleSections.forEach(({ sectionId, content }, index) => {
+  visibleSections.forEach(({ sectionId, content }) => {
+    // Default geometry stacks by the section's stable detach order, not the filtered index —
+    // otherwise a hidden neighbor (detached Settings while closed) toggling would shift windows
+    // that have no stored position yet.
+    const stackIndex = state.detachedSections.indexOf(sectionId);
     const windowEl = createDetachedSectionWindow(
       {
         sectionId,
         sectionTitle: DETACHABLE_SECTION_TITLES[sectionId],
-        geometry: detachedWindowGeometry(target.root, sectionId, target.layoutState.detachedWindowPositions.get(sectionId), index),
+        geometry: detachedWindowGeometry(target.root, sectionId, target.layoutState.detachedWindowPositions.get(sectionId), stackIndex),
         animate: !previousWindows.has(sectionId),
         minimized: target.layoutState.detachedWindowMinimized.has(sectionId),
         onPositionChange: (id, position) => {
@@ -83,14 +90,18 @@ export function renderDetachedSections(
     );
     detachedRoot.append(windowEl);
 
-    const scrollTop = previousScroll.get(sectionId);
-    const list = windowEl.querySelector<HTMLElement>('.image-trail-panel__record-list');
-    if (list && scrollTop !== undefined) {
-      list.scrollTop = scrollTop;
-      queueMicrotask(() => {
-        list.scrollTop = scrollTop;
-      });
-    }
+    restoreScroll(windowEl, '.image-trail-panel__record-list', previousListScroll.get(sectionId));
+    restoreScroll(windowEl, '.image-trail-panel__detached-body', previousBodyScroll.get(sectionId));
+  });
+}
+
+function restoreScroll(windowEl: HTMLElement, selector: string, scrollTop: number | undefined): void {
+  if (scrollTop === undefined) return;
+  const element = windowEl.querySelector<HTMLElement>(selector);
+  if (!element) return;
+  element.scrollTop = scrollTop;
+  queueMicrotask(() => {
+    element.scrollTop = scrollTop;
   });
 }
 
