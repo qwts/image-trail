@@ -105,8 +105,8 @@ can carry a stale copy until rebased or restarted from the main repo.
   `npm run test:stories:ci` (builds and serves a static Storybook); CI runs the
   latter.
 - CI enforces a coverage gate: `npm run test:cov` runs the unit + DOM suites under
-  `c8` and fails below the ratcheting thresholds in `.c8rc.json` (currently lines 54 /
-  branches 79), writing `coverage/lcov.info` (uploaded as a CI artifact). Raise the
+  `c8` and fails below the ratcheting thresholds in `.c8rc.json` (currently lines 71 /
+  branches 80), writing `coverage/lcov.info` (uploaded as a CI artifact). Raise the
   floor over time as coverage improves; do not lower it to make a change pass.
 - `npm run lint` ends with a type-coverage ratchet (`lint:types`: strict
   `type-coverage` over `extension/src`, floor 99.8%). Same rule as the c8 gate:
