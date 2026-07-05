@@ -310,7 +310,10 @@ test('URL review status export/import round trips without image-record side effe
   await clearAllUrlReviewStatus(page);
   await deleteVisibleRecents(page);
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(0);
-  await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
+  // Baseline-relative: the browser profile is worker-scoped (fixtures.ts), so durable pins from
+  // other spec files sharing this worker may legitimately exist. The invariant under test is that
+  // export/import causes no image-record side effects — not that the profile is virgin.
+  const queueCountBeforeImport = await page.locator('.image-trail-panel__bookmark-item').count();
   await expect(page.locator('.image-trail-panel__recall-drawer')).toHaveCount(0);
   const storageUsage = page.locator('.image-trail-panel__storage-usage');
   const storageUsageBeforeImport = (await storageUsage.count()) > 0 ? await storageUsage.textContent() : null;
@@ -318,7 +321,7 @@ test('URL review status export/import round trips without image-record side effe
   await importUrlReviewStatus(page, fileContent);
 
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(0);
-  await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
+  await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(queueCountBeforeImport);
   await expect(page.locator('.image-trail-panel__recall-drawer')).toHaveCount(0);
   if (storageUsageBeforeImport === null) {
     await expect(page.locator('.image-trail-panel__storage-usage')).toHaveCount(0);
