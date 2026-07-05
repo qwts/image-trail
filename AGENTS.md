@@ -90,7 +90,7 @@ can carry a stale copy until rebased or restarted from the main repo.
 - Wiki-first: long-lived docs, SOP, ADRs, acceptance tests, and agent pitfalls
   belong in the wiki. Other repo markdown should be pointer stubs, except agent
   instruction files (`AGENTS.md`, `CLAUDE.md` files, `.github/copilot-instructions.md`),
-  `CONTRIBUTING.md`, and root `README.md`.
+  `CONTRIBUTING.md`, root `README.md`, and root `DESIGN.md`.
 - Before claiming done on any change (code, docs, or config), run `npm run lint`,
   `npm run format:check`, `npm test`, and `npm run build` for the fast inner loop.
   Before pushing, run `npm run ci`, which chains lint → format:check → `test:cov`
