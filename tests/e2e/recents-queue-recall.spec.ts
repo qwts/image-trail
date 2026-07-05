@@ -17,6 +17,8 @@ import {
   togglePanelFromExtensionAction,
 } from './fixtures.js';
 
+const encryptedOriginalsPassword = 'correct horse battery staple';
+
 async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
@@ -36,6 +38,14 @@ async function openSettingsGroup(page: Page, name: string): Promise<void> {
 
 async function openImageUtilities(page: Page): Promise<void> {
   await openSettingsGroup(page, 'Image utilities');
+}
+
+async function setupEncryptedOriginals(page: Page): Promise<void> {
+  await openSettingsGroup(page, 'Encrypted originals');
+  if ((await page.getByText(/Encrypted capture is unlocked with blob:/u).count()) > 0) return;
+  await page.getByLabel('New encrypted originals password').fill(encryptedOriginalsPassword);
+  await page.getByRole('button', { name: 'Create first key' }).click();
+  await expectPanelStatusMessage(page, /Encrypted blob storage unlocked with blob:[a-f0-9-]+\./u);
 }
 
 async function openQueueMenu(page: Page): Promise<void> {
@@ -224,6 +234,42 @@ test('pins persist across panel reopen and Recall recalls offscreen durable rows
   await expect(recall).toHaveCount(0);
   await page.getByRole('button', { name: 'Recall', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Recall' }).locator('.image-trail-panel__recall-list > li')).toHaveCount(2);
+});
+
+test('Recents reflect captured queue state even when the saved row is in Recall', async ({ page, serviceWorker }) => {
+  test.setTimeout(60_000);
+  await openPanel(page, serviceWorker);
+  await setupEncryptedOriginals(page);
+  await setVisiblePins(page, '30');
+  await deleteAllDurableQueueRows(page);
+  await deleteVisibleRecents(page);
+
+  await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetOne));
+  await expectPanelStatusMessage(page, /Loaded .*asset-one\.svg|Image loaded but did not change\.|Applied .*asset-one\.svg/u);
+  await pinCurrent(page, 'asset-one.svg');
+  const capturedQueueRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
+  await capturedQueueRow.getByRole('button', { name: 'Capture' }).click();
+  await expectPanelStatusMessage(page, /Captured \d+\.\d KB image\./u);
+  await expect(capturedQueueRow.locator('.image-trail-panel__stored-original-dot')).toHaveAttribute('title', 'Original stored');
+
+  await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetTwo));
+  await expectPanelStatusMessage(page, /Loaded .*asset-two\.svg/u);
+  await pinCurrent(page, 'asset-two.svg');
+  await setVisiblePins(page, '1', 1);
+  await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-two.svg' })).toBeVisible();
+
+  await deleteVisibleRecents(page);
+  await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetOne));
+  await expectPanelStatusMessage(page, /Loaded .*asset-one\.svg|Image loaded but did not change\.|Applied .*asset-one\.svg/u);
+  const recent = page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' });
+  await expect(recent).toContainText('Pinned to queue / Captured original');
+  await expect(recent.getByRole('button', { name: 'Pin' })).toHaveCount(0);
+  await expect(recent.getByRole('button', { name: 'Capture' })).toHaveCount(0);
+  await expect(recent.getByRole('button', { name: 'Delete original' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Recall', exact: true }).click();
+  const recall = page.getByRole('dialog', { name: 'Recall' });
+  await expect(recall.locator('.image-trail-panel__recall-list > li', { hasText: 'asset-one.svg' })).toBeVisible();
 });
 
 test('select-all scopes export to visible Recents, visible queue rows, and loaded Recall rows only', async ({ page, serviceWorker }) => {

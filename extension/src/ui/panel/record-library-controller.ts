@@ -12,6 +12,7 @@ import {
   createDisplayRecord,
   encryptedBlobIdForRecord,
   validateImageRecordUrl,
+  withDurableQueueState,
   type ImageRecordUrlValidation,
 } from '../../core/display-records.js';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
@@ -137,12 +138,12 @@ export class RecordLibraryController {
   }
 
   async addRecentHistory(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<void> {
-    if (options.projectionId && !this.deps.isProjectionActive(options.projectionId)) return;
+    if (!this.isProjectionActive(options)) return;
     const validation = await this.validateRecordUrlForAdd(url, options);
-    if (options.projectionId && !this.deps.isProjectionActive(options.projectionId)) return;
+    if (!this.isProjectionActive(options)) return;
     if (!validation.ok || !validation.sourceUrl) return;
     const resolvedThumbnail = await this.resolveRecordThumbnail(validation.sourceUrl, thumbnail, validation, options);
-    if (options.projectionId && !this.deps.isProjectionActive(options.projectionId)) return;
+    if (!this.isProjectionActive(options)) return;
     const next = reducePanelAction(this.deps.getState(), {
       name: 'history/add-loaded',
       url: validation.sourceUrl,
@@ -150,12 +151,12 @@ export class RecordLibraryController {
       width: options.width,
       height: options.height,
     }).history;
-    const item = next[0];
+    const item = await this.withSavedQueueState(next[0]);
     if (!item) return;
-    if (options.projectionId && !this.deps.isProjectionActive(options.projectionId)) return;
+    if (!this.isProjectionActive(options)) return;
     const recentHistoryStore = this.deps.recentHistoryStore();
-    const history = recentHistoryStore ? await recentHistoryStore.add(item, window.location.href) : next;
-    if (options.projectionId && !this.deps.isProjectionActive(options.projectionId)) return;
+    const history = recentHistoryStore ? await recentHistoryStore.add(item, window.location.href) : [item, ...next.slice(1)];
+    if (!this.isProjectionActive(options)) return;
     this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
     this.deps.render();
   }
@@ -163,6 +164,19 @@ export class RecordLibraryController {
   async pinRecentHistory(id: string): Promise<void> {
     const record = this.deps.getState().history.find((item) => item.id === id);
     if (!record) return;
+    const existing = await this.deps.bookmarkStore()?.findByUrl(record.url);
+    if (existing) {
+      await this.markRecentHistoryRowPinned(id, existing);
+      this.deps.setState({
+        ...this.deps.getState(),
+        message: bookmarkSaveMessage(existing, existing.label),
+        lastUpdatedAt: Date.now(),
+      });
+      await this.deps.loadBookmarkPage(0, { render: false });
+      this.deps.renderPanelAndRefreshRecall();
+      void this.deps.refreshStorageUsage({ render: true });
+      return;
+    }
     const result = await this.saveRecentRecordAsBookmark(record, { render: false });
     if (!result.ok) {
       this.deps.setState({ ...this.deps.getState(), message: result.message, status: 'error', lastUpdatedAt: Date.now() });
@@ -212,8 +226,14 @@ export class RecordLibraryController {
     );
     const updatedHistory = this.deps.getState().history.find((item) => item.id === id);
     if (!updatedHistory) return;
+    const linkedHistory = withDurableQueueState(updatedHistory, bookmark);
+    this.deps.setState({
+      ...this.deps.getState(),
+      history: this.deps.getState().history.map((item) => (item.id === id ? linkedHistory : item)),
+      lastUpdatedAt: Date.now(),
+    });
     const recentHistoryStore = this.deps.recentHistoryStore();
-    const history = recentHistoryStore ? await recentHistoryStore.add(updatedHistory, window.location.href) : this.deps.getState().history;
+    const history = recentHistoryStore ? await recentHistoryStore.add(linkedHistory, window.location.href) : this.deps.getState().history;
     this.deps.setState({
       ...this.deps.getState(),
       history,
@@ -236,6 +256,16 @@ export class RecordLibraryController {
     if (validation.preloadDataUrl) return (await this.deps.createThumbnailDataUrlFromDataUrl(validation.preloadDataUrl)) ?? undefined;
     if (!options.trustLoadedImage) return undefined;
     return (await this.deps.createThumbnailDataUrlFromUrl(sourceUrl)) ?? sourceUrl;
+  }
+
+  private async withSavedQueueState(record: ImageDisplayRecord | undefined): Promise<ImageDisplayRecord | undefined> {
+    if (!record) return undefined;
+    const saved = await this.deps.bookmarkStore()?.findByUrl(record.url);
+    return saved ? withDurableQueueState(record, saved) : record;
+  }
+
+  private isProjectionActive(options: RecordAddOptions): boolean {
+    return !options.projectionId || this.deps.isProjectionActive(options.projectionId);
   }
 
   private async validateRecordUrlForAdd(url: string, options: RecordAddOptions = {}): Promise<ValidatedRecordUrl> {
@@ -288,7 +318,7 @@ export class RecordLibraryController {
 
   async removeRecentHistory(id: string): Promise<void> {
     const existing = this.deps.getState().history.find((item) => item.id === id);
-    const blobId = existing ? encryptedBlobIdForRecord(existing) : undefined;
+    const blobId = existing && !existing.pinnedRecordId ? encryptedBlobIdForRecord(existing) : undefined;
     const recentHistoryStore = this.deps.recentHistoryStore();
     const history = recentHistoryStore
       ? await recentHistoryStore.remove(id, window.location.href)
@@ -311,7 +341,7 @@ export class RecordLibraryController {
     this.deps.render();
     let removedCapturedBlob = false;
     for (const record of records) {
-      const blobId = encryptedBlobIdForRecord(record);
+      const blobId = record.pinnedRecordId ? undefined : encryptedBlobIdForRecord(record);
       if (blobId) {
         await this.deps.removeCapturedBlobReference(blobId, { render: false });
         removedCapturedBlob = true;

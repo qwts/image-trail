@@ -30,6 +30,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
   const log: string[] = [];
   const savedBookmarks: ImageDisplayRecord[] = [];
   const defaultBookmarkStore: Partial<BookmarkStore> = {
+    findByUrl: async () => null,
     save: async (record) => {
       savedBookmarks.push(record);
       return record;
@@ -199,10 +200,68 @@ test('pinRecentHistory surfaces a failed pin as an error state', async () => {
   assert.deepEqual(harness.log, ['render']);
 });
 
+test('pinRecentHistory reuses an existing durable queue row', async () => {
+  const existing = historyRecord({
+    id: 'bookmark-existing',
+    source: 'bookmark',
+    timestamp: '2026-06-19T00:00:05.000Z',
+    queueUpdatedAt: '2026-06-19T00:00:05.000Z',
+    captureStatus: 'captured',
+    blobId: 'blob-existing',
+    storedOriginal: {
+      blobId: 'blob-existing',
+      mimeType: 'image/jpeg',
+      byteLength: 2048,
+      capturedAt: '2026-06-19T00:00:06.000Z',
+    },
+  });
+  const harness = createHarness({ bookmarkStore: { findByUrl: async () => existing } });
+  harness.patchState({ history: [historyRecord()] });
+
+  await harness.controller.pinRecentHistory('history-1');
+
+  assert.deepEqual(harness.savedBookmarks, []);
+  assert.equal(harness.getState().history[0]?.pinnedRecordId, 'bookmark-existing');
+  assert.equal(harness.getState().history[0]?.captureStatus, 'captured');
+  assert.equal(harness.getState().history[0]?.blobId, 'blob-existing');
+  assert.deepEqual(harness.log, ['loadBookmarkPage:0:false', 'renderPanelAndRefreshRecall', 'refreshStorageUsage:true']);
+});
+
 test('pinRecentHistory is a no-op for an unknown history id', async () => {
   const harness = createHarness();
   await harness.controller.pinRecentHistory('missing');
   assert.deepEqual(harness.log, []);
+});
+
+test('addRecentHistory reflects existing durable queue state on the transient row', async () => {
+  const harness = createHarness({
+    bookmarkStore: {
+      findByUrl: async () =>
+        historyRecord({
+          id: 'bookmark-existing',
+          source: 'bookmark',
+          timestamp: '2026-06-19T00:00:05.000Z',
+          queueUpdatedAt: '2026-06-19T00:00:05.000Z',
+          thumbnail: 'data:image/jpeg;base64,durable',
+          captureStatus: 'captured',
+          blobId: 'blob-existing',
+          storedOriginal: {
+            blobId: 'blob-existing',
+            mimeType: 'image/jpeg',
+            byteLength: 2048,
+            capturedAt: '2026-06-19T00:00:06.000Z',
+          },
+        }),
+    },
+  });
+
+  await harness.controller.addRecentHistory('https://example.test/image-1.jpg');
+
+  assert.match(harness.getState().history[0]?.id ?? '', /:https:\/\/example\.test\/image-1\.jpg$/u);
+  assert.equal(harness.getState().history[0]?.pinnedRecordId, 'bookmark-existing');
+  assert.equal(harness.getState().history[0]?.captureStatus, 'captured');
+  assert.equal(harness.getState().history[0]?.blobId, 'blob-existing');
+  assert.equal(harness.getState().history[0]?.thumbnail, 'data:image/jpeg;base64,durable');
 });
 
 test('addRecentHistory bails out silently once its projection is superseded', async () => {

@@ -65,6 +65,8 @@ export const MessageType = {
   LoadBookmarksResult: 'imageTrail.loadBookmarksResult',
   LoadBookmarksByIds: 'imageTrail.loadBookmarksByIds',
   LoadBookmarksByIdsResult: 'imageTrail.loadBookmarksByIdsResult',
+  FindBookmarkByUrl: 'imageTrail.findBookmarkByUrl',
+  FindBookmarkByUrlResult: 'imageTrail.findBookmarkByUrlResult',
   SaveBookmark: 'imageTrail.saveBookmark',
   SaveBookmarkResult: 'imageTrail.saveBookmarkResult',
   RemoveBookmark: 'imageTrail.removeBookmark',
@@ -579,6 +581,18 @@ export interface LoadBookmarksByIdsResultMessage {
   readonly payload: { readonly items: readonly import('../core/display-records.js').ImageDisplayRecord[] };
 }
 
+export interface FindBookmarkByUrlMessage {
+  readonly type: typeof MessageType.FindBookmarkByUrl;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly url: string };
+}
+
+export interface FindBookmarkByUrlResultMessage {
+  readonly type: typeof MessageType.FindBookmarkByUrlResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly record: import('../core/display-records.js').ImageDisplayRecord | null };
+}
+
 export interface SaveBookmarkMessage {
   readonly type: typeof MessageType.SaveBookmark;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -1050,6 +1064,7 @@ export type ExtensionRequest =
   | ImportBlobKeyBackupMessage
   | LoadBookmarksMessage
   | LoadBookmarksByIdsMessage
+  | FindBookmarkByUrlMessage
   | SaveBookmarkMessage
   | RemoveBookmarkMessage
   | RemoveBookmarksMessage
@@ -1109,6 +1124,7 @@ export type ExtensionResponse =
   | ImportBlobKeyBackupResultMessage
   | LoadBookmarksResultMessage
   | LoadBookmarksByIdsResultMessage
+  | FindBookmarkByUrlResultMessage
   | SaveBookmarkResultMessage
   | RemoveBookmarkResultMessage
   | RemoveBookmarksResultMessage
@@ -1205,6 +1221,8 @@ export const MESSAGE_DIRECTION = {
   [MessageType.LoadBookmarksResult]: 'response',
   [MessageType.LoadBookmarksByIds]: 'request',
   [MessageType.LoadBookmarksByIdsResult]: 'response',
+  [MessageType.FindBookmarkByUrl]: 'request',
+  [MessageType.FindBookmarkByUrlResult]: 'response',
   [MessageType.SaveBookmark]: 'request',
   [MessageType.SaveBookmarkResult]: 'response',
   [MessageType.RemoveBookmark]: 'request',
@@ -1541,6 +1559,14 @@ export function createLoadBookmarksByIdsResultMessage(
   payload: LoadBookmarksByIdsResultMessage['payload'],
 ): LoadBookmarksByIdsResultMessage {
   return { type: MessageType.LoadBookmarksByIdsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
+}
+
+export function createFindBookmarkByUrlMessage(url: string): FindBookmarkByUrlMessage {
+  return { type: MessageType.FindBookmarkByUrl, version: MESSAGE_PROTOCOL_VERSION, payload: { url } };
+}
+
+export function createFindBookmarkByUrlResultMessage(payload: FindBookmarkByUrlResultMessage['payload']): FindBookmarkByUrlResultMessage {
+  return { type: MessageType.FindBookmarkByUrlResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createSaveBookmarkMessage(record: import('../core/display-records.js').ImageDisplayRecord): SaveBookmarkMessage {
@@ -1997,6 +2023,11 @@ export function isLoadBookmarksResultMessage(value: unknown): value is LoadBookm
 export function isLoadBookmarksByIdsResultMessage(value: unknown): value is LoadBookmarksByIdsResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.LoadBookmarksByIdsResult;
+}
+
+export function isFindBookmarkByUrlResultMessage(value: unknown): value is FindBookmarkByUrlResultMessage {
+  if (!hasVersionedObjectShape(value)) return false;
+  return value.type === MessageType.FindBookmarkByUrlResult;
 }
 
 export function isSaveBookmarkResultMessage(value: unknown): value is SaveBookmarkResultMessage {

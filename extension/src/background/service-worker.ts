@@ -42,11 +42,9 @@ import {
   createExportEncryptedImageResultMessage,
   createFetchLinkedPageResultMessage,
   createFetchThumbnailSourceResultMessage,
-  createLoadBookmarksByIdsResultMessage,
   createLoadParsedFieldStateBySourceResultMessage,
   createImportEncryptedImageResultMessage,
   createImportUrlReviewStatusResultMessage,
-  createLoadBookmarksResultMessage,
   createLoadBuildIdentityResultMessage,
   createAddRecentHistoryResultMessage,
   createDeletePanelPositionResultMessage,
@@ -60,12 +58,8 @@ import {
   createListPCloudBackupsResultMessage,
   createListUrlTemplatesResultMessage,
   createListUrlReviewStatusResultMessage,
-  createRemoveBookmarkResultMessage,
-  createRemoveBookmarksResultMessage,
-  createRemoveRecallBookmarksResultMessage,
   createRemoveRecentHistoryResultMessage,
   createRecallRecordsResultMessage,
-  createSaveBookmarkResultMessage,
   createSavePanelPositionResultMessage,
   createSaveParsedFieldStateResultMessage,
   createSaveUrlReviewStatusResultMessage,
@@ -100,14 +94,6 @@ import type {
   ImportOriginalBlobsMessage,
   RetrieveBlobMessage,
   GrantPermissionAndCaptureMessage,
-} from './messages.js';
-import type {
-  LoadBookmarksByIdsMessage,
-  LoadBookmarksMessage,
-  RemoveBookmarkMessage,
-  RemoveBookmarksMessage,
-  RemoveRecallBookmarksMessage,
-  SaveBookmarkMessage,
 } from './messages.js';
 import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHistoryMessage } from './messages.js';
 import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messages.js';
@@ -169,6 +155,7 @@ import type {
   PCloudProviderStatusMessage,
   StorageUsageRequestMessage,
 } from './messages.js';
+import { createBookmarkMessageRegistry } from './handlers/bookmark-message-handlers.js';
 
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
@@ -621,42 +608,6 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
     queueRecords: { count: bookmarkUsage.blobCount + pinUsage.blobCount, totalBytes: queueMetadataBytes },
     thumbnails: combinedThumbnailUsage,
   };
-}
-
-async function handleLoadBookmarks(message: LoadBookmarksMessage): Promise<import('./messages.js').LoadBookmarksResultMessage['payload']> {
-  return bookmarkStore.loadPage(message.payload);
-}
-
-async function handleLoadBookmarksByIds(
-  message: LoadBookmarksByIdsMessage,
-): Promise<import('./messages.js').LoadBookmarksByIdsResultMessage['payload']> {
-  return { items: await bookmarkStore.loadByIds(message.payload.ids) };
-}
-
-async function handleSaveBookmark(message: SaveBookmarkMessage): Promise<import('./messages.js').SaveBookmarkResultMessage['payload']> {
-  const record = await bookmarkStore.save(message.payload.record);
-  return { ok: true, record };
-}
-
-async function handleRemoveBookmark(
-  message: RemoveBookmarkMessage,
-): Promise<import('./messages.js').RemoveBookmarkResultMessage['payload']> {
-  await bookmarkStore.remove(message.payload.record);
-  return { ok: true };
-}
-
-async function handleRemoveBookmarks(
-  message: RemoveBookmarksMessage,
-): Promise<import('./messages.js').RemoveBookmarksResultMessage['payload']> {
-  const result = await bookmarkStore.removeMany(message.payload.ids);
-  return { ok: true, removedCount: result.removedCount };
-}
-
-async function handleRemoveRecallBookmarks(
-  message: RemoveRecallBookmarksMessage,
-): Promise<import('./messages.js').RemoveRecallBookmarksResultMessage['payload']> {
-  const result = await bookmarkStore.removeRecallPage(message.payload);
-  return { ok: true, removedCount: result.removedCount };
 }
 
 async function handleLoadPanelPosition(
@@ -1226,31 +1177,12 @@ const messageRegistry = {
     respond: (result) => createStorageUsageResponseMessage(result),
     fallback: () => createStorageUsageResponseMessage({ totalBytes: 0, blobCount: 0 }),
   }),
-  [MessageType.LoadBookmarks]: defineMessage({
-    requestSchema: requestSchemas.loadBookmarksRequestSchema,
-    handle: (message: LoadBookmarksMessage) => handleLoadBookmarks(message),
-    respond: (result) => createLoadBookmarksResultMessage(result),
-    fallback: (message) =>
-      createLoadBookmarksResultMessage({
-        items: [],
-        offset: message.payload.offset,
-        limit: message.payload.limit,
-        total: 0,
-        hasOlder: false,
-        hasNewer: false,
-      }),
-  }),
+  ...createBookmarkMessageRegistry({ bookmarkStore }),
   [MessageType.LoadRecentHistory]: defineMessage({
     requestSchema: requestSchemas.loadRecentHistoryRequestSchema,
     handle: (message: LoadRecentHistoryMessage) => handleLoadRecentHistory(message),
     respond: (result) => createLoadRecentHistoryResultMessage(result.items),
     fallback: () => createLoadRecentHistoryResultMessage([]),
-  }),
-  [MessageType.LoadBookmarksByIds]: defineMessage({
-    requestSchema: requestSchemas.loadBookmarksByIdsRequestSchema,
-    handle: (message: LoadBookmarksByIdsMessage) => handleLoadBookmarksByIds(message),
-    respond: (result) => createLoadBookmarksByIdsResultMessage(result),
-    fallback: () => createLoadBookmarksByIdsResultMessage({ items: [] }),
   }),
   [MessageType.AddRecentHistory]: defineMessage({
     requestSchema: requestSchemas.addRecentHistoryRequestSchema,
@@ -1279,30 +1211,6 @@ const messageRegistry = {
     handle: (message: RecallRecordsMessage) => handleRecallRecords(message),
     respond: (result) => createRecallRecordsResultMessage(result),
     fallback: () => createRecallRecordsResultMessage({ ok: false, reason: 'unknown', message: 'Selected records could not be recalled.' }),
-  }),
-  [MessageType.SaveBookmark]: defineMessage({
-    requestSchema: requestSchemas.saveBookmarkRequestSchema,
-    handle: (message: SaveBookmarkMessage) => handleSaveBookmark(message),
-    respond: (result) => createSaveBookmarkResultMessage(result),
-    fallback: () => createSaveBookmarkResultMessage({ ok: false, message: 'Bookmark save failed.' }),
-  }),
-  [MessageType.RemoveBookmark]: defineMessage({
-    requestSchema: requestSchemas.removeBookmarkRequestSchema,
-    handle: (message: RemoveBookmarkMessage) => handleRemoveBookmark(message),
-    respond: (result) => createRemoveBookmarkResultMessage(result),
-    fallback: () => createRemoveBookmarkResultMessage({ ok: false }),
-  }),
-  [MessageType.RemoveBookmarks]: defineMessage({
-    requestSchema: requestSchemas.removeBookmarksRequestSchema,
-    handle: (message: RemoveBookmarksMessage) => handleRemoveBookmarks(message),
-    respond: (result) => createRemoveBookmarksResultMessage(result),
-    fallback: () => createRemoveBookmarksResultMessage({ ok: false, removedCount: 0 }),
-  }),
-  [MessageType.RemoveRecallBookmarks]: defineMessage({
-    requestSchema: requestSchemas.removeRecallBookmarksRequestSchema,
-    handle: (message: RemoveRecallBookmarksMessage) => handleRemoveRecallBookmarks(message),
-    respond: (result) => createRemoveRecallBookmarksResultMessage(result),
-    fallback: () => createRemoveRecallBookmarksResultMessage({ ok: false, removedCount: 0 }),
   }),
   [MessageType.LoadPanelPosition]: defineMessage({
     requestSchema: requestSchemas.loadPanelPositionRequestSchema,

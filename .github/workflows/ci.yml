@@ -29,10 +29,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           # Single source of truth: CI and local resolve Node from the same .nvmrc, so versions
           # never drift. `npm run ci` runs the non-browser gates (lint, format:check, test:cov,
@@ -61,7 +61,7 @@ jobs:
 
       - name: Upload coverage
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage/lcov.info
@@ -80,7 +80,7 @@ jobs:
       # that is exactly when it matters. View: download, unzip, `npx playwright show-report <dir>`.
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report/
@@ -125,7 +125,7 @@ jobs:
       - name: Download Playwright report
         id: download
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: playwright-report
           path: playwright-report
