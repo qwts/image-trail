@@ -90,6 +90,7 @@ function panelLayoutStory(overrides: Partial<PanelState> = {}): HTMLElement {
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
     detachedWindowPositions: new Map(),
+    detachedWindowMinimized: new Set(),
   };
 
   renderPanel(
