@@ -484,6 +484,29 @@
           "reason": "Planning baseline review is documentation and behavior-map inspection, not executable product behavior."
         }
       ]
+    },
+    {
+      "id": "detachable-sections",
+      "acceptance": "Detachable sections",
+      "repoPath": "docs/acceptance-tests/detachable-sections.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Detachable-Sections",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/detachable-sections.test.ts", "tests/dom/detachable-section.test.ts"],
+          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing."
+        },
+        {
+          "type": "storybook",
+          "paths": ["extension/src/ui/components/detachable-section.stories.ts", "extension/src/ui/render.stories.ts"],
+          "notes": "Window/narrow/placeholder/control states with play tests for detach and restore dispatch; panel-layout story for the detached placeholder."
+        },
+        {
+          "type": "deferred",
+          "issue": 215,
+          "notes": "Browser-level detach/restore E2E lands with a later #215 slice (drag-out gesture) once the interaction surface is final; window chrome follow-up is #397."
+        }
+      ]
     }
   ]
 }
