@@ -47,9 +47,12 @@
   list-style: none;
 }
 
+.image-trail-panel-root .image-trail-panel__fields-summary h3 {
+  margin-right: auto;
+}
+
 .image-trail-panel-root .image-trail-panel__fields-reset-all {
   min-height: 24px;
-  margin-left: auto;
   padding: 0 7px;
   border: 1px solid rgb(255 255 255 / 22%);
   border-radius: 4px;
