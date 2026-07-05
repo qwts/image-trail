@@ -9,7 +9,7 @@ import { bumpUrlField, rebuildUrl, setUrlFieldValue } from './rebuild-url.js';
 import { collectUrlFields } from './tokenize-fields.js';
 import type { ParsedUrlModel, UrlField, UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from './types.js';
 
-export type FieldTransformId = 'set-value' | 'step' | 'digit-width' | 'split-apply' | 'split-clear';
+export type FieldTransformId = 'set-value' | 'step' | 'digit-width' | 'split-apply' | 'split-clear' | 'reset-field' | 'reset-all';
 
 export type FieldTransformKind = 'url' | 'state';
 
@@ -25,6 +25,8 @@ export const FIELD_TRANSFORM_REGISTRY: readonly FieldTransformDefinition[] = [
   { id: 'digit-width', kind: 'url', description: 'Apply or clear a parsed field digit-width override.' },
   { id: 'split-apply', kind: 'state', description: 'Split a parsed field into smaller editable parts.' },
   { id: 'split-clear', kind: 'state', description: 'Clear a parsed field split.' },
+  { id: 'reset-field', kind: 'url', description: 'Reset one parsed field back to the edit-session baseline.' },
+  { id: 'reset-all', kind: 'url', description: 'Reset all parsed fields back to the edit-session baseline.' },
 ] as const;
 
 export function fieldTransformDefinition(id: FieldTransformId): FieldTransformDefinition {
@@ -67,6 +69,13 @@ export type FieldSplitTransformResult = FieldTransformResult<{
 
 export type FieldSplitClearTransformResult = FieldTransformResult<{
   readonly baseFieldId: string;
+}>;
+
+export type FieldResetTransformResult = FieldTransformResult<{
+  readonly model: ParsedUrlModel;
+  readonly url: string;
+  readonly attemptedFieldIds: readonly string[];
+  readonly resetBaseFieldId: string;
 }>;
 
 export function applySetFieldValueTransform(model: ParsedUrlModel, field: UrlField, nextValue: string): FieldUrlTransformResult {
@@ -112,6 +121,23 @@ export function clearFieldSplitTransform(baseFieldId: string): FieldSplitClearTr
   return {
     ...toFieldTransformSuccess('split-clear'),
     baseFieldId,
+  };
+}
+
+export function applyResetFieldTransform(
+  currentBaseModel: ParsedUrlModel,
+  currentField: UrlField,
+  baselineBaseModel: ParsedUrlModel,
+): FieldResetTransformResult {
+  const resetBaseFieldId = currentField.splitBaseId ?? currentField.id;
+  const currentBaseField = collectUrlFields(currentBaseModel).find((field) => field.id === resetBaseFieldId);
+  const baselineBaseField = collectUrlFields(baselineBaseModel).find((field) => field.id === resetBaseFieldId);
+  if (!currentBaseField || !baselineBaseField) {
+    return toFieldTransformFailure('reset-field', 'Reset baseline is no longer available for this field.');
+  }
+  return {
+    ...toUrlTransformResult('reset-field', setUrlFieldValue(currentBaseModel, currentBaseField, baselineBaseField.value), []),
+    resetBaseFieldId,
   };
 }
 

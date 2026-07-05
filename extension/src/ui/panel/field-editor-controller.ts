@@ -3,6 +3,7 @@ import type { PanelAction, PanelState } from '../../core/types.js';
 import { applyFieldSplitSpecs } from '../../core/url/field-splits.js';
 import {
   applyFieldDigitWidthTransform,
+  applyResetFieldTransform,
   applyFieldSplitTransform,
   applySetFieldValueTransform,
   applyStepFieldValueTransform,
@@ -13,6 +14,7 @@ import { parseUrl } from '../../core/url/parse-url.js';
 import { collectUrlFields } from '../../core/url/tokenize-fields.js';
 import type { ParsedUrlModel } from '../../core/url/types.js';
 import { isUnsupportedUrlEditorInput } from '../components/url-editor-view.js';
+import { parsedFieldResetBaselineFromState, resetAllParsedFieldState, resetOneParsedFieldState } from './parsed-field-reset-baseline.js';
 
 // The intermediate result of a field-editor transform: `noop` skips application, `state` applies a
 // pure panel-state update, `project` applies an optional state update and then loads a new URL
@@ -25,7 +27,7 @@ type FieldEditorEffect =
       readonly state?: PanelState;
       readonly url: string;
       readonly attemptedFieldIds: readonly string[];
-      readonly saveTemplateOnLoad: 'always' | 'when-unlocked';
+      readonly saveTemplateOnLoad: 'always' | 'when-unlocked' | 'never';
     };
 
 export interface FieldEditorControllerDeps {
@@ -88,6 +90,10 @@ export class FieldEditorController {
     return applyFieldSplitSpecs(parseUrl(this.deps.currentRawUrl()), this.deps.getState().fieldSplitSpecs);
   }
 
+  private currentRawUrlModel(): ParsedUrlModel {
+    return parseUrl(this.deps.currentRawUrl());
+  }
+
   private pruneInvalidFieldSplitSpecsForCurrentUrl(): boolean {
     const state = this.deps.getState();
     const nextState = this.deps.pruneInvalidFieldSplitSpecsForUrl(state, this.deps.currentRawUrl());
@@ -111,6 +117,7 @@ export class FieldEditorController {
   }
 
   private async applyFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): Promise<void> {
+    if (action.transformId !== 'reset-all' && action.transformId !== 'reset-field') this.captureResetBaseline();
     const prunedInvalidSplitSpecs = action.transformId !== 'split-clear' && this.pruneInvalidFieldSplitSpecsForCurrentUrl();
     const effect = this.fieldEditorEffect(action);
     if (effect.kind === 'noop') {
@@ -121,6 +128,9 @@ export class FieldEditorController {
   }
 
   private fieldEditorEffect(action: Extract<PanelAction, { readonly name: 'field/transform' }>): FieldEditorEffect {
+    if (action.transformId === 'reset-all') return this.resetAllFieldsEffect();
+    if (action.transformId === 'reset-field') return this.resetOneFieldEffect(action.fieldId);
+
     if (action.transformId === 'digit-width') {
       const baseModel = this.currentUrlModelWithoutDigitWidthSpecs();
       if (!collectUrlFields(baseModel).some((field) => field.id === action.fieldId)) {
@@ -220,6 +230,60 @@ export class FieldEditorController {
     };
   }
 
+  private captureResetBaseline(): void {
+    const state = this.deps.getState();
+    if (state.parsedFieldResetBaseline) return;
+    this.deps.setState({
+      ...state,
+      parsedFieldResetBaseline: parsedFieldResetBaselineFromState(state, this.deps.currentRawUrl()),
+    });
+  }
+
+  private resetAllFieldsEffect(): FieldEditorEffect {
+    const baseline = this.deps.getState().parsedFieldResetBaseline;
+    if (!baseline) return { kind: 'noop' };
+    const state = resetAllParsedFieldState(this.deps.getState(), baseline);
+    if (baseline.sourceUrl === this.deps.currentRawUrl()) return { kind: 'state', state };
+    return {
+      kind: 'project',
+      state,
+      url: baseline.sourceUrl,
+      attemptedFieldIds: [],
+      saveTemplateOnLoad: 'never',
+    };
+  }
+
+  private resetOneFieldEffect(fieldId: string): FieldEditorEffect {
+    const baseline = this.deps.getState().parsedFieldResetBaseline;
+    if (!baseline) return { kind: 'noop' };
+
+    let currentModel: ParsedUrlModel;
+    let currentBaseModel: ParsedUrlModel;
+    let baselineBaseModel: ParsedUrlModel;
+    try {
+      currentModel = this.deps.currentUrlModel();
+      currentBaseModel = this.currentRawUrlModel();
+      baselineBaseModel = parseUrl(baseline.sourceUrl);
+    } catch {
+      return { kind: 'noop' };
+    }
+
+    const field = collectUrlFields(currentModel).find((item) => item.id === fieldId);
+    if (!field) return { kind: 'noop' };
+    const transform = applyResetFieldTransform(currentBaseModel, field, baselineBaseModel);
+    if (!transform.ok) return { kind: 'noop' };
+
+    const state = resetOneParsedFieldState(this.deps.getState(), baseline, transform.resetBaseFieldId);
+    if (transform.url === this.deps.currentRawUrl()) return { kind: 'state', state };
+    return {
+      kind: 'project',
+      state,
+      url: transform.url,
+      attemptedFieldIds: [],
+      saveTemplateOnLoad: 'never',
+    };
+  }
+
   private async runFieldEditorEffect(effect: FieldEditorEffect): Promise<boolean> {
     if (effect.kind === 'noop') return false;
     if (effect.kind === 'state') {
@@ -230,7 +294,11 @@ export class FieldEditorController {
     }
     if (effect.state) this.deps.applyPanelState(effect.state);
     const loaded = await this.deps.applySelectedUrl(effect.url, effect.attemptedFieldIds);
-    if (loaded && (effect.saveTemplateOnLoad === 'always' || this.deps.getState().unlockedFieldIds.length > 0)) {
+    if (
+      loaded &&
+      (effect.saveTemplateOnLoad === 'always' ||
+        (effect.saveTemplateOnLoad === 'when-unlocked' && this.deps.getState().unlockedFieldIds.length > 0))
+    ) {
       await this.deps.saveUrlTemplateFromCurrentFields();
     }
     return loaded;

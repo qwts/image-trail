@@ -158,6 +158,7 @@ test('set-value projects the rebuilt URL and skips the template save without unl
   assert.match(harness.applyCalls[0]!.url, /p=6/);
   assert.deepEqual(harness.applyCalls[0]!.attemptedFieldIds, [fieldId]);
   assert.ok(!harness.log.includes('saveTemplate'));
+  assert.equal(harness.getState().parsedFieldResetBaseline?.sourceUrl, 'https://example.test/image?p=5');
 });
 
 test('set-value saves the template when a field is unlocked', async () => {
@@ -213,6 +214,100 @@ test('digit-width pads the field and projects the padded URL', async () => {
   assert.match(harness.applyCalls[0]!.url, /p=005/);
   assert.equal(harness.getState().fieldDigitWidthSpecs.length, 1);
   assert.equal(harness.getState().activeFieldId, fieldId);
+});
+
+test('reset-field projects the baseline URL and restores field-local editor state without saving templates', async () => {
+  const harness = createHarness({ rawUrl: 'https://example.test/image?p=6' });
+  const fieldId = harness.fieldId('query p');
+  harness.patchState({
+    activeFieldId: fieldId,
+    successfulFieldIds: [fieldId],
+    unlockedFieldIds: [fieldId],
+    manuallyExcludedFieldIds: [fieldId],
+    fieldDigitWidthSpecs: [{ fieldId, width: 3 }],
+    parsedFieldResetBaseline: {
+      sourceUrl: 'https://example.test/image?p=5',
+      activeFieldId: null,
+      failedFieldId: null,
+      successfulFieldIds: [],
+      unchangedFieldIds: [],
+      unlockedFieldIds: [],
+      manuallyExcludedFieldIds: [],
+      fieldSplitSpecs: [],
+      fieldDigitWidthSpecs: [],
+    },
+  });
+
+  harness.controller.enqueueFieldTransform({ name: 'field/transform', fieldId, transformId: 'reset-field' });
+  await harness.settle();
+
+  assert.equal(harness.applyCalls.length, 1);
+  assert.equal(harness.applyCalls[0]!.url, 'https://example.test/image?p=5');
+  assert.deepEqual(harness.applyCalls[0]!.attemptedFieldIds, []);
+  assert.deepEqual(harness.getState().fieldDigitWidthSpecs, []);
+  assert.deepEqual(harness.getState().unlockedFieldIds, []);
+  assert.deepEqual(harness.getState().manuallyExcludedFieldIds, []);
+  assert.equal(harness.getState().activeFieldId, null);
+  assert.ok(!harness.log.includes('saveTemplate'));
+});
+
+test('reset-all restores the baseline state and source URL without saving templates', async () => {
+  const harness = createHarness({ rawUrl: 'https://example.test/image?p=6' });
+  const fieldId = harness.fieldId('query p');
+  harness.patchState({
+    activeFieldId: fieldId,
+    successfulFieldIds: [fieldId],
+    unlockedFieldIds: [fieldId],
+    fieldDigitWidthSpecs: [{ fieldId, width: 3 }],
+    parsedFieldResetBaseline: {
+      sourceUrl: 'https://example.test/image?p=5',
+      activeFieldId: null,
+      failedFieldId: null,
+      successfulFieldIds: [],
+      unchangedFieldIds: [],
+      unlockedFieldIds: [],
+      manuallyExcludedFieldIds: [],
+      fieldSplitSpecs: [],
+      fieldDigitWidthSpecs: [],
+    },
+  });
+
+  harness.controller.enqueueFieldTransform({ name: 'field/transform', transformId: 'reset-all' });
+  await harness.settle();
+
+  assert.equal(harness.applyCalls.length, 1);
+  assert.equal(harness.applyCalls[0]!.url, 'https://example.test/image?p=5');
+  assert.deepEqual(harness.getState().fieldDigitWidthSpecs, []);
+  assert.deepEqual(harness.getState().unlockedFieldIds, []);
+  assert.equal(harness.getState().activeFieldId, null);
+  assert.equal(harness.getState().parsedFieldResetBaseline, null);
+  assert.ok(!harness.log.includes('saveTemplate'));
+});
+
+test('reset-all with matching URL applies state only and saves parsed-field state', async () => {
+  const harness = createHarness({ rawUrl: 'https://example.test/image?p=5' });
+  const fieldId = harness.fieldId('query p');
+  harness.patchState({
+    activeFieldId: fieldId,
+    parsedFieldResetBaseline: {
+      sourceUrl: 'https://example.test/image?p=5',
+      activeFieldId: null,
+      failedFieldId: null,
+      successfulFieldIds: [],
+      unchangedFieldIds: [],
+      unlockedFieldIds: [],
+      manuallyExcludedFieldIds: [],
+      fieldSplitSpecs: [],
+      fieldDigitWidthSpecs: [],
+    },
+  });
+
+  harness.controller.enqueueFieldTransform({ name: 'field/transform', transformId: 'reset-all' });
+  await harness.settle();
+
+  assert.deepEqual(harness.applyCalls, []);
+  assert.deepEqual(harness.log, ['save', 'render']);
+  assert.equal(harness.getState().parsedFieldResetBaseline, null);
 });
 
 test('digit-width on an unknown field is a no-op', async () => {

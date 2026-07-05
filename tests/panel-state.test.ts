@@ -24,7 +24,7 @@ import {
   recordMetadataText,
 } from '../extension/src/ui/components/record-metadata.js';
 import { selectedRangeIds } from '../extension/src/ui/components/selection-ranges.js';
-import { recallDeleteCountForQueue } from '../extension/src/ui/render.js';
+import { recallDeleteCountForQueue } from '../extension/src/ui/recall-delete-count.js';
 import type { ImportRestorePreviewState } from '../extension/src/core/types.js';
 import type { UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from '../extension/src/core/url/types.js';
 import type { GrabSourcePattern, UrlTemplateRecord } from '../extension/src/core/url/templates.js';
