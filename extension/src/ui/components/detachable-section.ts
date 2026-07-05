@@ -13,8 +13,17 @@ export interface DetachedWindowGeometry extends DetachedWindowPosition {
 type DetachDispatch = (action: PanelAction) => void;
 
 const DRAG_OUT_THRESHOLD_PX = 6;
-const DRAG_GHOST_INLINE_SIZE = 340;
 const DRAG_GHOST_BLOCK_SIZE = 160;
+
+/**
+ * Preferred window widths per section; Settings gets the panel's width for its dense forms. Owned
+ * here so the drag-out ghost/clamp and the detached render pass share one source of truth.
+ */
+export const DETACHED_WINDOW_INLINE_SIZES: Record<DetachableSectionId, number> = {
+  history: 340,
+  bookmarks: 340,
+  settings: 420,
+};
 
 /**
  * Keyboard-accessible detach control rendered inside a section's own header. Click (or Enter/Space)
@@ -53,10 +62,13 @@ export function createSectionDetachControl(
     const startY = event.clientY;
     let ghost: HTMLElement | null = null;
 
+    // Clamp against the section's actual window width — a fixed ghost size would let a wider
+    // window (Settings, 420px) store a drop position that renders partially off-screen.
+    const windowInlineSize = DETACHED_WINDOW_INLINE_SIZES[sectionId];
     const dropPosition = (move: PointerEvent): DetachedWindowPosition =>
       clampPanelPosition(
         { left: move.clientX - 24, top: move.clientY - 12 },
-        { width: DRAG_GHOST_INLINE_SIZE, height: DRAG_GHOST_BLOCK_SIZE },
+        { width: windowInlineSize, height: DRAG_GHOST_BLOCK_SIZE },
         { width: window.innerWidth, height: window.innerHeight },
       );
     const onMove = (move: PointerEvent): void => {
@@ -64,7 +76,7 @@ export function createSectionDetachControl(
         if (Math.abs(move.clientX - startX) < DRAG_OUT_THRESHOLD_PX && Math.abs(move.clientY - startY) < DRAG_OUT_THRESHOLD_PX) return;
         ghost = document.createElement('div');
         ghost.className = 'image-trail-panel__detach-ghost';
-        ghost.style.width = `${DRAG_GHOST_INLINE_SIZE}px`;
+        ghost.style.width = `${windowInlineSize}px`;
         ghost.style.height = `${DRAG_GHOST_BLOCK_SIZE}px`;
         const rootNode = detach.getRootNode();
         (rootNode instanceof ShadowRoot ? rootNode : document.body).append(ghost);

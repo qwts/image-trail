@@ -1,5 +1,10 @@
 import type { DetachableSectionId, PanelState } from '../core/types.js';
-import { createDetachedSectionWindow, type DetachedWindowGeometry, type DetachedWindowPosition } from './components/detachable-section.js';
+import {
+  createDetachedSectionWindow,
+  DETACHED_WINDOW_INLINE_SIZES,
+  type DetachedWindowGeometry,
+  type DetachedWindowPosition,
+} from './components/detachable-section.js';
 import type { PanelRenderTarget } from './render.js';
 
 /** User-facing titles for detachable sections; shared by the header control, placeholder, and window. */
@@ -15,12 +20,6 @@ export const DETACHABLE_SECTION_TITLES: Record<DetachableSectionId, string> = {
  */
 export type DetachableSectionContentRenderer = (target: PanelRenderTarget, state: PanelState) => HTMLElement | null;
 
-/** Preferred window widths; Settings gets the panel's width for its dense forms and action groups. */
-const DETACHED_WINDOW_INLINE_SIZES: Record<DetachableSectionId, number> = {
-  history: 340,
-  bookmarks: 340,
-  settings: 420,
-};
 const DETACHED_WINDOW_GAP = 8;
 const DETACHED_WINDOW_EDGE_PADDING = 12;
 const DETACHED_WINDOW_STACK_OFFSET = 24;

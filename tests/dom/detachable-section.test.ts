@@ -200,6 +200,24 @@ test('dragging the detach control past the threshold detaches at the drop positi
   assert.equal(windowEl.style.top, '208px');
 });
 
+test('drag-out clamps the drop position against the section’s actual window width', () => {
+  const harness = createHarness();
+  harness.render(panelState({ settingsOpen: true }));
+  const detach = harness.root.querySelector<HTMLButtonElement>('[data-image-trail-detach="settings"]');
+  assert.ok(detach instanceof HTMLButtonElement);
+  (detach as HTMLButtonElement & { setPointerCapture(id: number): void }).setPointerCapture = () => {};
+  (detach as HTMLButtonElement & { releasePointerCapture(id: number): void }).releasePointerCapture = () => {};
+
+  detach.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 40, clientY: 40, bubbles: true, cancelable: true }));
+  detach.dispatchEvent(new MouseEvent('pointermove', { clientX: 1000, clientY: 100, bubbles: true }));
+  detach.dispatchEvent(new MouseEvent('pointerup', { clientX: 1000, clientY: 100, bubbles: true }));
+  detach.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  // viewport 1024 wide; Settings window is 420px → maxLeft = 1024 - 420 - 12 = 592, not the
+  // 672 a fixed 340px ghost would have allowed (which renders 80px off-screen).
+  assert.deepEqual(harness.layoutState.detachedWindowPositions.get('settings'), { left: 592, top: 88 });
+});
+
 test('a sub-threshold press still detaches via the plain click path', () => {
   const harness = createHarness();
   harness.render(panelState());
