@@ -161,6 +161,30 @@ test('set-value projects the rebuilt URL and skips the template save without unl
   assert.equal(harness.getState().parsedFieldResetBaseline?.sourceUrl, 'https://example.test/image?p=5');
 });
 
+test('set-value captures the reset baseline after stale split specs are pruned', async () => {
+  const staleSplitSpec = {
+    baseFieldId: 'missing-field',
+    location: 'query' as const,
+    queryIndex: 0,
+    tokenIndex: 0,
+    lengths: [1, 1],
+    pattern: '1-1',
+  };
+  const harness = createHarness({
+    rawUrl: 'https://example.test/image?p=5',
+    prune: (state) => ({ ...state, fieldSplitSpecs: [] }),
+  });
+  const fieldId = harness.fieldId('query p');
+  harness.patchState({ fieldSplitSpecs: [staleSplitSpec] });
+
+  harness.controller.enqueueFieldTransform({ name: 'field/transform', fieldId, transformId: 'set-value', value: '6' });
+  await harness.settle();
+
+  assert.equal(harness.pruneCalls(), 1);
+  assert.deepEqual(harness.getState().fieldSplitSpecs, []);
+  assert.deepEqual(harness.getState().parsedFieldResetBaseline?.fieldSplitSpecs, []);
+});
+
 test('set-value saves the template when a field is unlocked', async () => {
   const harness = createHarness({ rawUrl: 'https://example.test/image?p=5' });
   const fieldId = harness.fieldId('query p');

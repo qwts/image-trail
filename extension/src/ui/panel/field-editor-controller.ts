@@ -117,8 +117,8 @@ export class FieldEditorController {
   }
 
   private async applyFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): Promise<void> {
-    if (action.transformId !== 'reset-all' && action.transformId !== 'reset-field') this.captureResetBaseline();
     const prunedInvalidSplitSpecs = action.transformId !== 'split-clear' && this.pruneInvalidFieldSplitSpecsForCurrentUrl();
+    if (action.transformId !== 'reset-all' && action.transformId !== 'reset-field') this.captureResetBaseline();
     const effect = this.fieldEditorEffect(action);
     if (effect.kind === 'noop') {
       if (prunedInvalidSplitSpecs) this.deps.render();
