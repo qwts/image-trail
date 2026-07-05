@@ -21,7 +21,12 @@
         {
           "type": "unit-dom",
           "path": "tests/manifest-commands.test.ts",
-          "notes": "Covers the manifest command metadata and suggested Alt/Option+Shift+B binding for the build-info overlay toggle."
+          "notes": "Covers manifest command metadata for the browser action shortcut entry and the suggested Alt/Option+Shift+B binding for the build-info overlay toggle."
+        },
+        {
+          "type": "unit-dom",
+          "paths": ["tests/keyboard.test.ts", "tests/dom/settings-view.test.ts"],
+          "notes": "Covers the page-level shortcut binding table, the Settings shortcut reference, and the intentional legacy a-z/h parity gaps."
         }
       ]
     },

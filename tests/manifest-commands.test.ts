@@ -33,6 +33,14 @@ test('manifest exposes the build-info overlay toggle in Chromium keyboard shortc
   });
 });
 
+test('manifest exposes the browser action in Chromium keyboard shortcuts', () => {
+  const command = loadManifest().commands?.['_execute_action'];
+
+  assert.ok(command, 'browser action command should be registered');
+  assert.equal(command.description, 'Open or hide Image Trail panel');
+  assert.equal(command.suggested_key, undefined);
+});
+
 test('manifest exposes panel stylesheet imports to content pages', () => {
   const resources = loadManifest().web_accessible_resources?.flatMap((entry) => entry.resources ?? []) ?? [];
 

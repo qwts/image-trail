@@ -21,6 +21,7 @@ import {
   VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
 } from '../../core/settings.js';
 import { createRecentsSettingsView } from './recents-settings-view.js';
+import { createShortcutSettingsView } from './shortcut-settings-view.js';
 
 const MATCH_MODES: readonly { readonly value: UrlTemplateMatchMode; readonly label: string }[] = [
   { value: 'exact-page-shape', label: 'Exact page shape' },
@@ -105,6 +106,7 @@ export function createSettingsView(
       createNeighborPreloadSettingsView(neighborPreloadState, dispatch),
       createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),
     ]),
+    createSettingsGroup('Shortcuts', 'shortcuts', [createShortcutSettingsView()]),
     createSettingsGroup('Maintenance', 'maintenance', [
       createPanelLayoutSettingsView(dispatch),
       createBuildIdentitySettingsView(buildIdentityState, dispatch),

@@ -7,6 +7,9 @@
     "default_title": "Toggle Image Trail"
   },
   "commands": {
+    "_execute_action": {
+      "description": "Open or hide Image Trail panel"
+    },
     "toggle-build-info-overlay": {
       "suggested_key": {
         "default": "Alt+Shift+B",
