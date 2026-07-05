@@ -1,6 +1,5 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
 import { isBuildIdentity } from '../core/build-info.js';
-import type { ImageDisplayRecord } from '../core/display-records.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { IndexedDbPanelPositionStore } from '../data/panel-position-controller.js';
 import { IndexedDbParsedFieldStateStore } from '../data/parsed-field-state-controller.js';
@@ -8,8 +7,7 @@ import { IndexedDbUrlTemplateStore } from '../data/url-template-controller.js';
 import { IndexedDbUrlReviewStatusStore } from '../data/url-review-status-controller.js';
 import { RecentHistoryCache } from './recent-history-cache.js';
 import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, migrateLocalSettings } from '../data/local-settings.js';
-import { getActiveBlobKey, lockBlobKey } from '../data/crypto/blob-keyring.js';
-import { activateWrappedBlobKey, createAndActivateWrappedBlobKey } from '../data/crypto/blob-keyring.js';
+import { getActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
 import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFileHeader } from '../data/import-export/encrypted-image.js';
 import {
@@ -17,20 +15,16 @@ import {
   storedBlobRecordFromPortable,
   type PortableStoredBlobRecord,
 } from '../data/import-export/full-backup.js';
-import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../data/import-export/key-backup.js';
 import { openImageTrailDb } from '../data/db.js';
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
 import { EncryptedPinsRepository } from '../data/repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from '../data/repositories/encrypted-pin-thumbnails-repository.js';
-import { KeysRepository } from '../data/repositories/keys-repository.js';
 import type { StoredBlobRecord } from '../data/types.js';
-import type { StoredKeyRecord } from '../data/crypto/types.js';
-import type { RecallCandidate, UrlReviewStatusClearFilter } from '../core/types.js';
+import type { UrlReviewStatusClearFilter } from '../core/types.js';
 import { fetchImageBytes } from './fetch-image.js';
 import {
   MessageType,
   createCaptureImageMessage,
-  createBlobKeyResultMessage,
   createCaptureResultMessage,
   createClearUrlReviewStatusResultMessage,
   createCheckImageRequestPolicyResultMessage,
@@ -38,7 +32,6 @@ import {
   createCreateBlobPreviewResultMessage,
   createDeleteBlobResultMessage,
   createDownloadImageResultMessage,
-  createDownloadPCloudBackupResultMessage,
   createExportEncryptedImageResultMessage,
   createFetchLinkedPageResultMessage,
   createFetchThumbnailSourceResultMessage,
@@ -46,39 +39,20 @@ import {
   createImportEncryptedImageResultMessage,
   createImportUrlReviewStatusResultMessage,
   createLoadBuildIdentityResultMessage,
-  createAddRecentHistoryResultMessage,
-  createConnectPCloudProviderResultMessage,
-  createLoadRecentHistoryResultMessage,
-  createLoadRecallCandidatesResultMessage,
   createLoadParsedFieldStateResultMessage,
   createLoadLocalSettingsResultMessage,
-  createListGrabSourcePatternsResultMessage,
-  createListPCloudBackupsResultMessage,
-  createListUrlTemplatesResultMessage,
   createListUrlReviewStatusResultMessage,
-  createRemoveRecentHistoryResultMessage,
-  createRecallRecordsResultMessage,
   createSaveParsedFieldStateResultMessage,
   createSaveUrlReviewStatusResultMessage,
   createSaveLocalSettingsResultMessage,
-  createSaveGrabSourcePatternResultMessage,
-  createSaveUrlTemplateResultMessage,
-  createDeleteGrabSourcePatternResultMessage,
-  createDeleteUrlTemplateResultMessage,
-  createDisconnectPCloudProviderResultMessage,
-  createBlobKeyStatusResultMessage,
-  createExportBlobKeyBackupResultMessage,
   createFetchBufferedImageSourceResultMessage,
   createExportOriginalBlobsResultMessage,
   createImportOriginalBlobsResultMessage,
-  createImportBlobKeyBackupResultMessage,
   createPingMessage,
-  createPCloudProviderStatusResultMessage,
   createProbeImageSourceResultMessage,
   createRetrieveBlobResultMessage,
   createStorageUsageResponseMessage,
   createTogglePanelMessage,
-  createUploadPCloudBackupResultMessage,
   isExtensionRequest,
   isStatusMessage,
 } from './messages.js';
@@ -92,22 +66,12 @@ import type {
   RetrieveBlobMessage,
   GrantPermissionAndCaptureMessage,
 } from './messages.js';
-import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHistoryMessage } from './messages.js';
-import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messages.js';
 import type { LoadParsedFieldStateMessage, SaveParsedFieldStateMessage } from './messages.js';
 import type {
   ClearUrlReviewStatusMessage,
   ImportUrlReviewStatusMessage,
   ListUrlReviewStatusMessage,
   SaveUrlReviewStatusMessage,
-} from './messages.js';
-import type {
-  DeleteGrabSourcePatternMessage,
-  DeleteUrlTemplateMessage,
-  ListGrabSourcePatternsMessage,
-  ListUrlTemplatesMessage,
-  SaveGrabSourcePatternMessage,
-  SaveUrlTemplateMessage,
 } from './messages.js';
 import type { SaveLocalSettingsMessage } from './messages.js';
 import type {
@@ -118,41 +82,27 @@ import type {
   ProbeImageSourceMessage,
 } from './messages.js';
 import type { CreateBlobPreviewMessage } from './messages.js';
-import type { SetupBlobKeyMessage, UnlockBlobKeyMessage, BlobKeyResultMessage } from './messages.js';
-import type { ExportBlobKeyBackupMessage, ImportBlobKeyBackupMessage } from './messages.js';
 import type { ImportEncryptedImageMessage } from './messages.js';
-import type { DownloadPCloudBackupMessage, UploadPCloudBackupMessage } from './messages.js';
 import { ImageRequestManager } from './image-request-manager.js';
 import { extractOrigin, hasOriginPermission, requestOriginPermission } from './permissions.js';
-import {
-  connectPCloudProvider,
-  disconnectPCloudProvider,
-  downloadPCloudBackup,
-  listPCloudBackups,
-  loadPCloudProviderStatus,
-  uploadPCloudBackup,
-} from './pcloud-provider.js';
-import * as v from 'valibot';
 import { defineMessage, dispatchRequest, type MessageDef } from './message-dispatch.js';
 import * as requestSchemas from './message-schemas.js';
-import { imageDisplayRecordSchema } from '../core/display-records.schema.js';
 import type { ExtensionRequest, ExtensionResponse } from './messages.js';
 import type {
-  BlobKeyStatusMessage,
   CleanupOrphanedBlobsMessage,
-  ClearBlobKeyMessage,
-  ConnectPCloudProviderMessage,
   CreateDataUrlPreviewMessage,
-  DisconnectPCloudProviderMessage,
-  ListPCloudBackupsMessage,
   LoadBuildIdentityMessage,
   LoadLocalSettingsMessage,
   LoadParsedFieldStateBySourceMessage,
-  PCloudProviderStatusMessage,
   StorageUsageRequestMessage,
 } from './messages.js';
 import { createBookmarkMessageRegistry } from './handlers/bookmark-message-handlers.js';
 import { createPanelPositionMessageRegistry } from './handlers/panel-position-handlers.js';
+import { createRecentHistoryMessageRegistry } from './handlers/recent-history-handlers.js';
+import { createRecallMessageRegistry } from './handlers/recall-handlers.js';
+import { createBlobKeyMessageRegistry } from './handlers/blob-key-handlers.js';
+import { createPCloudMessageRegistry } from './handlers/pcloud-handlers.js';
+import { createUrlTemplateMessageRegistry } from './handlers/url-template-handlers.js';
 import { normalizeHostname } from './handlers/hostname.js';
 import type { ServiceWorkerContext } from './service-worker-context.js';
 
@@ -237,10 +187,6 @@ async function referencedBlobIds(): Promise<Set<string>> {
     }
   }
   return referenced;
-}
-
-function isStoredBlobKey(record: StoredKeyRecord | undefined): record is StoredKeyRecord<'blob'> {
-  return record?.kind === 'blob';
 }
 
 function arrayBufferToBase64(bytes: ArrayBuffer | Uint8Array): string {
@@ -417,15 +363,6 @@ async function handleImportOriginalBlobs(
     return { ok: false, reason: 'invalid-original', message: 'Encrypted original backup payload was invalid.' };
   }
   return { ok: true, importedCount };
-}
-
-async function handleBlobKeyStatus(): Promise<import('./messages.js').BlobKeyStatusResultMessage['payload']> {
-  const activeBlobKey = getActiveBlobKey();
-  if (activeBlobKey) return { unlocked: true, keyReference: activeBlobKey.reference.reference, hasKey: true };
-  const db = await getDb();
-  if (!db) return { unlocked: false, keyReference: null, hasKey: false };
-  const blobKeys = await new KeysRepository(db).listByKind('blob');
-  return { unlocked: false, keyReference: null, hasKey: blobKeys.length > 0 };
 }
 
 async function handleRetrieveBlob(message: RetrieveBlobMessage): Promise<import('./messages.js').RetrieveBlobResultMessage['payload']> {
@@ -690,58 +627,6 @@ function normalizeUrlReviewStatusClearFilter(filter: UrlReviewStatusClearFilter)
   return typeof filter.sourceUrl === 'string' ? { scope: 'source', hostname, sourceUrl: filter.sourceUrl } : null;
 }
 
-async function handleListUrlTemplates(
-  message: ListUrlTemplatesMessage,
-): Promise<import('./messages.js').ListUrlTemplatesResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.hostname);
-  if (!hostname) return { ok: true, templates: [] };
-  return { ok: true, templates: await urlTemplateStore.load(hostname) };
-}
-
-async function handleSaveUrlTemplate(
-  message: SaveUrlTemplateMessage,
-): Promise<import('./messages.js').SaveUrlTemplateResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.template.hostname);
-  if (!hostname) return { ok: false };
-  await urlTemplateStore.save({ ...message.payload.template, hostname });
-  return { ok: true };
-}
-
-async function handleDeleteUrlTemplate(
-  message: DeleteUrlTemplateMessage,
-): Promise<import('./messages.js').DeleteUrlTemplateResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.hostname);
-  if (!hostname) return { ok: false };
-  await urlTemplateStore.remove(hostname, message.payload.id);
-  return { ok: true };
-}
-
-async function handleListGrabSourcePatterns(
-  message: ListGrabSourcePatternsMessage,
-): Promise<import('./messages.js').ListGrabSourcePatternsResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.hostname);
-  if (!hostname) return { ok: true, patterns: [] };
-  return { ok: true, patterns: await urlTemplateStore.loadGrabSourcePatterns(hostname) };
-}
-
-async function handleSaveGrabSourcePattern(
-  message: SaveGrabSourcePatternMessage,
-): Promise<import('./messages.js').SaveGrabSourcePatternResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.pattern.hostname);
-  if (!hostname) return { ok: false };
-  await urlTemplateStore.saveGrabSourcePattern({ ...message.payload.pattern, hostname });
-  return { ok: true };
-}
-
-async function handleDeleteGrabSourcePattern(
-  message: DeleteGrabSourcePatternMessage,
-): Promise<import('./messages.js').DeleteGrabSourcePatternResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.hostname);
-  if (!hostname) return { ok: false };
-  await urlTemplateStore.removeGrabSourcePattern(hostname, message.payload.id);
-  return { ok: true };
-}
-
 async function handleLoadLocalSettings(): Promise<import('./messages.js').LoadLocalSettingsResultMessage['payload']> {
   return { ok: true, settings: await loadLocalSettings() };
 }
@@ -766,173 +651,6 @@ async function handleSaveLocalSettings(
   await chrome.storage.local.set({ [LOCAL_SETTINGS_KEY]: settings });
   recentHistoryCache.pruneForSettings(settings);
   return { ok: true };
-}
-
-async function handleLoadRecentHistory(
-  message: LoadRecentHistoryMessage,
-): Promise<import('./messages.js').LoadRecentHistoryResultMessage['payload']> {
-  const settings = await loadLocalSettings();
-  return { items: recentHistoryCache.load(message.payload.pageUrl, settings, message.payload.includeRetained ?? false) };
-}
-
-async function handleAddRecentHistory(
-  message: AddRecentHistoryMessage,
-): Promise<import('./messages.js').AddRecentHistoryResultMessage['payload']> {
-  const settings = await loadLocalSettings();
-  return { items: recentHistoryCache.add(message.payload.pageUrl, message.payload.item, settings) };
-}
-
-async function handleRemoveRecentHistory(
-  message: RemoveRecentHistoryMessage,
-): Promise<import('./messages.js').RemoveRecentHistoryResultMessage['payload']> {
-  const settings = await loadLocalSettings();
-  return { items: recentHistoryCache.remove(message.payload.pageUrl, message.payload.id, settings) };
-}
-
-async function handleLoadRecallCandidates(
-  message: LoadRecallCandidatesMessage,
-): Promise<import('./messages.js').LoadRecallCandidatesResultMessage['payload']> {
-  const offset = Math.max(0, message.payload.offset);
-  const limit = Math.max(1, Math.min(100, message.payload.limit));
-  const page = await bookmarkStore.loadRecallPage({
-    offset,
-    limit,
-    scope: message.payload.scope ?? 'global',
-    currentPageUrl: message.payload.currentPageUrl,
-  });
-  const candidates = page.items.map(toRecallCandidate);
-  const moreMessage = page.hasMore ? ` Showing ${candidates.length} of ${page.total}.` : '';
-  return {
-    ok: true,
-    candidates,
-    total: page.total,
-    nextOffset: page.nextOffset,
-    hasMore: page.hasMore,
-    failedCount: page.failedCount,
-    message: `Loaded ${candidates.length} recall record${candidates.length === 1 ? '' : 's'}.${moreMessage}`,
-  };
-}
-
-async function handleRecallRecords(message: RecallRecordsMessage): Promise<import('./messages.js').RecallRecordsResultMessage['payload']> {
-  const ids = message.payload.ids.filter(Boolean);
-  if (ids.length === 0) return { ok: false, reason: 'empty-selection', message: 'Select one or more records to recall.' };
-  const records = await bookmarkStore.moveToFront(ids);
-  const failedCount = ids.length - records.length;
-  return {
-    ok: true,
-    records,
-    failedCount,
-    message: `Recalled ${records.length} record${records.length === 1 ? '' : 's'}${failedCount ? `, ${failedCount} failed` : ''}.`,
-  };
-}
-
-function toRecallCandidate(record: ImageDisplayRecord): RecallCandidate {
-  return { ...record, envelopeCreatedAt: record.timestamp };
-}
-
-async function handleSetupBlobKey(message: SetupBlobKeyMessage): Promise<BlobKeyResultMessage['payload']> {
-  const password = message.payload.password.trim();
-  if (!password) return { ok: false, reason: 'empty-password', message: 'Enter a password to set up encrypted blob storage.' };
-  const db = await getDb();
-  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
-  const wrapped = await createAndActivateWrappedBlobKey({ password });
-  await new KeysRepository(db).put(wrapped.metadata);
-  return {
-    ok: true,
-    keyReference: wrapped.metadata.reference,
-    message: `Encrypted blob storage unlocked with ${wrapped.metadata.reference}.`,
-  };
-}
-
-async function handleUnlockBlobKey(message: UnlockBlobKeyMessage): Promise<BlobKeyResultMessage['payload']> {
-  const password = message.payload.password.trim();
-  if (!password) return { ok: false, reason: 'empty-password', message: 'Enter a password to unlock encrypted blob storage.' };
-  const db = await getDb();
-  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
-  const keys = new KeysRepository(db);
-  const requested = message.payload.keyReference ? await keys.get(message.payload.keyReference) : undefined;
-  const latest = [...(await keys.listByKind('blob'))].sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
-  const blobKey = requested ?? latest;
-  if (!isStoredBlobKey(blobKey)) {
-    return { ok: false, reason: 'missing-key', message: 'No encrypted blob key exists. Set up encrypted storage first.' };
-  }
-  await activateWrappedBlobKey(blobKey, password);
-  return { ok: true, keyReference: blobKey.reference, message: `Encrypted blob storage unlocked with ${blobKey.reference}.` };
-}
-
-async function handleExportBlobKeyBackup(
-  message: ExportBlobKeyBackupMessage,
-): Promise<import('./messages.js').ExportBlobKeyBackupResultMessage['payload']> {
-  const password = message.payload.password.trim();
-  if (!password) return { ok: false, reason: 'empty-password', message: 'Enter a password to export a key backup.' };
-  const db = await getDb();
-  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
-  const keys = new KeysRepository(db);
-  const blobKey = message.payload.keyReference
-    ? await keys.get(message.payload.keyReference)
-    : latestKeyByCreatedAt(await keys.listByKind('blob'));
-  if (!isStoredBlobKey(blobKey)) {
-    return { ok: false, reason: 'missing-key', message: 'No encrypted blob key exists to back up.' };
-  }
-  const result = await exportStoredKeyBackupWithPassword(blobKey, password);
-  if (!result.status.ok || !result.fileContent || !result.fileName) {
-    return { ok: false, reason: result.status.code, message: result.status.message };
-  }
-  return {
-    ok: true,
-    keyReference: blobKey.reference,
-    fileContent: result.fileContent,
-    fileName: result.fileName,
-    message: result.status.message,
-  };
-}
-
-async function handleImportBlobKeyBackup(
-  message: ImportBlobKeyBackupMessage,
-): Promise<import('./messages.js').ImportBlobKeyBackupResultMessage['payload']> {
-  const password = message.payload.password.trim();
-  if (!password) return { ok: false, reason: 'empty-password', message: 'Enter a password to import a key backup.' };
-  const db = await getDb();
-  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
-  const result = await importStoredKeyBackupWithPassword(message.payload.fileContent, password);
-  if (!result.status.ok || !result.record) {
-    return { ok: false, reason: result.status.code, message: result.status.message };
-  }
-  if (!isStoredBlobKey(result.record)) {
-    return { ok: false, reason: 'unsupported-key', message: 'Only blob key backups can be imported here.' };
-  }
-  const keys = new KeysRepository(db);
-  if (await keys.get(result.record.reference)) {
-    return {
-      ok: true,
-      keyReference: result.record.reference,
-      imported: false,
-      message: `Key backup already exists for ${result.record.reference}.`,
-    };
-  }
-  await keys.put(result.record);
-  return {
-    ok: true,
-    keyReference: result.record.reference,
-    imported: true,
-    message: `Imported key backup for ${result.record.reference}.`,
-  };
-}
-
-async function handleClearBlobKey(): Promise<BlobKeyResultMessage['payload']> {
-  lockBlobKey();
-  const db = await getDb();
-  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
-  const keys = new KeysRepository(db);
-  const blobKeys = await keys.listByKind('blob');
-  for (const key of blobKeys) {
-    await keys.remove(key.reference);
-  }
-  return { ok: true, keyReference: '', message: 'Encrypted blob key cleared. Import a key backup to recover encrypted originals.' };
-}
-
-function latestKeyByCreatedAt(keys: readonly StoredKeyRecord[]): StoredKeyRecord | undefined {
-  return keys.reduce<StoredKeyRecord | undefined>((latest, key) => (!latest || key.createdAt > latest.createdAt ? key : latest), undefined);
 }
 
 async function handleGrantPermissionAndCapture(
@@ -1159,40 +877,8 @@ const messageRegistry = {
     fallback: () => createStorageUsageResponseMessage({ totalBytes: 0, blobCount: 0 }),
   }),
   ...createBookmarkMessageRegistry({ bookmarkStore }),
-  [MessageType.LoadRecentHistory]: defineMessage({
-    requestSchema: requestSchemas.loadRecentHistoryRequestSchema,
-    handle: (message: LoadRecentHistoryMessage) => handleLoadRecentHistory(message),
-    respond: (result) => createLoadRecentHistoryResultMessage(result.items),
-    fallback: () => createLoadRecentHistoryResultMessage([]),
-  }),
-  [MessageType.AddRecentHistory]: defineMessage({
-    requestSchema: requestSchemas.addRecentHistoryRequestSchema,
-    handle: (message: AddRecentHistoryMessage) => handleAddRecentHistory(message),
-    respond: (result) => createAddRecentHistoryResultMessage(result.items),
-    // Only echo the item back optimistically when it is a valid record; a payload that
-    // failed validation reaches this fallback too, and its `item` may be malformed.
-    fallback: (message) =>
-      createAddRecentHistoryResultMessage(v.is(imageDisplayRecordSchema, message.payload.item) ? [message.payload.item] : []),
-  }),
-  [MessageType.RemoveRecentHistory]: defineMessage({
-    requestSchema: requestSchemas.removeRecentHistoryRequestSchema,
-    handle: (message: RemoveRecentHistoryMessage) => handleRemoveRecentHistory(message),
-    respond: (result) => createRemoveRecentHistoryResultMessage(result.items),
-    fallback: () => createRemoveRecentHistoryResultMessage([]),
-  }),
-  [MessageType.LoadRecallCandidates]: defineMessage({
-    requestSchema: requestSchemas.loadRecallCandidatesRequestSchema,
-    handle: (message: LoadRecallCandidatesMessage) => handleLoadRecallCandidates(message),
-    respond: (result) => createLoadRecallCandidatesResultMessage(result),
-    fallback: () =>
-      createLoadRecallCandidatesResultMessage({ ok: false, reason: 'unknown', message: 'Recall records could not be loaded.' }),
-  }),
-  [MessageType.RecallRecords]: defineMessage({
-    requestSchema: requestSchemas.recallRecordsRequestSchema,
-    handle: (message: RecallRecordsMessage) => handleRecallRecords(message),
-    respond: (result) => createRecallRecordsResultMessage(result),
-    fallback: () => createRecallRecordsResultMessage({ ok: false, reason: 'unknown', message: 'Selected records could not be recalled.' }),
-  }),
+  ...createRecentHistoryMessageRegistry(context),
+  ...createRecallMessageRegistry(context),
   ...createPanelPositionMessageRegistry(context),
   [MessageType.LoadParsedFieldState]: defineMessage({
     requestSchema: requestSchemas.loadParsedFieldStateRequestSchema,
@@ -1236,42 +922,7 @@ const messageRegistry = {
     respond: (result) => createClearUrlReviewStatusResultMessage(result),
     fallback: () => createClearUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be cleared.' }),
   }),
-  [MessageType.ListUrlTemplates]: defineMessage({
-    requestSchema: requestSchemas.listUrlTemplatesRequestSchema,
-    handle: (message: ListUrlTemplatesMessage) => handleListUrlTemplates(message),
-    respond: (result) => createListUrlTemplatesResultMessage(result),
-    fallback: () => createListUrlTemplatesResultMessage({ ok: false, message: 'URL templates could not be loaded.' }),
-  }),
-  [MessageType.SaveUrlTemplate]: defineMessage({
-    requestSchema: requestSchemas.saveUrlTemplateRequestSchema,
-    handle: (message: SaveUrlTemplateMessage) => handleSaveUrlTemplate(message),
-    respond: (result) => createSaveUrlTemplateResultMessage(result),
-    fallback: () => createSaveUrlTemplateResultMessage({ ok: false }),
-  }),
-  [MessageType.DeleteUrlTemplate]: defineMessage({
-    requestSchema: requestSchemas.deleteUrlTemplateRequestSchema,
-    handle: (message: DeleteUrlTemplateMessage) => handleDeleteUrlTemplate(message),
-    respond: (result) => createDeleteUrlTemplateResultMessage(result),
-    fallback: () => createDeleteUrlTemplateResultMessage({ ok: false }),
-  }),
-  [MessageType.ListGrabSourcePatterns]: defineMessage({
-    requestSchema: requestSchemas.listGrabSourcePatternsRequestSchema,
-    handle: (message: ListGrabSourcePatternsMessage) => handleListGrabSourcePatterns(message),
-    respond: (result) => createListGrabSourcePatternsResultMessage(result),
-    fallback: () => createListGrabSourcePatternsResultMessage({ ok: false, message: 'Grab source patterns could not be loaded.' }),
-  }),
-  [MessageType.SaveGrabSourcePattern]: defineMessage({
-    requestSchema: requestSchemas.saveGrabSourcePatternRequestSchema,
-    handle: (message: SaveGrabSourcePatternMessage) => handleSaveGrabSourcePattern(message),
-    respond: (result) => createSaveGrabSourcePatternResultMessage(result),
-    fallback: () => createSaveGrabSourcePatternResultMessage({ ok: false }),
-  }),
-  [MessageType.DeleteGrabSourcePattern]: defineMessage({
-    requestSchema: requestSchemas.deleteGrabSourcePatternRequestSchema,
-    handle: (message: DeleteGrabSourcePatternMessage) => handleDeleteGrabSourcePattern(message),
-    respond: (result) => createDeleteGrabSourcePatternResultMessage(result),
-    fallback: () => createDeleteGrabSourcePatternResultMessage({ ok: false }),
-  }),
+  ...createUrlTemplateMessageRegistry(context),
   [MessageType.LoadLocalSettings]: defineMessage({
     requestSchema: requestSchemas.loadLocalSettingsRequestSchema,
     handle: (_message: LoadLocalSettingsMessage) => handleLoadLocalSettings(),
@@ -1284,70 +935,7 @@ const messageRegistry = {
     respond: (result) => createSaveLocalSettingsResultMessage(result),
     fallback: () => createSaveLocalSettingsResultMessage({ ok: false }),
   }),
-  [MessageType.PCloudProviderStatus]: defineMessage({
-    requestSchema: requestSchemas.emptyPayloadSchema,
-    handle: (_message: PCloudProviderStatusMessage) => loadPCloudProviderStatus(),
-    respond: (result) => createPCloudProviderStatusResultMessage(result),
-    fallback: () => createPCloudProviderStatusResultMessage({ connected: false, message: 'pCloud status could not be loaded.' }),
-  }),
-  [MessageType.ConnectPCloudProvider]: defineMessage({
-    requestSchema: requestSchemas.emptyPayloadSchema,
-    handle: (_message: ConnectPCloudProviderMessage) => connectPCloudProvider(),
-    respond: (result) => createConnectPCloudProviderResultMessage(result),
-    fallback: () =>
-      createConnectPCloudProviderResultMessage({
-        ok: false,
-        status: { connected: false, message: 'pCloud connection failed.' },
-        message: 'pCloud connection failed.',
-      }),
-  }),
-  [MessageType.DisconnectPCloudProvider]: defineMessage({
-    requestSchema: requestSchemas.emptyPayloadSchema,
-    handle: (_message: DisconnectPCloudProviderMessage) => disconnectPCloudProvider(),
-    respond: (result) => createDisconnectPCloudProviderResultMessage(result),
-    fallback: () =>
-      createDisconnectPCloudProviderResultMessage({
-        ok: false,
-        status: { connected: false, message: 'pCloud disconnect failed.' },
-        message: 'pCloud disconnect failed.',
-      }),
-  }),
-  [MessageType.UploadPCloudBackup]: defineMessage({
-    requestSchema: requestSchemas.uploadPCloudBackupRequestSchema,
-    handle: (message: UploadPCloudBackupMessage) => uploadPCloudBackup(message.payload),
-    respond: (result) => createUploadPCloudBackupResultMessage(result),
-    fallback: () =>
-      createUploadPCloudBackupResultMessage({
-        ok: false,
-        status: { connected: false, message: 'pCloud backup upload failed.', messageIsError: true },
-        reason: 'upload-failed',
-        message: 'pCloud backup upload failed.',
-      }),
-  }),
-  [MessageType.ListPCloudBackups]: defineMessage({
-    requestSchema: requestSchemas.emptyPayloadSchema,
-    handle: (_message: ListPCloudBackupsMessage) => listPCloudBackups(),
-    respond: (result) => createListPCloudBackupsResultMessage(result),
-    fallback: () =>
-      createListPCloudBackupsResultMessage({
-        ok: false,
-        status: { connected: false, message: 'pCloud backups could not be listed.', messageIsError: true },
-        reason: 'list-failed',
-        message: 'pCloud backups could not be listed.',
-      }),
-  }),
-  [MessageType.DownloadPCloudBackup]: defineMessage({
-    requestSchema: requestSchemas.downloadPCloudBackupRequestSchema,
-    handle: (message: DownloadPCloudBackupMessage) => downloadPCloudBackup(message.payload),
-    respond: (result) => createDownloadPCloudBackupResultMessage(result),
-    fallback: () =>
-      createDownloadPCloudBackupResultMessage({
-        ok: false,
-        status: { connected: false, message: 'pCloud backup could not be downloaded.', messageIsError: true },
-        reason: 'download-failed',
-        message: 'pCloud backup could not be downloaded.',
-      }),
-  }),
+  ...createPCloudMessageRegistry(),
   [MessageType.DeleteBlob]: defineMessage({
     requestSchema: requestSchemas.deleteBlobRequestSchema,
     handle: (message: DeleteBlobMessage) => handleDeleteBlob(message),
@@ -1420,42 +1008,7 @@ const messageRegistry = {
     respond: (result) => createFetchLinkedPageResultMessage(result),
     fallback: () => createFetchLinkedPageResultMessage({ ok: false, reason: 'unknown', message: 'Linked page fetch failed.' }),
   }),
-  [MessageType.BlobKeyStatus]: defineMessage({
-    requestSchema: requestSchemas.emptyPayloadSchema,
-    handle: (_message: BlobKeyStatusMessage) => handleBlobKeyStatus(),
-    respond: (result) => createBlobKeyStatusResultMessage(result),
-    fallback: () => createBlobKeyStatusResultMessage({ unlocked: false, keyReference: null, hasKey: false }),
-  }),
-  [MessageType.SetupBlobKey]: defineMessage({
-    requestSchema: requestSchemas.setupBlobKeyRequestSchema,
-    handle: (message: SetupBlobKeyMessage) => handleSetupBlobKey(message),
-    respond: (result) => createBlobKeyResultMessage(result),
-    fallback: () => createBlobKeyResultMessage({ ok: false, reason: 'unknown', message: 'Blob key setup failed.' }),
-  }),
-  [MessageType.UnlockBlobKey]: defineMessage({
-    requestSchema: requestSchemas.unlockBlobKeyRequestSchema,
-    handle: (message: UnlockBlobKeyMessage) => handleUnlockBlobKey(message),
-    respond: (result) => createBlobKeyResultMessage(result),
-    fallback: () => createBlobKeyResultMessage({ ok: false, reason: 'unknown', message: 'Blob key unlock failed.' }),
-  }),
-  [MessageType.ClearBlobKey]: defineMessage({
-    requestSchema: requestSchemas.emptyPayloadSchema,
-    handle: (_message: ClearBlobKeyMessage) => handleClearBlobKey(),
-    respond: (result) => createBlobKeyResultMessage(result),
-    fallback: () => createBlobKeyResultMessage({ ok: false, reason: 'unknown', message: 'Blob key clear failed.' }),
-  }),
-  [MessageType.ExportBlobKeyBackup]: defineMessage({
-    requestSchema: requestSchemas.exportBlobKeyBackupRequestSchema,
-    handle: (message: ExportBlobKeyBackupMessage) => handleExportBlobKeyBackup(message),
-    respond: (result) => createExportBlobKeyBackupResultMessage(result),
-    fallback: () => createExportBlobKeyBackupResultMessage({ ok: false, reason: 'unknown', message: 'Key backup export failed.' }),
-  }),
-  [MessageType.ImportBlobKeyBackup]: defineMessage({
-    requestSchema: requestSchemas.importBlobKeyBackupRequestSchema,
-    handle: (message: ImportBlobKeyBackupMessage) => handleImportBlobKeyBackup(message),
-    respond: (result) => createImportBlobKeyBackupResultMessage(result),
-    fallback: () => createImportBlobKeyBackupResultMessage({ ok: false, reason: 'unknown', message: 'Key backup import failed.' }),
-  }),
+  ...createBlobKeyMessageRegistry(context),
   [MessageType.GrantPermissionAndCapture]: defineMessage({
     requestSchema: requestSchemas.grantPermissionAndCaptureRequestSchema,
     handle: (message: GrantPermissionAndCaptureMessage) => handleGrantPermissionAndCapture(message),
