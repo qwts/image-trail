@@ -777,7 +777,9 @@ function recallDrawerGeometry(panelRoot: HTMLElement, side: 'left' | 'right'): R
   const rect = panelRoot.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
-  const width = Math.min(DRAWER_INLINE_SIZE, Math.max(240, viewportWidth - DRAWER_EDGE_PADDING * 2));
+  // Mirror the stylesheet's `width: min(340px, calc(100vw - 24px))` — never wider than the
+  // viewport, since the inline width would otherwise override the CSS max-width.
+  const width = Math.min(DRAWER_INLINE_SIZE, Math.max(0, viewportWidth - DRAWER_EDGE_PADDING * 2));
   const blockStart = Math.max(DRAWER_EDGE_PADDING, Math.min(rect.top, viewportHeight - DRAWER_EDGE_PADDING));
   const blockSize = Math.max(180, viewportHeight - blockStart - DRAWER_EDGE_PADDING);
   const minLeft = DRAWER_EDGE_PADDING;
