@@ -186,13 +186,14 @@ jobs:
   # Publishes the Playwright HTML report to GitHub Pages at a stable per-PR URL:
   #   https://qwtm.github.io/image-trail/reports/pr-<number>/
   # Each run replaces that PR's report (bounded growth); the artifact above keeps 14 days of
-  # history. Runs even when the E2E job fails — a red E2E run is when the report matters most —
-  # but is skipped when E2E itself was skipped (no report to publish).
+  # history. Publishes ONLY when the E2E job fails — the browsable report exists to debug red
+  # runs (traces/screenshots/videos), and green runs deploying to Pages on every push was pure
+  # deploy-race noise. Green-run reports remain available as the workflow artifact.
   e2e-report:
     name: Publish E2E report
     needs: e2e
-    # PR-only (the stable URL is per-PR); skip when E2E was path-filtered out (no artifact).
-    if: ${{ !cancelled() && needs.e2e.result != 'skipped' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    # PR-only (the stable URL is per-PR).
+    if: ${{ !cancelled() && needs.e2e.result == 'failure' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -244,7 +245,9 @@ jobs:
       # workflow then publishes the branch, and it occasionally flakes server-side ("Deployment
       # failed, try again later"). Verify the latest Pages build is `built` and includes the
       # commit we just pushed; on a failed managed run, rerun it once (which also turns that red
-      # run green) and keep polling. Fails honestly if the site never picks up the deploy.
+      # run green) and keep polling. Exhausting the poll emits a WARNING, not a failure — the
+      # report commit is already on gh-pages and a lagging Pages publish is GitHub's infra, not
+      # this PR's code; a red X here just trains people to ignore the job.
       - name: Verify Pages picked up the deploy (self-heal once)
         id: verify
         if: ${{ steps.download.outcome == 'success' && steps.freshness.outputs.fresh == 'true' }}
@@ -277,8 +280,8 @@ jobs:
             fi
             sleep 10
           done
-          echo "Pages never confirmed the deploy (last status: $status, commit: $built)." >&2
-          exit 1
+          echo "::warning title=Pages deploy unconfirmed::gh-pages has the report commit but the managed Pages build never confirmed within 5m (last status: $status). The report URL may lag; no action needed on this PR."
+          exit 0
 
       - name: Link report in run summary
         if: ${{ steps.verify.outcome == 'success' }}
