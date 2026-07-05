@@ -47,11 +47,9 @@ import {
   createImportUrlReviewStatusResultMessage,
   createLoadBuildIdentityResultMessage,
   createAddRecentHistoryResultMessage,
-  createDeletePanelPositionResultMessage,
   createConnectPCloudProviderResultMessage,
   createLoadRecentHistoryResultMessage,
   createLoadRecallCandidatesResultMessage,
-  createLoadPanelPositionResultMessage,
   createLoadParsedFieldStateResultMessage,
   createLoadLocalSettingsResultMessage,
   createListGrabSourcePatternsResultMessage,
@@ -60,7 +58,6 @@ import {
   createListUrlReviewStatusResultMessage,
   createRemoveRecentHistoryResultMessage,
   createRecallRecordsResultMessage,
-  createSavePanelPositionResultMessage,
   createSaveParsedFieldStateResultMessage,
   createSaveUrlReviewStatusResultMessage,
   createSaveLocalSettingsResultMessage,
@@ -97,7 +94,6 @@ import type {
 } from './messages.js';
 import type { AddRecentHistoryMessage, LoadRecentHistoryMessage, RemoveRecentHistoryMessage } from './messages.js';
 import type { LoadRecallCandidatesMessage, RecallRecordsMessage } from './messages.js';
-import type { DeletePanelPositionMessage, LoadPanelPositionMessage, SavePanelPositionMessage } from './messages.js';
 import type { LoadParsedFieldStateMessage, SaveParsedFieldStateMessage } from './messages.js';
 import type {
   ClearUrlReviewStatusMessage,
@@ -156,6 +152,9 @@ import type {
   StorageUsageRequestMessage,
 } from './messages.js';
 import { createBookmarkMessageRegistry } from './handlers/bookmark-message-handlers.js';
+import { createPanelPositionMessageRegistry } from './handlers/panel-position-handlers.js';
+import { normalizeHostname } from './handlers/hostname.js';
+import type { ServiceWorkerContext } from './service-worker-context.js';
 
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
@@ -180,6 +179,19 @@ const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
 const urlReviewStatusStore = new IndexedDbUrlReviewStatusStore();
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
 const recentHistoryCache = new RecentHistoryCache();
+
+/** Composition-root context handed to extracted handler modules; see {@link ServiceWorkerContext}. */
+const context: ServiceWorkerContext = {
+  bookmarkStore,
+  panelPositionStore,
+  parsedFieldStateStore,
+  urlReviewStatusStore,
+  urlTemplateStore,
+  recentHistoryCache,
+  imageRequests,
+  getDb,
+  loadLocalSettings,
+};
 
 async function requestStatus(tabId: number): Promise<boolean> {
   try {
@@ -215,11 +227,6 @@ function getDb(): Promise<IDBDatabase | null> {
     dbPromise = openImageTrailDb().then((result) => (result.status.ok ? result.db : null));
   }
   return dbPromise;
-}
-
-function normalizeHostname(hostname: string): string | null {
-  const normalized = hostname.trim().toLowerCase();
-  return normalized || null;
 }
 
 async function referencedBlobIds(): Promise<Set<string>> {
@@ -608,32 +615,6 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
     queueRecords: { count: bookmarkUsage.blobCount + pinUsage.blobCount, totalBytes: queueMetadataBytes },
     thumbnails: combinedThumbnailUsage,
   };
-}
-
-async function handleLoadPanelPosition(
-  message: LoadPanelPositionMessage,
-): Promise<import('./messages.js').LoadPanelPositionResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.hostname);
-  if (!hostname) return { ok: true, position: null };
-  return { ok: true, position: await panelPositionStore.load(hostname) };
-}
-
-async function handleSavePanelPosition(
-  message: SavePanelPositionMessage,
-): Promise<import('./messages.js').SavePanelPositionResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.hostname);
-  if (!hostname) return { ok: false };
-  await panelPositionStore.save(hostname, message.payload.position);
-  return { ok: true };
-}
-
-async function handleDeletePanelPosition(
-  message: DeletePanelPositionMessage,
-): Promise<import('./messages.js').DeletePanelPositionResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.hostname);
-  if (!hostname) return { ok: false };
-  await panelPositionStore.remove(hostname);
-  return { ok: true };
 }
 
 async function handleLoadParsedFieldState(
@@ -1212,24 +1193,7 @@ const messageRegistry = {
     respond: (result) => createRecallRecordsResultMessage(result),
     fallback: () => createRecallRecordsResultMessage({ ok: false, reason: 'unknown', message: 'Selected records could not be recalled.' }),
   }),
-  [MessageType.LoadPanelPosition]: defineMessage({
-    requestSchema: requestSchemas.loadPanelPositionRequestSchema,
-    handle: (message: LoadPanelPositionMessage) => handleLoadPanelPosition(message),
-    respond: (result) => createLoadPanelPositionResultMessage(result),
-    fallback: () => createLoadPanelPositionResultMessage({ ok: false, message: 'Panel position could not be loaded.' }),
-  }),
-  [MessageType.SavePanelPosition]: defineMessage({
-    requestSchema: requestSchemas.savePanelPositionRequestSchema,
-    handle: (message: SavePanelPositionMessage) => handleSavePanelPosition(message),
-    respond: (result) => createSavePanelPositionResultMessage(result),
-    fallback: () => createSavePanelPositionResultMessage({ ok: false }),
-  }),
-  [MessageType.DeletePanelPosition]: defineMessage({
-    requestSchema: requestSchemas.deletePanelPositionRequestSchema,
-    handle: (message: DeletePanelPositionMessage) => handleDeletePanelPosition(message),
-    respond: (result) => createDeletePanelPositionResultMessage(result),
-    fallback: () => createDeletePanelPositionResultMessage({ ok: false }),
-  }),
+  ...createPanelPositionMessageRegistry(context),
   [MessageType.LoadParsedFieldState]: defineMessage({
     requestSchema: requestSchemas.loadParsedFieldStateRequestSchema,
     handle: (message: LoadParsedFieldStateMessage) => handleLoadParsedFieldState(message),
