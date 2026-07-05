@@ -13,6 +13,9 @@ interface ExtensionCommandManifest {
       };
     }
   >;
+  readonly web_accessible_resources?: readonly {
+    readonly resources?: readonly string[];
+  }[];
 }
 
 function loadManifest(): ExtensionCommandManifest {
@@ -28,4 +31,11 @@ test('manifest exposes the build-info overlay toggle in Chromium keyboard shortc
     default: 'Alt+Shift+B',
     mac: 'Alt+Shift+B',
   });
+});
+
+test('manifest exposes panel stylesheet imports to content pages', () => {
+  const resources = loadManifest().web_accessible_resources?.flatMap((entry) => entry.resources ?? []) ?? [];
+
+  assert.ok(resources.includes('src/ui/styles/panel.css'), 'panel stylesheet should be web-accessible');
+  assert.ok(resources.includes('src/ui/styles/fields.css'), 'imported parsed-fields stylesheet should be web-accessible');
 });

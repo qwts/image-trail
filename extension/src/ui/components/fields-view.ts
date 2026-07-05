@@ -247,7 +247,9 @@ export function createFieldsView(
     const canUnlock = (isSuccessful || isIncludedInTrail) && reservesTrailControlSlot;
     const canSplit = !isSplitField && field.value.length > 1;
     const fieldLabel = options.privacyMode ? 'Private field' : field.field.label;
-    let numericDisplayMode = options.numericDisplayModes?.get(field.field.id) ?? defaultNumericFieldDisplayMode(field.field);
+    const defaultNumericDisplayMode = defaultNumericFieldDisplayMode(field.field);
+    let numericDisplayMode =
+      defaultNumericDisplayMode === null ? null : (options.numericDisplayModes?.get(field.field.id) ?? defaultNumericDisplayMode);
     let fieldInputReferenceValue =
       numericDisplayMode === null ? field.value : numericFieldInputDisplayValue(field.field, numericDisplayMode);
     container.className = `image-trail-panel__field-row${field.field.id === activeFieldId ? ' is-active' : ''}${isSuccessful ? ' is-success' : ''}${isUnchanged ? ' is-unchanged' : ''}${isFailed ? ' is-error' : ''}`;
@@ -485,7 +487,7 @@ export function createFieldsView(
         suppressedValueChange = null;
         return;
       }
-      callbacks.onValueChange(field.field.id, value.value);
+      commitValueChange();
     });
     value.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {

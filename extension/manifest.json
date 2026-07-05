@@ -30,7 +30,7 @@
   "host_permissions": ["http://*/*", "https://*/*"],
   "web_accessible_resources": [
     {
-      "resources": ["src/ui/styles/panel.css"],
+      "resources": ["src/ui/styles/panel.css", "src/ui/styles/fields.css"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ]

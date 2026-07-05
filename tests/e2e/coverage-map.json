@@ -92,7 +92,8 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/parsed-field-state-sync.test.ts", "tests/dom/fields-view.test.ts"]
+          "paths": ["tests/parsed-field-state-sync.test.ts", "tests/dom/fields-view.test.ts"],
+          "notes": "Covers parsed-field state sync plus Parsed fields UI controls, including split length hints, Dec/Hex display toggles, alternate-base edit commits, stale cached numeric-mode isolation, and privacy masking."
         },
         {
           "type": "storybook",

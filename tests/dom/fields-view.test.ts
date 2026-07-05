@@ -162,6 +162,44 @@ test('alternate numeric display commits edits in source field representation', (
   assert.deepEqual(calls, [{ name: 'onValueChange', args: ['query-page', '18'] }]);
 });
 
+test('alternate numeric display blur commits edits in source field representation', () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls, { options: { open: true, blockSize: null, numericDisplayModes: new Map([['query-page', 'hex']]) } });
+  const input = inputByLabel(view, 'Edit page');
+
+  input.value = '0x12';
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+
+  assert.deepEqual(calls, [{ name: 'onValueChange', args: ['query-page', '18'] }]);
+});
+
+test('cached numeric display modes are ignored for nonnumeric fields', () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls, {
+    fields: [
+      {
+        field: {
+          id: 'query-page',
+          location: 'query',
+          label: 'slug',
+          value: 'page',
+          tokenKind: 'text',
+          queryIndex: 0,
+          tokenIndex: 0,
+        },
+        value: 'page',
+      },
+    ],
+    options: { open: true, blockSize: null, numericDisplayModes: new Map([['query-page', 'hex']]) },
+  });
+  const input = inputByLabel(view, 'Edit slug');
+
+  input.value = 'next';
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }));
+
+  assert.deepEqual(calls, [{ name: 'onValueChange', args: ['query-page', 'next'] }]);
+});
+
 test('split length hint renders without exposing field length in privacy mode', () => {
   const calls: CallbackCall[] = [];
   const view = buildFieldsView(calls);
