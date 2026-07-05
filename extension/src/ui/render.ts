@@ -17,7 +17,6 @@ import { createTargetPickerView } from './components/target-picker-view.js';
 import { activeUrlFieldsForState } from './active-url-fields.js';
 import type { UrlField } from '../core/url/types.js';
 import { createParsedFieldsSection, type NumericFieldDisplayMode } from './parsed-fields-section.js';
-import { recallDeleteCountForQueue } from './recall-delete-count.js';
 
 export interface PanelRenderTarget {
   readonly root: HTMLElement;
