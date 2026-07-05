@@ -227,6 +227,7 @@ export class ProjectionApplicationController {
       manuallyExcludedFieldIds: [],
       fieldSplitSpecs: [],
       fieldDigitWidthSpecs: [],
+      parsedFieldResetBaseline: null,
     };
   }
 

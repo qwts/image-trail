@@ -16,6 +16,8 @@ export interface FieldsViewCallbacks {
   readonly onNumericDisplayModeChange: (fieldId: string, mode: NumericFieldDisplayMode) => void;
   readonly onApplySplit: (fieldId: string, pattern: string) => void;
   readonly onClearSplit: (baseFieldId: string) => void;
+  readonly onResetField: (fieldId: string) => void;
+  readonly onResetAll: () => void;
   readonly onOpenChange: (open: boolean, blockSize: number | null) => void;
   readonly onResize: (blockSize: number) => void;
 }
@@ -25,6 +27,8 @@ export interface FieldsViewOptions {
   readonly blockSize: number | null;
   readonly privacyMode?: boolean;
   readonly numericDisplayModes?: ReadonlyMap<string, NumericFieldDisplayMode>;
+  readonly resettableFieldIds?: ReadonlySet<string>;
+  readonly resetAllAvailable?: boolean;
 }
 
 function computedPixelValue(styles: CSSStyleDeclaration, property: string): number {
@@ -221,6 +225,19 @@ export function createFieldsView(
   const heading = document.createElement('h3');
   heading.textContent = 'Parsed fields';
   summary.append(heading);
+  if (options.resetAllAvailable === true) {
+    const resetAll = document.createElement('button');
+    resetAll.type = 'button';
+    resetAll.className = 'image-trail-panel__fields-reset-all';
+    resetAll.textContent = 'Reset all';
+    resetAll.title = options.privacyMode ? 'Reset private parsed fields' : 'Reset all parsed fields';
+    resetAll.setAttribute('aria-label', resetAll.title);
+    resetAll.addEventListener('click', (event) => {
+      event.preventDefault();
+      callbacks.onResetAll();
+    });
+    summary.append(resetAll);
+  }
 
   const body = document.createElement('div');
   body.className = 'image-trail-panel__fields-body';
@@ -242,6 +259,7 @@ export function createFieldsView(
     const isUnchanged = unchangedFieldIds.includes(field.field.id);
     const isIncludedInTrail = unlockedFieldIds.includes(field.field.id);
     const isSplitField = field.field.splitBaseId !== undefined;
+    const isResettable = options.resettableFieldIds?.has(field.field.id) === true;
     const digitWidth = fieldDigitWidthSpecs.find((spec) => spec.fieldId === field.field.id)?.width;
     const reservesTrailControlSlot = fieldReservesTrailControlSlot(field.field);
     const canUnlock = (isSuccessful || isIncludedInTrail) && reservesTrailControlSlot;
@@ -305,7 +323,7 @@ export function createFieldsView(
 
     const hasStepControls = field.field.tokenKind === 'int' || field.field.tokenKind === 'hex';
     const controls = document.createElement('span');
-    controls.className = `image-trail-panel__field-control${hasStepControls ? ' has-step-controls' : ''}${reservesTrailControlSlot ? ' has-trail-control-slot' : ''}`;
+    controls.className = `image-trail-panel__field-control has-reset-control-slot${hasStepControls ? ' has-step-controls' : ''}${reservesTrailControlSlot ? ' has-trail-control-slot' : ''}`;
     controls.append(value);
     let splitControls: HTMLSpanElement | null = null;
     let decimalModeButton: HTMLButtonElement | null = null;
@@ -421,6 +439,29 @@ export function createFieldsView(
         callbacks.onToggleUnlock(field.field.id);
       });
       controls.append(trail);
+    }
+
+    if (isResettable) {
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.className = 'image-trail-panel__field-reset-button';
+      reset.textContent = 'Reset';
+      reset.title = options.privacyMode ? 'Reset private field' : `Reset ${field.field.label}`;
+      reset.setAttribute('aria-label', reset.title);
+      reset.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+      });
+      reset.addEventListener('click', () => {
+        commitAndBlurFocusedValue(value, fieldInputReferenceValue, options.privacyMode === true, commitValueChange);
+        callbacks.onResetField(field.field.id);
+      });
+      controls.append(reset);
+    } else {
+      const placeholder = document.createElement('span');
+      placeholder.className = 'image-trail-panel__field-reset-placeholder';
+      placeholder.setAttribute('aria-hidden', 'true');
+      controls.append(placeholder);
     }
 
     if (canSplit || isSplitField) {

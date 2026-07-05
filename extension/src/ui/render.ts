@@ -9,7 +9,6 @@ import {
   type DetachedWindowPosition,
 } from './components/detachable-section.js';
 import { createEncryptionView } from './components/encryption-view.js';
-import { createFieldsView, type EditableField, type NumericFieldDisplayMode } from './components/fields-view.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHistoryView } from './components/history-view.js';
 import {
@@ -23,12 +22,9 @@ import { createRecallDrawerView, type RecallDrawerGeometry } from './components/
 import { createSettingsView } from './components/settings-view.js';
 import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
-import { parseUrl } from '../core/url/parse-url.js';
-import { applyFieldSplitSpecs } from '../core/url/field-splits.js';
-import { applyFieldDigitWidthSpecs } from '../core/url/field-widths.js';
-import { collectUrlFields, tokenValue } from '../core/url/tokenize-fields.js';
-import { findBestMatchingTemplate } from '../core/url/templates.js';
-import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
+import { activeUrlFieldsForState } from './active-url-fields.js';
+import { createParsedFieldsSection, type NumericFieldDisplayMode } from './parsed-fields-section.js';
+import { recallDeleteCountForQueue } from './recall-delete-count.js';
 
 export interface PanelRenderTarget {
   readonly root: HTMLElement;
@@ -54,10 +50,6 @@ export interface PanelLayoutState {
   detachedWindowMinimized: Set<DetachableSectionId>;
 }
 
-export function recallDeleteCountForQueue(state: Pick<PanelState, 'bookmarkTotal' | 'bookmarkLimit'>): number {
-  return Math.max(0, state.bookmarkTotal - state.bookmarkLimit);
-}
-
 interface FocusedTextControlSnapshot {
   readonly selector: string;
   readonly value: string;
@@ -81,7 +73,6 @@ const SCROLL_SNAPSHOT_SELECTORS = [
   '.image-trail-panel__field-list',
   '.image-trail-panel__bookmarks-section .image-trail-panel__record-list',
 ] as const;
-const MIN_FIELDS_PANEL_BLOCK_SIZE = 160;
 const DRAWER_GAP = 8;
 const DRAWER_EDGE_PADDING = 12;
 const DRAWER_INLINE_SIZE = 340;
@@ -292,49 +283,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
 
   target.root.replaceChildren();
 
-  const fieldValueFor = (model: ParsedUrlModel, field: UrlField): string => {
-    if (field.location === 'path' && field.partIndex !== undefined) {
-      const part = model.pathParts[field.partIndex];
-      if (!part || part.type !== 'segment') return '';
-      const token = part.tokens[field.tokenIndex];
-      return token ? tokenValue(token) : '';
-    }
-
-    if (field.location === 'query' && field.queryIndex !== undefined) {
-      const queryField = model.queryFields[field.queryIndex];
-      const token = queryField?.valueTokens[field.tokenIndex];
-      return token ? tokenValue(token) : '';
-    }
-
-    return '';
-  };
-
-  const selectedUrl = state.target.selectedUrl;
-  const editableUrl = state.draftUrl ?? selectedUrl;
-  const selectedIsDataUrl = editableUrl?.startsWith('data:') === true;
-  const activeUrl = selectedIsDataUrl ? window.location.href : (editableUrl ?? window.location.href);
-
-  const parseActiveUrl = (): ParsedUrlModel | null => {
-    try {
-      return applyFieldDigitWidthSpecs(applyFieldSplitSpecs(parseUrl(activeUrl), state.fieldSplitSpecs), state.fieldDigitWidthSpecs);
-    } catch {
-      return null;
-    }
-  };
-
-  const targetModel = parseActiveUrl();
-  const fields = targetModel ? collectUrlFields(targetModel) : [];
-  const activeTemplate = targetModel ? findBestMatchingTemplate(state.urlTemplates, targetModel) : null;
-  const visibleFields =
-    activeTemplate?.hideExcludedFields === true
-      ? fields.filter((field) => activeTemplate.fields.some((templateField) => templateField.id === field.id))
-      : fields;
-  const editableFields: EditableField[] = targetModel
-    ? visibleFields.map((field) => ({
-        field,
-        value: fieldValueFor(targetModel, field),
-      }))
-    : [];
+  const { activeUrl, fields, visibleFields, editableFields, activeTemplate } = activeUrlFieldsForState(state, window.location.href);
 
   const dispatchActiveField = (delta: -1 | 1): void => {
     if (visibleFields.length === 0) return;
@@ -535,54 +484,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
       },
     ),
     createTargetPickerView(state.target, target.dispatch, { privacyMode: state.privacyModeEnabled }),
-    createFieldsView(
-      editableFields,
-      state.activeFieldId,
-      state.failedFieldId,
-      state.successfulFieldIds,
-      state.unchangedFieldIds,
-      state.unlockedFieldIds,
-      state.fieldDigitWidthSpecs,
-      {
-        onActivate: (fieldId) => {
-          target.dispatch({ name: 'active-field/set', id: fieldId });
-        },
-        onValueChange: (fieldId, value) => {
-          target.dispatch({ name: 'field/transform', fieldId, transformId: 'set-value', value });
-        },
-        onStep: (fieldId, delta) => {
-          target.dispatch({ name: 'field/transform', fieldId, transformId: 'step', delta });
-        },
-        onDigitWidthChange: (fieldId, value) => {
-          target.dispatch({ name: 'field/transform', fieldId, transformId: 'digit-width', value });
-        },
-        onToggleUnlock: (fieldId) => {
-          target.dispatch({ name: 'field-unlock/toggle', id: fieldId });
-        },
-        onNumericDisplayModeChange: (fieldId, mode) => {
-          target.layoutState.fieldDisplayModes.set(fieldId, mode);
-        },
-        onApplySplit: (fieldId, pattern) => {
-          target.dispatch({ name: 'field/transform', fieldId, transformId: 'split-apply', pattern });
-        },
-        onClearSplit: (baseFieldId) => {
-          target.dispatch({ name: 'field/transform', fieldId: baseFieldId, transformId: 'split-clear' });
-        },
-        onOpenChange: (open, blockSize) => {
-          target.layoutState.fieldsPanelOpen = open;
-          target.layoutState.fieldsPanelBlockSize = blockSize;
-        },
-        onResize: (blockSize) => {
-          target.layoutState.fieldsPanelBlockSize = Math.max(MIN_FIELDS_PANEL_BLOCK_SIZE, blockSize);
-        },
-      },
-      {
-        open: target.layoutState.fieldsPanelOpen,
-        blockSize: target.layoutState.fieldsPanelBlockSize,
-        privacyMode: state.privacyModeEnabled,
-        numericDisplayModes: target.layoutState.fieldDisplayModes,
-      },
-    ),
+    createParsedFieldsSection(editableFields, state, activeUrl, target),
     createSecondaryControlsGroup(state, target, [
       createControlsView({
         onPrevious: () => dispatchActiveField(-1),

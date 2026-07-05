@@ -28,6 +28,8 @@ function recordingCallbacks(calls: CallbackCall[]): FieldsViewCallbacks {
     onNumericDisplayModeChange: (fieldId, mode) => calls.push({ name: 'onNumericDisplayModeChange', args: [fieldId, mode] }),
     onApplySplit: (fieldId, pattern) => calls.push({ name: 'onApplySplit', args: [fieldId, pattern] }),
     onClearSplit: (baseFieldId) => calls.push({ name: 'onClearSplit', args: [baseFieldId] }),
+    onResetField: (fieldId) => calls.push({ name: 'onResetField', args: [fieldId] }),
+    onResetAll: () => calls.push({ name: 'onResetAll', args: [] }),
     onOpenChange: (open, blockSize) => calls.push({ name: 'onOpenChange', args: [open, blockSize] }),
     onResize: (blockSize) => calls.push({ name: 'onResize', args: [blockSize] }),
   };
@@ -136,6 +138,32 @@ test('the trail button toggles inclusion and flips its label', () => {
   assert.deepEqual(calls, [{ name: 'onToggleUnlock', args: ['query-page'] }]);
   assert.equal(trail.textContent, 'Exclude');
   assert.equal(trail.getAttribute('aria-label'), 'Exclude page from Previous/Next');
+});
+
+test('reset field button is only interactive when the field is resettable', () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls, { options: { open: true, blockSize: null, resettableFieldIds: new Set(['query-page']) } });
+
+  buttonByLabel(view, 'Reset page').click();
+
+  assert.deepEqual(calls, [{ name: 'onResetField', args: ['query-page'] }]);
+});
+
+test('non-resettable rows reserve reset space without exposing a button', () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls);
+
+  assert.equal(view.querySelector('button[aria-label="Reset page"]'), null);
+  assert.ok(view.querySelector('.image-trail-panel__field-reset-placeholder'));
+});
+
+test('reset-all button dispatches without exposing values in privacy mode', () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls, { options: { open: true, blockSize: null, privacyMode: true, resetAllAvailable: true } });
+
+  buttonByLabel(view, 'Reset private parsed fields').click();
+
+  assert.deepEqual(calls, [{ name: 'onResetAll', args: [] }]);
 });
 
 test('numeric display toggle changes the input display without committing a value', () => {

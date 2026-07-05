@@ -87,6 +87,18 @@ export interface ParsedFieldStateRecord {
   readonly updatedAt: string;
 }
 
+export interface ParsedFieldResetBaseline {
+  readonly sourceUrl: string;
+  readonly activeFieldId: string | null;
+  readonly failedFieldId: string | null;
+  readonly successfulFieldIds: readonly string[];
+  readonly unchangedFieldIds: readonly string[];
+  readonly unlockedFieldIds: readonly string[];
+  readonly manuallyExcludedFieldIds: readonly string[];
+  readonly fieldSplitSpecs: readonly UrlFieldSplitSpec[];
+  readonly fieldDigitWidthSpecs: readonly UrlFieldDigitWidthSpec[];
+}
+
 export interface ParsedFieldStateStore {
   load(hostname: string, pageUrl: string): Promise<ParsedFieldStateRecord | null>;
   loadForSource(hostname: string, sourceUrl: string): Promise<ParsedFieldStateRecord | null>;
@@ -230,6 +242,7 @@ export interface PanelState {
   readonly manuallyExcludedFieldIds: readonly string[];
   readonly fieldSplitSpecs: readonly UrlFieldSplitSpec[];
   readonly fieldDigitWidthSpecs: readonly UrlFieldDigitWidthSpec[];
+  readonly parsedFieldResetBaseline: ParsedFieldResetBaseline | null;
   readonly urlTemplates: readonly UrlTemplateRecord[];
   readonly grabSourcePatterns: readonly GrabSourcePattern[];
   readonly activeUrlTemplateId: string | null;
@@ -421,7 +434,9 @@ export type FieldTransformPanelAction =
       readonly transformId: Extract<FieldTransformId, 'split-apply'>;
       readonly pattern: string;
     }
-  | { readonly name: 'field/transform'; readonly fieldId: string; readonly transformId: Extract<FieldTransformId, 'split-clear'> };
+  | { readonly name: 'field/transform'; readonly fieldId: string; readonly transformId: Extract<FieldTransformId, 'split-clear'> }
+  | { readonly name: 'field/transform'; readonly fieldId: string; readonly transformId: Extract<FieldTransformId, 'reset-field'> }
+  | { readonly name: 'field/transform'; readonly transformId: Extract<FieldTransformId, 'reset-all'> };
 
 export type PanelAction =
   | {

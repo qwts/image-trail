@@ -47,13 +47,29 @@
   list-style: none;
 }
 
+.image-trail-panel-root .image-trail-panel__fields-reset-all {
+  min-height: 24px;
+  margin-left: auto;
+  padding: 0 7px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 4px;
+  background: #242424;
+  color: #ddd;
+  cursor: pointer;
+  font:
+    700 10px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
 .image-trail-panel-root .image-trail-panel__fields-summary::-webkit-details-marker {
   display: none;
 }
 
 .image-trail-panel-root .image-trail-panel__fields-summary::after {
   content: 'Show';
-  margin-left: auto;
   flex: none;
   color: #999;
   font:
@@ -119,18 +135,18 @@
 
 .image-trail-panel-root .image-trail-panel__field-control {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 48px;
   gap: 4px;
   min-width: 0;
   max-width: 100%;
 }
 
 .image-trail-panel-root .image-trail-panel__field-control.has-step-controls {
-  grid-template-columns: minmax(0, 1fr) minmax(54px, max-content) 64px 26px 26px;
+  grid-template-columns: minmax(0, 1fr) minmax(54px, max-content) 64px 26px 26px 48px;
 }
 
 .image-trail-panel-root .image-trail-panel__field-control.has-step-controls.has-trail-control-slot {
-  grid-template-columns: minmax(0, 1fr) minmax(54px, max-content) 64px 26px 26px minmax(58px, max-content);
+  grid-template-columns: minmax(0, 1fr) minmax(54px, max-content) 64px 26px 26px minmax(58px, max-content) 48px;
 }
 
 .image-trail-panel-root .image-trail-panel__field-split-control {
@@ -236,7 +252,8 @@
     sans-serif;
 }
 
-.image-trail-panel-root .image-trail-panel__field-split-button {
+.image-trail-panel-root .image-trail-panel__field-split-button,
+.image-trail-panel-root .image-trail-panel__field-reset-button {
   min-height: 26px;
   padding: 0 7px;
   border: 1px solid rgb(255 255 255 / 22%);
@@ -252,7 +269,15 @@
     sans-serif;
 }
 
-.image-trail-panel-root .image-trail-panel__field-split-button:hover {
+.image-trail-panel-root .image-trail-panel__field-reset-placeholder {
+  display: block;
+  min-width: 48px;
+  min-height: 26px;
+}
+
+.image-trail-panel-root .image-trail-panel__field-split-button:hover,
+.image-trail-panel-root .image-trail-panel__field-reset-button:hover,
+.image-trail-panel-root .image-trail-panel__fields-reset-all:hover {
   border-color: #8fd;
   background: #303030;
 }
@@ -264,7 +289,9 @@
 }
 
 .image-trail-panel-root .image-trail-panel__field-step-button:focus,
-.image-trail-panel-root .image-trail-panel__field-radix-button:focus {
+.image-trail-panel-root .image-trail-panel__field-radix-button:focus,
+.image-trail-panel-root .image-trail-panel__field-reset-button:focus,
+.image-trail-panel-root .image-trail-panel__fields-reset-all:focus {
   outline: 1px solid #8fd;
   outline-offset: 1px;
 }

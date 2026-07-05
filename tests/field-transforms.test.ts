@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   FIELD_TRANSFORM_REGISTRY,
   applyFieldDigitWidthTransform,
+  applyResetFieldTransform,
   applyFieldSplitTransform,
   applySetFieldValueTransform,
   applyStepFieldValueTransform,
@@ -10,16 +11,54 @@ import {
   fieldTransformDefinition,
 } from '../extension/src/core/url/field-transforms.js';
 import { fieldDigitWidthSpecsEqual } from '../extension/src/core/url/field-widths.js';
+import { applyFieldSplitSpecs } from '../extension/src/core/url/field-splits.js';
 import { parseUrl } from '../extension/src/core/url/parse-url.js';
 import { collectUrlFields } from '../extension/src/core/url/tokenize-fields.js';
 
 test('field transform registry defines current parsed-field behaviors', () => {
   assert.deepEqual(
     FIELD_TRANSFORM_REGISTRY.map((definition) => definition.id),
-    ['set-value', 'step', 'digit-width', 'split-apply', 'split-clear'],
+    ['set-value', 'step', 'digit-width', 'split-apply', 'split-clear', 'reset-field', 'reset-all'],
   );
   assert.equal(fieldTransformDefinition('set-value').kind, 'url');
   assert.equal(fieldTransformDefinition('split-clear').kind, 'state');
+});
+
+test('reset-field transform rebuilds the current URL from the baseline token', () => {
+  const currentModel = parseUrl('https://example.test/image?p=6');
+  const baselineModel = parseUrl('https://example.test/image?p=5');
+  const field = collectUrlFields(currentModel).find((candidate) => candidate.label === 'query p');
+  assert.ok(field);
+
+  const result = applyResetFieldTransform(currentModel, field, baselineModel);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.id, 'reset-field');
+  assert.equal(result.url, 'https://example.test/image?p=5');
+  assert.deepEqual(result.attemptedFieldIds, []);
+  assert.equal(result.resetBaseFieldId, field.id);
+});
+
+test('reset-field transform resets a split child through its base token', () => {
+  const splitSpec = {
+    baseFieldId: 'q:0:0',
+    location: 'query' as const,
+    queryIndex: 0,
+    tokenIndex: 0,
+    lengths: [2, 2, 4],
+    pattern: '2-2-4',
+  };
+  const currentBaseModel = parseUrl('https://example.test/image?date=99012001');
+  const currentSplitModel = applyFieldSplitSpecs(currentBaseModel, [splitSpec]);
+  const baselineBaseModel = parseUrl('https://example.test/image?date=01012001');
+  const splitChild = collectUrlFields(currentSplitModel).find((candidate) => candidate.id === 'q:0:1');
+  assert.ok(splitChild);
+
+  const result = applyResetFieldTransform(currentBaseModel, splitChild, baselineBaseModel);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.url, 'https://example.test/image?date=01012001');
+  assert.equal(result.resetBaseFieldId, 'q:0:0');
 });
 
 test('set-value transform preserves URL rebuild behavior', () => {

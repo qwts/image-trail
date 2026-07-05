@@ -157,6 +157,8 @@ function mockFieldsCallbacks(): FieldsViewCallbacks {
     onNumericDisplayModeChange: (fieldId, mode) => dispatch({ type: 'numeric-display-mode-change', fieldId, mode }),
     onApplySplit: (fieldId, pattern) => dispatch({ type: 'apply-split', fieldId, pattern }),
     onClearSplit: (baseFieldId) => dispatch({ type: 'clear-split', baseFieldId }),
+    onResetField: (fieldId) => dispatch({ type: 'reset-field', fieldId }),
+    onResetAll: () => dispatch({ type: 'reset-all' }),
     onOpenChange: (open, blockSize) => dispatch({ type: 'open-change', open, blockSize }),
     onResize: (blockSize) => dispatch({ type: 'resize', blockSize }),
   };

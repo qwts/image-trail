@@ -7,6 +7,7 @@ import { applyFieldDigitWidthSpecs } from '../../core/url/field-widths.js';
 import { parseUrl } from '../../core/url/parse-url.js';
 import { collectUrlFields } from '../../core/url/tokenize-fields.js';
 import { hostnameFromLocation } from '../panel-position.js';
+import { parsedFieldResetBaselineFromRecord } from './parsed-field-reset-baseline.js';
 
 export interface ParsedFieldStateRecordControllerDeps {
   getState(): PanelState;
@@ -69,12 +70,14 @@ export class ParsedFieldStateRecordController {
       const projected = await this.deps.applySelectedUrl(record.sourceUrl, [], { reason: 'parsed-field-restore' });
       if (!projected && !imageResourceUrlsEqual(record.sourceUrl, this.deps.currentRawUrl(), window.location.href)) return;
     }
-    this.deps.setState(
-      reducePanelAction(this.deps.getState(), {
+    const filtered = this.filterParsedFieldStateForCurrentUrl(record);
+    this.deps.setState({
+      ...reducePanelAction(this.deps.getState(), {
         name: 'parsed-field-state/restore',
-        record: this.filterParsedFieldStateForCurrentUrl(record),
+        record: filtered,
       }),
-    );
+      parsedFieldResetBaseline: parsedFieldResetBaselineFromRecord(filtered),
+    });
     this.deps.syncGrabSettings();
     void this.deps.saveFieldState();
     this.deps.render();
