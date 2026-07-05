@@ -12,6 +12,16 @@
           "type": "playwright-e2e",
           "path": "tests/e2e/automation-governance.spec.ts",
           "notes": "Covers typing-target keyboard preservation, global image export shortcut interception, slideshow start/pause/resume/stop, opposite-direction manual interruption, retry control reachability, and visible request-governor capping under automated navigation."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/extension-smoke.spec.ts",
+          "notes": "Covers Chromium command registration for the build-info overlay toggle via chrome.commands.getAll and the Settings checkbox that hides/shows the overlay."
+        },
+        {
+          "type": "unit-dom",
+          "path": "tests/manifest-commands.test.ts",
+          "notes": "Covers the manifest command metadata and suggested Alt/Option+Shift+B binding for the build-info overlay toggle."
         }
       ]
     },

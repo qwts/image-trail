@@ -183,6 +183,7 @@ export interface PanelState {
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
+  readonly buildInfoOverlayVisible: boolean;
   readonly urlReviewStatusLimit: number;
   readonly clearUrlReviewStatusAfterExport: boolean;
   readonly requestThrottleMs: number;
@@ -309,6 +310,7 @@ export type PanelActionName =
   | 'settings/update-recent-history-retention'
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
+  | 'settings/update-build-info-overlay-visibility'
   | 'settings/update-url-review-status-retention'
   | 'settings/update-request-throttle'
   | 'settings/update-neighbor-preload'
@@ -442,6 +444,7 @@ export type PanelAction =
         | 'settings/update-recent-history-retention'
         | 'settings/update-pin-save-storage-preference'
         | 'settings/update-privacy-mode'
+        | 'settings/update-build-info-overlay-visibility'
         | 'settings/update-url-review-status-retention'
         | 'settings/update-request-throttle'
         | 'settings/update-neighbor-preload'
@@ -540,6 +543,7 @@ export type PanelAction =
     }
   | { readonly name: 'settings/update-pin-save-storage-preference'; readonly value: PinSaveStoragePreference }
   | { readonly name: 'settings/update-privacy-mode'; readonly enabled: boolean }
+  | { readonly name: 'settings/update-build-info-overlay-visibility'; readonly visible: boolean }
   | {
       readonly name: 'settings/update-url-review-status-retention';
       readonly limit: number;

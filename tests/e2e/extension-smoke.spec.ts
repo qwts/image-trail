@@ -65,6 +65,37 @@ test('resolves the extension service worker and id', async ({ extensionId, page,
   expect(serviceWorker.url()).toBe(`chrome-extension://${extensionId}/src/background/service-worker.js`);
 });
 
+test('registers the build-info keyboard command for Chromium shortcut settings', async ({ serviceWorker }) => {
+  const command = await serviceWorker.evaluate(async () => {
+    return (await chrome.commands.getAll()).find((candidate) => candidate.name === 'toggle-build-info-overlay') ?? null;
+  });
+
+  expect(command).toMatchObject({
+    name: 'toggle-build-info-overlay',
+    description: 'Toggle build info overlay',
+  });
+});
+
+test('surfaces the build-info overlay toggle in Settings', async ({ page, serviceWorker }) => {
+  await openFixturePage(page, fixturePaths.singleImage);
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+
+  await page.getByRole('button', { name: 'Show settings' }).click();
+  await page.getByText('Maintenance', { exact: true }).click();
+
+  const toggle = page.getByLabel('Show build info overlay');
+  await expect(toggle).toBeVisible();
+  await toggle.check();
+  await expect(page.locator('#image-trail-build-identity-overlay')).toHaveCount(1);
+
+  await toggle.uncheck();
+  await expect(page.locator('#image-trail-build-identity-overlay')).toHaveCount(0);
+
+  await toggle.check();
+  await expect(page.locator('#image-trail-build-identity-overlay')).toHaveCount(1);
+});
+
 test('toggles the panel open and closed from the extension action path', async ({ page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
 

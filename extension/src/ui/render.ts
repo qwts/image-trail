@@ -470,7 +470,10 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
               busy: state.importExportBusy || state.recall.busy,
             },
             state.storageUsage,
-            state.buildIdentity,
+            {
+              identity: state.buildIdentity,
+              overlayVisible: state.buildInfoOverlayVisible,
+            },
             {
               limit: state.urlReviewStatusLimit,
               clearAfterExport: state.clearUrlReviewStatusAfterExport,

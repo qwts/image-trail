@@ -52,6 +52,7 @@ import {
   createProbeImageSourceResultMessage,
   createRetrieveBlobResultMessage,
   createStorageUsageResponseMessage,
+  createToggleBuildIdentityOverlayMessage,
   createTogglePanelMessage,
   isExtensionRequest,
   isStatusMessage,
@@ -107,6 +108,7 @@ import { normalizeHostname } from './handlers/hostname.js';
 import type { ServiceWorkerContext } from './service-worker-context.js';
 
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
+const TOGGLE_BUILD_IDENTITY_COMMAND = 'toggle-build-info-overlay';
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
 const PREVIEW_TTL_MS = 60_000;
 const MAX_LINKED_PAGE_BYTES = 2 * 1024 * 1024;
@@ -168,6 +170,18 @@ async function sendToggle(tabId: number): Promise<void> {
   if (!isStatusMessage(response)) {
     console.warn('Image Trail received an unexpected toggle response.', response);
   }
+}
+
+async function sendToggleBuildIdentityOverlay(tabId: number): Promise<void> {
+  const response = await chrome.tabs.sendMessage(tabId, createToggleBuildIdentityOverlayMessage());
+  if (!isStatusMessage(response)) {
+    console.warn('Image Trail received an unexpected build-info toggle response.', response);
+  }
+}
+
+function supportedTabId(tab: chrome.tabs.Tab): number | null {
+  if (typeof tab.id === 'number' && tab.url && SUPPORTED_PAGE_PATTERN.test(tab.url)) return tab.id;
+  return null;
 }
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
@@ -827,7 +841,10 @@ async function handleLoadBuildIdentity(): Promise<ReturnType<typeof createLoadBu
   }
 }
 
-type DispatchedRequestType = Exclude<ExtensionRequest['type'], typeof MessageType.TogglePanel | typeof MessageType.Ping>;
+type DispatchedRequestType = Exclude<
+  ExtensionRequest['type'],
+  typeof MessageType.TogglePanel | typeof MessageType.ToggleBuildIdentityOverlay | typeof MessageType.Ping
+>;
 
 /**
  * Message registry: the single source of truth for background request dispatch.
@@ -1041,13 +1058,30 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
 });
 
 chrome.action.onClicked.addListener((tab) => {
-  const tabId = tab.id;
-  if (typeof tabId !== 'number' || !tab.url || !SUPPORTED_PAGE_PATTERN.test(tab.url)) {
+  const tabId = supportedTabId(tab);
+  if (tabId === null) {
     console.warn('Image Trail can only be injected into http(s) pages.');
     return;
   }
 
   sendToggle(tabId).catch((error: unknown) => {
     console.warn('Image Trail could not toggle the in-page panel.', error);
+  });
+});
+
+chrome.commands.onCommand.addListener((command, tab) => {
+  if (command !== TOGGLE_BUILD_IDENTITY_COMMAND) return;
+  if (!tab) {
+    console.warn('Image Trail build-info command did not include an active tab.');
+    return;
+  }
+  const tabId = supportedTabId(tab);
+  if (tabId === null) {
+    console.warn('Image Trail build info can only be toggled on http(s) pages.');
+    return;
+  }
+
+  sendToggleBuildIdentityOverlay(tabId).catch((error: unknown) => {
+    console.warn('Image Trail could not toggle the build-info overlay.', error);
   });
 });

@@ -145,6 +145,25 @@ test('migrates preview preference local settings safely', () => {
   assert.equal(invalid.load().previewFillScreen, DEFAULT_LOCAL_SETTINGS.previewFillScreen);
 });
 
+test('migrates build info overlay visibility local settings safely', () => {
+  const visible = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ buildInfoOverlayVisible: true }),
+    setItem: () => {},
+  });
+  const hidden = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ buildInfoOverlayVisible: false }),
+    setItem: () => {},
+  });
+  const missing = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({}),
+    setItem: () => {},
+  });
+
+  assert.equal(visible.load().buildInfoOverlayVisible, true);
+  assert.equal(hidden.load().buildInfoOverlayVisible, false);
+  assert.equal(missing.load().buildInfoOverlayVisible, DEFAULT_LOCAL_SETTINGS.buildInfoOverlayVisible);
+});
+
 test('falls back to plaintext local setting defaults when storage is corrupt', () => {
   const repository = new LocalSettingsRepository({
     getItem: () => '{not-json',

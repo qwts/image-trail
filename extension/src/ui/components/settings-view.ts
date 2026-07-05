@@ -56,7 +56,10 @@ export function createSettingsView(
     readonly busy: boolean;
   },
   storageUsage: StorageUsageSummary | null,
-  buildIdentity: BuildIdentity | null,
+  buildIdentityState: {
+    readonly identity: BuildIdentity | null;
+    readonly overlayVisible: boolean;
+  },
   urlReviewStatusState: {
     readonly limit: number;
     readonly clearAfterExport: boolean;
@@ -98,7 +101,7 @@ export function createSettingsView(
     ]),
     createSettingsGroup('Maintenance', 'maintenance', [
       createPanelLayoutSettingsView(dispatch),
-      createBuildIdentitySettingsView(buildIdentity),
+      createBuildIdentitySettingsView(buildIdentityState, dispatch),
       createStorageHealthSettingsView(storageUsage),
       createDestructiveSettingsView(destructiveState, dispatch),
     ]),
@@ -683,28 +686,44 @@ function createPanelLayoutSettingsView(dispatch: (action: PanelAction) => void):
   return wrapper;
 }
 
-export function createBuildIdentitySettingsView(buildIdentity: BuildIdentity | null): HTMLElement {
+export function createBuildIdentitySettingsView(
+  buildIdentityState: {
+    readonly identity: BuildIdentity | null;
+    readonly overlayVisible: boolean;
+  },
+  dispatch: (action: PanelAction) => void,
+): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'image-trail-panel__settings-templates';
 
   const heading = document.createElement('h4');
   heading.textContent = 'Build identity';
 
-  if (!buildIdentity) {
+  const label = document.createElement('label');
+  label.className = 'image-trail-panel__settings-checkbox';
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = buildIdentityState.overlayVisible;
+  input.addEventListener('change', () => dispatch({ name: 'settings/update-build-info-overlay-visibility', visible: input.checked }));
+  const text = document.createElement('span');
+  text.textContent = 'Show build info overlay';
+  label.append(input, text);
+
+  if (!buildIdentityState.identity) {
     const empty = document.createElement('p');
     empty.className = 'image-trail-panel__settings-empty';
     empty.textContent = 'Build identity has not loaded yet.';
-    wrapper.append(heading, empty);
+    wrapper.append(heading, label, empty);
     return wrapper;
   }
 
   const list = document.createElement('dl');
   list.className = 'image-trail-panel__build-identity';
-  for (const row of buildIdentityRows(buildIdentity)) {
+  for (const row of buildIdentityRows(buildIdentityState.identity)) {
     appendKeyValueRow(list, row.label, row.value);
   }
 
-  wrapper.append(heading, list);
+  wrapper.append(heading, label, list);
   return wrapper;
 }
 

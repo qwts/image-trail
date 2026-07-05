@@ -6,6 +6,15 @@
   "action": {
     "default_title": "Toggle Image Trail"
   },
+  "commands": {
+    "toggle-build-info-overlay": {
+      "suggested_key": {
+        "default": "Alt+Shift+B",
+        "mac": "Alt+Shift+B"
+      },
+      "description": "Toggle build info overlay"
+    }
+  },
   "background": {
     "service_worker": "src/background/service-worker.js",
     "type": "module"

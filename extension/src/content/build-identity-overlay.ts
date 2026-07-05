@@ -27,6 +27,10 @@ export class BuildIdentityOverlay {
     return true;
   }
 
+  isVisible(): boolean {
+    return this.host !== null;
+  }
+
   hide(): void {
     this.host?.remove();
     this.host = null;

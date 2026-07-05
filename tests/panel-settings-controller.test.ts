@@ -130,6 +130,7 @@ test('loadLocalSettings syncs state, governor, and preview prefs from the store,
     storeSettings: {
       ...DEFAULT_LOCAL_SETTINGS,
       visibleBookmarkSoftMax: 12,
+      buildInfoOverlayVisible: false,
       recentHistoryLimit: 2,
       requestThrottleMs: 250,
       requestThrottleMaxRequests: 7,
@@ -156,6 +157,7 @@ test('loadLocalSettings syncs state, governor, and preview prefs from the store,
   assert.equal(harness.getLocalSettings().visibleBookmarkSoftMax, 12);
   const state = harness.getState();
   assert.equal(state.bookmarkLimit, 12);
+  assert.equal(state.buildInfoOverlayVisible, false);
   assert.equal(state.recentHistoryLimit, 2);
   assert.equal(state.neighborPreloadEnabled, true);
   assert.equal(state.neighborPreloadRadius, 4);
