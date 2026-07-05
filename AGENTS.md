@@ -93,11 +93,24 @@ can carry a stale copy until rebased or restarted from the main repo.
   `CONTRIBUTING.md`, root `README.md`, and root `DESIGN.md`.
 - Before claiming done on any change (code, docs, or config), run `npm run lint`,
   `npm run format:check`, `npm test`, and `npm run build` for the fast inner loop.
-  Before pushing, run `npm run ci`, which chains lint → format:check → `test:cov`
-  → build — the same gates CI enforces, including the `.c8rc.json` coverage floor,
-  so a coverage drop fails locally instead of on the PR. (`npm test` skips the c8
-  gate for speed; `npm run ci` does not.) Do not report a build you did not run;
-  do not break the build.
+  Before pushing, run `npm run ci`, which chains lint → format:check →
+  `check:acceptance-coverage` → `test:cov` → build — the same gates CI enforces,
+  including the `.c8rc.json` coverage floor, so a coverage drop or a missing
+  acceptance-coverage-map update fails locally instead of on the PR. (`npm test`
+  skips the c8 gate for speed; `npm run ci` does not.) Do not report a build you
+  did not run; do not break the build.
+- **Acceptance coverage map** (`tests/e2e/coverage-map.json`, #343): any change to a
+  `.ts`/`.css` file under `extension/src/ui` or `extension/src/content` (excluding
+  `*.test.ts`, `*.stories.ts`, and `extension/src/ui/stories/`) must also touch
+  `tests/e2e/coverage-map.json` — add or update an entry naming the automated
+  (playwright-e2e / storybook / unit-dom), manual, or deferred coverage for that
+  change — or the PR needs a `no-acceptance-impact` label/body token.
+  `npm run check:acceptance-coverage` (`scripts/check-acceptance-coverage-diff.mjs`)
+  enforces this: on a GitHub Actions PR run it reads the PR's changed files/body/
+  labels via `gh`; run locally (as part of `npm run ci`, before a PR exists) it
+  diffs against the merge-base with `origin/main` instead, so a missing map update
+  is caught before pushing rather than first on CI. The local fallback can't read a
+  PR body, so it can't honor the opt-out — that only works once the PR exists.
 - `npm test` includes the happy-dom suite (`npm run test:dom`, files under
   `tests/dom/`), which runs `node:test` with a real DOM registered via
   `tests/dom/register.ts`. Storybook interaction (`play`) tests run with

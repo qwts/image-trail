@@ -13,8 +13,12 @@
 // the opt-out), while a silent coverage gap compounds. Runs as a step inside the required `CI` job.
 //
 // Inputs come from the pull_request event + `gh` (live PR body/labels, so editing the body and
-// re-running picks it up). For local runs, override via env: ACCEPTANCE_CHECK_FILES (newline/comma
-// list), ACCEPTANCE_CHECK_BODY, ACCEPTANCE_CHECK_LABELS (comma list).
+// re-running picks it up). Outside that context (a local run, or `npm run ci` before pushing) it
+// falls back to a plain git diff against the merge-base with origin/main (or main) — this is what
+// lets a dev/agent catch a missing coverage-map update before pushing, not just when CI runs on the
+// PR. That local fallback has no PR body/labels to read, so it cannot honor the "no-acceptance-impact"
+// opt-out; the opt-out only works once a PR exists. Override via env for ad-hoc testing:
+// ACCEPTANCE_CHECK_FILES (newline/comma list), ACCEPTANCE_CHECK_BODY, ACCEPTANCE_CHECK_LABELS (comma list).
 
 import process from 'node:process';
 import { readFile } from 'node:fs/promises';
@@ -73,28 +77,63 @@ async function gatherInputs() {
     };
   }
 
-  if (process.env.GITHUB_EVENT_NAME !== 'pull_request' || !process.env.GITHUB_EVENT_PATH) {
-    return null;
+  if (process.env.GITHUB_EVENT_NAME === 'pull_request' && process.env.GITHUB_EVENT_PATH) {
+    const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'));
+    const repo = process.env.GITHUB_REPOSITORY;
+    const number = event.pull_request?.number ?? event.number;
+    const changedFiles = splitList(gh(['api', `repos/${repo}/pulls/${number}/files`, '--paginate', '--jq', '.[].filename']));
+    // Read PR body/labels live so an edited opt-out is honored on a re-run without a new commit.
+    const pr = JSON.parse(gh(['api', `repos/${repo}/pulls/${number}`]));
+    return {
+      changedFiles,
+      body: pr.body ?? '',
+      labels: (pr.labels ?? []).map((label) => label.name),
+      context: `PR #${number}`,
+    };
   }
 
-  const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'));
-  const repo = process.env.GITHUB_REPOSITORY;
-  const number = event.pull_request?.number ?? event.number;
-  const changedFiles = splitList(gh(['api', `repos/${repo}/pulls/${number}/files`, '--paginate', '--jq', '.[].filename']));
-  // Read PR body/labels live so an edited opt-out is honored on a re-run without a new commit.
-  const pr = JSON.parse(gh(['api', `repos/${repo}/pulls/${number}`]));
-  return {
-    changedFiles,
-    body: pr.body ?? '',
-    labels: (pr.labels ?? []).map((label) => label.name),
-    context: `PR #${number}`,
-  };
+  return gatherLocalDiffInputs();
+}
+
+function resolveBaseRef() {
+  for (const ref of ['origin/main', 'main']) {
+    try {
+      execFileSync('git', ['rev-parse', '--verify', '--quiet', ref], { stdio: 'ignore' });
+      return ref;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
+ * Local fallback (not a GitHub Actions pull_request run): diff committed changes against the
+ * merge-base with the default branch so this check can run before a PR exists, e.g. from
+ * `npm run ci` ahead of a push. Uncommitted changes aren't included — commit first, same as the
+ * rest of the `ci` gate expects.
+ */
+function gatherLocalDiffInputs() {
+  const baseRef = resolveBaseRef();
+  if (!baseRef) {
+    console.log('No origin/main or main ref found; skipping local acceptance-coverage diff check.');
+    return null;
+  }
+  let mergeBase;
+  try {
+    mergeBase = execFileSync('git', ['merge-base', 'HEAD', baseRef], { encoding: 'utf8' }).trim();
+  } catch {
+    console.log(`Could not compute a merge-base with ${baseRef}; skipping local acceptance-coverage diff check.`);
+    return null;
+  }
+  const changedFiles = splitList(execFileSync('git', ['diff', '--name-only', `${mergeBase}...HEAD`], { encoding: 'utf8' }));
+  return { changedFiles, body: '', labels: [], context: `local diff vs ${baseRef}` };
 }
 
 async function main() {
   const inputs = await gatherInputs();
   if (!inputs) {
-    console.log('Not a pull_request event and no local override; skipping acceptance-coverage diff check.');
+    console.log('Could not determine changed files (no PR context, no git ref); skipping acceptance-coverage diff check.');
     return;
   }
 
@@ -113,8 +152,14 @@ async function main() {
   console.error('automated coverage (playwright-e2e / storybook / unit-dom), or manual (with a reason)');
   console.error('or deferred (with an issue). See the wiki Testing Strategy page.');
   console.error('');
-  console.error(`If this change genuinely has no acceptance-flow impact, add "${ACK_TOKEN}" to the PR`);
-  console.error(`description (or apply the "${ACK_TOKEN}" label) and re-run.`);
+  if (inputs.context.startsWith('PR #')) {
+    console.error(`If this change genuinely has no acceptance-flow impact, add "${ACK_TOKEN}" to the PR`);
+    console.error(`description (or apply the "${ACK_TOKEN}" label) and re-run.`);
+  } else {
+    console.error(`If this change genuinely has no acceptance-flow impact, you can opt out once the PR`);
+    console.error(`exists by adding "${ACK_TOKEN}" to its description or label — this local check has no`);
+    console.error('PR to read yet, so it cannot honor that opt-out.');
+  }
   process.exitCode = 1;
 }
 
