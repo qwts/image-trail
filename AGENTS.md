@@ -108,6 +108,9 @@ can carry a stale copy until rebased or restarted from the main repo.
   `c8` and fails below the ratcheting thresholds in `.c8rc.json` (currently lines 54 /
   branches 79), writing `coverage/lcov.info` (uploaded as a CI artifact). Raise the
   floor over time as coverage improves; do not lower it to make a change pass.
+- `npm run lint` ends with a type-coverage ratchet (`lint:types`: strict
+  `type-coverage` over `extension/src`, floor 99.8%). Same rule as the c8 gate:
+  raise the floor as `any`/unsafe spots are removed; never lower it.
 - The highest-stakes product invariants (Product Model / Storage Rules) are enforced as
   executable checks: `tests/invariants.test.ts` (recents never persisted, queue order is
   `queueUpdatedAt` not envelope `updatedAt`, Recall pages the queue producer not the blob
