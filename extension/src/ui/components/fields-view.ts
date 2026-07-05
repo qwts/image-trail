@@ -411,6 +411,29 @@ export function createFieldsView(
       controls.append(numericToggle, digitWidthInput, decrement, increment);
     }
 
+    if (isResettable) {
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.className = 'image-trail-panel__field-reset-button';
+      reset.textContent = 'Reset';
+      reset.title = options.privacyMode ? 'Reset private field' : `Reset ${field.field.label}`;
+      reset.setAttribute('aria-label', reset.title);
+      reset.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+      });
+      reset.addEventListener('click', () => {
+        commitAndBlurFocusedValue(value, fieldInputReferenceValue, options.privacyMode === true, commitValueChange);
+        callbacks.onResetField(field.field.id);
+      });
+      controls.append(reset);
+    } else {
+      const placeholder = document.createElement('span');
+      placeholder.className = 'image-trail-panel__field-reset-placeholder';
+      placeholder.setAttribute('aria-hidden', 'true');
+      controls.append(placeholder);
+    }
+
     if (canUnlock) {
       const trail = document.createElement('button');
       trail.type = 'button';
@@ -439,29 +462,6 @@ export function createFieldsView(
         callbacks.onToggleUnlock(field.field.id);
       });
       controls.append(trail);
-    }
-
-    if (isResettable) {
-      const reset = document.createElement('button');
-      reset.type = 'button';
-      reset.className = 'image-trail-panel__field-reset-button';
-      reset.textContent = 'Reset';
-      reset.title = options.privacyMode ? 'Reset private field' : `Reset ${field.field.label}`;
-      reset.setAttribute('aria-label', reset.title);
-      reset.addEventListener('pointerdown', (event) => {
-        if (event.button !== 0) return;
-        event.preventDefault();
-      });
-      reset.addEventListener('click', () => {
-        commitAndBlurFocusedValue(value, fieldInputReferenceValue, options.privacyMode === true, commitValueChange);
-        callbacks.onResetField(field.field.id);
-      });
-      controls.append(reset);
-    } else {
-      const placeholder = document.createElement('span');
-      placeholder.className = 'image-trail-panel__field-reset-placeholder';
-      placeholder.setAttribute('aria-hidden', 'true');
-      controls.append(placeholder);
     }
 
     if (canSplit || isSplitField) {

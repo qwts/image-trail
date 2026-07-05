@@ -140,6 +140,21 @@ test('the trail button toggles inclusion and flips its label', () => {
   assert.equal(trail.getAttribute('aria-label'), 'Exclude page from Previous/Next');
 });
 
+test('reset control renders before trail include/exclude control', () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls, {
+    successfulFieldIds: ['query-page'],
+    options: { open: true, blockSize: null, resettableFieldIds: new Set(['query-page']) },
+  });
+  const controls = Array.from(view.querySelectorAll('.image-trail-panel__field-control > *'));
+  const resetIndex = controls.indexOf(buttonByLabel(view, 'Reset page'));
+  const trailIndex = controls.indexOf(buttonByLabel(view, 'Include page in Previous/Next'));
+
+  assert.ok(resetIndex > -1);
+  assert.ok(trailIndex > -1);
+  assert.ok(resetIndex < trailIndex);
+});
+
 test('reset field button is only interactive when the field is resettable', () => {
   const calls: CallbackCall[] = [];
   const view = buildFieldsView(calls, { options: { open: true, blockSize: null, resettableFieldIds: new Set(['query-page']) } });
