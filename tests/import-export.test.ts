@@ -161,8 +161,8 @@ test('history-export: exports and history-import decrypts with correct password'
   const importResult = await importEncryptedHistory(exportResult.fileContent!, 'export-pass-123');
   assert.ok(importResult.status.ok, importResult.status.message);
   assert.equal(importResult.entries.length, 2);
-  assert.equal(importResult.entries[0].payload.url, 'https://example.test/001.jpg');
-  assert.equal(importResult.entries[1].payload.title, 'Second image');
+  assert.equal(importResult.entries[0]!.payload.url, 'https://example.test/001.jpg');
+  assert.equal(importResult.entries[1]!.payload.title, 'Second image');
   assert.equal(importResult.skipped.length, 0);
 });
 
@@ -209,7 +209,7 @@ test('history-export: shift/plain export imports without password', async () => 
   const importResult = await importEncryptedHistory(exportResult.fileContent!, '');
   assert.ok(importResult.status.ok, importResult.status.message);
   assert.equal(importResult.plaintext, true);
-  assert.equal(importResult.entries[0].payload.url, 'https://example.test/plain.jpg');
+  assert.equal(importResult.entries[0]!.payload.url, 'https://example.test/plain.jpg');
 });
 
 test('bookmarks-export: exports encrypted and imports with password', async () => {
@@ -232,7 +232,7 @@ test('bookmarks-export: exports encrypted and imports with password', async () =
   const importResult = await importBookmarks(exportResult.fileContent!, 'bookmark-pass');
   assert.ok(importResult.status.ok, importResult.status.message);
   assert.equal(importResult.plaintext, false);
-  assert.equal(importResult.entries[0].payload.label, 'Bookmark');
+  assert.equal(importResult.entries[0]!.payload.label, 'Bookmark');
 });
 
 test('bookmarks-export: encrypted export does not pass undefined AES-GCM additionalData', async () => {
@@ -313,7 +313,7 @@ test('bookmarks-export: shift/plain export imports without password', async () =
   const importResult = await importBookmarks(exportResult.fileContent!, '');
   assert.ok(importResult.status.ok, importResult.status.message);
   assert.equal(importResult.plaintext, true);
-  assert.equal(importResult.entries[0].payload.url, 'https://example.test/plain-bookmark.webp');
+  assert.equal(importResult.entries[0]!.payload.url, 'https://example.test/plain-bookmark.webp');
 });
 
 test('bookmarks-export: preserves optional dimensions through plain import', async () => {
@@ -334,8 +334,8 @@ test('bookmarks-export: preserves optional dimensions through plain import', asy
 
   const importResult = await importBookmarks(exportResult.fileContent!, '');
   assert.ok(importResult.status.ok, importResult.status.message);
-  assert.equal(importResult.entries[0].payload.width, 2048);
-  assert.equal(importResult.entries[0].payload.height, 1365);
+  assert.equal(importResult.entries[0]!.payload.width, 2048);
+  assert.equal(importResult.entries[0]!.payload.height, 1365);
 });
 
 test('bookmarks-export: encrypts large thumbnail payloads', async () => {
@@ -356,7 +356,7 @@ test('bookmarks-export: encrypts large thumbnail payloads', async () => {
 
   const importResult = await importBookmarks(exportResult.fileContent!, 'bookmark-pass');
   assert.ok(importResult.status.ok, importResult.status.message);
-  assert.equal(importResult.entries[0].payload.thumbnail, largeThumbnail);
+  assert.equal(importResult.entries[0]!.payload.thumbnail, largeThumbnail);
 });
 
 test('recall: decrypts a single encrypted history record into visible payload', async () => {
@@ -817,7 +817,7 @@ test('history-import: skips entries with missing captureStatus', async () => {
   const importResult = await importEncryptedHistory(exportResult.fileContent!, 'test-pass');
   assert.ok(importResult.status.ok);
   assert.equal(importResult.entries.length, 1);
-  assert.equal(importResult.entries[0].uuid, 'valid-entry');
+  assert.equal(importResult.entries[0]!.uuid, 'valid-entry');
   assert.equal(importResult.skipped.length, 1);
   assert.equal(importResult.validationReport.rejectedCount, 1);
   assert.equal(importResult.validationReport.reasons.length, 1);

@@ -59,7 +59,7 @@ function createHarness(): Harness {
 test('loadBookmarkPage loads a page scoped to the current page url and folds it into state', async () => {
   const harness = createHarness();
   await harness.controller.loadBookmarkPage(0);
-  assert.equal(harness.loadPageInputs[0].currentPageUrl, 'https://images.example.test/gallery');
+  assert.equal(harness.loadPageInputs[0]!.currentPageUrl, 'https://images.example.test/gallery');
   assert.equal(harness.getState().bookmarks.length, 1);
   assert.equal(harness.getState().bookmarkTotal, 1);
   assert.ok(harness.log.includes('render'));

@@ -68,7 +68,7 @@ export class RequestGovernor {
 
   private pruneOldTimestamps(now: number): void {
     const cutoff = now - this.config.windowMs;
-    while (this.timestamps.length > 0 && this.timestamps[0] < cutoff) {
+    while ((this.timestamps[0] ?? Infinity) < cutoff) {
       this.timestamps.shift();
     }
   }

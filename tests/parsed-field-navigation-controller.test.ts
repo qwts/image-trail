@@ -223,14 +223,14 @@ test('navigateBy hands every included field to the buffered step so one press wa
     .filter(navigableQueryField)
     .map((f) => f.id);
   assert.equal(fieldIds.length, 2, 'expected two navigable int query fields');
-  harness.patchState({ unlockedFieldIds: fieldIds, successfulFieldIds: [fieldIds[0]] });
+  harness.patchState({ unlockedFieldIds: fieldIds, successfulFieldIds: [fieldIds[0]!] });
 
   harness.controller.navigateBy(1);
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.equal(harness.bufferedStepCalls.length, 1);
   // Both included fields step together — not just the most recently successful one.
-  assert.deepEqual(harness.bufferedStepCalls[0].fields.map((f) => f.id).sort(), [...fieldIds].sort());
+  assert.deepEqual(harness.bufferedStepCalls[0]!.fields.map((f) => f.id).sort(), [...fieldIds].sort());
 });
 
 test('parsedFieldRequestContextKey composes the navigation cache key from base url, specs, handle and direction', () => {

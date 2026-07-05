@@ -103,7 +103,7 @@ export class ProjectionSessionController {
   private loopGuardWarning(options: BeginProjectionSessionOptions, now: number): ProjectionLoopGuardWarning | null {
     const key = projectionLoopGuardKey(options);
     const windowStart = now - LOOP_GUARD_WINDOW_MS;
-    while (this.loopGuardEntries.length > 0 && this.loopGuardEntries[0]?.at < windowStart) {
+    while ((this.loopGuardEntries[0]?.at ?? Infinity) < windowStart) {
       this.loopGuardEntries.shift();
     }
     this.loopGuardEntries.push({ key, at: now });

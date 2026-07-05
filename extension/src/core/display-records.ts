@@ -120,7 +120,7 @@ export function imageExtensionFromUrl(url: string): string | null {
 
 export function imageExtensionFromValue(value: string | undefined): string | null {
   if (!value) return null;
-  const cleanName = value.split(/[?#]/u)[0];
+  const cleanName = value.split(/[?#]/u)[0] ?? value;
   const extension = cleanName.match(/\.([a-z0-9]+)$/iu)?.[1]?.toUpperCase();
   if (extension && isImageRecordExtension(extension)) return extension;
   return /(?:^|[/.-])OIP[.-]/iu.test(cleanName) ? 'JPG' : null;

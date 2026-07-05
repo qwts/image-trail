@@ -143,6 +143,7 @@ test('a stale reveal from a previous mount does not starve the live mount after 
 
   // Fire the leftover load event from the first (now detached) mount.
   const staleLink = harness.doc.createdByTag('link')[0];
+  assert.ok(staleLink, 'the first mount created a stylesheet link');
   staleLink.fire('load');
 
   assert.equal(harness.mount.panelStylesReady, false, 'stale reveal does not mark the live mount ready');
@@ -152,6 +153,7 @@ test('a stale reveal from a previous mount does not starve the live mount after 
 
   // The live mount's own reveal still works.
   const liveLink = harness.doc.createdByTag('link')[1];
+  assert.ok(liveLink, 'the second mount created its own stylesheet link');
   liveLink.fire('load');
   await harness.mount.whenStylesReady();
   assert.equal(harness.mount.panelStylesReady, true, 'the live mount becomes ready on its own reveal');
@@ -165,6 +167,7 @@ test('styles-ready reveal shows the root, resolves the promise, and runs onStyle
   assert.equal(harness.mount.panelStylesReady, false);
 
   const link = harness.doc.createdByTag('link')[0];
+  assert.ok(link, 'mount created a stylesheet link');
   link.fire('load');
 
   await harness.mount.whenStylesReady();
@@ -186,6 +189,7 @@ test('the reveal is idempotent across load, error, and the fallback timer', asyn
   const harness = createHarness();
   harness.mount.mount();
   const link = harness.doc.createdByTag('link')[0];
+  assert.ok(link, 'mount created a stylesheet link');
   link.fire('load');
   link.fire('error');
   harness.fireStylesReadyFallback();
@@ -197,7 +201,7 @@ test('teardown() removes the host and clears root/styles-ready state', async () 
   const harness = createHarness();
   harness.mount.mount();
   const host = harness.doc.getElementById(ROOT_ID);
-  harness.doc.createdByTag('link')[0].fire('load');
+  harness.doc.createdByTag('link')[0]!.fire('load');
   await harness.mount.whenStylesReady();
 
   harness.mount.teardown();

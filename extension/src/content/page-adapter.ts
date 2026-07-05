@@ -185,11 +185,12 @@ export class PageAdapter {
 
   prepareStandaloneImageBackdrop(options: { readonly requireBodyOnlyImage?: boolean } = {}): void {
     const images = Array.from(document.images);
+    const onlyImage = images.length === 1 ? images[0] : undefined;
     if (options.requireBodyOnlyImage && !isBodyOnlyImageDocument(images[0])) return;
-    if (images.length === 1) {
-      snapshotElementStyles(images[0]);
-      keepSelectedTargetBackdropBlack(images[0]);
-      this.preparedStandaloneBackdrop = images[0];
+    if (onlyImage) {
+      snapshotElementStyles(onlyImage);
+      keepSelectedTargetBackdropBlack(onlyImage);
+      this.preparedStandaloneBackdrop = onlyImage;
     }
   }
 
@@ -219,11 +220,12 @@ export class PageAdapter {
       markSelectedTarget(this.selected, { lockBox: this.selectedFillScreen, objectFit: this.selectedObjectFit });
       if (matches.length !== 1) return this.emit(`Selected ${summarizeTargetUrlForMessage(this.lastSnapshot.selected?.url)}.`);
     }
-    if (matches.length === 1) {
-      if (matches[0] === this.selected && this.selected.isConnected) {
+    const onlyMatch = matches.length === 1 ? matches[0] : undefined;
+    if (onlyMatch) {
+      if (onlyMatch === this.selected && this.selected.isConnected) {
         return this.emit(`Auto-selected ${summarizeTargetUrlForMessage(this.lastSnapshot.selected?.url)}.`);
       }
-      this.selectTarget(matches[0], 'auto');
+      this.selectTarget(onlyMatch, 'auto');
       return this.emit(`Auto-selected ${summarizeTargetUrlForMessage(this.lastSnapshot.selected?.url)}.`);
     }
 

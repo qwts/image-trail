@@ -65,7 +65,9 @@ test('saveUrlReviewStatus persists a host-keyed record with the configured per-h
   harness.patchState({ activeFieldId: 'f1' });
   await harness.controller.saveUrlReviewStatus('failed', 'https://images.example.test/a/1.jpg', ['f1', 'f2'], 'looks off');
   assert.equal(harness.saved.length, 1);
-  const { record, options } = harness.saved[0];
+  const saved = harness.saved[0];
+  assert.ok(saved, 'a save call was recorded');
+  const { record, options } = saved;
   assert.equal(record.hostname, 'images.example.test');
   assert.equal(record.pageUrl, 'https://images.example.test/gallery');
   assert.equal(record.sourceUrl, 'https://images.example.test/a/1.jpg');

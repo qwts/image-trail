@@ -119,7 +119,7 @@ test('rejectUrlEditorInput surfaces the data-URL error and schedules the reset a
   assert.deepEqual(harness.log, ['scheduleReset:status', 'render']);
   assert.equal(harness.resetCalls.length, 1);
   // The reset reads state.lastUpdatedAt *after* setState, so it must see the freshly stamped value.
-  assert.equal(harness.resetCalls[0].updatedAt, harness.getState().lastUpdatedAt);
+  assert.equal(harness.resetCalls[0]!.updatedAt, harness.getState().lastUpdatedAt);
 });
 
 test('enqueueSelectedUrlApply rejects a data URL without loading it', async () => {
@@ -136,17 +136,17 @@ test('enqueueSelectedUrlApply loads a differing URL and resets field state', asy
   harness.controller.enqueueSelectedUrlApply('https://example.test/b.jpg');
   await harness.settle();
   assert.equal(harness.applyCalls.length, 1);
-  assert.equal(harness.applyCalls[0].url, 'https://example.test/b.jpg');
-  assert.deepEqual(harness.applyCalls[0].attemptedFieldIds, []);
-  assert.equal(harness.applyCalls[0].options?.pushVisibleUrl, true);
-  assert.equal(harness.applyCalls[0].options?.resetFieldState, true);
+  assert.equal(harness.applyCalls[0]!.url, 'https://example.test/b.jpg');
+  assert.deepEqual(harness.applyCalls[0]!.attemptedFieldIds, []);
+  assert.equal(harness.applyCalls[0]!.options?.pushVisibleUrl, true);
+  assert.equal(harness.applyCalls[0]!.options?.resetFieldState, true);
 });
 
 test('enqueueSelectedUrlApply keeps field state when the URL matches the current one', async () => {
   const harness = createHarness({ rawUrl: 'https://example.test/a.jpg' });
   harness.controller.enqueueSelectedUrlApply('https://example.test/a.jpg');
   await harness.settle();
-  assert.equal(harness.applyCalls[0].options?.resetFieldState, false);
+  assert.equal(harness.applyCalls[0]!.options?.resetFieldState, false);
 });
 
 test('set-value projects the rebuilt URL and skips the template save without unlocked fields', async () => {
@@ -155,8 +155,8 @@ test('set-value projects the rebuilt URL and skips the template save without unl
   harness.controller.enqueueFieldTransform({ name: 'field/transform', fieldId, transformId: 'set-value', value: '6' });
   await harness.settle();
   assert.equal(harness.applyCalls.length, 1);
-  assert.match(harness.applyCalls[0].url, /p=6/);
-  assert.deepEqual(harness.applyCalls[0].attemptedFieldIds, [fieldId]);
+  assert.match(harness.applyCalls[0]!.url, /p=6/);
+  assert.deepEqual(harness.applyCalls[0]!.attemptedFieldIds, [fieldId]);
   assert.ok(!harness.log.includes('saveTemplate'));
 });
 
@@ -174,7 +174,7 @@ test('step always saves the template and sets the active field even without unlo
   const fieldId = harness.fieldId('query p');
   harness.controller.enqueueFieldTransform({ name: 'field/transform', fieldId, transformId: 'step', delta: 1 });
   await harness.settle();
-  assert.match(harness.applyCalls[0].url, /p=6/);
+  assert.match(harness.applyCalls[0]!.url, /p=6/);
   assert.ok(harness.log.includes('saveTemplate'));
   assert.equal(harness.getState().activeFieldId, fieldId);
 });
@@ -210,7 +210,7 @@ test('digit-width pads the field and projects the padded URL', async () => {
   harness.controller.enqueueFieldTransform({ name: 'field/transform', fieldId, transformId: 'digit-width', value: '3' });
   await harness.settle();
   assert.equal(harness.applyCalls.length, 1);
-  assert.match(harness.applyCalls[0].url, /p=005/);
+  assert.match(harness.applyCalls[0]!.url, /p=005/);
   assert.equal(harness.getState().fieldDigitWidthSpecs.length, 1);
   assert.equal(harness.getState().activeFieldId, fieldId);
 });

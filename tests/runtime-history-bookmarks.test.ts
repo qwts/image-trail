@@ -55,7 +55,7 @@ test('history/mark-pinned records durable queue state on recent rows', () => {
     url: 'https://example.test/pin.jpg',
     timestamp: '2026-06-19T00:00:00.000Z',
   });
-  const recordId = state.history[0].id;
+  const recordId = state.history[0]!.id;
 
   state = reducePanelAction(state, {
     name: 'history/mark-pinned',
@@ -64,8 +64,8 @@ test('history/mark-pinned records durable queue state on recent rows', () => {
     pinnedRecordId: 'bookmark-1',
   });
 
-  assert.equal(state.history[0].pinnedAt, '2026-06-19T00:00:01.000Z');
-  assert.equal(state.history[0].pinnedRecordId, 'bookmark-1');
+  assert.equal(state.history[0]!.pinnedAt, '2026-06-19T00:00:01.000Z');
+  assert.equal(state.history[0]!.pinnedRecordId, 'bookmark-1');
 });
 
 test('history/add-loaded preserves durable state for matching visible recents', () => {
@@ -76,7 +76,7 @@ test('history/add-loaded preserves durable state for matching visible recents', 
     thumbnail: 'data:image/jpeg;base64,abc',
     timestamp: '2026-06-19T00:00:00.000Z',
   });
-  const recordId = state.history[0].id;
+  const recordId = state.history[0]!.id;
   state = reducePanelAction(state, {
     name: 'history/mark-pinned',
     id: recordId,
@@ -96,11 +96,11 @@ test('history/add-loaded preserves durable state for matching visible recents', 
     timestamp: '2026-06-19T00:00:02.000Z',
   });
 
-  assert.equal(state.history[0].id, recordId);
-  assert.equal(state.history[0].pinnedRecordId, 'bookmark-1');
-  assert.equal(state.history[0].captureStatus, 'captured');
-  assert.equal(state.history[0].blobId, 'blob-1');
-  assert.equal(state.history[0].thumbnail, 'data:image/jpeg;base64,abc');
+  assert.equal(state.history[0]!.id, recordId);
+  assert.equal(state.history[0]!.pinnedRecordId, 'bookmark-1');
+  assert.equal(state.history[0]!.captureStatus, 'captured');
+  assert.equal(state.history[0]!.blobId, 'blob-1');
+  assert.equal(state.history[0]!.thumbnail, 'data:image/jpeg;base64,abc');
 });
 
 test('bookmarks/page-loaded syncs captured original state to pinned recents', () => {
@@ -110,7 +110,7 @@ test('bookmarks/page-loaded syncs captured original state to pinned recents', ()
     url: 'https://example.test/captured.jpg',
     timestamp: '2026-06-19T00:00:00.000Z',
   });
-  const recordId = state.history[0].id;
+  const recordId = state.history[0]!.id;
   state = reducePanelAction(state, {
     name: 'history/mark-pinned',
     id: recordId,
@@ -145,9 +145,9 @@ test('bookmarks/page-loaded syncs captured original state to pinned recents', ()
     hasNewer: false,
   });
 
-  assert.equal(state.history[0].captureStatus, 'captured');
-  assert.equal(state.history[0].blobId, 'blob-1');
-  assert.equal(state.history[0].storedOriginal?.blobId, 'blob-1');
+  assert.equal(state.history[0]!.captureStatus, 'captured');
+  assert.equal(state.history[0]!.blobId, 'blob-1');
+  assert.equal(state.history[0]!.storedOriginal?.blobId, 'blob-1');
 });
 
 test('bookmarks/page-loaded clears captured original state from exact pinned recents when queue row clears it', () => {
@@ -157,7 +157,7 @@ test('bookmarks/page-loaded clears captured original state from exact pinned rec
     url: 'https://example.test/cleared.jpg',
     timestamp: '2026-06-19T00:00:00.000Z',
   });
-  const recordId = state.history[0].id;
+  const recordId = state.history[0]!.id;
   state = reducePanelAction(state, {
     name: 'history/mark-pinned',
     id: recordId,
@@ -189,10 +189,10 @@ test('bookmarks/page-loaded clears captured original state from exact pinned rec
     hasNewer: false,
   });
 
-  assert.equal(state.history[0].pinnedRecordId, 'bookmark-1');
-  assert.equal(state.history[0].captureStatus, undefined);
-  assert.equal(state.history[0].blobId, undefined);
-  assert.equal(state.history[0].storedOriginal, undefined);
+  assert.equal(state.history[0]!.pinnedRecordId, 'bookmark-1');
+  assert.equal(state.history[0]!.captureStatus, undefined);
+  assert.equal(state.history[0]!.blobId, undefined);
+  assert.equal(state.history[0]!.storedOriginal, undefined);
 });
 
 test('history/add-loaded uses the configured visible recent limit', () => {
@@ -306,7 +306,7 @@ test('capture/complete with sourceRecordId updates matching history record', () 
     url: 'https://example.com/img.jpg',
     timestamp: '2026-01-01T00:00:00.000Z',
   });
-  const recordId = state.history[0].id;
+  const recordId = state.history[0]!.id;
 
   state = reducePanelAction(state, { name: 'capture/start' });
   state = reducePanelAction(state, {
@@ -315,20 +315,20 @@ test('capture/complete with sourceRecordId updates matching history record', () 
     sourceRecordId: recordId,
   });
 
-  assert.equal(state.history[0].captureStatus, 'captured');
-  assert.equal(state.history[0].blobId, 'blob-42');
-  assert.deepEqual(state.history[0].storedOriginal, {
+  assert.equal(state.history[0]!.captureStatus, 'captured');
+  assert.equal(state.history[0]!.blobId, 'blob-42');
+  assert.deepEqual(state.history[0]!.storedOriginal, {
     blobId: 'blob-42',
     mimeType: 'image/jpeg',
     byteLength: 4096,
-    capturedAt: state.history[0].capturedAt,
+    capturedAt: state.history[0]!.capturedAt,
   });
 });
 
 test('capture/complete with failed result does not modify records', () => {
   let state = createInitialPanelState(0);
   state = reducePanelAction(state, { name: 'history/add-loaded', url: 'https://example.com/img.jpg' });
-  const recordId = state.history[0].id;
+  const recordId = state.history[0]!.id;
 
   state = reducePanelAction(state, { name: 'capture/start' });
   state = reducePanelAction(state, {
@@ -337,8 +337,8 @@ test('capture/complete with failed result does not modify records', () => {
     sourceRecordId: recordId,
   });
 
-  assert.equal(state.history[0].captureStatus, undefined);
-  assert.equal(state.history[0].blobId, undefined);
+  assert.equal(state.history[0]!.captureStatus, undefined);
+  assert.equal(state.history[0]!.blobId, undefined);
   assert.equal(state.captureResult?.status, 'failed');
 });
 
@@ -357,7 +357,7 @@ test('capture/clear dismisses the current capture result', () => {
 test('capture/delete clears capture status and blobId from matching records', () => {
   let state = createInitialPanelState(0);
   state = reducePanelAction(state, { name: 'history/add-loaded', url: 'https://example.com/a.jpg' });
-  const recordId = state.history[0].id;
+  const recordId = state.history[0]!.id;
 
   state = reducePanelAction(state, { name: 'capture/start' });
   state = reducePanelAction(state, {
@@ -365,11 +365,11 @@ test('capture/delete clears capture status and blobId from matching records', ()
     result: { status: 'captured', blobId: 'blob-99', mimeType: 'image/png', byteLength: 512 },
     sourceRecordId: recordId,
   });
-  assert.equal(state.history[0].captureStatus, 'captured');
+  assert.equal(state.history[0]!.captureStatus, 'captured');
 
   state = reducePanelAction(state, { name: 'capture/delete', id: recordId, blobId: 'blob-99' });
-  assert.equal(state.history[0].captureStatus, undefined);
-  assert.equal(state.history[0].blobId, undefined);
+  assert.equal(state.history[0]!.captureStatus, undefined);
+  assert.equal(state.history[0]!.blobId, undefined);
 });
 
 test('capture/delete clears paired bookmark, recent, and recall original state by blob id', () => {
@@ -414,13 +414,13 @@ test('capture/delete clears paired bookmark, recent, and recall original state b
 
   const updated = reducePanelAction(state, { name: 'capture/delete', id: 'recent-paired', blobId: 'blob-paired' });
 
-  assert.equal(updated.history[0].captureStatus, undefined);
-  assert.equal(updated.history[0].blobId, undefined);
-  assert.equal(updated.history[0].capturedAt, undefined);
-  assert.equal(updated.history[0].storedOriginal, undefined);
-  assert.equal(updated.bookmarks[0].captureStatus, undefined);
-  assert.equal(updated.bookmarks[0].blobId, undefined);
-  assert.equal(updated.bookmarks[0].storedOriginal, undefined);
+  assert.equal(updated.history[0]!.captureStatus, undefined);
+  assert.equal(updated.history[0]!.blobId, undefined);
+  assert.equal(updated.history[0]!.capturedAt, undefined);
+  assert.equal(updated.history[0]!.storedOriginal, undefined);
+  assert.equal(updated.bookmarks[0]!.captureStatus, undefined);
+  assert.equal(updated.bookmarks[0]!.blobId, undefined);
+  assert.equal(updated.bookmarks[0]!.storedOriginal, undefined);
   assert.equal(updated.recall.candidates[0]?.captureStatus, undefined);
   assert.equal(updated.recall.candidates[0]?.blobId, undefined);
   assert.equal(updated.recall.candidates[0]?.storedOriginal, undefined);
@@ -487,11 +487,11 @@ test('bookmark/remove unlinks pinned recent rows and clears stale original state
   assert.deepEqual(updated.recall.selectedIds, []);
   assert.equal(updated.recall.nextOffset, 0);
   assert.equal(updated.recall.total, 0);
-  assert.equal(updated.history[0].pinnedAt, undefined);
-  assert.equal(updated.history[0].pinnedRecordId, undefined);
-  assert.equal(updated.history[0].captureStatus, undefined);
-  assert.equal(updated.history[0].blobId, undefined);
-  assert.equal(updated.history[0].storedOriginal, undefined);
+  assert.equal(updated.history[0]!.pinnedAt, undefined);
+  assert.equal(updated.history[0]!.pinnedRecordId, undefined);
+  assert.equal(updated.history[0]!.captureStatus, undefined);
+  assert.equal(updated.history[0]!.blobId, undefined);
+  assert.equal(updated.history[0]!.storedOriginal, undefined);
 });
 
 test('bookmark/clear hides the visible queue row without unlinking durable paired state', () => {
@@ -558,10 +558,10 @@ test('bookmark/clear hides the visible queue row without unlinking durable paire
 
   assert.deepEqual(updated.bookmarks, []);
   assert.deepEqual(updated.selectedBookmarkIds, []);
-  assert.equal(updated.history[0].pinnedRecordId, 'bookmark-clear-linked');
-  assert.equal(updated.history[0].captureStatus, 'captured');
-  assert.equal(updated.history[0].blobId, storedOriginal.blobId);
-  assert.deepEqual(updated.history[0].storedOriginal, storedOriginal);
+  assert.equal(updated.history[0]!.pinnedRecordId, 'bookmark-clear-linked');
+  assert.equal(updated.history[0]!.captureStatus, 'captured');
+  assert.equal(updated.history[0]!.blobId, storedOriginal.blobId);
+  assert.deepEqual(updated.history[0]!.storedOriginal, storedOriginal);
   assert.equal(updated.recall.candidates[0]?.id, 'bookmark-clear-linked');
   assert.deepEqual(updated.recall.selectedIds, ['bookmark-clear-linked']);
   assert.equal(updated.recall.candidates[0]?.storedOriginal?.blobId, storedOriginal.blobId);

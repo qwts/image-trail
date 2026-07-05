@@ -244,6 +244,7 @@ test('invariant: the ESLint rule blocks sorting a queue by envelope.updatedAt', 
 }
 `;
   const [violatingResult] = await eslint.lintText(violating, { filePath });
+  assert.ok(violatingResult, 'lintText must return a result for the violating fixture');
   const flagged = violatingResult.messages.filter((message) => message.ruleId === 'no-restricted-syntax');
   assert.ok(
     flagged.some((message) => message.message.includes('queueUpdatedAt')),
@@ -255,6 +256,7 @@ test('invariant: the ESLint rule blocks sorting a queue by envelope.updatedAt', 
 }
 `;
   const [cleanResult] = await eslint.lintText(clean, { filePath });
+  assert.ok(cleanResult, 'lintText must return a result for the clean fixture');
   assert.equal(
     cleanResult.messages.filter((message) => message.ruleId === 'no-restricted-syntax').length,
     0,
