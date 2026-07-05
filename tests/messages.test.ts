@@ -47,6 +47,8 @@ import {
   createDisconnectPCloudProviderResultMessage,
   createDownloadPCloudBackupMessage,
   createDownloadPCloudBackupResultMessage,
+  createFindBookmarkByUrlMessage,
+  createFindBookmarkByUrlResultMessage,
   createListPCloudBackupsMessage,
   createListPCloudBackupsResultMessage,
   createUploadPCloudBackupMessage,
@@ -103,6 +105,7 @@ import {
   createSaveGrabSourcePatternMessage,
   createSaveGrabSourcePatternResultMessage,
   createSaveUrlTemplateMessage,
+  isFindBookmarkByUrlResultMessage,
   createSaveUrlTemplateResultMessage,
   createDeleteGrabSourcePatternMessage,
   createDeleteGrabSourcePatternResultMessage,
@@ -887,6 +890,8 @@ test('creates bookmark store messages for extension-origin persistence', () => {
   });
   const loadByIds = createLoadBookmarksByIdsMessage(['bookmark-1']);
   const loadByIdsResult = createLoadBookmarksByIdsResultMessage({ items: [record] });
+  const findByUrl = createFindBookmarkByUrlMessage('https://example.test/a.jpg');
+  const findByUrlResult = createFindBookmarkByUrlResultMessage({ record });
   const save = createSaveBookmarkMessage(record);
   const saveResult = createSaveBookmarkResultMessage({ ok: true, record });
   const remove = createRemoveBookmarkMessage(record);
@@ -903,6 +908,10 @@ test('creates bookmark store messages for extension-origin persistence', () => {
   assert.equal(isExtensionRequest(loadByIds), true);
   assert.equal(isExtensionResponse(loadByIdsResult), true);
   assert.equal(isLoadBookmarksByIdsResultMessage(loadByIdsResult), true);
+  assert.deepEqual(findByUrl.payload, { url: 'https://example.test/a.jpg' });
+  assert.equal(isExtensionRequest(findByUrl), true);
+  assert.equal(isExtensionResponse(findByUrlResult), true);
+  assert.equal(isFindBookmarkByUrlResultMessage(findByUrlResult), true);
   assert.equal(isExtensionRequest(save), true);
   assert.equal(isExtensionResponse(saveResult), true);
   assert.equal(isSaveBookmarkResultMessage(saveResult), true);

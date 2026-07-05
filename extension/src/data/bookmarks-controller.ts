@@ -285,6 +285,35 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     return this.loadRecordsByIds(context, [...new Set(ids)].filter(Boolean));
   }
 
+  async findByUrl(url: string): Promise<ImageDisplayRecord | null> {
+    const context = await this.openContext();
+    if (!context) return null;
+    const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
+    if (activeBlobKey) {
+      const protectedRecord = await context.encryptedPins.getByUrlHash(await hashUrl(url));
+      if (protectedRecord) {
+        try {
+          return await this.openProtectedDisplayRecord(context, protectedRecord, activeBlobKey);
+        } catch {
+          // Fall through to the relationship/plain lookup below.
+        }
+      }
+    }
+
+    const plain = await context.repository.getEncryptedByUrl(url);
+    if (!plain) return null;
+    try {
+      const payload = await context.repository.openRecord(plain, context.bookmarkKey.key);
+      if (payload.protectedPin?.encryptedPinId && activeBlobKey) {
+        const protectedRecord = await context.encryptedPins.get(payload.protectedPin.encryptedPinId);
+        if (protectedRecord) return await this.openProtectedDisplayRecord(context, protectedRecord, activeBlobKey);
+      }
+      return toDisplayRecord(plain.uuid, payload, plain.queueUpdatedAt);
+    } catch {
+      return null;
+    }
+  }
+
   async remove(record: ImageDisplayRecord): Promise<void> {
     await this.removeMany([record.id]);
   }

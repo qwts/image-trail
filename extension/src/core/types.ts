@@ -722,6 +722,7 @@ export interface BookmarkStore {
     readonly hasNewer: boolean;
   }>;
   readonly loadByIds: (ids: readonly string[]) => Promise<readonly ImageDisplayRecord[]>;
+  readonly findByUrl: (url: string) => Promise<ImageDisplayRecord | null>;
   readonly save: (record: ImageDisplayRecord) => Promise<ImageDisplayRecord>;
   readonly saveResult?: (
     record: ImageDisplayRecord,

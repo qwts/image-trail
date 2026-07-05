@@ -147,6 +147,31 @@
       ]
     },
     {
+      "id": "recents-to-queue-state-unification",
+      "issue": 155,
+      "acceptance": "Unified Recents-to-Queue saved state",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/messages.test.ts",
+            "tests/indexeddb-data.test.ts",
+            "tests/record-library-controller.test.ts",
+            "tests/captured-originals-controller.test.ts",
+            "tests/dom/record-library-controller.test.ts",
+            "tests/dom/captured-originals-controller.test.ts"
+          ],
+          "notes": "Covers saved-row lookup messages, plain/protected URL lookup without queue-order mutation, recent enrichment from off-page saved rows, duplicate pin prevention, capture skip/update behavior, post-capture blob cleanup on failed durable save, linked recent cleanup, and Delete original resolving non-visible durable rows."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/recents-queue-recall.spec.ts",
+          "notes": "Covers a captured queue row moving off the visible page into Recall, then reloading the same URL into Recents with the pinned/captured state and durable actions reflected without creating duplicate controls."
+        }
+      ]
+    },
+    {
       "id": "multi-select-image-download",
       "acceptance": "Multi-select image download",
       "repoPath": "docs/acceptance-tests/multi-select-image-download.md",
