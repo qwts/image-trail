@@ -97,6 +97,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      # The Storybook interaction runner drives its stories through Playwright's Chromium, so this
+      # job needs the browser too (the E2E job installs its own copy on a separate runner).
+      - name: Install Playwright browser (for Storybook)
+        run: npx playwright install --with-deps chromium
+
       - name: Storybook interaction tests
         run: npm run test:stories:ci
 
