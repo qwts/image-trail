@@ -10,9 +10,11 @@ on:
       - main
 
 # Cancel superseded PR runs — a stacked push otherwise burns a full E2E run per commit. Main-push
-# runs are never cancelled: each merge commit keeps its own post-merge verdict.
+# runs are keyed by SHA instead of ref: a shared ref group would let GitHub replace the single
+# queued run when merges land back-to-back, silently dropping an intermediate commit's verdict.
+# Per-SHA groups never collide, so every merge commit keeps its own post-merge run.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
