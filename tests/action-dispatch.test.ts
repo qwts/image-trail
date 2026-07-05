@@ -138,6 +138,7 @@ function createHarness(
     clearRecallMessageTimer: () => record('clearRecallMessageTimer'),
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
     saveLocalSettings: () => record('saveLocalSettings'),
+    applyBuildInfoOverlayVisibility: () => record('applyBuildInfoOverlayVisibility'),
     pageAdapter: () => pageAdapter,
     panelMount: () => ({ mount: () => record('panelMount.mount') }) as unknown as PanelMount,
     keyboard: () => ({ enable: () => record('keyboard.enable') }) as unknown as KeyboardRouter,
@@ -230,6 +231,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   },
   'settings/update-pin-save-storage-preference': { name: 'settings/update-pin-save-storage-preference', value: 'encrypted' },
   'settings/update-privacy-mode': { name: 'settings/update-privacy-mode', enabled: true },
+  'settings/update-build-info-overlay-visibility': { name: 'settings/update-build-info-overlay-visibility', visible: false },
   'settings/update-url-review-status-retention': {
     name: 'settings/update-url-review-status-retention',
     limit: 100,
@@ -430,6 +432,16 @@ test('panel/secondary-controls-open is a silent no-op when the state already mat
   dispatchPanelAction(registry, { name: 'panel/secondary-controls-open', open: !current }, () => assert.fail('unexpected fallback'));
   assert.deepEqual(harness.log, ['reduce', 'saveLocalSettings', 'render']);
   assert.equal(harness.getState().secondaryControlsOpen, !current);
+});
+
+test('build info overlay visibility setting persists and applies the overlay', () => {
+  const harness = createHarness();
+  const registry = buildPanelActionRegistry(harness.deps);
+  dispatchPanelAction(registry, { name: 'settings/update-build-info-overlay-visibility', visible: false }, () =>
+    assert.fail('unexpected fallback'),
+  );
+  assert.deepEqual(harness.log, ['reduce', 'saveLocalSettings', 'applyBuildInfoOverlayVisibility', 'render']);
+  assert.equal(harness.getState().buildInfoOverlayVisible, false);
 });
 
 test('recall/open toggles an already-open drawer shut instead of reopening it', () => {

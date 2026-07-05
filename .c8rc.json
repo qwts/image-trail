@@ -6,6 +6,6 @@
   "reporter": ["text", "lcov", "json-summary"],
   "reports-dir": "coverage",
   "check-coverage": true,
-  "lines": 54,
-  "branches": 79
+  "lines": 71,
+  "branches": 80
 }

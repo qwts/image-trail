@@ -27,6 +27,14 @@ interface ImageTrailContentController {
   readonly destroy: () => void;
 }
 
+interface BuildIdentityOverlayController {
+  readonly applyVisibility: (visible: boolean) => boolean;
+  readonly toggle: () => boolean;
+  readonly isVisible: () => boolean;
+  readonly hide: () => void;
+  readonly load: (panel: ImageTrailPanel, localSettingsStore: ExtensionLocalSettingsStore) => void;
+}
+
 declare global {
   interface Window {
     __imageTrailContentController?: ImageTrailContentController;
@@ -53,9 +61,47 @@ async function loadBuildIdentity(): Promise<BuildIdentity | null> {
   }
 }
 
+function createBuildIdentityOverlayController(): BuildIdentityOverlayController {
+  const buildOverlay = new BuildIdentityOverlay();
+  let buildIdentity: BuildIdentity | null = null;
+  let buildIdentityLoaded = false;
+
+  const applyVisibility = (visible: boolean): boolean => {
+    if (!visible) {
+      buildOverlay.hide();
+      return true;
+    }
+    if (!buildIdentityLoaded || !isNonProductionBuildIdentity(buildIdentity)) {
+      buildOverlay.hide();
+      return false;
+    }
+    return buildOverlay.show(buildIdentity);
+  };
+
+  return {
+    applyVisibility,
+    toggle: () => {
+      if (!buildIdentityLoaded || !isNonProductionBuildIdentity(buildIdentity)) return false;
+      return buildOverlay.toggle(buildIdentity);
+    },
+    isVisible: () => buildOverlay.isVisible(),
+    hide: () => buildOverlay.hide(),
+    load: (panel, localSettingsStore) => {
+      void Promise.all([loadBuildIdentity(), localSettingsStore.load()]).then(([identity, settings]) => {
+        buildIdentity = identity;
+        buildIdentityLoaded = true;
+        if (identity) panel.setBuildIdentity(identity);
+        applyVisibility(settings.buildInfoOverlayVisible);
+      });
+    },
+  };
+}
+
 function createController(): ImageTrailContentController {
   const pageAdapter = new PageAdapter();
   pageAdapter.prepareStandaloneImageBackdrop({ requireBodyOnlyImage: true });
+  const buildOverlay = createBuildIdentityOverlayController();
+  const localSettingsStore = new ExtensionLocalSettingsStore();
   const panel = new ImageTrailPanel(
     pageAdapter,
     new ExtensionBookmarkStore(),
@@ -63,20 +109,23 @@ function createController(): ImageTrailContentController {
     new RecentHistoryStore(),
     new RecallStore(),
     new ExtensionPanelPositionStore(),
-    new ExtensionLocalSettingsStore(),
+    localSettingsStore,
     new ExtensionUrlTemplateStore(),
     new ExtensionParsedFieldStateStore(),
     new ExtensionUrlReviewStatusStore(),
+    {
+      applyBuildInfoOverlayVisibility: (visible) => {
+        buildOverlay.applyVisibility(visible);
+      },
+    },
   );
-  const buildOverlay = new BuildIdentityOverlay();
-  let buildIdentity: BuildIdentity | null = null;
-  let buildIdentityLoaded = false;
-  void loadBuildIdentity().then((identity) => {
-    buildIdentity = identity;
-    buildIdentityLoaded = true;
-    if (identity) panel.setBuildIdentity(identity);
-    buildOverlay.show(identity);
-  });
+  buildOverlay.load(panel, localSettingsStore);
+
+  function toggleBuildIdentityOverlay(): boolean {
+    const toggled = buildOverlay.toggle();
+    if (toggled) panel.setBuildInfoOverlayVisible(buildOverlay.isVisible());
+    return toggled;
+  }
 
   const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
     if (!isExtensionRequest(message)) {
@@ -90,6 +139,11 @@ function createController(): ImageTrailContentController {
         sendResponse(createStatusMessage(state.visible, state.message));
         return false;
       }
+      case MessageType.ToggleBuildIdentityOverlay: {
+        const toggled = toggleBuildIdentityOverlay();
+        sendResponse(createStatusMessage(panel.visible, toggled ? 'Build info overlay toggled.' : 'Build identity is not available.'));
+        return false;
+      }
       case MessageType.Ping:
         sendResponse(createStatusMessage(panel.visible, panel.statusMessage));
         return false;
@@ -101,10 +155,9 @@ function createController(): ImageTrailContentController {
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (!isBuildIdentityOverlayShortcut(event)) return;
     if (!shouldRouteKeyboardShortcut(classifyTarget(event), 'build-data-overlay-toggle')) return;
-    if (!buildIdentityLoaded || !isNonProductionBuildIdentity(buildIdentity)) return;
+    if (!toggleBuildIdentityOverlay()) return;
     event.preventDefault();
     event.stopPropagation();
-    buildOverlay.toggle(buildIdentity);
   };
 
   const destroy = (): void => {

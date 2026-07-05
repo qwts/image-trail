@@ -69,6 +69,7 @@ export class PanelSettingsController {
       recentHistoryOverflowBehavior: settings.recentHistoryOverflowBehavior,
       pinSaveStoragePreference: settings.pinSaveStoragePreference,
       privacyModeEnabled: settings.privacyModeEnabled,
+      buildInfoOverlayVisible: settings.buildInfoOverlayVisible,
       urlReviewStatusLimit: settings.urlReviewStatusLimit,
       clearUrlReviewStatusAfterExport: settings.clearUrlReviewStatusAfterExport,
       requestThrottleMs: settings.requestThrottleMs,

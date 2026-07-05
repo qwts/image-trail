@@ -20,6 +20,7 @@ export const plaintextLocalSettingsSchema = v.object({
   bookmarkVisibilityScope: v.picklist(['global', 'site']),
   pinSaveStoragePreference: v.picklist(['encrypted', 'plaintext']),
   privacyModeEnabled: v.boolean(),
+  buildInfoOverlayVisible: v.boolean(),
   previewObjectFit: v.picklist(['contain', 'cover', 'fill', 'none', 'scale-down']),
   previewFillScreen: v.boolean(),
   urlReviewStatusLimit: v.number(),

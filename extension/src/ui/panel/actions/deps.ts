@@ -40,6 +40,7 @@ export interface PanelActionDeps {
   // Local settings.
   getLocalSettings(): PlaintextLocalSettings;
   saveLocalSettings(settings: PlaintextLocalSettings): void;
+  applyBuildInfoOverlayVisibility(visible: boolean): void;
 
   // Collaborators, as lazy whole-object getters.
   pageAdapter(): PageAdapter;
