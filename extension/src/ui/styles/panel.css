@@ -576,6 +576,12 @@
   border-top: none;
 }
 
+/* The window chrome header already carries the section title — don't repeat it in the body. */
+.image-trail-panel-root .image-trail-panel__detached-body > .image-trail-panel__section > h3,
+.image-trail-panel-root .image-trail-panel__detached-body > .image-trail-panel__section > .image-trail-panel__section-header {
+  display: none;
+}
+
 .image-trail-panel-root .image-trail-panel__section-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
