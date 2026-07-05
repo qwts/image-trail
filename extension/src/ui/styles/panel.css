@@ -551,6 +551,19 @@
   touch-action: none;
 }
 
+.image-trail-panel-root .image-trail-panel__detached-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.image-trail-panel-root.image-trail-panel__detached-window.is-minimized {
+  grid-template-rows: auto;
+}
+
+.image-trail-panel-root.image-trail-panel__detached-window.is-minimized .image-trail-panel__detached-body {
+  display: none;
+}
+
 .image-trail-panel-root .image-trail-panel__detached-body {
   display: grid;
   min-width: 0;

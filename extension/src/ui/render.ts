@@ -51,6 +51,7 @@ export interface PanelLayoutState {
   historyListBlockSize: number | null;
   fieldDisplayModes: Map<string, NumericFieldDisplayMode>;
   detachedWindowPositions: Map<DetachableSectionId, DetachedWindowPosition>;
+  detachedWindowMinimized: Set<DetachableSectionId>;
 }
 
 export function recallDeleteCountForQueue(state: Pick<PanelState, 'bookmarkTotal' | 'bookmarkLimit'>): number {

@@ -32,6 +32,7 @@ function createHarness(): Harness {
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
     detachedWindowPositions: new Map(),
+    detachedWindowMinimized: new Set(),
   };
   const target: PanelRenderTarget = {
     root,
@@ -171,6 +172,43 @@ test('dragging the window title updates the position and stores it in layout sta
   assert.equal(windowEl.style.left, '200px', 'the window follows the drag');
   assert.equal(windowEl.style.top, '100px');
   assert.deepEqual(harness.layoutState.detachedWindowPositions.get('history'), { left: 200, top: 100 });
+});
+
+test('the minimize control collapses the window, updates aria-expanded, and records layout state', () => {
+  const harness = createHarness();
+  harness.render(panelState({ detachedSections: ['history'] }));
+  const windowEl = harness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="history"]');
+  assert.ok(windowEl);
+  const minimize = windowEl.querySelector<HTMLButtonElement>('[data-image-trail-minimize="history"]');
+  assert.ok(minimize instanceof HTMLButtonElement, 'the window header renders a minimize control');
+  assert.equal(minimize.getAttribute('aria-expanded'), 'true');
+
+  minimize.click();
+
+  assert.equal(windowEl.classList.contains('is-minimized'), true);
+  assert.equal(minimize.getAttribute('aria-expanded'), 'false');
+  assert.equal(harness.layoutState.detachedWindowMinimized.has('history'), true);
+  assert.deepEqual(harness.actions, [], 'minimize is layout state only — no panel action dispatches');
+
+  minimize.click();
+
+  assert.equal(windowEl.classList.contains('is-minimized'), false);
+  assert.equal(minimize.getAttribute('aria-expanded'), 'true');
+  assert.equal(harness.layoutState.detachedWindowMinimized.has('history'), false);
+});
+
+test('a minimized window stays minimized across rerenders and Escape still restores it', () => {
+  const harness = createHarness();
+  harness.layoutState.detachedWindowMinimized.add('history');
+  harness.render(panelState({ detachedSections: ['history'] }));
+  const windowEl = harness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="history"]');
+  assert.ok(windowEl);
+  assert.equal(windowEl.classList.contains('is-minimized'), true, 'layout state re-applies the minimized window');
+
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+  windowEl.dispatchEvent(escape);
+
+  assert.deepEqual(harness.actions, [{ name: 'section/restore', sectionId: 'history' }]);
 });
 
 test('minimizing the panel clears the detached root', () => {

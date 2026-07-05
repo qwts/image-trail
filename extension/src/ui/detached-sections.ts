@@ -52,8 +52,13 @@ export function renderDetachedSections(
         sectionTitle: DETACHABLE_SECTION_TITLES[sectionId],
         geometry: detachedWindowGeometry(target.root, target.layoutState.detachedWindowPositions.get(sectionId), index),
         animate: !previousWindows.has(sectionId),
+        minimized: target.layoutState.detachedWindowMinimized.has(sectionId),
         onPositionChange: (id, position) => {
           target.layoutState.detachedWindowPositions.set(id, position);
+        },
+        onMinimizedChange: (id, minimized) => {
+          if (minimized) target.layoutState.detachedWindowMinimized.add(id);
+          else target.layoutState.detachedWindowMinimized.delete(id);
         },
       },
       contentRenderers[sectionId](target, state),

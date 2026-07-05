@@ -63,14 +63,18 @@ export interface DetachedSectionWindowOptions {
   readonly sectionTitle: string;
   readonly geometry: DetachedWindowGeometry;
   readonly animate?: boolean;
+  /** Whether the window renders collapsed to its title bar. */
+  readonly minimized?: boolean;
   /** Persist the window position after a drag; extension-owned, session-transient state. */
   readonly onPositionChange: (sectionId: DetachableSectionId, position: DetachedWindowPosition) => void;
+  /** Persist the minimize toggle; extension-owned, session-transient state. */
+  readonly onMinimizedChange: (sectionId: DetachableSectionId, minimized: boolean) => void;
 }
 
 /**
  * Floating extension-owned window hosting a detached section: `role=dialog`, drag-to-move via the
- * header, Escape restores the section to the panel. The section content keeps dispatching its
- * existing actions — the window is chrome only.
+ * header, minimize collapses to the title bar, and close (X) or Escape restores the section to the
+ * panel. The section content keeps dispatching its existing actions — the window is chrome only.
  */
 export function createDetachedSectionWindow(
   options: DetachedSectionWindowOptions,
@@ -108,15 +112,40 @@ export function createDetachedSectionWindow(
   heading.textContent = sectionTitle;
   heading.addEventListener('pointerdown', (event) => startWindowDrag(event, windowEl, options));
 
+  const actions = document.createElement('div');
+  actions.className = 'image-trail-panel__detached-actions';
+
+  const minimize = document.createElement('button');
+  minimize.type = 'button';
+  minimize.className = 'image-trail-panel__icon-button';
+  minimize.textContent = '-';
+  minimize.dataset['imageTrailMinimize'] = sectionId;
+  const applyMinimized = (minimized: boolean): void => {
+    windowEl.classList.toggle('is-minimized', minimized);
+    minimize.setAttribute('aria-expanded', minimized ? 'false' : 'true');
+    const label = minimized ? `Expand ${sectionTitle} window` : `Minimize ${sectionTitle} window`;
+    minimize.setAttribute('aria-label', label);
+    minimize.title = label;
+  };
+  applyMinimized(options.minimized === true);
+  minimize.addEventListener('click', () => {
+    const minimized = !windowEl.classList.contains('is-minimized');
+    applyMinimized(minimized);
+    options.onMinimizedChange(sectionId, minimized);
+  });
+
+  // Close semantics: the X restores the section into the panel — the window has no other exit.
   const restore = document.createElement('button');
   restore.type = 'button';
-  restore.textContent = 'Restore';
+  restore.className = 'image-trail-panel__icon-button';
+  restore.textContent = 'X';
   restore.dataset['imageTrailRestore'] = sectionId;
   restore.setAttribute('aria-label', `Restore ${sectionTitle} into the panel`);
   restore.title = `Restore ${sectionTitle} into the panel`;
   restore.addEventListener('click', () => dispatch({ name: 'section/restore', sectionId }));
 
-  header.append(heading, restore);
+  actions.append(minimize, restore);
+  header.append(heading, actions);
 
   const body = document.createElement('div');
   body.className = 'image-trail-panel__detached-body';

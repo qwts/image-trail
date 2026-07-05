@@ -59,6 +59,7 @@ export class PanelRenderController {
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
     detachedWindowPositions: new Map(),
+    detachedWindowMinimized: new Set(),
   };
 
   constructor(private readonly deps: PanelRenderControllerDeps) {}

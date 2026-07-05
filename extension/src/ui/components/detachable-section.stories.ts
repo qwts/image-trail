@@ -22,6 +22,27 @@ export const DetachedWindowNarrow: Story = {
   render: () => windowStory({ inlineSize: 260 }),
 };
 
+export const DetachedWindowMinimized: Story = {
+  render: () => windowStory({ minimized: true }),
+};
+
+export const MinimizeTogglesWindowBody: Story = {
+  render: () => windowStory(),
+  play: async ({ canvasElement }) => {
+    const minimize = canvasElement.querySelector('[data-image-trail-minimize="history"]');
+    if (!(minimize instanceof HTMLElement)) throw new Error('expected the minimize control to render');
+    const windowEl = canvasElement.querySelector('[data-image-trail-detached-window="history"]');
+    if (!(windowEl instanceof HTMLElement)) throw new Error('expected the detached window to render');
+    await expect(minimize.getAttribute('aria-expanded')).toBe('true');
+    await userEvent.click(minimize);
+    await expect(windowEl.classList.contains('is-minimized')).toBe(true);
+    await expect(minimize.getAttribute('aria-expanded')).toBe('false');
+    await userEvent.click(minimize);
+    await expect(windowEl.classList.contains('is-minimized')).toBe(false);
+    await expect(minimize.getAttribute('aria-expanded')).toBe('true');
+  },
+};
+
 export const Placeholder: Story = {
   render: () => panelStory(createDetachedSectionPlaceholder('history', 'Recent history', mockDispatch())),
 };
@@ -79,7 +100,7 @@ export const RestorePathsDispatch: Story = {
 };
 
 function windowStory(
-  options: { readonly inlineSize?: number } = {},
+  options: { readonly inlineSize?: number; readonly minimized?: boolean } = {},
   dispatch: (action: PanelAction) => void = mockDispatch(),
 ): HTMLElement {
   const content = createHistoryView(recentFixtures, [selectedRecord.id], false, true, dispatch, {
@@ -92,11 +113,13 @@ function windowStory(
       sectionId: 'history',
       sectionTitle: 'Recent history',
       geometry: { left: 16, top: 16, inlineSize: options.inlineSize ?? 340 },
+      minimized: options.minimized,
       onPositionChange: mockDispatch('window position'),
+      onMinimizedChange: mockDispatch('window minimized'),
     },
     content,
     dispatch,
   );
-  windowEl.style.height = '420px';
+  if (!options.minimized) windowEl.style.height = '420px';
   return drawerStory(windowEl);
 }

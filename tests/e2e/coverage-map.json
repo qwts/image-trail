@@ -494,12 +494,12 @@
         {
           "type": "unit-dom",
           "paths": ["tests/detachable-sections.test.ts", "tests/dom/detachable-section.test.ts"],
-          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing."
+          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X)."
         },
         {
           "type": "storybook",
           "paths": ["extension/src/ui/components/detachable-section.stories.ts", "extension/src/ui/render.stories.ts"],
-          "notes": "Window/narrow/placeholder/control states with play tests for detach and restore dispatch; panel-layout story for the detached placeholder."
+          "notes": "Window/narrow/placeholder/control states with play tests for detach and restore dispatch; panel-layout story for the detached placeholder; minimized window state and a minimize-toggle play test."
         },
         {
           "type": "deferred",
