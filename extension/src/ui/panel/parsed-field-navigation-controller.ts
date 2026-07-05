@@ -170,6 +170,10 @@ export class ParsedFieldNavigationController {
       const buffered = await this.deps.bufferedNav().step(model, navigableFields, delta);
       if (buffered === 'loaded') {
         void this.deps.saveUrlTemplateFromCurrentFields();
+        // A buffered landing is progress too — reset the consecutive-miss budget so stale
+        // candidate-scan misses from before this success can't stop the next segment early
+        // (the total-skip safety net keeps counting).
+        this.navigationSessionSkippedUrls.clear();
         this.deps.setState(
           setAutomationState(this.deps.getState(), {
             governorStatus: 'ready',

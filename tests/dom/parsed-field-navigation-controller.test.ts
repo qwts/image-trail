@@ -60,6 +60,8 @@ interface HarnessOptions {
   readonly applyResult?: (url: string, callIndex: number) => boolean;
   readonly requestResult?: (callIndex: number) => 'ok' | 'throttled';
   readonly neighborPreloadRadius?: number;
+  readonly neighborPreloadActive?: boolean;
+  readonly bufferedStep?: (callIndex: number) => 'loaded' | 'blocked';
 }
 
 interface Harness {
@@ -76,6 +78,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
   const log: string[] = [];
   const applyCalls: ApplyCall[] = [];
   let requestCalls = 0;
+  let bufferedSteps = 0;
 
   const deps: ParsedFieldNavigationControllerDeps = {
     getState: () => state,
@@ -109,11 +112,15 @@ function createHarness(options: HarnessOptions = {}): Harness {
       requestsInWindow: () => 1,
     }),
     bufferedNav: () => ({
-      step: async () => 'blocked',
+      step: async () => {
+        const callIndex = bufferedSteps;
+        bufferedSteps += 1;
+        return options.bufferedStep ? options.bufferedStep(callIndex) : 'blocked';
+      },
     }),
     neighborPreload: () => ({
       get isActive() {
-        return false;
+        return options.neighborPreloadActive ?? false;
       },
       get runId() {
         return 7;
@@ -260,6 +267,27 @@ test('a successful load resets the consecutive-miss budget so sparse galleries k
 
   assert.equal(harness.applyCalls.length, 6, 'both steps land after skipping 2-wide gaps');
   assert.ok(!harness.getState().message.startsWith('Stopped after skipping'), 'no stop message — the drain finished by loading');
+});
+
+test('a buffered (preload fast-path) landing also resets the consecutive-miss budget', async () => {
+  // Preload active; the buffered step lands on the third drain step, after two candidate-scan
+  // misses. Those stale misses must not count against the segment after the buffered success —
+  // otherwise the drain would stop after a single further miss.
+  const harness = createHarness({
+    neighborPreloadActive: true,
+    bufferedStep: (callIndex) => (callIndex === 2 ? 'loaded' : 'blocked'),
+    applyResult: () => false,
+  });
+  harness.patchState({ unlockedFieldIds: [intFieldId()] });
+
+  harness.controller.navigateBy(1);
+  harness.controller.navigateBy(1);
+  await untilStopped(harness);
+
+  // 2 misses, buffered landing (resets the consecutive budget), then a FULL fresh budget of 3
+  // misses before the second step gives up — 5 total, not 3.
+  assert.equal(harness.getState().message, 'Stopped after skipping 5 unavailable images; no loadable image found in that direction.');
+  assert.equal(harness.applyCalls.length, 5, `fresh consecutive budget after the buffered landing, got ${harness.applyCalls.length}`);
 });
 
 test('the outer safety net caps TOTAL skips per drain even when successes keep resetting the budget', async () => {
