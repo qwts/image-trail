@@ -44,7 +44,7 @@ export function createBookmarksView(
     readonly hasNewer: boolean;
   },
   recall: { readonly recallOpen: boolean },
-  options: { readonly privacyMode?: boolean },
+  options: { readonly privacyMode?: boolean; readonly headerAccessory?: HTMLElement },
   dispatch: (action: BookmarkAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
@@ -52,6 +52,10 @@ export function createBookmarksView(
 
   const heading = document.createElement('h3');
   heading.textContent = 'Queue';
+  const header = document.createElement('div');
+  header.className = 'image-trail-panel__section-header';
+  header.append(heading);
+  if (options.headerAccessory) header.append(options.headerAccessory);
 
   const add = document.createElement('button');
   add.type = 'button';
@@ -338,7 +342,7 @@ export function createBookmarksView(
     selectedIds.length > 0
       ? `${selectedIds.length} queue row(s) selected for export.`
       : 'Cmd/Ctrl-click rows to select queue rows for export. Shift-click selects a range.';
-  section.append(heading, toolbar, statusRow, items.length ? selectionMeta : empty);
+  section.append(header, toolbar, statusRow, items.length ? selectionMeta : empty);
   if (items.length) section.append(list);
   return section;
 }

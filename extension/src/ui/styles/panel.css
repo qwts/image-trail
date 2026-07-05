@@ -556,6 +556,16 @@
   gap: 4px;
 }
 
+.image-trail-panel__detach-ghost {
+  position: fixed;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  border: 2px dashed rgb(255 255 255 / 55%);
+  border-radius: 8px;
+  background: rgb(0 0 0 / 35%);
+  pointer-events: none;
+}
+
 .image-trail-panel-root.image-trail-panel__detached-window.is-minimized {
   grid-template-rows: auto;
 }
