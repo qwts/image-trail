@@ -182,6 +182,7 @@ test('dragging the detach control past the threshold detaches at the drop positi
   const detach = harness.root.querySelector<HTMLButtonElement>('[data-image-trail-detach="history"]');
   assert.ok(detach instanceof HTMLButtonElement);
   (detach as HTMLButtonElement & { setPointerCapture(id: number): void }).setPointerCapture = () => {};
+  (detach as HTMLButtonElement & { releasePointerCapture(id: number): void }).releasePointerCapture = () => {};
 
   detach.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 40, clientY: 40, bubbles: true, cancelable: true }));
   detach.dispatchEvent(new MouseEvent('pointermove', { clientX: 300, clientY: 220, bubbles: true }));
