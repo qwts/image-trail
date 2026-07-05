@@ -149,7 +149,7 @@
 }
 
 .image-trail-panel-root .image-trail-panel__field-control.has-step-controls.has-trail-control-slot {
-  grid-template-columns: minmax(0, 1fr) minmax(54px, max-content) 64px 26px 26px minmax(58px, max-content) 48px;
+  grid-template-columns: minmax(0, 1fr) minmax(54px, max-content) 64px 26px 26px 48px minmax(58px, max-content);
 }
 
 .image-trail-panel-root .image-trail-panel__field-split-control {
