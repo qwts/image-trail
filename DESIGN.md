@@ -35,7 +35,7 @@ capabilities or change persistence/encryption semantics.
 - Recents are transient session state. They are not durable memory.
 - Pins are durable queue records and persist when they enter the queue.
 - Bookmarks are pins with associated captured original bytes.
-- Captured original bytes live separately in encrypted blob/original storage and
+- Captured original bytes live separately in the encrypted blob/original store and
   are linked from durable pin/bookmark records.
 - Recall pages durable pins/bookmarks from the queue producer after the visible
   queue window. Recall is not a browser over encrypted blobs and must not add
