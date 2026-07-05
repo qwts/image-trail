@@ -18,8 +18,6 @@ interface HistoryViewOptions {
   readonly listBlockSize: number | null;
   readonly onListResize: (blockSize: number) => void;
   readonly privacyMode?: boolean;
-  /** Extra control rendered beside the section heading (e.g. the detach-to-window button). */
-  readonly headerAccessory?: HTMLElement;
 }
 
 export function createHistoryView(
@@ -38,7 +36,6 @@ export function createHistoryView(
   const header = document.createElement('div');
   header.className = 'image-trail-panel__section-header';
   header.append(heading);
-  if (options?.headerAccessory) header.append(options.headerAccessory);
 
   const toolbar = document.createElement('div');
   toolbar.className = 'image-trail-panel__history-toolbar';

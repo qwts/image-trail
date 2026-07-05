@@ -178,11 +178,11 @@ export interface PCloudBackupState {
 }
 
 /**
- * Panel subsections that can detach into a floating extension-owned window (issue #215). Grows as
- * more sections adopt the detachable-section pattern; keep entries aligned with the renderer map in
- * `ui/render.ts`.
+ * Panel subsections that can detach into a floating extension-owned window (issues #215/#408).
+ * Every major section is eligible; keep entries aligned with the section registry in
+ * `ui/render.ts` (`SECTIONS`), which is the single place a section is declared detachable.
  */
-export type DetachableSectionId = 'history' | 'bookmarks' | 'settings';
+export type DetachableSectionId = 'settings' | 'url-editor' | 'target' | 'fields' | 'controls' | 'history' | 'bookmarks';
 
 export interface PanelState {
   readonly visible: boolean;

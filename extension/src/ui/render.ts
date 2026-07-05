@@ -1,13 +1,10 @@
 import type { DetachableSectionId, PanelAction, PanelState } from '../core/types.js';
 import { captureFailureMessage } from '../core/image/capture-result.js';
-import { DETACHABLE_SECTION_TITLES, renderDetachedSections } from './detached-sections.js';
+import { renderDetachedSections } from './detached-sections.js';
+import { attachedSectionElements, type DetachableSectionDefinition } from './section-registry.js';
 import { createBookmarksView } from './components/bookmarks-view.js';
 import { createControlsView } from './components/controls-view.js';
-import {
-  createDetachedSectionPlaceholder,
-  createSectionDetachControl,
-  type DetachedWindowPosition,
-} from './components/detachable-section.js';
+import type { DetachedWindowPosition } from './components/detachable-section.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHistoryView } from './components/history-view.js';
 import { createRecallDrawerView, type RecallDrawerGeometry } from './components/recall-drawer-view.js';
@@ -16,7 +13,6 @@ import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
 import { activeUrlFieldsForState } from './active-url-fields.js';
 
-import type { UrlField } from '../core/url/types.js';
 import { createParsedFieldsSection, type NumericFieldDisplayMode } from './parsed-fields-section.js';
 
 // PanelState is immutable per render, so the URL parse/tokenization is shared between the main
@@ -290,8 +286,71 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
 
   target.root.replaceChildren();
 
-  const { activeUrl, fields, visibleFields, editableFields, activeTemplate } = cachedActiveUrlFields(state);
+  target.root.append(
+    createPanelHeader(state, target),
+    createStatusView(state, target.dispatch, statusView),
+    ...attachedSectionElements(SECTIONS, target, state),
+  );
+  restoreScrollSnapshots(target.root, scrollPositions);
+  // Detached windows render before the focus restore so a control inside one can be re-found.
+  renderDetachedSections(target, state, SECTIONS);
+  restoreFocusedTextControl(target, focusedTextControl);
+  if (options.renderRecall !== false) renderRecallDrawer(target, state);
+}
 
+/**
+ * The section registry (issue #408): the single declaration of every detachable panel section, in
+ * panel order. The attached composition, detach controls, surface drag-out, placeholders, and
+ * floating windows all derive from these entries — adding a section here is all it takes.
+ */
+const SECTIONS: readonly DetachableSectionDefinition[] = [
+  {
+    id: 'settings',
+    title: 'Settings',
+    windowInlineSize: 420,
+    visible: (state) => state.settingsOpen,
+    create: (target, state) => {
+      const { fields, activeTemplate } = cachedActiveUrlFields(state);
+      return createSettingsSection(state, { fields, activeTemplateId: activeTemplate?.id ?? state.activeUrlTemplateId }, target.dispatch);
+    },
+  },
+  {
+    id: 'url-editor',
+    title: 'URL editor',
+    create: (target, state) =>
+      createUrlEditorView(
+        { url: cachedActiveUrlFields(state).activeUrl, privacyMode: state.privacyModeEnabled },
+        {
+          onApply: (url) => {
+            target.dispatch({ name: 'selected-url/apply', url });
+          },
+          onRejectUnsupportedInput: () => {
+            target.dispatch({ name: 'selected-url/reject-unsupported-input' });
+          },
+        },
+      ),
+  },
+  {
+    id: 'target',
+    title: 'Host target',
+    create: (target, state) => createTargetPickerView(state.target, target.dispatch, { privacyMode: state.privacyModeEnabled }),
+  },
+  {
+    id: 'fields',
+    title: 'Parsed fields',
+    windowInlineSize: 380,
+    create: (target, state) => {
+      const { activeUrl, editableFields } = cachedActiveUrlFields(state);
+      return createParsedFieldsSection(editableFields, state, activeUrl, target);
+    },
+  },
+  { id: 'controls', title: 'Manual controls', create: createManualControlsSection },
+  { id: 'history', title: 'Recent history', create: createHistorySection },
+  { id: 'bookmarks', title: 'Queue', create: createBookmarksSection },
+];
+
+function createManualControlsSection(target: PanelRenderTarget, state: PanelState): HTMLElement {
+  const { visibleFields } = cachedActiveUrlFields(state);
   const dispatchActiveField = (delta: -1 | 1): void => {
     if (visibleFields.length === 0) return;
     const currentIndex = visibleFields.findIndex((field) => field.id === state.activeFieldId);
@@ -311,18 +370,16 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
 
   const captureSection = document.createElement('div');
   captureSection.className = 'image-trail-panel__capture-actions';
-  if (!isNoTarget) {
-    const selectedUrl = state.target.selectedUrl;
-    if (selectedUrl) {
-      const captureBtn = makeButton(
-        'Capture original',
-        { name: 'capture/request', url: selectedUrl, sourceType: 'target' },
-        target.dispatch,
-        state.captureInProgress,
-      );
-      captureBtn.className = 'image-trail-panel__capture-btn';
-      captureSection.append(captureBtn);
-    }
+  const selectedUrl = state.target.selectedUrl;
+  if (selectedUrl) {
+    const captureBtn = makeButton(
+      'Capture original',
+      { name: 'capture/request', url: selectedUrl, sourceType: 'target' },
+      target.dispatch,
+      state.captureInProgress,
+    );
+    captureBtn.className = 'image-trail-panel__capture-btn';
+    captureSection.append(captureBtn);
   }
 
   const navSection = document.createElement('div');
@@ -359,67 +416,18 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     autoSection.append(makeButton('Stop all', { name: 'stop-all' }, target.dispatch));
   }
 
-  target.root.append(
-    createPanelHeader(state, target),
-    createStatusView(state, target.dispatch, statusView),
-    ...(state.settingsOpen
-      ? [
-          state.detachedSections.includes('settings')
-            ? createDetachedSectionPlaceholder('settings', DETACHABLE_SECTION_TITLES.settings, target.dispatch)
-            : createAttachedSettingsSection(target, state, fields, activeTemplate?.id ?? state.activeUrlTemplateId),
-        ]
-      : []),
-    createUrlEditorView(
-      { url: activeUrl, privacyMode: state.privacyModeEnabled },
-      {
-        onApply: (url) => {
-          target.dispatch({ name: 'selected-url/apply', url });
-        },
-        onRejectUnsupportedInput: () => {
-          target.dispatch({ name: 'selected-url/reject-unsupported-input' });
-        },
-      },
-    ),
-    createTargetPickerView(state.target, target.dispatch, { privacyMode: state.privacyModeEnabled }),
-    createParsedFieldsSection(editableFields, state, activeUrl, target),
-    createSecondaryControlsGroup(state, target, [
-      createControlsView({
-        onPrevious: () => dispatchActiveField(-1),
-        onNext: () => dispatchActiveField(1),
-      }),
-      captureSection,
-      navSection,
-      autoSection,
-    ]),
-    state.detachedSections.includes('history')
-      ? createDetachedSectionPlaceholder('history', DETACHABLE_SECTION_TITLES.history, target.dispatch)
-      : createHistorySection(target, state, { detachable: true }),
-    state.detachedSections.includes('bookmarks')
-      ? createDetachedSectionPlaceholder('bookmarks', DETACHABLE_SECTION_TITLES.bookmarks, target.dispatch)
-      : createBookmarksSection(target, state, { detachable: true }),
-  );
-  restoreScrollSnapshots(target.root, scrollPositions);
-  // Detached windows render before the focus restore so a control inside one can be re-found.
-  renderDetachedSections(target, state, DETACHED_SECTION_RENDERERS);
-  restoreFocusedTextControl(target, focusedTextControl);
-  if (options.renderRecall !== false) renderRecallDrawer(target, state);
+  return createSecondaryControlsGroup(state, target, [
+    createControlsView({
+      onPrevious: () => dispatchActiveField(-1),
+      onNext: () => dispatchActiveField(1),
+    }),
+    captureSection,
+    navSection,
+    autoSection,
+  ]);
 }
 
-/**
- * Content renderers for detached-section windows; the window chrome lives in `detached-sections.ts`.
- * A renderer may return null to skip its window this render (Settings while `settingsOpen` is false).
- */
-const DETACHED_SECTION_RENDERERS = {
-  history: (target: PanelRenderTarget, state: PanelState) => createHistorySection(target, state, { detachable: false }),
-  bookmarks: (target: PanelRenderTarget, state: PanelState) => createBookmarksSection(target, state, { detachable: false }),
-  settings: (target: PanelRenderTarget, state: PanelState) => {
-    if (!state.settingsOpen) return null;
-    const { fields, activeTemplate } = cachedActiveUrlFields(state);
-    return createSettingsSection(state, { fields, activeTemplateId: activeTemplate?.id ?? state.activeUrlTemplateId }, target.dispatch);
-  },
-} as const;
-
-function createHistorySection(target: PanelRenderTarget, state: PanelState, options: { readonly detachable: boolean }): HTMLElement {
+function createHistorySection(target: PanelRenderTarget, state: PanelState): HTMLElement {
   return createHistoryView(state.history, state.selectedHistoryIds, state.captureInProgress, state.blobKeyUnlocked, target.dispatch, {
     blobKeyAvailable: state.blobKeyAvailable,
     listBlockSize: target.layoutState.historyListBlockSize,
@@ -427,11 +435,10 @@ function createHistorySection(target: PanelRenderTarget, state: PanelState, opti
       target.layoutState.historyListBlockSize = blockSize;
     },
     privacyMode: state.privacyModeEnabled,
-    ...(options.detachable ? { headerAccessory: detachControl(target, 'history') } : {}),
   });
 }
 
-function createBookmarksSection(target: PanelRenderTarget, state: PanelState, options: { readonly detachable: boolean }): HTMLElement {
+function createBookmarksSection(target: PanelRenderTarget, state: PanelState): HTMLElement {
   return createBookmarksView(
     state.target.selectedUrl,
     state.bookmarks,
@@ -448,32 +455,9 @@ function createBookmarksSection(target: PanelRenderTarget, state: PanelState, op
       hasNewer: state.hasNewerBookmarks,
     },
     { recallOpen: state.recall.open },
-    {
-      privacyMode: state.privacyModeEnabled,
-      ...(options.detachable ? { headerAccessory: detachControl(target, 'bookmarks') } : {}),
-    },
+    { privacyMode: state.privacyModeEnabled },
     target.dispatch,
   );
-}
-
-function createAttachedSettingsSection(
-  target: PanelRenderTarget,
-  state: PanelState,
-  fields: readonly UrlField[],
-  activeTemplateId: string | null,
-): HTMLElement {
-  return createSettingsSection(state, { fields, activeTemplateId }, target.dispatch, {
-    headerAccessory: detachControl(target, 'settings'),
-  });
-}
-
-/** Detach control wired for drag-out: a drop seeds the window position before the detach dispatch. */
-function detachControl(target: PanelRenderTarget, sectionId: DetachableSectionId): HTMLElement {
-  return createSectionDetachControl(sectionId, DETACHABLE_SECTION_TITLES[sectionId], target.dispatch, {
-    onDragOutPosition: (id, position) => {
-      target.layoutState.detachedWindowPositions.set(id, position);
-    },
-  });
 }
 
 function renderStatusToast(toastRoot: HTMLElement | null | undefined, state: PanelState): void {

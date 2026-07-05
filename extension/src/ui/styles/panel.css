@@ -600,6 +600,16 @@
   min-width: 0;
 }
 
+/* Sections are drag-out sources (#408): hint on the natural grab area. */
+.image-trail-panel-root .image-trail-panel__section-header > h3 {
+  cursor: grab;
+}
+
+/* In <details> sections the control lives inside the (flex) summary; keep it on the far edge. */
+.image-trail-panel-root summary .image-trail-panel__section-detach {
+  margin-inline-start: auto;
+}
+
 .image-trail-panel-root .image-trail-panel__detached-placeholder {
   color: #999;
 }

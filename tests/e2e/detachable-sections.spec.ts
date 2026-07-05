@@ -47,9 +47,10 @@ test('dragging the detach control places the window at the drop point and Escape
   const startX = box!.x + box!.width / 2;
   const startY = box!.y + box!.height / 2;
 
+  // Drag up-left into open space so the drop point sits inside the viewport clamp.
   await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(startX + 200, startY + 160, { steps: 5 });
+  await page.mouse.move(startX + 120, startY - 160, { steps: 5 });
   await page.mouse.up();
 
   const windowEl = page.getByRole('dialog', { name: historyWindowName });
@@ -58,12 +59,44 @@ test('dragging the detach control places the window at the drop point and Escape
   expect(windowBox).not.toBeNull();
   // The window opens at the drop position (pointer minus the small grab offset, before clamping).
   // Tolerance covers sub-pixel pointer coordinates and the window's border box.
-  expect(Math.abs(windowBox!.x - (startX + 200 - 24))).toBeLessThanOrEqual(4);
-  expect(Math.abs(windowBox!.y - (startY + 160 - 12))).toBeLessThanOrEqual(4);
+  expect(Math.abs(windowBox!.x - (startX + 120 - 24))).toBeLessThanOrEqual(4);
+  expect(Math.abs(windowBox!.y - (startY - 160 - 12))).toBeLessThanOrEqual(4);
 
   await windowEl.press('Escape');
   await expect(windowEl).toHaveCount(0);
   await expect(page.getByRole('button', { name: detachHistoryName })).toBeVisible();
+});
+
+test('dragging a section by its heading detaches at the drop point, and Escape cancels a live drag', async ({ page, serviceWorker }) => {
+  await openPanel(page, serviceWorker);
+
+  const heading = page.locator('.image-trail-panel__history-section .image-trail-panel__section-header h3');
+  const box = await heading.boundingBox();
+  expect(box).not.toBeNull();
+  const startX = box!.x + box!.width / 2;
+  const startY = box!.y + box!.height / 2;
+
+  // Escape mid-drag cancels: the ghost disappears and nothing detaches.
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 150, startY - 120, { steps: 4 });
+  await expect(page.locator('.image-trail-panel__detach-ghost')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.image-trail-panel__detach-ghost')).toHaveCount(0);
+  await page.mouse.up();
+  await expect(page.getByRole('dialog', { name: historyWindowName })).toHaveCount(0);
+
+  // The same gesture released normally detaches at the drop point.
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 180, startY - 200, { steps: 4 });
+  await page.mouse.up();
+  const windowEl = page.getByRole('dialog', { name: historyWindowName });
+  await expect(windowEl).toBeVisible();
+  const windowBox = await windowEl.boundingBox();
+  expect(windowBox).not.toBeNull();
+  expect(Math.abs(windowBox!.x - (startX + 180 - 24))).toBeLessThanOrEqual(4);
+  expect(Math.abs(windowBox!.y - (startY - 200 - 12))).toBeLessThanOrEqual(4);
 });
 
 test('detached Settings follows the gear toggle without duplicating the surface', async ({ page, serviceWorker }) => {

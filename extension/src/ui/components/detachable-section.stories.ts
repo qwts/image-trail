@@ -48,29 +48,13 @@ export const Placeholder: Story = {
 };
 
 export const SectionWithDetachControl: Story = {
-  render: () =>
-    panelStory(
-      createHistoryView(recentFixtures, [], false, true, mockDispatch(), {
-        blobKeyAvailable: true,
-        listBlockSize: null,
-        onListResize: mockDispatch<number>('history resize'),
-        headerAccessory: createSectionDetachControl('history', 'Recent history', mockDispatch('detach action')),
-      }),
-    ),
+  render: () => panelStory(historySectionWithControl(mockDispatch('detach action'))),
 };
 
 const dispatchSpy = fn();
 
 export const DetachControlDispatches: Story = {
-  render: () =>
-    panelStory(
-      createHistoryView(recentFixtures, [], false, true, mockDispatch(), {
-        blobKeyAvailable: true,
-        listBlockSize: null,
-        onListResize: mockDispatch<number>('history resize'),
-        headerAccessory: createSectionDetachControl('history', 'Recent history', dispatchSpy),
-      }),
-    ),
+  render: () => panelStory(historySectionWithControl(dispatchSpy)),
   play: async ({ canvasElement }) => {
     dispatchSpy.mockClear();
     const detach = canvasElement.querySelector('[data-image-trail-detach="history"]');
@@ -98,6 +82,17 @@ export const RestorePathsDispatch: Story = {
     await expect(dispatchSpy).toHaveBeenCalledTimes(1);
   },
 };
+
+/** Mirrors the registry's generic control injection for a standalone section story. */
+function historySectionWithControl(dispatch: (action: PanelAction) => void): HTMLElement {
+  const section = createHistoryView(recentFixtures, [], false, true, mockDispatch(), {
+    blobKeyAvailable: true,
+    listBlockSize: null,
+    onListResize: mockDispatch<number>('history resize'),
+  });
+  section.querySelector('.image-trail-panel__section-header')?.append(createSectionDetachControl('history', 'Recent history', dispatch));
+  return section;
+}
 
 function windowStory(
   options: { readonly inlineSize?: number; readonly minimized?: boolean } = {},

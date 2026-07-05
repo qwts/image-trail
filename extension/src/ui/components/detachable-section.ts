@@ -14,29 +14,121 @@ type DetachDispatch = (action: PanelAction) => void;
 
 const DRAG_OUT_THRESHOLD_PX = 6;
 const DRAG_GHOST_BLOCK_SIZE = 160;
+export const DEFAULT_DETACHED_WINDOW_INLINE_SIZE = 340;
+
+export interface DragOutOptions {
+  readonly sectionId: DetachableSectionId;
+  /** The section's floating-window width — the ghost renders and clamps at this size. */
+  readonly windowInlineSize: number;
+  readonly dispatch: DetachDispatch;
+  readonly onDragOutPosition: (sectionId: DetachableSectionId, position: DetachedWindowPosition) => void;
+  /** Called when a drag actually engaged and ended (dropped or cancelled) — e.g. to swallow the trailing click. */
+  readonly onDragEnd?: (committed: boolean) => void;
+}
 
 /**
- * Preferred window widths per section; Settings gets the panel's width for its dense forms. Owned
- * here so the drag-out ghost/clamp and the detached render pass share one source of truth.
+ * Shared drag-out engine used by the ⧉ control and by section surfaces: past a small pointer
+ * distance a drop ghost appears; releasing seeds the window position and dispatches
+ * `section/detach`; Escape (or pointercancel) cancels the drag and dispatches nothing.
  */
-export const DETACHED_WINDOW_INLINE_SIZES: Record<DetachableSectionId, number> = {
-  history: 340,
-  bookmarks: 340,
-  settings: 420,
-};
+export function beginDragOut(event: PointerEvent, handle: HTMLElement, options: DragOutOptions): void {
+  if (event.button !== 0) return;
+  // Capture immediately: once the pointer leaves the handle, move/up events would otherwise
+  // target whatever is under the cursor and the drag would never engage.
+  if (typeof handle.setPointerCapture === 'function') handle.setPointerCapture(event.pointerId);
+  const startX = event.clientX;
+  const startY = event.clientY;
+  let ghost: HTMLElement | null = null;
+
+  const dropPosition = (move: PointerEvent): DetachedWindowPosition =>
+    clampPanelPosition(
+      { left: move.clientX - 24, top: move.clientY - 12 },
+      { width: options.windowInlineSize, height: DRAG_GHOST_BLOCK_SIZE },
+      { width: window.innerWidth, height: window.innerHeight },
+    );
+  const onMove = (move: PointerEvent): void => {
+    if (!ghost) {
+      if (Math.hypot(move.clientX - startX, move.clientY - startY) < DRAG_OUT_THRESHOLD_PX) return;
+      ghost = document.createElement('div');
+      ghost.className = 'image-trail-panel__detach-ghost';
+      ghost.style.width = `${options.windowInlineSize}px`;
+      ghost.style.height = `${DRAG_GHOST_BLOCK_SIZE}px`;
+      const rootNode = handle.getRootNode();
+      (rootNode instanceof ShadowRoot ? rootNode : document.body).append(ghost);
+      // A drag started from a section surface would otherwise smear a text selection around.
+      document.getSelection()?.removeAllRanges();
+      handle.style.userSelect = 'none';
+    }
+    const position = dropPosition(move);
+    ghost.style.left = `${position.left}px`;
+    ghost.style.top = `${position.top}px`;
+  };
+  const cleanup = (): void => {
+    handle.removeEventListener('pointermove', onMove);
+    handle.removeEventListener('pointerup', onUp);
+    handle.removeEventListener('pointercancel', onAbort);
+    window.removeEventListener('keydown', onKeyDown, true);
+    if (typeof handle.releasePointerCapture === 'function') handle.releasePointerCapture(event.pointerId);
+    handle.style.userSelect = '';
+    ghost?.remove();
+  };
+  const onUp = (up: PointerEvent): void => {
+    const dragged = ghost !== null;
+    cleanup();
+    if (!dragged) return;
+    options.onDragEnd?.(true);
+    options.onDragOutPosition(options.sectionId, dropPosition(up));
+    options.dispatch({ name: 'section/detach', sectionId: options.sectionId });
+  };
+  const onAbort = (): void => {
+    const dragged = ghost !== null;
+    cleanup();
+    if (dragged) options.onDragEnd?.(false);
+  };
+  const onKeyDown = (key: KeyboardEvent): void => {
+    if (key.key !== 'Escape') return;
+    key.preventDefault();
+    key.stopPropagation();
+    onAbort();
+  };
+  handle.addEventListener('pointermove', onMove);
+  handle.addEventListener('pointerup', onUp);
+  handle.addEventListener('pointercancel', onAbort);
+  window.addEventListener('keydown', onKeyDown, true);
+}
+
+/**
+ * Makes a whole section surface a drag-out source: pressing any non-interactive part of the
+ * section (not buttons, form controls, summaries, list rows, or resizable lists) and dragging past
+ * the threshold detaches it at the drop point. Sub-threshold presses stay inert, so ordinary
+ * clicks never detach.
+ */
+const INTERACTIVE_DRAG_ORIGIN =
+  'button, input, select, textarea, summary, a, [role="button"], [contenteditable="true"], li, ol, img, .image-trail-panel__field-list';
+
+export function attachSectionDragOut(sectionEl: HTMLElement, options: DragOutOptions): void {
+  sectionEl.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    const origin = event.target;
+    if (origin instanceof Element && origin.closest(INTERACTIVE_DRAG_ORIGIN)) return;
+    beginDragOut(event, sectionEl, options);
+  });
+}
 
 /**
  * Keyboard-accessible detach control rendered inside a section's own header. Click (or Enter/Space)
- * detaches at the default position; press-and-drag past a small threshold shows a drop ghost and
- * detaches with the window opening where it was released (`onDragOutPosition` seeds the position
- * before the dispatch). The floating window is extension-owned; this only dispatches — window
- * creation happens on the detached render pass.
+ * detaches at the default position; press-and-drag runs the shared drag-out engine. The floating
+ * window is extension-owned; this only dispatches — window creation happens on the detached render
+ * pass.
  */
 export function createSectionDetachControl(
   sectionId: DetachableSectionId,
   sectionTitle: string,
   dispatch: DetachDispatch,
-  options: { readonly onDragOutPosition?: (sectionId: DetachableSectionId, position: DetachedWindowPosition) => void } = {},
+  options: {
+    readonly windowInlineSize?: number;
+    readonly onDragOutPosition?: (sectionId: DetachableSectionId, position: DetachedWindowPosition) => void;
+  } = {},
 ): HTMLElement {
   const detach = document.createElement('button');
   detach.type = 'button';
@@ -46,68 +138,31 @@ export function createSectionDetachControl(
   detach.setAttribute('aria-label', `Detach ${sectionTitle} into a floating window (drag to place)`);
   detach.title = `Detach ${sectionTitle} into a floating window (drag to place)`;
   let suppressClick = false;
-  detach.addEventListener('click', () => {
+  detach.addEventListener('click', (event) => {
+    // The control may live inside a <details> summary (Host target, Parsed fields, Manual
+    // controls) — activating it must not toggle the group.
+    event.preventDefault();
+    event.stopPropagation();
     if (suppressClick) {
       suppressClick = false;
       return;
     }
     dispatch({ name: 'section/detach', sectionId });
   });
-  detach.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || !options.onDragOutPosition) return;
-    // Capture immediately: once the pointer leaves this small button, move/up events would
-    // otherwise target whatever is under the cursor and the drag would never engage.
-    if (typeof detach.setPointerCapture === 'function') detach.setPointerCapture(event.pointerId);
-    const startX = event.clientX;
-    const startY = event.clientY;
-    let ghost: HTMLElement | null = null;
-
-    // Clamp against the section's actual window width — a fixed ghost size would let a wider
-    // window (Settings, 420px) store a drop position that renders partially off-screen.
-    const windowInlineSize = DETACHED_WINDOW_INLINE_SIZES[sectionId];
-    const dropPosition = (move: PointerEvent): DetachedWindowPosition =>
-      clampPanelPosition(
-        { left: move.clientX - 24, top: move.clientY - 12 },
-        { width: windowInlineSize, height: DRAG_GHOST_BLOCK_SIZE },
-        { width: window.innerWidth, height: window.innerHeight },
-      );
-    const onMove = (move: PointerEvent): void => {
-      if (!ghost) {
-        if (Math.hypot(move.clientX - startX, move.clientY - startY) < DRAG_OUT_THRESHOLD_PX) return;
-        ghost = document.createElement('div');
-        ghost.className = 'image-trail-panel__detach-ghost';
-        ghost.style.width = `${windowInlineSize}px`;
-        ghost.style.height = `${DRAG_GHOST_BLOCK_SIZE}px`;
-        const rootNode = detach.getRootNode();
-        (rootNode instanceof ShadowRoot ? rootNode : document.body).append(ghost);
-      }
-      const position = dropPosition(move);
-      ghost.style.left = `${position.left}px`;
-      ghost.style.top = `${position.top}px`;
-    };
-    const cleanup = (): void => {
-      detach.removeEventListener('pointermove', onMove);
-      detach.removeEventListener('pointerup', onUp);
-      detach.removeEventListener('pointercancel', onCancel);
-      if (typeof detach.releasePointerCapture === 'function') detach.releasePointerCapture(event.pointerId);
-      ghost?.remove();
-    };
-    const onUp = (up: PointerEvent): void => {
-      const dragged = ghost !== null;
-      cleanup();
-      if (!dragged) return;
-      suppressClick = true;
-      options.onDragOutPosition?.(sectionId, dropPosition(up));
-      dispatch({ name: 'section/detach', sectionId });
-    };
-    const onCancel = (): void => {
-      cleanup();
-      suppressClick = ghost !== null;
-    };
-    detach.addEventListener('pointermove', onMove);
-    detach.addEventListener('pointerup', onUp);
-    detach.addEventListener('pointercancel', onCancel);
-  });
+  const onDragOutPosition = options.onDragOutPosition;
+  if (onDragOutPosition) {
+    detach.addEventListener('pointerdown', (event) => {
+      beginDragOut(event, detach, {
+        sectionId,
+        windowInlineSize: options.windowInlineSize ?? DEFAULT_DETACHED_WINDOW_INLINE_SIZE,
+        dispatch,
+        onDragOutPosition,
+        onDragEnd: () => {
+          suppressClick = true;
+        },
+      });
+    });
+  }
   return detach;
 }
 
@@ -248,6 +303,8 @@ function startWindowDrag(event: PointerEvent, windowEl: HTMLElement, options: De
   const rect = windowEl.getBoundingClientRect();
   const offsetX = event.clientX - rect.left;
   const offsetY = event.clientY - rect.top;
+  const originalLeft = windowEl.style.left;
+  const originalTop = windowEl.style.top;
   const heading = event.currentTarget;
   if (!(heading instanceof HTMLElement)) return;
   heading.setPointerCapture(event.pointerId);
@@ -264,14 +321,31 @@ function startWindowDrag(event: PointerEvent, windowEl: HTMLElement, options: De
     windowEl.style.left = `${position.left}px`;
     windowEl.style.top = `${position.top}px`;
   };
-  const onUp = (up: PointerEvent): void => {
-    heading.releasePointerCapture(up.pointerId);
+  const cleanup = (): void => {
     heading.removeEventListener('pointermove', onMove);
     heading.removeEventListener('pointerup', onUp);
-    heading.removeEventListener('pointercancel', onUp);
+    heading.removeEventListener('pointercancel', onCancel);
+    window.removeEventListener('keydown', onKeyDown, true);
+    if (typeof heading.releasePointerCapture === 'function') heading.releasePointerCapture(event.pointerId);
+  };
+  const onUp = (up: PointerEvent): void => {
+    cleanup();
     options.onPositionChange(options.sectionId, positionFor(up));
+  };
+  // Escape (or pointercancel) reverts the window to where the drag started.
+  const onCancel = (): void => {
+    cleanup();
+    windowEl.style.left = originalLeft;
+    windowEl.style.top = originalTop;
+  };
+  const onKeyDown = (key: KeyboardEvent): void => {
+    if (key.key !== 'Escape') return;
+    key.preventDefault();
+    key.stopPropagation();
+    onCancel();
   };
   heading.addEventListener('pointermove', onMove);
   heading.addEventListener('pointerup', onUp);
-  heading.addEventListener('pointercancel', onUp);
+  heading.addEventListener('pointercancel', onCancel);
+  window.addEventListener('keydown', onKeyDown, true);
 }

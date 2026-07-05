@@ -44,7 +44,7 @@ export function createBookmarksView(
     readonly hasNewer: boolean;
   },
   recall: { readonly recallOpen: boolean },
-  options: { readonly privacyMode?: boolean; readonly headerAccessory?: HTMLElement },
+  options: { readonly privacyMode?: boolean },
   dispatch: (action: BookmarkAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
@@ -55,7 +55,6 @@ export function createBookmarksView(
   const header = document.createElement('div');
   header.className = 'image-trail-panel__section-header';
   header.append(heading);
-  if (options.headerAccessory) header.append(options.headerAccessory);
 
   const add = document.createElement('button');
   add.type = 'button';

@@ -27,7 +27,6 @@ export function createSettingsSection(
   state: PanelState,
   urlContext: SettingsUrlContext,
   dispatch: (action: PanelAction) => void,
-  options: { readonly headerAccessory?: HTMLElement } = {},
 ): HTMLElement {
   const importExportState: ImportExportViewState = {
     busy: state.importExportBusy,
@@ -141,7 +140,6 @@ export function createSettingsSection(
       createImportExportView(importExportState, dispatch),
     ],
     dispatch,
-    options,
   );
 }
 
