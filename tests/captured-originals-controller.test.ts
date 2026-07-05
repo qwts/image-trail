@@ -120,6 +120,34 @@ test('captureImage is a silent no-op without a capture store or while a capture 
   assert.deepEqual(busy.log, []);
 });
 
+test('captureImage ignores a second request while saved-row lookup is pending', async () => {
+  let resolveLookup: (record: ImageDisplayRecord | null) => void = () => {};
+  const lookup = new Promise<ImageDisplayRecord | null>((resolve) => {
+    resolveLookup = resolve;
+  });
+  let lookupCount = 0;
+  const harness = createHarness({
+    bookmarkStore: {
+      findByUrl: async () => {
+        lookupCount += 1;
+        return lookup;
+      },
+    },
+  });
+
+  const first = harness.controller.captureImage('https://example.test/pic.jpg', 'target');
+  const second = harness.controller.captureImage('https://example.test/pic.jpg', 'target');
+
+  await second;
+  assert.equal(lookupCount, 1);
+  assert.deepEqual(harness.log, []);
+
+  resolveLookup(null);
+  await first;
+
+  assert.equal(harness.log.filter((entry) => entry === 'requestCapture:https://example.test/pic.jpg:target').length, 1);
+});
+
 test('captureImage rejects non-durable URLs with a finite status error scheduled after the render', async () => {
   const harness = createHarness();
   await harness.controller.captureImage('blob:https://example.test/x', 'target');

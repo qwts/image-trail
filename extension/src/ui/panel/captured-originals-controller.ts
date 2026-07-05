@@ -48,6 +48,8 @@ export interface CapturedOriginalsControllerDeps {
  * through panel-mediated deps callbacks.
  */
 export class CapturedOriginalsController {
+  private capturePreflightInProgress = false;
+
   constructor(private readonly deps: CapturedOriginalsControllerDeps) {}
 
   async removeCapturedBlobReference(blobId: string, options: { readonly render?: boolean } = {}): Promise<void> {
@@ -84,7 +86,7 @@ export class CapturedOriginalsController {
   async captureImage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<void> {
     const captureStore = this.deps.captureStore();
     if (!captureStore) return;
-    if (this.deps.getState().captureInProgress) return;
+    if (this.deps.getState().captureInProgress || this.capturePreflightInProgress) return;
     const isImportedImage = url.startsWith('data:image/');
     if (!isImportedImage && !isDurableImageSourceUrl(url)) {
       const lastUpdatedAt = Date.now();
@@ -98,7 +100,7 @@ export class CapturedOriginalsController {
       this.deps.scheduleFiniteCaptureErrorReset(lastUpdatedAt, 'status');
       return;
     }
-    const existingSavedRecord = await this.findSavedRecordByUrl(url);
+    const existingSavedRecord = await this.findSavedRecordDuringCapturePreflight(url);
     if (existingSavedRecord && recordHasStoredOriginal(existingSavedRecord)) {
       await this.useExistingStoredOriginal(url, sourceType, sourceRecordId, existingSavedRecord);
       return;
@@ -248,6 +250,15 @@ export class CapturedOriginalsController {
 
   private async findSavedRecordByUrl(url: string): Promise<ImageDisplayRecord | null> {
     return (await this.deps.bookmarkStore()?.findByUrl(url)) ?? null;
+  }
+
+  private async findSavedRecordDuringCapturePreflight(url: string): Promise<ImageDisplayRecord | null> {
+    this.capturePreflightInProgress = true;
+    try {
+      return await this.findSavedRecordByUrl(url);
+    } finally {
+      this.capturePreflightInProgress = false;
+    }
   }
 
   private async useExistingStoredOriginal(
