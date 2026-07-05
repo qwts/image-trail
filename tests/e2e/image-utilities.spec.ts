@@ -1,4 +1,6 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import type { Download, Page, Worker } from '@playwright/test';
 
@@ -23,6 +25,20 @@ import {
 const primaryImage = '#fixture-primary-image';
 const password = 'correct horse battery staple';
 const wrongPassword = 'wrong horse battery staple';
+
+const oversizedAssetRoute = '/assets/generated-oversized.svg';
+// Just past DEFAULT_MAX_ORIGINAL_BYTES (25 MiB), so the background capture fetch
+// must refuse the original on its declared Content-Length.
+const oversizedAssetBytes = 26 * 1024 * 1024;
+
+test.beforeAll(async () => {
+  const assetPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'pages', oversizedAssetRoute);
+  const existing = await stat(assetPath).catch(() => null);
+  if (existing && existing.size >= oversizedAssetBytes) return;
+  const head = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#7744aa"/><!--';
+  const tail = '--></svg>';
+  await writeFile(assetPath, head + 'x'.repeat(oversizedAssetBytes - head.length - tail.length) + tail);
+});
 
 async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await openFixturePage(page, fixturePaths.singleImage);
@@ -128,6 +144,14 @@ async function waitForDownloadRequests(serviceWorker: Worker, count: number) {
     })
     .toBe(count);
   return snapshot;
+}
+
+async function encryptedOriginalsStorageText(page: Page): Promise<string> {
+  await openSettingsGroup(page, 'Maintenance');
+  const usage = page
+    .locator('.image-trail-panel__storage-health dt', { hasText: 'Encrypted originals' })
+    .locator('xpath=following-sibling::dd[1]');
+  return (await usage.textContent()) ?? '';
 }
 
 async function clearSelectedQueueRows(page: Page) {
@@ -251,4 +275,48 @@ test('captures originals, prefers stored bytes for export, and round-trips encry
   await expectPanelStatusMessage(page, /Unlock blob:[a-f0-9-]+ before importing this encrypted image\./u);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(historyCountBeforeWrongKey);
+});
+
+test('refuses to store oversized originals and keeps stored-original usage bounded', async ({ page, serviceWorker }) => {
+  test.setTimeout(60_000);
+  await openPanel(page, serviceWorker);
+  // The extension context is shared across tests in this file: earlier tests can
+  // leave a key (locked with another password) and orphaned blobs behind.
+  await openEncryptedOriginals(page);
+  if ((await page.getByRole('button', { name: 'Clear key' }).count()) > 0) await clearEncryptedOriginalsKey(page);
+  await setupEncryptedOriginals(page);
+
+  await page.getByRole('button', { name: 'Pin current' }).click();
+  const baselineRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
+  await expect(baselineRow).toBeVisible();
+  await baselineRow.getByRole('button', { name: 'Capture' }).click();
+  await expectPanelStatusMessage(page, /Captured \d+\.\d KB image\./u);
+  await expect(baselineRow.locator('.image-trail-panel__stored-original-dot')).toHaveAttribute('title', 'Original stored');
+  // The capture flow refreshes storage usage after every attempt, so the
+  // Storage health readout is current after each capture completes.
+  const baselineUsage = await encryptedOriginalsStorageText(page);
+  expect(baselineUsage).toMatch(/^1 record ·/u);
+
+  // The acceptance flow captures the host page's own oversized image: the panel's
+  // URL editor already refuses oversized loads, so navigate to a fixture whose
+  // single image is the oversized asset and let panel open auto-select it.
+  await openFixturePage(page, fixturePaths.oversizedImage);
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+  const oversizedRecent = page.locator('.image-trail-panel__history-item', { hasText: 'generated-oversized.svg' });
+  await expect(oversizedRecent).toBeVisible();
+
+  await oversizedRecent.getByRole('button', { name: 'Capture', exact: true }).click();
+  // Capture failures surface through the status toast, not the header status line.
+  await expect(page.locator('.image-trail-panel__toast-message')).toHaveText(/exceeds limit|exceeds the 25 MB size limit/u);
+  // The refused record stays a valid recents row without a stored-original marker,
+  // and the originals count/bytes stay at the pre-attempt baseline.
+  await expect(oversizedRecent).toBeVisible();
+  await expect(oversizedRecent).not.toContainText('Captured original');
+  expect(await encryptedOriginalsStorageText(page)).toBe(baselineUsage);
+
+  // The extension context is shared with later spec files: drop the queue rows
+  // this test pinned so their exports keep their expected record counts.
+  await deleteVisibleQueueRows(page);
+  await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
 });

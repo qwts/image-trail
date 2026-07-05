@@ -243,6 +243,11 @@
         {
           "type": "unit-dom",
           "paths": ["tests/encrypted-blobs.test.ts", "tests/image-request-manager.test.ts"]
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/image-utilities.spec.ts",
+          "notes": "Covers oversized capture refusal from a pinned queue row against a generated >25 MB fixture: the failure status names the size limit, no stored-original indicator appears, the pinned record stays listed, and the Storage health originals row keeps its pre-attempt count and byte total."
         }
       ]
     },
