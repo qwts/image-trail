@@ -73,7 +73,7 @@ export function createSectionDetachControl(
       );
     const onMove = (move: PointerEvent): void => {
       if (!ghost) {
-        if (Math.abs(move.clientX - startX) < DRAG_OUT_THRESHOLD_PX && Math.abs(move.clientY - startY) < DRAG_OUT_THRESHOLD_PX) return;
+        if (Math.hypot(move.clientX - startX, move.clientY - startY) < DRAG_OUT_THRESHOLD_PX) return;
         ghost = document.createElement('div');
         ghost.className = 'image-trail-panel__detach-ghost';
         ghost.style.width = `${windowInlineSize}px`;
