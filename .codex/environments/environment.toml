@@ -53,7 +53,7 @@ elif [ -f "yarn.lock" ]; then
   yarn install --frozen-lockfile
 elif [ -f "package-lock.json" ] || [ -f "npm-shrinkwrap.json" ]; then
   echo "==> Installing dependencies with npm ci"
-  npm ci
+  npm ci --no-audit --no-fund
 elif [ -f "package.json" ]; then
   echo "==> Installing dependencies with npm install"
   npm install
@@ -63,11 +63,13 @@ fi
 
 # Browser automation support, only when Playwright is present.
 if [ -f "package.json" ] && grep -qi '"@playwright/test"\|"playwright"' package.json; then
-  echo "==> Playwright detected; installing Chromium"
-  npx playwright install chromium || true
+  echo "==> Playwright detected; installing Chromium (with system deps for fresh containers)"
+  npx playwright install --with-deps chromium || npx playwright install chromium || true
 fi
 
-# Optional initial build. Keep this non-fatal if your repo may not always have build.
+# Initial build is deliberately FATAL: a broken build should fail setup loudly instead of
+# wasting the session, and extension/dist/build-info.json must exist for the AGENTS.md
+# build-identity footer.
 if [ -f "package.json" ] && npm run | grep -qE '^\s+build$'; then
   echo "==> build script detected; running initial build"
   npm run build

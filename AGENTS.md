@@ -84,6 +84,10 @@ can carry a stale copy until rebased or restarted from the main repo.
 - Do not resolve GitHub review threads silently. If no code change is needed, reply with the rationale first.
 - Commit intentional, scoped slices regularly after validating them; do not push, open PRs, close issues, resolve threads, or update broad project state unless the user has asked for that step.
 - When a PR merges or issue work is abandoned, clean up the task worktree from the main checkout (`git worktree remove` then `git worktree prune`); see wiki [Contributing](https://github.com/qwtm/image-trail/wiki/Contributing).
+- If a push seems to not trigger CI, or a PR shows a stale failing check from an
+  older commit: check `gh pr view <n> --json mergeable` FIRST. GitHub silently
+  creates no `pull_request` workflow runs for a CONFLICTING PR (no merge ref
+  exists). Rebase onto `main`, then push — do not rerun or debug the stale check.
 
 ## Documentation And Validation
 
@@ -130,6 +134,10 @@ can carry a stale copy until rebased or restarted from the main repo.
   cannot affect it; the required ruleset check is **`E2E gate`** (a small always-run job),
   not `E2E`. Design, ceiling, and follow-ups: wiki → _Testing Strategy → E2E execution
   model and the parallelism ceiling_ (issue #379).
+- **E2E cold-start flake:** the first local parallel run after a build can fail 3–4
+  specs with the panel stuck at `visibility: hidden` (styles-ready race under
+  worker contention). Rerun the failing spec with `--workers=1` (or rerun the
+  suite) before debugging; treat it as a regression only if it fails serially.
 - `npm run lint` ends with a type-coverage ratchet (`lint:types`: strict
   `type-coverage` over `extension/src`, floor 99.8%). Same rule as the c8 gate:
   raise the floor as `any`/unsafe spots are removed; never lower it.
