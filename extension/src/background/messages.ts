@@ -159,8 +159,7 @@ export interface LoadBuildIdentityResultMessage {
   readonly type: typeof MessageType.LoadBuildIdentityResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload:
-    | { readonly ok: true; readonly identity: BuildIdentity }
-    | { readonly ok: false; readonly identity: null; readonly message: string };
+    { readonly ok: true; readonly identity: BuildIdentity } | { readonly ok: false; readonly identity: null; readonly message: string };
 }
 
 export interface StatusMessage {
@@ -334,8 +333,7 @@ export interface ImportOriginalBlobsResultMessage {
   readonly type: typeof MessageType.ImportOriginalBlobsResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload:
-    | { readonly ok: true; readonly importedCount: number }
-    | { readonly ok: false; readonly reason: string; readonly message: string };
+    { readonly ok: true; readonly importedCount: number } | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 
 export interface CreateBlobPreviewMessage {

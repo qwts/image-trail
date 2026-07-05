@@ -8,12 +8,7 @@ type EncryptionAction = Extract<
   PanelAction,
   {
     readonly name:
-      | 'blob-key/setup'
-      | 'blob-key/unlock'
-      | 'blob-key/clear'
-      | 'blob-key/export'
-      | 'blob-key/import'
-      | 'capture/cleanup-orphans';
+      'blob-key/setup' | 'blob-key/unlock' | 'blob-key/clear' | 'blob-key/export' | 'blob-key/import' | 'capture/cleanup-orphans';
   }
 >;
 

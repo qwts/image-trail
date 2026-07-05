@@ -1,9 +1,5 @@
 export type ProjectionReason =
-  | 'selected-url-apply'
-  | 'parsed-field-navigation'
-  | 'parsed-field-restore'
-  | 'bookmark-load'
-  | 'record-preview';
+  'selected-url-apply' | 'parsed-field-navigation' | 'parsed-field-restore' | 'bookmark-load' | 'record-preview';
 
 export type ProjectionSessionStatus = 'idle' | 'preloading' | 'applying' | 'loaded' | 'failed' | 'canceled' | 'superseded';
 
@@ -36,8 +32,7 @@ export interface ProjectionLoopGuardWarning {
 }
 
 export type BeginProjectionSessionResult =
-  | { readonly ok: true; readonly session: ProjectionSession }
-  | { readonly ok: false; readonly warning: ProjectionLoopGuardWarning };
+  { readonly ok: true; readonly session: ProjectionSession } | { readonly ok: false; readonly warning: ProjectionLoopGuardWarning };
 
 interface ProjectionLoopGuardEntry {
   readonly key: string;

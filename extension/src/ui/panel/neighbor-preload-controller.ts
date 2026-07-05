@@ -22,8 +22,7 @@ type NeighborPreloadCacheEntry =
 type FetchThumbnailResult = Awaited<ReturnType<typeof fetchThumbnailSource>>;
 
 type PreloadResult =
-  | { readonly ok: true; readonly displayUrl: string; readonly sha256: string | null }
-  | { readonly ok: false; readonly message: string };
+  { readonly ok: true; readonly displayUrl: string; readonly sha256: string | null } | { readonly ok: false; readonly message: string };
 
 export interface NeighborPreloadLocalSettings {
   readonly neighborPreloadEnabled: boolean;

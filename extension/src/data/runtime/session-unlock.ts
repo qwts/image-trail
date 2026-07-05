@@ -1,8 +1,7 @@
 import type { KeyReference } from '../crypto/types.js';
 
 export type SessionUnlockSnapshot =
-  | { readonly status: 'locked' }
-  | { readonly status: 'unlocked'; readonly keyReference: KeyReference; readonly unlockedAt: string };
+  { readonly status: 'locked' } | { readonly status: 'unlocked'; readonly keyReference: KeyReference; readonly unlockedAt: string };
 
 interface ActiveSessionUnlock {
   readonly keyReference: KeyReference;

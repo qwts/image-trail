@@ -36,13 +36,11 @@ export function createRestoreDuplicateSummary<TEntry extends RestoreImageImportE
     sha256: restoreSha256FromUnknown(entry.payload),
     entry,
   }));
-  const existing = existingRecords.map(
-    (record): RestoreDuplicateRecord => ({
-      id: record.id,
-      url: record.url,
-      sha256: restoreSha256FromUnknown(record),
-    }),
-  );
+  const existing = existingRecords.map((record): RestoreDuplicateRecord => ({
+    id: record.id,
+    url: record.url,
+    sha256: restoreSha256FromUnknown(record),
+  }));
   const classifications = classifyRestoreDuplicates(candidates, existing);
   const matchesByUuid = new Map<string, RestoreDuplicateMatch>();
   const uniqueEntries: TEntry[] = [];

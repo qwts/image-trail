@@ -1,22 +1,9 @@
 import type { EncryptionAlgorithm, KeyReference } from './crypto/types.js';
 
 export type DataStoreName =
-  | 'metadata'
-  | 'keys'
-  | 'history'
-  | 'bookmarks'
-  | 'blobs'
-  | 'downloads'
-  | 'encryptedPins'
-  | 'encryptedPinThumbnails';
+  'metadata' | 'keys' | 'history' | 'bookmarks' | 'blobs' | 'downloads' | 'encryptedPins' | 'encryptedPinThumbnails';
 export type DataStatusCode =
-  | 'ok'
-  | 'db-open-failed'
-  | 'migration-failed'
-  | 'encryption-failed'
-  | 'decryption-failed'
-  | 'not-found'
-  | 'locked';
+  'ok' | 'db-open-failed' | 'migration-failed' | 'encryption-failed' | 'decryption-failed' | 'not-found' | 'locked';
 
 export interface RecoverableDataStatus {
   readonly ok: boolean;
