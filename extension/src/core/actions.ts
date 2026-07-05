@@ -32,7 +32,6 @@ function updateRecordCapture(
       : r,
   );
 }
-
 function updateRecordPinned(
   records: readonly ImageDisplayRecord[],
   sourceRecordId: string,
@@ -613,6 +612,7 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return {
         ...state,
         recentHistoryLimit: action.limit,
+        recentHistoryRetainedLimit: action.retainedLimit,
         recentHistoryOverflowBehavior: action.overflowBehavior,
         history,
         selectedHistoryIds: keepItems(

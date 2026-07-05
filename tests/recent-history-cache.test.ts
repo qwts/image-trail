@@ -38,17 +38,45 @@ test('RecentHistoryCache.add is newest-first, deduped by url/id, and scoped per 
 
 test('RecentHistoryCache.load without includeRetained is bounded by recentHistoryLimit, even when more is retained', () => {
   const cache = new RecentHistoryCache();
-  // In 'keep-session' mode, storage retains more than recentHistoryLimit (up to the internal
-  // session cap); only the visible (non-retained) view is bounded by recentHistoryLimit. Under the
+  // In 'keep-session' mode, storage retains more than recentHistoryLimit (up to
+  // recentHistoryRetainedLimit); only the visible (non-retained) view is bounded by recentHistoryLimit. Under the
   // default 'drop-oldest' mode the two caps are the same number, so this distinction only shows up
   // in 'keep-session' mode.
-  const settings = { ...DEFAULT_LOCAL_SETTINGS, recentHistoryLimit: 2, recentHistoryOverflowBehavior: 'keep-session' as const };
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 2,
+    recentHistoryRetainedLimit: 3,
+    recentHistoryOverflowBehavior: 'keep-session' as const,
+  };
   cache.add('https://a.test/page', record('1'), settings);
   cache.add('https://a.test/page', record('2'), settings);
   cache.add('https://a.test/page', record('3'), settings);
 
   assert.equal(cache.load('https://a.test/page', settings, false).length, 2);
   assert.equal(cache.load('https://a.test/page', settings, true).length, 3);
+});
+
+test('RecentHistoryCache.add caps retained hidden rows at recentHistoryRetainedLimit in keep-session mode', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 2,
+    recentHistoryRetainedLimit: 3,
+    recentHistoryOverflowBehavior: 'keep-session' as const,
+  };
+
+  for (const id of ['1', '2', '3', '4']) {
+    cache.add('https://a.test/page', record(id), settings);
+  }
+
+  assert.deepEqual(
+    cache.load('https://a.test/page', settings, false).map((item) => item.id),
+    ['4', '3'],
+  );
+  assert.deepEqual(
+    cache.load('https://a.test/page', settings, true).map((item) => item.id),
+    ['4', '3', '2'],
+  );
 });
 
 test('RecentHistoryCache.remove drops only the matching id', () => {
@@ -63,16 +91,16 @@ test('RecentHistoryCache.remove drops only the matching id', () => {
   );
 });
 
-test('RecentHistoryCache.pruneForSettings trims every site down to the new limit only in drop-oldest mode', () => {
+test('RecentHistoryCache.pruneForSettings trims every site down to the active retained limit', () => {
   const cache = new RecentHistoryCache();
   const roomy = { ...DEFAULT_LOCAL_SETTINGS, recentHistoryLimit: 30, recentHistoryOverflowBehavior: 'drop-oldest' as const };
   cache.add('https://a.test/page', record('1'), roomy);
   cache.add('https://a.test/page', record('2'), roomy);
   cache.add('https://b.test/page', record('3'), roomy);
 
-  const keepSession = { ...roomy, recentHistoryOverflowBehavior: 'keep-session' as const };
-  cache.pruneForSettings({ ...keepSession, recentHistoryLimit: 1 });
-  assert.equal(cache.load('https://a.test/page', keepSession, true).length, 2, 'keep-session settings must not prune retained rows');
+  const keepSession = { ...roomy, recentHistoryRetainedLimit: 1, recentHistoryOverflowBehavior: 'keep-session' as const };
+  cache.pruneForSettings(keepSession);
+  assert.equal(cache.load('https://a.test/page', keepSession, true).length, 1, 'keep-session prunes down to max kept recents');
 
   const tight = { ...roomy, recentHistoryLimit: 1 };
   cache.pruneForSettings(tight);

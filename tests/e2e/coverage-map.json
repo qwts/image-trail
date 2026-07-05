@@ -155,12 +155,18 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/invariants.test.ts", "tests/panel-state.test.ts"]
+          "paths": [
+            "tests/invariants.test.ts",
+            "tests/panel-state.test.ts",
+            "tests/recent-history-cache.test.ts",
+            "tests/panel-settings-controller.test.ts",
+            "tests/dom/settings-view.test.ts"
+          ]
         },
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/recents-queue-recall.spec.ts",
-          "notes": "Covers visible Recents being populated only by successful image loads, failed loads being excluded from the transient recent list, Visible recents limiting, Keep hidden this session retention, and Show hidden recents reveal behavior."
+          "notes": "Covers visible Recents being populated only by successful image loads, failed loads being excluded from the transient recent list, Visible recents limiting, Max kept recents bounding hidden session retention, Keep hidden this session retention, and Show hidden recents reveal behavior."
         }
       ]
     },

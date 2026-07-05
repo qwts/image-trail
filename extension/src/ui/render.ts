@@ -453,6 +453,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
             state.bookmarkLimit,
             {
               limit: state.recentHistoryLimit,
+              retainedLimit: state.recentHistoryRetainedLimit,
               overflowBehavior: state.recentHistoryOverflowBehavior,
             },
             state.privacyModeEnabled,

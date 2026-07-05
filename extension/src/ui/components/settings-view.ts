@@ -14,13 +14,13 @@ import type { UrlField } from '../../core/url/types.js';
 import {
   NEIGHBOR_PRELOAD_CACHE_LIMITS,
   NEIGHBOR_PRELOAD_RADIUS_LIMITS,
-  RECENT_HISTORY_LIMITS,
   REQUEST_THROTTLE_MAX_REQUESTS_LIMITS,
   REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS,
   REQUEST_THROTTLE_WINDOW_LIMITS,
   URL_REVIEW_STATUS_LIMITS,
   VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
 } from '../../core/settings.js';
+import { createRecentsSettingsView } from './recents-settings-view.js';
 
 const MATCH_MODES: readonly { readonly value: UrlTemplateMatchMode; readonly label: string }[] = [
   { value: 'exact-page-shape', label: 'Exact page shape' },
@@ -38,6 +38,7 @@ export function createSettingsView(
   visibleBookmarkSoftMax: number,
   recentHistoryState: {
     readonly limit: number;
+    readonly retainedLimit: number;
     readonly overflowBehavior: RecentHistoryOverflowBehavior;
   },
   privacyModeEnabled: boolean,
@@ -500,98 +501,6 @@ function createUrlReviewStatusSettingsView(
   form.append(limitLabel, clearLabel, apply);
   wrapper.append(heading, form, meta);
   return wrapper;
-}
-
-function createRecentsSettingsView(
-  state: {
-    readonly limit: number;
-    readonly overflowBehavior: RecentHistoryOverflowBehavior;
-  },
-  dispatch: (action: PanelAction) => void,
-): HTMLElement {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'image-trail-panel__settings-templates';
-
-  const heading = document.createElement('h4');
-  heading.textContent = 'Recents';
-
-  const form = document.createElement('form');
-  form.className = 'image-trail-panel__settings-form';
-
-  const limitLabel = document.createElement('label');
-  limitLabel.className = 'image-trail-panel__settings-field';
-  const limitText = document.createElement('span');
-  limitText.textContent = 'Visible recents';
-  const limitInput = document.createElement('input');
-  limitInput.className = 'image-trail-panel__settings-number-input';
-  limitInput.type = 'number';
-  limitInput.min = String(RECENT_HISTORY_LIMITS.min);
-  limitInput.max = String(RECENT_HISTORY_LIMITS.max);
-  limitInput.step = '1';
-  limitInput.value = String(state.limit);
-  limitInput.inputMode = 'numeric';
-  limitLabel.append(limitText, limitInput);
-
-  const overflowLabel = document.createElement('label');
-  overflowLabel.className = 'image-trail-panel__settings-field';
-  const overflowText = document.createElement('span');
-  overflowText.textContent = 'Overflow';
-  const overflowSelect = document.createElement('select');
-  overflowSelect.className = 'image-trail-panel__settings-select';
-  overflowSelect.append(
-    createOption('drop-oldest', 'Drop oldest', state.overflowBehavior),
-    createOption('keep-session', 'Keep hidden this session', state.overflowBehavior),
-  );
-  overflowLabel.append(overflowText, overflowSelect);
-
-  const apply = document.createElement('button');
-  apply.type = 'submit';
-  apply.textContent = 'Apply';
-
-  const showHidden = document.createElement('button');
-  showHidden.type = 'button';
-  showHidden.textContent = 'Show hidden recents';
-
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const limit = Number(limitInput.value);
-    const overflowBehavior = recentHistoryOverflowBehaviorFrom(overflowSelect.value);
-    if (!Number.isInteger(limit) || !overflowBehavior) return;
-    dispatch({ name: 'settings/update-recent-history-retention', limit, overflowBehavior });
-  });
-  showHidden.addEventListener('click', () => {
-    limitInput.value = String(RECENT_HISTORY_LIMITS.max);
-    overflowSelect.value = 'keep-session';
-    dispatch({
-      name: 'settings/update-recent-history-retention',
-      limit: RECENT_HISTORY_LIMITS.max,
-      overflowBehavior: 'keep-session',
-    });
-  });
-
-  const meta = document.createElement('p');
-  meta.className = 'image-trail-panel__settings-empty';
-  meta.textContent = 'Recents stay transient. Overflow can be dropped or hidden only for the current extension session.';
-
-  form.append(limitLabel, overflowLabel, apply, showHidden);
-  wrapper.append(heading, form, meta);
-  return wrapper;
-}
-
-function createOption(
-  value: RecentHistoryOverflowBehavior,
-  label: string,
-  selectedValue: RecentHistoryOverflowBehavior,
-): HTMLOptionElement {
-  const option = document.createElement('option');
-  option.value = value;
-  option.textContent = label;
-  option.selected = value === selectedValue;
-  return option;
-}
-
-function recentHistoryOverflowBehaviorFrom(value: string): RecentHistoryOverflowBehavior | null {
-  return value === 'drop-oldest' || value === 'keep-session' ? value : null;
 }
 
 function createPrivatePinSettingsView(

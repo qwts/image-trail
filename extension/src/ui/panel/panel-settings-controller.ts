@@ -6,6 +6,7 @@ import {
   NEIGHBOR_PRELOAD_CACHE_LIMITS,
   NEIGHBOR_PRELOAD_RADIUS_LIMITS,
   RECENT_HISTORY_LIMITS,
+  RECENT_HISTORY_RETAINED_LIMITS,
   REQUEST_THROTTLE_MAX_REQUESTS_LIMITS,
   REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS,
   REQUEST_THROTTLE_WINDOW_LIMITS,
@@ -66,6 +67,7 @@ export class PanelSettingsController {
       bookmarkVisibilityScope: settings.bookmarkVisibilityScope,
       bookmarkLimit: settings.visibleBookmarkSoftMax,
       recentHistoryLimit: settings.recentHistoryLimit,
+      recentHistoryRetainedLimit: settings.recentHistoryRetainedLimit,
       recentHistoryOverflowBehavior: settings.recentHistoryOverflowBehavior,
       pinSaveStoragePreference: settings.pinSaveStoragePreference,
       privacyModeEnabled: settings.privacyModeEnabled,
@@ -121,13 +123,19 @@ export class PanelSettingsController {
 
   async updateRecentHistoryRetention(input: {
     readonly limit: number;
+    readonly retainedLimit: number;
     readonly overflowBehavior: PlaintextLocalSettings['recentHistoryOverflowBehavior'];
   }): Promise<void> {
+    const retainedLimit = Math.max(input.retainedLimit, input.limit);
     if (
       !Number.isInteger(input.limit) ||
+      !Number.isInteger(input.retainedLimit) ||
       input.limit < RECENT_HISTORY_LIMITS.min ||
       input.limit > RECENT_HISTORY_LIMITS.max ||
+      input.retainedLimit < RECENT_HISTORY_RETAINED_LIMITS.min ||
+      input.retainedLimit > RECENT_HISTORY_RETAINED_LIMITS.max ||
       (input.limit === this.deps.getState().recentHistoryLimit &&
+        retainedLimit === this.deps.getState().recentHistoryRetainedLimit &&
         input.overflowBehavior === this.deps.getState().recentHistoryOverflowBehavior)
     ) {
       return;
@@ -137,12 +145,14 @@ export class PanelSettingsController {
       reducePanelAction(this.deps.getState(), {
         name: 'settings/update-recent-history-retention',
         limit: input.limit,
+        retainedLimit,
         overflowBehavior: input.overflowBehavior,
       }),
     );
     await this.saveLocalSettingsAsync({
       ...this.deps.getLocalSettings(),
       recentHistoryLimit: input.limit,
+      recentHistoryRetainedLimit: retainedLimit,
       recentHistoryOverflowBehavior: input.overflowBehavior,
     });
     if (input.limit > previousLimit && input.overflowBehavior === 'keep-session') {

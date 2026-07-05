@@ -122,6 +122,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     draftUrl: 'https://images.example.test/gallery/2026/quiet-ridge-0042.jpg?page=17&color=0x2a&slug=quiet-ridge-final',
     history: recentFixtures,
     recentHistoryLimit: 50,
+    recentHistoryRetainedLimit: 50,
     recentHistoryOverflowBehavior: 'drop-oldest',
     bookmarks: bookmarkFixtures,
     bookmarkOffset: 0,

@@ -199,6 +199,7 @@ test('history/add-loaded uses the configured visible recent limit', () => {
   let state = reducePanelAction(createInitialPanelState(0), {
     name: 'settings/update-recent-history-retention',
     limit: 2,
+    retainedLimit: 2,
     overflowBehavior: 'drop-oldest',
   });
   for (let index = 0; index < 3; index += 1) {
@@ -229,6 +230,7 @@ test('recent retention setting prunes visible rows and stale selections', () => 
   const updated = reducePanelAction(state, {
     name: 'settings/update-recent-history-retention',
     limit: 2,
+    retainedLimit: 12,
     overflowBehavior: 'keep-session',
   });
 
@@ -238,6 +240,7 @@ test('recent retention setting prunes visible rows and stale selections', () => 
   );
   assert.deepEqual(updated.selectedHistoryIds, ['history-1']);
   assert.equal(updated.recentHistoryLimit, 2);
+  assert.equal(updated.recentHistoryRetainedLimit, 12);
   assert.equal(updated.recentHistoryOverflowBehavior, 'keep-session');
 });
 

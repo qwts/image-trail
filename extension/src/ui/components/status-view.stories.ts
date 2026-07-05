@@ -239,6 +239,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     draftUrl: 'https://images.example.test/gallery/current.jpg',
     history: recentFixtures,
     recentHistoryLimit: 50,
+    recentHistoryRetainedLimit: 50,
     recentHistoryOverflowBehavior: 'drop-oldest',
     bookmarks: bookmarkFixtures,
     bookmarkOffset: 0,

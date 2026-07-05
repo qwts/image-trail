@@ -227,6 +227,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'settings/update-recent-history-retention': {
     name: 'settings/update-recent-history-retention',
     limit: 20,
+    retainedLimit: 40,
     overflowBehavior: 'drop-oldest',
   },
   'settings/update-pin-save-storage-preference': { name: 'settings/update-pin-save-storage-preference', value: 'encrypted' },

@@ -68,6 +68,7 @@ export interface PanelActionDeps {
   updateVisibleBookmarkSoftMax(value: number): Promise<void>;
   updateRecentHistoryRetention(input: {
     readonly limit: number;
+    readonly retainedLimit: number;
     readonly overflowBehavior: PlaintextLocalSettings['recentHistoryOverflowBehavior'];
   }): Promise<void>;
   updatePinSaveStoragePreference(value: PlaintextLocalSettings['pinSaveStoragePreference']): void;

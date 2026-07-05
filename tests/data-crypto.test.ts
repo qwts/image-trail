@@ -98,6 +98,7 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().panelDock, 'left');
   assert.equal(repository.load().visibleBookmarkSoftMax, 30);
   assert.equal(repository.load().recentHistoryLimit, 30);
+  assert.equal(repository.load().recentHistoryRetainedLimit, 30);
   assert.equal(repository.load().recentHistoryOverflowBehavior, 'drop-oldest');
   assert.equal(repository.load().bookmarkVisibilityScope, 'global');
   assert.equal(repository.load().pinSaveStoragePreference, 'encrypted');
@@ -247,11 +248,29 @@ test('migrates recent history retention settings safely', () => {
     setItem: () => {},
   });
   const validDrop = new LocalSettingsRepository({
-    getItem: () => JSON.stringify({ recentHistoryLimit: 75, recentHistoryOverflowBehavior: 'drop-oldest' }),
+    getItem: () => JSON.stringify({ recentHistoryLimit: 75, recentHistoryRetainedLimit: 80, recentHistoryOverflowBehavior: 'drop-oldest' }),
     setItem: () => {},
   });
   const validKeep = new LocalSettingsRepository({
-    getItem: () => JSON.stringify({ recentHistoryLimit: 12, recentHistoryOverflowBehavior: 'keep-session' }),
+    getItem: () =>
+      JSON.stringify({ recentHistoryLimit: 12, recentHistoryRetainedLimit: 20, recentHistoryOverflowBehavior: 'keep-session' }),
+    setItem: () => {},
+  });
+  const missingDropRetained = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentHistoryLimit: 8, recentHistoryOverflowBehavior: 'drop-oldest' }),
+    setItem: () => {},
+  });
+  const missingKeepRetained = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentHistoryLimit: 8, recentHistoryOverflowBehavior: 'keep-session' }),
+    setItem: () => {},
+  });
+  const retainedBelowVisible = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentHistoryLimit: 12, recentHistoryRetainedLimit: 6, recentHistoryOverflowBehavior: 'keep-session' }),
+    setItem: () => {},
+  });
+  const invalidRetained = new LocalSettingsRepository({
+    getItem: () =>
+      JSON.stringify({ recentHistoryLimit: 50, recentHistoryRetainedLimit: 999, recentHistoryOverflowBehavior: 'keep-session' }),
     setItem: () => {},
   });
   const invalidBehavior = new LocalSettingsRepository({
@@ -262,9 +281,15 @@ test('migrates recent history retention settings safely', () => {
   assert.equal(high.load().recentHistoryLimit, DEFAULT_LOCAL_SETTINGS.recentHistoryLimit);
   assert.equal(low.load().recentHistoryLimit, DEFAULT_LOCAL_SETTINGS.recentHistoryLimit);
   assert.equal(validDrop.load().recentHistoryLimit, 75);
+  assert.equal(validDrop.load().recentHistoryRetainedLimit, 80);
   assert.equal(validDrop.load().recentHistoryOverflowBehavior, 'drop-oldest');
   assert.equal(validKeep.load().recentHistoryLimit, 12);
+  assert.equal(validKeep.load().recentHistoryRetainedLimit, 20);
   assert.equal(validKeep.load().recentHistoryOverflowBehavior, 'keep-session');
+  assert.equal(missingDropRetained.load().recentHistoryRetainedLimit, 8);
+  assert.equal(missingKeepRetained.load().recentHistoryRetainedLimit, 200);
+  assert.equal(retainedBelowVisible.load().recentHistoryRetainedLimit, 12);
+  assert.equal(invalidRetained.load().recentHistoryRetainedLimit, 50);
   assert.equal(invalidBehavior.load().recentHistoryOverflowBehavior, DEFAULT_LOCAL_SETTINGS.recentHistoryOverflowBehavior);
 });
 

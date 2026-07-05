@@ -8,6 +8,11 @@ export const RECENT_HISTORY_LIMITS = {
   max: 200,
 } as const;
 
+export const RECENT_HISTORY_RETAINED_LIMITS = {
+  min: 1,
+  max: 200,
+} as const;
+
 export const URL_REVIEW_STATUS_LIMITS = {
   min: 10,
   max: 20_000,

@@ -175,6 +175,7 @@ export interface PanelState {
   readonly draftUrl: string | null;
   readonly history: readonly ImageDisplayRecord[];
   readonly recentHistoryLimit: number;
+  readonly recentHistoryRetainedLimit: number;
   readonly recentHistoryOverflowBehavior: RecentHistoryOverflowBehavior;
   readonly bookmarks: readonly ImageDisplayRecord[];
   readonly bookmarkOffset: number;
@@ -539,6 +540,7 @@ export type PanelAction =
   | {
       readonly name: 'settings/update-recent-history-retention';
       readonly limit: number;
+      readonly retainedLimit: number;
       readonly overflowBehavior: RecentHistoryOverflowBehavior;
     }
   | { readonly name: 'settings/update-pin-save-storage-preference'; readonly value: PinSaveStoragePreference }

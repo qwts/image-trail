@@ -1,8 +1,6 @@
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import type { PlaintextLocalSettings } from '../data/local-settings.js';
 
-const MAX_RECENT_HISTORY_ITEMS = 200;
-
 export function recentHistoryKey(pageUrl: string): string {
   try {
     return new URL(pageUrl).hostname;
@@ -12,7 +10,8 @@ export function recentHistoryKey(pageUrl: string): string {
 }
 
 function retainedRecentHistory(items: readonly ImageDisplayRecord[], settings: PlaintextLocalSettings): readonly ImageDisplayRecord[] {
-  const limit = settings.recentHistoryOverflowBehavior === 'drop-oldest' ? settings.recentHistoryLimit : MAX_RECENT_HISTORY_ITEMS;
+  const limit =
+    settings.recentHistoryOverflowBehavior === 'drop-oldest' ? settings.recentHistoryLimit : settings.recentHistoryRetainedLimit;
   return items.slice(0, limit);
 }
 
@@ -51,7 +50,6 @@ export class RecentHistoryCache {
   }
 
   pruneForSettings(settings: PlaintextLocalSettings): void {
-    if (settings.recentHistoryOverflowBehavior !== 'drop-oldest') return;
     for (const [key, items] of this.bySite) {
       this.bySite.set(key, retainedRecentHistory(items, settings));
     }

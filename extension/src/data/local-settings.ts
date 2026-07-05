@@ -5,6 +5,7 @@ import {
   NEIGHBOR_PRELOAD_CACHE_LIMITS,
   NEIGHBOR_PRELOAD_RADIUS_LIMITS,
   RECENT_HISTORY_LIMITS,
+  RECENT_HISTORY_RETAINED_LIMITS,
   REQUEST_THROTTLE_MAX_REQUESTS_LIMITS,
   REQUEST_THROTTLE_MINIMUM_INTERVAL_LIMITS,
   REQUEST_THROTTLE_WINDOW_LIMITS,
@@ -25,6 +26,7 @@ export interface PlaintextLocalSettings {
   readonly panelDock: 'right' | 'left';
   readonly visibleBookmarkSoftMax: number;
   readonly recentHistoryLimit: number;
+  readonly recentHistoryRetainedLimit: number;
   readonly recentHistoryOverflowBehavior: RecentHistoryOverflowBehavior;
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
@@ -50,6 +52,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   panelDock: 'right',
   visibleBookmarkSoftMax: 30,
   recentHistoryLimit: 30,
+  recentHistoryRetainedLimit: 30,
   recentHistoryOverflowBehavior: 'drop-oldest',
   bookmarkVisibilityScope: 'global',
   pinSaveStoragePreference: 'encrypted',
@@ -98,6 +101,18 @@ export class LocalSettingsRepository {
 }
 
 export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): PlaintextLocalSettings {
+  const recentHistoryLimit = isSafeRecentHistoryLimit(input.recentHistoryLimit)
+    ? input.recentHistoryLimit
+    : DEFAULT_LOCAL_SETTINGS.recentHistoryLimit;
+  const recentHistoryOverflowBehavior = isRecentHistoryOverflowBehavior(input.recentHistoryOverflowBehavior)
+    ? input.recentHistoryOverflowBehavior
+    : DEFAULT_LOCAL_SETTINGS.recentHistoryOverflowBehavior;
+  const recentHistoryRetainedLimit = migrateRecentHistoryRetainedLimit(
+    input.recentHistoryRetainedLimit,
+    recentHistoryLimit,
+    recentHistoryOverflowBehavior,
+  );
+
   return {
     schemaVersion: 1,
     showHistoryThumbnails: input.showHistoryThumbnails === true,
@@ -112,12 +127,9 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
     visibleBookmarkSoftMax: isSafeVisibleBookmarkSoftMax(input.visibleBookmarkSoftMax)
       ? input.visibleBookmarkSoftMax
       : DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
-    recentHistoryLimit: isSafeRecentHistoryLimit(input.recentHistoryLimit)
-      ? input.recentHistoryLimit
-      : DEFAULT_LOCAL_SETTINGS.recentHistoryLimit,
-    recentHistoryOverflowBehavior: isRecentHistoryOverflowBehavior(input.recentHistoryOverflowBehavior)
-      ? input.recentHistoryOverflowBehavior
-      : DEFAULT_LOCAL_SETTINGS.recentHistoryOverflowBehavior,
+    recentHistoryLimit,
+    recentHistoryRetainedLimit,
+    recentHistoryOverflowBehavior,
     bookmarkVisibilityScope: input.bookmarkVisibilityScope === 'site' ? 'site' : 'global',
     pinSaveStoragePreference: isPinSaveStoragePreference(input.pinSaveStoragePreference)
       ? input.pinSaveStoragePreference
@@ -195,6 +207,23 @@ function isSafeVisibleBookmarkSoftMax(value: unknown): value is number {
 
 function isSafeRecentHistoryLimit(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= RECENT_HISTORY_LIMITS.min && value <= RECENT_HISTORY_LIMITS.max;
+}
+
+function isSafeRecentHistoryRetainedLimit(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= RECENT_HISTORY_RETAINED_LIMITS.min &&
+    value <= RECENT_HISTORY_RETAINED_LIMITS.max
+  );
+}
+
+function migrateRecentHistoryRetainedLimit(value: unknown, visibleLimit: number, overflowBehavior: RecentHistoryOverflowBehavior): number {
+  if (isSafeRecentHistoryRetainedLimit(value)) return Math.max(value, visibleLimit);
+  if (value === undefined) {
+    return overflowBehavior === 'keep-session' ? RECENT_HISTORY_RETAINED_LIMITS.max : visibleLimit;
+  }
+  return Math.max(DEFAULT_LOCAL_SETTINGS.recentHistoryRetainedLimit, visibleLimit);
 }
 
 function isSafeUrlReviewStatusLimit(value: unknown): value is number {

@@ -67,13 +67,22 @@ async function setVisiblePins(page: Page, value: string, expectedVisibleCount?: 
 
 async function setVisibleRecents(
   page: Page,
-  input: { readonly limit: string; readonly overflow: 'Drop oldest' | 'Keep hidden this session'; readonly expectedVisibleCount?: number },
+  input: {
+    readonly limit: string;
+    readonly retainedLimit?: string;
+    readonly overflow: 'Drop oldest' | 'Keep hidden this session';
+    readonly expectedVisibleCount?: number;
+  },
 ): Promise<void> {
   await openSettingsGroup(page, 'Display');
   const recents = page
     .getByRole('heading', { name: 'Recents' })
     .locator('xpath=ancestor::div[contains(@class, "image-trail-panel__settings-templates")][1]');
-  await recents.locator('input[type="number"]').fill(input.limit);
+  await recents.locator('input[type="number"]').nth(0).fill(input.limit);
+  await recents
+    .locator('input[type="number"]')
+    .nth(1)
+    .fill(input.retainedLimit ?? input.limit);
   await recents.locator('select').selectOption({ label: input.overflow });
   await recents.locator('button', { hasText: 'Apply' }).click();
   if (input.expectedVisibleCount !== undefined) {
@@ -178,19 +187,27 @@ test('successful loads add Recents while failed loads do not', async ({ page, se
 test('Recents retention settings hide overflow rows without persisting them', async ({ page, serviceWorker }) => {
   await openPanel(page, serviceWorker);
   await deleteVisibleRecents(page);
-  await setVisibleRecents(page, { limit: '2', overflow: 'Keep hidden this session' });
+  await setVisibleRecents(page, { limit: '2', retainedLimit: '3', overflow: 'Keep hidden this session' });
 
-  for (const assetPath of [fixtureAssetPaths.assetOne, fixtureAssetPaths.assetTwo, fixtureAssetPaths.assetThree]) {
-    await applyUrlInEditor(page, fixtureUrl(assetPath));
-    await expectPanelStatusMessage(page, new RegExp(`Loaded .*${escapedFilenameFromAssetPath(assetPath)}`, 'u'));
+  const recentUrls = [
+    fixtureUrl(fixtureAssetPaths.assetOne),
+    fixtureUrl(fixtureAssetPaths.assetTwo),
+    fixtureUrl(fixtureAssetPaths.assetThree),
+    `${fixtureUrl(fixtureAssetPaths.assetOne)}?newest=1`,
+  ];
+  for (const url of recentUrls) {
+    await applyUrlInEditor(page, url);
+    await expectPanelStatusMessage(page, /(Loaded|Applied) .*asset-(one|two|three)\.svg/u);
   }
 
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(2);
-  await expect(page.locator('.image-trail-panel__history-item').first()).toContainText('asset-three.svg');
-  await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' })).toHaveCount(0);
+  await expect(page.locator('.image-trail-panel__history-item').first()).toContainText('asset-one.svg');
+  await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-two.svg' })).toHaveCount(0);
 
   await showHiddenRecents(page, 3);
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(3);
   await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' })).toHaveCount(1);
+  await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-two.svg' })).toHaveCount(1);
 });
 
 test('pins persist across panel reopen and Recall recalls offscreen durable rows to the capped queue', async ({ page, serviceWorker }) => {

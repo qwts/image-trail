@@ -132,6 +132,7 @@ test('loadLocalSettings syncs state, governor, and preview prefs from the store,
       visibleBookmarkSoftMax: 12,
       buildInfoOverlayVisible: false,
       recentHistoryLimit: 2,
+      recentHistoryRetainedLimit: 4,
       requestThrottleMs: 250,
       requestThrottleMaxRequests: 7,
       requestThrottleWindowMs: 9_000,
@@ -159,6 +160,7 @@ test('loadLocalSettings syncs state, governor, and preview prefs from the store,
   assert.equal(state.bookmarkLimit, 12);
   assert.equal(state.buildInfoOverlayVisible, false);
   assert.equal(state.recentHistoryLimit, 2);
+  assert.equal(state.recentHistoryRetainedLimit, 4);
   assert.equal(state.neighborPreloadEnabled, true);
   assert.equal(state.neighborPreloadRadius, 4);
   assert.equal(state.history.length, 2, 'history is trimmed to the new recentHistoryLimit');
@@ -211,25 +213,36 @@ test('updateVisibleBookmarkSoftMax reloads the first page and refreshes recall o
 
 test('updateRecentHistoryRetention reloads session history only when the limit grows in keep-session mode', async () => {
   const grow = createHarness();
-  await grow.controller.updateRecentHistoryRetention({ limit: 50, overflowBehavior: 'keep-session' });
+  await grow.controller.updateRecentHistoryRetention({ limit: 50, retainedLimit: 75, overflowBehavior: 'keep-session' });
   assert.equal(grow.getState().recentHistoryLimit, 50);
+  assert.equal(grow.getState().recentHistoryRetainedLimit, 75);
+  assert.equal(grow.getLocalSettings().recentHistoryRetainedLimit, 75);
   assert.deepEqual(grow.log, ['loadRecentHistory'], 'growth in keep-session mode reloads instead of rendering');
   assert.equal(grow.saved.length, 1);
 
   const shrink = createHarness();
-  await shrink.controller.updateRecentHistoryRetention({ limit: 10, overflowBehavior: 'drop-oldest' });
+  await shrink.controller.updateRecentHistoryRetention({ limit: 10, retainedLimit: 10, overflowBehavior: 'drop-oldest' });
   assert.deepEqual(shrink.log, ['render']);
 });
 
 test('updateRecentHistoryRetention no-ops when unchanged or out of range', async () => {
   const unchanged = createHarness();
-  await unchanged.controller.updateRecentHistoryRetention({ limit: 30, overflowBehavior: 'drop-oldest' });
+  await unchanged.controller.updateRecentHistoryRetention({ limit: 30, retainedLimit: 30, overflowBehavior: 'drop-oldest' });
   assert.deepEqual(unchanged.log, []);
 
   const outOfRange = createHarness();
-  await outOfRange.controller.updateRecentHistoryRetention({ limit: 9_999, overflowBehavior: 'drop-oldest' });
+  await outOfRange.controller.updateRecentHistoryRetention({ limit: 9_999, retainedLimit: 9_999, overflowBehavior: 'drop-oldest' });
   assert.deepEqual(outOfRange.log, []);
   assert.deepEqual(outOfRange.saved, []);
+});
+
+test('updateRecentHistoryRetention normalizes max kept recents to at least visible recents', async () => {
+  const harness = createHarness();
+  await harness.controller.updateRecentHistoryRetention({ limit: 40, retainedLimit: 10, overflowBehavior: 'keep-session' });
+
+  assert.equal(harness.getState().recentHistoryLimit, 40);
+  assert.equal(harness.getState().recentHistoryRetainedLimit, 40);
+  assert.equal(harness.getLocalSettings().recentHistoryRetainedLimit, 40);
 });
 
 test('updatePinSaveStoragePreference persists and renders only on a change', () => {

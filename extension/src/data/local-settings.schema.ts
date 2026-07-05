@@ -16,6 +16,7 @@ export const plaintextLocalSettingsSchema = v.object({
   panelDock: v.picklist(['right', 'left']),
   visibleBookmarkSoftMax: v.number(),
   recentHistoryLimit: v.number(),
+  recentHistoryRetainedLimit: v.number(),
   recentHistoryOverflowBehavior: v.picklist(['drop-oldest', 'keep-session']),
   bookmarkVisibilityScope: v.picklist(['global', 'site']),
   pinSaveStoragePreference: v.picklist(['encrypted', 'plaintext']),

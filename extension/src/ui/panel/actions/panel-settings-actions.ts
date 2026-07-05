@@ -57,7 +57,11 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
     },
     'settings/update-recent-history-retention': {
       handle(action) {
-        void deps.updateRecentHistoryRetention({ limit: action.limit, overflowBehavior: action.overflowBehavior });
+        void deps.updateRecentHistoryRetention({
+          limit: action.limit,
+          retainedLimit: action.retainedLimit,
+          overflowBehavior: action.overflowBehavior,
+        });
       },
     },
     'settings/update-pin-save-storage-preference': {
