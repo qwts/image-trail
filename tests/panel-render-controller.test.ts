@@ -25,6 +25,7 @@ function createHarness(): Harness {
     },
     root: () => null,
     recallRoot: () => null,
+    detachedRoot: () => null,
     toastRoot: () => null,
     panelStylesReady: () => {
       log.push('panelStylesReady');

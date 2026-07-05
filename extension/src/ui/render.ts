@@ -1,7 +1,13 @@
-import type { PanelAction, PanelState } from '../core/types.js';
+import type { DetachableSectionId, PanelAction, PanelState } from '../core/types.js';
 import { captureFailureMessage } from '../core/image/capture-result.js';
+import { DETACHABLE_SECTION_TITLES, renderDetachedSections } from './detached-sections.js';
 import { createBookmarksView } from './components/bookmarks-view.js';
 import { createControlsView } from './components/controls-view.js';
+import {
+  createDetachedSectionPlaceholder,
+  createSectionDetachControl,
+  type DetachedWindowPosition,
+} from './components/detachable-section.js';
 import { createEncryptionView } from './components/encryption-view.js';
 import { createFieldsView, type EditableField, type NumericFieldDisplayMode } from './components/fields-view.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
@@ -27,6 +33,7 @@ import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
 export interface PanelRenderTarget {
   readonly root: HTMLElement;
   readonly recallRoot?: HTMLElement | null;
+  readonly detachedRoot?: HTMLElement | null;
   readonly toastRoot?: HTMLElement | null;
   readonly dispatch: (action: PanelAction) => void;
   readonly layoutState: PanelLayoutState;
@@ -43,6 +50,7 @@ export interface PanelLayoutState {
   fieldsPanelBlockSize: number | null;
   historyListBlockSize: number | null;
   fieldDisplayModes: Map<string, NumericFieldDisplayMode>;
+  detachedWindowPositions: Map<DetachableSectionId, DetachedWindowPosition>;
 }
 
 export function recallDeleteCountForQueue(state: Pick<PanelState, 'bookmarkTotal' | 'bookmarkLimit'>): number {
@@ -270,6 +278,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
   if (state.minimized) {
     target.root.replaceChildren(createMinimizedPanel(state, target));
     if (target.recallRoot && options.renderRecall !== false) target.recallRoot.replaceChildren();
+    target.detachedRoot?.replaceChildren();
     return;
   }
 
@@ -579,14 +588,9 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
       navSection,
       autoSection,
     ]),
-    createHistoryView(state.history, state.selectedHistoryIds, state.captureInProgress, state.blobKeyUnlocked, target.dispatch, {
-      blobKeyAvailable: state.blobKeyAvailable,
-      listBlockSize: target.layoutState.historyListBlockSize,
-      onListResize: (blockSize) => {
-        target.layoutState.historyListBlockSize = blockSize;
-      },
-      privacyMode: state.privacyModeEnabled,
-    }),
+    state.detachedSections.includes('history')
+      ? createDetachedSectionPlaceholder('history', DETACHABLE_SECTION_TITLES.history, target.dispatch)
+      : createHistorySection(target, state, { detachable: true }),
     createBookmarksView(
       state.target.selectedUrl,
       state.bookmarks,
@@ -609,7 +613,27 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
   );
   restoreScrollSnapshots(target.root, scrollPositions);
   restoreFocusedTextControl(target.root, focusedTextControl);
+  renderDetachedSections(target, state, DETACHED_SECTION_RENDERERS);
   if (options.renderRecall !== false) renderRecallDrawer(target, state);
+}
+
+/** Content renderers for detached-section windows; the window chrome lives in `detached-sections.ts`. */
+const DETACHED_SECTION_RENDERERS = {
+  history: (target: PanelRenderTarget, state: PanelState) => createHistorySection(target, state, { detachable: false }),
+} as const;
+
+function createHistorySection(target: PanelRenderTarget, state: PanelState, options: { readonly detachable: boolean }): HTMLElement {
+  return createHistoryView(state.history, state.selectedHistoryIds, state.captureInProgress, state.blobKeyUnlocked, target.dispatch, {
+    blobKeyAvailable: state.blobKeyAvailable,
+    listBlockSize: target.layoutState.historyListBlockSize,
+    onListResize: (blockSize) => {
+      target.layoutState.historyListBlockSize = blockSize;
+    },
+    privacyMode: state.privacyModeEnabled,
+    ...(options.detachable
+      ? { headerAccessory: createSectionDetachControl('history', DETACHABLE_SECTION_TITLES.history, target.dispatch) }
+      : {}),
+  });
 }
 
 function formatCloudBackupBytes(bytes: number): string {

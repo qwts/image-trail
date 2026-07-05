@@ -46,6 +46,7 @@ function defaultEnvironment(): PanelMountEnvironment {
 export class PanelMount {
   private rootEl: HTMLElement | null = null;
   private recallRootEl: HTMLElement | null = null;
+  private detachedRootEl: HTMLElement | null = null;
   private toastRootEl: HTMLElement | null = null;
   private stylesReady = false;
   private stylesReadyPromise: Promise<void> | null = null;
@@ -62,6 +63,10 @@ export class PanelMount {
 
   get recallRoot(): HTMLElement | null {
     return this.recallRootEl;
+  }
+
+  get detachedRoot(): HTMLElement | null {
+    return this.detachedRootEl;
   }
 
   get toastRoot(): HTMLElement | null {
@@ -104,6 +109,9 @@ export class PanelMount {
     const recallRoot = doc.createElement('div');
     recallRoot.className = 'image-trail-panel-recall-root';
     this.recallRootEl = recallRoot;
+    const detachedRoot = doc.createElement('div');
+    detachedRoot.className = 'image-trail-panel-detached-root';
+    this.detachedRootEl = detachedRoot;
     const toastRoot = doc.createElement('div');
     toastRoot.className = 'image-trail-panel-root image-trail-panel__toast-root';
     this.toastRootEl = toastRoot;
@@ -128,7 +136,7 @@ export class PanelMount {
       link.addEventListener('error', reveal, { once: true });
       this.environment.scheduleStylesReadyFallback(reveal);
     });
-    shadow.replaceChildren(link, root, recallRoot, toastRoot);
+    shadow.replaceChildren(link, root, recallRoot, detachedRoot, toastRoot);
     // Prefer document.body; fall back to documentElement only when body is absent. The logical
     // expression keeps this clear of the no-document-element-append lint rule.
     (doc.body ?? doc.documentElement).append(host);
@@ -139,6 +147,7 @@ export class PanelMount {
     this.environment.document.getElementById(ROOT_ID)?.remove();
     this.rootEl = null;
     this.recallRootEl = null;
+    this.detachedRootEl = null;
     this.toastRootEl = null;
     this.stylesReady = false;
     this.stylesReadyPromise = null;

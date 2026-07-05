@@ -605,6 +605,16 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       };
     case 'settings/toggle':
       return { ...state, settingsOpen: !state.settingsOpen, lastUpdatedAt: Date.now() };
+    case 'section/detach':
+      if (state.detachedSections.includes(action.sectionId)) return state;
+      return { ...state, detachedSections: [...state.detachedSections, action.sectionId], lastUpdatedAt: Date.now() };
+    case 'section/restore':
+      if (!state.detachedSections.includes(action.sectionId)) return state;
+      return {
+        ...state,
+        detachedSections: state.detachedSections.filter((sectionId) => sectionId !== action.sectionId),
+        lastUpdatedAt: Date.now(),
+      };
     case 'settings/update-visible-bookmark-soft-max':
       return { ...state, bookmarkLimit: action.value, bookmarkOffset: 0, lastUpdatedAt: Date.now() };
     case 'settings/update-recent-history-retention': {

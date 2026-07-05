@@ -97,6 +97,9 @@ export class ImageTrailPanel {
   private get recallRoot(): HTMLElement | null {
     return this.panelMount.recallRoot;
   }
+  private get detachedRoot(): HTMLElement | null {
+    return this.panelMount.detachedRoot;
+  }
   private get toastRoot(): HTMLElement | null {
     return this.panelMount.toastRoot;
   }
@@ -378,6 +381,7 @@ export class ImageTrailPanel {
     dispatch: (action) => this.dispatch(action),
     root: () => this.root,
     recallRoot: () => this.recallRoot,
+    detachedRoot: () => this.detachedRoot,
     toastRoot: () => this.toastRoot,
     panelStylesReady: () => this.panelMount.panelStylesReady,
     previewScrollAnchorId: () => this.projectionApplication.previewScrollAnchorId,

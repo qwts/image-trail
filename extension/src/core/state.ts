@@ -70,6 +70,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     neighborPreloadCacheLimit: DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
     neighborPreloadProbeMethod: 'get',
     secondaryControlsOpen: false,
+    detachedSections: [],
     hasOlderBookmarks: false,
     hasNewerBookmarks: false,
     captureInProgress: false,

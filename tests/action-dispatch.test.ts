@@ -12,6 +12,7 @@ import type { PanelAction, PanelState } from '../extension/src/core/types.js';
 import { defineAction, dispatchPanelAction, type ActionDef, type PanelActionFor } from '../extension/src/ui/panel/action-dispatch.js';
 import { buildAutomationActionEntries } from '../extension/src/ui/panel/actions/automation-actions.js';
 import type { PanelActionDeps } from '../extension/src/ui/panel/actions/deps.js';
+import { buildDetachableSectionActionEntries } from '../extension/src/ui/panel/actions/detach-actions.js';
 import { buildFieldActionEntries } from '../extension/src/ui/panel/actions/field-actions.js';
 import { buildLibraryActionEntries } from '../extension/src/ui/panel/actions/library-actions.js';
 import { buildPanelSettingsActionEntries } from '../extension/src/ui/panel/actions/panel-settings-actions.js';
@@ -220,6 +221,8 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'target/fill-screen': { name: 'target/fill-screen', enabled: true },
   'target/set-object-fit': { name: 'target/set-object-fit', mode: 'contain' },
   'panel/secondary-controls-open': { name: 'panel/secondary-controls-open', open: true },
+  'section/detach': { name: 'section/detach', sectionId: 'history' },
+  'section/restore': { name: 'section/restore', sectionId: 'history' },
   'panel/minimize': { name: 'panel/minimize' },
   'panel/expand': { name: 'panel/expand' },
   'settings/toggle': { name: 'settings/toggle' },
@@ -397,6 +400,7 @@ test('registry keys match the fixture domain with one entry per name and no tail
     buildFieldActionEntries,
     buildTransferActionEntries,
     buildAutomationActionEntries,
+    buildDetachableSectionActionEntries,
   ].reduce((sum, build) => sum + Object.keys(build(harness.deps)).length, 0);
   assert.equal(groupKeySum, keys.length);
   assert.ok(!keys.includes('toggle-panel'), 'toggle-panel must stay on the fallback tail');

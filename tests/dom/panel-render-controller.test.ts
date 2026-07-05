@@ -49,6 +49,7 @@ function createHarness(): Harness {
     dispatch: () => {},
     root: () => root,
     recallRoot: () => recallRoot,
+    detachedRoot: () => null,
     toastRoot: () => toastRoot,
     panelStylesReady: () => true,
     previewScrollAnchorId: () => null,
