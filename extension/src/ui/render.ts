@@ -20,14 +20,17 @@ import type { UrlField } from '../core/url/types.js';
 import { createParsedFieldsSection, type NumericFieldDisplayMode } from './parsed-fields-section.js';
 
 // PanelState is immutable per render, so the URL parse/tokenization is shared between the main
-// panel pass and the detached Settings renderer instead of running twice per render.
-const activeUrlFieldsCache = new WeakMap<PanelState, ReturnType<typeof activeUrlFieldsForState>>();
+// panel pass and the detached Settings renderer instead of running twice per render. Keyed by
+// the page href too: the derivation falls back to window.location.href (no selected URL, or a
+// data: URL), and an SPA navigation can re-render with the same state object.
+const activeUrlFieldsCache = new WeakMap<PanelState, { href: string; value: ReturnType<typeof activeUrlFieldsForState> }>();
 function cachedActiveUrlFields(state: PanelState): ReturnType<typeof activeUrlFieldsForState> {
+  const href = window.location.href;
   const cached = activeUrlFieldsCache.get(state);
-  if (cached) return cached;
-  const computed = activeUrlFieldsForState(state, window.location.href);
-  activeUrlFieldsCache.set(state, computed);
-  return computed;
+  if (cached && cached.href === href) return cached.value;
+  const value = activeUrlFieldsForState(state, href);
+  activeUrlFieldsCache.set(state, { href, value });
+  return value;
 }
 
 export interface PanelRenderTarget {
