@@ -89,6 +89,7 @@ export interface ProjectionApplicationControllerDeps {
  */
 export class ProjectionApplicationController {
   private previewScrollAnchorIdValue: string | null = null;
+  private previewAnchorOwner: symbol | null = null;
 
   constructor(private readonly deps: ProjectionApplicationControllerDeps) {}
 
@@ -275,6 +276,11 @@ export class ProjectionApplicationController {
   }
 
   async previewRecord(url: string, blobId?: string, scrollAnchorId?: string): Promise<void> {
+    // Per-call anchor ownership: an overlapping newer preview takes the anchor over, and the stale
+    // call's finally must not clear it — the delegated plain-URL path has no session of its own to
+    // check, and even the blob path's session can be superseded before its finally runs (#434).
+    const anchorOwner = Symbol('record-preview');
+    this.previewAnchorOwner = anchorOwner;
     this.previewScrollAnchorIdValue = scrollAnchorId ?? null;
     const captureStore = this.deps.captureStore();
     let session: ProjectionSession | null = null;
@@ -341,7 +347,13 @@ export class ProjectionApplicationController {
       });
       this.deps.render();
     } finally {
-      if (!session || this.isCurrentProjectionSession(session)) this.previewScrollAnchorIdValue = null;
+      // Clear only when this call still owns the anchor (no newer preview took it over — the
+      // delegated plain-URL path has no session to check) AND, where a blob session exists, it was
+      // not superseded by another projection (the pinned blob-retrieve supersession behavior).
+      if (this.previewAnchorOwner === anchorOwner && (!session || this.isCurrentProjectionSession(session))) {
+        this.previewAnchorOwner = null;
+        this.previewScrollAnchorIdValue = null;
+      }
     }
   }
 

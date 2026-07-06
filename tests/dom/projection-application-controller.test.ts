@@ -30,6 +30,8 @@ interface HarnessOptions {
   readonly selectedHandleId?: string | null;
   readonly selectedUrl?: string | null;
   readonly preloadResults?: readonly PreloadResult[];
+  /** Overrides the queue-based preload entirely (deferred/overlapping-load tests). */
+  readonly preload?: (url: string) => Promise<PreloadResult>;
 }
 
 function makeSnapshot(selected: { readonly url: string; readonly handleId: string } | null): TargetSelectionSnapshot {
@@ -109,6 +111,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
     neighborPreload: () => ({
       preload: async (url) => {
         log.push(`preload:${url}`);
+        if (options.preload) return options.preload(url);
         return preloadQueue.shift() ?? { ok: false as const, message: 'preload queue empty' };
       },
       runId: 7,
@@ -197,6 +200,33 @@ test('previewRecord clears a stale failed draft and failure markers from the pre
   assert.equal(harness.getState().draftUrl, null, 'a successful preview supersedes the failed draft');
   assert.equal(harness.getState().failedFieldId, null, 'the failed marker from the previous URL is reset');
   assert.equal(harness.getState().activeFieldId, null, 'field interaction state rebuilds from the projected URL');
+});
+
+test("a superseded preview does not clear the newer preview's scroll anchor (#434)", async () => {
+  document.body.replaceChildren();
+  mountSelectedImage('handle-1');
+  const gates = new Map<string, (result: PreloadResult) => void>();
+  const harness = createHarness({
+    preload: (url) =>
+      new Promise<PreloadResult>((resolve) => {
+        gates.set(url, resolve);
+      }),
+  });
+
+  // Preview A parks on its preload; preview B supersedes it and owns the anchor.
+  const first = harness.controller.previewRecord('https://images.example.test/img/a.jpg', undefined, 'anchor-a');
+  const second = harness.controller.previewRecord('https://images.example.test/img/b.jpg', undefined, 'anchor-b');
+  assert.equal(harness.controller.previewScrollAnchorId, 'anchor-b');
+
+  // The stale call settling (however its preload ends) must not clear the newer anchor.
+  gates.get('https://images.example.test/img/a.jpg')?.({ ok: false, message: 'superseded' });
+  await first;
+  assert.equal(harness.controller.previewScrollAnchorId, 'anchor-b', 'the stale preview left the newer anchor alone');
+
+  // The owning call clears its own anchor when it settles.
+  gates.get('https://images.example.test/img/b.jpg')?.({ ok: true, displayUrl: 'blob:b', sha256: 'f'.repeat(64) });
+  await second;
+  assert.equal(harness.controller.previewScrollAnchorId, null);
 });
 
 test('applySelectedUrl pushes the visible URL only for same-origin loads', async () => {
