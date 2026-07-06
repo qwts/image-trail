@@ -184,3 +184,20 @@ test('the per-site workspace layout persists across a reload when opted in, and 
   // Leave the shared profile the way we found it: opt back out.
   await page.getByLabel('Restore workspace layout per site').uncheck();
 });
+
+test('a detached section window keeps its header-row action toolbar usable (#430)', async ({ page, serviceWorker }) => {
+  await openPanel(page, serviceWorker);
+
+  await page.getByRole('button', { name: 'Detach Queue into a floating window (drag to place)' }).click();
+  const windowEl = page.getByRole('dialog', { name: 'Queue (detached)' });
+  await expect(windowEl).toBeVisible();
+
+  // The window chrome carries the title, but the header row must stay for its actions: the
+  // toolbar moved into the section header (#430) and previously vanished with it when detached.
+  await expect(windowEl.getByRole('button', { name: 'Pin current' })).toBeVisible();
+  await expect(windowEl.getByTitle('Queue scope and maintenance actions.')).toBeVisible();
+  await expect(windowEl.locator('.image-trail-panel__section-header--with-actions h3')).toBeHidden();
+
+  await windowEl.getByRole('button', { name: 'Restore Queue into the panel' }).click();
+  await expect(windowEl).toHaveCount(0);
+});

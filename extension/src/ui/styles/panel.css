@@ -589,9 +589,22 @@
   border-top: none;
 }
 
-/* The window chrome header already carries the section title — don't repeat it in the body. */
+/* The window chrome header already carries the section title — don't repeat it in the body. A
+   header that carries the section's action toolbar (#430) stays visible so the detached window
+   keeps its actions; only its redundant heading is hidden. */
 .image-trail-panel-root .image-trail-panel__detached-body > .image-trail-panel__section > h3,
-.image-trail-panel-root .image-trail-panel__detached-body > .image-trail-panel__section > .image-trail-panel__section-header {
+.image-trail-panel-root
+  .image-trail-panel__detached-body
+  > .image-trail-panel__section
+  > .image-trail-panel__section-header:not(.image-trail-panel__section-header--with-actions) {
+  display: none;
+}
+
+.image-trail-panel-root
+  .image-trail-panel__detached-body
+  > .image-trail-panel__section
+  > .image-trail-panel__section-header--with-actions
+  > h3 {
   display: none;
 }
 
