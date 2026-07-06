@@ -77,6 +77,9 @@ interface ScrollSnapshot {
 const SCROLL_SNAPSHOT_SELECTORS = [
   '.image-trail-panel__field-list',
   '.image-trail-panel__bookmarks-section .image-trail-panel__record-list',
+  // The attached Settings section is a fixed-height scroll region (#367); without a snapshot every
+  // settings form apply would rerender it back to scrollTop 0.
+  '.image-trail-panel__settings-section',
 ] as const;
 const DRAWER_GAP = 8;
 const DRAWER_EDGE_PADDING = 12;

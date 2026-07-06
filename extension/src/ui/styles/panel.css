@@ -963,6 +963,17 @@
   gap: 8px;
 }
 
+/* The attached Settings section is a layout-reserved scroll region (#367): it always occupies the
+   same block size while open, so expanding/collapsing a settings group reflows inside this box and
+   can never push the sections below it up or down (the click-target-under-pointer jump). Scoped to
+   the panel's direct child so a detached Settings window keeps its natural window-sized layout. */
+.image-trail-panel-root.image-trail-panel > .image-trail-panel__settings-section {
+  block-size: min(420px, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .image-trail-panel-root .image-trail-panel__settings-utility-summary {
   list-style: none;
   cursor: pointer;

@@ -120,6 +120,11 @@
       "coverage": [
         {
           "type": "playwright-e2e",
+          "path": "tests/e2e/settings-layout-stability.spec.ts",
+          "notes": "Covers #367: the attached Settings section is a layout-reserved scroll region, so expanding/collapsing settings groups keeps the clicked summary and the sections below Settings stationary, and the region's scroll position survives the rerender caused by applying a setting."
+        },
+        {
+          "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
           "notes": "Covers open/close, duplicate panel root behavior, minimize/expand, close/reopen, and single-image auto-select selected-target preview assertions."
         },
