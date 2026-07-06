@@ -131,7 +131,14 @@ function createHarness(options: HarnessOptions = {}): Harness {
       applySelectedUrl: async (url, attemptedFieldIds, opts) => {
         const callIndex = applyCalls.length;
         applyCalls.push({ url, attemptedFieldIds: attemptedFieldIds ?? [], options: opts });
-        return options.applyResult ? options.applyResult(url, callIndex) : true;
+        const ok = options.applyResult ? await options.applyResult(url, callIndex) : true;
+        // Mirror projection-application-controller's quiet failure: a skipped candidate marks the
+        // field failed (so mid-drain steps re-base off the last-good URL) and stashes the failed
+        // draft, without a visible status change.
+        if (!ok && opts?.quietFailure) {
+          state = { ...state, failedFieldId: (attemptedFieldIds ?? [])[0] ?? null, draftUrl: url };
+        }
+        return ok;
       },
       beginProjectionSession: () => null,
       applyProjectionToSelectedImage: () => null,
@@ -244,6 +251,21 @@ test('a dead run short-circuits after a few consecutive misses instead of walkin
   assert.equal(harness.getState().message, 'Stopped after skipping 3 unavailable images; no loadable image found in that direction.');
   const urls = new Set(harness.applyCalls.map((call) => call.url));
   assert.equal(urls.size, harness.applyCalls.length, 'each attempt is a distinct URL');
+});
+
+test('a drain that stops after skipping clears the stranded failed-field marker so a good value is not left red (#447)', async () => {
+  const harness = createHarness({ applyResult: () => false });
+  harness.patchState({ unlockedFieldIds: [intFieldId()] });
+
+  harness.controller.navigateBy(1);
+  await untilStopped(harness);
+
+  // Every candidate failed, so the drain gave up while the field still rests on its last-good
+  // value. The transient quiet-skip marker must not linger as a red outline, and the failed draft
+  // must not become the next press's navigation base.
+  assert.equal(harness.getState().failedFieldId, null, 'no stranded red field outline after the drain stops');
+  assert.equal(harness.getState().draftUrl, null, 'the failed candidate does not remain as the next navigation base');
+  assert.match(harness.getState().message, /^Stopped after skipping/, 'the stop message is preserved');
 });
 
 test('a larger neighbor-preload radius raises the consecutive-miss threshold with it', async () => {

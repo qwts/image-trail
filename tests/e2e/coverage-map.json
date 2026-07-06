@@ -140,6 +140,11 @@
           "type": "playwright-e2e",
           "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
           "notes": "Covers #434 end to end: step a field into a mocked 404 (field row shows the failed marker), double-click an earlier recent \u2014 the projection lands, the URL editor follows the record, and no field renders the failed marker."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
+          "notes": "Covers #447: a Next step that skips a dead run of failed neighbors and then stops leaves no stray red failed-field outline on the field, which rests on its last-good value. The quiet-skip failure marker is transient and reconciled when the navigation drain comes to rest."
         }
       ]
     },
@@ -466,6 +471,11 @@
             "tests/dom/parsed-field-navigation-controller.test.ts"
           ],
           "notes": "Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts."
+        },
+        {
+          "type": "unit-dom",
+          "paths": ["tests/dom/parsed-field-navigation-controller.test.ts"],
+          "notes": "Covers #447: when the navigation drain stops after skipping (no loadable candidate), the transient quiet-skip failed-field marker and stale failed draft are reconciled at the drain's resting point, so the field is not left flagged failed while showing its last-good value and the next press bases from the good URL."
         },
         {
           "type": "deferred",

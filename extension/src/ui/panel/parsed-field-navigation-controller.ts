@@ -160,8 +160,27 @@ export class ParsedFieldNavigationController {
     } finally {
       this.parsedNavigationQueueRunning = false;
       this.setNavigationBusy(false);
-      if (this.queuedParsedNavigationDelta() !== 0) void this.drainQueuedParsedNavigation();
+      if (this.queuedParsedNavigationDelta() !== 0) {
+        void this.drainQueuedParsedNavigation();
+      } else {
+        this.reconcileRestingFailureMarker();
+      }
     }
+  }
+
+  // A quiet skip (`applySelectedUrl({ quietFailure: true })`) sets `failedFieldId` during traversal
+  // so mid-drain steps re-base off the last-good `selectedUrl` rather than the failed candidate's
+  // draft. A successful land clears it, but a drain that stops WITHOUT landing (no candidate /
+  // blocked / abandoned wait) would otherwise strand it: the field rests on its last successfully
+  // displayed value yet stays outlined red, and the failed draft would seed the next press's
+  // navigation base (#447). Once the queue is fully drained, reconcile that transient marker. The
+  // candidate skip is driven by the request-policy cache + session skip set, not `failedFieldId`,
+  // so clearing it here does not change skip behavior.
+  private reconcileRestingFailureMarker(): void {
+    const state = this.deps.getState();
+    if (state.failedFieldId === null) return;
+    this.deps.setState({ ...state, failedFieldId: null, draftUrl: null, lastUpdatedAt: Date.now() });
+    this.deps.render();
   }
 
   private setNavigationBusy(busy: boolean): void {

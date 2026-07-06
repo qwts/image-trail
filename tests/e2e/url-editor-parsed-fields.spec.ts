@@ -312,6 +312,36 @@ test('previewing a recent clears the red failed-field marker left by a failed st
   await expect(page.locator('.image-trail-panel__field-row.is-error')).toHaveCount(0);
 });
 
+test('a Next step that skips a dead run leaves no stray red field outline on the last-good value (#447)', async ({
+  page,
+  serviceWorker,
+}) => {
+  // Frames 3-5 are a dead run: stepping into them skips, then the drain stops with the field still
+  // resting on the last-good value (frame 2). The quiet-skip failure marker must not be stranded.
+  await installDynamicImageRoute(page, ['3', '4', '5']);
+  await openPanel(page, serviceWorker);
+  await setRequestThrottle(page, { minimumIntervalMs: '0', maxRequests: '100', windowMs: '1000' });
+  await closeSettingsIfOpen(page);
+
+  await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=1'));
+  await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?frame=1/u);
+
+  // A successful step makes the field lockable; lock it so Next drives it.
+  await openParsedFields(page);
+  await page.getByRole('button', { name: /Increment .*frame/u }).click();
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?frame=2/u);
+  await ensureQueryFrameIncluded(page);
+
+  // Next steps into frames 3,4,5 — all dead — so the drain gives up after skipping them.
+  await openManualControls(page);
+  await page.getByRole('button', { name: 'Next ▶' }).click();
+  await expectPanelStatusMessage(page, /Stopped after skipping \d+ unavailable images?/u);
+
+  // The field rests on the last-good value and carries no stranded red outline.
+  await expect(page.locator('.image-trail-panel__field-row.is-error')).toHaveCount(0);
+  await expectFrame(page, '2');
+});
+
 test('Prev/Next steps every included field together into one combined URL', async ({ page, serviceWorker }) => {
   // #263: prev/next (and arrows) are the automation tier — one press applies the same ±1 step to
   // ALL included fields at once, the same result as clicking each field's +/- individually.
