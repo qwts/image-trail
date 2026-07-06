@@ -81,7 +81,12 @@ export class ParsedFieldStateRecordController {
       // selected image — e.g. the snapshot-subscription restore that fires right after the user
       // projects a record — must not resurrect that draft over the projection (#429).
       draftUrl: ctx.sameSource ? restored.draftUrl : this.deps.getState().draftUrl,
-      parsedFieldResetBaseline: parsedFieldResetBaselineFromRecord(filtered),
+      // The reset baseline is EDIT-SESSION state: once captured (first field edit), it survives
+      // loads and restores until Reset all or a target change clears it. The snapshot-subscription
+      // restore runs after every successful load, and adopting the record's baseline here stomped
+      // the live one — Reset all flickered and vanished on success (stale records made it stick
+      // permanently instead). Adopt the record's baseline only when no session baseline exists.
+      parsedFieldResetBaseline: this.deps.getState().parsedFieldResetBaseline ?? parsedFieldResetBaselineFromRecord(filtered),
     });
     this.deps.syncGrabSettings();
     void this.deps.saveFieldState();

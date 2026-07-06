@@ -247,6 +247,38 @@ test('URL editor and parsed fields load, fail closed, navigate, learn templates,
   await expect(page.getByLabel(/Edit .*frame/u)).toHaveValue('2');
 });
 
+test('Reset all stays available across successful steps instead of flickering away (#429)', async ({ page, serviceWorker }) => {
+  await installMultiParamImageRoute(page);
+  await openPanel(page, serviceWorker);
+  await setRequestThrottle(page, { minimumIntervalMs: '0', maxRequests: '100', windowMs: '1000' });
+  await closeSettingsIfOpen(page);
+
+  // Distinct values from this serial spec's other tests, so the load is a real state change.
+  await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?set=30&frame=70'));
+  await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?set=30&frame=70/u);
+  await openParsedFields(page);
+
+  // The first edit captures the session baseline; Reset all appears.
+  await page.getByRole('button', { name: /Increment .*set/u }).click();
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?set=31&frame=70/u);
+  const resetAll = page.getByRole('button', { name: /Reset (all parsed fields|private parsed fields)/u });
+  await expect(resetAll).toBeVisible();
+
+  // Further SUCCESSFUL loads (each triggers the post-load field-state restore) must not stomp the
+  // session baseline: Reset all stays available until the user resets or the target changes.
+  await page.getByRole('button', { name: /Increment .*set/u }).click();
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?set=32&frame=70/u);
+  await expect(resetAll).toBeVisible();
+  await page.getByRole('button', { name: /Increment .*frame/u }).click();
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?set=32&frame=71/u);
+  await expect(resetAll).toBeVisible();
+
+  // Reset all returns to the baseline URL and then disappears — the session is closed.
+  await resetAll.click();
+  await expectPanelStatusMessage(page, /Parsed fields reset\.|(?:Loaded|Applied) .*dynamic-image\.svg\?set=30&frame=70/u);
+  await expect(page.getByRole('button', { name: /Reset (all parsed fields|private parsed fields)/u })).toHaveCount(0);
+});
+
 test('Prev/Next steps every included field together into one combined URL', async ({ page, serviceWorker }) => {
   // #263: prev/next (and arrows) are the automation tier — one press applies the same ±1 step to
   // ALL included fields at once, the same result as clicking each field's +/- individually.

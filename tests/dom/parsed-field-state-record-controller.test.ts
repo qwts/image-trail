@@ -119,3 +119,44 @@ test('applyRestoredParsedFieldState skips projection when the source already mat
   assert.ok(harness.log.includes('saveFieldState'));
   assert.ok(harness.log.includes('render'));
 });
+
+test('applyRestoredParsedFieldState keeps a live edit-session reset baseline instead of stomping it (#429)', async () => {
+  const harness = createHarness();
+  harness.patchState({ target: { ...harness.getState().target, selectedUrl: 'https://images.example.test/a/1.jpg' } });
+  const built = harness.controller.createParsedFieldStateRecord();
+  assert.ok(built);
+  const sessionBaseline = {
+    sourceUrl: 'https://images.example.test/a/0.jpg',
+    activeFieldId: null,
+    failedFieldId: null,
+    successfulFieldIds: [],
+    unchangedFieldIds: [],
+    unlockedFieldIds: [],
+    manuallyExcludedFieldIds: [],
+    fieldSplitSpecs: [],
+    fieldDigitWidthSpecs: [],
+  };
+  harness.patchState({ parsedFieldResetBaseline: sessionBaseline });
+
+  // The snapshot-subscription restore runs after every successful load; it must not replace the
+  // baseline captured at the user's first edit — that is what made Reset all flicker and vanish.
+  await harness.controller.applyRestoredParsedFieldState(built, { sameSource: true, projectSavedSource: false });
+
+  assert.equal(harness.getState().parsedFieldResetBaseline, sessionBaseline, 'the session baseline object survives the restore');
+});
+
+test('applyRestoredParsedFieldState adopts the record baseline when no session baseline exists', async () => {
+  const harness = createHarness();
+  harness.patchState({ target: { ...harness.getState().target, selectedUrl: 'https://images.example.test/a/1.jpg' } });
+  const built = harness.controller.createParsedFieldStateRecord();
+  assert.ok(built);
+  assert.equal(harness.getState().parsedFieldResetBaseline, null);
+
+  await harness.controller.applyRestoredParsedFieldState(built, { sameSource: true, projectSavedSource: false });
+
+  assert.equal(
+    harness.getState().parsedFieldResetBaseline?.sourceUrl,
+    built.sourceUrl,
+    'a fresh restore seeds the baseline from the record',
+  );
+});
