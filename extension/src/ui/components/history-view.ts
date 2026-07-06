@@ -1,5 +1,6 @@
 import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import { createPrivacyThumbnail, PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordExtensionLabel, recordTitle } from './record-metadata.js';
+import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { selectedRangeIds } from './selection-ranges.js';
 
 type HistoryAction =
@@ -121,11 +122,11 @@ export function createHistoryView(
       entry.tabIndex = 0;
       entry.setAttribute('role', 'button');
       entry.title =
-        'Click to select this row. Click the selected row or press Enter to preview it. Cmd/Ctrl-click selects for export. Shift-click selects a range.';
+        'Click to select this row. Double-click or press Enter to preview it. Cmd/Ctrl-click selects for export. Shift-click selects a range.';
       entry.addEventListener('click', (event) => {
         if (isSelectionClick(event)) return;
         event.preventDefault();
-        if (selected && selectedIds.length === 1) {
+        if (registerPreviewRowClick(`history:${item.id}`) && selected && selectedIds.length === 1) {
           dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
           return;
         }

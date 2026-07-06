@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { resetPreviewRowClickTracking } from '../../extension/src/ui/components/record-row-preview-click.js';
 import assert from 'node:assert/strict';
 
 import { createRecallDrawerView } from '../../extension/src/ui/components/recall-drawer-view.js';
@@ -54,6 +55,7 @@ function rowFor(view: HTMLElement, id: string): HTMLElement {
 }
 
 test('a plain click selects an unselected Recall row without previewing it', () => {
+  resetPreviewRowClickTracking();
   const actions: unknown[] = [];
   const view = buildRecallView(actions);
   const row = rowFor(view, 'recall-1');
@@ -63,14 +65,36 @@ test('a plain click selects an unselected Recall row without previewing it', () 
   assert.deepEqual(actions, [{ name: 'recall-selection/select', ids: ['recall-1'] }]);
 });
 
-test('a plain click previews an already selected Recall row', () => {
+test('a double-click on a selected Recall row previews it (#426)', () => {
+  resetPreviewRowClickTracking();
   const actions: unknown[] = [];
   const view = buildRecallView(actions, ['recall-1']);
   const row = rowFor(view, 'recall-1');
 
   row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 
-  assert.deepEqual(actions, [{ name: 'capture/preview', url: record.url, blobId: undefined, scrollAnchorId: 'recall-1' }]);
+  assert.deepEqual(actions, [
+    { name: 'recall-selection/select', ids: ['recall-1'] },
+    { name: 'capture/preview', url: record.url, blobId: undefined, scrollAnchorId: 'recall-1' },
+  ]);
+});
+
+test('a stale second click on a selected Recall row re-selects instead of previewing (#426)', (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  resetPreviewRowClickTracking();
+  const actions: unknown[] = [];
+  const view = buildRecallView(actions, ['recall-1']);
+  const row = rowFor(view, 'recall-1');
+
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  t.mock.timers.tick(501);
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  assert.deepEqual(actions, [
+    { name: 'recall-selection/select', ids: ['recall-1'] },
+    { name: 'recall-selection/select', ids: ['recall-1'] },
+  ]);
 });
 
 test('Enter on a selected Recall row previews it', () => {
