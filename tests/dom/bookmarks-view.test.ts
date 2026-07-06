@@ -142,6 +142,24 @@ test('ArrowDown moves queue row single selection to the next row', () => {
   assert.deepEqual(actions, [{ name: 'bookmark-selection/single', id: 'row-2' }]);
 });
 
+test('ArrowDown restores queue row focus inside a shadow root', async () => {
+  const actions: unknown[] = [];
+  const second = { ...record, id: 'row-2', url: 'https://images.example.test/albums/1024/photo_0043.jpg' };
+  const host = document.createElement('div');
+  const root = host.attachShadow({ mode: 'open' });
+  const view = buildBookmarksView(actions, { items: [record, second], selectedIds: ['row-1'] });
+  root.append(view);
+  document.body.append(host);
+  const row = rowFor(view, 'row-1');
+  const nextRow = rowFor(view, 'row-2');
+
+  row.focus();
+  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true, bubbles: true }));
+  await Promise.resolve();
+
+  assert.equal(root.activeElement, nextRow);
+});
+
 test('stored queue rows render the original indicator and clear action', () => {
   const actions: unknown[] = [];
   const captured = {

@@ -193,7 +193,7 @@ function createRecallRow(
   item.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
-      selectAdjacentRecallRow(orderedIds, record.id, event.key === 'ArrowDown' ? 1 : -1, dispatch);
+      selectAdjacentRecallRow(orderedIds, record.id, event.key === 'ArrowDown' ? 1 : -1, dispatch, queryableRootFor(item));
       return;
     }
     if (event.key === 'Enter' || event.key === ' ') {
@@ -213,24 +213,30 @@ function selectAdjacentRecallRow(
   currentId: string,
   delta: -1 | 1,
   dispatch: (action: PanelAction) => void,
+  root: ParentNode = document,
 ): void {
   const currentIndex = orderedIds.indexOf(currentId);
   const nextId = orderedIds[currentIndex + delta];
   if (!nextId) return;
   dispatch({ name: 'recall-selection/select', ids: [nextId] });
-  focusRecordRow(nextId);
+  focusRecordRow(root, nextId);
 }
 
 /* c8 ignore start */
-function focusRecordRow(id: string): void {
+function queryableRootFor(element: HTMLElement): ParentNode {
+  const root = element.getRootNode();
+  return typeof (root as ParentNode).querySelectorAll === 'function' ? (root as ParentNode) : document;
+}
+
+function focusRecordRow(root: ParentNode, id: string): void {
   queueMicrotask(() => {
-    const row = findRecordRow(id);
+    const row = findRecordRow(root, id);
     if (row) row.focus();
   });
 }
 
-function findRecordRow(id: string): HTMLElement | null {
-  for (const candidate of document.querySelectorAll('[data-image-trail-row-id]')) {
+function findRecordRow(root: ParentNode, id: string): HTMLElement | null {
+  for (const candidate of root.querySelectorAll('[data-image-trail-row-id]')) {
     if (!(candidate instanceof HTMLElement)) continue;
     if (candidate.dataset['imageTrailRowId'] === id) {
       return candidate;

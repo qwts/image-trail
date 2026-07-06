@@ -138,6 +138,24 @@ test('ArrowDown moves Recall single selection to the next row', () => {
   assert.deepEqual(actions, [{ name: 'recall-selection/select', ids: ['recall-2'] }]);
 });
 
+test('ArrowDown restores Recall row focus inside a shadow root', async () => {
+  const actions: unknown[] = [];
+  const second = { ...record, id: 'recall-2', url: 'https://images.example.test/recall/photo_0043.jpg' };
+  const host = document.createElement('div');
+  const root = host.attachShadow({ mode: 'open' });
+  const view = buildRecallView(actions, ['recall-1'], [record, second]);
+  root.append(view);
+  document.body.append(host);
+  const row = rowFor(view, 'recall-1');
+  const nextRow = rowFor(view, 'recall-2');
+
+  row.focus();
+  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true, bubbles: true }));
+  await Promise.resolve();
+
+  assert.equal(root.activeElement, nextRow);
+});
+
 test('a viewport narrower than the drawer clamps the inline width inside the edge padding', () => {
   // Regression: the geometry had a 240px width floor, so on viewports narrower than ~264px the
   // inline width overrode the CSS `width: min(340px, calc(100vw - 24px))` and pushed the Close

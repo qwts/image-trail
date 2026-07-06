@@ -277,7 +277,7 @@ export function createBookmarksView(
       entry.addEventListener('keydown', (event) => {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
           event.preventDefault();
-          selectAdjacentBookmarkRow(items, item.id, event.key === 'ArrowDown' ? 1 : -1, dispatch);
+          selectAdjacentBookmarkRow(items, item.id, event.key === 'ArrowDown' ? 1 : -1, dispatch, queryableRootFor(entry));
           return;
         }
         if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -443,24 +443,30 @@ function selectAdjacentBookmarkRow(
   currentId: string,
   delta: -1 | 1,
   dispatch: (action: BookmarkAction) => void,
+  root: ParentNode = document,
 ): void {
   const currentIndex = items.findIndex((item) => item.id === currentId);
   const next = items[currentIndex + delta];
   if (!next) return;
   dispatch({ name: 'bookmark-selection/single', id: next.id });
-  focusRecordRow(next.id);
+  focusRecordRow(root, next.id);
 }
 
 /* c8 ignore start */
-function focusRecordRow(id: string): void {
+function queryableRootFor(element: HTMLElement): ParentNode {
+  const root = element.getRootNode();
+  return typeof (root as ParentNode).querySelectorAll === 'function' ? (root as ParentNode) : document;
+}
+
+function focusRecordRow(root: ParentNode, id: string): void {
   queueMicrotask(() => {
-    const row = findRecordRow(id);
+    const row = findRecordRow(root, id);
     if (row) row.focus();
   });
 }
 
-function findRecordRow(id: string): HTMLElement | null {
-  for (const candidate of document.querySelectorAll('[data-image-trail-row-id]')) {
+function findRecordRow(root: ParentNode, id: string): HTMLElement | null {
+  for (const candidate of root.querySelectorAll('[data-image-trail-row-id]')) {
     if (!(candidate instanceof HTMLElement)) continue;
     if (candidate.dataset['imageTrailRowId'] === id) {
       return candidate;
