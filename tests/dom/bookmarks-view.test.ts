@@ -19,6 +19,7 @@ function buildBookmarksView(
     readonly selectedIds?: readonly string[];
     readonly total?: number;
     readonly sectionOpen?: boolean;
+    readonly collapsible?: boolean;
   } = {},
 ): HTMLElement {
   const items = overrides.items ?? [record];
@@ -32,7 +33,7 @@ function buildBookmarksView(
     'global',
     { offset: 0, limit: Math.max(items.length, 1), total: overrides.total ?? items.length, hasOlder: false, hasNewer: false },
     { recallOpen: false },
-    { sectionOpen: overrides.sectionOpen ?? true },
+    { sectionOpen: overrides.sectionOpen ?? true, collapsible: overrides.collapsible ?? true },
     (action) => actions.push(action),
   );
 }
@@ -245,4 +246,15 @@ test('a collapsed queue section keeps its header actions but hides the rows (#43
 
   pinCurrent.click();
   assert.deepEqual(actions, [{ name: 'pin/current' }], 'toolbar clicks never toggle the collapse');
+});
+
+test('a non-collapsible render (detached window) has no toggle affordance (#441)', () => {
+  const actions: unknown[] = [];
+  const view = buildBookmarksView(actions, { collapsible: false });
+  const header = view.querySelector<HTMLElement>('.image-trail-panel__section-header');
+  assert.ok(header);
+  assert.equal(header.getAttribute('role'), null, 'no button role in a detached window');
+
+  header.click();
+  assert.deepEqual(actions, [], 'a detached header click must not flip the hidden attached collapse state');
 });

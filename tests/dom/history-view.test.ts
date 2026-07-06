@@ -17,10 +17,12 @@ function buildHistoryView(
   selectedIds: readonly string[] = [],
   items: readonly ImageDisplayRecord[] = [record],
   sectionOpen = true,
+  collapsible = true,
 ): HTMLElement {
   return createHistoryView(items, selectedIds, false, true, (action) => actions.push(action), {
     blobKeyAvailable: true,
     sectionOpen,
+    collapsible,
     listBlockSize: null,
     onListResize: () => undefined,
   });
@@ -221,4 +223,16 @@ test('a collapsed recents section keeps its header actions but hides the list (#
   // Toolbar clicks are plain sibling buttons — they must never toggle the collapse.
   selectAll.click();
   assert.deepEqual(actions, [{ name: 'history-selection/select', ids: [record.id] }]);
+});
+
+test('a non-collapsible render (detached window) has no toggle affordance (#441)', () => {
+  const actions: unknown[] = [];
+  const view = buildHistoryView(actions, [], [record], true, false);
+  const header = view.querySelector<HTMLElement>('.image-trail-panel__section-header');
+  assert.ok(header);
+  assert.equal(header.getAttribute('role'), null, 'no button role in a detached window');
+  assert.equal(header.classList.contains('image-trail-panel__section-header--collapsible'), false);
+
+  header.click();
+  assert.deepEqual(actions, [], 'a detached header click must not flip the hidden attached collapse state');
 });

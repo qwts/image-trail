@@ -47,40 +47,45 @@ export function createBookmarksView(
     readonly hasNewer: boolean;
   },
   recall: { readonly recallOpen: boolean },
-  options: { readonly privacyMode?: boolean; readonly sectionOpen?: boolean },
+  options: { readonly privacyMode?: boolean; readonly sectionOpen?: boolean; readonly collapsible?: boolean },
   dispatch: (action: BookmarkAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
   section.className = 'image-trail-panel__section image-trail-panel__bookmarks-section';
 
   const sectionOpen = options.sectionOpen !== false;
+  const collapsible = options.collapsible !== false;
   const heading = document.createElement('h3');
   heading.textContent = 'Queue';
   const header = document.createElement('div');
-  header.className =
-    'image-trail-panel__section-header image-trail-panel__section-header--with-actions image-trail-panel__section-header--collapsible';
+  header.className = 'image-trail-panel__section-header image-trail-panel__section-header--with-actions';
   header.dataset['open'] = String(sectionOpen);
   // Summary ergonomics (#441): the WHOLE header row is the toggle — hint area included — while
   // clicks on its interactive children (toolbar buttons, queue menu, detach) pass through, and
-  // dragging the row still pops the section out (an engaged drag suppresses the click).
-  header.setAttribute('role', 'button');
-  header.tabIndex = 0;
-  header.setAttribute('aria-expanded', String(sectionOpen));
-  header.setAttribute('aria-label', sectionOpen ? 'Hide the Queue list' : 'Show the Queue list');
-  header.title = sectionOpen ? 'Hide the Queue list' : 'Show the Queue list';
-  const toggleSection = (): void => dispatch({ name: 'panel/bookmarks-section-open', open: !sectionOpen });
-  header.addEventListener('click', (event) => {
-    const target = event.target;
-    if (target instanceof Element && target.closest('button, summary, details, input, select, a')) return;
-    event.preventDefault();
-    toggleSection();
-  });
-  header.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    if (event.target !== header) return;
-    event.preventDefault();
-    toggleSection();
-  });
+  // dragging the row still pops the section out (an engaged drag suppresses the click). A detached
+  // window renders the header non-interactive: it is always open there, and a live toggle would
+  // silently flip the ATTACHED collapse state behind the user's back.
+  if (collapsible) {
+    header.classList.add('image-trail-panel__section-header--collapsible');
+    header.setAttribute('role', 'button');
+    header.tabIndex = 0;
+    header.setAttribute('aria-expanded', String(sectionOpen));
+    header.setAttribute('aria-label', sectionOpen ? 'Hide the Queue list' : 'Show the Queue list');
+    header.title = sectionOpen ? 'Hide the Queue list' : 'Show the Queue list';
+    const toggleSection = (): void => dispatch({ name: 'panel/bookmarks-section-open', open: !sectionOpen });
+    header.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('button, summary, details, input, select, a')) return;
+      event.preventDefault();
+      toggleSection();
+    });
+    header.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (event.target !== header) return;
+      event.preventDefault();
+      toggleSection();
+    });
+  }
   header.append(heading);
 
   const add = document.createElement('button');

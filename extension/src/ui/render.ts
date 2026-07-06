@@ -454,8 +454,10 @@ function createManualControlsSection(target: PanelRenderTarget, state: PanelStat
 function createHistorySection(target: PanelRenderTarget, state: PanelState): HTMLElement {
   return createHistoryView(state.history, state.selectedHistoryIds, state.captureInProgress, state.blobKeyUnlocked, target.dispatch, {
     blobKeyAvailable: state.blobKeyAvailable,
-    // A detached window is its own container — collapse only applies to the attached panel.
+    // A detached window is its own container — collapse only applies to the attached panel, and
+    // the detached header must not carry a live toggle for the hidden attached state (#441).
     sectionOpen: state.detachedSections.includes('history') || state.historySectionOpen,
+    collapsible: !state.detachedSections.includes('history'),
     listBlockSize: target.layoutState.historyListBlockSize,
     onListResize: (blockSize) => {
       target.layoutState.historyListBlockSize = blockSize;
@@ -481,7 +483,11 @@ function createBookmarksSection(target: PanelRenderTarget, state: PanelState): H
       hasNewer: state.hasNewerBookmarks,
     },
     { recallOpen: state.recall.open },
-    { privacyMode: state.privacyModeEnabled, sectionOpen: state.detachedSections.includes('bookmarks') || state.bookmarksSectionOpen },
+    {
+      privacyMode: state.privacyModeEnabled,
+      sectionOpen: state.detachedSections.includes('bookmarks') || state.bookmarksSectionOpen,
+      collapsible: !state.detachedSections.includes('bookmarks'),
+    },
     target.dispatch,
   );
 }

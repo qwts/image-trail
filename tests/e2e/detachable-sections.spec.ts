@@ -198,6 +198,13 @@ test('a detached section window keeps its header-row action toolbar usable (#430
   await expect(windowEl.getByTitle('Queue scope and maintenance actions.')).toBeVisible();
   await expect(windowEl.locator('.image-trail-panel__section-header--with-actions h3')).toBeHidden();
 
+  // A detached header carries no live toggle (#441): clicking its surface must not flip the
+  // hidden attached collapse state — the restored section comes back expanded.
+  await windowEl.locator('.image-trail-panel__section-header').click({ position: { x: 10, y: 10 } });
+  await windowEl.locator('.image-trail-panel__section-header').click({ position: { x: 10, y: 10 } });
+
   await windowEl.getByRole('button', { name: 'Restore Queue into the panel' }).click();
   await expect(windowEl).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Hide the Queue list' })).toBeVisible();
+  await expect(page.locator('.image-trail-panel__bookmark-status-row')).toHaveCount(1);
 });
