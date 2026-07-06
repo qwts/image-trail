@@ -28,7 +28,8 @@ type BookmarkAction =
       readonly blobId?: string | undefined;
       readonly scrollAnchorId?: string | undefined;
     }
-  | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string };
+  | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string }
+  | { readonly name: 'panel/bookmarks-section-open'; readonly open: boolean };
 
 export function createBookmarksView(
   currentUrl: string | null,
@@ -46,16 +47,29 @@ export function createBookmarksView(
     readonly hasNewer: boolean;
   },
   recall: { readonly recallOpen: boolean },
-  options: { readonly privacyMode?: boolean },
+  options: { readonly privacyMode?: boolean; readonly sectionOpen?: boolean },
   dispatch: (action: BookmarkAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
   section.className = 'image-trail-panel__section image-trail-panel__bookmarks-section';
 
+  const sectionOpen = options.sectionOpen !== false;
   const heading = document.createElement('h3');
-  heading.textContent = 'Queue';
+  const headingToggle = document.createElement('button');
+  headingToggle.type = 'button';
+  headingToggle.className = 'image-trail-panel__section-heading-toggle';
+  headingToggle.textContent = 'Queue';
+  headingToggle.setAttribute('aria-expanded', String(sectionOpen));
+  headingToggle.title = sectionOpen ? 'Hide the Queue list' : 'Show the Queue list';
+  headingToggle.addEventListener('click', (event) => {
+    event.preventDefault();
+    dispatch({ name: 'panel/bookmarks-section-open', open: !sectionOpen });
+  });
+  heading.append(headingToggle);
   const header = document.createElement('div');
-  header.className = 'image-trail-panel__section-header image-trail-panel__section-header--with-actions';
+  header.className =
+    'image-trail-panel__section-header image-trail-panel__section-header--with-actions image-trail-panel__section-header--collapsible';
+  header.dataset['open'] = String(sectionOpen);
   header.append(heading);
 
   const add = document.createElement('button');
@@ -355,8 +369,12 @@ export function createBookmarksView(
   // The toolbar lives in the header row (#430) so the heading line carries the section's actions
   // instead of leaving a dead row above a full-width button strip.
   header.append(toolbar);
-  section.append(header, statusRow, items.length ? selectionMeta : empty);
-  if (items.length) section.append(list);
+  section.append(header);
+  // Collapsed (#438): the header row (heading toggle + actions + detach) stays; the content hides.
+  if (sectionOpen) {
+    section.append(statusRow, items.length ? selectionMeta : empty);
+    if (items.length) section.append(list);
+  }
   return section;
 }
 

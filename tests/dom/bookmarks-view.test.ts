@@ -14,7 +14,12 @@ const record: ImageDisplayRecord = {
 
 function buildBookmarksView(
   actions: unknown[],
-  overrides: { readonly items?: readonly ImageDisplayRecord[]; readonly selectedIds?: readonly string[]; readonly total?: number } = {},
+  overrides: {
+    readonly items?: readonly ImageDisplayRecord[];
+    readonly selectedIds?: readonly string[];
+    readonly total?: number;
+    readonly sectionOpen?: boolean;
+  } = {},
 ): HTMLElement {
   const items = overrides.items ?? [record];
   return createBookmarksView(
@@ -27,7 +32,7 @@ function buildBookmarksView(
     'global',
     { offset: 0, limit: Math.max(items.length, 1), total: overrides.total ?? items.length, hasOlder: false, hasNewer: false },
     { recallOpen: false },
-    {},
+    { sectionOpen: overrides.sectionOpen ?? true },
     (action) => actions.push(action),
   );
 }
@@ -197,4 +202,26 @@ test('the queue toolbar renders inside the section header row (#430)', () => {
   const view = buildBookmarksView(actions);
   const toolbar = view.querySelector('.image-trail-panel__section-header--with-actions .image-trail-panel__bookmark-toolbar');
   assert.ok(toolbar, 'the toolbar lives in the header row, not on a floating row below it');
+});
+
+test('the heading toggle collapses and expands the queue section (#438)', () => {
+  const actions: unknown[] = [];
+  const view = buildBookmarksView(actions);
+  const toggle = view.querySelector<HTMLButtonElement>('.image-trail-panel__section-heading-toggle');
+  assert.ok(toggle);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+
+  toggle.click();
+  assert.deepEqual(actions, [{ name: 'panel/bookmarks-section-open', open: false }]);
+});
+
+test('a collapsed queue section keeps its header actions but hides the rows (#438)', () => {
+  const actions: unknown[] = [];
+  const view = buildBookmarksView(actions, { sectionOpen: false });
+  assert.equal(view.querySelector('.image-trail-panel__record-list'), null, 'the list is hidden while collapsed');
+  const pinCurrent = [...view.querySelectorAll('button')].find((button) => button.textContent === 'Pin current');
+  assert.ok(pinCurrent, 'the header toolbar stays usable while collapsed');
+
+  pinCurrent.click();
+  assert.deepEqual(actions, [{ name: 'pin/current' }], 'toolbar clicks never toggle the collapse');
 });

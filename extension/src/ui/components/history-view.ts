@@ -12,10 +12,13 @@ type HistoryAction =
   | { readonly name: 'history-selection/clear' }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'history'; readonly sourceRecordId: string }
   | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string | undefined }
+  | { readonly name: 'panel/history-section-open'; readonly open: boolean }
   | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string };
 
 interface HistoryViewOptions {
   readonly blobKeyAvailable: boolean;
+  /** Attached-panel collapse state (#438); detached windows always render open. */
+  readonly sectionOpen?: boolean;
   readonly listBlockSize: number | null;
   readonly onListResize: (blockSize: number) => void;
   readonly privacyMode?: boolean;
@@ -32,10 +35,23 @@ export function createHistoryView(
   const section = document.createElement('section');
   section.className = 'image-trail-panel__section image-trail-panel__history-section';
 
+  const sectionOpen = options?.sectionOpen !== false;
   const heading = document.createElement('h3');
-  heading.textContent = 'Recent history';
+  const headingToggle = document.createElement('button');
+  headingToggle.type = 'button';
+  headingToggle.className = 'image-trail-panel__section-heading-toggle';
+  headingToggle.textContent = 'Recent history';
+  headingToggle.setAttribute('aria-expanded', String(sectionOpen));
+  headingToggle.title = sectionOpen ? 'Hide the Recent history list' : 'Show the Recent history list';
+  headingToggle.addEventListener('click', (event) => {
+    event.preventDefault();
+    dispatch({ name: 'panel/history-section-open', open: !sectionOpen });
+  });
+  heading.append(headingToggle);
   const header = document.createElement('div');
-  header.className = 'image-trail-panel__section-header image-trail-panel__section-header--with-actions';
+  header.className =
+    'image-trail-panel__section-header image-trail-panel__section-header--with-actions image-trail-panel__section-header--collapsible';
+  header.dataset['open'] = String(sectionOpen);
   header.append(heading);
 
   const toolbar = document.createElement('div');
@@ -241,8 +257,12 @@ export function createHistoryView(
   // The toolbar lives in the header row (#430) so the heading line carries the section's actions
   // instead of leaving a dead row above a floating button strip.
   header.append(toolbar);
-  section.append(header, items.length ? selectionMeta : empty);
-  if (items.length) section.append(list);
+  section.append(header);
+  // Collapsed (#438): the header row (heading toggle + actions + detach) stays; the content hides.
+  if (sectionOpen) {
+    section.append(items.length ? selectionMeta : empty);
+    if (items.length) section.append(list);
+  }
   return section;
 }
 

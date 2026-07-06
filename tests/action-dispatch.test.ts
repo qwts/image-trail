@@ -226,6 +226,8 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'target/fill-screen': { name: 'target/fill-screen', enabled: true },
   'target/set-object-fit': { name: 'target/set-object-fit', mode: 'contain' },
   'panel/secondary-controls-open': { name: 'panel/secondary-controls-open', open: true },
+  'panel/history-section-open': { name: 'panel/history-section-open', open: true },
+  'panel/bookmarks-section-open': { name: 'panel/bookmarks-section-open', open: true },
   'section/detach': { name: 'section/detach', sectionId: 'history' },
   'section/restore': { name: 'section/restore', sectionId: 'history' },
   'panel/minimize': { name: 'panel/minimize' },

@@ -588,6 +588,16 @@
           "type": "unit-dom",
           "paths": ["tests/dom/history-view.test.ts", "tests/dom/bookmarks-view.test.ts"],
           "notes": "Covers #430: the Recents and Queue action toolbars render inside their section header rows (heading | wrapping toolbar | pinned detach column) instead of floating rows below the heading."
+        },
+        {
+          "type": "unit-dom",
+          "paths": ["tests/dom/history-view.test.ts", "tests/dom/bookmarks-view.test.ts"],
+          "notes": "Covers #438: the Recents/Queue heading toggles collapse and expand the section body (aria-expanded button), a collapsed section keeps its header-row actions usable, and toolbar clicks never toggle the collapse."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/recents-queue-recall.spec.ts",
+          "notes": "Covers #438 end to end: collapse/expand both sections from the heading toggles, header actions stay usable while collapsed (pinning while the queue is collapsed works), and toolbar clicks do not toggle the collapse."
         }
       ]
     },

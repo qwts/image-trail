@@ -16,9 +16,11 @@ function buildHistoryView(
   actions: unknown[],
   selectedIds: readonly string[] = [],
   items: readonly ImageDisplayRecord[] = [record],
+  sectionOpen = true,
 ): HTMLElement {
   return createHistoryView(items, selectedIds, false, true, (action) => actions.push(action), {
     blobKeyAvailable: true,
+    sectionOpen,
     listBlockSize: null,
     onListResize: () => undefined,
   });
@@ -135,4 +137,27 @@ test('the recents toolbar renders inside the section header row (#430)', () => {
   const view = buildHistoryView(actions);
   const toolbar = view.querySelector('.image-trail-panel__section-header--with-actions .image-trail-panel__history-toolbar');
   assert.ok(toolbar, 'the toolbar lives in the header row, not on a floating row below it');
+});
+
+test('the heading toggle collapses and expands the recents section (#438)', () => {
+  const actions: unknown[] = [];
+  const view = buildHistoryView(actions);
+  const toggle = view.querySelector<HTMLButtonElement>('.image-trail-panel__section-heading-toggle');
+  assert.ok(toggle);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+
+  toggle.click();
+  assert.deepEqual(actions, [{ name: 'panel/history-section-open', open: false }]);
+});
+
+test('a collapsed recents section keeps its header actions but hides the list (#438)', () => {
+  const actions: unknown[] = [];
+  const view = buildHistoryView(actions, [], [record], false);
+  assert.equal(view.querySelector('.image-trail-panel__record-list'), null, 'the list is hidden while collapsed');
+  const selectAll = [...view.querySelectorAll('button')].find((button) => button.textContent === 'Select all recents');
+  assert.ok(selectAll, 'the header toolbar stays usable while collapsed');
+
+  // Toolbar clicks are plain sibling buttons — they must never toggle the collapse.
+  selectAll.click();
+  assert.deepEqual(actions, [{ name: 'history-selection/select', ids: [record.id] }]);
 });

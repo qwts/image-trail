@@ -211,6 +211,8 @@ export interface PanelState {
   readonly neighborPreloadCacheLimit: number;
   readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly secondaryControlsOpen: boolean;
+  readonly historySectionOpen: boolean;
+  readonly bookmarksSectionOpen: boolean;
   readonly detachedSections: readonly DetachableSectionId[];
   readonly restoreWorkspaceLayoutEnabled: boolean;
   readonly hasOlderBookmarks: boolean;
@@ -565,6 +567,8 @@ export type PanelAction =
     }
   | { readonly name: 'history/load' | 'history/download' }
   | { readonly name: 'panel/secondary-controls-open'; readonly open: boolean }
+  | { readonly name: 'panel/history-section-open'; readonly open: boolean }
+  | { readonly name: 'panel/bookmarks-section-open'; readonly open: boolean }
   | { readonly name: 'section/detach' | 'section/restore'; readonly sectionId: DetachableSectionId }
   | { readonly name: 'settings/update-visible-bookmark-soft-max'; readonly value: number }
   | {

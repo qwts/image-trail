@@ -368,3 +368,28 @@ test('selecting a recent row keeps the recents list scroll position (#425)', asy
   await expect(page.locator('.image-trail-panel__history-item.is-selected')).toHaveCount(1);
   await expect.poll(async () => list.evaluate((element) => element.scrollTop)).toBe(scrolled);
 });
+
+test('the Recents and Queue sections collapse and expand from their heading toggles (#438)', async ({ page, serviceWorker }) => {
+  await openPanel(page, serviceWorker);
+  await deleteVisibleRecents(page);
+  await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetOne));
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(1);
+
+  const recentsToggle = page.getByRole('button', { name: 'Hide the Recent history list' });
+  await recentsToggle.click();
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(0);
+  // The header row keeps its actions while collapsed.
+  await expect(page.getByRole('button', { name: 'Select all recents' })).toBeVisible();
+  await page.getByRole('button', { name: 'Show the Recent history list' }).click();
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(1);
+
+  const queueToggle = page.getByRole('button', { name: 'Hide the Queue list' });
+  await queueToggle.click();
+  await expect(page.locator('.image-trail-panel__bookmark-status-row')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Pin current' })).toBeVisible();
+  // Toolbar clicks never toggle the collapse: pin while collapsed, then expand and see the row.
+  await page.getByRole('button', { name: 'Pin current' }).click();
+  await expect(page.getByRole('button', { name: 'Hide the Queue list' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show the Queue list' }).click();
+  await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' })).toBeVisible();
+});

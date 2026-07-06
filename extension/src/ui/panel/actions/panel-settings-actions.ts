@@ -3,6 +3,8 @@ import type { PanelActionDeps } from './deps.js';
 
 export type PanelSettingsActionName =
   | 'panel/secondary-controls-open'
+  | 'panel/history-section-open'
+  | 'panel/bookmarks-section-open'
   | 'panel/minimize'
   | 'panel/expand'
   | 'settings/toggle'
@@ -40,6 +42,22 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
         if (deps.getState().secondaryControlsOpen === action.open) return;
         deps.reduce(action);
         deps.saveLocalSettings({ ...deps.getLocalSettings(), secondaryControlsOpen: action.open });
+        deps.render();
+      },
+    },
+    // Session-local collapse for the Recents/Queue sections (#438); durable persistence is an
+    // explicit follow-up if wanted.
+    'panel/history-section-open': {
+      handle(action) {
+        if (deps.getState().historySectionOpen === action.open) return;
+        deps.reduce(action);
+        deps.render();
+      },
+    },
+    'panel/bookmarks-section-open': {
+      handle(action) {
+        if (deps.getState().bookmarksSectionOpen === action.open) return;
+        deps.reduce(action);
         deps.render();
       },
     },
