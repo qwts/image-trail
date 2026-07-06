@@ -59,8 +59,8 @@ export interface FullBackupExportResult {
 
 export async function exportEncryptedFullBackup(input: FullBackupExportInput): Promise<FullBackupExportResult> {
   const { bookmarks, originalBlobs, password, now = new Date().toISOString(), albums = [] } = input;
-  if (bookmarks.length === 0) {
-    return { status: { ok: false, code: 'not-found', message: 'No bookmarks to export.' } };
+  if (bookmarks.length === 0 && albums.length === 0) {
+    return { status: { ok: false, code: 'not-found', message: 'No bookmarks or albums to export.' } };
   }
 
   try {

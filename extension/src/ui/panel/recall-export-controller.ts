@@ -207,6 +207,7 @@ export class RecallExportController {
     this.deps.render();
 
     const bookmarks = await this.loadAllBookmarksForExport();
+    const albums = (await this.deps.albumStore()?.listBackupEntries()) ?? [];
     if (bookmarks.some(isLockedPrivatePin)) {
       this.deps.setState(
         reducePanelAction(this.deps.getState(), { name: 'pcloud-backup/upload-error', message: PRIVATE_PIN_EXPORT_LOCKED_MESSAGE }),
@@ -214,11 +215,11 @@ export class RecallExportController {
       this.deps.render();
       return;
     }
-    if (bookmarks.length === 0) {
+    if (bookmarks.length === 0 && albums.length === 0) {
       this.deps.setState(
         reducePanelAction(this.deps.getState(), {
           name: 'pcloud-backup/upload-error',
-          message: 'No durable pins or bookmarks to back up.',
+          message: 'No durable pins, bookmarks, or albums to back up.',
         }),
       );
       this.deps.render();
@@ -250,7 +251,6 @@ export class RecallExportController {
     }
 
     const now = new Date().toISOString();
-    const albums = (await this.deps.albumStore()?.listBackupEntries()) ?? [];
     const exportResult = await exportEncryptedFullBackup({
       bookmarks: bookmarks.map(bookmarkRecordToExportEntry),
       albums,

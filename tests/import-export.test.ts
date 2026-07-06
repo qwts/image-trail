@@ -598,6 +598,33 @@ test('full-backup: exports bookmarks with encrypted original blob records', asyn
   assert.deepEqual(Array.from(new Uint8Array(restored.ciphertext).slice(0, 4)), [0, 1, 2, 3]);
 });
 
+test('full-backup: exports album metadata even when there are no bookmarks', async () => {
+  const exported = await exportEncryptedFullBackup({
+    bookmarks: [],
+    albums: [
+      {
+        id: 'empty-album',
+        name: 'Empty album',
+        createdAt: '2026-06-28T00:00:00.000Z',
+        updatedAt: '2026-06-28T00:00:00.000Z',
+        recordIds: [],
+      },
+    ],
+    originalBlobs: [],
+    password: 'backup-password',
+    now: '2026-06-28T00:00:00.000Z',
+  });
+
+  assert.ok(exported.status.ok, exported.status.message);
+  const imported = await importBookmarks(exported.fileContent!, 'backup-password');
+  assert.ok(imported.status.ok, imported.status.message);
+  assert.equal(imported.entries.length, 0);
+  assert.deepEqual(
+    imported.albums.map((album) => ({ id: album.id, name: album.name, recordIds: album.recordIds })),
+    [{ id: 'empty-album', name: 'Empty album', recordIds: [] }],
+  );
+});
+
 test('full-backup: rejects malformed original and key backup entries', () => {
   assert.equal(
     fullBackupPayloadFromUnknown({

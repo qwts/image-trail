@@ -118,7 +118,7 @@
             "tests/recall-restore-controller.test.ts",
             "tests/dom/recall-export-controller.test.ts"
           ],
-          "notes": "Covers durable album and membership stores, v8 IndexedDB migration/indexes, idempotent ordered membership add/remove without queueUpdatedAt changes, album and bookmark mutation notifications, gallery debounced refresh hooks, privacy-safe notification payloads, album message registry fallbacks, gallery album create/select/rename/delete controls, custom add-to-album popovers with independent per-card choices, add/remove membership actions, selected-album missing-record status, v2 full-backup album metadata export/import, duplicate UUID remapping, and explicit skipped membership reporting."
+          "notes": "Covers durable album and membership stores, v8 IndexedDB migration/indexes, idempotent ordered membership add/remove without queueUpdatedAt changes, album and bookmark mutation notifications, gallery debounced refresh hooks, privacy-safe notification payloads, album message registry fallbacks, gallery album create/select/rename/delete controls, custom add-to-album popovers with independent per-card choices, add/remove membership actions, selected-album missing-record status, v2 full-backup album metadata export/import including album-only backups, duplicate UUID remapping, and explicit skipped membership reporting."
         },
         {
           "type": "manual",

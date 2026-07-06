@@ -117,7 +117,7 @@ test('backupPCloudNow rejects an empty backup set', async () => {
 
   await harness.controller.backupPCloudNow('cloud-pass');
 
-  assert.match(harness.getState().pcloudBackup.message ?? '', /No durable pins or bookmarks to back up\./u);
+  assert.match(harness.getState().pcloudBackup.message ?? '', /No durable pins, bookmarks, or albums to back up\./u);
   assert.equal(harness.uploads.length, 0);
 });
 
@@ -160,6 +160,32 @@ test('backupPCloudNow uploads an encrypted backup and reports success', async ()
     [{ name: 'Reference', recordIds: ['bookmark-1'] }],
   );
   assert.equal(harness.getState().pcloudBackup.lastBackupMissingOriginalCount, 0);
+  assert.equal(harness.getState().pcloudBackup.messageIsError, false);
+});
+
+test('backupPCloudNow uploads album-only backups', async () => {
+  const harness = createExportHarness({
+    bookmarks: [],
+    albums: [
+      {
+        id: 'empty-album',
+        name: 'Empty album',
+        createdAt: '2026-06-20T00:00:00.000Z',
+        updatedAt: '2026-06-20T00:00:00.000Z',
+        recordIds: [],
+      },
+    ],
+  });
+
+  await harness.controller.backupPCloudNow('cloud-pass');
+
+  assert.equal(harness.uploads.length, 1, 'the album-only backup is uploaded');
+  const imported = await importBookmarks(harness.uploads[0]!.fileContent, 'cloud-pass');
+  assert.equal(imported.entries.length, 0);
+  assert.deepEqual(
+    imported.albums.map((album) => ({ name: album.name, recordIds: album.recordIds })),
+    [{ name: 'Empty album', recordIds: [] }],
+  );
   assert.equal(harness.getState().pcloudBackup.messageIsError, false);
 });
 
