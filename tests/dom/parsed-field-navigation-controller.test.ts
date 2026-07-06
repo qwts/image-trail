@@ -57,8 +57,9 @@ interface ApplyCall {
 
 interface HarnessOptions {
   readonly baseUrl?: string;
-  readonly applyResult?: (url: string, callIndex: number) => boolean;
+  readonly applyResult?: (url: string, callIndex: number) => boolean | Promise<boolean>;
   readonly requestResult?: (callIndex: number) => 'ok' | 'throttled';
+  readonly nextReadyDelayMs?: number;
   readonly neighborPreloadRadius?: number;
   readonly neighborPreloadActive?: boolean;
   readonly bufferedStep?: (callIndex: number) => 'loaded' | 'blocked';
@@ -108,7 +109,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
         const status = options.requestResult ? options.requestResult(requestCalls) : 'ok';
         return status === 'ok' ? { value: operation(), status: 'ok' as const } : { value: null, status: 'throttled' as const };
       },
-      nextReadyDelayMs: () => 0,
+      nextReadyDelayMs: () => options.nextReadyDelayMs ?? 0,
       requestsInWindow: () => 1,
     }),
     bufferedNav: () => ({
@@ -258,11 +259,12 @@ test('a larger neighbor-preload radius raises the consecutive-miss threshold wit
 
 test('a successful load resets the consecutive-miss budget so sparse galleries keep navigating', async () => {
   // Misses at call indexes 0,1 and 3,4; loads at 2 and 5 — two queued steps across two gaps of 2.
+  // Slideshow steps queue without coalescing (#373), so one drain walks both gaps step by step.
   const harness = createHarness({ applyResult: (_url, callIndex) => callIndex % 3 === 2 });
   harness.patchState({ unlockedFieldIds: [intFieldId()] });
 
-  harness.controller.navigateBy(1);
-  harness.controller.navigateBy(1);
+  harness.controller.navigateBy(1, 'slideshow');
+  harness.controller.navigateBy(1, 'slideshow');
   await until(() => harness.applyCalls.filter((_, index) => index % 3 === 2).length >= 2, 5000);
 
   assert.equal(harness.applyCalls.length, 6, 'both steps land after skipping 2-wide gaps');
@@ -280,8 +282,8 @@ test('a buffered (preload fast-path) landing also resets the consecutive-miss bu
   });
   harness.patchState({ unlockedFieldIds: [intFieldId()] });
 
-  harness.controller.navigateBy(1);
-  harness.controller.navigateBy(1);
+  harness.controller.navigateBy(1, 'slideshow');
+  harness.controller.navigateBy(1, 'slideshow');
   await untilStopped(harness);
 
   // 2 misses, buffered landing (resets the consecutive budget), then a FULL fresh budget of 3
@@ -296,10 +298,68 @@ test('the outer safety net caps TOTAL skips per drain even when successes keep r
   const harness = createHarness({ applyResult: (_url, callIndex) => callIndex % 3 === 2 });
   harness.patchState({ unlockedFieldIds: [intFieldId()] });
 
-  for (let press = 0; press < 30; press += 1) harness.controller.navigateBy(1);
+  // Slideshow steps stay single-step; a manual burst would coalesce to one jump instead (#373).
+  for (let press = 0; press < 30; press += 1) harness.controller.navigateBy(1, 'slideshow');
   await untilStopped(harness, 15000);
 
   assert.equal(harness.getState().message, 'Stopped after skipping 50 unavailable images; no loadable image found in that direction.');
   const misses = harness.applyCalls.filter((_, index) => index % 3 !== 2).length;
   assert.equal(misses, 50, `the drain stops at 50 total skips, got ${misses}`);
+});
+
+test('a rapid manual burst coalesces into one net jump instead of a load per press (latest wins, #373)', async () => {
+  const harness = createHarness();
+  harness.patchState({ unlockedFieldIds: [intFieldId()] });
+
+  // The first press starts the drain and claims its single step synchronously; the four presses
+  // landing during that in-flight load must fold into ONE follow-up jump, not four more loads.
+  harness.controller.navigateBy(1);
+  harness.controller.navigateBy(1);
+  harness.controller.navigateBy(1);
+  harness.controller.navigateBy(1);
+  harness.controller.navigateBy(1);
+  await until(() => harness.applyCalls.length >= 2);
+  // Let any (wrong) extra queued loads surface before asserting the drain went quiet.
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  // The harness base URL is fixed, so the coalesced jump scans from image=10: +1, then +4 net.
+  assert.deepEqual(
+    harness.applyCalls.map((call) => call.url),
+    ['https://example.test/gallery?image=11', 'https://example.test/gallery?image=14'],
+  );
+  assert.equal(harness.getState().automation.navigationBusy, false, 'the busy flag clears once the burst settles');
+});
+
+test('cancelQueuedManualNavigation drops queued presses while a load is in flight (Escape/Stop, #373)', async () => {
+  let resolveFirst!: (loaded: boolean) => void;
+  const harness = createHarness({
+    applyResult: (_url, callIndex) => (callIndex === 0 ? new Promise<boolean>((resolve) => (resolveFirst = resolve)) : true),
+  });
+  harness.patchState({ unlockedFieldIds: [intFieldId()] });
+
+  harness.controller.navigateBy(1);
+  await until(() => harness.applyCalls.length === 1);
+  assert.equal(harness.getState().automation.navigationBusy, true, 'an in-flight load reports busy');
+  harness.controller.navigateBy(1);
+  harness.controller.navigateBy(1);
+
+  harness.controller.cancelQueuedManualNavigation();
+  resolveFirst(true);
+  await until(() => !harness.getState().automation.navigationBusy);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  assert.equal(harness.applyCalls.length, 1, 'only the in-flight load applies; cancelled presses never do');
+});
+
+test('a long governor wait drops queued manual intent with a visible message instead of loading later (#373)', async () => {
+  const harness = createHarness({ requestResult: () => 'throttled', nextReadyDelayMs: 60_000 });
+  harness.patchState({ unlockedFieldIds: [intFieldId()] });
+
+  harness.controller.navigateBy(1);
+  await until(() => harness.getState().message.startsWith('Request limit reached'));
+
+  assert.deepEqual(harness.applyCalls, [], 'the throttled manual step is abandoned, not applied a minute later');
+  assert.equal(harness.getState().message, 'Request limit reached; navigation stopped instead of loading 60s from now. Try again shortly.');
+  assert.equal(harness.getState().automation.navigationBusy, false);
+  assert.equal(harness.getState().automation.governorStatus, 'throttled', 'the rate-limit state stays visible');
 });

@@ -118,6 +118,7 @@ function createHarness(): Harness {
     clearUrlReviewStatus: noopAsync,
     navigateBy: noop,
     cancelQueuedSlideshowNavigation: noop,
+    cancelQueuedManualNavigation: noop,
   };
   return { deps, log, panelMount };
 }

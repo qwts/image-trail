@@ -45,6 +45,9 @@ export interface AutomationState {
   readonly retriesMax: number;
   readonly governorStatus: 'ready' | 'throttled' | 'capped';
   readonly requestsInWindow: number;
+  // True while the parsed-field navigation drain is working (loading, skipping, or waiting on the
+  // governor) — the panel's visible "navigation is busy" signal (#373).
+  readonly navigationBusy: boolean;
 }
 
 export type RecallDrawerSide = 'left' | 'right';

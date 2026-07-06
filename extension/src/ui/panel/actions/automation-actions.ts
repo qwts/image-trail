@@ -63,6 +63,9 @@ export function buildAutomationActionEntries(deps: PanelActionDeps): ActionEntri
       handle(action) {
         deps.slideshow().stop();
         deps.retry().stop();
+        // Stop means stop: queued manual navigation must not keep applying afterward (#373).
+        deps.cancelQueuedManualNavigation();
+        deps.cancelQueuedSlideshowNavigation();
         deps.reduce(action);
         deps.render();
       },

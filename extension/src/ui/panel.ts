@@ -650,6 +650,7 @@ export class ImageTrailPanel {
       clearUrlReviewStatus: (scope) => this.urlReviewStatus.clearUrlReviewStatus(scope),
       navigateBy: (delta) => this.parsedFieldNavigation.navigateBy(delta),
       cancelQueuedSlideshowNavigation: () => this.parsedFieldNavigation.cancelQueuedSlideshowNavigation(),
+      cancelQueuedManualNavigation: () => this.parsedFieldNavigation.cancelQueuedManualNavigation(),
     };
   }
 

@@ -65,13 +65,36 @@ export interface FieldEditorControllerDeps {
  * template on a successful load only when `saveTemplateOnLoad === 'always'` or a field is unlocked.
  */
 export class FieldEditorController {
+  // Latest wins for rapid -/+ (#373): while a step for a field is still queued (not yet running),
+  // further steps on the same field fold their delta into it instead of enqueueing another load —
+  // a burst becomes one net transform. Only valid while the step is the newest queued interaction;
+  // any other interaction arriving in between must run after it in order, so folding stops.
+  private mergeableQueuedStep: { readonly fieldId: string; readonly entry: { delta: number } } | null = null;
+
   constructor(private readonly deps: FieldEditorControllerDeps) {}
 
   enqueueFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): void {
+    if (action.transformId === 'step') {
+      if (this.mergeableQueuedStep?.fieldId === action.fieldId) {
+        this.mergeableQueuedStep.entry.delta += action.delta;
+        return;
+      }
+      const entry = { delta: action.delta as number };
+      this.mergeableQueuedStep = { fieldId: action.fieldId, entry };
+      this.enqueueFieldInteraction(async () => {
+        if (this.mergeableQueuedStep?.entry === entry) this.mergeableQueuedStep = null;
+        // A +/- pair that netted to zero is a no-op, not two loads.
+        if (entry.delta === 0) return;
+        await this.applyFieldTransform(action, entry.delta);
+      });
+      return;
+    }
+    this.mergeableQueuedStep = null;
     this.enqueueFieldInteraction(() => this.applyFieldTransform(action));
   }
 
   enqueueSelectedUrlApply(url: string): void {
+    this.mergeableQueuedStep = null;
     this.enqueueFieldInteraction(() => this.applyUrlEditorUrl(url));
   }
 
@@ -116,10 +139,13 @@ export class FieldEditorController {
     await this.deps.applySelectedUrl(url, [], { pushVisibleUrl: true, resetFieldState: url !== this.deps.currentRawUrl() });
   }
 
-  private async applyFieldTransform(action: Extract<PanelAction, { readonly name: 'field/transform' }>): Promise<void> {
+  private async applyFieldTransform(
+    action: Extract<PanelAction, { readonly name: 'field/transform' }>,
+    coalescedStepDelta?: number,
+  ): Promise<void> {
     const prunedInvalidSplitSpecs = action.transformId !== 'split-clear' && this.pruneInvalidFieldSplitSpecsForCurrentUrl();
     if (action.transformId !== 'reset-all' && action.transformId !== 'reset-field') this.captureResetBaseline();
-    const effect = this.fieldEditorEffect(action);
+    const effect = this.fieldEditorEffect(action, coalescedStepDelta);
     if (effect.kind === 'noop') {
       if (prunedInvalidSplitSpecs) this.deps.render();
       return;
@@ -127,7 +153,10 @@ export class FieldEditorController {
     await this.runFieldEditorEffect(effect);
   }
 
-  private fieldEditorEffect(action: Extract<PanelAction, { readonly name: 'field/transform' }>): FieldEditorEffect {
+  private fieldEditorEffect(
+    action: Extract<PanelAction, { readonly name: 'field/transform' }>,
+    coalescedStepDelta?: number,
+  ): FieldEditorEffect {
     if (action.transformId === 'reset-all') return this.resetAllFieldsEffect();
     if (action.transformId === 'reset-field') return this.resetOneFieldEffect(action.fieldId);
 
@@ -210,7 +239,7 @@ export class FieldEditorController {
     const transform =
       action.transformId === 'set-value'
         ? applySetFieldValueTransform(model, field, action.value)
-        : applyStepFieldValueTransform(model, field, action.delta);
+        : applyStepFieldValueTransform(model, field, coalescedStepDelta ?? action.delta);
 
     const state =
       action.transformId === 'step'
