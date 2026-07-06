@@ -203,6 +203,7 @@ function createHarness(
     clearUrlReviewStatus: (scope) => recordAsync(`clearUrlReviewStatus:${scope}`),
     navigateBy: (delta) => record(`navigateBy:${delta}`),
     cancelQueuedSlideshowNavigation: () => record('cancelQueuedSlideshowNavigation'),
+    cancelQueuedManualNavigation: () => record('cancelQueuedManualNavigation'),
   };
   return {
     deps,
@@ -491,7 +492,14 @@ test('stop-all halts the collaborators before reducing, unlike slideshow-start',
   const harness = createHarness();
   const registry = buildPanelActionRegistry(harness.deps);
   dispatchPanelAction(registry, { name: 'stop-all' }, () => assert.fail('unexpected fallback'));
-  assert.deepEqual(harness.log, ['slideshow.stop', 'retry.stop', 'reduce', 'render']);
+  assert.deepEqual(harness.log, [
+    'slideshow.stop',
+    'retry.stop',
+    'cancelQueuedManualNavigation',
+    'cancelQueuedSlideshowNavigation',
+    'reduce',
+    'render',
+  ]);
   harness.log.length = 0;
   dispatchPanelAction(registry, { name: 'slideshow-start' }, () => assert.fail('unexpected fallback'));
   assert.deepEqual(harness.log, ['reduce', 'slideshow.start', 'render']);

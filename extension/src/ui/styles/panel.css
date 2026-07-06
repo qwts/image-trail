@@ -450,8 +450,11 @@
   background-size:
     240% 100%,
     auto;
+
+  /* Waiting toasts enter on a short delay (fill-mode backwards holds them invisible) so busy
+     phases that resolve near-instantly — e.g. a buffered navigation step (#373) — never flash. */
   animation:
-    image-trail-toast-enter 170ms ease-out,
+    image-trail-toast-enter 170ms ease-out 150ms backwards,
     image-trail-wait-sweep 1200ms linear infinite;
 }
 

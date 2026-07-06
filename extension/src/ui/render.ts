@@ -465,27 +465,38 @@ function createBookmarksSection(target: PanelRenderTarget, state: PanelState): H
 function renderStatusToast(toastRoot: HTMLElement | null | undefined, state: PanelState): void {
   if (!toastRoot) return;
   const message = toastMessageText(state);
+  const showToast = state.visible && state.status !== 'closed' && !!message;
+  const label = hasPanelError(state) ? 'Error' : isPanelWaiting(state) ? 'Working' : statusSummaryText(state);
+  // Targeted refresh (#373): rebuilding the toast on every render replays its enter animation, so
+  // an unchanged (often stale) status message "pops up" again on each navigation render. Skip the
+  // rebuild unless something the toast shows actually changed. The key holds every input that
+  // affects the DOM below; out-of-band writers (the buffered-skip toast) clear it to force a rebuild.
+  const toastKey = showToast
+    ? [statusToneClass(state), String(isPanelWaiting(state)), String(hasPanelError(state)), label, message].join(' ')
+    : '';
+  if (toastRoot.dataset['imageTrailToastKey'] === toastKey) return;
+  toastRoot.dataset['imageTrailToastKey'] = toastKey;
   toastRoot.replaceChildren();
   toastRoot.className = `image-trail-panel-root image-trail-panel__toast-root ${statusToneClass(state)}`;
   toastRoot.classList.toggle('is-waiting', isPanelWaiting(state));
   toastRoot.classList.toggle('has-status-error', hasPanelError(state));
-  if (!state.visible || state.status === 'closed' || !message) return;
+  if (!showToast) return;
 
   const toast = document.createElement('aside');
   toast.className = 'image-trail-panel__toast';
   toast.setAttribute('role', hasPanelError(state) ? 'alert' : 'status');
   toast.setAttribute('aria-live', hasPanelError(state) ? 'assertive' : 'polite');
 
-  const label = document.createElement('span');
-  label.className = 'image-trail-panel__toast-label';
-  label.textContent = hasPanelError(state) ? 'Error' : isPanelWaiting(state) ? 'Working' : statusSummaryText(state);
+  const labelElement = document.createElement('span');
+  labelElement.className = 'image-trail-panel__toast-label';
+  labelElement.textContent = label;
 
   const copy = document.createElement('span');
   copy.className = 'image-trail-panel__toast-message';
   copy.textContent = message;
   copy.title = message;
 
-  toast.append(label, copy);
+  toast.append(labelElement, copy);
   toastRoot.append(toast);
 }
 
@@ -498,6 +509,7 @@ function statusSummaryText(state: PanelState): string {
   if (state.automation.retryPhase === 'running') return 'Retrying';
   if (state.automation.slideshowPhase === 'running') return 'Slideshow';
   if (state.automation.governorStatus !== 'ready') return 'Rate limited';
+  if (state.automation.navigationBusy) return 'Loading';
   if (state.status === 'picking') return 'Picking';
   return 'Ready';
 }
@@ -524,6 +536,7 @@ function waitingToastMessageText(state: PanelState): string {
   if (state.automation.retryPhase === 'running') return 'Retrying failed image loads.';
   if (state.automation.slideshowPhase === 'running') return 'Slideshow is advancing images.';
   if (state.automation.governorStatus !== 'ready') return 'Waiting for the request limit window.';
+  if (state.automation.navigationBusy) return 'Loading the next image.';
   return '';
 }
 
@@ -541,7 +554,8 @@ function isPanelWaiting(state: PanelState): boolean {
     state.recall.busy ||
     state.automation.slideshowPhase === 'running' ||
     state.automation.retryPhase === 'running' ||
-    state.automation.governorStatus !== 'ready'
+    state.automation.governorStatus !== 'ready' ||
+    state.automation.navigationBusy
   );
 }
 

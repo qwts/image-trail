@@ -24,6 +24,7 @@ export const EMPTY_AUTOMATION_STATE: AutomationState = {
   retriesMax: 3,
   governorStatus: 'ready',
   requestsInWindow: 0,
+  navigationBusy: false,
 };
 
 export const EMPTY_RECALL_STATE: RecallState = {

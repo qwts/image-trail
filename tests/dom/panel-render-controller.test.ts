@@ -267,3 +267,38 @@ test('scheduleFiniteCaptureErrorReset (capture-result) clears a non-captured res
     timers.restore();
   }
 });
+
+test('an unchanged status toast is not rebuilt on re-render, so its enter animation cannot replay (#373)', () => {
+  const harness = createHarness();
+  harness.patchState({ visible: true, status: 'error', message: 'Image export failed for photo.jpg.' });
+
+  harness.controller.render();
+  const firstToast = harness.toastRoot.querySelector('.image-trail-panel__toast');
+  assert.ok(firstToast, 'the error message renders a toast');
+
+  harness.controller.render();
+  assert.equal(
+    harness.toastRoot.querySelector('.image-trail-panel__toast'),
+    firstToast,
+    'a re-render with the same message keeps the same toast element',
+  );
+
+  harness.patchState({ message: 'Image export failed for other.jpg.' });
+  harness.controller.render();
+  const changedToast = harness.toastRoot.querySelector('.image-trail-panel__toast');
+  assert.ok(changedToast && changedToast !== firstToast, 'a changed message rebuilds the toast');
+});
+
+test('a render after the out-of-band buffered-skip toast rebuilds the status toast area (#373)', () => {
+  const harness = createHarness();
+  harness.patchState({ visible: true });
+  harness.controller.render();
+
+  harness.controller.showBufferedNavigationToast('Skipped 2 unavailable images.');
+  assert.ok(harness.toastRoot.querySelector('.image-trail-panel__buffered-skip-toast'));
+
+  // The skip toast wrote toastRoot outside renderStatusToast; the next render must not treat the
+  // area as already up to date.
+  harness.controller.render();
+  assert.equal(harness.toastRoot.querySelector('.image-trail-panel__buffered-skip-toast'), null);
+});

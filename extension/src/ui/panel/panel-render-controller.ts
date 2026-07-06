@@ -171,6 +171,8 @@ export class PanelRenderController {
 
     toastRoot.replaceChildren();
     toastRoot.className = 'image-trail-panel-root image-trail-panel__toast-root has-buffered-skip-pulse';
+    // Out-of-band toast write: clear the status-toast refresh key so the next render rebuilds.
+    delete toastRoot.dataset['imageTrailToastKey'];
 
     const toast = document.createElement('aside');
     toast.className = 'image-trail-panel__toast image-trail-panel__buffered-skip-toast';
@@ -194,6 +196,7 @@ export class PanelRenderController {
       if (currentToastRoot) {
         currentToastRoot.replaceChildren();
         currentToastRoot.className = 'image-trail-panel-root image-trail-panel__toast-root';
+        delete currentToastRoot.dataset['imageTrailToastKey'];
       }
       this.bufferedNavigationToastTimer = null;
     }, 1800);

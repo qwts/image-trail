@@ -346,7 +346,9 @@ test('navigateBy stops immediately when the snapshot has no selected image', asy
 
   assert.deepEqual(harness.bufferedStepCalls, []);
   assert.deepEqual(harness.applyCalls, []);
-  assert.deepEqual(harness.log, [], 'a blocked first step renders nothing');
+  // The drain's busy-indicator toggle renders on entry and exit (#373); nothing else may render.
+  assert.deepEqual(harness.log, ['render', 'render'], 'a blocked first step renders only the busy toggles');
+  assert.equal(harness.getState().automation.navigationBusy, false, 'the busy flag clears when the drain ends');
 });
 
 test('navigateBy stops when no navigable fields are unlocked', async () => {

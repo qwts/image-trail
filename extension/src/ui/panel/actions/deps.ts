@@ -96,4 +96,5 @@ export interface PanelActionDeps {
   clearUrlReviewStatus(scope: 'hostname' | 'page' | 'source' | 'all'): Promise<void>;
   navigateBy(delta: 1 | -1): void;
   cancelQueuedSlideshowNavigation(): void;
+  cancelQueuedManualNavigation(): void;
 }

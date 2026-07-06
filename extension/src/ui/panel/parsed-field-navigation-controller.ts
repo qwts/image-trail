@@ -17,6 +17,12 @@ import { toTargetState, urlReviewStatusForLoadResult, type ProjectionApplication
 
 const PARSED_NAVIGATION_RETRY_MIN_DELAY_MS = 25;
 
+// How long a governor-throttled drain keeps a MANUAL intent alive. Manual navigation is a live
+// gesture: if the request window forces a wait longer than this, the user has visibly stopped
+// getting responses and a load landing much later reads as random (#373). Automation sources
+// (slideshow/retry) are exempt — they are scheduled work and must ride out the window.
+const MANUAL_NAVIGATION_MAX_WAIT_MS = 3_000;
+
 // Primary stop for the "skip to next good image" auto-advance: a dead run ends after this many
 // CONSECUTIVE misses (or the user's neighbor-preload radius, whichever is larger — a user who asked
 // for a deeper buffer has opted into probing that far). Each miss is a real remote request, so a
@@ -104,23 +110,37 @@ export class ParsedFieldNavigationController {
     this.queuedParsedNavigationDeltas.slideshow = 0;
   }
 
+  // Escape/Stop must not leave queued manual steps applying after the user asked everything to
+  // stop (#373). The in-flight step (at most one — the drain is single-flight) still completes.
+  cancelQueuedManualNavigation(): void {
+    this.queuedParsedNavigationDeltas.manual = 0;
+  }
+
   private async drainQueuedParsedNavigation(): Promise<void> {
     if (this.parsedNavigationQueueRunning) return;
     this.parsedNavigationQueueRunning = true;
     this.navigationSessionSkippedUrls.clear();
     this.navigationSessionTotalSkips = 0;
+    this.setNavigationBusy(true);
     try {
       while (this.queuedParsedNavigationDelta() !== 0) {
         const delta = this.queuedParsedNavigationDelta() > 0 ? 1 : -1;
         const source = this.nextQueuedParsedNavigationSource(delta);
         if (!source) break;
-        const result = await this.runQueuedParsedNavigationStep(delta);
+        // Latest wins (#373): a burst of manual input coalesces into ONE jump for the whole queued
+        // delta instead of one image load per press — when input stops, at most the in-flight step
+        // plus one coalesced step ever apply. The claim is captured before the await so presses
+        // arriving mid-load stay queued for the next iteration. Slideshow/retry stay single-step:
+        // their cadence is scheduled, not a burst to collapse.
+        const claimed = source === 'manual' ? this.queuedParsedNavigationDeltas.manual : delta;
+        const result = await this.runQueuedParsedNavigationStep(delta, Math.abs(claimed));
         if (result === 'blocked') {
           this.clearQueuedParsedNavigation();
           break;
         }
         if (result === 'wait') {
           const delayMs = Math.max(PARSED_NAVIGATION_RETRY_MIN_DELAY_MS, this.deps.governor().nextReadyDelayMs());
+          if (this.shouldAbandonManualWait(delayMs)) break;
           await delay(delayMs);
           continue;
         }
@@ -129,14 +149,42 @@ export class ParsedFieldNavigationController {
           continue;
         }
         if (result === 'loaded' && Math.sign(this.queuedParsedNavigationDeltas[source]) === delta) {
-          this.queuedParsedNavigationDeltas[source] -= delta;
+          // Consume the whole claim, clamped so presses that netted the queue down mid-load can't
+          // flip its sign.
+          const consumed =
+            source === 'manual' ? delta * Math.min(Math.abs(claimed), Math.abs(this.queuedParsedNavigationDeltas.manual)) : delta;
+          this.queuedParsedNavigationDeltas[source] -= consumed;
           this.normalizeQueuedParsedNavigationDeltas();
         }
       }
     } finally {
       this.parsedNavigationQueueRunning = false;
+      this.setNavigationBusy(false);
       if (this.queuedParsedNavigationDelta() !== 0) void this.drainQueuedParsedNavigation();
     }
+  }
+
+  private setNavigationBusy(busy: boolean): void {
+    if (this.deps.getState().automation.navigationBusy === busy) return;
+    this.deps.setState(setAutomationState(this.deps.getState(), { navigationBusy: busy }));
+    this.deps.render();
+  }
+
+  // A throttled MANUAL drain gives up instead of applying a load long after the user stopped
+  // pressing; queued automation keeps the normal wait path so slideshow/retry ride out the window.
+  private shouldAbandonManualWait(delayMs: number): boolean {
+    if (delayMs <= MANUAL_NAVIGATION_MAX_WAIT_MS) return false;
+    if (this.queuedParsedNavigationDeltas.retry !== 0 || this.queuedParsedNavigationDeltas.slideshow !== 0) return false;
+    if (this.queuedParsedNavigationDeltas.manual === 0) return false;
+    this.cancelQueuedManualNavigation();
+    this.deps.setState({
+      ...this.deps.getState(),
+      status: 'ready',
+      message: `Request limit reached; navigation stopped instead of loading ${Math.ceil(delayMs / 1000)}s from now. Try again shortly.`,
+      lastUpdatedAt: Date.now(),
+    });
+    this.deps.render();
+    return true;
   }
 
   private queuedParsedNavigationDelta(): number {
@@ -158,7 +206,7 @@ export class ParsedFieldNavigationController {
     return sources.find((source) => Math.sign(this.queuedParsedNavigationDeltas[source]) === delta) ?? null;
   }
 
-  private async runQueuedParsedNavigationStep(delta: 1 | -1): Promise<QueuedParsedNavigationStepResult> {
+  private async runQueuedParsedNavigationStep(delta: 1 | -1, jumpDistance: number): Promise<QueuedParsedNavigationStepResult> {
     const snapshot = this.deps.pageAdapter().getSnapshot();
     if (!snapshot.selected?.url) return 'blocked';
     const model = this.deps.currentNavigationBaseModel();
@@ -166,7 +214,9 @@ export class ParsedFieldNavigationController {
     const navigableFields = this.includedNavigationFields(fields);
     if (navigableFields.length === 0) return 'blocked';
     const governor = this.deps.governor();
-    if (this.deps.neighborPreload().isActive) {
+    // The buffered fast path only steps one neighbor at a time; coalesced multi-step jumps go
+    // straight to the candidate scan, which can land the net distance in a single load.
+    if (jumpDistance === 1 && this.deps.neighborPreload().isActive) {
       const buffered = await this.deps.bufferedNav().step(model, navigableFields, delta);
       if (buffered === 'loaded') {
         void this.deps.saveUrlTemplateFromCurrentFields();
@@ -189,7 +239,7 @@ export class ParsedFieldNavigationController {
       // cache, so no re-probe) and advances to the next good image, giving preload-on navigation the
       // same smooth skip-to-next-good behavior as the plain path.
     }
-    const candidate = await this.nextParsedFieldNavigationCandidate(model, navigableFields, delta);
+    const candidate = await this.nextParsedFieldNavigationCandidate(model, navigableFields, delta, jumpDistance);
     if (!candidate) {
       const skipped = this.navigationSessionTotalSkips;
       this.deps.setState({
@@ -253,6 +303,7 @@ export class ParsedFieldNavigationController {
     model: ParsedUrlModel,
     fields: readonly UrlField[],
     direction: NeighborPreloadDirection,
+    minDistance: number,
   ): Promise<AdjacentParsedFieldUrlCandidate | null> {
     // Primary stop: a dead run ends after a few consecutive misses instead of probing the whole
     // scan window — each miss is a real remote request (#287). The outer total cap bounds the
@@ -260,9 +311,14 @@ export class ParsedFieldNavigationController {
     // base can advance to each failed URL).
     if (this.navigationSessionSkippedUrls.size >= this.consecutiveMissShortCircuit()) return null;
     if (this.navigationSessionTotalSkips >= MAX_PARSED_NAVIGATION_SKIP_ATTEMPTS) return null;
-    const candidates = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT)
+    const all = adjacentParsedFieldUrlCandidates(model, fields, NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT)
       .filter((candidate) => candidate.direction === direction)
       .sort((a, b) => a.distance - b.distance);
+    // A coalesced jump (#373) starts the scan at the net queued distance so one load lands the
+    // user's whole burst; skip-forward past failed URLs continues from there. A jump beyond the
+    // scan window clamps to the farthest generated candidates (nearer ones first among those).
+    const atOrBeyond = all.filter((candidate) => candidate.distance >= minDistance);
+    const candidates = atOrBeyond.length > 0 || all.length === 0 ? atOrBeyond : [...all].reverse();
     for (const candidate of candidates) {
       if (this.navigationSessionSkippedUrls.has(candidate.url)) continue;
       const policy = await checkImageRequestPolicy(candidate.url, {
