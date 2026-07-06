@@ -144,6 +144,15 @@ test('Pin current dispatches pin/current', () => {
   assert.deepEqual(actions, [{ name: 'pin/current' }]);
 });
 
+test('Open gallery dispatches gallery/open from the Queue menu', () => {
+  const actions: unknown[] = [];
+  const view = buildBookmarksView(actions, { items: [], total: 0 });
+
+  buttonByText(view, 'Open gallery').click();
+
+  assert.deepEqual(actions, [{ name: 'gallery/open' }]);
+});
+
 test('pager buttons are disabled when there are no other pages', () => {
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions);

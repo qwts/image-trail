@@ -3,6 +3,7 @@
   "entry": [
     "extension/src/background/service-worker.ts",
     "extension/src/content/content-script.ts",
+    "extension/src/gallery/gallery.ts",
     "extension/src/ui/**/*.stories.ts",
     "tests/**/*.test.ts",
     "tests/dom/register.ts",

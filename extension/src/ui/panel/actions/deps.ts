@@ -61,6 +61,7 @@ export interface PanelActionDeps {
   pinRecentHistory(id: string): Promise<void>;
   loadBookmark(id: string): Promise<void>;
   removeBookmark(id: string): Promise<void>;
+  openGallery(): Promise<void>;
   loadBookmarkPage(offset: number, options?: { readonly render?: boolean }): Promise<void>;
   refreshBookmarkThumbnails(): Promise<void>;
   deleteVisibleBookmarks(): Promise<void>;

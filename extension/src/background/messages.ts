@@ -43,6 +43,10 @@ export interface LoadBuildIdentityResultMessage {
     { readonly ok: true; readonly identity: BuildIdentity } | { readonly ok: false; readonly identity: null; readonly message: string };
 }
 
+// prettier-ignore
+export type OpenGalleryMessage = { readonly type: typeof MessageType.OpenGallery; readonly version: typeof MESSAGE_PROTOCOL_VERSION; readonly payload: Record<string, never> };
+// prettier-ignore
+export type OpenGalleryResultMessage = { readonly type: typeof MessageType.OpenGalleryResult; readonly version: typeof MESSAGE_PROTOCOL_VERSION; readonly payload: { readonly ok: true; readonly url: string; readonly tabId?: number | undefined } | { readonly ok: false; readonly message: string } };
 export interface StatusMessage {
   readonly type: typeof MessageType.Status;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -920,6 +924,7 @@ export type ExtensionRequest =
   | ToggleBuildIdentityOverlayMessage
   | PingMessage
   | LoadBuildIdentityMessage
+  | OpenGalleryMessage
   | CaptureImageMessage
   | DownloadImageMessage
   | ExportEncryptedImageMessage
@@ -984,6 +989,7 @@ export type ExtensionResponse =
   | StatusMessage
   | UnknownMessageResponse
   | LoadBuildIdentityResultMessage
+  | OpenGalleryResultMessage
   | CaptureResultMessage
   | DownloadImageResultMessage
   | ExportEncryptedImageResultMessage
