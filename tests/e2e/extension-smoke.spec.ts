@@ -130,7 +130,9 @@ test('the panel header Help toggle shows the shortcut reference and feature guid
   await expect(helpSection.getByRole('heading', { name: 'Panel shortcuts' })).toBeVisible();
   await expect(helpSection.getByRole('heading', { name: 'Browser shortcuts' })).toBeVisible();
   await expect(helpSection.getByRole('heading', { name: 'Feature guide' })).toBeVisible();
-  await expect(helpSection.locator('strong').filter({ hasText: 'Next trail step' })).toBeVisible();
+  // The label can render in both the panel list and the legacy-keys list; any one instance proves
+  // the shared registry feeds Help.
+  await expect(helpSection.locator('strong').filter({ hasText: 'Next trail step' }).first()).toBeVisible();
 
   // Keyboard access without a focus trap: the toggle is a plain button and focus stays usable.
   await page.getByRole('button', { name: 'Hide help' }).click();
