@@ -605,9 +605,39 @@
   cursor: grab;
 }
 
-/* In <details> sections the control lives inside the (flex) summary; keep it on the far edge. */
+/* The detach control and the Show/Hide hint form two fixed right-hand columns across every
+   section header: the control carries the single auto margin (two auto margins would split the
+   free space and strand it mid-bar), and the hint has a fixed inline size so 'Show' vs 'Hide'
+   never shifts the control's column. */
 .image-trail-panel-root summary .image-trail-panel__section-detach {
   margin-inline-start: auto;
+}
+
+.image-trail-panel-root .image-trail-panel__target-summary::after,
+.image-trail-panel-root .image-trail-panel__secondary-controls-summary::after,
+.image-trail-panel-root .image-trail-panel__fields-summary::after {
+  content: 'Show';
+  flex: none;
+  inline-size: 30px;
+  text-align: end;
+  color: #999;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+/* Inside a detached window the section renders without an injected control; the hint takes the
+   auto margin itself so it stays on the far edge. */
+.image-trail-panel-root summary:not(:has(.image-trail-panel__section-detach))::after {
+  margin-inline-start: auto;
+}
+
+/* Plain header rows have no Show/Hide hint; reserve its column so every ⧉ lines up. */
+.image-trail-panel-root .image-trail-panel__section-header .image-trail-panel__section-detach {
+  margin-inline-end: 38px;
 }
 
 .image-trail-panel-root .image-trail-panel__detached-placeholder {
@@ -925,19 +955,6 @@
   display: none;
 }
 
-.image-trail-panel-root .image-trail-panel__target-summary::after {
-  content: 'Show';
-  margin-left: var(--image-trail-summary-tail-margin, auto);
-  flex: none;
-  color: #999;
-  font:
-    11px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
 .image-trail-panel-root .image-trail-panel__target-utility[open] .image-trail-panel__target-summary::after {
   content: 'Hide';
 }
@@ -1127,19 +1144,6 @@
 
 .image-trail-panel-root .image-trail-panel__secondary-controls-summary::-webkit-details-marker {
   display: none;
-}
-
-.image-trail-panel-root .image-trail-panel__secondary-controls-summary::after {
-  content: 'Show';
-  margin-left: var(--image-trail-summary-tail-margin, auto);
-  flex: none;
-  color: #999;
-  font:
-    11px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
 }
 
 .image-trail-panel-root .image-trail-panel__secondary-controls[open] .image-trail-panel__secondary-controls-summary::after {

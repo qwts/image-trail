@@ -1,4 +1,5 @@
 import type { PanelState, ParsedFieldResetBaseline, ParsedFieldStateRecord } from '../../core/types.js';
+import { imageResourceUrlsEqual } from '../../core/image/image-navigation.js';
 import { applyFieldSplitSpecs } from '../../core/url/field-splits.js';
 import { applyFieldDigitWidthSpecs, fieldDigitWidthSpecsEqual } from '../../core/url/field-widths.js';
 import { parseUrl } from '../../core/url/parse-url.js';
@@ -49,7 +50,10 @@ export function parsedFieldResetBaselineFromRecord(record: ParsedFieldStateRecor
 export function parsedFieldResetAllAvailable(state: PanelState, currentUrl: string): boolean {
   const baseline = state.parsedFieldResetBaseline;
   if (!baseline) return false;
-  return baseline.sourceUrl !== currentUrl || !resetSlicesEqual(state, baseline);
+  // Resolved-URL comparison, matching the restore path (`applyRestoredParsedFieldState`): a raw
+  // string compare flags relative-vs-absolute variants of the SAME image as "navigated away" and
+  // shows Reset all when nothing changed.
+  return !imageResourceUrlsEqual(baseline.sourceUrl, currentUrl) || !resetSlicesEqual(state, baseline);
 }
 
 export function resettableFieldIdsForFields(fields: readonly UrlField[], state: PanelState, currentUrl: string): ReadonlySet<string> {

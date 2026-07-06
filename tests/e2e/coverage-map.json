@@ -129,8 +129,8 @@
         },
         {
           "type": "unit-dom",
-          "path": "tests/dom/recall-drawer-view.test.ts",
-          "notes": "Covers the Recall drawer's inline width staying clamped inside the viewport's edge padding on a narrow viewport, mirroring the CSS max-width so the Close control can't be pushed off-screen (regression: a stale 240px width floor)."
+          "notes": "Covers the Recall drawer's inline width staying clamped inside the viewport's edge padding on a narrow viewport, mirroring the CSS max-width so the Close control can't be pushed off-screen (regression: a stale 240px width floor). Header follow-up to #408: the detach control and Show/Hide hint form fixed right-hand columns (single auto margin; fixed-width hint), and Reset all availability compares resolved image URLs so a restored baseline no longer shows it when nothing changed.",
+          "paths": ["tests/dom/recall-drawer-view.test.ts", "tests/parsed-field-reset-baseline.test.ts"]
         }
       ]
     },

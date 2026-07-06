@@ -156,8 +156,6 @@ test('summary-backed sections keep detach controls beside the Show/Hide tail', (
   for (const selector of ['.image-trail-panel__target-summary', '.image-trail-panel__secondary-controls-summary']) {
     const summary = harness.root.querySelector<HTMLElement>(selector);
     assert.ok(summary, `expected ${selector}`);
-    assert.equal(summary.classList.contains('image-trail-panel__summary-has-detach-control'), true);
-    assert.equal(summary.style.getPropertyValue('--image-trail-summary-tail-margin'), '8px');
     assert.ok(summary.lastElementChild instanceof HTMLButtonElement, `${selector} keeps the detach button as the last real element`);
     assert.equal(summary.lastElementChild.matches('[data-image-trail-detach]'), true);
   }
