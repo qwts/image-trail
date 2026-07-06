@@ -15,6 +15,7 @@ export const plaintextLocalSettingsSchema = v.object({
   requestThrottleWindowMs: v.number(),
   panelDock: v.picklist(['right', 'left']),
   visibleBookmarkSoftMax: v.number(),
+  galleryPageLimit: v.number(),
   recentHistoryLimit: v.number(),
   recentHistoryRetainedLimit: v.number(),
   recentHistoryOverflowBehavior: v.picklist(['drop-oldest', 'keep-session']),

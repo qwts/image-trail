@@ -3,6 +3,13 @@ export const VISIBLE_BOOKMARK_SOFT_MAX_LIMITS = {
   max: 200,
 } as const;
 
+export const GALLERY_PAGE_LIMITS = {
+  min: 0,
+  max: 500,
+} as const;
+
+export const DEFAULT_GALLERY_PAGE_LIMIT = 72;
+
 export const RECENT_HISTORY_LIMITS = {
   min: 1,
   max: 200,

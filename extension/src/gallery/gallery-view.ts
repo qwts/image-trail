@@ -4,6 +4,8 @@ import { galleryRecordKind, openActionForGalleryRecord } from './gallery-model.j
 
 export interface GalleryViewState {
   readonly items: readonly ImageDisplayRecord[];
+  readonly searchQuery: string;
+  readonly draftSearchQuery: string;
   readonly offset: number;
   readonly limit: number;
   readonly total: number;
@@ -17,6 +19,9 @@ export interface GalleryViewState {
 
 export interface GalleryViewHandlers {
   readonly openRecord: (record: ImageDisplayRecord) => void;
+  readonly updateSearch: (query: string) => void;
+  readonly clearSearch: () => void;
+  readonly updatePageLimit: (limit: number) => void;
   readonly loadPage: (offset: number) => void;
   readonly reload: () => void;
 }
@@ -24,7 +29,7 @@ export interface GalleryViewHandlers {
 export function createGalleryView(state: GalleryViewState, handlers: GalleryViewHandlers): HTMLElement {
   const shell = document.createElement('main');
   shell.className = 'image-trail-gallery';
-  shell.append(createHeader(state, handlers), createStatus(state), createGrid(state, handlers));
+  shell.append(createHeader(state, handlers), createSearchControls(state, handlers), createStatus(state), createGrid(state, handlers));
   return shell;
 }
 
@@ -54,12 +59,85 @@ function createHeader(state: GalleryViewState, handlers: GalleryViewHandlers): H
   return header;
 }
 
+function createSearchControls(state: GalleryViewState, handlers: GalleryViewHandlers): HTMLElement {
+  const controls = document.createElement('section');
+  controls.className = 'image-trail-gallery__search';
+  controls.append(createSearchField(state, handlers), createLimitForm(state, handlers));
+  return controls;
+}
+
+function createSearchField(state: GalleryViewState, handlers: GalleryViewHandlers): HTMLElement {
+  const label = document.createElement('label');
+  label.className = 'image-trail-gallery__field';
+  const labelText = document.createElement('span');
+  labelText.textContent = 'Search gallery';
+  const input = document.createElement('input');
+  const inputValue = state.draftSearchQuery;
+  input.type = 'search';
+  input.value = inputValue;
+  input.placeholder = 'URL, host, filename, label';
+  input.autocomplete = 'off';
+  input.setAttribute('aria-label', 'Search gallery');
+  label.append(labelText, input);
+
+  const clear = createPageButton('Clear', inputValue.length > 0 && !state.loading, handlers.clearSearch);
+  input.addEventListener('input', () => {
+    clear.disabled = input.value.length === 0 || state.loading;
+    handlers.updateSearch(input.value);
+  });
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-gallery__search-row';
+  wrapper.append(label, clear);
+  return wrapper;
+}
+
+function createLimitForm(state: GalleryViewState, handlers: GalleryViewHandlers): HTMLElement {
+  const form = document.createElement('form');
+  form.className = 'image-trail-gallery__limit-form';
+  const label = document.createElement('label');
+  label.className = 'image-trail-gallery__field';
+  const labelText = document.createElement('span');
+  labelText.textContent = 'Page limit';
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0';
+  input.max = '500';
+  input.step = '1';
+  input.value = String(state.limit);
+  input.inputMode = 'numeric';
+  input.setAttribute('aria-describedby', 'image-trail-gallery-limit-help');
+  label.append(labelText, input);
+
+  const help = document.createElement('span');
+  help.id = 'image-trail-gallery-limit-help';
+  help.className = 'image-trail-gallery__hint';
+  help.textContent = '0 shows all';
+
+  const applyLimit = () => {
+    const value = Number(input.value);
+    if (Number.isInteger(value)) handlers.updatePageLimit(value);
+  };
+  const apply = document.createElement('button');
+  apply.type = 'submit';
+  apply.textContent = 'Apply';
+  apply.disabled = state.loading;
+  apply.addEventListener('click', (event) => {
+    event.preventDefault();
+    applyLimit();
+  });
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    applyLimit();
+  });
+  form.append(label, help, apply);
+  return form;
+}
+
 function createStatus(state: GalleryViewState): HTMLElement {
   const status = document.createElement('p');
   status.className = 'image-trail-gallery__status';
   status.setAttribute('role', 'status');
-  status.textContent =
-    state.message ?? (state.loading ? 'Loading library...' : state.total === 0 ? 'No durable pins or bookmarks yet.' : '');
+  status.textContent = state.message ?? defaultStatusText(state);
   return status;
 }
 
@@ -141,8 +219,16 @@ function createPageButton(label: string, enabled: boolean, onClick: () => void):
 }
 
 function pageText(state: GalleryViewState): string {
-  if (state.total === 0) return 'Durable pins and captured bookmarks';
+  if (state.total === 0) return state.searchQuery.trim() ? 'No matching durable records' : 'Durable pins and captured bookmarks';
+  if (state.limit === 0) return `${state.total} durable record${state.total === 1 ? '' : 's'}`;
   const start = Math.min(state.offset + 1, state.total);
   const end = Math.min(state.offset + state.items.length, state.total);
-  return `${start}-${end} of ${state.total} durable records`;
+  const suffix = state.searchQuery.trim() ? 'matching durable records' : 'durable records';
+  return `${start}-${end} of ${state.total} ${suffix}`;
+}
+
+function defaultStatusText(state: GalleryViewState): string {
+  if (state.loading) return state.searchQuery.trim() ? 'Searching library...' : 'Loading library...';
+  if (state.total === 0) return state.searchQuery.trim() ? 'No gallery matches.' : 'No durable pins or bookmarks yet.';
+  return '';
 }

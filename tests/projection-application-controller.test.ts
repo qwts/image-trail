@@ -369,6 +369,24 @@ function makeCaptureStore(
   } as unknown as CaptureStore;
 }
 
+test('previewRecord blocks private placeholders before projection or preload', async () => {
+  const harness = createHarness();
+  await harness.controller.previewRecord('image-trail-private:pin-1', undefined, 'row-anchor');
+
+  assert.equal(harness.getState().status, 'error');
+  assert.equal(harness.getState().message, 'Unlock encrypted originals to preview this private pin.');
+  assert.deepEqual(harness.log, ['render']);
+  assert.equal(harness.controller.previewScrollAnchorId, null);
+});
+
+test('previewRecord blocks private placeholders when blob retrieval is unavailable', async () => {
+  const harness = createHarness({ captureStore: null });
+  await harness.controller.previewRecord('image-trail-private:pin-1', 'blob-1');
+
+  assert.equal(harness.getState().message, 'Unlock encrypted originals to preview this private pin.');
+  assert.deepEqual(harness.log, ['render']);
+});
+
 test('previewRecord projects an encrypted original, reports its size, and clears the scroll anchor', async () => {
   const retrieveLog: string[] = [];
   const harness = createHarness({

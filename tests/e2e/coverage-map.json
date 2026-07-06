@@ -71,6 +71,24 @@
       ]
     },
     {
+      "id": "gallery-search",
+      "acceptance": "Gallery search",
+      "repoPath": "tests/gallery-search.test.ts",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Gallery-Search",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/gallery-search.test.ts", "tests/dom/gallery-view.test.ts", "tests/data-crypto.test.ts"],
+          "notes": "Covers gallery metadata matching, privacy-mode search masking, matched-result queue order, single-pass durable search loading, zero-as-unlimited gallery limit migration, draft search input handling, and the gallery search/page-limit controls."
+        },
+        {
+          "type": "manual",
+          "reason": "Extension-page search over real durable IndexedDB records remains manual until the gallery page gets a focused Playwright extension-page spec.",
+          "notes": "Load the built extension, open the gallery, save a finite gallery page limit and then 0, type host/filename/label/extension queries, verify search waits for a typing pause, results stay in queue order, no-match and cleared states are explicit, privacy mode hides URL/label matches, thumbnails crop from the top, and queue/Recents/Recall/pCloud/import-export state does not change."
+        }
+      ]
+    },
+    {
       "id": "host-image-projection-ownership",
       "acceptance": "Host image projection ownership",
       "repoPath": "docs/acceptance-tests/host-image-projection-ownership.md",
@@ -85,7 +103,7 @@
             "tests/dom/bookmarks-view.test.ts",
             "tests/dom/recall-drawer-view.test.ts"
           ],
-          "notes": "Covers projection ownership plus row interaction dispatch: plain click selects once, selected-row click or Enter projects through capture/preview, arrows move single selection/focus, and locked rows stay disabled."
+          "notes": "Covers projection ownership plus row interaction dispatch: plain click selects once, selected-row click or Enter projects through capture/preview, arrows move single selection/focus, locked rows stay disabled, and private placeholder preview is blocked before preload/fetch."
         },
         {
           "type": "playwright-e2e",
@@ -545,7 +563,7 @@
             "tests/workspace-layout-controller.test.ts",
             "tests/dom/panel-layout-settings-view.test.ts"
           ],
-          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X). #217 Settings detach: detach control, window/placeholder conditional on settingsOpen, wider window default, settings-action routing from the window, and the Escape-in-editable-control guard. #215 completion: Queue (bookmarks) detach, drag-out gesture (threshold, ghost cleanup, drop-position seeding, click suppression), and settings-section state branches. #408: registry-driven eligibility asserted across every section id (URL editor, Host target, Parsed fields, Manual controls, Recents, Queue, Settings), section-surface drag-out with interactive-origin filtering, and Escape cancelling both surface drags and window drags. #398 per-site workspace persistence: layout sanitize/capture/equality helpers, restore gating on the opt-in flag, hydration of detached sections + positions + minimized state, debounced change-only saves, immediate capture on opt-in, reset clearing storage and reattaching, teardown-invalidated restores, and the settings-view toggle/reset dispatch contract."
+          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X). #217 Settings detach: detach control, window/placeholder conditional on settingsOpen, wider window default, settings-action routing from the window, and the Escape-in-editable-control guard. #215 completion: Queue (bookmarks) detach, drag-out gesture (threshold, ghost cleanup, drop-position seeding, click suppression), and settings-section state branches. #408: registry-driven eligibility asserted across every section id (URL editor, Host target, Parsed fields, Manual controls, Recents, Queue, Settings), summary-backed detach control placement beside the Show/Hide tail, section-surface drag-out with interactive-origin filtering, and Escape cancelling both surface drags and window drags. #398 per-site workspace persistence: layout sanitize/capture/equality helpers, restore gating on the opt-in flag, hydration of detached sections + positions + minimized state, debounced change-only saves, immediate capture on opt-in, reset clearing storage and reattaching, teardown-invalidated restores, and the settings-view toggle/reset dispatch contract."
         },
         {
           "type": "storybook",

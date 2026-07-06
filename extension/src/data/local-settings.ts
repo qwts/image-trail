@@ -1,7 +1,9 @@
 import {
+  DEFAULT_GALLERY_PAGE_LIMIT,
   DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
   DEFAULT_NEIGHBOR_PRELOAD_RADIUS,
   DEFAULT_URL_REVIEW_STATUS_LIMIT,
+  GALLERY_PAGE_LIMITS,
   NEIGHBOR_PRELOAD_CACHE_LIMITS,
   NEIGHBOR_PRELOAD_RADIUS_LIMITS,
   RECENT_HISTORY_LIMITS,
@@ -25,6 +27,7 @@ export interface PlaintextLocalSettings {
   readonly requestThrottleWindowMs: number;
   readonly panelDock: 'right' | 'left';
   readonly visibleBookmarkSoftMax: number;
+  readonly galleryPageLimit: number;
   readonly recentHistoryLimit: number;
   readonly recentHistoryRetainedLimit: number;
   readonly recentHistoryOverflowBehavior: RecentHistoryOverflowBehavior;
@@ -52,6 +55,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   requestThrottleWindowMs: DEFAULT_GOVERNOR_CONFIG.windowMs,
   panelDock: 'right',
   visibleBookmarkSoftMax: 30,
+  galleryPageLimit: DEFAULT_GALLERY_PAGE_LIMIT,
   recentHistoryLimit: 30,
   recentHistoryRetainedLimit: 30,
   recentHistoryOverflowBehavior: 'drop-oldest',
@@ -129,6 +133,7 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
     visibleBookmarkSoftMax: isSafeVisibleBookmarkSoftMax(input.visibleBookmarkSoftMax)
       ? input.visibleBookmarkSoftMax
       : DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
+    galleryPageLimit: migrateGalleryPageLimit(input.galleryPageLimit),
     recentHistoryLimit,
     recentHistoryRetainedLimit,
     recentHistoryOverflowBehavior,
@@ -206,6 +211,14 @@ function isSafeVisibleBookmarkSoftMax(value: unknown): value is number {
     value >= VISIBLE_BOOKMARK_SOFT_MAX_LIMITS.min &&
     value <= VISIBLE_BOOKMARK_SOFT_MAX_LIMITS.max
   );
+}
+
+function isSafeGalleryPageLimit(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= GALLERY_PAGE_LIMITS.min && value <= GALLERY_PAGE_LIMITS.max;
+}
+
+function migrateGalleryPageLimit(value: unknown): number {
+  return isSafeGalleryPageLimit(value) ? value : DEFAULT_LOCAL_SETTINGS.galleryPageLimit;
 }
 
 function isSafeRecentHistoryLimit(value: unknown): value is number {

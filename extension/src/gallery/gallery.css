@@ -76,6 +76,70 @@ button {
   opacity: 0.48;
 }
 
+.image-trail-gallery__search {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 16px 0 0;
+}
+
+.image-trail-gallery__search-row,
+.image-trail-gallery__limit-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+
+.image-trail-gallery__field {
+  display: grid;
+  gap: 5px;
+  min-width: min(100%, 260px);
+  color: #59606b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.image-trail-gallery__field input {
+  min-height: 36px;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid #bbb5aa;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #191b1f;
+  font: inherit;
+  font-weight: 500;
+}
+
+.image-trail-gallery__limit-form .image-trail-gallery__field {
+  min-width: 104px;
+  width: 104px;
+}
+
+.image-trail-gallery__hint {
+  padding-bottom: 9px;
+  color: #59606b;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.image-trail-gallery__search button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #bbb5aa;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #191b1f;
+  cursor: pointer;
+}
+
+.image-trail-gallery__search button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
 .image-trail-gallery__status {
   min-height: 22px;
 }
@@ -123,6 +187,7 @@ button {
   width: 100%;
   height: 148px;
   object-fit: cover;
+  object-position: top;
   background: #1f2937;
 }
 
@@ -186,6 +251,23 @@ button {
     color: #f3f4f6;
   }
 
+  .image-trail-gallery__search button {
+    border-color: #434953;
+    background: #23272f;
+    color: #f3f4f6;
+  }
+
+  .image-trail-gallery__field,
+  .image-trail-gallery__hint {
+    color: #aeb6c2;
+  }
+
+  .image-trail-gallery__field input {
+    border-color: #434953;
+    background: #23272f;
+    color: #f3f4f6;
+  }
+
   .image-trail-gallery__card-button {
     border-color: #303640;
     background: #20242b;
@@ -209,6 +291,10 @@ button {
 
   .image-trail-gallery__controls {
     justify-content: flex-start;
+  }
+
+  .image-trail-gallery__search {
+    grid-template-columns: 1fr;
   }
 
   .image-trail-gallery__grid {

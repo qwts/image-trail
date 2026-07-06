@@ -89,6 +89,8 @@ function injectDetachControl(sectionEl: HTMLElement, control: HTMLElement): void
     return;
   }
   if (heading.parentElement.tagName === 'SUMMARY') {
+    heading.parentElement.classList.add('image-trail-panel__summary-has-detach-control');
+    heading.parentElement.style.setProperty('--image-trail-summary-tail-margin', '8px');
     heading.parentElement.append(control);
     return;
   }

@@ -97,6 +97,7 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().showHistoryThumbnails, true);
   assert.equal(repository.load().panelDock, 'left');
   assert.equal(repository.load().visibleBookmarkSoftMax, 30);
+  assert.equal(repository.load().galleryPageLimit, 72);
   assert.equal(repository.load().recentHistoryLimit, 30);
   assert.equal(repository.load().recentHistoryRetainedLimit, 30);
   assert.equal(repository.load().recentHistoryOverflowBehavior, 'drop-oldest');
@@ -236,6 +237,25 @@ test('rejects out-of-range bookmark soft max setting migrations', () => {
   assert.equal(high.load().visibleBookmarkSoftMax, DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax);
   assert.equal(low.load().visibleBookmarkSoftMax, DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax);
   assert.equal(valid.load().visibleBookmarkSoftMax, 75);
+});
+
+test('migrates gallery page limit with zero as unlimited', () => {
+  const unlimited = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ galleryPageLimit: 0 }),
+    setItem: () => {},
+  });
+  const high = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ galleryPageLimit: 501 }),
+    setItem: () => {},
+  });
+  const fractional = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ galleryPageLimit: 12.5 }),
+    setItem: () => {},
+  });
+
+  assert.equal(unlimited.load().galleryPageLimit, 0);
+  assert.equal(high.load().galleryPageLimit, DEFAULT_LOCAL_SETTINGS.galleryPageLimit);
+  assert.equal(fractional.load().galleryPageLimit, DEFAULT_LOCAL_SETTINGS.galleryPageLimit);
 });
 
 test('migrates recent history retention settings safely', () => {

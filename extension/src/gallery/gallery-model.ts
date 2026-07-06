@@ -1,7 +1,5 @@
 import { recordHasStoredOriginal, type ImageDisplayRecord } from '../core/display-records.js';
 
-export const GALLERY_PAGE_LIMIT = 72;
-
 export type GalleryOpenAction =
   | { readonly kind: 'open-url'; readonly url: string }
   | { readonly kind: 'preview-data-url'; readonly dataUrl: string }

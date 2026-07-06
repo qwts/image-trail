@@ -927,7 +927,7 @@
 
 .image-trail-panel-root .image-trail-panel__target-summary::after {
   content: 'Show';
-  margin-left: auto;
+  margin-left: var(--image-trail-summary-tail-margin, auto);
   flex: none;
   color: #999;
   font:
@@ -1131,7 +1131,7 @@
 
 .image-trail-panel-root .image-trail-panel__secondary-controls-summary::after {
   content: 'Show';
-  margin-left: auto;
+  margin-left: var(--image-trail-summary-tail-margin, auto);
   flex: none;
   color: #999;
   font:

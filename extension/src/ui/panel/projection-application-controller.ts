@@ -13,6 +13,7 @@ import type { NeighborPreloadController } from './neighbor-preload-controller.js
 // / prev traversal mutes them entirely (see applySelectedUrl's quietFailure), while the +/- single
 // step surfaces them for only about this long.
 const FIELD_LOAD_ERROR_DISPLAY_MS = 1500;
+const PRIVATE_PIN_URL_PREFIX = 'image-trail-private:';
 
 export function urlReviewStatusForLoadResult(nextFingerprint: string | null, previousFingerprint: string | null): UrlReviewStatus | null {
   if (!nextFingerprint || !previousFingerprint) return null;
@@ -37,6 +38,10 @@ export function toTargetState(snapshot: TargetSelectionSnapshot): TargetState {
 
 export function projectionSessionOwnsSelectedTarget(session: ProjectionSession, selectedHandleId: string | null): boolean {
   return session.selectedHandleId === selectedHandleId;
+}
+
+function isPrivatePlaceholderUrl(url: string): boolean {
+  return url.startsWith(PRIVATE_PIN_URL_PREFIX);
 }
 
 export interface ProjectionApplicationControllerDeps {
@@ -274,6 +279,7 @@ export class ProjectionApplicationController {
     const captureStore = this.deps.captureStore();
     let session: ProjectionSession | null = null;
     try {
+      if (this.blockPrivatePlaceholderPreview(url, blobId, captureStore)) return;
       if ((!blobId || !captureStore) && this.isCurrentSelectedImageUrl(url)) {
         this.applyAlreadyProjectedPreviewMessage();
         return;
@@ -367,6 +373,23 @@ export class ProjectionApplicationController {
       ...state,
       message: 'Recent image is already projected into the selected host element.',
       status: 'ready',
+      lastUpdatedAt: Date.now(),
+    });
+    this.deps.render();
+  }
+
+  private blockPrivatePlaceholderPreview(url: string, blobId: string | undefined, captureStore: CaptureStore | null): boolean {
+    if (!isPrivatePlaceholderUrl(url) || (blobId && captureStore)) return false;
+    this.applyPrivatePlaceholderPreviewMessage();
+    return true;
+  }
+
+  private applyPrivatePlaceholderPreviewMessage(): void {
+    const state = this.deps.getState();
+    this.deps.setState({
+      ...state,
+      message: 'Unlock encrypted originals to preview this private pin.',
+      status: 'error',
       lastUpdatedAt: Date.now(),
     });
     this.deps.render();
