@@ -13,7 +13,9 @@ export default defineConfig({
   expect: {
     timeout: 5_000,
   },
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
+  // 'github' turns failures into file/line-anchored annotations in the run summary UI; without it
+  // a red E2E step shows only a blank "Error:". 'list' keeps the readable log, 'html' the artifact.
+  reporter: process.env.CI ? [['list'], ['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL: 'http://127.0.0.1:4173',
     screenshot: 'only-on-failure',
