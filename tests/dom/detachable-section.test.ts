@@ -127,6 +127,90 @@ test('a surface drag starting on an interactive control never detaches', () => {
   assert.deepEqual(harness.actions, [], 'buttons and other controls are not drag-out origins');
 });
 
+test('summary-backed sections drag out by their header, and an engaged drag suppresses the details toggle', () => {
+  const harness = createHarness();
+  harness.render(panelState());
+  const section = harness.root.querySelector<HTMLElement>('.image-trail-panel__target-utility');
+  assert.ok(section);
+  (section as HTMLElement & { setPointerCapture(id: number): void }).setPointerCapture = () => {};
+  (section as HTMLElement & { releasePointerCapture(id: number): void }).releasePointerCapture = () => {};
+  const summary = section.querySelector<HTMLElement>('.image-trail-panel__target-summary');
+  assert.ok(summary, 'Host target keeps its summary header');
+
+  summary.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 60, clientY: 60, bubbles: true, cancelable: true }));
+  section.dispatchEvent(new MouseEvent('pointermove', { clientX: 260, clientY: 200, bubbles: true }));
+  section.dispatchEvent(new MouseEvent('pointerup', { clientX: 260, clientY: 200, bubbles: true }));
+
+  assert.deepEqual(harness.actions, [{ name: 'section/detach', sectionId: 'target' }], 'the summary header is a drag-out source');
+  assert.deepEqual(harness.layoutState.detachedWindowPositions.get('target'), { left: 236, top: 188 });
+
+  const trailingClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+  summary.dispatchEvent(trailingClick);
+  assert.equal(trailingClick.defaultPrevented, true, 'the trailing click cannot toggle the details group');
+});
+
+test('a sub-threshold press on a summary leaves the details toggle untouched', () => {
+  const harness = createHarness();
+  harness.render(panelState());
+  const section = harness.root.querySelector<HTMLElement>('.image-trail-panel__target-utility');
+  assert.ok(section);
+  const summary = section.querySelector<HTMLElement>('.image-trail-panel__target-summary');
+  assert.ok(summary);
+
+  summary.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 60, clientY: 60, bubbles: true, cancelable: true }));
+  summary.dispatchEvent(new MouseEvent('pointerup', { clientX: 61, clientY: 60, bubbles: true }));
+  const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+  summary.dispatchEvent(click);
+
+  assert.equal(click.defaultPrevented, false, 'ordinary summary clicks keep toggling the group');
+  assert.deepEqual(harness.actions, [], 'no detach dispatches');
+});
+
+test('a pointerdown on a natively resizable surface resizes instead of starting a drag-out', () => {
+  const harness = createHarness();
+  harness.render(panelState());
+  const section = harness.root.querySelector<HTMLElement>('.image-trail-panel__fields');
+  assert.ok(section);
+  section.style.resize = 'vertical';
+  (section as HTMLElement & { setPointerCapture(id: number): void }).setPointerCapture = () => {};
+
+  section.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 60, clientY: 60, bubbles: true, cancelable: true }));
+  section.dispatchEvent(new MouseEvent('pointermove', { clientX: 260, clientY: 200, bubbles: true }));
+  section.dispatchEvent(new MouseEvent('pointerup', { clientX: 260, clientY: 200, bubbles: true }));
+
+  assert.deepEqual(harness.actions, [], 'the resize corner never starts a drag-out');
+});
+
+test('a focused field input in the detached Parsed fields window survives a rerender with value and selection', async () => {
+  const harness = createHarness();
+  const withTarget = (): PanelState =>
+    panelState({
+      detachedSections: ['fields'],
+      target: { ...createInitialPanelState(0).target, selectedUrl: 'https://images.example.test/a/photo_0042.jpg?page=3' },
+    });
+  harness.render(withTarget());
+  const input = harness.detachedRoot.querySelector<HTMLInputElement>(
+    '[data-image-trail-detached-window="fields"] .image-trail-panel__field-input',
+  );
+  assert.ok(input instanceof HTMLInputElement, 'the detached fields window renders field inputs');
+  input.focus();
+  input.value = '0777';
+  input.setSelectionRange(1, 3);
+
+  harness.render(withTarget());
+  // The focus restore lands in a microtask after the render swap.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const restored = harness.detachedRoot.querySelector<HTMLInputElement>(
+    '[data-image-trail-detached-window="fields"] .image-trail-panel__field-input',
+  );
+  assert.ok(restored instanceof HTMLInputElement);
+  assert.equal(document.activeElement, restored, 'focus returns to the detached field input');
+  assert.equal(restored.value, '0777', 'the in-progress value survives');
+  assert.equal(restored.selectionStart, 1);
+  assert.equal(restored.selectionEnd, 3);
+});
+
 test('Escape cancels an in-progress surface drag without detaching', () => {
   const harness = createHarness();
   harness.render(panelState());

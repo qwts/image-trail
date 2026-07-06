@@ -16,5 +16,11 @@ route through `content/` controllers (ESLint-enforced).
   `createExtensionIndicator` in `components/bookmarks-view.ts` and
   `components/history-view.ts`). Keep them on separate visual channels — the dot
   is an indicator, not a competing selected-row background.
+- **Pointer capture kills native clicks.** `setPointerCapture` on pointerdown retargets the
+  pointerup and suppresses click synthesis — it silently breaks `<details>` summary toggles and
+  any click-driven control under the pointer. For drag gestures on large surfaces, observe
+  pre-threshold moves at the window level and capture only once the drag engages
+  (`beginDragOut`'s `deferCaptureUntilEngaged` in `components/detachable-section.ts`). When
+  touching shared input plumbing, e2e-test the neighboring click behaviors first.
 - **Panel files are size-capped.** `ui/panel/**` files trip an ESLint
   `max-lines` error at 800 lines; split rather than grow them.
