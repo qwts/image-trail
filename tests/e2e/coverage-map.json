@@ -592,12 +592,12 @@
         {
           "type": "unit-dom",
           "paths": ["tests/dom/history-view.test.ts", "tests/dom/bookmarks-view.test.ts"],
-          "notes": "Covers #438: the Recents/Queue heading toggles collapse and expand the section body (aria-expanded button), a collapsed section keeps its header-row actions usable, and toolbar clicks never toggle the collapse."
+          "notes": "Covers #438/#441: the Recents/Queue HEADER ROWS collapse and expand the section body (role=button, aria-expanded, Enter/Space); a collapsed section keeps its header-row actions usable; clicks on interactive children never toggle."
         },
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/recents-queue-recall.spec.ts",
-          "notes": "Covers #438 end to end: collapse/expand both sections from the heading toggles, header actions stay usable while collapsed (pinning while the queue is collapsed works), and toolbar clicks do not toggle the collapse."
+          "notes": "Covers #438/#441 end to end with geometry pins: single-row header (hint shares the row), the far-right hint area and heading side both toggle, header actions stay usable while collapsed (pinning while the queue is collapsed works), and toolbar clicks do not toggle."
         }
       ]
     },
