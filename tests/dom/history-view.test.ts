@@ -100,6 +100,30 @@ test('Enter on a selected recent row previews it', () => {
   assert.deepEqual(actions, [{ name: 'capture/preview', url: record.url, blobId: undefined }]);
 });
 
+test('Enter on an unselected recent row previews it', () => {
+  const actions: unknown[] = [];
+  const view = buildHistoryView(actions);
+  const row = rowFor(view, 'recent-1');
+
+  const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true });
+  row.dispatchEvent(enter);
+
+  assert.equal(enter.defaultPrevented, true);
+  assert.deepEqual(actions, [{ name: 'capture/preview', url: record.url, blobId: undefined }]);
+});
+
+test('Space on an unselected recent row still selects it', () => {
+  const actions: unknown[] = [];
+  const view = buildHistoryView(actions);
+  const row = rowFor(view, 'recent-1');
+
+  const space = new KeyboardEvent('keydown', { key: ' ', cancelable: true, bubbles: true });
+  row.dispatchEvent(space);
+
+  assert.equal(space.defaultPrevented, true);
+  assert.deepEqual(actions, [{ name: 'history-selection/select', ids: ['recent-1'] }]);
+});
+
 test('ArrowDown moves recent row single selection to the next row', () => {
   const actions: unknown[] = [];
   const second = { ...record, id: 'recent-2', url: 'https://images.example.test/recent/photo_0043.jpg' };

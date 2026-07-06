@@ -157,7 +157,12 @@ export function createHistoryView(
           selectAdjacentHistoryRow(items, item.id, event.key === 'ArrowDown' ? 1 : -1, dispatch);
           return;
         }
-        if (event.key !== 'Enter' && event.key !== ' ') return;
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
+          return;
+        }
+        if (event.key !== ' ') return;
         event.preventDefault();
         if (selected && selectedIds.length === 1) {
           dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });

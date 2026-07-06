@@ -114,7 +114,7 @@
             "tests/dom/bookmarks-view.test.ts",
             "tests/dom/recall-drawer-view.test.ts"
           ],
-          "notes": "Covers projection ownership plus row interaction dispatch: plain click selects once, selected-row click or Enter projects through capture/preview, arrows move single selection/focus, locked rows stay disabled, and private placeholder preview is blocked before preload/fetch."
+          "notes": "Covers projection ownership plus row interaction dispatch: plain click selects once, selected-row click or focused-row Enter projects through capture/preview, Space keeps selection-first activation, arrows move single selection/focus, locked rows stay disabled, and private placeholder preview is blocked before preload/fetch."
         },
         {
           "type": "playwright-e2e",
