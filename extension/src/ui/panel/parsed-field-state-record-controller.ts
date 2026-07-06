@@ -71,11 +71,16 @@ export class ParsedFieldStateRecordController {
       if (!projected && !imageResourceUrlsEqual(record.sourceUrl, this.deps.currentRawUrl(), window.location.href)) return;
     }
     const filtered = this.filterParsedFieldStateForCurrentUrl(record);
+    const restored = reducePanelAction(this.deps.getState(), {
+      name: 'parsed-field-state/restore',
+      record: filtered,
+    });
     this.deps.setState({
-      ...reducePanelAction(this.deps.getState(), {
-        name: 'parsed-field-state/restore',
-        record: filtered,
-      }),
+      ...restored,
+      // A record's draft belongs to the source it was saved against. Restoring onto a DIFFERENT
+      // selected image — e.g. the snapshot-subscription restore that fires right after the user
+      // projects a record — must not resurrect that draft over the projection (#429).
+      draftUrl: ctx.sameSource ? restored.draftUrl : this.deps.getState().draftUrl,
       parsedFieldResetBaseline: parsedFieldResetBaselineFromRecord(filtered),
     });
     this.deps.syncGrabSettings();

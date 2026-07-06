@@ -353,6 +353,10 @@ export class ProjectionApplicationController {
       if (!this.isCurrentProjectionSession(session)) return;
       const state = this.deps.getState();
       this.deps.setState({ ...state, message: 'Projected image into selected host element.', lastUpdatedAt: Date.now() });
+      // Parity with the applySelectedUrl success path (#429): rewrite the persisted field-state
+      // record from the projected reality, so a record tainted by an earlier FAILED load (its
+      // sourceUrl is the dead draft URL) cannot be restored over this projection later.
+      void this.deps.saveFieldState();
       this.deps.render();
       return;
     }
@@ -416,7 +420,10 @@ export class ProjectionApplicationController {
     const snapshot = this.applyProjectionToSelectedImage(session, preload.displayUrl);
     if (!snapshot) return false;
     if (!this.isCurrentProjectionSession(session)) return false;
-    this.deps.setState(setTargetState(this.deps.getState(), toTargetState(snapshot)));
+    // A successful projection supersedes any draft, exactly like the applySelectedUrl success path:
+    // after a FAILED load, draftUrl still holds the failed address, and leaving it set keeps the
+    // URL editor and parsed fields deriving from that stale URL instead of the projected one (#429).
+    this.deps.setState({ ...setTargetState(this.deps.getState(), toTargetState(snapshot)), draftUrl: null });
     this.deps.render();
     void this.deps.loadGrabSettings();
     return true;
