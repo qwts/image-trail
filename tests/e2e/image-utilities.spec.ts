@@ -313,11 +313,11 @@ test('captures originals, prefers stored bytes for export, and round-trips encry
   const bookmarkCountAfterImport = await page.locator('.image-trail-panel__bookmark-item').count();
   expect(bookmarkCountAfterImport).toBeGreaterThanOrEqual(bookmarkCountBeforeFailures);
   const importedRecent = page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' }).first();
+  // A single click only selects (#426); projecting the imported recent takes a real double-click.
   await importedRecent.click();
   await expect(importedRecent).toHaveClass(/is-selected/u);
-  await importedRecent.click();
-  const imported = await imageNavigationSnapshot(page, primaryImage);
-  expect(imported.src).toMatch(/^data:image\/svg\+xml;base64,/u);
+  await importedRecent.dblclick();
+  await expect.poll(async () => (await imageNavigationSnapshot(page, primaryImage)).src).toMatch(/^data:image\/svg\+xml;base64,/u);
 
   const historyCountBeforeWrongType = await page.locator('.image-trail-panel__history-item').count();
   await importEncryptedImage(page, JSON.stringify({ header: { payloadType: 'bookmarks' }, payload: '' }), 'wrong-type.json');
