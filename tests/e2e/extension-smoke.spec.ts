@@ -128,7 +128,7 @@ test('surfaces the build-info overlay toggle in Settings', async ({ page, servic
   await toggle.check();
   const overlayHost = page.locator('#image-trail-build-identity-overlay');
   await expect(overlayHost).toHaveCount(1);
-  await expect(overlayHost).toHaveCSS('pointer-events', 'auto');
+  await expect(overlayHost).toHaveCSS('pointer-events', 'none');
 
   const overlay = overlayHost.locator('.image-trail-build-overlay');
   await expect(overlay).toHaveCSS('pointer-events', 'auto');

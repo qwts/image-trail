@@ -46,7 +46,7 @@ export class BuildIdentityOverlay {
     host.style.top = '12px';
     host.style.right = '12px';
     host.style.zIndex = '2147483647';
-    host.style.pointerEvents = 'auto';
+    host.style.pointerEvents = 'none';
 
     const shadow = host.attachShadow({ mode: 'open' });
     shadow.append(createStyles(), createOverlayContent(buildIdentity));
