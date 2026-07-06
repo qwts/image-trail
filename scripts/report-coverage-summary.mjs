@@ -113,6 +113,26 @@ const thresholds = {
   statements: c8Config?.statements,
 };
 
+// On GitHub Actions, surface each failed floor as an ::error annotation so the run summary names
+// the failing metric instead of a blank "Error:" from the (separate, already-failed) c8 gate step.
+// Annotations render regardless of this step's exit code, so this stays a reporter: still exit 0.
+if (process.env.GITHUB_ACTIONS && summary?.total) {
+  for (const [label, key] of [
+    ['Lines', 'lines'],
+    ['Branches', 'branches'],
+    ['Functions', 'functions'],
+    ['Statements', 'statements'],
+  ]) {
+    const metric = summary.total[key];
+    const floor = thresholds[key];
+    if (typeof metric?.pct === 'number' && typeof floor === 'number' && metric.pct < floor) {
+      console.log(
+        `::error title=Coverage::${label} coverage ${metric.pct.toFixed(2)}% is below the .c8rc.json floor of ${floor}% (covered ${metric.covered}/${metric.total}).`,
+      );
+    }
+  }
+}
+
 const markdown = [
   '## Test coverage',
   '',
