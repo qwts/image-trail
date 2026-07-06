@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/html-vite';
 import { expect, fireEvent, fn, userEvent } from 'storybook/test';
 
 import { createBookmarksView } from './bookmarks-view.js';
+import { resetPreviewRowClickTracking } from './record-row-preview-click.js';
 import { bookmarkFixtures, capturedRecord, lockedPrivateRecord, longOverflowRecord } from '../stories/fixtures.js';
 import { mockDispatch, panelStory } from '../stories/story-host.js';
 
@@ -62,13 +63,16 @@ export const PreviewsSelectedRow: Story = {
   render: () => bookmarksStory(bookmarkFixtures, ['queue-normal'], {}, dispatchSpy),
   play: async ({ canvasElement }) => {
     dispatchSpy.mockClear();
+    resetPreviewRowClickTracking();
     const row = canvasElement.querySelector('[data-image-trail-scroll-anchor="bookmark:queue-normal"]');
     if (!(row instanceof HTMLElement)) throw new Error('expected the queue-normal row to render');
-    await userEvent.click(row);
+    // Preview requires a real double-click (#426): the first click re-selects, the second previews.
+    await userEvent.dblClick(row);
+    await expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ name: 'bookmark-selection/single' }));
     await expect(dispatchSpy).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'capture/preview', scrollAnchorId: 'bookmark:queue-normal' }),
     );
-    await expect(dispatchSpy).toHaveBeenCalledTimes(1);
+    await expect(dispatchSpy).toHaveBeenCalledTimes(2);
   },
 };
 
