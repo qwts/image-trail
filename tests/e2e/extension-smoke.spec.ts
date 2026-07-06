@@ -285,6 +285,28 @@ test('recent preview projects into selected host image and guards repeated curre
   expect(await imageNavigationSnapshot(page, primaryImage)).toEqual(projectedOne);
 });
 
+test('previewing a recent after a failed load updates the URL editor and parsed fields (#429)', async ({ page, serviceWorker }) => {
+  await openFixturePage(page, fixturePaths.singleImage);
+
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+  await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetOne));
+  await expectPanelStatusMessage(page, /Loaded .*asset-one\.svg/u);
+  await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetTwo));
+  await expectPanelStatusMessage(page, /Loaded .*asset-two\.svg/u);
+
+  // The failed load parks its address in the draft URL.
+  await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.missingImage));
+  await expectPanelStatusMessage(page, /Image failed to load: HTTP 404/u);
+  await expect(page.locator('.image-trail-panel__full-url-input')).toHaveValue(fixtureUrl(fixtureAssetPaths.missingImage));
+
+  // Double-click projecting a recent must supersede the failed draft: the URL editor and the
+  // parsed-field derivation follow the projected record, not the dead address.
+  await page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' }).dblclick();
+  await expectPanelStatusMessage(page, /(Loaded|Applied) .*asset-one\.svg|Projected image into selected host element\./u);
+  await expect(page.locator('.image-trail-panel__full-url-input')).toHaveValue(fixtureUrl(fixtureAssetPaths.assetOne));
+});
+
 test('failed projection keeps the previous successful host image', async ({ page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
 

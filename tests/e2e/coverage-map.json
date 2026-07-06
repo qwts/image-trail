@@ -120,6 +120,16 @@
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
           "notes": "Covers Recent preview projection into the selected host image, failed projection preserving the previous successful image, same-current already-projected reporting, and release/close restoration of host image src/srcset/sizes and extension-owned styles."
+        },
+        {
+          "type": "unit-dom",
+          "paths": ["tests/dom/projection-application-controller.test.ts"],
+          "notes": "Covers #429: a successful record preview clears a stale failed draftUrl so the URL editor and parsed fields rebuild from the projected URL."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/extension-smoke.spec.ts",
+          "notes": "Covers #429 end to end: ok load, 404 load (draft parks on the dead URL), double-click a recent \u2014 the projection lands and the URL editor shows the projected record's URL, not the failed draft."
         }
       ]
     },

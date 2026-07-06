@@ -21,6 +21,7 @@ interface Harness {
   readonly log: string[];
   readonly projections: ProjectionSessionController;
   getState(): PanelState;
+  patchState(patch: Partial<PanelState>): void;
 }
 
 type PreloadResult = Awaited<ReturnType<ReturnType<ProjectionApplicationControllerDeps['neighborPreload']>['preload']>>;
@@ -126,6 +127,9 @@ function createHarness(options: HarnessOptions = {}): Harness {
     log,
     projections,
     getState: () => state,
+    patchState: (patch) => {
+      state = { ...state, ...patch };
+    },
   };
 }
 
@@ -173,6 +177,19 @@ test('previewRecord projects a plain URL into the selected host element and clea
   const applyIndex = harness.log.findIndex((entry) => entry.startsWith('applyUrlToSelected'));
   assert.ok(preloadingIndex >= 0 && applyingIndex > preloadingIndex && applyIndex > applyingIndex);
   assert.equal(harness.controller.previewScrollAnchorId, null);
+});
+
+test('previewRecord clears a stale failed draft so the URL editor and fields follow the projected URL (#429)', async () => {
+  document.body.replaceChildren();
+  mountSelectedImage('handle-1');
+  const harness = createHarness();
+  // A failed load leaves its address in draftUrl; the editor/fields derive from draftUrl first.
+  harness.patchState({ draftUrl: 'https://images.example.test/img/missing.jpg' });
+
+  await harness.controller.previewRecord('https://images.example.test/img/other.jpg');
+
+  assert.equal(harness.getState().message, 'Projected image into selected host element.');
+  assert.equal(harness.getState().draftUrl, null, 'a successful preview supersedes the failed draft');
 });
 
 test('applySelectedUrl pushes the visible URL only for same-origin loads', async () => {
