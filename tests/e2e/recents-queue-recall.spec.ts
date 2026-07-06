@@ -197,7 +197,11 @@ test('Recents retention settings hide overflow rows without persisting them', as
   ];
   for (const url of recentUrls) {
     await applyUrlInEditor(page, url);
-    await expectPanelStatusMessage(page, /(Loaded|Applied) .*asset-(one|two|three)\.svg/u);
+    // Wait on THIS load's full URL (query string included): the previous shared-alternation regex
+    // matched the stale status from an earlier load, letting the loop race ahead of the in-flight
+    // loads and intermittently drop a Recents row under CI load.
+    const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+    await expectPanelStatusMessage(page, new RegExp(`(Loaded|Applied) .*${escapedUrl}`, 'u'));
   }
 
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(2);
@@ -297,9 +301,15 @@ test('select-all scopes export to visible Recents, visible queue rows, and loade
   await deleteAllDurableQueueRows(page);
   await deleteVisibleRecents(page);
 
+  let loadedCount = 0;
   for (const assetPath of [fixtureAssetPaths.assetOne, fixtureAssetPaths.assetTwo, fixtureAssetPaths.assetThree]) {
     await applyUrlInEditor(page, fixtureUrl(assetPath));
-    await expectPanelStatusMessage(page, new RegExp(`Loaded .*${escapedFilenameFromAssetPath(assetPath)}`, 'u'));
+    loadedCount += 1;
+    // Stale-proof wait: the status title can still show a matching "Loaded ...asset-one.svg..."
+    // message left by an earlier test in this serial spec, so wait for the Recents list to reflect
+    // THIS load instead of racing ahead on a stale status match.
+    await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(loadedCount);
+    await expect(page.locator('.image-trail-panel__history-item').first()).toContainText(filenameFromAssetPath(assetPath));
   }
 
   await page.getByRole('button', { name: 'Select all recents' }).click();
