@@ -324,6 +324,7 @@ export type PanelActionName =
   | 'bookmark-selection/select'
   | 'bookmark-selection/clear'
   | 'bookmarks/page-loaded'
+  | 'gallery/open'
   | 'bookmarks/older'
   | 'bookmarks/newer'
   | 'bookmarks/toggle-scope'

@@ -4,6 +4,7 @@ import { storageUsageSummarySchema } from '../core/image/capture-result.schema.j
 import type { ImageProbeMethod, ImageRequestIntent, ImageSourceProfile } from '../core/image/request-policy.js';
 import { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
 import type { MessageType as ProtocolMessageType } from './message-protocol.js';
+import type { OpenGalleryMessage, OpenGalleryResultMessage } from './gallery-messages.js';
 
 export { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
 
@@ -920,6 +921,7 @@ export type ExtensionRequest =
   | ToggleBuildIdentityOverlayMessage
   | PingMessage
   | LoadBuildIdentityMessage
+  | OpenGalleryMessage
   | CaptureImageMessage
   | DownloadImageMessage
   | ExportEncryptedImageMessage
@@ -984,6 +986,7 @@ export type ExtensionResponse =
   | StatusMessage
   | UnknownMessageResponse
   | LoadBuildIdentityResultMessage
+  | OpenGalleryResultMessage
   | CaptureResultMessage
   | DownloadImageResultMessage
   | ExportEncryptedImageResultMessage

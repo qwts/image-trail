@@ -87,6 +87,7 @@ function createHarness(): Harness {
     pinRecentHistory: noopAsync,
     loadBookmark: noopAsync,
     removeBookmark: noopAsync,
+    openGallery: noopAsync,
     loadBookmarkPage: noopAsync,
     refreshBookmarkThumbnails: noopAsync,
     deleteVisibleBookmarks: noopAsync,

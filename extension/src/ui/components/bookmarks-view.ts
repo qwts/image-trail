@@ -18,6 +18,7 @@ type BookmarkAction =
   | { readonly name: 'bookmarks/clear-visible' }
   | { readonly name: 'bookmarks/reload' }
   | { readonly name: 'bookmarks/refresh-thumbnails' }
+  | { readonly name: 'gallery/open' }
   | { readonly name: 'recall/open'; readonly side: 'left' | 'right' }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'bookmark'; readonly sourceRecordId: string }
   | {
@@ -109,6 +110,15 @@ export function createBookmarksView(
     dispatch({ name: 'bookmarks/reload' });
   });
 
+  const gallery = document.createElement('button');
+  gallery.type = 'button';
+  gallery.textContent = 'Open gallery';
+  gallery.title = 'Browse the durable image library in a dedicated tab.';
+  gallery.addEventListener('click', () => {
+    queueMenu.open = false;
+    dispatch({ name: 'gallery/open' });
+  });
+
   const selectAllQueue = document.createElement('button');
   selectAllQueue.type = 'button';
   selectAllQueue.textContent = 'Select all queue';
@@ -148,7 +158,7 @@ export function createBookmarksView(
     dispatch({ name: 'bookmarks/clear-visible' });
   });
 
-  queueMenuActions.append(scope, reload, selectAllQueue, selectPins, selectBookmarks, refreshThumbnails, clearQueue);
+  queueMenuActions.append(scope, reload, gallery, selectAllQueue, selectPins, selectBookmarks, refreshThumbnails, clearQueue);
   queueMenu.append(queueMenuActions);
 
   const toolbar = document.createElement('div');

@@ -64,6 +64,7 @@ import { buildPanelActionRegistry } from './panel/actions/registry.js';
 import type { PanelActionDeps } from './panel/actions/deps.js';
 import { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../content/panel-services.js';
 import { hostnameFromLocation } from './panel-position.js';
+import { galleryOpenErrorState, openGalleryErrorMessage } from './panel/gallery-action.js';
 
 function addItems(items: readonly string[], nextItems: readonly string[]): readonly string[] {
   return [...items, ...nextItems.filter((item) => !items.includes(item))];
@@ -593,6 +594,12 @@ export class ImageTrailPanel {
       pinRecentHistory: (id) => this.recordLibrary.pinRecentHistory(id),
       loadBookmark: (id) => this.recordLibrary.loadBookmark(id),
       removeBookmark: (id) => this.recordLibrary.removeBookmark(id),
+      openGallery: async () => {
+        const message = await openGalleryErrorMessage();
+        if (!message) return;
+        this.state = galleryOpenErrorState(this.state, message);
+        this.render();
+      },
       loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
       refreshBookmarkThumbnails: () => this.recordLibrary.refreshBookmarkThumbnails(),
       deleteVisibleBookmarks: () => this.recordLibrary.deleteVisibleBookmarks(),

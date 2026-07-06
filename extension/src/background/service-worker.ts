@@ -103,6 +103,7 @@ import { createPanelPositionMessageRegistry } from './handlers/panel-position-ha
 import { createRecentHistoryMessageRegistry } from './handlers/recent-history-handlers.js';
 import { createRecallMessageRegistry } from './handlers/recall-handlers.js';
 import { createBlobKeyMessageRegistry } from './handlers/blob-key-handlers.js';
+import { createGalleryMessageRegistry } from './handlers/gallery-page-handler.js';
 import { createPCloudMessageRegistry } from './handlers/pcloud-handlers.js';
 import { createUrlTemplateMessageRegistry } from './handlers/url-template-handlers.js';
 import { normalizeHostname } from './handlers/hostname.js';
@@ -875,6 +876,7 @@ const messageRegistry = {
     respond: (result) => createLoadBuildIdentityResultMessage(result),
     fallback: () => createLoadBuildIdentityResultMessage({ ok: false, identity: null, message: 'Build identity could not be loaded.' }),
   }),
+  ...createGalleryMessageRegistry(),
   [MessageType.CaptureImage]: defineMessage({
     requestSchema: requestSchemas.captureImageRequestSchema,
     handle: (message: CaptureImageMessage) => handleCaptureImage(message),

@@ -238,6 +238,26 @@ test('validates build identity result payloads before exposing them to the panel
   );
 });
 
+test('classifies open gallery request and result messages', () => {
+  const request = { type: MessageType.OpenGallery, version: MESSAGE_PROTOCOL_VERSION, payload: {} };
+  const success = {
+    type: MessageType.OpenGalleryResult,
+    version: MESSAGE_PROTOCOL_VERSION,
+    payload: { ok: true, url: 'chrome-extension://id/src/gallery/gallery.html', tabId: 7 },
+  };
+  const failure = {
+    type: MessageType.OpenGalleryResult,
+    version: MESSAGE_PROTOCOL_VERSION,
+    payload: { ok: false, message: 'Gallery tab could not be opened.' },
+  };
+
+  assert.equal(request.type, MessageType.OpenGallery);
+  assert.equal(isExtensionRequest(request), true);
+  assert.equal(isExtensionResponse(success), true);
+  assert.equal(isExtensionResponse(failure), true);
+  assert.equal(isExtensionResponse(request), false);
+});
+
 test('creates capture image request messages with correct structure', () => {
   const msg = createCaptureImageMessage('https://cdn.example.com/photo.jpg', 'target');
   assert.equal(msg.type, MessageType.CaptureImage);

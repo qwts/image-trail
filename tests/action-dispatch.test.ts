@@ -172,6 +172,7 @@ function createHarness(
     pinRecentHistory: () => recordAsync('pinRecentHistory'),
     loadBookmark: () => recordAsync('loadBookmark'),
     removeBookmark: () => recordAsync('removeBookmark'),
+    openGallery: () => recordAsync('openGallery'),
     loadBookmarkPage: (offset) => recordAsync(`loadBookmarkPage:${offset}`),
     refreshBookmarkThumbnails: () => recordAsync('refreshBookmarkThumbnails'),
     deleteVisibleBookmarks: () => recordAsync('deleteVisibleBookmarks'),
@@ -270,6 +271,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'bookmarks/toggle-scope': { name: 'bookmarks/toggle-scope' },
   'bookmarks/reload': { name: 'bookmarks/reload' },
   'bookmarks/refresh-thumbnails': { name: 'bookmarks/refresh-thumbnails' },
+  'gallery/open': { name: 'gallery/open' },
   'bookmarks/delete-visible': { name: 'bookmarks/delete-visible' },
   'selection/select-visible': { name: 'selection/select-visible' },
   'history-selection/toggle': { name: 'history-selection/toggle', id: 'history-1' },
@@ -426,6 +428,13 @@ test('bookmark/clear uses the renderPanelAndRefreshRecall variant, not a plain r
   const registry = buildPanelActionRegistry(harness.deps);
   dispatchPanelAction(registry, { name: 'bookmark/clear', id: 'bookmark-1' }, () => assert.fail('unexpected fallback'));
   assert.deepEqual(harness.log, ['reduce', 'renderPanelAndRefreshRecall']);
+});
+
+test('gallery/open delegates to the gallery tab command without reducing queue state', () => {
+  const harness = createHarness();
+  const registry = buildPanelActionRegistry(harness.deps);
+  dispatchPanelAction(registry, { name: 'gallery/open' }, () => assert.fail('unexpected fallback'));
+  assert.deepEqual(harness.log, ['openGallery']);
 });
 
 test('panel/secondary-controls-open is a silent no-op when the state already matches', () => {

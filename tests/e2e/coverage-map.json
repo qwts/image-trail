@@ -48,6 +48,29 @@
       ]
     },
     {
+      "id": "durable-gallery-tab",
+      "acceptance": "Dedicated durable gallery tab",
+      "repoPath": "tests/dom/gallery-view.test.ts",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Dedicated-Durable-Gallery-Tab",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom/gallery-view.test.ts",
+            "tests/gallery-model.test.ts",
+            "tests/messages.test.ts",
+            "tests/action-dispatch.test.ts"
+          ],
+          "notes": "Covers the panel open-gallery action, runtime message classification, bounded gallery paging controls, URL/data/blob activation decisions, and locked private-record disabling without implementing search, filters, or albums."
+        },
+        {
+          "type": "manual",
+          "reason": "Cross-extension-tab activation and browser tab focus are covered manually until this flow is promoted to a focused Playwright extension-page spec.",
+          "notes": "Load the built extension, open the Queue menu, choose Open gallery, verify a dedicated extension tab lists only durable pins/bookmarks, URL-only rows open their saved URL, unlocked captured originals use encrypted preview, locked originals stay disabled, and Queue/Recents/Recall/pCloud/import-export state does not change while browsing."
+        }
+      ]
+    },
+    {
       "id": "host-image-projection-ownership",
       "acceptance": "Host image projection ownership",
       "repoPath": "docs/acceptance-tests/host-image-projection-ownership.md",

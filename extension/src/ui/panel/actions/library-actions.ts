@@ -24,7 +24,8 @@ export type LibraryActionName =
   | 'bookmark-selection/toggle'
   | 'bookmark-selection/single'
   | 'bookmark-selection/select'
-  | 'bookmark-selection/clear';
+  | 'bookmark-selection/clear'
+  | 'gallery/open';
 
 /** Recent history, bookmarks, and row selection. Bodies moved verbatim from the panel dispatch chain. */
 export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<LibraryActionName> {
@@ -71,6 +72,11 @@ export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<
     'bookmark/remove': {
       handle(action) {
         void deps.removeBookmark(action.id);
+      },
+    },
+    'gallery/open': {
+      handle() {
+        void deps.openGallery();
       },
     },
     'bookmark/clear': reduceAndRefreshRecall,

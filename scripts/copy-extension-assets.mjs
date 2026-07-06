@@ -8,3 +8,6 @@ await cp('extension/src/ui/styles', 'extension/dist/src/ui/styles', { recursive:
 await mkdir('extension/dist/src/preview', { recursive: true });
 await cp('extension/src/preview/preview.html', 'extension/dist/src/preview/preview.html');
 await cp('extension/src/preview/preview.js', 'extension/dist/src/preview/preview.js');
+await mkdir('extension/dist/src/gallery', { recursive: true });
+await cp('extension/src/gallery/gallery.html', 'extension/dist/src/gallery/gallery.html');
+await cp('extension/src/gallery/gallery.css', 'extension/dist/src/gallery/gallery.css');
