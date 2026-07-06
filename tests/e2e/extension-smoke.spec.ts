@@ -125,10 +125,12 @@ test('the panel header Help toggle shows the shortcut reference and feature guid
 
   const helpSection = page.locator('.image-trail-panel__help-section');
   await expect(helpSection).toBeVisible();
-  await expect(helpSection.getByText('Panel shortcuts')).toBeVisible();
-  await expect(helpSection.getByText('Browser shortcuts')).toBeVisible();
-  await expect(helpSection.getByText('Feature guide')).toBeVisible();
-  await expect(helpSection.getByText('Next trail step')).toBeVisible();
+  // Role-based locators: shortcut ROW text can contain the heading strings as substrings
+  // (e.g. a row starting 'Browser shortcut…'), which trips strict mode with getByText.
+  await expect(helpSection.getByRole('heading', { name: 'Panel shortcuts' })).toBeVisible();
+  await expect(helpSection.getByRole('heading', { name: 'Browser shortcuts' })).toBeVisible();
+  await expect(helpSection.getByRole('heading', { name: 'Feature guide' })).toBeVisible();
+  await expect(helpSection.locator('strong').filter({ hasText: 'Next trail step' })).toBeVisible();
 
   // Keyboard access without a focus trap: the toggle is a plain button and focus stays usable.
   await page.getByRole('button', { name: 'Hide help' }).click();
