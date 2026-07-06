@@ -8,7 +8,10 @@ import { getJestConfig } from '@storybook/test-runner';
 // of a blank "Error:". Locally the runner's default reporter output is unchanged.
 const testRunnerConfig = getJestConfig();
 
+// Append 'github-actions' rather than replace: getJestConfig() already sets reporters, and adds
+// jest-junit when STORYBOOK_JUNIT is set (test-storybook --junit) — overwriting the list would
+// silently drop that JUnit XML output for that invocation.
 export default {
   ...testRunnerConfig,
-  reporters: process.env.GITHUB_ACTIONS ? ['default', 'github-actions'] : ['default'],
+  reporters: process.env.GITHUB_ACTIONS ? [...(testRunnerConfig.reporters ?? ['default']), 'github-actions'] : testRunnerConfig.reporters,
 };
