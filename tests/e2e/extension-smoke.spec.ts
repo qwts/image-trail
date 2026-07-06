@@ -346,6 +346,26 @@ test('recent preview projects into selected host image and guards repeated curre
   expect(await imageNavigationSnapshot(page, primaryImage)).toEqual(projectedOne);
 });
 
+test('focused recent row loads on Enter after arrow navigation (#390)', async ({ page, serviceWorker }) => {
+  await openFixturePage(page, fixturePaths.singleImage);
+
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+  await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetTwo));
+  await expectPanelStatusMessage(page, /Loaded .*asset-two\.svg/u);
+
+  const assetTwoRecent = page.locator('.image-trail-panel__history-item', { hasText: 'asset-two.svg' });
+  const assetOneRecent = page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' });
+  await assetTwoRecent.click();
+  await expect(assetTwoRecent).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(assetOneRecent).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expectPanelStatusMessage(page, /Loaded .*asset-one\.svg/u);
+  await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl(fixtureAssetPaths.assetOne));
+});
+
 test('previewing a recent after a failed load updates the URL editor and parsed fields (#429)', async ({ page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
 

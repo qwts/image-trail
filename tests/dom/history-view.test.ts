@@ -45,6 +45,22 @@ test('a plain click selects an unselected recent row without previewing it', () 
   assert.deepEqual(actions, [{ name: 'history-selection/select', ids: ['recent-1'] }]);
 });
 
+test('a plain click restores recent row focus inside a shadow root', async () => {
+  resetPreviewRowClickTracking();
+  const actions: unknown[] = [];
+  const host = document.createElement('div');
+  const root = host.attachShadow({ mode: 'open' });
+  const view = buildHistoryView(actions);
+  root.append(view);
+  document.body.append(host);
+  const row = rowFor(view, 'recent-1');
+
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  await Promise.resolve();
+
+  assert.equal(root.activeElement, row);
+});
+
 test('a double-click on a selected recent row previews it (#426)', () => {
   resetPreviewRowClickTracking();
   const actions: unknown[] = [];
@@ -135,6 +151,24 @@ test('ArrowDown moves recent row single selection to the next row', () => {
 
   assert.equal(arrow.defaultPrevented, true);
   assert.deepEqual(actions, [{ name: 'history-selection/select', ids: ['recent-2'] }]);
+});
+
+test('ArrowDown restores recent row focus inside a shadow root', async () => {
+  const actions: unknown[] = [];
+  const second = { ...record, id: 'recent-2', url: 'https://images.example.test/recent/photo_0043.jpg' };
+  const host = document.createElement('div');
+  const root = host.attachShadow({ mode: 'open' });
+  const view = buildHistoryView(actions, ['recent-1'], [record, second]);
+  root.append(view);
+  document.body.append(host);
+  const row = rowFor(view, 'recent-1');
+  const nextRow = rowFor(view, 'recent-2');
+
+  row.focus();
+  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true, bubbles: true }));
+  await Promise.resolve();
+
+  assert.equal(root.activeElement, nextRow);
 });
 
 test('stored recent rows render the original indicator', () => {

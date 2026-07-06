@@ -62,6 +62,12 @@ test('classifyTarget returns panel for shadow DOM elements inside panel host', (
   assert.equal(classifyTarget(fakeEvent({ target: host, composedPath: () => [row, host] })), 'panel');
 });
 
+test('classifyTarget returns record-row for row shortcuts inside the panel', () => {
+  const row = { tagName: 'LI', dataset: { imageTrailRowId: 'recent-1' } };
+  const host = { tagName: 'DIV', id: 'image-trail-panel-root' };
+  assert.equal(classifyTarget(fakeEvent({ target: host, composedPath: () => [row, host] })), 'record-row');
+});
+
 test('default keyboard bindings map d to download and shifted shortcuts to save-as download', () => {
   assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'd' && binding.action === 'download'));
   assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'ArrowDown' && binding.action === 'download'));
@@ -104,6 +110,9 @@ test('keyboard shortcuts route from panel controls but not typing targets', () =
   assert.equal(shouldRouteKeyboardShortcut('button', 'download'), true);
   assert.equal(shouldRouteKeyboardShortcut('button', 'download-save-as'), true);
   assert.equal(shouldRouteKeyboardShortcut('button', 'grab-mode-toggle'), true);
+  assert.equal(shouldRouteKeyboardShortcut('record-row', 'download', 'ArrowDown'), false);
+  assert.equal(shouldRouteKeyboardShortcut('record-row', 'download', 'd'), true);
+  assert.equal(shouldRouteKeyboardShortcut('record-row', 'download-save-as', 'Enter'), true);
   assert.equal(shouldRouteKeyboardShortcut('panel', 'slideshow-toggle'), true);
   assert.equal(shouldRouteKeyboardShortcut('page', 'download'), true);
 });

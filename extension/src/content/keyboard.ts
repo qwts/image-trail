@@ -1,6 +1,6 @@
 import { PAGE_SHORTCUTS } from '../core/keyboard-shortcuts.js';
 
-export type KeyTarget = 'typing' | 'button' | 'panel' | 'page';
+export type KeyTarget = 'typing' | 'button' | 'record-row' | 'panel' | 'page';
 
 export interface KeyBinding {
   readonly key: string;
@@ -41,9 +41,20 @@ export function classifyTarget(event: KeyboardEvent): KeyTarget {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return 'typing';
   if (el['isContentEditable'] === true) return 'typing';
   if (tag === 'BUTTON') return 'button';
+  if (composedPath.some(isRecordRow)) return 'record-row';
+  if (typeof el['closest'] === 'function' && (el as unknown as HTMLElement).closest('[data-image-trail-row-id]')) return 'record-row';
   if (composedPath.some(isPanelHost)) return 'panel';
   if (typeof el['closest'] === 'function' && (el as unknown as HTMLElement).closest('#image-trail-panel-root')) return 'panel';
   return 'page';
+}
+
+function isRecordRow(node: unknown): boolean {
+  if (!node || typeof node !== 'object') return false;
+  const candidate = node as { dataset?: { imageTrailRowId?: unknown }; getAttribute?: (name: string) => string | null };
+  return (
+    typeof candidate.dataset?.imageTrailRowId === 'string' ||
+    (typeof candidate.getAttribute === 'function' && candidate.getAttribute('data-image-trail-row-id') !== null)
+  );
 }
 
 function isPanelHost(node: unknown): boolean {
@@ -51,8 +62,9 @@ function isPanelHost(node: unknown): boolean {
   return (node as { id?: unknown }).id === 'image-trail-panel-root';
 }
 
-export function shouldRouteKeyboardShortcut(target: KeyTarget, action: string): boolean {
+export function shouldRouteKeyboardShortcut(target: KeyTarget, action: string, key?: string): boolean {
   if (target === 'typing') return false;
+  if (target === 'record-row' && action === 'download' && (key === 'ArrowDown' || key === 'ArrowUp')) return false;
   // Keep native button activation intact; only explicit global shortcuts route from focused panel controls.
   if (target === 'button') {
     return (
@@ -111,7 +123,7 @@ export class KeyboardRouter {
 
     for (const binding of this.bindings) {
       if (matchesBinding(event, binding)) {
-        if (!shouldRouteKeyboardShortcut(target, binding.action)) return;
+        if (!shouldRouteKeyboardShortcut(target, binding.action, binding.key)) return;
         event.preventDefault();
         event.stopPropagation();
         this.handler(binding.action);

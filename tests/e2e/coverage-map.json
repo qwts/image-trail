@@ -26,7 +26,7 @@
         {
           "type": "unit-dom",
           "paths": ["tests/keyboard.test.ts", "tests/dom/settings-view.test.ts"],
-          "notes": "Covers the page-level shortcut binding table, the Settings shortcut reference row layout, and the intentional legacy a-z/h parity gaps."
+          "notes": "Covers the page-level shortcut binding table, record-row ArrowDown routing that lets focused rows handle local navigation instead of the global download shortcut, the Settings shortcut reference row layout, and the intentional legacy a-z/h parity gaps."
         },
         {
           "type": "storybook",
@@ -119,7 +119,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
-          "notes": "Covers Recent preview projection into the selected host image, failed projection preserving the previous successful image, same-current already-projected reporting, and release/close restoration of host image src/srcset/sizes and extension-owned styles."
+          "notes": "Covers Recent preview projection into the selected host image, #390 focused-row click then ArrowDown then Enter loading, failed projection preserving the previous successful image, same-current already-projected reporting, and release/close restoration of host image src/srcset/sizes and extension-owned styles."
         },
         {
           "type": "unit-dom",
