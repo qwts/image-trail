@@ -24,6 +24,12 @@ export interface DragOutOptions {
   readonly onDragOutPosition: (sectionId: DetachableSectionId, position: DetachedWindowPosition) => void;
   /** Called when a drag actually engaged and ended (dropped or cancelled) — e.g. to swallow the trailing click. */
   readonly onDragEnd?: (committed: boolean) => void;
+  /**
+   * Capture the pointer only once the threshold engages. Section surfaces need this: immediate
+   * capture retargets the pointerup and swallows the native click, breaking <details> summary
+   * toggles. The 26px ⧉ control keeps immediate capture — off-button moves would never reach it.
+   */
+  readonly deferCaptureUntilEngaged?: boolean;
 }
 
 /**
@@ -33,9 +39,11 @@ export interface DragOutOptions {
  */
 export function beginDragOut(event: PointerEvent, handle: HTMLElement, options: DragOutOptions): void {
   if (event.button !== 0) return;
-  // Capture immediately: once the pointer leaves the handle, move/up events would otherwise
-  // target whatever is under the cursor and the drag would never engage.
-  if (typeof handle.setPointerCapture === 'function') handle.setPointerCapture(event.pointerId);
+  // Without capture, moves/ups stop targeting the handle once the pointer leaves it. In deferred
+  // mode the pre-threshold moves are observed at the window instead — a drag from a section's top
+  // edge leaves the section immediately, and capturing up front would swallow native clicks.
+  if (!options.deferCaptureUntilEngaged && typeof handle.setPointerCapture === 'function') handle.setPointerCapture(event.pointerId);
+  const listenerTarget: EventTarget = options.deferCaptureUntilEngaged ? window : handle;
   const startX = event.clientX;
   const startY = event.clientY;
   let ghost: HTMLElement | null = null;
@@ -49,6 +57,7 @@ export function beginDragOut(event: PointerEvent, handle: HTMLElement, options: 
   const onMove = (move: PointerEvent): void => {
     if (!ghost) {
       if (Math.hypot(move.clientX - startX, move.clientY - startY) < DRAG_OUT_THRESHOLD_PX) return;
+      if (options.deferCaptureUntilEngaged && typeof handle.setPointerCapture === 'function') handle.setPointerCapture(event.pointerId);
       ghost = document.createElement('div');
       ghost.className = 'image-trail-panel__detach-ghost';
       ghost.style.width = `${options.windowInlineSize}px`;
@@ -64,9 +73,9 @@ export function beginDragOut(event: PointerEvent, handle: HTMLElement, options: 
     ghost.style.top = `${position.top}px`;
   };
   const cleanup = (): void => {
-    handle.removeEventListener('pointermove', onMove);
-    handle.removeEventListener('pointerup', onUp);
-    handle.removeEventListener('pointercancel', onAbort);
+    listenerTarget.removeEventListener('pointermove', onMove as EventListener);
+    listenerTarget.removeEventListener('pointerup', onUp as EventListener);
+    listenerTarget.removeEventListener('pointercancel', onAbort as EventListener);
     window.removeEventListener('keydown', onKeyDown, true);
     if (typeof handle.releasePointerCapture === 'function') handle.releasePointerCapture(event.pointerId);
     handle.style.userSelect = '';
@@ -91,28 +100,53 @@ export function beginDragOut(event: PointerEvent, handle: HTMLElement, options: 
     key.stopPropagation();
     onAbort();
   };
-  handle.addEventListener('pointermove', onMove);
-  handle.addEventListener('pointerup', onUp);
-  handle.addEventListener('pointercancel', onAbort);
+  listenerTarget.addEventListener('pointermove', onMove as EventListener);
+  listenerTarget.addEventListener('pointerup', onUp as EventListener);
+  listenerTarget.addEventListener('pointercancel', onAbort as EventListener);
   window.addEventListener('keydown', onKeyDown, true);
 }
 
 /**
  * Makes a whole section surface a drag-out source: pressing any non-interactive part of the
- * section (not buttons, form controls, summaries, list rows, or resizable lists) and dragging past
- * the threshold detaches it at the drop point. Sub-threshold presses stay inert, so ordinary
- * clicks never detach.
+ * section — including a `<details>` summary header — and dragging past the threshold detaches it
+ * at the drop point. Presses on buttons, form controls, links, list rows, or resizable surfaces
+ * never engage, and sub-threshold presses stay inert, so ordinary clicks (and summary toggles)
+ * keep working.
  */
 const INTERACTIVE_DRAG_ORIGIN =
-  'button, input, select, textarea, summary, a, [role="button"], [contenteditable="true"], li, ol, img, .image-trail-panel__field-list';
+  'button, input, select, textarea, a, [role="button"], [contenteditable="true"], li, ol, img, .image-trail-panel__field-list';
 
 export function attachSectionDragOut(sectionEl: HTMLElement, options: DragOutOptions): void {
   sectionEl.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
     const origin = event.target;
-    if (origin instanceof Element && origin.closest(INTERACTIVE_DRAG_ORIGIN)) return;
-    beginDragOut(event, sectionEl, options);
+    if (!(origin instanceof Element)) return;
+    if (origin.closest(INTERACTIVE_DRAG_ORIGIN)) return;
+    // A CSS-resizable surface (Parsed fields' details is `resize: vertical`) owns its resize
+    // corner: pointerdowns targeting it must resize, not drag out.
+    if (origin instanceof HTMLElement && isNativelyResizable(origin)) return;
+    beginDragOut(event, sectionEl, {
+      ...options,
+      deferCaptureUntilEngaged: true,
+      onDragEnd: (committed) => {
+        // An engaged drag from a summary must not also toggle its <details> (drop or cancel).
+        sectionEl.addEventListener(
+          'click',
+          (click) => {
+            click.preventDefault();
+            click.stopPropagation();
+          },
+          { capture: true, once: true },
+        );
+        options.onDragEnd?.(committed);
+      },
+    });
   });
+}
+
+function isNativelyResizable(element: HTMLElement): boolean {
+  const resize = window.getComputedStyle(element).resize;
+  return resize === 'vertical' || resize === 'horizontal' || resize === 'both' || resize === 'block' || resize === 'inline';
 }
 
 /**
