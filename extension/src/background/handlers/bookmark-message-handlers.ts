@@ -1,4 +1,5 @@
 import type { BookmarkStore } from '../../core/types.js';
+import { noopLibraryChangeNotifier, type LibraryChangeNotifier } from '../library-change-notifier.js';
 import { defineMessage, type MessageDef } from '../message-dispatch.js';
 import * as requestSchemas from '../message-schemas.js';
 import {
@@ -35,10 +36,12 @@ export interface BookmarkMessageHandlerDeps {
     BookmarkStore,
     'loadPage' | 'loadByIds' | 'findByUrl' | 'save' | 'remove' | 'removeMany' | 'removeRecallPage'
   >;
+  readonly notifyLibraryChange?: LibraryChangeNotifier;
 }
 
 export function createBookmarkMessageRegistry({
   bookmarkStore,
+  notifyLibraryChange = noopLibraryChangeNotifier,
 }: BookmarkMessageHandlerDeps): Record<BookmarkRequestType, MessageDef<ExtensionRequest, ExtensionResponse>> {
   return {
     [MessageType.LoadBookmarks]: defineMessage({
@@ -69,7 +72,11 @@ export function createBookmarkMessageRegistry({
     }),
     [MessageType.SaveBookmark]: defineMessage({
       requestSchema: requestSchemas.saveBookmarkRequestSchema,
-      handle: async (message: SaveBookmarkMessage) => ({ ok: true as const, record: await bookmarkStore.save(message.payload.record) }),
+      handle: async (message: SaveBookmarkMessage) => {
+        const record = await bookmarkStore.save(message.payload.record);
+        notifyLibraryChange({ topic: 'bookmarks', reason: 'bookmark-saved', recordIds: [record.id] });
+        return { ok: true as const, record };
+      },
       respond: (result) => createSaveBookmarkResultMessage(result),
       fallback: () => createSaveBookmarkResultMessage({ ok: false, message: 'Bookmark save failed.' }),
     }),
@@ -77,6 +84,7 @@ export function createBookmarkMessageRegistry({
       requestSchema: requestSchemas.removeBookmarkRequestSchema,
       handle: async (message: RemoveBookmarkMessage) => {
         await bookmarkStore.remove(message.payload.record);
+        notifyLibraryChange({ topic: 'bookmarks', reason: 'bookmark-removed', recordIds: [message.payload.record.id] });
         return { ok: true as const };
       },
       respond: (result) => createRemoveBookmarkResultMessage(result),
@@ -84,16 +92,23 @@ export function createBookmarkMessageRegistry({
     }),
     [MessageType.RemoveBookmarks]: defineMessage({
       requestSchema: requestSchemas.removeBookmarksRequestSchema,
-      handle: async (message: RemoveBookmarksMessage) => ({ ok: true as const, ...(await bookmarkStore.removeMany(message.payload.ids)) }),
+      handle: async (message: RemoveBookmarksMessage) => {
+        const result = await bookmarkStore.removeMany(message.payload.ids);
+        if (result.removedCount > 0) {
+          notifyLibraryChange({ topic: 'bookmarks', reason: 'bookmarks-removed', recordIds: message.payload.ids });
+        }
+        return { ok: true as const, ...result };
+      },
       respond: (result) => createRemoveBookmarksResultMessage(result),
       fallback: () => createRemoveBookmarksResultMessage({ ok: false, removedCount: 0 }),
     }),
     [MessageType.RemoveRecallBookmarks]: defineMessage({
       requestSchema: requestSchemas.removeRecallBookmarksRequestSchema,
-      handle: async (message: RemoveRecallBookmarksMessage) => ({
-        ok: true as const,
-        ...(await bookmarkStore.removeRecallPage(message.payload)),
-      }),
+      handle: async (message: RemoveRecallBookmarksMessage) => {
+        const result = await bookmarkStore.removeRecallPage(message.payload);
+        if (result.removedCount > 0) notifyLibraryChange({ topic: 'bookmarks', reason: 'recall-bookmarks-removed' });
+        return { ok: true as const, ...result };
+      },
       respond: (result) => createRemoveRecallBookmarksResultMessage(result),
       fallback: () => createRemoveRecallBookmarksResultMessage({ ok: false, removedCount: 0 }),
     }),
