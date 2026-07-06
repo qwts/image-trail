@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/html-vite';
 import { expect, fireEvent, fn, userEvent } from 'storybook/test';
 
 import { createRecallDrawerView } from './recall-drawer-view.js';
+import { resetPreviewRowClickTracking } from './record-row-preview-click.js';
 import { recallState } from '../stories/fixtures.js';
 import { drawerStory, mockDispatch } from '../stories/story-host.js';
 
@@ -80,11 +81,14 @@ export const PreviewsSelectedRow: Story = {
   render: () => recallStory({ selectedIds: ['recall-queue-captured'] }, geometry, dispatchSpy),
   play: async ({ canvasElement }) => {
     dispatchSpy.mockClear();
+    resetPreviewRowClickTracking();
     const row = canvasElement.querySelector('[data-image-trail-row-id="recall-queue-captured"]');
     if (!(row instanceof HTMLElement)) throw new Error('expected the recall-queue-captured row to render');
-    await userEvent.click(row);
+    // Preview requires a real double-click (#426): the first click re-selects, the second previews.
+    await userEvent.dblClick(row);
+    await expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ name: 'recall-selection/select' }));
     await expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ name: 'capture/preview' }));
-    await expect(dispatchSpy).toHaveBeenCalledTimes(1);
+    await expect(dispatchSpy).toHaveBeenCalledTimes(2);
   },
 };
 

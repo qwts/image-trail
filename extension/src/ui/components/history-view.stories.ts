@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/html-vite';
 import { expect, fireEvent, fn, userEvent } from 'storybook/test';
 
 import { createHistoryView } from './history-view.js';
+import { resetPreviewRowClickTracking } from './record-row-preview-click.js';
 import {
   capturedRecord,
   lockedPrivateRecord,
@@ -69,11 +70,14 @@ export const PreviewsSelectedRow: Story = {
   render: () => historyStory(recentFixtures, ['recent-normal'], {}, dispatchSpy),
   play: async ({ canvasElement }) => {
     dispatchSpy.mockClear();
+    resetPreviewRowClickTracking();
     const row = canvasElement.querySelector('[data-image-trail-row-id="recent-normal"]');
     if (!(row instanceof HTMLElement)) throw new Error('expected the recent-normal row to render');
-    await userEvent.click(row);
+    // Preview requires a real double-click (#426): the first click re-selects, the second previews.
+    await userEvent.dblClick(row);
+    await expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ name: 'history-selection/select' }));
     await expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ name: 'capture/preview' }));
-    await expect(dispatchSpy).toHaveBeenCalledTimes(1);
+    await expect(dispatchSpy).toHaveBeenCalledTimes(2);
   },
 };
 
