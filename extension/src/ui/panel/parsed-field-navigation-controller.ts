@@ -180,6 +180,10 @@ export class ParsedFieldNavigationController {
     const state = this.deps.getState();
     if (state.failedFieldId === null) return;
     this.deps.setState({ ...state, failedFieldId: null, draftUrl: null, lastUpdatedAt: Date.now() });
+    // The quiet skip persisted the failed marker/draft to the durable parsed-field record via
+    // saveFieldState(); persist the cleared resting state too, or a panel close/reopen or restore
+    // would resurrect the stale red marker and failed draft this just cleared (#447).
+    void this.deps.saveFieldState();
     this.deps.render();
   }
 

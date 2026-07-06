@@ -266,6 +266,8 @@ test('a drain that stops after skipping clears the stranded failed-field marker 
   assert.equal(harness.getState().failedFieldId, null, 'no stranded red field outline after the drain stops');
   assert.equal(harness.getState().draftUrl, null, 'the failed candidate does not remain as the next navigation base');
   assert.match(harness.getState().message, /^Stopped after skipping/, 'the stop message is preserved');
+  // The cleared resting state must be persisted, or a panel close/reopen restores the stale marker.
+  assert.ok(harness.log.includes('saveFieldState'), 'the reconciled resting state is saved to the durable record');
 });
 
 test('a larger neighbor-preload radius raises the consecutive-miss threshold with it', async () => {
