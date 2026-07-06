@@ -73,13 +73,18 @@ test('the Settings scroll position survives the rerender caused by applying a se
   const scrolled = await settingsSection.evaluate((element) => element.scrollTop);
   expect(scrolled).toBeGreaterThan(0);
 
-  // Applying a setting dispatches a panel action and swaps the whole panel DOM.
-  await panel
-    .locator('.image-trail-panel__settings-utility-section', { hasText: 'Display' })
-    .first()
-    .getByRole('button', { name: 'Apply' })
-    .first()
-    .click();
-
+  // Applying a setting dispatches a panel action and swaps the whole panel DOM. The value must
+  // actually CHANGE: applying the unchanged default short-circuits before rendering
+  // (updateVisibleBookmarkSoftMax returns early on an equal value), which would let this test pass
+  // without exercising rerender-time scroll restoration at all.
+  const displayGroup = panel.locator('.image-trail-panel__settings-utility-section', { hasText: 'Display' }).first();
+  const visiblePinsInput = displayGroup.locator('input[type="number"]').first();
+  const currentValue = await visiblePinsInput.inputValue();
+  const changedValue = String(Number(currentValue) + 1);
+  await visiblePinsInput.fill(changedValue);
+  await displayGroup.getByRole('button', { name: 'Apply' }).first().click();
+  // The rerender happened (the input rebuilt with the new applied value) ...
+  await expect(displayGroup.locator('input[type="number"]').first()).toHaveValue(changedValue);
+  // ... and the Settings region kept its scroll position through it.
   await expect.poll(async () => settingsSection.evaluate((element) => element.scrollTop)).toBe(scrolled);
 });
