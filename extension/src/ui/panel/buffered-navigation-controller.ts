@@ -136,6 +136,11 @@ export class BufferedNavigationController {
         this.schedulePreloads();
         return 'blocked';
       }
+      // Warm the seek's whole skip budget concurrently before parking on the blocked index: a run
+      // of failed neighbors then resolves in ~one probe round-trip instead of one await per index,
+      // and the probe results (with their URLs) land in the index map so a beyond-window landing
+      // stays reusable instead of forcing a full window rebuild on the next press (#373).
+      this.prefetchFrontierProbes(blockedOn, direction);
       await this.resolveIndex(blockedOn, { advanceOnResolve: true });
       if (!this.isCurrentRun(runId)) return 'blocked';
       // Re-run the seek against the now-updated index states. resolveIndex() only fires an ADVANCE
@@ -250,6 +255,18 @@ export class BufferedNavigationController {
     return Math.max(0, Math.min(5, this.deps.getLocalSettings().neighborPreloadRadius));
   }
 
+  // Probe-only lookahead for a blocked seek: fire manifest probes for the indices the skip budget
+  // may still need, in the travel direction, without awaiting them. GETs stay reserved for the
+  // index the cursor actually lands on. probeIndex() dedupes queued/in-flight work, so repeated
+  // calls as the block point advances are cheap, and most probes resolve from the shared
+  // request-policy cache without a network request.
+  private prefetchFrontierProbes(from: number, direction: NeighborPreloadDirection): void {
+    if (!this.navigation) return;
+    for (let offset = 1; offset <= this.navigation.settings.probeK; offset += 1) {
+      void this.probeIndex(from + direction * offset, { advanceOnResolve: false });
+    }
+  }
+
   private async resolveIndex(index: number, options: { readonly advanceOnResolve?: boolean } = {}): Promise<void> {
     if (!this.navigation) return;
     const current = this.navigation.indices.get(index);
@@ -281,7 +298,10 @@ export class BufferedNavigationController {
     }
     const queued = this.headQueued.get(index);
     if (queued) {
-      if (options.advanceOnResolve) queued.advanceOnResolve = true;
+      if (options.advanceOnResolve) {
+        queued.advanceOnResolve = true;
+        this.promoteQueuedHeadProbe(index);
+      }
       return queued.promise;
     }
     const url = this.urlForIndex(index);
@@ -302,8 +322,25 @@ export class BufferedNavigationController {
     });
     this.headQueue.push(index);
     this.sortQueues();
-    this.drainHeadQueue();
+    if (options.advanceOnResolve) {
+      this.promoteQueuedHeadProbe(index);
+    } else {
+      this.drainHeadQueue();
+    }
     return promise;
+  }
+
+  // Fast lane for a request the user's navigation is parked on (#373): speculative window-refill
+  // work must never make the active step wait for a concurrency slot, so a user-blocking request
+  // starts immediately, bypassing the prefetch queue and its cap.
+  private promoteQueuedHeadProbe(index: number): void {
+    this.headQueue = this.headQueue.filter((queuedIndex) => queuedIndex !== index);
+    this.startHeadProbe(index);
+  }
+
+  private promoteQueuedGet(index: number): void {
+    this.getQueue = this.getQueue.filter((queuedIndex) => queuedIndex !== index);
+    this.startGet(index);
   }
 
   private startHeadProbe(index: number): void {
@@ -381,7 +418,10 @@ export class BufferedNavigationController {
     }
     const queued = this.getQueued.get(index);
     if (queued) {
-      if (options.advanceOnResolve) queued.advanceOnResolve = true;
+      if (options.advanceOnResolve) {
+        queued.advanceOnResolve = true;
+        this.promoteQueuedGet(index);
+      }
       return queued.promise;
     }
     const url = current?.url ?? this.urlForIndex(index);
@@ -402,7 +442,11 @@ export class BufferedNavigationController {
     });
     this.getQueue.push(index);
     this.sortQueues();
-    this.drainGetQueue();
+    if (options.advanceOnResolve) {
+      this.promoteQueuedGet(index);
+    } else {
+      this.drainGetQueue();
+    }
     return promise;
   }
 

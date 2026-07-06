@@ -39,9 +39,10 @@
             "tests/dom/parsed-field-navigation-controller.test.ts",
             "tests/parsed-field-navigation-controller.test.ts",
             "tests/dom/field-editor-controller.test.ts",
-            "tests/dom/panel-render-controller.test.ts"
+            "tests/dom/panel-render-controller.test.ts",
+            "tests/buffered-navigation-controller.test.ts"
           ],
-          "notes": "Covers #373 bounded manual navigation (latest wins): a rapid press burst coalesces into one net jump, cancelQueuedManualNavigation drops queued presses on Escape/Stop, a long governor wait abandons manual-only intent with a visible message, parsed-field +/- bursts fold into one net transform (a +/- pair loads nothing, interleaved interactions preserve order), the navigationBusy waiting state toggles around the drain, and an unchanged status toast is not rebuilt across renders so stale messages cannot replay their enter animation."
+          "notes": "Covers #373 bounded manual navigation (latest wins): a rapid press burst coalesces into one net jump, cancelQueuedManualNavigation drops queued presses on Escape/Stop, a long governor wait abandons manual-only intent with a visible message, parsed-field +/- bursts fold into one net transform (a +/- pair loads nothing, interleaved interactions preserve order), the navigationBusy waiting state toggles around the drain, and an unchanged status toast is not rebuilt across renders so stale messages cannot replay their enter animation. Buffered prewarming responsiveness: a blocked seek probes the skip-budget frontier concurrently and lands past a failed run in one step, and the GET the user is blocked on bypasses the prefetch concurrency cap."
         }
       ]
     },
