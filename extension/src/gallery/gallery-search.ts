@@ -29,7 +29,9 @@ export function gallerySearchText(record: ImageDisplayRecord, options: GallerySe
 }
 
 function privacySafeFields(record: ImageDisplayRecord, options: GallerySearchOptions): readonly string[] {
-  return [recordDisplayName(record, options), recordMetadataText(record, options), recordExtensionLabel(record), galleryRecordKind(record)];
+  return options.privacyMode && record.privacyStatus !== 'locked'
+    ? [recordDisplayName(record, options), recordMetadataText(record, options), galleryRecordKind(record)]
+    : [recordDisplayName(record, options), recordMetadataText(record, options), recordExtensionLabel(record), galleryRecordKind(record)];
 }
 
 function urlFields(record: ImageDisplayRecord): readonly string[] {

@@ -79,7 +79,7 @@
         {
           "type": "unit-dom",
           "paths": ["tests/gallery-search.test.ts", "tests/dom/gallery-view.test.ts", "tests/data-crypto.test.ts"],
-          "notes": "Covers gallery metadata matching, privacy-mode search masking, matched-result queue order, zero-as-unlimited gallery limit migration, draft search input handling, and the gallery search/page-limit controls."
+          "notes": "Covers gallery metadata matching, privacy-mode search masking, matched-result queue order, single-pass durable search loading, zero-as-unlimited gallery limit migration, draft search input handling, and the gallery search/page-limit controls."
         },
         {
           "type": "manual",

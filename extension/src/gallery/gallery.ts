@@ -9,7 +9,7 @@ import { ExtensionBookmarkStore } from '../content/extension-bookmark-store.js';
 import { sendRuntimeMessage } from '../content/runtime-message.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { GALLERY_PAGE_LIMITS } from '../core/settings.js';
-import { DEFAULT_LOCAL_SETTINGS, type PlaintextLocalSettings } from '../data/local-settings.js';
+import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, type PlaintextLocalSettings } from '../data/local-settings.js';
 import { openActionForGalleryRecord } from './gallery-model.js';
 import { loadGallerySearchPage } from './gallery-search-loader.js';
 import { createGalleryView, type GalleryViewState } from './gallery-view.js';
@@ -34,6 +34,7 @@ let state: GalleryViewState = {
 };
 let searchTimer: number | null = null;
 let loadGeneration = 0;
+let settingsRefreshInFlight = false;
 
 function root(): HTMLElement {
   const element = document.getElementById('image-trail-gallery-root');
@@ -124,6 +125,38 @@ function clearSearch(): void {
   void loadPage(0, { focusSearch: true });
 }
 
+async function refreshSettingsFromStorage(options: { readonly reloadOnChange?: boolean } = {}): Promise<void> {
+  if (settingsRefreshInFlight) return;
+  settingsRefreshInFlight = true;
+  try {
+    const settings = await loadLocalSettings();
+    const privacyChanged = settings.privacyModeEnabled !== state.privacyMode;
+    const limitChanged = settings.galleryPageLimit !== state.limit;
+    if (!privacyChanged && !limitChanged) return;
+    state = { ...state, privacyMode: settings.privacyModeEnabled, limit: settings.galleryPageLimit };
+    render();
+    const nextOffset = settings.galleryPageLimit === 0 ? 0 : state.offset;
+    if (options.reloadOnChange ?? true) void loadPage(nextOffset);
+  } finally {
+    settingsRefreshInFlight = false;
+  }
+}
+
+function installSettingsRefreshHooks(): void {
+  if (typeof chrome !== 'undefined') {
+    chrome.storage?.onChanged?.addListener((changes, areaName) => {
+      if (areaName !== 'local' || !(LOCAL_SETTINGS_KEY in changes)) return;
+      void refreshSettingsFromStorage();
+    });
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void refreshSettingsFromStorage();
+  });
+  window.addEventListener('focus', () => {
+    void refreshSettingsFromStorage();
+  });
+}
+
 async function updatePageLimit(limit: number): Promise<void> {
   if (!Number.isInteger(limit) || limit < GALLERY_PAGE_LIMITS.min || limit > GALLERY_PAGE_LIMITS.max || limit === state.limit) return;
   const settings = await loadLocalSettings();
@@ -164,6 +197,7 @@ async function showPreviewResult(preview: Promise<Awaited<ReturnType<CaptureCont
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  installSettingsRefreshHooks();
   render();
   void loadPage(0);
 });

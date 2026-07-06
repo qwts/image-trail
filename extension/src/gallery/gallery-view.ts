@@ -113,11 +113,21 @@ function createLimitForm(state: GalleryViewState, handlers: GalleryViewHandlers)
   help.className = 'image-trail-gallery__hint';
   help.textContent = '0 shows all';
 
-  const apply = createPageButton('Apply', !state.loading, () => undefined);
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
+  const applyLimit = () => {
     const value = Number(input.value);
     if (Number.isInteger(value)) handlers.updatePageLimit(value);
+  };
+  const apply = document.createElement('button');
+  apply.type = 'submit';
+  apply.textContent = 'Apply';
+  apply.disabled = state.loading;
+  apply.addEventListener('click', (event) => {
+    event.preventDefault();
+    applyLimit();
+  });
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    applyLimit();
   });
   form.append(label, help, apply);
   return form;
