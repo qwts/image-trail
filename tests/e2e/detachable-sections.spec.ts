@@ -122,3 +122,65 @@ test('detached Settings follows the gear toggle without duplicating the surface'
   await expect(settingsWindow).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: 'Image Trail panel' }).locator('.image-trail-panel__settings-section')).toHaveCount(1);
 });
+
+test('the per-site workspace layout persists across a reload when opted in, and reset reattaches everything', async ({
+  page,
+  serviceWorker,
+}) => {
+  await openPanel(page, serviceWorker);
+
+  const openMaintenanceGroup = async (): Promise<void> => {
+    const showSettingsButton = page.getByRole('button', { name: 'Show settings' });
+    if ((await showSettingsButton.count()) > 0) await showSettingsButton.click();
+    const heading = page.getByRole('heading', { name: 'Maintenance' });
+    const group = heading.locator('xpath=ancestor::details[1]');
+    if (!(await group.evaluate((element) => element.hasAttribute('open')))) await heading.click();
+  };
+
+  // Opt in (Maintenance → Panel layout), then close settings to leave a clean panel.
+  await openMaintenanceGroup();
+  const restoreToggle = page.getByLabel('Restore workspace layout per site');
+  await restoreToggle.check();
+  await page.getByRole('button', { name: 'Hide settings' }).click();
+
+  // Detach Recent history, drag its window to a distinctive spot, and minimize it.
+  await page.getByRole('button', { name: detachHistoryName }).click();
+  const windowEl = page.getByRole('dialog', { name: historyWindowName });
+  await expect(windowEl).toBeVisible();
+  const header = windowEl.locator('.image-trail-panel__detached-header');
+  const headerBox = await header.boundingBox();
+  expect(headerBox).not.toBeNull();
+  // Park the window at the far left, well clear of the right-docked panel, so the restored
+  // (minimized) title bar can never sit over the panel's controls and intercept later clicks.
+  await page.mouse.move(headerBox!.x + 40, headerBox!.y + headerBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(90, 420, { steps: 8 });
+  await page.mouse.up();
+  const movedBox = await windowEl.boundingBox();
+  expect(movedBox).not.toBeNull();
+  await windowEl.getByRole('button', { name: 'Minimize Recent history window' }).click();
+  // Let the debounced save (400ms) flush before reloading.
+  await page.waitForTimeout(700);
+
+  await page.reload();
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+
+  // The saved workspace restores: Recent history opens detached, at the dragged spot, still minimized.
+  const restoredWindow = page.getByRole('dialog', { name: historyWindowName });
+  await expect(restoredWindow).toBeVisible();
+  const restoredBox = await restoredWindow.boundingBox();
+  expect(restoredBox).not.toBeNull();
+  expect(Math.abs(restoredBox!.x - movedBox!.x)).toBeLessThanOrEqual(4);
+  expect(Math.abs(restoredBox!.y - movedBox!.y)).toBeLessThanOrEqual(4);
+  await expect(restoredWindow.locator('.image-trail-panel__detached-body')).toBeHidden();
+
+  // Reset clears the saved layout for the site and reattaches the section.
+  await openMaintenanceGroup();
+  await page.getByRole('button', { name: 'Reset workspace layout' }).click();
+  await expect(restoredWindow).toHaveCount(0);
+  await expect(page.getByRole('button', { name: detachHistoryName })).toBeVisible();
+
+  // Leave the shared profile the way we found it: opt back out.
+  await page.getByLabel('Restore workspace layout per site').uncheck();
+});

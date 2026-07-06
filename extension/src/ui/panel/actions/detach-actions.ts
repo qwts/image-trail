@@ -20,6 +20,7 @@ export function buildDetachableSectionActionEntries(deps: PanelActionDeps): Acti
       handle(action) {
         deps.reduce(action);
         deps.render();
+        deps.notifyWorkspaceLayoutChanged();
         focusControl(deps.panelMount().detachedRoot, `[data-image-trail-restore="${action.sectionId}"]`);
       },
     },
@@ -27,6 +28,7 @@ export function buildDetachableSectionActionEntries(deps: PanelActionDeps): Acti
       handle(action) {
         deps.reduce(action);
         deps.render();
+        deps.notifyWorkspaceLayoutChanged();
         focusControl(deps.panelMount().root, `[data-image-trail-detach="${action.sectionId}"]`);
       },
     },

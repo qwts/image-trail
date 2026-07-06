@@ -78,6 +78,9 @@ export interface PanelActionDeps {
   updateNeighborPreload(enabled: boolean, radius: number, cacheLimit: number, probeMethod: ImageProbeMethod): void;
   preloadMoreNeighbors(radius: number, cacheLimit: number): void;
   resetPanelPosition(): Promise<void>;
+  updateWorkspaceLayoutRestore(enabled: boolean): void;
+  resetWorkspaceLayout(): Promise<void>;
+  notifyWorkspaceLayoutChanged(): void;
   refreshStorageUsage(options?: { readonly render?: boolean }): Promise<void>;
   restoreParsedFieldStateForCurrentPanel(): void;
   openRecallDrawer(): Promise<void>;

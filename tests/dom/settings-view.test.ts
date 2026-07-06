@@ -54,6 +54,7 @@ test('recents settings dispatches visible and max kept limits', () => {
     { limit: 5_000, clearAfterExport: false },
     { minimumIntervalMs: 0, maxRequests: 3, windowMs: 10_000 },
     { enabled: false, radius: 3, cacheLimit: 24, probeMethod: 'get' },
+    false,
     [],
     (action) => actions.push(action),
   );
@@ -99,6 +100,7 @@ test('settings exposes browser, panel, and legacy shortcut decisions', () => {
     { limit: 5_000, clearAfterExport: false },
     { minimumIntervalMs: 0, maxRequests: 3, windowMs: 10_000 },
     { enabled: false, radius: 3, cacheLimit: 24, probeMethod: 'get' },
+    false,
     [],
     () => {},
   );

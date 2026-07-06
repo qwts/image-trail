@@ -15,7 +15,9 @@ export type PanelSettingsActionName =
   | 'settings/update-request-throttle'
   | 'settings/update-neighbor-preload'
   | 'neighbor-preload/manual'
-  | 'settings/reset-panel-position';
+  | 'settings/reset-panel-position'
+  | 'settings/update-workspace-layout-restore'
+  | 'settings/reset-workspace-layout';
 
 /** Panel chrome (minimize/expand, secondary controls) and the settings drawer. Bodies moved verbatim from the panel dispatch chain. */
 export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEntries<PanelSettingsActionName> {
@@ -108,6 +110,16 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
     'settings/reset-panel-position': {
       handle() {
         void deps.resetPanelPosition();
+      },
+    },
+    'settings/update-workspace-layout-restore': {
+      handle(action) {
+        deps.updateWorkspaceLayoutRestore(action.enabled);
+      },
+    },
+    'settings/reset-workspace-layout': {
+      handle() {
+        void deps.resetWorkspaceLayout();
       },
     },
   };

@@ -124,6 +124,7 @@ export function createSettingsSection(
       cacheLimit: state.neighborPreloadCacheLimit,
       probeMethod: state.neighborPreloadProbeMethod,
     },
+    state.restoreWorkspaceLayoutEnabled,
     [
       createEncryptionView(
         {

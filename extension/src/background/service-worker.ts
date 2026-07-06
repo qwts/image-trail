@@ -2,6 +2,7 @@ import type { StorageUsageSummary } from '../core/image/capture-result.js';
 import { isBuildIdentity } from '../core/build-info.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { IndexedDbPanelPositionStore } from '../data/panel-position-controller.js';
+import { IndexedDbWorkspaceLayoutStore } from '../data/workspace-layout-controller.js';
 import { IndexedDbParsedFieldStateStore } from '../data/parsed-field-state-controller.js';
 import { IndexedDbUrlTemplateStore } from '../data/url-template-controller.js';
 import { IndexedDbUrlReviewStatusStore } from '../data/url-review-status-controller.js';
@@ -130,7 +131,6 @@ const bookmarkStore = new IndexedDbBookmarkStore({
   getActiveBlobKey,
   getPinSaveStoragePreference: async () => (await loadLocalSettings()).pinSaveStoragePreference,
 });
-const panelPositionStore = new IndexedDbPanelPositionStore();
 const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
 const urlReviewStatusStore = new IndexedDbUrlReviewStatusStore();
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
@@ -139,7 +139,8 @@ const recentHistoryCache = new RecentHistoryCache();
 /** Composition-root context handed to extracted handler modules; see {@link ServiceWorkerContext}. */
 const context: ServiceWorkerContext = {
   bookmarkStore,
-  panelPositionStore,
+  panelPositionStore: new IndexedDbPanelPositionStore(),
+  workspaceLayoutStore: new IndexedDbWorkspaceLayoutStore(),
   parsedFieldStateStore,
   urlReviewStatusStore,
   urlTemplateStore,

@@ -71,6 +71,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     neighborPreloadProbeMethod: 'get',
     secondaryControlsOpen: false,
     detachedSections: [],
+    restoreWorkspaceLayoutEnabled: false,
     hasOlderBookmarks: false,
     hasNewerBookmarks: false,
     captureInProgress: false,

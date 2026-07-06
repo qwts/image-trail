@@ -1,4 +1,10 @@
-import type { PanelPositionStore, ParsedFieldStateStore, UrlReviewStatusStore, UrlTemplateStore } from '../core/types.js';
+import type {
+  PanelPositionStore,
+  ParsedFieldStateStore,
+  UrlReviewStatusStore,
+  UrlTemplateStore,
+  WorkspaceLayoutStore,
+} from '../core/types.js';
 import type { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import type { DEFAULT_LOCAL_SETTINGS } from '../data/local-settings.js';
 import type { ImageRequestManager } from './image-request-manager.js';
@@ -14,6 +20,7 @@ import type { RecentHistoryCache } from './recent-history-cache.js';
 export interface ServiceWorkerContext {
   readonly bookmarkStore: IndexedDbBookmarkStore;
   readonly panelPositionStore: PanelPositionStore;
+  readonly workspaceLayoutStore: WorkspaceLayoutStore;
   readonly parsedFieldStateStore: ParsedFieldStateStore;
   readonly urlReviewStatusStore: UrlReviewStatusStore;
   readonly urlTemplateStore: UrlTemplateStore;

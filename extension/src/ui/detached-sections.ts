@@ -70,10 +70,12 @@ export function renderDetachedSections(
         minimized: target.layoutState.detachedWindowMinimized.has(sectionId),
         onPositionChange: (id, position) => {
           target.layoutState.detachedWindowPositions.set(id, position);
+          target.onWorkspaceLayoutChanged?.();
         },
         onMinimizedChange: (id, minimized) => {
           if (minimized) target.layoutState.detachedWindowMinimized.add(id);
           else target.layoutState.detachedWindowMinimized.delete(id);
+          target.onWorkspaceLayoutChanged?.();
         },
       },
       content,
@@ -106,12 +108,20 @@ function detachedWindowGeometry(
   // viewport, since the inline width would otherwise override the CSS max-width.
   const availableInlineSize = Math.max(0, window.innerWidth - DETACHED_WINDOW_EDGE_PADDING * 2);
   const inlineSize = Math.min(preferredInlineSize, availableInlineSize);
-  if (stored) return { ...stored, inlineSize };
+  const maxLeft = window.innerWidth - inlineSize - DETACHED_WINDOW_EDGE_PADDING;
+  const maxTop = window.innerHeight - DETACHED_WINDOW_EDGE_PADDING - DETACHED_WINDOW_MIN_VISIBLE_BLOCK_SIZE;
+  if (stored) {
+    // A stored position can come from a larger viewport (a restored per-site workspace layout, or a
+    // resized window mid-session) — clamp it back into view instead of trusting it verbatim.
+    return {
+      left: Math.max(DETACHED_WINDOW_EDGE_PADDING, Math.min(stored.left, maxLeft)),
+      top: Math.max(DETACHED_WINDOW_EDGE_PADDING, Math.min(stored.top, maxTop)),
+      inlineSize,
+    };
+  }
   const rect = panelRoot.getBoundingClientRect();
   const stackOffset = index * DETACHED_WINDOW_STACK_OFFSET;
-  const maxLeft = window.innerWidth - inlineSize - DETACHED_WINDOW_EDGE_PADDING;
   const left = Math.max(DETACHED_WINDOW_EDGE_PADDING, Math.min(rect.right + DETACHED_WINDOW_GAP + stackOffset, maxLeft));
-  const maxTop = window.innerHeight - DETACHED_WINDOW_EDGE_PADDING - DETACHED_WINDOW_MIN_VISIBLE_BLOCK_SIZE;
   const top = Math.max(DETACHED_WINDOW_EDGE_PADDING, Math.min(rect.top + stackOffset, maxTop));
   return { left, top, inlineSize };
 }

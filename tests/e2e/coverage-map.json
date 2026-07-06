@@ -537,18 +537,29 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/detachable-sections.test.ts", "tests/dom/detachable-section.test.ts", "tests/dom/settings-section.test.ts"],
-          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X). #217 Settings detach: detach control, window/placeholder conditional on settingsOpen, wider window default, settings-action routing from the window, and the Escape-in-editable-control guard. #215 completion: Queue (bookmarks) detach, drag-out gesture (threshold, ghost cleanup, drop-position seeding, click suppression), and settings-section state branches. #408: registry-driven eligibility asserted across every section id (URL editor, Host target, Parsed fields, Manual controls, Recents, Queue, Settings), section-surface drag-out with interactive-origin filtering, and Escape cancelling both surface drags and window drags."
+          "paths": [
+            "tests/detachable-sections.test.ts",
+            "tests/dom/detachable-section.test.ts",
+            "tests/dom/settings-section.test.ts",
+            "tests/workspace-layout.test.ts",
+            "tests/workspace-layout-controller.test.ts",
+            "tests/dom/panel-layout-settings-view.test.ts"
+          ],
+          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X). #217 Settings detach: detach control, window/placeholder conditional on settingsOpen, wider window default, settings-action routing from the window, and the Escape-in-editable-control guard. #215 completion: Queue (bookmarks) detach, drag-out gesture (threshold, ghost cleanup, drop-position seeding, click suppression), and settings-section state branches. #408: registry-driven eligibility asserted across every section id (URL editor, Host target, Parsed fields, Manual controls, Recents, Queue, Settings), section-surface drag-out with interactive-origin filtering, and Escape cancelling both surface drags and window drags. #398 per-site workspace persistence: layout sanitize/capture/equality helpers, restore gating on the opt-in flag, hydration of detached sections + positions + minimized state, debounced change-only saves, immediate capture on opt-in, reset clearing storage and reattaching, teardown-invalidated restores, and the settings-view toggle/reset dispatch contract."
         },
         {
           "type": "storybook",
-          "paths": ["extension/src/ui/components/detachable-section.stories.ts", "extension/src/ui/render.stories.ts"],
-          "notes": "Window/narrow/placeholder/control states with play tests for detach and restore dispatch; panel-layout story for the detached placeholder; minimized window state and a minimize-toggle play test; SettingsDetached (with play assertions) and SettingsDetachedPrivacyMasked panel stories"
+          "paths": [
+            "extension/src/ui/components/detachable-section.stories.ts",
+            "extension/src/ui/render.stories.ts",
+            "extension/src/ui/components/panel-layout-settings-view.stories.ts"
+          ],
+          "notes": "Window/narrow/placeholder/control states with play tests for detach and restore dispatch; panel-layout story for the detached placeholder; minimized window state and a minimize-toggle play test; SettingsDetached (with play assertions) and SettingsDetachedPrivacyMasked panel stories; #398 panel-layout settings group states (workspace restore off/on) with a toggle/reset dispatch play test"
         },
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/detachable-sections.spec.ts",
-          "notes": "Browser-level detach/restore: floating dialog + placeholder, minimize/expand, close-to-restore with focus hand-off, drag-out placement at the drop point, Escape restore, and detached Settings following the gear toggle without duplication; #408 adds heading-surface drag-out placement and Escape mid-drag cancel."
+          "notes": "Browser-level detach/restore: floating dialog + placeholder, minimize/expand, close-to-restore with focus hand-off, drag-out placement at the drop point, Escape restore, and detached Settings following the gear toggle without duplication; #408 adds heading-surface drag-out placement and Escape mid-drag cancel. #398 adds the reload round-trip: opt in, detach + drag + minimize, reload restores the arrangement at the saved position, and Reset workspace layout reattaches everything."
         }
       ]
     }

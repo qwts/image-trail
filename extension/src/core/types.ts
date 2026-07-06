@@ -8,6 +8,7 @@ import type { UrlTemplateGrabStrategy } from './url/grab-strategies.js';
 import type { FieldTransformId } from './url/field-transforms.js';
 import type { UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from './url/types.js';
 import type { ObjectFitMode } from './preview-style.js';
+import type { DetachableSectionId } from './workspace-layout.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
@@ -48,16 +49,14 @@ export interface AutomationState {
 
 export type RecallDrawerSide = 'left' | 'right';
 
-export interface PanelPosition {
-  readonly left: number;
-  readonly top: number;
-}
-
-export interface PanelPositionStore {
-  load(hostname: string): Promise<PanelPosition | null>;
-  save(hostname: string, position: PanelPosition): Promise<void>;
-  remove(hostname: string): Promise<void>;
-}
+export type {
+  DetachableSectionId,
+  PanelPosition,
+  PanelPositionStore,
+  WorkspaceLayout,
+  WorkspaceLayoutStore,
+  WorkspaceSectionLayout,
+} from './workspace-layout.js';
 
 export interface UrlTemplateStore {
   load(hostname: string): Promise<readonly UrlTemplateRecord[]>;
@@ -177,13 +176,6 @@ export interface PCloudBackupState {
   readonly messageIsError?: boolean | undefined;
 }
 
-/**
- * Panel subsections that can detach into a floating extension-owned window (issues #215/#408).
- * Every major section is eligible; keep entries aligned with the section registry in
- * `ui/render.ts` (`SECTIONS`), which is the single place a section is declared detachable.
- */
-export type DetachableSectionId = 'settings' | 'url-editor' | 'target' | 'fields' | 'controls' | 'history' | 'bookmarks';
-
 export interface PanelState {
   readonly visible: boolean;
   readonly minimized: boolean;
@@ -215,6 +207,7 @@ export interface PanelState {
   readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly secondaryControlsOpen: boolean;
   readonly detachedSections: readonly DetachableSectionId[];
+  readonly restoreWorkspaceLayoutEnabled: boolean;
   readonly hasOlderBookmarks: boolean;
   readonly hasNewerBookmarks: boolean;
   readonly captureInProgress: boolean;
@@ -341,6 +334,8 @@ export type PanelActionName =
   | 'settings/update-neighbor-preload'
   | 'neighbor-preload/manual'
   | 'settings/reset-panel-position'
+  | 'settings/update-workspace-layout-restore'
+  | 'settings/reset-workspace-layout'
   | 'url-templates/load'
   | 'url-template/remove'
   | 'url-template/update-settings'
@@ -477,6 +472,7 @@ export type PanelAction =
         | 'settings/update-url-review-status-retention'
         | 'settings/update-request-throttle'
         | 'settings/update-neighbor-preload'
+        | 'settings/update-workspace-layout-restore'
         | 'neighbor-preload/manual'
         | 'url-templates/load'
         | 'url-template/remove'
@@ -574,6 +570,7 @@ export type PanelAction =
     }
   | { readonly name: 'settings/update-pin-save-storage-preference'; readonly value: PinSaveStoragePreference }
   | { readonly name: 'settings/update-privacy-mode'; readonly enabled: boolean }
+  | { readonly name: 'settings/update-workspace-layout-restore'; readonly enabled: boolean }
   | { readonly name: 'settings/update-build-info-overlay-visibility'; readonly visible: boolean }
   | {
       readonly name: 'settings/update-url-review-status-retention';

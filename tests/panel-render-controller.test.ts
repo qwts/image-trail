@@ -46,6 +46,7 @@ function createHarness(): Harness {
     refreshRecallIfOpen: () => {
       log.push('refreshRecallIfOpen');
     },
+    onWorkspaceLayoutChanged: () => {},
   };
   return { controller: new PanelRenderController(deps), log };
 }

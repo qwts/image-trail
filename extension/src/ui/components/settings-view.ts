@@ -2,6 +2,7 @@ import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import type { ImageProbeMethod } from '../../core/image/request-policy.js';
 import { buildIdentityRows, type BuildIdentity } from '../../core/build-info.js';
 import type { PanelAction, PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../../core/types.js';
+import { createPanelLayoutSettingsView } from './panel-layout-settings-view.js';
 import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from '../../core/url/templates.js';
 import {
   defaultGrabStrategy,
@@ -77,6 +78,7 @@ export function createSettingsView(
     readonly cacheLimit: number;
     readonly probeMethod: ImageProbeMethod;
   },
+  restoreWorkspaceLayoutEnabled: boolean,
   utilityChildren: readonly HTMLElement[],
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
@@ -106,7 +108,7 @@ export function createSettingsView(
     ]),
     createSettingsGroup('Shortcuts', 'shortcuts', [createShortcutSettingsView()]),
     createSettingsGroup('Maintenance', 'maintenance', [
-      createPanelLayoutSettingsView(dispatch),
+      createPanelLayoutSettingsView(restoreWorkspaceLayoutEnabled, dispatch),
       createBuildIdentitySettingsView(buildIdentityState, dispatch),
       createStorageHealthSettingsView(storageUsage),
       createDestructiveSettingsView(destructiveState, dispatch),
@@ -578,26 +580,6 @@ function privatePinSettingsMessage(state: {
   if (state.blobKeyUnlocked) return 'New pins save encrypted while encrypted storage is unlocked.';
   if (state.blobKeyAvailable) return 'New pins save plaintext until encrypted storage is unlocked.';
   return 'New pins save plaintext until encrypted storage is set up.';
-}
-
-function createPanelLayoutSettingsView(dispatch: (action: PanelAction) => void): HTMLElement {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'image-trail-panel__settings-templates';
-
-  const heading = document.createElement('h4');
-  heading.textContent = 'Panel layout';
-
-  const reset = document.createElement('button');
-  reset.type = 'button';
-  reset.textContent = 'Reset panel position';
-  reset.addEventListener('click', () => dispatch({ name: 'settings/reset-panel-position' }));
-
-  const meta = document.createElement('p');
-  meta.className = 'image-trail-panel__settings-empty';
-  meta.textContent = 'Clears the saved position for this site and returns the panel to its default placement.';
-
-  wrapper.append(heading, reset, meta);
-  return wrapper;
 }
 
 export function createBuildIdentitySettingsView(

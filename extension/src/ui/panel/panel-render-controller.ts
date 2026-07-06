@@ -25,6 +25,7 @@ export interface PanelRenderControllerDeps {
   bufferedNavDebugSnapshot(): BufferedNavigationDebugSnapshot | null;
   // Queue refresh after a panel-only render so the recall drawer never triggers a full rerender.
   refreshRecallIfOpen(): void;
+  onWorkspaceLayoutChanged(): void;
 }
 
 // The captured active-element identity re-applied after a render swaps the panel DOM: the control is
@@ -63,6 +64,11 @@ export class PanelRenderController {
   };
 
   constructor(private readonly deps: PanelRenderControllerDeps) {}
+
+  /** Live session geometry for the detached workspace; the workspace-layout controller hydrates and captures it. */
+  workspaceGeometry(): Pick<PanelLayoutState, 'detachedWindowPositions' | 'detachedWindowMinimized'> {
+    return this.layoutState;
+  }
 
   scheduleFiniteCaptureErrorReset(
     updatedAt: number,
@@ -108,6 +114,7 @@ export class PanelRenderController {
           toastRoot: this.deps.toastRoot(),
           dispatch: this.deps.dispatch,
           layoutState: this.layoutState,
+          onWorkspaceLayoutChanged: () => this.deps.onWorkspaceLayoutChanged(),
           scrollAnchorId: this.deps.previewScrollAnchorId(),
           onPanelDragStart: this.deps.handlePanelDragStart,
         },

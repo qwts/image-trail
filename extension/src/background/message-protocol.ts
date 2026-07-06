@@ -84,6 +84,12 @@ export const MessageType = {
   SavePanelPositionResult: 'imageTrail.savePanelPositionResult',
   DeletePanelPosition: 'imageTrail.deletePanelPosition',
   DeletePanelPositionResult: 'imageTrail.deletePanelPositionResult',
+  LoadWorkspaceLayout: 'imageTrail.loadWorkspaceLayout',
+  LoadWorkspaceLayoutResult: 'imageTrail.loadWorkspaceLayoutResult',
+  SaveWorkspaceLayout: 'imageTrail.saveWorkspaceLayout',
+  SaveWorkspaceLayoutResult: 'imageTrail.saveWorkspaceLayoutResult',
+  DeleteWorkspaceLayout: 'imageTrail.deleteWorkspaceLayout',
+  DeleteWorkspaceLayoutResult: 'imageTrail.deleteWorkspaceLayoutResult',
   LoadParsedFieldState: 'imageTrail.loadParsedFieldState',
   LoadParsedFieldStateResult: 'imageTrail.loadParsedFieldStateResult',
   LoadParsedFieldStateBySource: 'imageTrail.loadParsedFieldStateBySource',
@@ -214,6 +220,12 @@ export const MESSAGE_DIRECTION = {
   [MessageType.SavePanelPositionResult]: 'response',
   [MessageType.DeletePanelPosition]: 'request',
   [MessageType.DeletePanelPositionResult]: 'response',
+  [MessageType.LoadWorkspaceLayout]: 'request',
+  [MessageType.LoadWorkspaceLayoutResult]: 'response',
+  [MessageType.SaveWorkspaceLayout]: 'request',
+  [MessageType.SaveWorkspaceLayoutResult]: 'response',
+  [MessageType.DeleteWorkspaceLayout]: 'request',
+  [MessageType.DeleteWorkspaceLayoutResult]: 'response',
   [MessageType.LoadParsedFieldState]: 'request',
   [MessageType.LoadParsedFieldStateResult]: 'response',
   [MessageType.LoadParsedFieldStateBySource]: 'request',
@@ -257,3 +269,10 @@ export const MESSAGE_DIRECTION = {
   [MessageType.DeleteGrabSourcePattern]: 'request',
   [MessageType.DeleteGrabSourcePatternResult]: 'response',
 } as const satisfies Record<MessageType, 'request' | 'response'>;
+
+/** Shared envelope-shape guard backing the per-type response guards in `messages.ts` and its extracted message modules. */
+export function hasVersionedObjectShape(value: unknown): value is { type?: unknown; version?: unknown; payload?: unknown } {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as { version?: unknown; payload?: unknown };
+  return candidate.version === MESSAGE_PROTOCOL_VERSION && !!candidate.payload && typeof candidate.payload === 'object';
+}

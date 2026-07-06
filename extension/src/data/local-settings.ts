@@ -41,6 +41,7 @@ export interface PlaintextLocalSettings {
   readonly neighborPreloadCacheLimit: number;
   readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly secondaryControlsOpen: boolean;
+  readonly restoreWorkspaceLayout: boolean;
 }
 
 export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
@@ -67,6 +68,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   neighborPreloadCacheLimit: DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
   neighborPreloadProbeMethod: 'get',
   secondaryControlsOpen: false,
+  restoreWorkspaceLayout: false,
 };
 
 export const LOCAL_SETTINGS_KEY = 'imageTrail.localSettings';
@@ -153,6 +155,7 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
       ? input.neighborPreloadProbeMethod
       : DEFAULT_LOCAL_SETTINGS.neighborPreloadProbeMethod,
     secondaryControlsOpen: input.secondaryControlsOpen === true,
+    restoreWorkspaceLayout: input.restoreWorkspaceLayout === true,
   };
 }
 

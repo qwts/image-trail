@@ -41,6 +41,7 @@ export interface PanelSettingsControllerDeps {
   governor(): Pick<RequestGovernor, 'updateConfig'>;
   neighborPreload(): Pick<NeighborPreloadController, 'invalidate' | 'pruneCache' | 'isActive' | 'preloadMore'>;
   pageAdapter(): Pick<PageAdapter, 'setPreviewPreferences'>;
+  onLocalSettingsLoaded?(): void;
 }
 
 /**
@@ -82,6 +83,7 @@ export class PanelSettingsController {
       neighborPreloadCacheLimit: settings.neighborPreloadCacheLimit,
       neighborPreloadProbeMethod: settings.neighborPreloadProbeMethod,
       secondaryControlsOpen: settings.secondaryControlsOpen,
+      restoreWorkspaceLayoutEnabled: settings.restoreWorkspaceLayout,
       lastUpdatedAt: Date.now(),
     });
     this.deps.governor().updateConfig({
@@ -94,6 +96,8 @@ export class PanelSettingsController {
       objectFit: settings.previewObjectFit,
     });
     this.deps.setState(setTargetState(this.deps.getState(), toTargetState(snapshot)));
+    // The workspace-layout restore is gated on the opt-in flag that just landed in state.
+    this.deps.onLocalSettingsLoaded?.();
     if (options.render !== false) this.deps.render();
   }
 

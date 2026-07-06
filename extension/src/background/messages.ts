@@ -2,11 +2,26 @@ import * as v from 'valibot';
 import { isBuildIdentity, type BuildIdentity } from '../core/build-info.js';
 import { storageUsageSummarySchema } from '../core/image/capture-result.schema.js';
 import type { ImageProbeMethod, ImageRequestIntent, ImageSourceProfile } from '../core/image/request-policy.js';
-import { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
+import { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType, hasVersionedObjectShape } from './message-protocol.js';
 import type { MessageType as ProtocolMessageType } from './message-protocol.js';
 import type { OpenGalleryMessage, OpenGalleryResultMessage } from './gallery-messages.js';
+import type {
+  DeletePanelPositionMessage,
+  DeletePanelPositionResultMessage,
+  DeleteWorkspaceLayoutMessage,
+  DeleteWorkspaceLayoutResultMessage,
+  LoadPanelPositionMessage,
+  LoadPanelPositionResultMessage,
+  LoadWorkspaceLayoutMessage,
+  LoadWorkspaceLayoutResultMessage,
+  SavePanelPositionMessage,
+  SavePanelPositionResultMessage,
+  SaveWorkspaceLayoutMessage,
+  SaveWorkspaceLayoutResultMessage,
+} from './layout-messages.js';
 
 export { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
+export * from './layout-messages.js';
 
 const deleteBlobResultPayloadSchema = v.object({
   deleted: v.boolean(),
@@ -611,47 +626,6 @@ export interface RecallRecordsResultMessage {
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 
-export interface LoadPanelPositionMessage {
-  readonly type: typeof MessageType.LoadPanelPosition;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly hostname: string };
-}
-
-export interface LoadPanelPositionResultMessage {
-  readonly type: typeof MessageType.LoadPanelPositionResult;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload:
-    | { readonly ok: true; readonly position: import('../core/types.js').PanelPosition | null }
-    | { readonly ok: false; readonly message: string };
-}
-
-export interface SavePanelPositionMessage {
-  readonly type: typeof MessageType.SavePanelPosition;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: {
-    readonly hostname: string;
-    readonly position: import('../core/types.js').PanelPosition;
-  };
-}
-
-export interface SavePanelPositionResultMessage {
-  readonly type: typeof MessageType.SavePanelPositionResult;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly ok: boolean };
-}
-
-export interface DeletePanelPositionMessage {
-  readonly type: typeof MessageType.DeletePanelPosition;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly hostname: string };
-}
-
-export interface DeletePanelPositionResultMessage {
-  readonly type: typeof MessageType.DeletePanelPositionResult;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly ok: boolean };
-}
-
 export interface LoadParsedFieldStateMessage {
   readonly type: typeof MessageType.LoadParsedFieldState;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -961,6 +935,9 @@ export type ExtensionRequest =
   | LoadPanelPositionMessage
   | SavePanelPositionMessage
   | DeletePanelPositionMessage
+  | LoadWorkspaceLayoutMessage
+  | SaveWorkspaceLayoutMessage
+  | DeleteWorkspaceLayoutMessage
   | LoadParsedFieldStateMessage
   | LoadParsedFieldStateBySourceMessage
   | SaveParsedFieldStateMessage
@@ -1022,6 +999,9 @@ export type ExtensionResponse =
   | LoadPanelPositionResultMessage
   | SavePanelPositionResultMessage
   | DeletePanelPositionResultMessage
+  | LoadWorkspaceLayoutResultMessage
+  | SaveWorkspaceLayoutResultMessage
+  | DeleteWorkspaceLayoutResultMessage
   | LoadParsedFieldStateResultMessage
   | LoadParsedFieldStateBySourceResultMessage
   | SaveParsedFieldStateResultMessage
@@ -1419,35 +1399,6 @@ export function createRecallRecordsResultMessage(payload: RecallRecordsResultMes
   return { type: MessageType.RecallRecordsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-export function createLoadPanelPositionMessage(hostname: string): LoadPanelPositionMessage {
-  return { type: MessageType.LoadPanelPosition, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
-}
-
-export function createLoadPanelPositionResultMessage(payload: LoadPanelPositionResultMessage['payload']): LoadPanelPositionResultMessage {
-  return { type: MessageType.LoadPanelPositionResult, version: MESSAGE_PROTOCOL_VERSION, payload };
-}
-
-export function createSavePanelPositionMessage(
-  hostname: string,
-  position: import('../core/types.js').PanelPosition,
-): SavePanelPositionMessage {
-  return { type: MessageType.SavePanelPosition, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname, position } };
-}
-
-export function createSavePanelPositionResultMessage(payload: SavePanelPositionResultMessage['payload']): SavePanelPositionResultMessage {
-  return { type: MessageType.SavePanelPositionResult, version: MESSAGE_PROTOCOL_VERSION, payload };
-}
-
-export function createDeletePanelPositionMessage(hostname: string): DeletePanelPositionMessage {
-  return { type: MessageType.DeletePanelPosition, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
-}
-
-export function createDeletePanelPositionResultMessage(
-  payload: DeletePanelPositionResultMessage['payload'],
-): DeletePanelPositionResultMessage {
-  return { type: MessageType.DeletePanelPositionResult, version: MESSAGE_PROTOCOL_VERSION, payload };
-}
-
 export function createLoadParsedFieldStateMessage(hostname: string, pageUrl: string): LoadParsedFieldStateMessage {
   return { type: MessageType.LoadParsedFieldState, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname, pageUrl } };
 }
@@ -1654,12 +1605,6 @@ export function createDeleteGrabSourcePatternResultMessage(
   return { type: MessageType.DeleteGrabSourcePatternResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-function hasVersionedObjectShape(value: unknown): value is { type?: unknown; version?: unknown; payload?: unknown } {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as { version?: unknown; payload?: unknown };
-  return candidate.version === MESSAGE_PROTOCOL_VERSION && !!candidate.payload && typeof candidate.payload === 'object';
-}
-
 export function isExtensionRequest(value: unknown): value is ExtensionRequest {
   if (!hasVersionedObjectShape(value)) return false;
   return MESSAGE_DIRECTION[value.type as ProtocolMessageType] === 'request';
@@ -1830,21 +1775,6 @@ export function isLoadRecallCandidatesResultMessage(value: unknown): value is Lo
 export function isRecallRecordsResultMessage(value: unknown): value is RecallRecordsResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.RecallRecordsResult;
-}
-
-export function isLoadPanelPositionResultMessage(value: unknown): value is LoadPanelPositionResultMessage {
-  if (!hasVersionedObjectShape(value)) return false;
-  return value.type === MessageType.LoadPanelPositionResult;
-}
-
-export function isSavePanelPositionResultMessage(value: unknown): value is SavePanelPositionResultMessage {
-  if (!hasVersionedObjectShape(value)) return false;
-  return value.type === MessageType.SavePanelPositionResult;
-}
-
-export function isDeletePanelPositionResultMessage(value: unknown): value is DeletePanelPositionResultMessage {
-  if (!hasVersionedObjectShape(value)) return false;
-  return value.type === MessageType.DeletePanelPositionResult;
 }
 
 export function isLoadParsedFieldStateResultMessage(value: unknown): value is LoadParsedFieldStateResultMessage {

@@ -12,7 +12,7 @@ import {
 import { KeyboardRouter } from '../content/keyboard.js';
 import { RequestGovernor } from '../content/request-governor.js';
 import type { PageAdapter } from '../content/page-adapter.js';
-import { pruneInvalidFieldSplitSpecsFromState, reducePanelAction } from '../core/actions.js';
+import { reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
 import type { BuildIdentity } from '../core/build-info.js';
@@ -21,14 +21,13 @@ import type {
   BookmarkStore,
   PanelAction,
   PanelPositionStore,
+  WorkspaceLayoutStore,
   PanelState,
   ParsedFieldStateStore,
   UrlTemplateStore,
   UrlReviewStatusStore,
 } from '../core/types.js';
-import { applyFieldSplitSpecs } from '../core/url/field-splits.js';
-import { applyFieldDigitWidthSpecs } from '../core/url/field-widths.js';
-import { parseUrl } from '../core/url/parse-url.js';
+import { pruneInvalidFieldSplitSpecsForUrl, urlModelFromRawUrl } from './panel/url-model.js';
 import { collectUrlFields } from '../core/url/tokenize-fields.js';
 import { ProjectionSessionController } from '../core/projection-session.js';
 import type { ParsedUrlModel, UrlField } from '../core/url/types.js';
@@ -47,6 +46,8 @@ import { ParsedFieldNavigationController } from './panel/parsed-field-navigation
 import { ParsedFieldStateSync } from './panel/parsed-field-state-sync.js';
 import { PanelMount } from './panel/panel-mount.js';
 import { PanelPositionController } from './panel/panel-position-controller.js';
+import { WorkspaceLayoutController } from './panel/workspace-layout-controller.js';
+import { handlePanelShortcutAction } from './panel/shortcut-actions.js';
 import { PanelRenderController } from './panel/panel-render-controller.js';
 import { ParsedFieldStateRecordController } from './panel/parsed-field-state-record-controller.js';
 import { UrlReviewStatusController } from './panel/url-review-status-controller.js';
@@ -278,7 +279,7 @@ export class ImageTrailPanel {
     currentKnownImageFingerprint: () => this.currentKnownImageFingerprint(),
     applyFieldLoadResult: (state, attemptedFieldIds, nextFingerprint, previousFingerprint) =>
       this.applyFieldLoadResult(state, attemptedFieldIds, nextFingerprint, previousFingerprint),
-    pruneInvalidFieldSplitSpecsForUrl: (state, url, options) => this.pruneInvalidFieldSplitSpecsForUrl(state, url, options),
+    pruneInvalidFieldSplitSpecsForUrl: (state, url, options) => pruneInvalidFieldSplitSpecsForUrl(state, url, options),
     parsedFieldRequestContextKey: (attemptedFieldIds, direction, runId) =>
       this.parsedFieldNavigation.parsedFieldRequestContextKey(attemptedFieldIds, direction, runId),
     currentSelectedUrl: () => this.currentSelectedUrl(),
@@ -299,6 +300,18 @@ export class ImageTrailPanel {
     whenStylesReady: () => this.panelMount.whenStylesReady(),
     root: () => this.root,
     panelPositionStore: () => this.panelPositionStore,
+  });
+  private readonly workspaceLayout: WorkspaceLayoutController = new WorkspaceLayoutController({
+    getState: () => this.state,
+    setState: (state) => {
+      this.state = state;
+    },
+    render: () => this.render(),
+    workspaceLayoutStore: () => this.workspaceLayoutStore,
+    getLocalSettings: () => this.localSettings,
+    saveLocalSettings: (settings) => this.panelSettings.saveLocalSettings(settings),
+    detachedWindowPositions: () => this.panelRender.workspaceGeometry().detachedWindowPositions,
+    detachedWindowMinimized: () => this.panelRender.workspaceGeometry().detachedWindowMinimized,
   });
   private readonly recallDrawer: RecallDrawerController = new RecallDrawerController({
     getState: () => this.state,
@@ -333,6 +346,7 @@ export class ImageTrailPanel {
     governor: () => this.governor,
     neighborPreload: () => this.neighborPreload,
     pageAdapter: () => this.pageAdapter,
+    onLocalSettingsLoaded: () => this.workspaceLayout.queueWorkspaceRestore(),
   });
   private readonly parsedFieldNavigation: ParsedFieldNavigationController = new ParsedFieldNavigationController({
     getState: () => this.state,
@@ -367,7 +381,7 @@ export class ImageTrailPanel {
     scheduleFiniteCaptureErrorReset: (updatedAt, mode) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode),
     currentRawUrl: () => this.currentRawUrl(),
     currentUrlModel: () => this.currentUrlModel(),
-    pruneInvalidFieldSplitSpecsForUrl: (state, url, options) => this.pruneInvalidFieldSplitSpecsForUrl(state, url, options),
+    pruneInvalidFieldSplitSpecsForUrl: (state, url, options) => pruneInvalidFieldSplitSpecsForUrl(state, url, options),
     applyPanelState: (nextState, options) => this.applyPanelState(nextState, options),
     enqueueFieldInteraction: (run) => this.fieldStateSync.enqueueFieldInteraction(run),
     saveFieldState: () => this.fieldStateSync.save(),
@@ -391,6 +405,7 @@ export class ImageTrailPanel {
     applyRestoredPanelPosition: () => this.panelPosition.applyRestoredPanelPosition(),
     bufferedNavDebugSnapshot: () => this.bufferedNav.getDebugSnapshot(),
     refreshRecallIfOpen: () => this.recallDrawer.refreshRecallIfOpen(),
+    onWorkspaceLayoutChanged: () => this.workspaceLayout.handleWorkspaceLayoutChanged(),
   });
   private readonly parsedFieldStateRecord: ParsedFieldStateRecordController = new ParsedFieldStateRecordController({
     getState: () => this.state,
@@ -445,6 +460,7 @@ export class ImageTrailPanel {
     private readonly urlTemplateStore: UrlTemplateStore | null = null,
     private readonly parsedFieldStateStore: ParsedFieldStateStore | null = null,
     private readonly urlReviewStatusStore: UrlReviewStatusStore | null = null,
+    private readonly workspaceLayoutStore: WorkspaceLayoutStore | null = null,
     private readonly options: ImageTrailPanelOptions = {},
   ) {
     this.panelMount.registerSubscriptions([
@@ -544,6 +560,7 @@ export class ImageTrailPanel {
     }
     this.panelMount.teardown();
     this.panelPosition.invalidateRestore();
+    this.workspaceLayout.invalidateRestore();
     this.recallDrawer.clearRecallMessageTimer();
     this.panelRender.clearFiniteCaptureErrorTimer();
   }
@@ -615,6 +632,9 @@ export class ImageTrailPanel {
         this.panelSettings.updateNeighborPreload(enabled, radius, cacheLimit, probeMethod),
       preloadMoreNeighbors: (radius, cacheLimit) => this.panelSettings.preloadMoreNeighbors(radius, cacheLimit),
       resetPanelPosition: () => this.panelPosition.resetPanelPosition(),
+      updateWorkspaceLayoutRestore: (enabled) => this.workspaceLayout.updateWorkspaceLayoutRestore(enabled),
+      resetWorkspaceLayout: () => this.workspaceLayout.resetWorkspaceLayout(),
+      notifyWorkspaceLayoutChanged: () => this.workspaceLayout.handleWorkspaceLayoutChanged(),
       refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
       restoreParsedFieldStateForCurrentPanel: () => this.parsedFieldStateRecord.restoreParsedFieldStateForCurrentPanel(),
       openRecallDrawer: () => this.recallDrawer.openRecallDrawer(),
@@ -662,62 +682,20 @@ export class ImageTrailPanel {
   };
 
   handleShortcutAction(action: string): void {
-    const handlers: Record<string, () => void> = {
-      next: () => this.dispatch({ name: 'navigate-next' }),
-      previous: () => this.dispatch({ name: 'navigate-previous' }),
-      'slideshow-toggle': () => this.dispatch({ name: this.shortcutSlideshowAction() }),
-      'buffer-debug-toggle': () => this.bufferedNav.toggleDebugVisible(),
-      stop: () => this.dispatch({ name: 'stop-all' }),
-      'panel-toggle': () => this.dispatch({ name: 'toggle-panel' }),
-      'grab-mode-toggle': () => this.dispatch({ name: this.state.target.grabModeActive ? 'grab-mode/stop' : 'grab-mode/start' }),
-      retry: () => this.dispatch({ name: 'retry-start' }),
-      download: () => {
-        if (!this.state.importExportBusy) this.dispatch({ name: 'export/image', saveAs: false });
-      },
-      'download-save-as': () => {
-        if (!this.state.importExportBusy) this.dispatch({ name: 'export/image', saveAs: true });
-      },
-    };
-    handlers[action]?.();
-  }
-
-  private shortcutSlideshowAction(): 'slideshow-pause' | 'slideshow-resume' | 'slideshow-start' {
-    if (this.slideshow.currentPhase === 'running') return 'slideshow-pause';
-    if (this.slideshow.currentPhase === 'paused') return 'slideshow-resume';
-    return 'slideshow-start';
+    handlePanelShortcutAction(action, {
+      getState: () => this.state,
+      dispatch: this.dispatch,
+      slideshow: () => this.slideshow,
+      toggleBufferedNavDebug: () => this.bufferedNav.toggleDebugVisible(),
+    });
   }
 
   private currentUrlModel(): ParsedUrlModel {
-    return this.urlModelFromRawUrl(this.currentRawUrl());
+    return urlModelFromRawUrl(this.currentRawUrl(), this.state);
   }
 
   private currentNavigationBaseModel(): ParsedUrlModel {
-    return this.urlModelFromRawUrl(this.currentNavigationBaseRawUrl());
-  }
-
-  private urlModelFromRawUrl(url: string): ParsedUrlModel {
-    return this.applyCurrentFieldDigitWidthSpecs(applyFieldSplitSpecs(parseUrl(url), this.state.fieldSplitSpecs));
-  }
-
-  private pruneInvalidFieldSplitSpecsForUrl(
-    state: PanelState,
-    url: string,
-    options: { readonly preserveMessage?: boolean } = {},
-  ): PanelState {
-    if (state.fieldSplitSpecs.length === 0) return state;
-    let model: ParsedUrlModel;
-    try {
-      model = parseUrl(url);
-    } catch {
-      return state;
-    }
-    const pruned = pruneInvalidFieldSplitSpecsFromState(state, model);
-    if (pruned === state || options.preserveMessage !== true) return pruned;
-    return { ...pruned, status: state.status, message: state.message, lastUpdatedAt: state.lastUpdatedAt };
-  }
-
-  private applyCurrentFieldDigitWidthSpecs(model: ParsedUrlModel): ParsedUrlModel {
-    return applyFieldDigitWidthSpecs(model, this.state.fieldDigitWidthSpecs);
+    return urlModelFromRawUrl(this.currentNavigationBaseRawUrl(), this.state);
   }
 
   private currentRawUrl(): string {

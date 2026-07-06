@@ -38,6 +38,8 @@ export interface PanelRenderTarget {
   readonly layoutState: PanelLayoutState;
   readonly scrollAnchorId?: string | null;
   readonly onPanelDragStart?: (event: PointerEvent) => void;
+  /** Fired when detached-window geometry or minimized state mutates, so per-site workspace persistence (issue #398) can save. */
+  readonly onWorkspaceLayoutChanged?: () => void;
 }
 
 export interface PanelRenderOptions {

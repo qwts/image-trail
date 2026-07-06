@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ImageDisplayRecord } from '../extension/src/core/display-records.js';
 import type { GrabSourcePattern, UrlTemplateRecord } from '../extension/src/core/url/templates.js';
-import type { PanelPosition, PanelPositionStore, UrlTemplateStore } from '../extension/src/core/types.js';
+import type {
+  PanelPosition,
+  PanelPositionStore,
+  UrlTemplateStore,
+  WorkspaceLayout,
+  WorkspaceLayoutStore,
+} from '../extension/src/core/types.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
 import { createBookmarkMessageRegistry } from '../extension/src/background/handlers/bookmark-message-handlers.js';
 import { createPanelPositionMessageRegistry } from '../extension/src/background/handlers/panel-position-handlers.js';
@@ -97,7 +103,17 @@ function panelPositionFixture() {
       positions.delete(hostname);
     },
   };
-  return { positions, registry: createPanelPositionMessageRegistry({ panelPositionStore: store }) };
+  const layouts = new Map<string, WorkspaceLayout>();
+  const workspaceLayoutStore: WorkspaceLayoutStore = {
+    load: async (hostname) => layouts.get(hostname) ?? null,
+    save: async (hostname, layout) => {
+      layouts.set(hostname, layout);
+    },
+    remove: async (hostname) => {
+      layouts.delete(hostname);
+    },
+  };
+  return { positions, layouts, registry: createPanelPositionMessageRegistry({ panelPositionStore: store, workspaceLayoutStore }) };
 }
 
 test('panel position load normalizes the hostname and wraps the stored position', async () => {

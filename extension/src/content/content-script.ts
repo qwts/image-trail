@@ -15,6 +15,7 @@ import { CaptureController } from './capture-controller.js';
 import { RecentHistoryStore } from './recent-history-store.js';
 import { RecallStore } from './recall-store.js';
 import { ExtensionPanelPositionStore } from './panel-position-store.js';
+import { ExtensionWorkspaceLayoutStore } from './workspace-layout-store.js';
 import { ExtensionParsedFieldStateStore } from './parsed-field-state-store.js';
 import { ExtensionLocalSettingsStore } from './local-settings-store.js';
 import { ExtensionUrlTemplateStore } from './url-template-store.js';
@@ -114,6 +115,7 @@ function createController(): ImageTrailContentController {
     new ExtensionUrlTemplateStore(),
     new ExtensionParsedFieldStateStore(),
     new ExtensionUrlReviewStatusStore(),
+    new ExtensionWorkspaceLayoutStore(),
     {
       applyBuildInfoOverlayVisibility: (visible) => {
         buildOverlay.applyVisibility(visible);

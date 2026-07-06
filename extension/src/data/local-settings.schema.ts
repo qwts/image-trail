@@ -31,6 +31,7 @@ export const plaintextLocalSettingsSchema = v.object({
   neighborPreloadCacheLimit: v.number(),
   neighborPreloadProbeMethod: v.picklist(['get', 'head']),
   secondaryControlsOpen: v.boolean(),
+  restoreWorkspaceLayout: v.boolean(),
 });
 
 type _AssertPlaintextLocalSettings = Assert<MutuallyAssignable<v.InferOutput<typeof plaintextLocalSettingsSchema>, PlaintextLocalSettings>>;

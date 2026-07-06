@@ -7,6 +7,7 @@ import {
   urlReviewStatusRecordSchema,
 } from '../core/types.schema.js';
 import { grabSourcePatternSchema, urlTemplateRecordSchema } from '../core/url/templates.schema.js';
+import { workspaceLayoutSchema } from '../core/workspace-layout.schema.js';
 import { pcloudBackupDownloadInputSchema, pcloudBackupUploadInputSchema } from '../core/cloud/pcloud-provider.schema.js';
 import { plaintextLocalSettingsSchema } from '../data/local-settings.schema.js';
 import { portableStoredBlobRecordSchema } from '../data/import-export/full-backup.schema.js';
@@ -110,6 +111,15 @@ export const savePanelPositionRequestSchema = v.object({
 });
 
 export const deletePanelPositionRequestSchema = v.object({ hostname: v.string() });
+
+export const loadWorkspaceLayoutRequestSchema = v.object({ hostname: v.string() });
+
+export const saveWorkspaceLayoutRequestSchema = v.object({
+  hostname: v.string(),
+  layout: workspaceLayoutSchema,
+});
+
+export const deleteWorkspaceLayoutRequestSchema = v.object({ hostname: v.string() });
 
 export const loadParsedFieldStateRequestSchema = v.object({ hostname: v.string(), pageUrl: v.string() });
 
