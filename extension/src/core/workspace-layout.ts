@@ -35,9 +35,24 @@ export interface WorkspaceLayout {
   readonly sections: readonly WorkspaceSectionLayout[];
 }
 
+/**
+ * A layout as it comes back from storage: section ids stay plain strings so a record saved by a
+ * newer build (with section ids this build does not know) still loads instead of being quarantined
+ * by validation — `sanitizeWorkspaceLayout` filters the unknown ids, keeping the rest.
+ */
+export interface StoredWorkspaceSectionLayout {
+  readonly sectionId: string;
+  readonly position: PanelPosition | null;
+  readonly minimized: boolean;
+}
+
+export interface StoredWorkspaceLayout {
+  readonly sections: readonly StoredWorkspaceSectionLayout[];
+}
+
 export interface WorkspaceLayoutStore {
-  load(hostname: string): Promise<WorkspaceLayout | null>;
-  save(hostname: string, layout: WorkspaceLayout): Promise<void>;
+  load(hostname: string): Promise<StoredWorkspaceLayout | null>;
+  save(hostname: string, layout: StoredWorkspaceLayout): Promise<void>;
   remove(hostname: string): Promise<void>;
 }
 
@@ -46,13 +61,13 @@ export function isDetachableSectionId(value: unknown): value is DetachableSectio
 }
 
 /** Drop entries whose section id is unknown (a layout saved by a newer build) and dedupe by id, keeping first occurrence. */
-export function sanitizeWorkspaceLayout(layout: WorkspaceLayout): WorkspaceLayout {
+export function sanitizeWorkspaceLayout(layout: StoredWorkspaceLayout): WorkspaceLayout {
   const seen = new Set<DetachableSectionId>();
   const sections: WorkspaceSectionLayout[] = [];
   for (const section of layout.sections) {
     if (!isDetachableSectionId(section.sectionId) || seen.has(section.sectionId)) continue;
     seen.add(section.sectionId);
-    sections.push(section);
+    sections.push({ sectionId: section.sectionId, position: section.position, minimized: section.minimized });
   }
   return { sections };
 }

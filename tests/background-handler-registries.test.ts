@@ -5,8 +5,8 @@ import type { GrabSourcePattern, UrlTemplateRecord } from '../extension/src/core
 import type {
   PanelPosition,
   PanelPositionStore,
+  StoredWorkspaceLayout,
   UrlTemplateStore,
-  WorkspaceLayout,
   WorkspaceLayoutStore,
 } from '../extension/src/core/types.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
@@ -103,7 +103,7 @@ function panelPositionFixture() {
       positions.delete(hostname);
     },
   };
-  const layouts = new Map<string, WorkspaceLayout>();
+  const layouts = new Map<string, StoredWorkspaceLayout>();
   const workspaceLayoutStore: WorkspaceLayoutStore = {
     load: async (hostname) => layouts.get(hostname) ?? null,
     save: async (hostname, layout) => {

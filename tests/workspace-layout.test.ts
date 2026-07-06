@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import * as v from 'valibot';
+
 import {
   captureWorkspaceLayout,
   sanitizeWorkspaceLayout,
@@ -8,6 +10,7 @@ import {
   type DetachableSectionId,
   type WorkspaceLayout,
 } from '../extension/src/core/workspace-layout.js';
+import { workspaceLayoutSchema } from '../extension/src/core/workspace-layout.schema.js';
 
 test('sanitizeWorkspaceLayout drops unknown section ids and dedupes by first occurrence', () => {
   const layout = {
@@ -49,4 +52,18 @@ test('workspaceLayoutsEqual compares section order, geometry, and minimized flag
   assert.equal(workspaceLayoutsEqual(a, { sections: [{ sectionId: 'history', position: null, minimized: false }] }), false);
   assert.equal(workspaceLayoutsEqual(a, { sections: [{ sectionId: 'history', position: { left: 1, top: 2 }, minimized: true }] }), false);
   assert.equal(workspaceLayoutsEqual(a, { sections: [] }), false);
+});
+
+test('the storage schema accepts section ids from newer builds so sanitize can drop just those entries', () => {
+  // A strict picklist here would quarantine the whole per-site record on downgrade; the boundary
+  // stays permissive and sanitizeWorkspaceLayout filters instead.
+  const stored = v.parse(workspaceLayoutSchema, {
+    sections: [
+      { sectionId: 'section-from-a-newer-build', position: { left: 5, top: 6 }, minimized: false },
+      { sectionId: 'history', position: null, minimized: true },
+    ],
+  });
+  assert.deepEqual(sanitizeWorkspaceLayout(stored), {
+    sections: [{ sectionId: 'history', position: null, minimized: true }],
+  });
 });

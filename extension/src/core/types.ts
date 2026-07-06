@@ -53,6 +53,8 @@ export type {
   DetachableSectionId,
   PanelPosition,
   PanelPositionStore,
+  StoredWorkspaceLayout,
+  StoredWorkspaceSectionLayout,
   WorkspaceLayout,
   WorkspaceLayoutStore,
   WorkspaceSectionLayout,

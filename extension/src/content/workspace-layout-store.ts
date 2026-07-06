@@ -6,16 +6,16 @@ import {
   isLoadWorkspaceLayoutResultMessage,
   isSaveWorkspaceLayoutResultMessage,
 } from '../background/messages.js';
-import type { WorkspaceLayout, WorkspaceLayoutStore } from '../core/types.js';
+import type { StoredWorkspaceLayout, WorkspaceLayoutStore } from '../core/types.js';
 import { sendRuntimeMessage } from './runtime-message.js';
 
 export class ExtensionWorkspaceLayoutStore implements WorkspaceLayoutStore {
-  async load(hostname: string): Promise<WorkspaceLayout | null> {
+  async load(hostname: string): Promise<StoredWorkspaceLayout | null> {
     const response = await sendRuntimeMessage(createLoadWorkspaceLayoutMessage(hostname));
     return isLoadWorkspaceLayoutResultMessage(response) && response.payload.ok ? response.payload.layout : null;
   }
 
-  async save(hostname: string, layout: WorkspaceLayout): Promise<void> {
+  async save(hostname: string, layout: StoredWorkspaceLayout): Promise<void> {
     const response = await sendRuntimeMessage(createSaveWorkspaceLayoutMessage(hostname, layout));
     if (response === null || isSaveWorkspaceLayoutResultMessage(response)) return;
     throw new Error('Invalid workspace layout save response from background.');

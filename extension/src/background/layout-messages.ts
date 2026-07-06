@@ -1,4 +1,4 @@
-import type { PanelPosition, WorkspaceLayout } from '../core/workspace-layout.js';
+import type { PanelPosition, StoredWorkspaceLayout } from '../core/workspace-layout.js';
 import { MESSAGE_PROTOCOL_VERSION, MessageType, hasVersionedObjectShape } from './message-protocol.js';
 
 /**
@@ -55,7 +55,7 @@ export interface LoadWorkspaceLayoutMessage {
 export interface LoadWorkspaceLayoutResultMessage {
   readonly type: typeof MessageType.LoadWorkspaceLayoutResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly ok: true; readonly layout: WorkspaceLayout | null } | { readonly ok: false; readonly message: string };
+  readonly payload: { readonly ok: true; readonly layout: StoredWorkspaceLayout | null } | { readonly ok: false; readonly message: string };
 }
 
 export interface SaveWorkspaceLayoutMessage {
@@ -63,7 +63,7 @@ export interface SaveWorkspaceLayoutMessage {
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload: {
     readonly hostname: string;
-    readonly layout: WorkspaceLayout;
+    readonly layout: StoredWorkspaceLayout;
   };
 }
 
@@ -121,7 +121,7 @@ export function createLoadWorkspaceLayoutResultMessage(
   return { type: MessageType.LoadWorkspaceLayoutResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-export function createSaveWorkspaceLayoutMessage(hostname: string, layout: WorkspaceLayout): SaveWorkspaceLayoutMessage {
+export function createSaveWorkspaceLayoutMessage(hostname: string, layout: StoredWorkspaceLayout): SaveWorkspaceLayoutMessage {
   return { type: MessageType.SaveWorkspaceLayout, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname, layout } };
 }
 

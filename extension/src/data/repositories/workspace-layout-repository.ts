@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import type { WorkspaceLayout } from '../../core/workspace-layout.js';
+import type { StoredWorkspaceLayout } from '../../core/workspace-layout.js';
 import { workspaceLayoutSchema } from '../../core/workspace-layout.schema.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore } from '../schema.js';
@@ -9,7 +9,7 @@ export interface WorkspaceLayoutRecord {
   readonly key: string;
   readonly kind: 'workspaceLayout';
   readonly hostname: string;
-  readonly sections: WorkspaceLayout['sections'];
+  readonly sections: StoredWorkspaceLayout['sections'];
   readonly updatedAt: string;
 }
 
@@ -26,7 +26,7 @@ const WORKSPACE_LAYOUT_KEY_PREFIX = 'workspace-layout:';
 export class WorkspaceLayoutRepository {
   constructor(private readonly db: IDBDatabase) {}
 
-  async get(hostname: string): Promise<WorkspaceLayout | null> {
+  async get(hostname: string): Promise<StoredWorkspaceLayout | null> {
     const transaction = this.db.transaction(DataStore.Metadata, 'readonly');
     const raw = await requestToPromise<unknown>(transaction.objectStore(DataStore.Metadata).get(workspaceLayoutKey(hostname)));
     await transactionDone(transaction);
@@ -34,7 +34,7 @@ export class WorkspaceLayoutRepository {
     return record ? { sections: record.sections } : null;
   }
 
-  async put(hostname: string, layout: WorkspaceLayout): Promise<void> {
+  async put(hostname: string, layout: StoredWorkspaceLayout): Promise<void> {
     const transaction = this.db.transaction(DataStore.Metadata, 'readwrite');
     const record: WorkspaceLayoutRecord = {
       key: workspaceLayoutKey(hostname),
