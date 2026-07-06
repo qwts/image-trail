@@ -17,6 +17,8 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
       DataStore.Downloads,
       DataStore.EncryptedPins,
       DataStore.EncryptedPinThumbnails,
+      DataStore.Albums,
+      DataStore.AlbumMemberships,
       DataStore.History,
       DataStore.Keys,
       DataStore.Metadata,
@@ -33,6 +35,8 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
       DataStore.Downloads,
       DataStore.EncryptedPins,
       DataStore.EncryptedPinThumbnails,
+      DataStore.Albums,
+      DataStore.AlbumMemberships,
     ],
     'readonly',
   );
@@ -43,6 +47,8 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   const downloads = transaction.objectStore(DataStore.Downloads);
   const encryptedPins = transaction.objectStore(DataStore.EncryptedPins);
   const encryptedPinThumbnails = transaction.objectStore(DataStore.EncryptedPinThumbnails);
+  const albums = transaction.objectStore(DataStore.Albums);
+  const albumMemberships = transaction.objectStore(DataStore.AlbumMemberships);
 
   assert.deepEqual(asArray(keys.indexNames), [SchemaIndex.KeysByKind, SchemaIndex.KeysByReference, SchemaIndex.KeysByUuid].sort());
   assert.deepEqual(asArray(history.indexNames), [SchemaIndex.HistoryByKeyReference, SchemaIndex.HistoryByUpdatedAt].sort());
@@ -73,6 +79,16 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
       SchemaIndex.EncryptedPinThumbnailsByCreatedAt,
       SchemaIndex.EncryptedPinThumbnailsByKeyReference,
       SchemaIndex.EncryptedPinThumbnailsByPinId,
+    ].sort(),
+  );
+  assert.deepEqual(asArray(albums.indexNames), [SchemaIndex.AlbumsByUpdatedAt].sort());
+  assert.deepEqual(
+    asArray(albumMemberships.indexNames),
+    [
+      SchemaIndex.AlbumMembershipsByAlbumId,
+      SchemaIndex.AlbumMembershipsByAlbumPosition,
+      SchemaIndex.AlbumMembershipsByAlbumRecord,
+      SchemaIndex.AlbumMembershipsByRecordId,
     ].sort(),
   );
 

@@ -6,6 +6,7 @@ import type {
   WorkspaceLayoutStore,
 } from '../core/types.js';
 import type { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
+import type { IndexedDbAlbumStore } from '../data/albums-controller.js';
 import type { DEFAULT_LOCAL_SETTINGS } from '../data/local-settings.js';
 import type { ImageRequestManager } from './image-request-manager.js';
 import type { RecentHistoryCache } from './recent-history-cache.js';
@@ -19,6 +20,7 @@ import type { RecentHistoryCache } from './recent-history-cache.js';
  */
 export interface ServiceWorkerContext {
   readonly bookmarkStore: IndexedDbBookmarkStore;
+  readonly albumStore: IndexedDbAlbumStore;
   readonly panelPositionStore: PanelPositionStore;
   readonly workspaceLayoutStore: WorkspaceLayoutStore;
   readonly parsedFieldStateStore: ParsedFieldStateStore;

@@ -100,6 +100,31 @@
       ]
     },
     {
+      "id": "gallery-albums",
+      "acceptance": "Gallery albums",
+      "repoPath": "docs/acceptance-tests/gallery-albums.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Gallery-Albums",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/indexeddb-albums.test.ts",
+            "tests/background-handler-registries.test.ts",
+            "tests/dom/gallery-view.test.ts",
+            "tests/import-export.test.ts",
+            "tests/recall-restore-controller.test.ts",
+            "tests/dom/recall-export-controller.test.ts"
+          ],
+          "notes": "Covers durable album and membership stores, v8 IndexedDB migration/indexes, idempotent ordered membership add/remove without queueUpdatedAt changes, album message registry fallbacks, gallery album create/select/rename/delete controls, add/remove membership actions, selected-album missing-record status, v2 full-backup album metadata export/import, duplicate UUID remapping, and explicit skipped membership reporting."
+        },
+        {
+          "type": "manual",
+          "reason": "Extension-page album CRUD over real durable records remains manual until the gallery page gets a focused Playwright extension-page spec.",
+          "notes": "Load the built extension, create captured and uncaptured durable records, open Gallery, create/rename/delete an album, add/remove records, search inside the selected album, verify missing/deleted referenced records are omitted with status text, confirm privacy mode still masks URL-derived record metadata, verify queue/Recall/Recents order is unchanged, then run pCloud/full-backup restore and verify albums restore without duplicating encrypted originals."
+        }
+      ]
+    },
+    {
       "id": "host-image-projection-ownership",
       "acceptance": "Host image projection ownership",
       "repoPath": "docs/acceptance-tests/host-image-projection-ownership.md",

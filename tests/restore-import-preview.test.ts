@@ -81,6 +81,7 @@ function bookmarkResult(overrides: Partial<BookmarkImportResult> = {}): Bookmark
     originalBlobs: [],
     blobKeyBackups: [],
     missingOriginalBlobIds: [],
+    albums: [],
     ...overrides,
   };
 }
@@ -105,6 +106,7 @@ test('createRestoreDuplicateSummary splits unique entries from URL duplicates', 
   );
   assert.equal(summary.duplicateCount, 1);
   assert.equal(summary.matchesByUuid.get('uuid-1'), 'url');
+  assert.equal(summary.duplicateRecordIdsByUuid.get('uuid-1'), 'existing-1');
 });
 
 test('createRestoreDuplicateSummary matches sha256 fingerprints nested in storedOriginal', () => {

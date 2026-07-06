@@ -7,7 +7,13 @@ import type { ImageDisplayRecord } from '../extension/src/core/display-records.j
 import type { BookmarkStore, PanelState, UrlReviewStatusRecord, UrlReviewStatusStore } from '../extension/src/core/types.js';
 import type { CaptureStore } from '../extension/src/content/capture-controller.js';
 import type { RecentHistoryStore } from '../extension/src/content/recent-history-store.js';
-import { DEFAULT_LOCAL_SETTINGS, exportPlainBookmarks, exportUrlReviewStatus } from '../extension/src/content/panel-services.js';
+import {
+  DEFAULT_LOCAL_SETTINGS,
+  exportEncryptedFullBackup,
+  exportPlainBookmarks,
+  exportUrlReviewStatus,
+  type AlbumBackupEntry,
+} from '../extension/src/content/panel-services.js';
 import { bookmarkRecordToExportEntry } from '../extension/src/ui/panel/record-export-helpers.js';
 import { RecallRestoreController, type RecallRestoreControllerDeps } from '../extension/src/ui/panel/recall-restore-controller.js';
 
@@ -36,6 +42,10 @@ interface RestoreHarness {
   readonly controller: RecallRestoreController;
   getState(): PanelState;
   readonly savedBookmarks: ImageDisplayRecord[];
+  readonly albumImports: {
+    readonly albums: readonly AlbumBackupEntry[];
+    readonly recordIdMap: ReadonlyMap<string, string>;
+  }[];
   readonly importedStatusRecords: (readonly UrlReviewStatusRecord[])[];
   readonly importedImages: number;
 }
@@ -46,6 +56,10 @@ interface RestoreHarness {
 function createRestoreHarness(config: RestoreHarnessConfig = {}): RestoreHarness {
   let state = createInitialPanelState(0);
   const savedBookmarks: ImageDisplayRecord[] = [];
+  const albumImports: {
+    readonly albums: readonly AlbumBackupEntry[];
+    readonly recordIdMap: ReadonlyMap<string, string>;
+  }[] = [];
   const importedStatusRecords: (readonly UrlReviewStatusRecord[])[] = [];
   let importedImages = 0;
 
@@ -79,6 +93,21 @@ function createRestoreHarness(config: RestoreHarnessConfig = {}): RestoreHarness
     },
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
     bookmarkStore: () => bookmarkStore,
+    albumStore: () => ({
+      importBackupEntries: async (albums, recordIdMap) => {
+        albumImports.push({ albums, recordIdMap: new Map(recordIdMap) });
+        const requestedMembershipCount = albums.reduce((sum, album) => sum + album.recordIds.length, 0);
+        const importedMembershipCount = albums.reduce(
+          (sum, album) => sum + album.recordIds.filter((recordId) => recordIdMap.has(recordId)).length,
+          0,
+        );
+        return {
+          importedAlbumCount: albums.length,
+          importedMembershipCount,
+          skippedMembershipCount: requestedMembershipCount - importedMembershipCount,
+        };
+      },
+    }),
     captureStore: () => null as CaptureStore | null,
     recentHistoryStore: () => null as RecentHistoryStore | null,
     urlReviewStatusStore: () => urlReviewStatusStore,
@@ -95,6 +124,7 @@ function createRestoreHarness(config: RestoreHarnessConfig = {}): RestoreHarness
     controller: new RecallRestoreController(deps),
     getState: () => state,
     savedBookmarks,
+    albumImports,
     importedStatusRecords,
     get importedImages() {
       return importedImages;
@@ -121,6 +151,58 @@ test('bookmarks preview → confirm imports only the unique entries and reports 
   );
   assert.match(harness.getState().message, /Imported 1 bookmark/u);
   assert.match(harness.getState().message, /1 duplicate bookmark/u);
+});
+
+test('full backup restore remaps album memberships to duplicate and imported local record ids', async () => {
+  const duplicateBackup = createDisplayRecord({
+    id: 'backup-dup',
+    url: 'https://images.example.test/dup.jpg',
+    source: 'bookmark',
+    timestamp: '2026-06-20T00:00:00.000Z',
+  });
+  const newBackup = createDisplayRecord({
+    id: 'backup-new',
+    url: 'https://images.example.test/new.jpg',
+    source: 'bookmark',
+    timestamp: '2026-06-20T00:00:01.000Z',
+  });
+  const localDuplicate = createDisplayRecord({
+    id: 'local-dup',
+    url: duplicateBackup.url,
+    source: 'bookmark',
+    timestamp: '2026-06-19T00:00:00.000Z',
+  });
+  const exported = await exportEncryptedFullBackup({
+    bookmarks: [bookmarkRecordToExportEntry(duplicateBackup), bookmarkRecordToExportEntry(newBackup)],
+    albums: [
+      {
+        id: 'backup-album',
+        name: 'Restored',
+        createdAt: '2026-06-20T00:00:00.000Z',
+        updatedAt: '2026-06-20T00:00:00.000Z',
+        recordIds: ['backup-dup', 'backup-new', 'missing-record'],
+      },
+    ],
+    originalBlobs: [],
+    password: 'backup-pass',
+    now: '2026-06-20T00:00:00.000Z',
+  });
+  assert.ok(exported.status.ok, exported.status.message);
+  const harness = createRestoreHarness({ existingBookmarks: [localDuplicate] });
+
+  await harness.controller.previewBookmarksImport(exported.fileContent!, 'backup-pass');
+  await harness.controller.confirmRestorePreview();
+
+  assert.deepEqual(
+    harness.savedBookmarks.map((record) => record.id),
+    ['backup-new'],
+  );
+  assert.equal(harness.albumImports.length, 1);
+  assert.equal(harness.albumImports[0]!.recordIdMap.get('backup-dup'), 'local-dup');
+  assert.equal(harness.albumImports[0]!.recordIdMap.get('backup-new'), 'backup-new');
+  assert.equal(harness.albumImports[0]!.recordIdMap.has('missing-record'), false);
+  assert.match(harness.getState().message, /Restored 1 album with 2 memberships/u);
+  assert.match(harness.getState().message, /Skipped 1 album membership/u);
 });
 
 test('url-review-status preview → confirm persists records via the store', async () => {

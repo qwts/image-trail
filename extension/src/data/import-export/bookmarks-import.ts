@@ -5,6 +5,7 @@ import type { DurableBookmarkPayloadV1, RecoverableDataStatus } from '../types.j
 import { durableBookmarkPayloadSchema } from '../types.schema.js';
 import { fromBase64, parseExportFile } from './encrypted-file-format.js';
 import { fullBackupPayloadFromUnknown, type FullBackupBlobKeyBackup, type PortableStoredBlobRecord } from './full-backup.js';
+import type { AlbumBackupEntry } from '../albums-controller.js';
 import { parsePlainRecordsExport } from './plain-records-format.js';
 import { firstIssueReason } from './schema-issues.js';
 import { createImportValidationReport, type ImportValidationReport } from './validation-report.js';
@@ -30,6 +31,7 @@ export interface BookmarksImportResult {
   readonly originalBlobs: readonly PortableStoredBlobRecord[];
   readonly blobKeyBackups: readonly FullBackupBlobKeyBackup[];
   readonly missingOriginalBlobIds: readonly string[];
+  readonly albums: readonly AlbumBackupEntry[];
 }
 
 type BasicBookmarksImportResult = Pick<
@@ -52,6 +54,7 @@ export async function importBookmarks(fileContent: string, password: string): Pr
     originalBlobs: [],
     blobKeyBackups: [],
     missingOriginalBlobIds: [],
+    albums: [],
   });
 
   let envelope;
@@ -86,6 +89,7 @@ export async function importBookmarks(fileContent: string, password: string): Pr
         originalBlobs: fullBackup.originalBlobs,
         blobKeyBackups: fullBackup.blobKeyBackups,
         missingOriginalBlobIds: fullBackup.missingOriginalBlobIds,
+        albums: fullBackup.albums,
       };
     }
     return {
@@ -95,6 +99,7 @@ export async function importBookmarks(fileContent: string, password: string): Pr
       originalBlobs: [],
       blobKeyBackups: [],
       missingOriginalBlobIds: [],
+      albums: [],
     };
   } catch {
     return fail('Decryption failed. Wrong password or corrupted file.');
@@ -111,6 +116,7 @@ function tryImportPlainBookmarks(fileContent: string): Omit<BookmarksImportResul
       originalBlobs: [],
       blobKeyBackups: [],
       missingOriginalBlobIds: [],
+      albums: [],
     };
   } catch {
     return null;

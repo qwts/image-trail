@@ -17,6 +17,7 @@ import {
   exportPlainHistory,
   exportUrlReviewStatus as exportUrlReviewStatusFile,
   storedBlobRecordFromPortable,
+  type AlbumBackupEntry,
   type FullBackupBlobKeyBackup,
   type PlaintextLocalSettings,
 } from '../../content/panel-services.js';
@@ -62,6 +63,7 @@ export interface RecallExportControllerDeps {
   getLocalSettings(): PlaintextLocalSettings;
   findSelectedImage(handleId: string): HTMLImageElement | null;
   bookmarkStore(): BookmarkStore | null;
+  albumStore(): { readonly listBackupEntries: () => Promise<readonly AlbumBackupEntry[]> } | null;
   captureStore(): CaptureStore | null;
   urlReviewStatusStore(): UrlReviewStatusStore | null;
   loadPCloudProviderStatus: typeof loadPCloudProviderStatus;
@@ -248,8 +250,10 @@ export class RecallExportController {
     }
 
     const now = new Date().toISOString();
+    const albums = (await this.deps.albumStore()?.listBackupEntries()) ?? [];
     const exportResult = await exportEncryptedFullBackup({
       bookmarks: bookmarks.map(bookmarkRecordToExportEntry),
+      albums,
       originalBlobs: originalBlobRecords,
       blobKeyBackups: blobKeyBackupResult.backups,
       missingOriginalBlobIds: originalBlobResult.missingBlobIds,

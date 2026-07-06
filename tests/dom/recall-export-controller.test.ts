@@ -6,7 +6,7 @@ import { createDisplayRecord } from '../../extension/src/core/display-records.js
 import type { ImageDisplayRecord } from '../../extension/src/core/display-records.js';
 import type { BookmarkStore, PanelState, UrlReviewStatusStore } from '../../extension/src/core/types.js';
 import type { CaptureStore } from '../../extension/src/content/capture-controller.js';
-import { DEFAULT_LOCAL_SETTINGS } from '../../extension/src/content/panel-services.js';
+import { DEFAULT_LOCAL_SETTINGS, importBookmarks, type AlbumBackupEntry } from '../../extension/src/content/panel-services.js';
 import { PRIVATE_PIN_EXPORT_LOCKED_MESSAGE } from '../../extension/src/ui/panel/record-export-helpers.js';
 import { RecallExportController, type RecallExportControllerDeps } from '../../extension/src/ui/panel/recall-export-controller.js';
 
@@ -28,6 +28,7 @@ function bookmark(overrides: Partial<ImageDisplayRecord> = {}): ImageDisplayReco
 
 interface ExportHarnessConfig {
   readonly bookmarks?: readonly ImageDisplayRecord[];
+  readonly albums?: readonly AlbumBackupEntry[];
   readonly captureStore?: Partial<Record<keyof CaptureStore, unknown>>;
 }
 
@@ -73,6 +74,7 @@ function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
     findSelectedImage: () => null,
     bookmarkStore: () => bookmarkStore,
+    albumStore: () => ({ listBackupEntries: async () => config.albums ?? [] }),
     captureStore: () => captureStore,
     urlReviewStatusStore: () => null as UrlReviewStatusStore | null,
     loadPCloudProviderStatus: (async () => ({ connected: false })) as RecallExportControllerDeps['loadPCloudProviderStatus'],
@@ -135,12 +137,28 @@ test('backupPCloudNow collects full-backup original blob ids from stored origina
 });
 
 test('backupPCloudNow uploads an encrypted backup and reports success', async () => {
-  const harness = createExportHarness({ bookmarks: [bookmark()] });
+  const harness = createExportHarness({
+    bookmarks: [bookmark({ id: 'bookmark-1' })],
+    albums: [
+      {
+        id: 'album-1',
+        name: 'Reference',
+        createdAt: '2026-06-20T00:00:00.000Z',
+        updatedAt: '2026-06-20T00:00:00.000Z',
+        recordIds: ['bookmark-1'],
+      },
+    ],
+  });
 
   await harness.controller.backupPCloudNow('cloud-pass');
 
   assert.equal(harness.uploads.length, 1, 'the encrypted backup is uploaded');
   assert.ok(harness.uploads[0]!.fileContent.length > 0, 'the uploaded backup has encrypted content');
+  const imported = await importBookmarks(harness.uploads[0]!.fileContent, 'cloud-pass');
+  assert.deepEqual(
+    imported.albums.map((album) => ({ name: album.name, recordIds: album.recordIds })),
+    [{ name: 'Reference', recordIds: ['bookmark-1'] }],
+  );
   assert.equal(harness.getState().pcloudBackup.lastBackupMissingOriginalCount, 0);
   assert.equal(harness.getState().pcloudBackup.messageIsError, false);
 });

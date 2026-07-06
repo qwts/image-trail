@@ -11,6 +11,7 @@ import type {
 } from '../extension/src/core/types.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
 import { createBookmarkMessageRegistry } from '../extension/src/background/handlers/bookmark-message-handlers.js';
+import { createAlbumMessageRegistry } from '../extension/src/background/handlers/album-handlers.js';
 import { createPanelPositionMessageRegistry } from '../extension/src/background/handlers/panel-position-handlers.js';
 import { createPCloudMessageRegistry } from '../extension/src/background/handlers/pcloud-handlers.js';
 import { createRecallMessageRegistry, type RecallMessageHandlerDeps } from '../extension/src/background/handlers/recall-handlers.js';
@@ -21,16 +22,21 @@ import { RecentHistoryCache } from '../extension/src/background/recent-history-c
 import {
   MessageType,
   createAddRecentHistoryMessage,
+  createAddAlbumRecordsMessage,
+  createCreateAlbumMessage,
   createConnectPCloudProviderMessage,
+  createDeleteAlbumMessage,
   createDeleteGrabSourcePatternMessage,
   createDeletePanelPositionMessage,
   createDeleteUrlTemplateMessage,
   createDisconnectPCloudProviderMessage,
   createDownloadPCloudBackupMessage,
   createFindBookmarkByUrlMessage,
+  createImportAlbumBackupMessage,
   createListGrabSourcePatternsMessage,
   createListPCloudBackupsMessage,
   createListUrlTemplatesMessage,
+  createLoadAlbumsMessage,
   createLoadBookmarksByIdsMessage,
   createLoadBookmarksMessage,
   createLoadPanelPositionMessage,
@@ -38,16 +44,21 @@ import {
   createLoadRecentHistoryMessage,
   createPCloudProviderStatusMessage,
   createRecallRecordsMessage,
+  createRemoveAlbumRecordMessage,
   createRemoveBookmarkMessage,
   createRemoveBookmarksMessage,
   createRemoveRecallBookmarksMessage,
   createRemoveRecentHistoryMessage,
+  createRenameAlbumMessage,
   createSaveBookmarkMessage,
   createSaveGrabSourcePatternMessage,
   createSavePanelPositionMessage,
   createSaveUrlTemplateMessage,
   type AddRecentHistoryMessage,
   type AddRecentHistoryResultMessage,
+  type AddAlbumRecordsResultMessage,
+  type CreateAlbumResultMessage,
+  type DeleteAlbumResultMessage,
   type ConnectPCloudProviderResultMessage,
   type DeleteGrabSourcePatternResultMessage,
   type DeletePanelPositionResultMessage,
@@ -60,6 +71,8 @@ import {
   type ListGrabSourcePatternsResultMessage,
   type ListPCloudBackupsResultMessage,
   type ListUrlTemplatesResultMessage,
+  type ImportAlbumBackupResultMessage,
+  type LoadAlbumsResultMessage,
   type LoadBookmarksByIdsResultMessage,
   type LoadBookmarksResultMessage,
   type LoadPanelPositionResultMessage,
@@ -67,10 +80,12 @@ import {
   type LoadRecentHistoryResultMessage,
   type PCloudProviderStatusResultMessage,
   type RecallRecordsResultMessage,
+  type RemoveAlbumRecordResultMessage,
   type RemoveBookmarkResultMessage,
   type RemoveBookmarksResultMessage,
   type RemoveRecallBookmarksResultMessage,
   type RemoveRecentHistoryResultMessage,
+  type RenameAlbumResultMessage,
   type SaveBookmarkResultMessage,
   type SaveGrabSourcePatternResultMessage,
   type SavePanelPositionResultMessage,
@@ -726,6 +741,130 @@ test('bookmark fallbacks return the documented degraded payloads', () => {
     createRemoveRecallBookmarksMessage({ offset: 0 }),
   ) as RemoveRecallBookmarksResultMessage;
   assert.deepEqual(removedRecall.payload, { ok: false, removedCount: 0 });
+});
+
+// --- album registry ---------------------------------------------------------
+
+function albumFixture() {
+  const album = {
+    id: 'album-1',
+    schemaVersion: 1 as const,
+    name: 'Field work',
+    createdAt: '2026-07-01T00:00:00.000Z',
+    updatedAt: '2026-07-01T00:00:00.000Z',
+  };
+  const membership = {
+    id: 'album-1:record-1',
+    schemaVersion: 1 as const,
+    albumId: 'album-1',
+    recordId: 'record-1',
+    position: 0,
+    addedAt: '2026-07-01T00:00:01.000Z',
+  };
+  const imported = { importedAlbumCount: 1, importedMembershipCount: 1, skippedMembershipCount: 1 };
+  const registry = createAlbumMessageRegistry({
+    albumStore: {
+      listSnapshot: async () => ({ albums: [album], memberships: [membership] }),
+      createAlbum: async (name) => ({ ...album, name }),
+      renameAlbum: async (_albumId, name) => ({ ...album, name, updatedAt: '2026-07-02T00:00:00.000Z' }),
+      deleteAlbum: async () => true,
+      addRecords: async () => [membership],
+      removeRecord: async () => true,
+      importBackupEntries: async () => imported,
+    },
+  });
+  return { album, membership, imported, registry };
+}
+
+test('album registry wraps CRUD and membership operations', async () => {
+  const { album, membership, registry } = albumFixture();
+
+  const loaded = await handleAndRespond<LoadAlbumsResultMessage>(registry[MessageType.LoadAlbums], createLoadAlbumsMessage());
+  assert.equal(loaded.type, MessageType.LoadAlbumsResult);
+  assert.deepEqual(loaded.payload, { ok: true, albums: [album], memberships: [membership] });
+
+  const created = await handleAndRespond<CreateAlbumResultMessage>(registry[MessageType.CreateAlbum], createCreateAlbumMessage('Restored'));
+  assert.deepEqual(created.payload, { ok: true, album: { ...album, name: 'Restored' } });
+
+  const renamed = await handleAndRespond<RenameAlbumResultMessage>(
+    registry[MessageType.RenameAlbum],
+    createRenameAlbumMessage(album.id, 'Renamed'),
+  );
+  assert.deepEqual(renamed.payload, { ok: true, album: { ...album, name: 'Renamed', updatedAt: '2026-07-02T00:00:00.000Z' } });
+
+  const added = await handleAndRespond<AddAlbumRecordsResultMessage>(
+    registry[MessageType.AddAlbumRecords],
+    createAddAlbumRecordsMessage(album.id, ['record-1']),
+  );
+  assert.deepEqual(added.payload, { ok: true, memberships: [membership] });
+
+  const removed = await handleAndRespond<RemoveAlbumRecordResultMessage>(
+    registry[MessageType.RemoveAlbumRecord],
+    createRemoveAlbumRecordMessage(album.id, 'record-1'),
+  );
+  assert.deepEqual(removed.payload, { ok: true });
+
+  const deleted = await handleAndRespond<DeleteAlbumResultMessage>(registry[MessageType.DeleteAlbum], createDeleteAlbumMessage(album.id));
+  assert.deepEqual(deleted.payload, { ok: true });
+});
+
+test('album registry imports backup entries with record id remaps', async () => {
+  const { imported, registry } = albumFixture();
+
+  const response = await handleAndRespond<ImportAlbumBackupResultMessage>(
+    registry[MessageType.ImportAlbumBackup],
+    createImportAlbumBackupMessage({
+      albums: [
+        {
+          id: 'backup-album',
+          name: 'Backup',
+          createdAt: '2026-07-01T00:00:00.000Z',
+          updatedAt: '2026-07-01T00:00:01.000Z',
+          recordIds: ['old-record', 'missing-record'],
+        },
+      ],
+      recordIdMap: [{ sourceId: 'old-record', targetId: 'record-1' }],
+    }),
+  );
+
+  assert.deepEqual(response.payload, { ok: true, ...imported });
+});
+
+test('album fallbacks return documented degraded payloads', () => {
+  const { album, registry } = albumFixture();
+
+  assert.deepEqual(registry[MessageType.LoadAlbums].fallback(createLoadAlbumsMessage()) as LoadAlbumsResultMessage, {
+    type: MessageType.LoadAlbumsResult,
+    version: MESSAGE_PROTOCOL_VERSION,
+    payload: { ok: false, message: 'Albums could not be loaded.' },
+  });
+  assert.deepEqual((registry[MessageType.CreateAlbum].fallback(createCreateAlbumMessage('x')) as CreateAlbumResultMessage).payload, {
+    ok: false,
+    message: 'Album could not be created.',
+  });
+  assert.deepEqual(
+    (registry[MessageType.RenameAlbum].fallback(createRenameAlbumMessage(album.id, 'x')) as RenameAlbumResultMessage).payload,
+    {
+      ok: false,
+      message: 'Album could not be renamed.',
+    },
+  );
+  assert.deepEqual((registry[MessageType.DeleteAlbum].fallback(createDeleteAlbumMessage(album.id)) as DeleteAlbumResultMessage).payload, {
+    ok: false,
+  });
+  assert.deepEqual(
+    (registry[MessageType.AddAlbumRecords].fallback(createAddAlbumRecordsMessage(album.id, ['record-1'])) as AddAlbumRecordsResultMessage)
+      .payload,
+    { ok: false, message: 'Record could not be added to the album.' },
+  );
+  assert.deepEqual(
+    (
+      registry[MessageType.RemoveAlbumRecord].fallback(
+        createRemoveAlbumRecordMessage(album.id, 'record-1'),
+      ) as RemoveAlbumRecordResultMessage
+    ).payload,
+    { ok: false },
+  );
 });
 
 // --- pcloud registry --------------------------------------------------------------

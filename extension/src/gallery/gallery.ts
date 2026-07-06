@@ -5,21 +5,27 @@ import {
   isSaveLocalSettingsResultMessage,
 } from '../background/messages.js';
 import { CaptureController } from '../content/capture-controller.js';
+import { ExtensionAlbumStore } from '../content/extension-album-store.js';
 import { ExtensionBookmarkStore } from '../content/extension-bookmark-store.js';
 import { sendRuntimeMessage } from '../content/runtime-message.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { GALLERY_PAGE_LIMITS } from '../core/settings.js';
 import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, type PlaintextLocalSettings } from '../data/local-settings.js';
+import { galleryAlbumSummaries, galleryListStore, missingAlbumRecordCount, selectedGalleryAlbum } from './gallery-albums.js';
 import { openActionForGalleryRecord } from './gallery-model.js';
-import { loadGallerySearchPage } from './gallery-search-loader.js';
+import { type GallerySearchPage, loadGallerySearchPage } from './gallery-search-loader.js';
 import { createGalleryView, type GalleryViewState } from './gallery-view.js';
 
 const bookmarkStore = new ExtensionBookmarkStore();
+const albumStore = new ExtensionAlbumStore();
 const captureStore = new CaptureController();
 const SEARCH_DEBOUNCE_MS = 500;
 
 let state: GalleryViewState = {
   items: [],
+  albums: [],
+  selectedAlbumId: null,
+  missingAlbumRecordCount: 0,
   searchQuery: '',
   draftSearchQuery: '',
   offset: 0,
@@ -46,6 +52,24 @@ function render(options: { readonly focusSearch?: boolean } = {}): void {
   root().replaceChildren(
     createGalleryView(state, {
       openRecord,
+      createAlbum: (name) => {
+        void createAlbum(name);
+      },
+      selectAlbum: (albumId) => {
+        void selectAlbum(albumId);
+      },
+      renameAlbum: (albumId, name) => {
+        void renameAlbum(albumId, name);
+      },
+      deleteAlbum: (albumId) => {
+        void deleteAlbum(albumId);
+      },
+      addRecordToAlbum: (albumId, recordId) => {
+        void addRecordToAlbum(albumId, recordId);
+      },
+      removeRecordFromAlbum: (albumId, recordId) => {
+        void removeRecordFromAlbum(albumId, recordId);
+      },
       updateSearch,
       clearSearch,
       updatePageLimit: (limit) => {
@@ -62,32 +86,38 @@ function render(options: { readonly focusSearch?: boolean } = {}): void {
   if (options.focusSearch) focusSearchInput();
 }
 
-async function loadPage(offset: number, options: { readonly focusSearch?: boolean } = {}): Promise<void> {
+async function loadPage(offset: number, options: { readonly focusSearch?: boolean; readonly message?: string } = {}): Promise<void> {
   const generation = (loadGeneration += 1);
   const searchQuery = state.searchQuery;
+  const selectedAlbumId = state.selectedAlbumId;
   state = { ...state, loading: true, message: null };
   render(options);
 
   try {
-    const [settings, blobKeyStatus] = await Promise.all([loadLocalSettings(), captureStore.requestBlobKeyStatus()]);
-    const page = await loadGallerySearchPage({
-      store: bookmarkStore,
-      query: searchQuery,
-      offset,
-      limit: settings.galleryPageLimit,
-      privacyMode: settings.privacyModeEnabled,
-    });
+    const [settings, blobKeyStatus, albumSnapshot] = await Promise.all([
+      loadLocalSettings(),
+      captureStore.requestBlobKeyStatus(),
+      albumStore.listSnapshot(),
+    ]);
+    const albums = galleryAlbumSummaries(albumSnapshot);
+    const selectedAlbum = selectedGalleryAlbum(albums, selectedAlbumId);
+    const pageResult = selectedAlbum
+      ? await loadAlbumPage(selectedAlbum, searchQuery, offset, settings)
+      : { page: await loadGalleryPage(searchQuery, offset, settings), missingCount: 0 };
     if (generation !== loadGeneration) return;
     state = {
       ...state,
-      items: page.items,
-      offset: page.offset,
-      limit: page.limit,
-      total: page.total,
-      hasOlder: page.hasOlder,
-      hasNewer: page.hasNewer,
+      albums,
+      selectedAlbumId: selectedAlbum?.album.id ?? null,
+      missingAlbumRecordCount: pageResult.missingCount,
+      items: pageResult.page.items,
+      offset: pageResult.page.offset,
+      limit: pageResult.page.limit,
+      total: pageResult.page.total,
+      hasOlder: pageResult.page.hasOlder,
+      hasNewer: pageResult.page.hasNewer,
       loading: false,
-      message: null,
+      message: options.message ?? null,
       blobKeyUnlocked: blobKeyStatus.unlocked,
       privacyMode: settings.privacyModeEnabled,
     };
@@ -96,6 +126,35 @@ async function loadPage(offset: number, options: { readonly focusSearch?: boolea
     state = { ...state, loading: false, message: 'Gallery could not load durable records.' };
   }
   render(options);
+}
+
+async function loadGalleryPage(query: string, offset: number, settings: PlaintextLocalSettings): Promise<GallerySearchPage> {
+  return loadGallerySearchPage({
+    store: bookmarkStore,
+    query,
+    offset,
+    limit: settings.galleryPageLimit,
+    privacyMode: settings.privacyModeEnabled,
+  });
+}
+
+async function loadAlbumPage(
+  album: NonNullable<ReturnType<typeof selectedGalleryAlbum>>,
+  query: string,
+  offset: number,
+  settings: PlaintextLocalSettings,
+): Promise<{ readonly page: GallerySearchPage; readonly missingCount: number }> {
+  const records = await bookmarkStore.loadByIds(album.recordIds);
+  return {
+    page: await loadGallerySearchPage({
+      store: galleryListStore(records),
+      query,
+      offset,
+      limit: settings.galleryPageLimit,
+      privacyMode: settings.privacyModeEnabled,
+    }),
+    missingCount: missingAlbumRecordCount(album, records),
+  };
 }
 
 async function loadLocalSettings(): Promise<PlaintextLocalSettings> {
@@ -123,6 +182,45 @@ function clearSearch(): void {
   searchTimer = null;
   state = { ...state, searchQuery: '', draftSearchQuery: '', offset: 0, message: 'Search cleared.' };
   void loadPage(0, { focusSearch: true });
+}
+
+async function createAlbum(name: string): Promise<void> {
+  const album = await albumStore.createAlbum(name);
+  if (!album) {
+    state = { ...state, message: 'Album could not be created.' };
+    render();
+    return;
+  }
+  state = { ...state, selectedAlbumId: album.id, offset: 0 };
+  await loadPage(0, { message: `Created album: ${album.name}.` });
+}
+
+async function selectAlbum(albumId: string | null): Promise<void> {
+  if (albumId === state.selectedAlbumId) return;
+  state = { ...state, selectedAlbumId: albumId, offset: 0 };
+  await loadPage(0);
+}
+
+async function renameAlbum(albumId: string, name: string): Promise<void> {
+  const album = await albumStore.renameAlbum(albumId, name);
+  await loadPage(state.offset, { message: album ? `Renamed album: ${album.name}.` : 'Album could not be renamed.' });
+}
+
+async function deleteAlbum(albumId: string): Promise<void> {
+  const deleted = await albumStore.deleteAlbum(albumId);
+  state = { ...state, selectedAlbumId: state.selectedAlbumId === albumId ? null : state.selectedAlbumId, offset: 0 };
+  await loadPage(0, { message: deleted ? 'Album deleted.' : 'Album could not be deleted.' });
+}
+
+async function addRecordToAlbum(albumId: string, recordId: string): Promise<void> {
+  const memberships = await albumStore.addRecords(albumId, [recordId]);
+  await loadPage(state.offset, { message: memberships.length > 0 ? 'Added record to album.' : 'Record is already in that album.' });
+}
+
+async function removeRecordFromAlbum(albumId: string, recordId: string): Promise<void> {
+  const removed = await albumStore.removeRecord(albumId, recordId);
+  const nextOffset = state.items.length <= 1 ? Math.max(0, state.offset - state.limit) : state.offset;
+  await loadPage(nextOffset, { message: removed ? 'Removed record from album.' : 'Record was not in the album.' });
 }
 
 async function refreshSettingsFromStorage(options: { readonly reloadOnChange?: boolean } = {}): Promise<void> {

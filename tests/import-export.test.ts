@@ -555,6 +555,15 @@ test('full-backup: exports bookmarks with encrypted original blob records', asyn
         },
       },
     ],
+    albums: [
+      {
+        id: 'album-full-backup',
+        name: 'Restored set',
+        createdAt: '2026-06-28T00:00:00.000Z',
+        updatedAt: '2026-06-28T00:00:01.000Z',
+        recordIds: ['bookmark-full-backup'],
+      },
+    ],
     originalBlobs: [blobRecord],
     blobKeyBackups: [{ keyReference: 'blob:full-backup-key', fileContent: '{"header":{"payloadType":"keys"}}' }],
     password: 'backup-password',
@@ -575,6 +584,10 @@ test('full-backup: exports bookmarks with encrypted original blob records', asyn
   assert.equal(importedBookmarks.externalOriginalCount, 1);
   assert.equal(importedBookmarks.originalBlobs.length, 1);
   assert.equal(importedBookmarks.blobKeyBackups.length, 1);
+  assert.deepEqual(
+    importedBookmarks.albums.map((album) => ({ id: album.id, name: album.name, recordIds: album.recordIds })),
+    [{ id: 'album-full-backup', name: 'Restored set', recordIds: ['bookmark-full-backup'] }],
+  );
   assert.equal(importedBookmarks.entries[0]?.payload.storedOriginal?.blobId, 'blob-full-backup');
 
   const portable = portableStoredBlobRecord(blobRecord);
@@ -606,6 +619,18 @@ test('full-backup: rejects malformed original and key backup entries', () => {
     }),
     null,
   );
+  assert.equal(
+    fullBackupPayloadFromUnknown({
+      schemaVersion: 2,
+      bookmarks: [],
+      albums: [
+        { id: 'album-without-record-ids', name: 'Broken', createdAt: '2026-06-28T00:00:00.000Z', updatedAt: '2026-06-28T00:00:00.000Z' },
+      ],
+      originalBlobs: [],
+      blobKeyBackups: [],
+    }),
+    null,
+  );
 });
 
 test('full-backup: filters malformed missing original ids while preserving valid payloads', () => {
@@ -619,6 +644,7 @@ test('full-backup: filters malformed missing original ids while preserving valid
 
   assert.ok(payload);
   assert.deepEqual(payload.missingOriginalBlobIds, ['missing-original', 'other-missing-original']);
+  assert.deepEqual(payload.albums, []);
 });
 
 test('full-backup: parseFullBackupPayload rejects a malformed corrupted-record fixture with structured issues', () => {

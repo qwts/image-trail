@@ -4,6 +4,7 @@ import { storageUsageSummarySchema } from '../core/image/capture-result.schema.j
 import type { ImageProbeMethod, ImageRequestIntent, ImageSourceProfile } from '../core/image/request-policy.js';
 import { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType, hasVersionedObjectShape } from './message-protocol.js';
 import type { MessageType as ProtocolMessageType } from './message-protocol.js';
+import type { AlbumRequest, AlbumResponse } from './album-messages.js';
 import type { OpenGalleryMessage, OpenGalleryResultMessage } from './gallery-messages.js';
 import type {
   DeletePanelPositionMessage,
@@ -21,6 +22,7 @@ import type {
 } from './layout-messages.js';
 
 export { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
+export * from './album-messages.js';
 export * from './layout-messages.js';
 
 const deleteBlobResultPayloadSchema = v.object({
@@ -896,6 +898,7 @@ export type ExtensionRequest =
   | PingMessage
   | LoadBuildIdentityMessage
   | OpenGalleryMessage
+  | AlbumRequest
   | CaptureImageMessage
   | DownloadImageMessage
   | ExportEncryptedImageMessage
@@ -964,6 +967,7 @@ export type ExtensionResponse =
   | UnknownMessageResponse
   | LoadBuildIdentityResultMessage
   | OpenGalleryResultMessage
+  | AlbumResponse
   | CaptureResultMessage
   | DownloadImageResultMessage
   | ExportEncryptedImageResultMessage

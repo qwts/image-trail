@@ -9,6 +9,7 @@ import {
   importBookmarks as importBookmarkRecords,
   importEncryptedHistory,
   importUrlReviewStatus as importUrlReviewStatusFile,
+  type AlbumBackupEntry,
   type PlaintextLocalSettings,
 } from '../../content/panel-services.js';
 import {
@@ -36,6 +37,7 @@ export type PendingRestoreImport =
       readonly kind: 'bookmarks';
       readonly result: BookmarkImportResult;
       readonly duplicateCount: number;
+      readonly duplicateRecordIdsByUuid: ReadonlyMap<string, string>;
       readonly password: string;
     }
   | { readonly kind: 'url-review-status'; readonly result: UrlReviewStatusImportResult };
@@ -61,6 +63,16 @@ export interface RecallRestoreControllerDeps {
   addImportedImage(file: ImportedImageFile): Promise<boolean>;
   getLocalSettings(): PlaintextLocalSettings;
   bookmarkStore(): BookmarkStore | null;
+  albumStore(): {
+    readonly importBackupEntries: (
+      albums: readonly AlbumBackupEntry[],
+      recordIdMap: ReadonlyMap<string, string>,
+    ) => Promise<{
+      readonly importedAlbumCount: number;
+      readonly importedMembershipCount: number;
+      readonly skippedMembershipCount: number;
+    }>;
+  } | null;
   captureStore(): CaptureStore | null;
   recentHistoryStore(): RecentHistoryStore | null;
   urlReviewStatusStore(): UrlReviewStatusStore | null;
@@ -335,6 +347,7 @@ export class RecallRestoreController {
         externalOriginalCount: bookmarkEntriesOriginalReferenceCount(duplicateSummary.uniqueEntries),
       },
       duplicateCount: duplicateSummary.duplicateCount,
+      duplicateRecordIdsByUuid: duplicateSummary.duplicateRecordIdsByUuid,
       password,
     };
     this.deps.setState(
@@ -346,7 +359,12 @@ export class RecallRestoreController {
     this.deps.render();
   }
 
-  private async importBookmarks(result: BookmarkImportResult, duplicateCount: number, password: string): Promise<void> {
+  private async importBookmarks(
+    result: BookmarkImportResult,
+    duplicateCount: number,
+    password: string,
+    duplicateRecordIdsByUuid: ReadonlyMap<string, string>,
+  ): Promise<void> {
     const bookmarkStore = this.deps.bookmarkStore();
     if (!bookmarkStore) {
       this.deps.setState(
@@ -367,25 +385,53 @@ export class RecallRestoreController {
       return;
     }
     let importedCount = 0;
+    const recordIdMap = new Map(duplicateRecordIdsByUuid);
     for (const entry of result.entries) {
-      await bookmarkStore.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
+      const saved = await bookmarkStore.save(bookmarkPayloadToDisplayRecord(entry.uuid, entry.payload));
+      recordIdMap.set(entry.uuid, saved.id);
       importedCount += 1;
     }
+    const albumRestore = await this.restoreFullBackupAlbums(result, recordIdMap);
     await this.deps.loadBookmarkPage(0, { render: false });
     this.deps.setState(
       reducePanelAction(this.deps.getState(), {
         name: 'import-export/complete',
-        message: restoreImportCompleteMessage(
-          'bookmark',
-          importedCount,
-          duplicateCount,
-          result.skipped.length,
-          result.plaintext,
-          result.fullBackup ? fullBackupRestoreDetail(fullBackupOriginalRestore.importedOriginalCount) : 'encrypted into bookmark storage',
-        ),
+        message:
+          restoreImportCompleteMessage(
+            'bookmark',
+            importedCount,
+            duplicateCount,
+            result.skipped.length,
+            result.plaintext,
+            result.fullBackup
+              ? fullBackupRestoreDetail(fullBackupOriginalRestore.importedOriginalCount)
+              : 'encrypted into bookmark storage',
+          ) + albumRestoreCompleteMessage(albumRestore),
       }),
     );
     this.deps.renderPanelAndRefreshRecall();
+  }
+
+  private async restoreFullBackupAlbums(
+    result: BookmarkImportResult,
+    recordIdMap: ReadonlyMap<string, string>,
+  ): Promise<{
+    readonly importedAlbumCount: number;
+    readonly importedMembershipCount: number;
+    readonly skippedMembershipCount: number;
+    readonly unavailable?: boolean;
+  } | null> {
+    if (!result.fullBackup || result.albums.length === 0) return null;
+    const albumStore = this.deps.albumStore();
+    if (!albumStore) {
+      return {
+        importedAlbumCount: 0,
+        importedMembershipCount: 0,
+        skippedMembershipCount: result.albums.reduce((sum, album) => sum + album.recordIds.length, 0),
+        unavailable: true,
+      };
+    }
+    return albumStore.importBackupEntries(result.albums, recordIdMap);
   }
 
   private async restoreFullBackupOriginals(
@@ -460,7 +506,7 @@ export class RecallRestoreController {
         await this.importHistory(pending.result, pending.duplicateCount);
         break;
       case 'bookmarks':
-        await this.importBookmarks(pending.result, pending.duplicateCount, pending.password);
+        await this.importBookmarks(pending.result, pending.duplicateCount, pending.password, pending.duplicateRecordIdsByUuid);
         break;
       case 'url-review-status':
         await this.importUrlReviewStatus(pending.result);
@@ -480,4 +526,22 @@ export class RecallRestoreController {
     if (!recentHistoryStore) return this.deps.getState().history;
     return recentHistoryStore.load(window.location.href, { includeRetained: true });
   }
+}
+
+function albumRestoreCompleteMessage(
+  summary: {
+    readonly importedAlbumCount: number;
+    readonly importedMembershipCount: number;
+    readonly skippedMembershipCount: number;
+    readonly unavailable?: boolean;
+  } | null,
+): string {
+  if (!summary) return '';
+  if (summary.unavailable) return ' Albums were not restored because album storage is unavailable.';
+  const restored = ` Restored ${summary.importedAlbumCount} album${summary.importedAlbumCount === 1 ? '' : 's'} with ${summary.importedMembershipCount} membership${summary.importedMembershipCount === 1 ? '' : 's'}.`;
+  const skipped =
+    summary.skippedMembershipCount > 0
+      ? ` Skipped ${summary.skippedMembershipCount} album membership${summary.skippedMembershipCount === 1 ? '' : 's'} without a local record.`
+      : '';
+  return `${restored}${skipped}`;
 }

@@ -31,6 +31,7 @@ function createExportHarness(captureStore: Partial<Record<keyof CaptureStore, un
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
     findSelectedImage: () => null,
     bookmarkStore: () => null as BookmarkStore | null,
+    albumStore: () => null,
     captureStore: () => (captureStore === null ? null : (captureStore as unknown as CaptureStore)),
     urlReviewStatusStore: () => null as UrlReviewStatusStore | null,
     loadPCloudProviderStatus: (async () => DISCONNECTED_STATUS) as RecallExportControllerDeps['loadPCloudProviderStatus'],

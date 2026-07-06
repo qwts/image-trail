@@ -71,6 +71,48 @@ button {
   cursor: pointer;
 }
 
+.image-trail-gallery__albums {
+  display: grid;
+  gap: 12px;
+  padding: 16px 0 0;
+}
+
+.image-trail-gallery__album-form,
+.image-trail-gallery__album-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+
+.image-trail-gallery__album-list {
+  align-items: center;
+}
+
+.image-trail-gallery__album-form button,
+.image-trail-gallery__album-list button,
+.image-trail-gallery__card-actions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #bbb5aa;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #191b1f;
+  cursor: pointer;
+}
+
+.image-trail-gallery__album-list button.is-selected {
+  border-color: #191b1f;
+  background: #191b1f;
+  color: #ffffff;
+}
+
+.image-trail-gallery__album-form button:disabled,
+.image-trail-gallery__card-actions button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
 .image-trail-gallery__controls button:disabled {
   cursor: default;
   opacity: 0.48;
@@ -111,6 +153,18 @@ button {
   color: #191b1f;
   font: inherit;
   font-weight: 500;
+}
+
+.image-trail-gallery__card-actions select {
+  min-height: 34px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid #bbb5aa;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #191b1f;
+  font: inherit;
+  font-size: 0.82rem;
 }
 
 .image-trail-gallery__limit-form .image-trail-gallery__field {
@@ -155,6 +209,8 @@ button {
 
 .image-trail-gallery__card {
   min-width: 0;
+  display: grid;
+  gap: 8px;
 }
 
 .image-trail-gallery__card-button {
@@ -233,6 +289,16 @@ button {
   line-height: 1.35;
 }
 
+.image-trail-gallery__card-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.image-trail-gallery__card-actions button:only-child {
+  grid-column: 1 / -1;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     background: #15171b;
@@ -251,6 +317,20 @@ button {
     color: #f3f4f6;
   }
 
+  .image-trail-gallery__album-form button,
+  .image-trail-gallery__album-list button,
+  .image-trail-gallery__card-actions button {
+    border-color: #434953;
+    background: #23272f;
+    color: #f3f4f6;
+  }
+
+  .image-trail-gallery__album-list button.is-selected {
+    border-color: #f3f4f6;
+    background: #f3f4f6;
+    color: #15171b;
+  }
+
   .image-trail-gallery__search button {
     border-color: #434953;
     background: #23272f;
@@ -263,6 +343,12 @@ button {
   }
 
   .image-trail-gallery__field input {
+    border-color: #434953;
+    background: #23272f;
+    color: #f3f4f6;
+  }
+
+  .image-trail-gallery__card-actions select {
     border-color: #434953;
     background: #23272f;
     color: #f3f4f6;

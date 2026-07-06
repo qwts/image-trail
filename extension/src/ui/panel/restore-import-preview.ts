@@ -24,6 +24,7 @@ export interface RestoreDuplicateSummary<TEntry extends RestoreImageImportEntry>
   readonly uniqueEntries: readonly TEntry[];
   readonly duplicateCount: number;
   readonly matchesByUuid: ReadonlyMap<string, RestoreDuplicateMatch>;
+  readonly duplicateRecordIdsByUuid: ReadonlyMap<string, string>;
 }
 
 export function createRestoreDuplicateSummary<TEntry extends RestoreImageImportEntry>(
@@ -43,11 +44,13 @@ export function createRestoreDuplicateSummary<TEntry extends RestoreImageImportE
   }));
   const classifications = classifyRestoreDuplicates(candidates, existing);
   const matchesByUuid = new Map<string, RestoreDuplicateMatch>();
+  const duplicateRecordIdsByUuid = new Map<string, string>();
   const uniqueEntries: TEntry[] = [];
 
   for (const classification of classifications) {
     if (classification.duplicate) {
       matchesByUuid.set(classification.candidate.entry.uuid, classification.duplicate.matchedBy);
+      duplicateRecordIdsByUuid.set(classification.candidate.entry.uuid, classification.duplicate.existingId);
     } else {
       uniqueEntries.push(classification.candidate.entry);
     }
@@ -57,6 +60,7 @@ export function createRestoreDuplicateSummary<TEntry extends RestoreImageImportE
     uniqueEntries,
     duplicateCount: matchesByUuid.size,
     matchesByUuid,
+    duplicateRecordIdsByUuid,
   };
 }
 
@@ -65,6 +69,7 @@ export function emptyRestoreDuplicateSummary<TEntry extends RestoreImageImportEn
     uniqueEntries: [],
     duplicateCount: 0,
     matchesByUuid: new Map<string, RestoreDuplicateMatch>(),
+    duplicateRecordIdsByUuid: new Map<string, string>(),
   };
 }
 

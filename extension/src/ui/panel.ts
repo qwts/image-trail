@@ -1,4 +1,5 @@
 import type { CaptureStore } from '../content/capture-controller.js';
+import { ExtensionAlbumStore } from '../content/extension-album-store.js';
 import type { RecallStore } from '../content/recall-store.js';
 import type { RecentHistoryStore } from '../content/recent-history-store.js';
 import {
@@ -113,6 +114,7 @@ export class ImageTrailPanel {
   private readonly slideshow: Slideshow;
   private readonly retry: Retry404;
   private localSettings: PlaintextLocalSettings = DEFAULT_LOCAL_SETTINGS;
+  private readonly albumStore = new ExtensionAlbumStore();
   private readonly fieldStateSync = new ParsedFieldStateSync({
     store: () => this.parsedFieldStateStore,
     hostname: () => hostnameFromLocation(),
@@ -193,6 +195,7 @@ export class ImageTrailPanel {
     getLocalSettings: () => this.localSettings,
     findSelectedImage: (handleId) => this.findSelectedImage(handleId),
     bookmarkStore: () => this.bookmarkStore,
+    albumStore: () => this.albumStore,
     captureStore: () => this.captureStore,
     urlReviewStatusStore: () => this.urlReviewStatusStore,
     loadPCloudProviderStatus: (...args) => loadPCloudProviderStatus(...args),
@@ -213,6 +216,7 @@ export class ImageTrailPanel {
     addImportedImage: (file) => this.recordLibrary.addImportedImage(file),
     getLocalSettings: () => this.localSettings,
     bookmarkStore: () => this.bookmarkStore,
+    albumStore: () => this.albumStore,
     captureStore: () => this.captureStore,
     recentHistoryStore: () => this.recentHistoryStore,
     urlReviewStatusStore: () => this.urlReviewStatusStore,

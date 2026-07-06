@@ -1,7 +1,7 @@
 import type { DataStoreName } from './types.js';
 
 export const IMAGE_TRAIL_DB_NAME = 'image-trail';
-export const IMAGE_TRAIL_DB_VERSION = 7;
+export const IMAGE_TRAIL_DB_VERSION = 8;
 
 export const DataStore = {
   Metadata: 'metadata',
@@ -12,6 +12,8 @@ export const DataStore = {
   Downloads: 'downloads',
   EncryptedPins: 'encryptedPins',
   EncryptedPinThumbnails: 'encryptedPinThumbnails',
+  Albums: 'albums',
+  AlbumMemberships: 'albumMemberships',
 } as const satisfies Record<string, DataStoreName>;
 
 export const DATA_STORE_NAMES = Object.values(DataStore);
@@ -39,4 +41,9 @@ export const SchemaIndex = {
   EncryptedPinThumbnailsByCreatedAt: 'encryptedPinThumbnails.byCreatedAt',
   EncryptedPinThumbnailsByByteLength: 'encryptedPinThumbnails.byByteLength',
   EncryptedPinThumbnailsByKeyReference: 'encryptedPinThumbnails.byKeyReference',
+  AlbumsByUpdatedAt: 'albums.byUpdatedAt',
+  AlbumMembershipsByAlbumId: 'albumMemberships.byAlbumId',
+  AlbumMembershipsByRecordId: 'albumMemberships.byRecordId',
+  AlbumMembershipsByAlbumPosition: 'albumMemberships.byAlbumPosition',
+  AlbumMembershipsByAlbumRecord: 'albumMemberships.byAlbumRecord',
 } as const;

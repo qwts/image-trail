@@ -116,6 +116,31 @@ export function migrateImageTrailDb(db: IDBDatabase, oldVersion: number, transac
     }
   }
 
+  if (oldVersion < 8) {
+    const albums = db.objectStoreNames.contains(DataStore.Albums)
+      ? requireUpgradeTransaction(transaction).objectStore(DataStore.Albums)
+      : db.createObjectStore(DataStore.Albums, { keyPath: 'id' });
+    if (!albums.indexNames.contains(SchemaIndex.AlbumsByUpdatedAt)) {
+      albums.createIndex(SchemaIndex.AlbumsByUpdatedAt, 'updatedAt', { unique: false });
+    }
+
+    const memberships = db.objectStoreNames.contains(DataStore.AlbumMemberships)
+      ? requireUpgradeTransaction(transaction).objectStore(DataStore.AlbumMemberships)
+      : db.createObjectStore(DataStore.AlbumMemberships, { keyPath: 'id' });
+    if (!memberships.indexNames.contains(SchemaIndex.AlbumMembershipsByAlbumId)) {
+      memberships.createIndex(SchemaIndex.AlbumMembershipsByAlbumId, 'albumId', { unique: false });
+    }
+    if (!memberships.indexNames.contains(SchemaIndex.AlbumMembershipsByRecordId)) {
+      memberships.createIndex(SchemaIndex.AlbumMembershipsByRecordId, 'recordId', { unique: false });
+    }
+    if (!memberships.indexNames.contains(SchemaIndex.AlbumMembershipsByAlbumPosition)) {
+      memberships.createIndex(SchemaIndex.AlbumMembershipsByAlbumPosition, ['albumId', 'position'], { unique: false });
+    }
+    if (!memberships.indexNames.contains(SchemaIndex.AlbumMembershipsByAlbumRecord)) {
+      memberships.createIndex(SchemaIndex.AlbumMembershipsByAlbumRecord, ['albumId', 'recordId'], { unique: true });
+    }
+  }
+
   const metadata = transaction?.objectStore(DataStore.Metadata);
   metadata?.put({
     key: 'schema',

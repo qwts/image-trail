@@ -1,7 +1,16 @@
 import type { EncryptionAlgorithm, KeyReference } from './crypto/types.js';
 
 export type DataStoreName =
-  'metadata' | 'keys' | 'history' | 'bookmarks' | 'blobs' | 'downloads' | 'encryptedPins' | 'encryptedPinThumbnails';
+  | 'metadata'
+  | 'keys'
+  | 'history'
+  | 'bookmarks'
+  | 'blobs'
+  | 'downloads'
+  | 'encryptedPins'
+  | 'encryptedPinThumbnails'
+  | 'albums'
+  | 'albumMemberships';
 export type DataStatusCode =
   'ok' | 'db-open-failed' | 'migration-failed' | 'encryption-failed' | 'decryption-failed' | 'not-found' | 'locked';
 
@@ -16,6 +25,23 @@ export interface VersionMetadataRecord {
   readonly key: 'schema';
   readonly databaseVersion: number;
   readonly migratedAt: string;
+}
+
+export interface AlbumRecord {
+  readonly id: string;
+  readonly schemaVersion: 1;
+  readonly name: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface AlbumMembershipRecord {
+  readonly id: string;
+  readonly schemaVersion: 1;
+  readonly albumId: string;
+  readonly recordId: string;
+  readonly position: number;
+  readonly addedAt: string;
 }
 
 export type BlobKind = 'original' | 'thumbnail';

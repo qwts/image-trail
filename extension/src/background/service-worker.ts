@@ -1,6 +1,7 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
 import { isBuildIdentity } from '../core/build-info.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
+import { IndexedDbAlbumStore } from '../data/albums-controller.js';
 import { IndexedDbPanelPositionStore } from '../data/panel-position-controller.js';
 import { IndexedDbWorkspaceLayoutStore } from '../data/workspace-layout-controller.js';
 import { IndexedDbParsedFieldStateStore } from '../data/parsed-field-state-controller.js';
@@ -100,6 +101,7 @@ import type {
   StorageUsageRequestMessage,
 } from './messages.js';
 import { createBookmarkMessageRegistry } from './handlers/bookmark-message-handlers.js';
+import { createAlbumMessageRegistry } from './handlers/album-handlers.js';
 import { createPanelPositionMessageRegistry } from './handlers/panel-position-handlers.js';
 import { createRecentHistoryMessageRegistry } from './handlers/recent-history-handlers.js';
 import { createRecallMessageRegistry } from './handlers/recall-handlers.js';
@@ -131,6 +133,7 @@ const bookmarkStore = new IndexedDbBookmarkStore({
   getActiveBlobKey,
   getPinSaveStoragePreference: async () => (await loadLocalSettings()).pinSaveStoragePreference,
 });
+const albumStore = new IndexedDbAlbumStore();
 const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
 const urlReviewStatusStore = new IndexedDbUrlReviewStatusStore();
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
@@ -139,6 +142,7 @@ const recentHistoryCache = new RecentHistoryCache();
 /** Composition-root context handed to extracted handler modules; see {@link ServiceWorkerContext}. */
 const context: ServiceWorkerContext = {
   bookmarkStore,
+  albumStore,
   panelPositionStore: new IndexedDbPanelPositionStore(),
   workspaceLayoutStore: new IndexedDbWorkspaceLayoutStore(),
   parsedFieldStateStore,
@@ -878,6 +882,7 @@ const messageRegistry = {
     fallback: () => createLoadBuildIdentityResultMessage({ ok: false, identity: null, message: 'Build identity could not be loaded.' }),
   }),
   ...createGalleryMessageRegistry(),
+  ...createAlbumMessageRegistry({ albumStore }),
   [MessageType.CaptureImage]: defineMessage({
     requestSchema: requestSchemas.captureImageRequestSchema,
     handle: (message: CaptureImageMessage) => handleCaptureImage(message),

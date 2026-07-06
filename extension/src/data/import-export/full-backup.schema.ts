@@ -1,4 +1,5 @@
 import * as v from 'valibot';
+import type { AlbumBackupEntry } from '../albums-controller.js';
 import { keyReferenceForKind } from '../crypto/types.schema.js';
 import type { FullBackupBlobKeyBackup, FullBackupPayloadV1, PortableStoredBlobRecord } from './full-backup.js';
 
@@ -23,16 +24,26 @@ export const fullBackupBlobKeyBackupSchema = v.object({
   fileContent: v.string(),
 }) as v.GenericSchema<unknown, FullBackupBlobKeyBackup>;
 
+export const albumBackupEntrySchema = v.object({
+  id: v.string(),
+  name: v.string(),
+  createdAt: v.string(),
+  updatedAt: v.string(),
+  recordIds: v.pipe(v.array(v.string()), v.readonly()),
+}) as v.GenericSchema<unknown, AlbumBackupEntry>;
+
 /**
  * Envelope-level schema. `originalBlobs`/`blobKeyBackups` are validated element
  * by element (parity with the former hand-rolled guard); `bookmarks` are kept as
  * an array here and validated per entry downstream (`parseBookmarkEntries`) so a
  * single corrupt bookmark is skipped and reported, not fatal to the whole restore.
  * `missingOriginalBlobIds` defaults to `[]` when absent, matching the old code.
+ * `albums` also defaults to `[]` so v1 full backups continue to import.
  */
 export const fullBackupPayloadSchema = v.object({
-  schemaVersion: v.literal(1),
+  schemaVersion: v.union([v.literal(1), v.literal(2)]),
   bookmarks: v.pipe(v.array(v.unknown()), v.readonly()),
+  albums: v.optional(v.pipe(v.array(albumBackupEntrySchema), v.readonly()), () => []),
   originalBlobs: v.pipe(v.array(portableStoredBlobRecordSchema), v.readonly()),
   blobKeyBackups: v.pipe(v.array(fullBackupBlobKeyBackupSchema), v.readonly()),
   // Non-essential list: coerce anything non-array to [] and filter junk entries down to

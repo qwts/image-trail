@@ -10,6 +10,7 @@ export {
   storedBlobRecordFromPortable,
   type FullBackupBlobKeyBackup,
 } from '../data/import-export/full-backup.js';
+export type { AlbumBackupEntry } from '../data/albums-controller.js';
 export { importBookmarks } from '../data/import-export/bookmarks-import.js';
 export { exportEncryptedHistory, exportPlainHistory } from '../data/import-export/history-export.js';
 export { importEncryptedHistory } from '../data/import-export/history-import.js';

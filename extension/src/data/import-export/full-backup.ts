@@ -1,6 +1,7 @@
 import * as v from 'valibot';
 import { createAesGcmIv, encryptAesGcm } from '../crypto/webcrypto.js';
 import { createPasswordSalt, deriveEncryptionKey } from '../crypto/password-wrap.js';
+import type { AlbumBackupEntry } from '../albums-controller.js';
 import type { DurableBookmarkPayloadV1, RecoverableDataStatus, StoredBlobRecord } from '../types.js';
 import { buildExportFileHeader, serializeExportFile, toBase64, fromBase64, type ExportFileEnvelope } from './encrypted-file-format.js';
 import { fullBackupPayloadSchema } from './full-backup.schema.js';
@@ -25,11 +26,12 @@ export interface PortableStoredBlobRecord {
 }
 
 export interface FullBackupPayloadV1 {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly bookmarks: readonly FullBackupBookmarkEntry[];
   readonly originalBlobs: readonly PortableStoredBlobRecord[];
   readonly blobKeyBackups: readonly FullBackupBlobKeyBackup[];
   readonly missingOriginalBlobIds: readonly string[];
+  readonly albums: readonly AlbumBackupEntry[];
 }
 
 export interface FullBackupBlobKeyBackup {
@@ -39,6 +41,7 @@ export interface FullBackupBlobKeyBackup {
 
 export interface FullBackupExportInput {
   readonly bookmarks: readonly FullBackupBookmarkEntry[];
+  readonly albums?: readonly AlbumBackupEntry[];
   readonly originalBlobs: readonly StoredBlobRecord[];
   readonly blobKeyBackups?: readonly FullBackupBlobKeyBackup[];
   readonly missingOriginalBlobIds?: readonly string[];
@@ -55,7 +58,7 @@ export interface FullBackupExportResult {
 }
 
 export async function exportEncryptedFullBackup(input: FullBackupExportInput): Promise<FullBackupExportResult> {
-  const { bookmarks, originalBlobs, password, now = new Date().toISOString() } = input;
+  const { bookmarks, originalBlobs, password, now = new Date().toISOString(), albums = [] } = input;
   if (bookmarks.length === 0) {
     return { status: { ok: false, code: 'not-found', message: 'No bookmarks to export.' } };
   }
@@ -65,8 +68,9 @@ export async function exportEncryptedFullBackup(input: FullBackupExportInput): P
     const iterations = 600_000;
     const encryptionKey = await deriveEncryptionKey(password, { salt, iterations });
     const payload: FullBackupPayloadV1 = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       bookmarks,
+      albums,
       originalBlobs: originalBlobs.map(portableStoredBlobRecord),
       blobKeyBackups: input.blobKeyBackups ?? [],
       missingOriginalBlobIds: input.missingOriginalBlobIds ?? [],
@@ -92,7 +96,7 @@ export async function exportEncryptedFullBackup(input: FullBackupExportInput): P
       status: {
         ok: true,
         code: 'ok',
-        message: fullBackupExportMessage(bookmarks.length, originalBlobs.length, input.missingOriginalBlobIds?.length ?? 0),
+        message: fullBackupExportMessage(bookmarks.length, originalBlobs.length, albums.length, input.missingOriginalBlobIds?.length ?? 0),
       },
       fileContent,
       fileName: `image-trail-full-backup-${now.slice(0, 10)}.json`,
@@ -111,10 +115,19 @@ export async function exportEncryptedFullBackup(input: FullBackupExportInput): P
   }
 }
 
-function fullBackupExportMessage(bookmarkCount: number, originalBlobCount: number, missingOriginalBlobCount: number): string {
+function fullBackupExportMessage(
+  bookmarkCount: number,
+  originalBlobCount: number,
+  albumCount: number,
+  missingOriginalBlobCount: number,
+): string {
   const base = `Exported ${bookmarkCount} bookmark(s) and ${originalBlobCount} encrypted original(s).`;
-  if (missingOriginalBlobCount === 0) return base;
-  return `${base} ${missingOriginalBlobCount} referenced original(s) were missing and will restore as metadata-only.`;
+  const albums = albumCount > 0 ? ` Included ${albumCount} album(s).` : '';
+  const missing =
+    missingOriginalBlobCount > 0
+      ? ` ${missingOriginalBlobCount} referenced original(s) were missing and will restore as metadata-only.`
+      : '';
+  return `${base}${albums}${missing}`;
 }
 
 export function portableStoredBlobRecord(record: StoredBlobRecord): PortableStoredBlobRecord {
