@@ -369,6 +369,32 @@ test('selecting a recent row keeps the recents list scroll position (#425)', asy
   await expect.poll(async () => list.evaluate((element) => element.scrollTop)).toBe(scrolled);
 });
 
+test('re-expanding Recents restores the scroll position from before the collapse (#443)', async ({ page, serviceWorker }) => {
+  await openPanel(page, serviceWorker);
+  await deleteVisibleRecents(page);
+  await setVisibleRecents(page, { limit: '6', overflow: 'Drop oldest' });
+
+  // Five rows overflow the three-row list height so the list can scroll.
+  for (let index = 1; index <= 5; index += 1) {
+    await applyUrlInEditor(page, `${fixtureUrl(fixtureAssetPaths.assetOne)}?scroll=${index}`);
+    await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(index);
+  }
+
+  const list = page.locator('.image-trail-panel__history-section .image-trail-panel__record-list');
+  await page.locator('.image-trail-panel__history-item').nth(4).scrollIntoViewIfNeeded();
+  const scrolled = await list.evaluate((element) => element.scrollTop);
+  expect(scrolled).toBeGreaterThan(0);
+
+  // Collapse drops the list from the DOM entirely, then expand rebuilds it.
+  await page.getByRole('button', { name: 'Hide the Recent history list' }).click({ position: { x: 10, y: 10 } });
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show the Recent history list' }).click({ position: { x: 10, y: 10 } });
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(5);
+
+  // The rebuilt list must reopen at the parked offset, not scrollTop 0.
+  await expect.poll(async () => list.evaluate((element) => element.scrollTop)).toBe(scrolled);
+});
+
 test('the Recents and Queue sections collapse and expand from their heading toggles (#438)', async ({ page, serviceWorker }) => {
   await openPanel(page, serviceWorker);
   await deleteVisibleRecents(page);

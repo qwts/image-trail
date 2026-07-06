@@ -33,6 +33,7 @@ function createHarness(): Harness {
     fieldDisplayModes: new Map(),
     detachedWindowPositions: new Map(),
     detachedWindowMinimized: new Set(),
+    collapsibleListScrollTops: new Map(),
   };
   const target: PanelRenderTarget = {
     root,
@@ -268,6 +269,43 @@ test('Escape reverts an in-progress detached-window drag to its original positio
   assert.equal(windowEl.style.left, '200px', 'Escape reverts the window position');
   assert.equal(windowEl.style.top, '80px');
   assert.deepEqual(harness.layoutState.detachedWindowPositions.get('history'), { left: 200, top: 80 }, 'no new position is stored');
+});
+
+const HISTORY_LIST_SELECTOR = '.image-trail-panel__history-section .image-trail-panel__record-list';
+
+test('collapsing then re-expanding Recents restores the list scroll offset (#443)', () => {
+  const harness = createHarness();
+  harness.render(panelState());
+  const list = harness.root.querySelector<HTMLElement>(HISTORY_LIST_SELECTOR);
+  assert.ok(list, 'the expanded Recents section renders its scroll list');
+  list.scrollTop = 120;
+
+  // Collapse: the list leaves the DOM, so its offset must be parked in session layout state.
+  harness.render(panelState({ historySectionOpen: false }));
+  assert.equal(harness.root.querySelector(HISTORY_LIST_SELECTOR), null, 'the collapsed section drops its list');
+  assert.equal(harness.layoutState.collapsibleListScrollTops.get(HISTORY_LIST_SELECTOR), 120, 'the offset is remembered while collapsed');
+
+  // Re-expand: the fresh list must reopen at the parked offset, not scrollTop 0.
+  harness.render(panelState({ historySectionOpen: true }));
+  const reopened = harness.root.querySelector<HTMLElement>(HISTORY_LIST_SELECTOR);
+  assert.ok(reopened, 'the section renders its list again');
+  assert.equal(reopened.scrollTop, 120, 'the reopened list keeps the reader’s place');
+});
+
+test('a plain re-render never seeds a collapsible list from a stale parked offset (#443)', () => {
+  const harness = createHarness();
+  harness.render(panelState());
+  const list = harness.root.querySelector<HTMLElement>(HISTORY_LIST_SELECTOR);
+  assert.ok(list);
+  list.scrollTop = 90;
+
+  // The list stays open across this render; its live scroll snapshot — not the parked value —
+  // owns the restore, so a mid-session scroll change is honored rather than reverted.
+  list.scrollTop = 30;
+  harness.render(panelState());
+  const same = harness.root.querySelector<HTMLElement>(HISTORY_LIST_SELECTOR);
+  assert.ok(same);
+  assert.equal(same.scrollTop, 30, 'an open list follows its live offset across ordinary re-renders');
 });
 
 test('the Settings header renders a detach control that dispatches section/detach', () => {

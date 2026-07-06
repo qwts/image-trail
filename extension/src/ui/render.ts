@@ -54,6 +54,13 @@ export interface PanelLayoutState {
   fieldDisplayModes: Map<string, NumericFieldDisplayMode>;
   detachedWindowPositions: Map<DetachableSectionId, DetachedWindowPosition>;
   detachedWindowMinimized: Set<DetachableSectionId>;
+  /**
+   * Last-seen scrollTop of each collapsible record-list, keyed by its snapshot selector. The DOM
+   * scroll snapshot only bridges renders where the list exists before and after; collapse destroys
+   * the list, so its offset is parked here to survive the collapsed intermediate renders and is
+   * restored when the list reappears (#443). Session-transient, like the detached-window scroll.
+   */
+  collapsibleListScrollTops: Map<string, number>;
 }
 
 interface FocusedTextControlSnapshot {
@@ -87,6 +94,15 @@ const SCROLL_SNAPSHOT_SELECTORS = [
   // the list back to the top and the user loses their place (#425).
   '.image-trail-panel__history-section .image-trail-panel__record-list',
 ] as const;
+
+// The record-lists that can be collapsed away (Recents, Queue). Their scroll offset is parked in
+// `PanelLayoutState` so it survives the collapse round-trip, where the list element is absent from
+// the DOM and the plain scroll snapshot cannot bridge it (#443).
+const COLLAPSIBLE_LIST_SELECTORS = [
+  '.image-trail-panel__history-section .image-trail-panel__record-list',
+  '.image-trail-panel__bookmarks-section .image-trail-panel__record-list',
+] as const;
+
 const DRAWER_GAP = 8;
 const DRAWER_EDGE_PADDING = 12;
 const DRAWER_INLINE_SIZE = 340;
@@ -231,7 +247,7 @@ function restoreFocusedTextControl(target: PanelRenderTarget, snapshot: FocusedT
   });
 }
 
-function scrollSnapshots(root: HTMLElement, scrollAnchorId?: string | null): readonly ScrollSnapshot[] {
+function scrollSnapshots(root: HTMLElement, layoutState: PanelLayoutState, scrollAnchorId?: string | null): readonly ScrollSnapshot[] {
   const snapshots: ScrollSnapshot[] = [
     { selector: null, scrollTop: root.scrollTop, scrollLeft: root.scrollLeft, anchor: scrollAnchor(root, scrollAnchorId) },
   ];
@@ -240,10 +256,17 @@ function scrollSnapshots(root: HTMLElement, scrollAnchorId?: string | null): rea
     if (!element) continue;
     snapshots.push({ selector, scrollTop: element.scrollTop, scrollLeft: element.scrollLeft, anchor: visibleScrollAnchor(element) });
   }
+  // Park each collapsible list's live offset so a subsequent collapse-then-expand can restore it
+  // even though the list is absent from the DOM in between (#443).
+  for (const selector of COLLAPSIBLE_LIST_SELECTORS) {
+    const element = root.querySelector<HTMLElement>(selector);
+    if (element) layoutState.collapsibleListScrollTops.set(selector, element.scrollTop);
+  }
   return snapshots;
 }
 
-function restoreScrollSnapshots(root: HTMLElement, snapshots: readonly ScrollSnapshot[]): void {
+function restoreScrollSnapshots(root: HTMLElement, snapshots: readonly ScrollSnapshot[], layoutState: PanelLayoutState): void {
+  const snapshotSelectors = new Set(snapshots.map((snapshot) => snapshot.selector));
   const restore = (): void => {
     for (const snapshot of snapshots) {
       const element = snapshot.selector ? root.querySelector<HTMLElement>(snapshot.selector) : root;
@@ -251,6 +274,16 @@ function restoreScrollSnapshots(root: HTMLElement, snapshots: readonly ScrollSna
       element.scrollTop = snapshot.scrollTop;
       element.scrollLeft = snapshot.scrollLeft;
       restoreScrollAnchor(element, snapshot.anchor);
+    }
+    // A just-reappeared collapsible list has no live snapshot (it was absent when this render's
+    // snapshot was taken). Seed its offset from the parked value so re-expand keeps the reader's
+    // place instead of jumping to the top (#443).
+    for (const selector of COLLAPSIBLE_LIST_SELECTORS) {
+      if (snapshotSelectors.has(selector)) continue;
+      const remembered = layoutState.collapsibleListScrollTops.get(selector);
+      if (remembered === undefined) continue;
+      const element = root.querySelector<HTMLElement>(selector);
+      if (element) element.scrollTop = remembered;
     }
   };
 
@@ -298,7 +331,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
   }
 
   const focusedTextControl = focusedTextControlSnapshot(target.root);
-  const scrollPositions = scrollSnapshots(target.root, target.scrollAnchorId);
+  const scrollPositions = scrollSnapshots(target.root, target.layoutState, target.scrollAnchorId);
   const statusView = target.root.querySelector<HTMLElement>('.image-trail-panel__status-section');
 
   target.root.replaceChildren();
@@ -308,7 +341,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
     createStatusView(state, target.dispatch, statusView),
     ...attachedSectionElements(SECTIONS, target, state),
   );
-  restoreScrollSnapshots(target.root, scrollPositions);
+  restoreScrollSnapshots(target.root, scrollPositions, target.layoutState);
   // Detached windows render before the focus restore so a control inside one can be re-found.
   renderDetachedSections(target, state, SECTIONS);
   restoreFocusedTextControl(target, focusedTextControl);

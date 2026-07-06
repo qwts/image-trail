@@ -182,6 +182,7 @@ test('a viewport narrower than the drawer clamps the inline width inside the edg
         fieldDisplayModes: new Map(),
         detachedWindowPositions: new Map(),
         detachedWindowMinimized: new Set(),
+        collapsibleListScrollTops: new Map(),
       },
     };
     const state = {

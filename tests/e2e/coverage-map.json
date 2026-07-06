@@ -598,6 +598,16 @@
           "type": "playwright-e2e",
           "path": "tests/e2e/recents-queue-recall.spec.ts",
           "notes": "Covers #438/#441 end to end with geometry pins: single-row header (hint shares the row), the far-right hint area and heading side both toggle, header actions stay usable while collapsed (pinning while the queue is collapsed works), and toolbar clicks do not toggle."
+        },
+        {
+          "type": "unit-dom",
+          "paths": ["tests/dom/detachable-section.test.ts"],
+          "notes": "Covers #443: collapsing a Recents/Queue section parks its list scrollTop in PanelLayoutState (the list leaves the DOM, so the plain scroll snapshot cannot bridge it) and re-expanding restores the offset; an open list still follows its live snapshot across ordinary re-renders rather than a stale parked value."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/recents-queue-recall.spec.ts",
+          "notes": "Covers #443 end to end with real layout: scroll an overflowing Recents list, Hide then Show, and assert the rebuilt list reopens at the pre-collapse scrollTop instead of jumping to the top."
         }
       ]
     },

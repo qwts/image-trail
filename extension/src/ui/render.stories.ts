@@ -115,6 +115,7 @@ function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
     fieldDisplayModes: new Map(),
     detachedWindowPositions: new Map([['settings', { left: 420, top: 16 }]]),
     detachedWindowMinimized: new Set(),
+    collapsibleListScrollTops: new Map(),
   };
   wrapper.append(host, detachedRoot);
 
@@ -151,6 +152,7 @@ function panelLayoutStory(overrides: Partial<PanelState> = {}): HTMLElement {
     fieldDisplayModes: new Map(),
     detachedWindowPositions: new Map(),
     detachedWindowMinimized: new Set(),
+    collapsibleListScrollTops: new Map(),
   };
 
   renderPanel(

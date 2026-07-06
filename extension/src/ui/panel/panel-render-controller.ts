@@ -61,6 +61,7 @@ export class PanelRenderController {
     fieldDisplayModes: new Map(),
     detachedWindowPositions: new Map(),
     detachedWindowMinimized: new Set(),
+    collapsibleListScrollTops: new Map(),
   };
 
   constructor(private readonly deps: PanelRenderControllerDeps) {}
