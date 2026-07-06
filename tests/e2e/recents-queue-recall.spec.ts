@@ -342,3 +342,29 @@ test('select-all scopes export to visible Recents, visible queue rows, and loade
   await setVisiblePins(page, '30', 3);
   await deleteAllDurableQueueRows(page);
 });
+
+test('selecting a recent row keeps the recents list scroll position (#425)', async ({ page, serviceWorker }) => {
+  await openPanel(page, serviceWorker);
+  await deleteVisibleRecents(page);
+  await setVisibleRecents(page, { limit: '6', overflow: 'Drop oldest' });
+
+  // Five distinct URLs (same image) overflow the three-row default list height so it can scroll.
+  for (let index = 1; index <= 5; index += 1) {
+    await applyUrlInEditor(page, `${fixtureUrl(fixtureAssetPaths.assetOne)}?scroll=${index}`);
+    await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(index);
+  }
+
+  const list = page.locator('.image-trail-panel__history-section .image-trail-panel__record-list');
+  await list.evaluate((element) => {
+    element.scrollTop = 40;
+  });
+  const target = page.locator('.image-trail-panel__history-item').nth(2);
+  await target.scrollIntoViewIfNeeded();
+  const scrolled = await list.evaluate((element) => element.scrollTop);
+  expect(scrolled).toBeGreaterThan(0);
+
+  // Selecting a row rerenders the whole panel; the list must come back at the same offset.
+  await target.click();
+  await expect(page.locator('.image-trail-panel__history-item.is-selected')).toHaveCount(1);
+  await expect.poll(async () => list.evaluate((element) => element.scrollTop)).toBe(scrolled);
+});
