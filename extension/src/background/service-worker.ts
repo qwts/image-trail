@@ -110,6 +110,7 @@ import { createGalleryMessageRegistry } from './handlers/gallery-page-handler.js
 import { createPCloudMessageRegistry } from './handlers/pcloud-handlers.js';
 import { createUrlTemplateMessageRegistry } from './handlers/url-template-handlers.js';
 import { normalizeHostname } from './handlers/hostname.js';
+import { createRuntimeLibraryChangeNotifier } from './library-change-notifier.js';
 import type { ServiceWorkerContext } from './service-worker-context.js';
 import { createShortcutActionMessage } from './shortcut-action-message.js';
 
@@ -138,6 +139,7 @@ const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
 const urlReviewStatusStore = new IndexedDbUrlReviewStatusStore();
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
 const recentHistoryCache = new RecentHistoryCache();
+const notifyLibraryChange = createRuntimeLibraryChangeNotifier(chrome.runtime);
 
 /** Composition-root context handed to extracted handler modules; see {@link ServiceWorkerContext}. */
 const context: ServiceWorkerContext = {
@@ -882,7 +884,7 @@ const messageRegistry = {
     fallback: () => createLoadBuildIdentityResultMessage({ ok: false, identity: null, message: 'Build identity could not be loaded.' }),
   }),
   ...createGalleryMessageRegistry(),
-  ...createAlbumMessageRegistry({ albumStore }),
+  ...createAlbumMessageRegistry({ albumStore, notifyLibraryChange }),
   [MessageType.CaptureImage]: defineMessage({
     requestSchema: requestSchemas.captureImageRequestSchema,
     handle: (message: CaptureImageMessage) => handleCaptureImage(message),
@@ -913,7 +915,7 @@ const messageRegistry = {
     respond: (result) => createStorageUsageResponseMessage(result),
     fallback: () => createStorageUsageResponseMessage({ totalBytes: 0, blobCount: 0 }),
   }),
-  ...createBookmarkMessageRegistry({ bookmarkStore }),
+  ...createBookmarkMessageRegistry({ bookmarkStore, notifyLibraryChange }),
   ...createRecentHistoryMessageRegistry(context),
   ...createRecallMessageRegistry(context),
   ...createPanelPositionMessageRegistry(context),

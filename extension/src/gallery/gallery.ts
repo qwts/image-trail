@@ -13,6 +13,7 @@ import { GALLERY_PAGE_LIMITS } from '../core/settings.js';
 import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, type PlaintextLocalSettings } from '../data/local-settings.js';
 import { galleryAlbumSummaries, galleryListStore, missingAlbumRecordCount, selectedGalleryAlbum } from './gallery-albums.js';
 import { openActionForGalleryRecord } from './gallery-model.js';
+import { installGalleryLibraryRefreshHook } from './gallery-refresh.js';
 import { type GallerySearchPage, loadGallerySearchPage } from './gallery-search-loader.js';
 import { createGalleryView, type GalleryViewState } from './gallery-view.js';
 
@@ -20,6 +21,7 @@ const bookmarkStore = new ExtensionBookmarkStore();
 const albumStore = new ExtensionAlbumStore();
 const captureStore = new CaptureController();
 const SEARCH_DEBOUNCE_MS = 500;
+const LIBRARY_REFRESH_DEBOUNCE_MS = 150;
 
 let state: GalleryViewState = {
   items: [],
@@ -90,12 +92,18 @@ function render(options: { readonly focusSearch?: boolean } = {}): void {
   if (options.focusSearch) focusSearchInput();
 }
 
-async function loadPage(offset: number, options: { readonly focusSearch?: boolean; readonly message?: string } = {}): Promise<void> {
+async function loadPage(
+  offset: number,
+  options: { readonly focusSearch?: boolean; readonly message?: string; readonly silent?: boolean } = {},
+): Promise<void> {
   const generation = (loadGeneration += 1);
   const searchQuery = state.searchQuery;
   const selectedAlbumId = state.selectedAlbumId;
-  state = { ...state, loading: true, message: null };
-  render(options);
+  const previousMessage = state.message;
+  if (!options.silent) {
+    state = { ...state, loading: true, message: null };
+    render(options);
+  }
 
   try {
     const [settings, blobKeyStatus, albumSnapshot] = await Promise.all([
@@ -121,14 +129,18 @@ async function loadPage(offset: number, options: { readonly focusSearch?: boolea
       hasOlder: pageResult.page.hasOlder,
       hasNewer: pageResult.page.hasNewer,
       loading: false,
-      message: options.message ?? null,
+      message: options.message ?? (options.silent ? previousMessage : null),
       blobKeyUnlocked: blobKeyStatus.unlocked,
       privacyMode: settings.privacyModeEnabled,
       ...albumMenuStateFor(albums),
     };
   } catch {
     if (generation !== loadGeneration) return;
-    state = { ...state, loading: false, message: 'Gallery could not load durable records.' };
+    state = {
+      ...state,
+      loading: false,
+      message: options.silent ? previousMessage : 'Gallery could not load durable records.',
+    };
   }
   render(options);
 }
@@ -343,6 +355,12 @@ async function showPreviewResult(preview: Promise<Awaited<ReturnType<CaptureCont
 
 document.addEventListener('DOMContentLoaded', () => {
   installSettingsRefreshHooks();
+  installGalleryLibraryRefreshHook({
+    runtime: typeof chrome === 'undefined' ? undefined : chrome.runtime,
+    window,
+    debounceMs: LIBRARY_REFRESH_DEBOUNCE_MS,
+    refresh: () => loadPage(state.offset, { silent: true }),
+  });
   render();
   void loadPage(0);
 });

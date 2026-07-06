@@ -1,5 +1,6 @@
 import * as v from 'valibot';
 import type { IndexedDbAlbumStore } from '../../data/albums-controller.js';
+import { noopLibraryChangeNotifier, type LibraryChangeNotifier } from '../library-change-notifier.js';
 import { defineMessage, type MessageDef } from '../message-dispatch.js';
 import {
   MessageType,
@@ -36,6 +37,7 @@ export interface AlbumHandlerDeps {
     IndexedDbAlbumStore,
     'listSnapshot' | 'createAlbum' | 'renameAlbum' | 'deleteAlbum' | 'addRecords' | 'removeRecord' | 'importBackupEntries'
   >;
+  readonly notifyLibraryChange?: LibraryChangeNotifier;
 }
 
 const albumNameSchema = v.object({ name: v.string() });
@@ -57,6 +59,7 @@ const importAlbumBackupSchema = v.object({
 
 export function createAlbumMessageRegistry({
   albumStore,
+  notifyLibraryChange = noopLibraryChangeNotifier,
 }: AlbumHandlerDeps): Record<AlbumRequestType, MessageDef<ExtensionRequest, ExtensionResponse>> {
   return {
     [MessageType.LoadAlbums]: defineMessage({
@@ -69,6 +72,7 @@ export function createAlbumMessageRegistry({
       requestSchema: albumNameSchema,
       handle: async (message: CreateAlbumMessage) => {
         const album = await albumStore.createAlbum(message.payload.name);
+        if (album) notifyLibraryChange({ topic: 'albums', reason: 'album-created', albumIds: [album.id] });
         return album ? { ok: true as const, album } : { ok: false as const, message: 'Album could not be created.' };
       },
       respond: (result) => createCreateAlbumResultMessage(result),
@@ -78,6 +82,7 @@ export function createAlbumMessageRegistry({
       requestSchema: renameAlbumSchema,
       handle: async (message: RenameAlbumMessage) => {
         const album = await albumStore.renameAlbum(message.payload.albumId, message.payload.name);
+        if (album) notifyLibraryChange({ topic: 'albums', reason: 'album-renamed', albumIds: [album.id] });
         return album ? { ok: true as const, album } : { ok: false as const, message: 'Album could not be renamed.' };
       },
       respond: (result) => createRenameAlbumResultMessage(result),
@@ -85,38 +90,80 @@ export function createAlbumMessageRegistry({
     }),
     [MessageType.DeleteAlbum]: defineMessage({
       requestSchema: albumIdSchema,
-      handle: async (message: DeleteAlbumMessage) => ({ ok: await albumStore.deleteAlbum(message.payload.albumId) }),
+      handle: async (message: DeleteAlbumMessage) => {
+        const ok = await albumStore.deleteAlbum(message.payload.albumId);
+        if (ok) notifyLibraryChange({ topic: 'albums', reason: 'album-deleted', albumIds: [message.payload.albumId] });
+        return { ok };
+      },
       respond: (result) => createDeleteAlbumResultMessage(result),
       fallback: () => createDeleteAlbumResultMessage({ ok: false }),
     }),
     [MessageType.AddAlbumRecords]: defineMessage({
       requestSchema: addAlbumRecordsSchema,
-      handle: async (message: AddAlbumRecordsMessage) => ({
-        ok: true as const,
-        memberships: await albumStore.addRecords(message.payload.albumId, message.payload.recordIds),
-      }),
+      handle: (message: AddAlbumRecordsMessage) => handleAddAlbumRecords(albumStore, notifyLibraryChange, message),
       respond: (result) => createAddAlbumRecordsResultMessage(result),
       fallback: () => createAddAlbumRecordsResultMessage({ ok: false, message: 'Record could not be added to the album.' }),
     }),
     [MessageType.RemoveAlbumRecord]: defineMessage({
       requestSchema: removeAlbumRecordSchema,
-      handle: async (message: RemoveAlbumRecordMessage) => ({
-        ok: await albumStore.removeRecord(message.payload.albumId, message.payload.recordId),
-      }),
+      handle: (message: RemoveAlbumRecordMessage) => handleRemoveAlbumRecord(albumStore, notifyLibraryChange, message),
       respond: (result) => createRemoveAlbumRecordResultMessage(result),
       fallback: () => createRemoveAlbumRecordResultMessage({ ok: false }),
     }),
     [MessageType.ImportAlbumBackup]: defineMessage({
       requestSchema: importAlbumBackupSchema,
-      handle: async (message: ImportAlbumBackupMessage) => ({
-        ok: true as const,
-        ...(await albumStore.importBackupEntries(
-          message.payload.albums,
-          new Map(message.payload.recordIdMap.map((entry) => [entry.sourceId, entry.targetId])),
-        )),
-      }),
+      handle: (message: ImportAlbumBackupMessage) => handleImportAlbumBackup(albumStore, notifyLibraryChange, message),
       respond: (result) => createImportAlbumBackupResultMessage(result),
       fallback: () => createImportAlbumBackupResultMessage({ ok: false, message: 'Album backup could not be imported.' }),
     }),
   };
+}
+
+async function handleAddAlbumRecords(
+  albumStore: AlbumHandlerDeps['albumStore'],
+  notifyLibraryChange: LibraryChangeNotifier,
+  message: AddAlbumRecordsMessage,
+) {
+  const memberships = await albumStore.addRecords(message.payload.albumId, message.payload.recordIds);
+  if (memberships.length > 0) {
+    notifyLibraryChange({
+      topic: 'albums',
+      reason: 'album-records-added',
+      albumIds: [message.payload.albumId],
+      recordIds: memberships.map((membership) => membership.recordId),
+    });
+  }
+  return { ok: true as const, memberships };
+}
+
+async function handleRemoveAlbumRecord(
+  albumStore: AlbumHandlerDeps['albumStore'],
+  notifyLibraryChange: LibraryChangeNotifier,
+  message: RemoveAlbumRecordMessage,
+) {
+  const ok = await albumStore.removeRecord(message.payload.albumId, message.payload.recordId);
+  if (ok) {
+    notifyLibraryChange({
+      topic: 'albums',
+      reason: 'album-record-removed',
+      albumIds: [message.payload.albumId],
+      recordIds: [message.payload.recordId],
+    });
+  }
+  return { ok };
+}
+
+async function handleImportAlbumBackup(
+  albumStore: AlbumHandlerDeps['albumStore'],
+  notifyLibraryChange: LibraryChangeNotifier,
+  message: ImportAlbumBackupMessage,
+) {
+  const result = await albumStore.importBackupEntries(
+    message.payload.albums,
+    new Map(message.payload.recordIdMap.map((entry) => [entry.sourceId, entry.targetId])),
+  );
+  if (result.importedAlbumCount > 0 || result.importedMembershipCount > 0) {
+    notifyLibraryChange({ topic: 'albums', reason: 'album-backup-imported' });
+  }
+  return { ok: true as const, ...result };
 }
