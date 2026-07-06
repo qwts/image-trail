@@ -80,6 +80,9 @@ const SCROLL_SNAPSHOT_SELECTORS = [
   // The attached Settings section is a fixed-height scroll region (#367); without a snapshot every
   // settings form apply would rerender it back to scrollTop 0.
   '.image-trail-panel__settings-section',
+  // The recents list is a bounded scroll region too; without a snapshot, selecting a row rerenders
+  // the list back to the top and the user loses their place (#425).
+  '.image-trail-panel__history-section .image-trail-panel__record-list',
 ] as const;
 const DRAWER_GAP = 8;
 const DRAWER_EDGE_PADDING = 12;

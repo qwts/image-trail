@@ -131,6 +131,11 @@
       "coverage": [
         {
           "type": "playwright-e2e",
+          "path": "tests/e2e/recents-queue-recall.spec.ts",
+          "notes": "Covers #425: the recents list participates in the render scroll snapshot, so selecting a row (which rerenders the panel) keeps the list's scroll position."
+        },
+        {
+          "type": "playwright-e2e",
           "path": "tests/e2e/settings-layout-stability.spec.ts",
           "notes": "Covers #367: the attached Settings section is a layout-reserved scroll region, so expanding/collapsing settings groups keeps the clicked summary and the sections below Settings stationary, and the region's scroll position survives the rerender caused by applying a setting."
         },
