@@ -16,7 +16,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
-          "notes": "Covers Chromium command registration for the build-info overlay toggle and assignable Image Trail action commands via chrome.commands.getAll, hidden-panel browser shortcut no-op behavior, plus the Settings checkbox that hides/shows the overlay."
+          "notes": "Covers Chromium command registration for the build-info overlay toggle and assignable Image Trail action commands via chrome.commands.getAll, hidden-panel browser shortcut no-op behavior, plus the Settings checkbox that hides/shows the overlay and verifies selectable overlay values without blocking outside-page clicks."
         },
         {
           "type": "unit-dom",

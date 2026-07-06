@@ -126,7 +126,44 @@ test('surfaces the build-info overlay toggle in Settings', async ({ page, servic
   const toggle = page.getByLabel('Show build info overlay');
   await expect(toggle).toBeVisible();
   await toggle.check();
-  await expect(page.locator('#image-trail-build-identity-overlay')).toHaveCount(1);
+  const overlayHost = page.locator('#image-trail-build-identity-overlay');
+  await expect(overlayHost).toHaveCount(1);
+  await expect(overlayHost).toHaveCSS('pointer-events', 'auto');
+
+  const overlay = overlayHost.locator('.image-trail-build-overlay');
+  await expect(overlay).toHaveCSS('pointer-events', 'auto');
+  await expect(overlay).toHaveCSS('user-select', 'text');
+
+  const details = overlay.locator('.image-trail-build-overlay__details');
+  const detailsText = ((await details.textContent()) ?? '').trim();
+  expect(detailsText).toContain('Version:');
+  expect(detailsText).toContain('Mode:');
+  expect(detailsText).toContain('Built UTC:');
+  const detailsBox = await details.boundingBox();
+  if (!detailsBox) throw new Error('Build-info overlay details were not visible for selection.');
+  await page.mouse.move(detailsBox.x + 2, detailsBox.y + 2);
+  await page.mouse.down();
+  await page.mouse.move(detailsBox.x + detailsBox.width - 2, detailsBox.y + detailsBox.height - 2, { steps: 12 });
+  await page.mouse.up();
+  const selectedText = (await page.evaluate(() => getSelection()?.toString() ?? '')).trim();
+  expect(selectedText).toContain('Version:');
+  expect(selectedText).toContain('Mode:');
+  expect(selectedText).toContain('Built UTC:');
+
+  await page.evaluate(() => {
+    document.body.dataset['imageTrailOutsideOverlayClick'] = 'pending';
+    document.body.addEventListener(
+      'click',
+      () => {
+        document.body.dataset['imageTrailOutsideOverlayClick'] = 'received';
+      },
+      { once: true },
+    );
+  });
+  const overlayBox = await overlay.boundingBox();
+  if (!overlayBox) throw new Error('Build-info overlay was not visible for outside-click check.');
+  await page.mouse.click(Math.max(8, overlayBox.x - 8), overlayBox.y + 8);
+  await expect(page.locator('body')).toHaveAttribute('data-image-trail-outside-overlay-click', 'received');
 
   await toggle.uncheck();
   await expect(page.locator('#image-trail-build-identity-overlay')).toHaveCount(0);

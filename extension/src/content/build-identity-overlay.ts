@@ -46,7 +46,7 @@ export class BuildIdentityOverlay {
     host.style.top = '12px';
     host.style.right = '12px';
     host.style.zIndex = '2147483647';
-    host.style.pointerEvents = 'none';
+    host.style.pointerEvents = 'auto';
 
     const shadow = host.attachShadow({ mode: 'open' });
     shadow.append(createStyles(), createOverlayContent(buildIdentity));
@@ -65,16 +65,13 @@ function createOverlayContent(buildIdentity: BuildIdentity): HTMLElement {
   const heading = document.createElement('h2');
   heading.textContent = 'Image Trail build';
 
-  const rows = document.createElement('dl');
-  for (const row of buildIdentityRows(buildIdentity)) {
-    const label = document.createElement('dt');
-    label.textContent = row.label;
-    const value = document.createElement('dd');
-    value.textContent = row.value;
-    rows.append(label, value);
-  }
+  const details = document.createElement('pre');
+  details.className = 'image-trail-build-overlay__details';
+  details.textContent = buildIdentityRows(buildIdentity)
+    .map((row) => `${row.label}: ${row.value}`)
+    .join('\n');
 
-  wrapper.append(heading, rows);
+  wrapper.append(heading, details);
   return wrapper;
 }
 
@@ -104,6 +101,10 @@ function createStyles(): HTMLStyleElement {
       font-size: 12px;
       line-height: 1.35;
       overflow-wrap: anywhere;
+      pointer-events: auto;
+      user-select: text;
+      -webkit-user-select: text;
+      cursor: text;
     }
 
     h2 {
@@ -113,22 +114,13 @@ function createStyles(): HTMLStyleElement {
       letter-spacing: 0;
     }
 
-    dl {
-      display: grid;
-      grid-template-columns: max-content minmax(0, 1fr);
-      gap: 4px 10px;
+    .image-trail-build-overlay__details {
       margin: 0;
-    }
-
-    dt {
-      color: #cbd5e1;
-      font-weight: 600;
-    }
-
-    dd {
-      margin: 0;
+      white-space: pre-wrap;
       color: #f8fafc;
       font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+      user-select: text;
+      -webkit-user-select: text;
     }
   `;
   return style;
