@@ -235,7 +235,7 @@ test('gallery limit form accepts zero as unlimited', () => {
   assert.ok(input);
   assert.equal(input.value, '0');
   input.value = '24';
-  input.form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  buttonByText(view, 'Apply').click();
 
   assert.deepEqual(limits, [24]);
   assert.match(view.textContent ?? '', /0 shows all/u);

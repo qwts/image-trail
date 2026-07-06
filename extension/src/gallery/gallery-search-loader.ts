@@ -1,7 +1,7 @@
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { galleryRecordMatchesSearch, normalizeGallerySearchQuery } from './gallery-search.js';
 
-export const GALLERY_SCAN_CHUNK_LIMIT = 100;
+const ALL_GALLERY_RECORDS_LIMIT = Number.MAX_SAFE_INTEGER;
 
 export interface GallerySearchPage {
   readonly items: readonly ImageDisplayRecord[];
@@ -32,16 +32,8 @@ export async function loadGallerySearchPage(input: {
   const query = normalizeGallerySearchQuery(input.query);
   if (!query && limit > 0) return input.store.loadPage({ offset, limit, scope: 'global' });
 
-  const matches: ImageDisplayRecord[] = [];
-  let sourceOffset = 0;
-  for (;;) {
-    const page = await input.store.loadPage({ offset: sourceOffset, limit: GALLERY_SCAN_CHUNK_LIMIT, scope: 'global' });
-    for (const record of page.items) {
-      if (galleryRecordMatchesSearch(record, query, { privacyMode: input.privacyMode })) matches.push(record);
-    }
-    if (!page.hasOlder || page.items.length === 0) break;
-    sourceOffset = page.offset + page.items.length;
-  }
+  const source = await input.store.loadPage({ offset: 0, limit: ALL_GALLERY_RECORDS_LIMIT, scope: 'global' });
+  const matches = source.items.filter((record) => galleryRecordMatchesSearch(record, query, { privacyMode: input.privacyMode }));
 
   const items = limit === 0 ? matches : matches.slice(offset, offset + limit);
   return {

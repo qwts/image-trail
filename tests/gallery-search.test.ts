@@ -48,6 +48,7 @@ test('gallery search matches durable metadata without encrypted blob identifiers
 
 test('gallery search hides URL and label terms while privacy mode is active', () => {
   assert.equal(galleryRecordMatchesSearch(records[0]!, 'mars', { privacyMode: true }), false);
+  assert.equal(galleryRecordMatchesSearch(records[0]!, 'jpg', { privacyMode: true }), false);
   assert.equal(galleryRecordMatchesSearch(records[0]!, 'private image', { privacyMode: true }), true);
 });
 
@@ -87,9 +88,29 @@ test('gallery search treats zero limit as unlimited results', async () => {
   assert.equal(page.hasOlder, false);
 });
 
-function pagedStore(items: readonly ImageDisplayRecord[]) {
+test('gallery search scans the durable list once per query', async () => {
+  const calls: { readonly offset: number; readonly limit: number }[] = [];
+  const page = await loadGallerySearchPage({
+    store: pagedStore(records, calls),
+    query: 'example',
+    offset: 1,
+    limit: 1,
+    privacyMode: false,
+  });
+
+  assert.deepEqual(
+    page.items.map((record) => record.id),
+    ['b'],
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.offset, 0);
+  assert.equal(calls[0]?.limit, Number.MAX_SAFE_INTEGER);
+});
+
+function pagedStore(items: readonly ImageDisplayRecord[], calls: { readonly offset: number; readonly limit: number }[] = []) {
   return {
     async loadPage(input: { readonly offset: number; readonly limit: number }) {
+      calls.push(input);
       const pageItems = items.slice(input.offset, input.offset + input.limit);
       return {
         items: pageItems,
