@@ -130,6 +130,16 @@
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
           "notes": "Covers #429 end to end: ok load, 404 load (draft parks on the dead URL), double-click a recent \u2014 the projection lands and the URL editor shows the projected record's URL, not the failed draft."
+        },
+        {
+          "type": "unit-dom",
+          "paths": ["tests/dom/projection-application-controller.test.ts"],
+          "notes": "Covers #434: plain-URL record previews load through the applySelectedUrl pipeline (record-preview session, projection order, field-state persistence) and reset stale failed/active field markers and the failed draft from the previous URL."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
+          "notes": "Covers #434 end to end: step a field into a mocked 404 (field row shows the failed marker), double-click an earlier recent \u2014 the projection lands, the URL editor follows the record, and no field renders the failed marker."
         }
       ]
     },
