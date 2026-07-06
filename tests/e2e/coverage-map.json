@@ -32,6 +32,16 @@
           "type": "storybook",
           "path": "extension/src/ui/components/shortcut-settings-view.stories.ts",
           "notes": "Covers the shortcut reference at standard and narrow panel widths with row overflow assertions."
+        },
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom/parsed-field-navigation-controller.test.ts",
+            "tests/parsed-field-navigation-controller.test.ts",
+            "tests/dom/field-editor-controller.test.ts",
+            "tests/dom/panel-render-controller.test.ts"
+          ],
+          "notes": "Covers #373 bounded manual navigation (latest wins): a rapid press burst coalesces into one net jump, cancelQueuedManualNavigation drops queued presses on Escape/Stop, a long governor wait abandons manual-only intent with a visible message, parsed-field +/- bursts fold into one net transform (a +/- pair loads nothing, interleaved interactions preserve order), the navigationBusy waiting state toggles around the drain, and an unchanged status toast is not rebuilt across renders so stale messages cannot replay their enter animation."
         }
       ]
     },
