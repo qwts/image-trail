@@ -47,6 +47,23 @@
   list-style: none;
 }
 
+/* Reset all sits against the fixed right-hand detach/hint columns (#430): it takes over the
+   summary's SINGLE auto margin (two autos would split the free space and strand controls
+   mid-bar), so the detach control's auto is zeroed only when Reset all is present, and in a
+   detached window (no control) the hint's auto is zeroed the same way. */
+.image-trail-panel-root .image-trail-panel__fields-summary .image-trail-panel__fields-reset-all {
+  margin-inline-start: auto;
+}
+
+.image-trail-panel-root .image-trail-panel__fields-summary:has(.image-trail-panel__fields-reset-all) .image-trail-panel__section-detach {
+  margin-inline-start: 0;
+}
+
+.image-trail-panel-root
+  .image-trail-panel__fields-summary:has(.image-trail-panel__fields-reset-all):not(:has(.image-trail-panel__section-detach))::after {
+  margin-inline-start: 0;
+}
+
 .image-trail-panel-root .image-trail-panel__fields-reset-all {
   min-height: 24px;
   padding: 0 7px;
