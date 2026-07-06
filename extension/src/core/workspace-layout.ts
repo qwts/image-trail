@@ -10,7 +10,7 @@
  * Every major section is eligible; keep entries aligned with the section registry in
  * `ui/render.ts` (`SECTIONS`), which is the single place a section is declared detachable.
  */
-export const DETACHABLE_SECTION_IDS = ['settings', 'url-editor', 'target', 'fields', 'controls', 'history', 'bookmarks'] as const;
+export const DETACHABLE_SECTION_IDS = ['settings', 'help', 'url-editor', 'target', 'fields', 'controls', 'history', 'bookmarks'] as const;
 export type DetachableSectionId = (typeof DETACHABLE_SECTION_IDS)[number];
 
 export interface PanelPosition {

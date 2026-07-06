@@ -89,6 +89,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
       connectionState: 'disconnected',
     },
     settingsOpen: false,
+    helpOpen: false,
     automation: EMPTY_AUTOMATION_STATE,
     recall: EMPTY_RECALL_STATE,
     selectedHistoryIds: [],

@@ -230,6 +230,7 @@ export interface PanelState {
   readonly importRestorePreview?: ImportRestorePreviewState | undefined;
   readonly pcloudBackup: PCloudBackupState;
   readonly settingsOpen: boolean;
+  readonly helpOpen: boolean;
   readonly automation: AutomationState;
   readonly recall: RecallState;
   readonly selectedHistoryIds: readonly string[];
@@ -331,6 +332,7 @@ export type PanelActionName =
   | 'bookmarks/reload'
   | 'bookmarks/refresh-thumbnails'
   | 'settings/toggle'
+  | 'help/toggle'
   | 'settings/update-visible-bookmark-soft-max'
   | 'settings/update-recent-history-retention'
   | 'settings/update-pin-save-storage-preference'

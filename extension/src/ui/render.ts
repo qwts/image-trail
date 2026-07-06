@@ -6,6 +6,7 @@ import { createBookmarksView } from './components/bookmarks-view.js';
 import { createControlsView } from './components/controls-view.js';
 import type { DetachedWindowPosition } from './components/detachable-section.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
+import { createHelpView } from './components/help-view.js';
 import { createHistoryView } from './components/history-view.js';
 import { createRecallDrawerView, type RecallDrawerGeometry } from './components/recall-drawer-view.js';
 import { createSettingsSection } from './settings-section.js';
@@ -80,6 +81,8 @@ const SCROLL_SNAPSHOT_SELECTORS = [
   // The attached Settings section is a fixed-height scroll region (#367); without a snapshot every
   // settings form apply would rerender it back to scrollTop 0.
   '.image-trail-panel__settings-section',
+  // The Help section shares the fixed-height scroll-region pattern (#352).
+  '.image-trail-panel__help-section',
   // The recents list is a bounded scroll region too; without a snapshot, selecting a row rerenders
   // the list back to the top and the user loses their place (#425).
   '.image-trail-panel__history-section .image-trail-panel__record-list',
@@ -144,6 +147,12 @@ function createPanelHeader(state: PanelState, target: PanelRenderTarget): HTMLEl
   settings.title = state.settingsOpen ? 'Hide settings' : 'Show settings';
   settings.setAttribute('aria-pressed', state.settingsOpen ? 'true' : 'false');
 
+  const help = makeButton('?', { name: 'help/toggle' }, target.dispatch);
+  help.className = 'image-trail-panel__icon-button';
+  help.setAttribute('aria-label', state.helpOpen ? 'Hide help' : 'Show help');
+  help.title = state.helpOpen ? 'Hide help' : 'Show help';
+  help.setAttribute('aria-pressed', state.helpOpen ? 'true' : 'false');
+
   const minimize = makeButton('-', { name: 'panel/minimize' }, target.dispatch);
   minimize.className = 'image-trail-panel__icon-button';
   minimize.setAttribute('aria-label', 'Minimize panel');
@@ -160,7 +169,7 @@ function createPanelHeader(state: PanelState, target: PanelRenderTarget): HTMLEl
   status.title = state.message.trim() || status.textContent;
   if (isPanelWaiting(state)) status.classList.add('is-waiting');
 
-  actions.append(settings, minimize, close);
+  actions.append(help, settings, minimize, close);
   header.append(heading, status, actions);
   return header;
 }
@@ -321,6 +330,13 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [
       const { fields, activeTemplate } = cachedActiveUrlFields(state);
       return createSettingsSection(state, { fields, activeTemplateId: activeTemplate?.id ?? state.activeUrlTemplateId }, target.dispatch);
     },
+  },
+  {
+    id: 'help',
+    title: 'Help',
+    windowInlineSize: 420,
+    visible: (state) => state.helpOpen,
+    create: () => createHelpView(),
   },
   {
     id: 'url-editor',

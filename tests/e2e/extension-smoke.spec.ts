@@ -115,6 +115,26 @@ test('ignores browser shortcut action messages while the panel is closed', async
   await expectPanelClosed(page);
 });
 
+test('the panel header Help toggle shows the shortcut reference and feature guide (#352)', async ({ page, serviceWorker }) => {
+  await openFixturePage(page, fixturePaths.singleImage);
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+
+  const helpToggle = page.getByRole('button', { name: 'Show help' });
+  await helpToggle.click();
+
+  const helpSection = page.locator('.image-trail-panel__help-section');
+  await expect(helpSection).toBeVisible();
+  await expect(helpSection.getByText('Panel shortcuts')).toBeVisible();
+  await expect(helpSection.getByText('Browser shortcuts')).toBeVisible();
+  await expect(helpSection.getByText('Feature guide')).toBeVisible();
+  await expect(helpSection.getByText('Next trail step')).toBeVisible();
+
+  // Keyboard access without a focus trap: the toggle is a plain button and focus stays usable.
+  await page.getByRole('button', { name: 'Hide help' }).click();
+  await expect(page.locator('.image-trail-panel__help-section')).toHaveCount(0);
+});
+
 test('surfaces the build-info overlay toggle in Settings', async ({ page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);

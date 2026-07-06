@@ -609,6 +609,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       };
     case 'settings/toggle':
       return { ...state, settingsOpen: !state.settingsOpen, lastUpdatedAt: Date.now() };
+    case 'help/toggle':
+      return { ...state, helpOpen: !state.helpOpen, lastUpdatedAt: Date.now() };
     case 'section/detach':
       if (state.detachedSections.includes(action.sectionId)) return state;
       return { ...state, detachedSections: [...state.detachedSections, action.sectionId], lastUpdatedAt: Date.now() };

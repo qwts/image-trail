@@ -233,6 +233,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'panel/minimize': { name: 'panel/minimize' },
   'panel/expand': { name: 'panel/expand' },
   'settings/toggle': { name: 'settings/toggle' },
+  'help/toggle': { name: 'help/toggle' },
   'settings/update-visible-bookmark-soft-max': { name: 'settings/update-visible-bookmark-soft-max', value: 10 },
   'settings/update-recent-history-retention': {
     name: 'settings/update-recent-history-retention',

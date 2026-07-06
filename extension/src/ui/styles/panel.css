@@ -990,6 +990,33 @@
   scrollbar-gutter: stable;
 }
 
+/* Help shares the Settings reserved scroll-region pattern (#352): a bounded box that scrolls
+   internally, so opening it never makes controls jump and its content cannot fight the queue for
+   space. Scoped to the attached panel; a detached Help window keeps its natural layout. */
+.image-trail-panel-root.image-trail-panel > .image-trail-panel__help-section {
+  block-size: min(420px, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.image-trail-panel-root .image-trail-panel__help-features {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__help-features dt {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.image-trail-panel-root .image-trail-panel__help-features dd {
+  margin: 0;
+  min-width: 0;
+}
+
 .image-trail-panel-root .image-trail-panel__settings-utility-summary {
   list-style: none;
   cursor: pointer;

@@ -646,6 +646,23 @@
           "notes": "Browser-level detach/restore: floating dialog + placeholder, minimize/expand, close-to-restore with focus hand-off, drag-out placement at the drop point, Escape restore, and detached Settings following the gear toggle without duplication; #408 adds heading-surface drag-out placement and Escape mid-drag cancel. #398 adds the reload round-trip: opt in, detach + drag + minimize, reload restores the arrangement at the saved position, and Reset workspace layout reattaches everything."
         }
       ]
+    },
+    {
+      "id": "in-panel-help-surface",
+      "acceptance": "In-panel Help surface for shortcuts, features, and settings (issue #352)",
+      "coverage": [
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/extension-smoke.spec.ts",
+          "notes": "Covers the header Help toggle: opening shows the shared shortcut reference (panel and browser groups) and the feature guide; closing removes the section without trapping focus."
+        },
+        {
+          "type": "unit-dom",
+          "paths": ["tests/dom/help-view.test.ts"],
+          "notes": "Covers help/toggle reduction, the shared shortcut registry rendering (labels come from the same source the keyboard router uses), feature-guide completeness for the major panel areas, and the privacy-inert static-copy guarantee (no URL or blob values in Help content)."
+        }
+      ],
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-In-Panel-Help"
     }
   ]
 }

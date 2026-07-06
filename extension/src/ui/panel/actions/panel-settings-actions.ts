@@ -8,6 +8,7 @@ export type PanelSettingsActionName =
   | 'panel/minimize'
   | 'panel/expand'
   | 'settings/toggle'
+  | 'help/toggle'
   | 'settings/update-visible-bookmark-soft-max'
   | 'settings/update-recent-history-retention'
   | 'settings/update-pin-save-storage-preference'
@@ -68,6 +69,12 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
         deps.reduce(action);
         deps.render();
         if (deps.getState().settingsOpen) void deps.refreshStorageUsage({ render: true });
+      },
+    },
+    'help/toggle': {
+      handle(action) {
+        deps.reduce(action);
+        deps.render();
       },
     },
     'settings/update-visible-bookmark-soft-max': {
