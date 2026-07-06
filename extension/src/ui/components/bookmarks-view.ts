@@ -55,24 +55,32 @@ export function createBookmarksView(
 
   const sectionOpen = options.sectionOpen !== false;
   const heading = document.createElement('h3');
-  const headingToggle = document.createElement('button');
-  headingToggle.type = 'button';
-  headingToggle.className = 'image-trail-panel__section-heading-toggle';
-  headingToggle.textContent = 'Queue';
-  headingToggle.setAttribute('aria-expanded', String(sectionOpen));
-  // The visible text stays the section name; the accessible name carries the action so assistive
-  // tech (and role-based tests) see what the button does.
-  headingToggle.setAttribute('aria-label', sectionOpen ? 'Hide the Queue list' : 'Show the Queue list');
-  headingToggle.title = sectionOpen ? 'Hide the Queue list' : 'Show the Queue list';
-  headingToggle.addEventListener('click', (event) => {
-    event.preventDefault();
-    dispatch({ name: 'panel/bookmarks-section-open', open: !sectionOpen });
-  });
-  heading.append(headingToggle);
+  heading.textContent = 'Queue';
   const header = document.createElement('div');
   header.className =
     'image-trail-panel__section-header image-trail-panel__section-header--with-actions image-trail-panel__section-header--collapsible';
   header.dataset['open'] = String(sectionOpen);
+  // Summary ergonomics (#441): the WHOLE header row is the toggle — hint area included — while
+  // clicks on its interactive children (toolbar buttons, queue menu, detach) pass through, and
+  // dragging the row still pops the section out (an engaged drag suppresses the click).
+  header.setAttribute('role', 'button');
+  header.tabIndex = 0;
+  header.setAttribute('aria-expanded', String(sectionOpen));
+  header.setAttribute('aria-label', sectionOpen ? 'Hide the Queue list' : 'Show the Queue list');
+  header.title = sectionOpen ? 'Hide the Queue list' : 'Show the Queue list';
+  const toggleSection = (): void => dispatch({ name: 'panel/bookmarks-section-open', open: !sectionOpen });
+  header.addEventListener('click', (event) => {
+    const target = event.target;
+    if (target instanceof Element && target.closest('button, summary, details, input, select, a')) return;
+    event.preventDefault();
+    toggleSection();
+  });
+  header.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target !== header) return;
+    event.preventDefault();
+    toggleSection();
+  });
   header.append(heading);
 
   const add = document.createElement('button');

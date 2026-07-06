@@ -121,11 +121,12 @@ export function attachSectionDragOut(sectionEl: HTMLElement, options: DragOutOpt
     if (event.button !== 0) return;
     const origin = event.target;
     if (!(origin instanceof Element)) return;
-    // The collapsible heading toggle (#438) doubles as the section's drag handle: engagement is
-    // movement-thresholded, and the onDragEnd click suppressor keeps a completed drag from also
-    // toggling the collapse — so a plain click still toggles and a drag still detaches.
-    const headingToggleOrigin = origin.closest('.image-trail-panel__section-heading-toggle');
-    if (!headingToggleOrigin && origin.closest(INTERACTIVE_DRAG_ORIGIN)) return;
+    // The collapsible header row (#441) has role=button for its toggle but is still the section's
+    // drag handle — engagement is movement-thresholded and the onDragEnd click suppressor keeps a
+    // completed drag from also toggling the collapse.
+    const collapsibleHeaderOrigin =
+      origin.closest('.image-trail-panel__section-header--collapsible') && !origin.closest('button, summary, details, input, select, a');
+    if (!collapsibleHeaderOrigin && origin.closest(INTERACTIVE_DRAG_ORIGIN)) return;
     // A CSS-resizable surface (Parsed fields' details is `resize: vertical`) owns its resize
     // corner: pointerdowns targeting it must resize, not drag out.
     if (origin instanceof HTMLElement && isNativelyResizable(origin)) return;

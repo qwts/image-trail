@@ -200,11 +200,13 @@ test('the recents toolbar renders inside the section header row (#430)', () => {
 test('the heading toggle collapses and expands the recents section (#438)', () => {
   const actions: unknown[] = [];
   const view = buildHistoryView(actions);
-  const toggle = view.querySelector<HTMLButtonElement>('.image-trail-panel__section-heading-toggle');
+  const toggle = view.querySelector<HTMLElement>('.image-trail-panel__section-header--collapsible');
   assert.ok(toggle);
+  assert.equal(toggle.getAttribute('role'), 'button');
   assert.equal(toggle.getAttribute('aria-expanded'), 'true');
   assert.equal(toggle.getAttribute('aria-label'), 'Hide the Recent history list', 'the accessible name carries the action');
 
+  // Summary ergonomics (#441): the whole header row toggles — a click on the row itself counts.
   toggle.click();
   assert.deepEqual(actions, [{ name: 'panel/history-section-open', open: false }]);
 });

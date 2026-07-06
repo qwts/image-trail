@@ -225,11 +225,13 @@ test('the queue toolbar renders inside the section header row (#430)', () => {
 test('the heading toggle collapses and expands the queue section (#438)', () => {
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions);
-  const toggle = view.querySelector<HTMLButtonElement>('.image-trail-panel__section-heading-toggle');
+  const toggle = view.querySelector<HTMLElement>('.image-trail-panel__section-header--collapsible');
   assert.ok(toggle);
+  assert.equal(toggle.getAttribute('role'), 'button');
   assert.equal(toggle.getAttribute('aria-expanded'), 'true');
   assert.equal(toggle.getAttribute('aria-label'), 'Hide the Queue list', 'the accessible name carries the action');
 
+  // Summary ergonomics (#441): the whole header row toggles — a click on the row itself counts.
   toggle.click();
   assert.deepEqual(actions, [{ name: 'panel/bookmarks-section-open', open: false }]);
 });
