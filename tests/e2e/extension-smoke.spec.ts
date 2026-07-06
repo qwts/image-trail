@@ -268,17 +268,19 @@ test('recent preview projects into selected host image and guards repeated curre
   expect(projectedTwo.src).toMatch(/^data:image\/svg\+xml;base64,/u);
 
   const assetOneRecent = page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' });
+  // A single click only selects (#426); the projected image must stay asset-two.
   await assetOneRecent.click();
   await expect(assetOneRecent).toHaveClass(/is-selected/u);
   await expectPanelStatusMessage(page, /Loaded .*asset-two\.svg/u);
-  await assetOneRecent.click();
+  // A real double-click projects the row.
+  await assetOneRecent.dblclick();
   await expectPanelStatusMessage(page, /Loaded .*asset-one\.svg/u);
   await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl(fixtureAssetPaths.assetOne));
   const projectedOne = await imageNavigationSnapshot(page, primaryImage);
   expect(projectedOne.src).toMatch(/^data:image\/svg\+xml;base64,/u);
   expect(projectedOne.src).not.toBe(projectedTwo.src);
 
-  await page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' }).click();
+  await page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' }).dblclick();
   await expectPanelStatusMessage(page, 'Recent image is already projected into the selected host element.');
   expect(await imageNavigationSnapshot(page, primaryImage)).toEqual(projectedOne);
 });

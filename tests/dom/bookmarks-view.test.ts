@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { resetPreviewRowClickTracking } from '../../extension/src/ui/components/record-row-preview-click.js';
 import assert from 'node:assert/strict';
 
 import { createBookmarksView } from '../../extension/src/ui/components/bookmarks-view.js';
@@ -44,6 +45,7 @@ function buttonByText(view: HTMLElement, text: string): HTMLButtonElement {
 }
 
 test('a plain click selects an unselected queue row without previewing it', () => {
+  resetPreviewRowClickTracking();
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions);
   const row = rowFor(view, 'row-1');
@@ -56,14 +58,36 @@ test('a plain click selects an unselected queue row without previewing it', () =
   assert.deepEqual(actions, [{ name: 'bookmark-selection/single', id: 'row-1' }]);
 });
 
-test('a plain click previews an already selected queue row', () => {
+test('a double-click on a selected queue row previews it (#426)', () => {
+  resetPreviewRowClickTracking();
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions, { selectedIds: ['row-1'] });
   const row = rowFor(view, 'row-1');
 
   row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 
-  assert.deepEqual(actions, [{ name: 'capture/preview', url: record.url, blobId: undefined, scrollAnchorId: 'bookmark:row-1' }]);
+  assert.deepEqual(actions, [
+    { name: 'bookmark-selection/single', id: 'row-1' },
+    { name: 'capture/preview', url: record.url, blobId: undefined, scrollAnchorId: 'bookmark:row-1' },
+  ]);
+});
+
+test('a stale second click on a selected queue row re-selects instead of previewing (#426)', (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  resetPreviewRowClickTracking();
+  const actions: unknown[] = [];
+  const view = buildBookmarksView(actions, { selectedIds: ['row-1'] });
+  const row = rowFor(view, 'row-1');
+
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  t.mock.timers.tick(501);
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  assert.deepEqual(actions, [
+    { name: 'bookmark-selection/single', id: 'row-1' },
+    { name: 'bookmark-selection/single', id: 'row-1' },
+  ]);
 });
 
 test('a ctrl-click toggles selection without previewing', () => {

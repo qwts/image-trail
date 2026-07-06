@@ -2,6 +2,7 @@ import { encryptedBlobIdForRecord, imageExtensionFromUrl, type ImageDisplayRecor
 import type { PanelAction, RecallDrawerSide, RecallState } from '../../core/types.js';
 import { createExtensionIndicator, isCapturedOriginalRecord } from './bookmarks-view.js';
 import { createPrivacyThumbnail, recordDisplayName, recordMetadataText, recordTitle } from './record-metadata.js';
+import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { selectedRangeIds } from './selection-ranges.js';
 
 export interface RecallDrawerGeometry {
@@ -159,7 +160,7 @@ function createRecallRow(
   item.dataset['imageTrailScrollAnchor'] = record.id;
   item.dataset['imageTrailRowId'] = record.id;
   item.title =
-    'Click to select this row. Click the selected row or press Enter to preview it. Cmd/Ctrl-click selects for export. Shift-click selects a range.';
+    'Click to select this row. Double-click or press Enter to preview it. Cmd/Ctrl-click selects for export. Shift-click selects a range.';
 
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
@@ -183,7 +184,7 @@ function createRecallRow(
       dispatch({ name: 'recall-selection/select', ids: selectedRangeIds(orderedIds, selectedIds, record.id), mode: 'add' });
       return;
     }
-    if (selected && selectedIds.length === 1) {
+    if (registerPreviewRowClick(`recall:${record.id}`) && selected && selectedIds.length === 1) {
       dispatch({ name: 'capture/preview', url: record.url, blobId: encryptedBlobIdForRecord(record), scrollAnchorId: record.id });
       return;
     }

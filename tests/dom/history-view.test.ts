@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createHistoryView } from '../../extension/src/ui/components/history-view.js';
+import { resetPreviewRowClickTracking } from '../../extension/src/ui/components/record-row-preview-click.js';
 import type { ImageDisplayRecord } from '../../extension/src/core/display-records.js';
 
 const record: ImageDisplayRecord = {
@@ -32,6 +33,7 @@ function rowFor(view: HTMLElement, id: string): HTMLElement {
 }
 
 test('a plain click selects an unselected recent row without previewing it', () => {
+  resetPreviewRowClickTracking();
   const actions: unknown[] = [];
   const view = buildHistoryView(actions);
   const row = rowFor(view, 'recent-1');
@@ -41,14 +43,37 @@ test('a plain click selects an unselected recent row without previewing it', () 
   assert.deepEqual(actions, [{ name: 'history-selection/select', ids: ['recent-1'] }]);
 });
 
-test('a plain click previews an already selected recent row', () => {
+test('a double-click on a selected recent row previews it (#426)', () => {
+  resetPreviewRowClickTracking();
   const actions: unknown[] = [];
   const view = buildHistoryView(actions, ['recent-1']);
   const row = rowFor(view, 'recent-1');
 
   row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 
-  assert.deepEqual(actions, [{ name: 'capture/preview', url: record.url, blobId: undefined }]);
+  assert.deepEqual(actions, [
+    { name: 'history-selection/select', ids: ['recent-1'] },
+    { name: 'capture/preview', url: record.url, blobId: undefined },
+  ]);
+});
+
+test('a stale second click on a selected recent row re-selects instead of previewing (#426)', (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  resetPreviewRowClickTracking();
+  const actions: unknown[] = [];
+  const view = buildHistoryView(actions, ['recent-1']);
+  const row = rowFor(view, 'recent-1');
+
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  t.mock.timers.tick(501);
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  // Two clicks beyond the double-click window are two selections — never a surprise projection.
+  assert.deepEqual(actions, [
+    { name: 'history-selection/select', ids: ['recent-1'] },
+    { name: 'history-selection/select', ids: ['recent-1'] },
+  ]);
 });
 
 test('a ctrl-click toggles recent selection without previewing', () => {

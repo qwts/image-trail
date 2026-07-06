@@ -553,6 +553,16 @@
         {
           "type": "manual",
           "reason": "Visual consistency across dense row states remains human-reviewed."
+        },
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/record-row-preview-click.test.ts",
+            "tests/dom/history-view.test.ts",
+            "tests/dom/bookmarks-view.test.ts",
+            "tests/dom/recall-drawer-view.test.ts"
+          ],
+          "notes": "Covers #426: previewing/projecting a Recents, queue, or Recall row requires a real double-click \u2014 a second click within the 500ms window on the same row previews, while a stale later click re-selects; window semantics unit-tested in the shared registerPreviewRowClick helper."
         }
       ]
     },
