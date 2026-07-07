@@ -252,6 +252,23 @@ test('recents render the selected sparse-row display mode and sparse count class
   assert.equal(list.classList.contains('has-sparse-count-2'), true);
 });
 
+test('Backspace removes the selected recent even when encrypted-original keys are unavailable', () => {
+  const actions: unknown[] = [];
+  const view = createHistoryView([record], ['recent-1'], false, false, (action) => actions.push(action), {
+    blobKeyAvailable: false,
+    sectionOpen: true,
+    collapsible: true,
+    listBlockSize: null,
+    onListResize: () => undefined,
+    sparseRowDisplayMode: 'full',
+  });
+  const row = rowFor(view, 'recent-1');
+
+  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
+
+  assert.deepEqual(actions, [{ name: 'history/remove', id: 'recent-1' }]);
+});
+
 test('privacy mode keeps masked sparse rows free of record metadata in visible text and titles', () => {
   const actions: unknown[] = [];
   const view = createHistoryView([record], [], false, true, (action) => actions.push(action), {
