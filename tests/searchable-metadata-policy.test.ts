@@ -37,7 +37,7 @@ test('needsUrlRedaction flags real URLs but skips hashes and synthetic tokens', 
   assert.equal(needsUrlRedaction('https://example.test/photo.jpg'), true);
   assert.equal(needsUrlRedaction(await hashSearchableUrl('https://example.test/photo.jpg')), false);
   assert.equal(needsUrlRedaction('image-trail-import:abc-123'), false);
-  assert.equal(needsUrlRedaction('private-pin:def-456'), false);
+  assert.equal(needsUrlRedaction('image-trail-private:def-456'), false);
 });
 
 test('policy guards accept valid values and reject malformed ones', () => {

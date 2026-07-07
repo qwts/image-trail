@@ -75,9 +75,9 @@ export function hashSearchableUrl(url: string): Promise<string> {
 const SEARCHABLE_URL_HASH_PATTERN = /^[0-9a-f]{64}$/u;
 
 // Synthetic (non-URL) index tokens already used for records that never carry a real page URL in the
-// index: data-URL imports and protected-pin relationship rows. These do not leak browsing URLs and
-// are left untouched by redaction.
-const SYNTHETIC_INDEX_URL_PREFIXES = ['image-trail-import:', 'private-pin:'] as const;
+// index: data-URL imports (`image-trail-import:`) and protected-pin relationship rows
+// (`image-trail-private:`). These do not leak browsing URLs and are left untouched by redaction.
+const SYNTHETIC_INDEX_URL_PREFIXES = ['image-trail-import:', 'image-trail-private:'] as const;
 
 export function looksLikeSearchableUrlHash(value: string): boolean {
   return SEARCHABLE_URL_HASH_PATTERN.test(value);
