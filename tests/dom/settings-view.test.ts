@@ -134,7 +134,7 @@ test('the Searchable metadata control dispatches the updated policy (#451)', () 
   const actions: PanelAction[] = [];
   const view = createSettingsView(
     30,
-    { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session' },
+    { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session', sparseRowDisplayMode: 'adaptive' },
     false,
     { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' },
     [],
