@@ -43,6 +43,7 @@ test('recents settings dispatches visible and max kept limits', () => {
     30,
     { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session' },
     false,
+    { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' },
     [],
     [],
     null,
@@ -90,6 +91,7 @@ test('the Failure feedback control dispatches the selected mode (#450)', () => {
     30,
     { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session' },
     false,
+    { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' },
     [],
     [],
     null,
@@ -118,11 +120,48 @@ test('the Failure feedback control dispatches the selected mode (#450)', () => {
   assert.equal((last as { readonly loadFailureFeedback?: string }).loadFailureFeedback, 'alert');
 });
 
+test('the Searchable metadata control dispatches the updated policy (#451)', () => {
+  const actions: PanelAction[] = [];
+  const view = createSettingsView(
+    30,
+    { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session' },
+    false,
+    { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' },
+    [],
+    [],
+    null,
+    [],
+    { pinSaveStoragePreference: 'encrypted', blobKeyUnlocked: false, blobKeyAvailable: false },
+    { visibleQueueCount: 0, recallCount: 0, busy: false },
+    null,
+    { identity: null, overlayVisible: true },
+    { limit: 5_000, clearAfterExport: false },
+    { minimumIntervalMs: 0, maxRequests: 3, windowMs: 10_000 },
+    { enabled: false, radius: 3, cacheLimit: 24, probeMethod: 'get', feedback: 'mute' },
+    false,
+    [],
+    (action) => actions.push(action),
+  );
+
+  const urlLabel = Array.from(view.querySelectorAll('label')).find((label) => label.textContent?.includes('Image URLs'));
+  assert.ok(urlLabel, 'expected an Image URLs control');
+  const select = urlLabel.querySelector('select');
+  assert.ok(select instanceof HTMLSelectElement, 'expected the URL policy select');
+  select.value = 'plaintext';
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+
+  assert.deepEqual(actions.at(-1), {
+    name: 'settings/update-metadata-policy',
+    policy: { urlDerived: 'plaintext', albumName: 'encrypted', thumbnail: 'encrypted' },
+  });
+});
+
 test('settings exposes browser, panel, and legacy shortcut decisions', () => {
   const view = createSettingsView(
     30,
     { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session' },
     false,
+    { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' },
     [],
     [],
     null,

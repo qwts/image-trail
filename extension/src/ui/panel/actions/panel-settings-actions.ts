@@ -13,6 +13,7 @@ export type PanelSettingsActionName =
   | 'settings/update-recent-history-retention'
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
+  | 'settings/update-metadata-policy'
   | 'settings/update-build-info-overlay-visibility'
   | 'settings/update-url-review-status-retention'
   | 'settings/update-request-throttle'
@@ -102,6 +103,16 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
         deps.saveLocalSettings({ ...deps.getLocalSettings(), privacyModeEnabled: action.enabled });
         deps.render();
         deps.refreshRecallIfOpen();
+      },
+    },
+    // At-rest searchable-metadata policy (#451). Persisting the setting is enough here: the background
+    // applies the policy to durable records (hashing/redaction) when it stores the new settings, and
+    // display reads the decrypted payload, so no recall refresh is needed.
+    'settings/update-metadata-policy': {
+      handle(action) {
+        deps.reduce(action);
+        deps.saveLocalSettings({ ...deps.getLocalSettings(), searchableMetadataPolicy: action.policy });
+        deps.render();
       },
     },
     'settings/update-build-info-overlay-visibility': {

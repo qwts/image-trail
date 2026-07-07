@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/html-vite';
 import { expect } from 'storybook/test';
 
 import type { PanelState } from '../core/types.js';
+import { DEFAULT_SEARCHABLE_METADATA_POLICY } from '../core/metadata-policy.js';
 import { renderPanel, type PanelLayoutState } from './render.js';
 import {
   bookmarkFixtures,
@@ -199,6 +200,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     bookmarkVisibilityScope: 'global',
     pinSaveStoragePreference: 'encrypted',
     privacyModeEnabled: false,
+    searchableMetadataPolicy: DEFAULT_SEARCHABLE_METADATA_POLICY,
     urlReviewStatusLimit: 200,
     clearUrlReviewStatusAfterExport: false,
     requestThrottleMs: 250,

@@ -90,6 +90,7 @@ export function createSettingsSection(
       overflowBehavior: state.recentHistoryOverflowBehavior,
     },
     state.privacyModeEnabled,
+    state.searchableMetadataPolicy,
     state.urlTemplates,
     state.grabSourcePatterns,
     urlContext.activeTemplateId,

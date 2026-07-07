@@ -6,6 +6,7 @@ import {
   DEFAULT_URL_REVIEW_STATUS_LIMIT,
 } from './settings.js';
 import { DEFAULT_GOVERNOR_CONFIG } from './automation/types.js';
+import { DEFAULT_SEARCHABLE_METADATA_POLICY } from './metadata-policy.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT } from './preview-style.js';
 
 export const EMPTY_TARGET_STATE: TargetState = {
@@ -65,6 +66,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     bookmarkVisibilityScope: 'global',
     pinSaveStoragePreference: 'encrypted',
     privacyModeEnabled: false,
+    searchableMetadataPolicy: DEFAULT_SEARCHABLE_METADATA_POLICY,
     buildInfoOverlayVisible: true,
     urlReviewStatusLimit: DEFAULT_URL_REVIEW_STATUS_LIMIT,
     clearUrlReviewStatusAfterExport: false,

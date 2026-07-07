@@ -243,6 +243,10 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   },
   'settings/update-pin-save-storage-preference': { name: 'settings/update-pin-save-storage-preference', value: 'encrypted' },
   'settings/update-privacy-mode': { name: 'settings/update-privacy-mode', enabled: true },
+  'settings/update-metadata-policy': {
+    name: 'settings/update-metadata-policy',
+    policy: { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' },
+  },
   'settings/update-build-info-overlay-visibility': { name: 'settings/update-build-info-overlay-visibility', visible: false },
   'settings/update-url-review-status-retention': {
     name: 'settings/update-url-review-status-retention',

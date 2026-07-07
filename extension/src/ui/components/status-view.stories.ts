@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/html-vite';
 
 import { captureFailureMessage } from '../../core/image/capture-result.js';
 import type { PanelState } from '../../core/types.js';
+import { DEFAULT_SEARCHABLE_METADATA_POLICY } from '../../core/metadata-policy.js';
 import { createStatusView } from './status-view.js';
 import { bookmarkFixtures, recallState, recentFixtures } from '../stories/fixtures.js';
 import { mockDispatch, panelStory } from '../stories/story-host.js';
@@ -248,6 +249,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     bookmarkVisibilityScope: 'global',
     pinSaveStoragePreference: 'encrypted',
     privacyModeEnabled: false,
+    searchableMetadataPolicy: DEFAULT_SEARCHABLE_METADATA_POLICY,
     urlReviewStatusLimit: 200,
     clearUrlReviewStatusAfterExport: false,
     requestThrottleMs: 250,

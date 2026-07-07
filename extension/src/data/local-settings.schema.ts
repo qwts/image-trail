@@ -22,6 +22,11 @@ export const plaintextLocalSettingsSchema = v.object({
   bookmarkVisibilityScope: v.picklist(['global', 'site']),
   pinSaveStoragePreference: v.picklist(['encrypted', 'plaintext']),
   privacyModeEnabled: v.boolean(),
+  searchableMetadataPolicy: v.object({
+    urlDerived: v.picklist(['plaintext', 'encrypted']),
+    albumName: v.picklist(['plaintext', 'encrypted']),
+    thumbnail: v.picklist(['plaintext', 'encrypted']),
+  }),
   buildInfoOverlayVisible: v.boolean(),
   previewObjectFit: v.picklist(['contain', 'cover', 'fill', 'none', 'scale-down']),
   previewFillScreen: v.boolean(),

@@ -1,6 +1,7 @@
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import type { ImageProbeMethod } from '../../core/image/request-policy.js';
 import { isLoadFailureFeedback, type LoadFailureFeedback } from '../../core/settings.js';
+import { isSearchableMetadataMode, type SearchableMetadataMode, type SearchableMetadataPolicy } from '../../core/metadata-policy.js';
 import { buildIdentityRows, type BuildIdentity } from '../../core/build-info.js';
 import type { PanelAction, PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../../core/types.js';
 import { createPanelLayoutSettingsView } from './panel-layout-settings-view.js';
@@ -45,6 +46,7 @@ export function createSettingsView(
     readonly overflowBehavior: RecentHistoryOverflowBehavior;
   },
   privacyModeEnabled: boolean,
+  searchableMetadataPolicy: SearchableMetadataPolicy,
   templates: readonly UrlTemplateRecord[],
   grabSourcePatterns: readonly GrabSourcePattern[],
   activeTemplateId: string | null,
@@ -102,6 +104,7 @@ export function createSettingsView(
     createSettingsGroup('Privacy', 'privacy', [
       createPrivatePinSettingsView(privatePinState, dispatch),
       createPrivacySettingsView(privacyModeEnabled, dispatch),
+      createSearchableMetadataSettingsView(searchableMetadataPolicy, dispatch),
     ]),
     createSettingsGroup('Automation', 'automation', [
       createRequestThrottleSettingsView(requestThrottleState, dispatch),
@@ -598,6 +601,78 @@ function createPrivacySettingsView(privacyModeEnabled: boolean, dispatch: (actio
   label.append(input, text);
   wrapper.append(heading, label, meta);
   return wrapper;
+}
+
+// #451 — at-rest searchable-metadata policy. Distinct from Privacy mode (which only masks the display):
+// this governs which optional fields may sit in plaintext searchable metadata on disk. Privacy-max by
+// default. The thumbnail row is informational — thumbnails are always encrypted at rest.
+function createSearchableMetadataSettingsView(policy: SearchableMetadataPolicy, dispatch: (action: PanelAction) => void): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+
+  const heading = document.createElement('h4');
+  heading.textContent = 'Searchable metadata';
+
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__settings-empty';
+  meta.textContent =
+    'Controls which optional fields may stay in plaintext searchable metadata on disk. Encrypted keeps them out of plaintext (URLs are hashed). This is separate from Privacy mode, which only masks the display.';
+
+  const urlSelect = createMetadataModeSelect(policy.urlDerived);
+  const urlField = createMetadataModeField('Image URLs', urlSelect);
+
+  const albumSelect = createMetadataModeSelect(policy.albumName);
+  const albumField = createMetadataModeField('Album names', albumSelect);
+
+  const thumbnailSelect = createMetadataModeSelect('encrypted');
+  thumbnailSelect.disabled = true;
+  const thumbnailField = createMetadataModeField('Thumbnails', thumbnailSelect);
+
+  const dispatchCurrent = (): void => {
+    dispatch({
+      name: 'settings/update-metadata-policy',
+      policy: {
+        urlDerived: parseMetadataMode(urlSelect.value, policy.urlDerived),
+        albumName: parseMetadataMode(albumSelect.value, policy.albumName),
+        // Thumbnails have no plaintext-at-rest path; the policy value is fixed.
+        thumbnail: 'encrypted',
+      },
+    });
+  };
+  urlSelect.addEventListener('change', dispatchCurrent);
+  albumSelect.addEventListener('change', dispatchCurrent);
+
+  wrapper.append(heading, meta, urlField, albumField, thumbnailField);
+  return wrapper;
+}
+
+function createMetadataModeSelect(mode: SearchableMetadataMode): HTMLSelectElement {
+  const select = document.createElement('select');
+  select.className = 'image-trail-panel__settings-select';
+  for (const option of [
+    { value: 'encrypted' as const, label: 'Encrypted' },
+    { value: 'plaintext' as const, label: 'Plaintext' },
+  ]) {
+    const element = document.createElement('option');
+    element.value = option.value;
+    element.textContent = option.label;
+    element.selected = mode === option.value;
+    select.append(element);
+  }
+  return select;
+}
+
+function createMetadataModeField(labelText: string, select: HTMLSelectElement): HTMLElement {
+  const field = document.createElement('label');
+  field.className = 'image-trail-panel__settings-field';
+  const text = document.createElement('span');
+  text.textContent = labelText;
+  field.append(text, select);
+  return field;
+}
+
+function parseMetadataMode(value: string, fallback: SearchableMetadataMode): SearchableMetadataMode {
+  return isSearchableMetadataMode(value) ? value : fallback;
 }
 
 function privatePinSettingsMessage(state: {

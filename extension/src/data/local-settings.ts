@@ -19,6 +19,11 @@ import {
 } from '../core/settings.js';
 import { DEFAULT_GOVERNOR_CONFIG } from '../core/automation/types.js';
 import type { ImageProbeMethod } from '../core/image/request-policy.js';
+import {
+  DEFAULT_SEARCHABLE_METADATA_POLICY,
+  sanitizeSearchableMetadataPolicy,
+  type SearchableMetadataPolicy,
+} from '../core/metadata-policy.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT, isObjectFitMode, type ObjectFitMode } from '../core/preview-style.js';
 import type { PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../core/types.js';
 
@@ -37,6 +42,7 @@ export interface PlaintextLocalSettings {
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
+  readonly searchableMetadataPolicy: SearchableMetadataPolicy;
   readonly buildInfoOverlayVisible: boolean;
   readonly previewObjectFit: ObjectFitMode;
   readonly previewFillScreen: boolean;
@@ -66,6 +72,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   bookmarkVisibilityScope: 'global',
   pinSaveStoragePreference: 'encrypted',
   privacyModeEnabled: false,
+  searchableMetadataPolicy: DEFAULT_SEARCHABLE_METADATA_POLICY,
   buildInfoOverlayVisible: true,
   previewObjectFit: DEFAULT_PREVIEW_OBJECT_FIT,
   previewFillScreen: true,
@@ -147,6 +154,7 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
       ? input.pinSaveStoragePreference
       : DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference,
     privacyModeEnabled: input.privacyModeEnabled === true,
+    searchableMetadataPolicy: sanitizeSearchableMetadataPolicy(input.searchableMetadataPolicy),
     buildInfoOverlayVisible: input.buildInfoOverlayVisible !== false,
     previewObjectFit: isObjectFitMode(input.previewObjectFit) ? input.previewObjectFit : DEFAULT_LOCAL_SETTINGS.previewObjectFit,
     previewFillScreen: input.previewFillScreen !== false,

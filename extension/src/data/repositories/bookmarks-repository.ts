@@ -189,6 +189,24 @@ export class BookmarksRepository {
     return updated;
   }
 
+  // #451 — rewrite the plaintext URL index value of existing rows (e.g. redacting real URLs to their
+  // hash when the searchable-metadata policy tightens). Only the index field changes; the envelope,
+  // queue order, and uuid are untouched.
+  async replaceIndexUrls(updates: readonly { readonly uuid: string; readonly indexUrl: string }[]): Promise<number> {
+    if (updates.length === 0) return 0;
+    const transaction = this.db.transaction(DataStore.Bookmarks, 'readwrite');
+    const store = transaction.objectStore(DataStore.Bookmarks);
+    let changed = 0;
+    for (const update of updates) {
+      const existing = await requestToPromise<EncryptedBookmarkRecord | undefined>(store.get(update.uuid));
+      if (!existing || existing.url === update.indexUrl) continue;
+      store.put({ ...existing, url: update.indexUrl });
+      changed += 1;
+    }
+    await transactionDone(transaction);
+    return changed;
+  }
+
   async sealAndPut(
     uuid: string,
     payload: DurableBookmarkPayloadV1,

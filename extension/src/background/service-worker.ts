@@ -133,6 +133,7 @@ const imageRequests = new ImageRequestManager();
 const bookmarkStore = new IndexedDbBookmarkStore({
   getActiveBlobKey,
   getPinSaveStoragePreference: async () => (await loadLocalSettings()).pinSaveStoragePreference,
+  getSearchableMetadataPolicy: async () => (await loadLocalSettings()).searchableMetadataPolicy,
 });
 const albumStore = new IndexedDbAlbumStore();
 const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
@@ -684,6 +685,10 @@ async function handleSaveLocalSettings(
   const settings = migrateLocalSettings(message.payload.settings);
   await chrome.storage.local.set({ [LOCAL_SETTINGS_KEY]: settings });
   recentHistoryCache.pruneForSettings(settings);
+  // Reconcile durable records with the (possibly changed) searchable-metadata policy — e.g. redact
+  // plaintext bookmark URLs to their hash when the URL class tightens (#451). Idempotent and cheap
+  // when the policy is unchanged.
+  await bookmarkStore.applySearchableMetadataPolicy(settings.searchableMetadataPolicy);
   return { ok: true };
 }
 
@@ -1114,4 +1119,16 @@ chrome.commands.onCommand.addListener((command, tab) => {
   sendToggleBuildIdentityOverlay(tabId).catch((error: unknown) => {
     console.warn('Image Trail could not toggle the build-info overlay.', error);
   });
+});
+
+// Reconcile durable records with the searchable-metadata policy after install/update so existing
+// rows are redacted to the (privacy-max) default without waiting for a settings change (#451).
+chrome.runtime.onInstalled.addListener(() => {
+  void (async () => {
+    try {
+      await bookmarkStore.applySearchableMetadataPolicy((await loadLocalSettings()).searchableMetadataPolicy);
+    } catch (error) {
+      console.warn('Image Trail could not apply the searchable-metadata policy on install.', error);
+    }
+  })();
 });

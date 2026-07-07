@@ -1,16 +1,26 @@
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { createDisplayRecord } from '../core/display-records.js';
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
-import { computeSha256 } from '../core/image/fingerprints.js';
+import {
+  bookmarkSearchIndexKey,
+  DEFAULT_SEARCHABLE_METADATA_POLICY,
+  hashSearchableUrl,
+  isSearchableMetadataMode,
+  needsUrlRedaction,
+  type SearchableMetadataMode,
+  type SearchableMetadataPolicy,
+} from '../core/metadata-policy.js';
 import type { BookmarkStore, PinSaveStoragePreference } from '../core/types.js';
 import type { ActiveBlobKey } from './crypto/blob-keyring.js';
 import { createKeyReference } from './crypto/key-reference.js';
 import type { KeyReference, StoredKeyRecord } from './crypto/types.js';
 import { generateAesGcmKey } from './crypto/webcrypto.js';
 import { openImageTrailDb } from './db.js';
+import { requestToPromise, transactionDone } from './idb-helpers.js';
 import { DEFAULT_LOCAL_SETTINGS } from './local-settings.js';
+import { DataStore } from './schema.js';
 import { BlobsRepository } from './repositories/blobs-repository.js';
-import { BookmarksRepository } from './repositories/bookmarks-repository.js';
+import { BookmarksRepository, type EncryptedBookmarkRecord } from './repositories/bookmarks-repository.js';
 import { EncryptedPinsRepository, type EncryptedPinRecord } from './repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from './repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from './repositories/keys-repository.js';
@@ -28,6 +38,7 @@ interface BookmarkKeyContext {
 interface ProtectedBookmarkOptions {
   readonly getActiveBlobKey?: () => ActiveBlobKey | null;
   readonly getPinSaveStoragePreference?: () => PinSaveStoragePreference | Promise<PinSaveStoragePreference>;
+  readonly getSearchableMetadataPolicy?: () => SearchableMetadataPolicy | Promise<SearchableMetadataPolicy>;
 }
 
 type BookmarkContext = {
@@ -159,10 +170,11 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   ): Promise<ImageDisplayRecord> {
     const importedDataUrl = bookmark.url.startsWith('data:image/');
 
-    const indexUrl = importedDataUrl ? `image-trail-import:${bookmark.id}` : bookmark.url;
+    const policy = await this.searchableMetadataPolicy();
+    const indexUrl = importedDataUrl ? `image-trail-import:${bookmark.id}` : await bookmarkSearchIndexKey(bookmark.url, policy);
     const existing = importedDataUrl
       ? await context.repository.getEncrypted(bookmark.id)
-      : await context.repository.getEncryptedByUrl(bookmark.url);
+      : await this.findPlainRecordByUrl(context, bookmark.url, policy);
     const existingPayload = existing ? await context.repository.openRecord(existing, context.bookmarkKey.key).catch(() => null) : null;
     const uuid = existing?.uuid ?? crypto.randomUUID();
     await context.repository.sealAndPut(
@@ -180,7 +192,47 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   }
 
   private async hasProtectedPinForBookmark(context: BookmarkContext, bookmark: ImageDisplayRecord): Promise<boolean> {
-    return !!(await context.encryptedPins.getByUrlHash(await hashUrl(bookmark.url)));
+    return !!(await context.encryptedPins.getByUrlHash(await hashSearchableUrl(bookmark.url)));
+  }
+
+  private async searchableMetadataPolicy(): Promise<SearchableMetadataPolicy> {
+    return (await this.options.getSearchableMetadataPolicy?.()) ?? DEFAULT_SEARCHABLE_METADATA_POLICY;
+  }
+
+  // Dedup lookup for a real bookmark URL (#451). The index value is the URL under a 'plaintext' policy
+  // and its hash under 'encrypted'. We try the current-policy key first and fall back to the other
+  // encoding so dedup keeps working across a policy change before redaction has re-encoded every row.
+  private async findPlainRecordByUrl(
+    context: BookmarkContext,
+    url: string,
+    policy: SearchableMetadataPolicy,
+  ): Promise<EncryptedBookmarkRecord | undefined> {
+    const primary = await context.repository.getEncryptedByUrl(await bookmarkSearchIndexKey(url, policy));
+    if (primary) return primary;
+    const fallbackKey = policy.urlDerived === 'plaintext' ? await hashSearchableUrl(url) : url;
+    return context.repository.getEncryptedByUrl(fallbackKey);
+  }
+
+  // Bring durable records in line with the active searchable-metadata policy (#451). Called by the
+  // background when settings are saved and once per store open (idempotent via a stored applied-mode
+  // marker). For 'encrypted' this redacts any lingering plaintext URL index value to its hash — no
+  // decryption of originals is needed because the plaintext index value is hashed directly.
+  async applySearchableMetadataPolicy(policy: SearchableMetadataPolicy): Promise<void> {
+    const context = await this.openContext();
+    if (!context) return;
+    if ((await readAppliedUrlMode(context.db)) === policy.urlDerived) return;
+    if (policy.urlDerived === 'encrypted') {
+      const records = await context.repository.listEncrypted();
+      const updates: { readonly uuid: string; readonly indexUrl: string }[] = [];
+      for (const record of records) {
+        if (needsUrlRedaction(record.url)) updates.push({ uuid: record.uuid, indexUrl: await hashSearchableUrl(record.url) });
+      }
+      if (updates.length > 0) {
+        await context.repository.replaceIndexUrls(updates);
+        this.invalidateMergedRecordsCache();
+      }
+    }
+    await writeAppliedUrlMode(context.db, policy.urlDerived);
   }
 
   async loadRecallPage(input: {
@@ -290,7 +342,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     if (!context) return null;
     const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
     if (activeBlobKey) {
-      const protectedRecord = await context.encryptedPins.getByUrlHash(await hashUrl(url));
+      const protectedRecord = await context.encryptedPins.getByUrlHash(await hashSearchableUrl(url));
       if (protectedRecord) {
         try {
           return await this.openProtectedDisplayRecord(context, protectedRecord, activeBlobKey);
@@ -300,7 +352,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       }
     }
 
-    const plain = await context.repository.getEncryptedByUrl(url);
+    const plain = await this.findPlainRecordByUrl(context, url, await this.searchableMetadataPolicy());
     if (!plain) return null;
     try {
       const payload = await context.repository.openRecord(plain, context.bookmarkKey.key);
@@ -445,7 +497,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     bookmark: ImageDisplayRecord,
     activeBlobKey: ActiveBlobKey,
   ): Promise<ImageDisplayRecord> {
-    const urlHash = await hashUrl(bookmark.url);
+    const urlHash = await hashSearchableUrl(bookmark.url);
     return withProtectedPinSaveLock(urlHash, () => this.saveProtectedForHash(context, bookmark, activeBlobKey, urlHash));
   }
 
@@ -875,8 +927,31 @@ async function withProtectedPinSaveLock<T>(urlHash: string, work: () => Promise<
   }
 }
 
-async function hashUrl(url: string): Promise<string> {
-  return computeSha256(new TextEncoder().encode(url).buffer);
+// One-time marker (in the Metadata store) recording the urlDerived mode the durable bookmark index
+// was last reconciled to, so applySearchableMetadataPolicy stays a cheap no-op after it runs (#451).
+const SEARCHABLE_URL_MODE_METADATA_KEY = 'searchable-metadata:url-mode';
+
+interface SearchableUrlModeMetadataRecord {
+  readonly key: typeof SEARCHABLE_URL_MODE_METADATA_KEY;
+  readonly kind: 'searchableUrlMode';
+  readonly mode: SearchableMetadataMode;
+}
+
+async function readAppliedUrlMode(db: IDBDatabase): Promise<SearchableMetadataMode | null> {
+  const transaction = db.transaction(DataStore.Metadata, 'readonly');
+  const raw = await requestToPromise<SearchableUrlModeMetadataRecord | undefined>(
+    transaction.objectStore(DataStore.Metadata).get(SEARCHABLE_URL_MODE_METADATA_KEY),
+  );
+  await transactionDone(transaction);
+  return raw?.kind === 'searchableUrlMode' && isSearchableMetadataMode(raw.mode) ? raw.mode : null;
+}
+
+async function writeAppliedUrlMode(db: IDBDatabase, mode: SearchableMetadataMode): Promise<void> {
+  const transaction = db.transaction(DataStore.Metadata, 'readwrite');
+  transaction
+    .objectStore(DataStore.Metadata)
+    .put({ key: SEARCHABLE_URL_MODE_METADATA_KEY, kind: 'searchableUrlMode', mode } satisfies SearchableUrlModeMetadataRecord);
+  await transactionDone(transaction);
 }
 
 function dataUrlToBytes(dataUrl: string): { readonly mimeType: string; readonly bytes: ArrayBuffer } | null {

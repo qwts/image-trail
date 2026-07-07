@@ -733,6 +733,28 @@
         }
       ],
       "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-In-Panel-Help"
+    },
+    {
+      "id": "searchable-metadata-privacy-policy",
+      "acceptance": "User-controlled searchable metadata privacy policy (issue #451) — Slice 1: policy framework, settings surface, and URL-derived at-rest enforcement",
+      "repoPath": "docs/acceptance-tests/searchable-metadata-privacy-policy.md",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Searchable-Metadata-Privacy-Policy",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/searchable-metadata-policy.test.ts",
+            "tests/searchable-metadata-store.test.ts",
+            "tests/dom/settings-view.test.ts"
+          ],
+          "notes": "Covers the policy model (privacy-max default, URL index-key derivation, redaction predicate, guards, local-settings sanitize), the durable store enforcing a hashed URL index under the default policy while staying findable/dedupable by real URL, plaintext-mode indexing by raw URL, applySearchableMetadataPolicy redacting lingering plaintext URLs idempotently, and the Searchable metadata settings control dispatching the updated policy."
+        },
+        {
+          "type": "deferred",
+          "issue": 451,
+          "notes": "Album-name encryption (Slice 2) and the thumbnail class + full field-inventory doc/ADR (Slice 3) land in follow-up slices of this issue; Playwright coverage of the URL policy toggle is added when the setting surface is exercised end-to-end."
+        }
+      ]
     }
   ]
 }

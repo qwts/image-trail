@@ -4,6 +4,7 @@ import type { CaptureResult, StorageUsageSummary } from './image/capture-result.
 import type { ImageDisplayRecord } from './display-records.js';
 import type { ImageProbeMethod } from './image/request-policy.js';
 import type { LoadFailureFeedback } from './settings.js';
+import type { SearchableMetadataPolicy } from './metadata-policy.js';
 import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from './url/templates.js';
 import type { UrlTemplateGrabStrategy } from './url/grab-strategies.js';
 import type { FieldTransformId } from './url/field-transforms.js';
@@ -201,6 +202,7 @@ export interface PanelState {
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
+  readonly searchableMetadataPolicy: SearchableMetadataPolicy;
   readonly buildInfoOverlayVisible: boolean;
   readonly urlReviewStatusLimit: number;
   readonly clearUrlReviewStatusAfterExport: boolean;
@@ -339,6 +341,7 @@ export type PanelActionName =
   | 'settings/update-recent-history-retention'
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
+  | 'settings/update-metadata-policy'
   | 'settings/update-build-info-overlay-visibility'
   | 'settings/update-url-review-status-retention'
   | 'settings/update-request-throttle'
@@ -479,6 +482,7 @@ export type PanelAction =
         | 'settings/update-recent-history-retention'
         | 'settings/update-pin-save-storage-preference'
         | 'settings/update-privacy-mode'
+        | 'settings/update-metadata-policy'
         | 'settings/update-build-info-overlay-visibility'
         | 'settings/update-url-review-status-retention'
         | 'settings/update-request-throttle'
@@ -583,6 +587,7 @@ export type PanelAction =
     }
   | { readonly name: 'settings/update-pin-save-storage-preference'; readonly value: PinSaveStoragePreference }
   | { readonly name: 'settings/update-privacy-mode'; readonly enabled: boolean }
+  | { readonly name: 'settings/update-metadata-policy'; readonly policy: SearchableMetadataPolicy }
   | { readonly name: 'settings/update-workspace-layout-restore'; readonly enabled: boolean }
   | { readonly name: 'settings/update-build-info-overlay-visibility'; readonly visible: boolean }
   | {

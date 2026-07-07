@@ -642,6 +642,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
       return { ...state, pinSaveStoragePreference: action.value, lastUpdatedAt: Date.now() };
     case 'settings/update-privacy-mode':
       return { ...state, privacyModeEnabled: action.enabled, lastUpdatedAt: Date.now() };
+    case 'settings/update-metadata-policy':
+      return { ...state, searchableMetadataPolicy: action.policy, lastUpdatedAt: Date.now() };
     case 'settings/update-build-info-overlay-visibility':
       return { ...state, buildInfoOverlayVisible: action.visible, lastUpdatedAt: Date.now() };
     case 'settings/update-url-review-status-retention':
