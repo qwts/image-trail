@@ -15,6 +15,7 @@ type StyleSnapshot = Pick<
   | 'outlineOffset'
   | 'position'
   | 'top'
+  | 'transition'
   | 'width'
 >;
 type PageBackdropSnapshot = Pick<CSSStyleDeclaration, 'background' | 'backgroundColor'>;
@@ -49,11 +50,16 @@ export function snapshotElementStyles(element: HTMLElement): void {
     outlineOffset: element.style.outlineOffset,
     position: element.style.position,
     top: element.style.top,
+    transition: element.style.transition,
     width: element.style.width,
   });
 }
 
 export function keepSelectedTargetBackdropBlack(element: HTMLElement): void {
+  // Chrome's standalone image viewer gives the <img> a light-grey background with a 300ms
+  // background-color transition, so flipping it to black would animate grey->black — a visible flash,
+  // especially in fit (letterboxed) mode. Disable transitions so the backdrop change applies instantly.
+  element.style.transition = 'none';
   element.style.background = '#000';
   element.style.backgroundColor = '#000';
 }
@@ -165,6 +171,9 @@ export function restoreElementStyles(element: HTMLElement, options: RestoreEleme
     element.style.position = original.position;
     element.style.top = original.top;
     element.style.width = original.width;
+    // Restore transitions LAST — after the background is already back — so re-enabling them cannot
+    // animate (and flash) the backdrop change we just made.
+    element.style.transition = original.transition;
     snapshots.delete(element);
   }
   delete element.dataset['imageTrailCandidate'];

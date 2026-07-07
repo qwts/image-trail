@@ -759,6 +759,18 @@
           "notes": "Album-name encryption (Slice 2) and the thumbnail class + full field-inventory doc/ADR (Slice 3) land in follow-up slices of this issue; Playwright coverage of the URL policy toggle is added when the setting surface is exercised end-to-end."
         }
       ]
+    },
+    {
+      "id": "image-preview-backdrop-no-flash",
+      "acceptance": "Image preview backdrop applies instantly without a transition flash (issue #456)",
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Image-Preview-Backdrop-No-Flash",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/dom/page-style.test.ts"],
+          "notes": "Covers neutralizing the selected image's transition while it is darkened so Chrome's standalone image-viewer grey->black background-color transition cannot animate/flash the backdrop (worst in fit/letterboxed mode), and restoring the original transition last on release so it cannot flash on close either. Page/element restore stays verbatim (tests/page-style.test.ts)."
+        }
+      ]
     }
   ]
 }
