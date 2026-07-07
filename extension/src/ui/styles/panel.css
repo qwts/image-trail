@@ -2408,12 +2408,10 @@
   align-content: start;
 }
 
-.image-trail-panel-root
-  .image-trail-panel__history-section
-  .image-trail-panel__record-list.is-sparse-full.has-sparse-count-1:not(.is-user-resized) {
+.image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list.is-sparse-full:not(.is-user-resized) {
   block-size: var(--image-trail-history-viewport-size);
-  grid-auto-rows: minmax(0, 1fr);
-  align-content: stretch;
+  grid-auto-rows: minmax(var(--image-trail-history-viewport-size), max-content);
+  align-content: start;
 }
 
 .image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list.is-sparse-half:not(.is-user-resized) {

@@ -37,7 +37,7 @@ test('Recents sparse-row modes opt into full and half viewport rows (#452)', () 
     '.image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list.is-sparse-adaptive:not(.is-user-resized)',
   );
   const full = cssRule(
-    '.image-trail-panel-root\n  .image-trail-panel__history-section\n  .image-trail-panel__record-list.is-sparse-full.has-sparse-count-1:not(.is-user-resized)',
+    '.image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list.is-sparse-full:not(.is-user-resized)',
   );
   const half = cssRule(
     '.image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list.is-sparse-half:not(.is-user-resized)',
@@ -46,7 +46,8 @@ test('Recents sparse-row modes opt into full and half viewport rows (#452)', () 
   assert.match(adaptive, /block-size:\s*var\(--image-trail-history-viewport-size\);/u);
   assert.match(adaptive, /grid-auto-rows:\s*minmax\(0,\s*1fr\);/u);
   assert.match(full, /block-size:\s*var\(--image-trail-history-viewport-size\);/u);
-  assert.match(full, /grid-auto-rows:\s*minmax\(0,\s*1fr\);/u);
+  assert.match(full, /grid-auto-rows:\s*minmax\(var\(--image-trail-history-viewport-size\),\s*max-content\);/u);
+  assert.match(full, /align-content:\s*start;/u);
   assert.match(half, /grid-auto-rows:\s*minmax\(var\(--image-trail-history-half-row-size\),\s*max-content\);/u);
 });
 

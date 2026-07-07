@@ -183,6 +183,11 @@ export function createHistoryView(
           dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId });
           return;
         }
+        if (event.key === 'Backspace' && selected) {
+          event.preventDefault();
+          dispatch({ name: 'history/remove', id: item.id });
+          return;
+        }
         if (event.key !== ' ') return;
         event.preventDefault();
         if (selected && selectedIds.length === 1) {
