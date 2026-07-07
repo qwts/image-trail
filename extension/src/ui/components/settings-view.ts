@@ -604,8 +604,9 @@ function createPrivacySettingsView(privacyModeEnabled: boolean, dispatch: (actio
 }
 
 // #451 — at-rest searchable-metadata policy. Distinct from Privacy mode (which only masks the display):
-// this governs which optional fields may sit in plaintext searchable metadata on disk. Privacy-max by
-// default. The thumbnail row is informational — thumbnails are always encrypted at rest.
+// this governs which optional fields NEW records may write to plaintext searchable metadata on disk;
+// it never rewrites existing records. Defaults to plaintext (no change vs today) — enabling it is
+// opt-in. The thumbnail row is informational — thumbnails are always encrypted at rest.
 function createSearchableMetadataSettingsView(policy: SearchableMetadataPolicy, dispatch: (action: PanelAction) => void): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'image-trail-panel__settings-templates';
@@ -624,7 +625,7 @@ function createSearchableMetadataSettingsView(policy: SearchableMetadataPolicy, 
   const albumSelect = createMetadataModeSelect(policy.albumName);
   const albumField = createMetadataModeField('Album names', albumSelect);
 
-  const thumbnailSelect = createMetadataModeSelect('encrypted');
+  const thumbnailSelect = createMetadataModeSelect(policy.thumbnail);
   thumbnailSelect.disabled = true;
   const thumbnailField = createMetadataModeField('Thumbnails', thumbnailSelect);
 
@@ -634,8 +635,8 @@ function createSearchableMetadataSettingsView(policy: SearchableMetadataPolicy, 
       policy: {
         urlDerived: parseMetadataMode(urlSelect.value, policy.urlDerived),
         albumName: parseMetadataMode(albumSelect.value, policy.albumName),
-        // Thumbnails have no plaintext-at-rest path; the policy value is fixed.
-        thumbnail: 'encrypted',
+        // Thumbnails have no plaintext-at-rest path yet; carry the current value through unchanged.
+        thumbnail: policy.thumbnail,
       },
     });
   };

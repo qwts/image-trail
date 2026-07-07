@@ -736,7 +736,7 @@
     },
     {
       "id": "searchable-metadata-privacy-policy",
-      "acceptance": "User-controlled searchable metadata privacy policy (issue #451) — Slice 1: policy framework, settings surface, and URL-derived at-rest enforcement",
+      "acceptance": "User-controlled searchable metadata privacy policy (issue #451) — Slice 1: policy framework, settings surface, and opt-in URL-derived enforcement for new records",
       "repoPath": "docs/acceptance-tests/searchable-metadata-privacy-policy.md",
       "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Searchable-Metadata-Privacy-Policy",
       "coverage": [
@@ -747,7 +747,7 @@
             "tests/searchable-metadata-store.test.ts",
             "tests/dom/settings-view.test.ts"
           ],
-          "notes": "Covers the policy model (privacy-max default, URL index-key derivation, redaction predicate, guards, local-settings sanitize), the durable store enforcing a hashed URL index under the default policy while staying findable/dedupable by real URL, plaintext-mode indexing by raw URL, applySearchableMetadataPolicy redacting lingering plaintext URLs idempotently, and the Searchable metadata settings control dispatching the updated policy."
+          "notes": "Covers the policy model (plaintext default preserving current behaviour, URL index-key derivation, guards, local-settings sanitize), the durable store keeping the raw URL index under the default while an opt-in encrypted policy hashes only NEW records yet stays findable/dedupable by real URL, dual-encoding lookup resolving a legacy plaintext row after switching to encrypted without ever rewriting existing records, and the Searchable metadata settings control dispatching the updated policy."
         },
         {
           "type": "deferred",

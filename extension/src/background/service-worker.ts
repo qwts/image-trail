@@ -685,13 +685,6 @@ async function handleSaveLocalSettings(
   const settings = migrateLocalSettings(message.payload.settings);
   await chrome.storage.local.set({ [LOCAL_SETTINGS_KEY]: settings });
   recentHistoryCache.pruneForSettings(settings);
-  // Reconcile durable records with the (possibly changed) searchable-metadata policy — e.g. redact
-  // plaintext bookmark URLs to their hash when the URL class tightens (#451). Fire-and-forget so
-  // saving a setting never blocks on a durable pass, and internally flag-gated so it does real work
-  // only when the URL mode actually changed (a deliberate policy toggle), never on startup.
-  void bookmarkStore.applySearchableMetadataPolicy(settings.searchableMetadataPolicy).catch((error: unknown) => {
-    console.warn('Image Trail could not reconcile the searchable-metadata policy.', error);
-  });
   return { ok: true };
 }
 

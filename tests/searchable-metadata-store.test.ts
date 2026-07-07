@@ -9,7 +9,6 @@ import { openImageTrailDb } from '../extension/src/data/db.js';
 import { BookmarksRepository } from '../extension/src/data/repositories/bookmarks-repository.js';
 import { deleteImageTrailDb } from './indexeddb-test-helpers.js';
 
-const PLAINTEXT_POLICY: SearchableMetadataPolicy = { urlDerived: 'plaintext', albumName: 'encrypted', thumbnail: 'encrypted' };
 const ENCRYPTED_POLICY: SearchableMetadataPolicy = { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' };
 const URL = 'https://example.test/photo.jpg';
 
@@ -32,28 +31,35 @@ function bookmark(url = URL): ReturnType<typeof createDisplayRecord> {
   return createDisplayRecord({ id: url, url, label: 'photo.jpg', timestamp: '2026-06-19T00:00:00.000Z', source: 'bookmark' });
 }
 
-test('a plain bookmark saved under the default policy stores a hashed URL index but stays findable by URL', async () => {
+test('the default policy keeps the raw URL as the searchable index value (no data-format change)', async () => {
   await deleteImageTrailDb();
   const store = new IndexedDbBookmarkStore();
   try {
     await store.save(bookmark());
-
-    assert.deepEqual(
-      await indexPresence(),
-      { plaintext: false, hashed: true },
-      'the raw URL must not sit in plaintext searchable metadata',
-    );
-
-    const found = await store.findByUrl(URL);
-    assert.equal(found?.url, URL, 'the record is still findable by its real URL, and display shows the real URL');
+    assert.deepEqual(await indexPresence(), { plaintext: true, hashed: false }, 'the default preserves the plaintext URL index');
+    assert.equal((await store.findByUrl(URL))?.url, URL);
   } finally {
     await store.close();
   }
 });
 
-test('saving the same URL twice under the default policy dedups to a single record', async () => {
+test('opting URLs into encrypted stores a hashed index for new records yet stays findable by URL', async () => {
   await deleteImageTrailDb();
-  const store = new IndexedDbBookmarkStore();
+  const store = new IndexedDbBookmarkStore({ getSearchableMetadataPolicy: () => ENCRYPTED_POLICY });
+  try {
+    await store.save(bookmark());
+
+    assert.deepEqual(await indexPresence(), { plaintext: false, hashed: true }, 'the URL is hashed, not stored in plaintext');
+    // The real URL still lives in the encrypted payload, so display and dedup lookup resolve it.
+    assert.equal((await store.findByUrl(URL))?.url, URL, 'findByUrl resolves the hashed row');
+  } finally {
+    await store.close();
+  }
+});
+
+test('saving the same URL twice under the encrypted policy dedups to a single record', async () => {
+  await deleteImageTrailDb();
+  const store = new IndexedDbBookmarkStore({ getSearchableMetadataPolicy: () => ENCRYPTED_POLICY });
   try {
     await store.save(bookmark());
     await store.save(bookmark());
@@ -64,38 +70,24 @@ test('saving the same URL twice under the default policy dedups to a single reco
   }
 });
 
-test('a plaintext policy keeps the raw URL as the searchable index value', async () => {
+test('a legacy plaintext row is still found after switching to encrypted, and is never rewritten', async () => {
   await deleteImageTrailDb();
-  const store = new IndexedDbBookmarkStore({ getSearchableMetadataPolicy: () => PLAINTEXT_POLICY });
+  // Save under the default (plaintext) policy, then reopen under an encrypted policy.
+  const plaintextStore = new IndexedDbBookmarkStore();
   try {
-    await store.save(bookmark());
-    assert.deepEqual(await indexPresence(), { plaintext: true, hashed: false }, 'plaintext policy indexes by the raw URL');
+    await plaintextStore.save(bookmark());
   } finally {
-    await store.close();
+    await plaintextStore.close();
   }
-});
 
-test('applySearchableMetadataPolicy redacts a lingering plaintext URL to its hash and is idempotent', async () => {
-  await deleteImageTrailDb();
-  // Seed a legacy plaintext-URL row by saving under a plaintext policy.
-  const legacyStore = new IndexedDbBookmarkStore({ getSearchableMetadataPolicy: () => PLAINTEXT_POLICY });
+  const encryptedStore = new IndexedDbBookmarkStore({ getSearchableMetadataPolicy: () => ENCRYPTED_POLICY });
   try {
-    await legacyStore.save(bookmark());
+    // Dual-encoding lookup resolves the legacy plaintext row without any migration pass.
+    assert.equal((await encryptedStore.findByUrl(URL))?.url, URL, 'the legacy plaintext row is still found by URL');
   } finally {
-    await legacyStore.close();
+    await encryptedStore.close();
   }
-  assert.deepEqual(await indexPresence(), { plaintext: true, hashed: false }, 'precondition: the seeded row is plaintext-indexed');
 
-  const store = new IndexedDbBookmarkStore();
-  try {
-    await store.applySearchableMetadataPolicy(ENCRYPTED_POLICY);
-    assert.deepEqual(await indexPresence(), { plaintext: false, hashed: true }, 'the legacy plaintext URL is redacted to its hash');
-    assert.equal((await store.findByUrl(URL))?.url, URL, 'dedup lookup still resolves the redacted row');
-
-    // A second application is a cheap no-op (applied-mode marker) and leaves the row hashed.
-    await store.applySearchableMetadataPolicy(ENCRYPTED_POLICY);
-    assert.deepEqual(await indexPresence(), { plaintext: false, hashed: true });
-  } finally {
-    await store.close();
-  }
+  // Simply opening under a different policy must not have rewritten anything on disk.
+  assert.deepEqual(await indexPresence(), { plaintext: true, hashed: false }, 'the legacy row stays plaintext — never rewritten');
 });
