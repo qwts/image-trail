@@ -500,6 +500,7 @@ function createHistorySection(target: PanelRenderTarget, state: PanelState): HTM
     onListResize: (blockSize) => {
       target.layoutState.historyListBlockSize = blockSize;
     },
+    sparseRowDisplayMode: state.recentSparseRowDisplayMode,
     privacyMode: state.privacyModeEnabled,
   });
 }

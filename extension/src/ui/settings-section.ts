@@ -88,6 +88,7 @@ export function createSettingsSection(
       limit: state.recentHistoryLimit,
       retainedLimit: state.recentHistoryRetainedLimit,
       overflowBehavior: state.recentHistoryOverflowBehavior,
+      sparseRowDisplayMode: state.recentSparseRowDisplayMode,
     },
     state.privacyModeEnabled,
     state.searchableMetadataPolicy,

@@ -11,6 +11,7 @@ export type PanelSettingsActionName =
   | 'help/toggle'
   | 'settings/update-visible-bookmark-soft-max'
   | 'settings/update-recent-history-retention'
+  | 'settings/update-recent-sparse-row-display-mode'
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
   | 'settings/update-metadata-policy'
@@ -90,6 +91,11 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
           retainedLimit: action.retainedLimit,
           overflowBehavior: action.overflowBehavior,
         });
+      },
+    },
+    'settings/update-recent-sparse-row-display-mode': {
+      handle(action) {
+        deps.updateRecentSparseRowDisplayMode(action.mode);
       },
     },
     'settings/update-pin-save-storage-preference': {

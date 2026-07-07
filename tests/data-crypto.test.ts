@@ -103,6 +103,7 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().recentHistoryLimit, 30);
   assert.equal(repository.load().recentHistoryRetainedLimit, 30);
   assert.equal(repository.load().recentHistoryOverflowBehavior, 'drop-oldest');
+  assert.equal(repository.load().recentSparseRowDisplayMode, 'adaptive');
   assert.equal(repository.load().bookmarkVisibilityScope, 'global');
   assert.equal(repository.load().pinSaveStoragePreference, 'encrypted');
   assert.equal(repository.load().privacyModeEnabled, false);
@@ -313,6 +314,20 @@ test('migrates recent history retention settings safely', () => {
   assert.equal(retainedBelowVisible.load().recentHistoryRetainedLimit, 12);
   assert.equal(invalidRetained.load().recentHistoryRetainedLimit, 50);
   assert.equal(invalidBehavior.load().recentHistoryOverflowBehavior, DEFAULT_LOCAL_SETTINGS.recentHistoryOverflowBehavior);
+});
+
+test('migrates recent sparse-row display mode safely', () => {
+  const full = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentSparseRowDisplayMode: 'full' }),
+    setItem: () => {},
+  });
+  const invalid = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentSparseRowDisplayMode: 'stretchy' }),
+    setItem: () => {},
+  });
+
+  assert.equal(full.load().recentSparseRowDisplayMode, 'full');
+  assert.equal(invalid.load().recentSparseRowDisplayMode, DEFAULT_LOCAL_SETTINGS.recentSparseRowDisplayMode);
 });
 
 test('migrates bookmark visibility scope setting safely', () => {

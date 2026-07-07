@@ -59,6 +59,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     recentHistoryLimit: 30,
     recentHistoryRetainedLimit: 30,
     recentHistoryOverflowBehavior: 'drop-oldest',
+    recentSparseRowDisplayMode: 'adaptive',
     bookmarks: [],
     bookmarkOffset: 0,
     bookmarkLimit: 30,

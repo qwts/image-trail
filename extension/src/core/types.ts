@@ -183,6 +183,8 @@ export interface PCloudBackupState {
   readonly messageIsError?: boolean | undefined;
 }
 
+export type RecentSparseRowDisplayMode = 'adaptive' | 'full' | 'half' | 'compact';
+
 export interface PanelState {
   readonly visible: boolean;
   readonly minimized: boolean;
@@ -195,6 +197,7 @@ export interface PanelState {
   readonly recentHistoryLimit: number;
   readonly recentHistoryRetainedLimit: number;
   readonly recentHistoryOverflowBehavior: RecentHistoryOverflowBehavior;
+  readonly recentSparseRowDisplayMode: RecentSparseRowDisplayMode;
   readonly bookmarks: readonly ImageDisplayRecord[];
   readonly bookmarkOffset: number;
   readonly bookmarkLimit: number;
@@ -339,6 +342,7 @@ export type PanelActionName =
   | 'help/toggle'
   | 'settings/update-visible-bookmark-soft-max'
   | 'settings/update-recent-history-retention'
+  | 'settings/update-recent-sparse-row-display-mode'
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
   | 'settings/update-metadata-policy'
@@ -480,6 +484,7 @@ export type PanelAction =
         | 'bookmarks/page-loaded'
         | 'settings/update-visible-bookmark-soft-max'
         | 'settings/update-recent-history-retention'
+        | 'settings/update-recent-sparse-row-display-mode'
         | 'settings/update-pin-save-storage-preference'
         | 'settings/update-privacy-mode'
         | 'settings/update-metadata-policy'
@@ -585,6 +590,7 @@ export type PanelAction =
       readonly retainedLimit: number;
       readonly overflowBehavior: RecentHistoryOverflowBehavior;
     }
+  | { readonly name: 'settings/update-recent-sparse-row-display-mode'; readonly mode: RecentSparseRowDisplayMode }
   | { readonly name: 'settings/update-pin-save-storage-preference'; readonly value: PinSaveStoragePreference }
   | { readonly name: 'settings/update-privacy-mode'; readonly enabled: boolean }
   | { readonly name: 'settings/update-metadata-policy'; readonly policy: SearchableMetadataPolicy }

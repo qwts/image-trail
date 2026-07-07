@@ -179,6 +179,7 @@ function createHarness(
     deleteRecallBookmarks: () => recordAsync('deleteRecallBookmarks'),
     updateVisibleBookmarkSoftMax: () => recordAsync('updateVisibleBookmarkSoftMax'),
     updateRecentHistoryRetention: () => recordAsync('updateRecentHistoryRetention'),
+    updateRecentSparseRowDisplayMode: () => record('updateRecentSparseRowDisplayMode'),
     updatePinSaveStoragePreference: () => record('updatePinSaveStoragePreference'),
     updateUrlReviewStatusRetention: () => recordAsync('updateUrlReviewStatusRetention'),
     updateRequestThrottle: () => record('updateRequestThrottle'),
@@ -241,6 +242,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
     retainedLimit: 40,
     overflowBehavior: 'drop-oldest',
   },
+  'settings/update-recent-sparse-row-display-mode': { name: 'settings/update-recent-sparse-row-display-mode', mode: 'compact' },
   'settings/update-pin-save-storage-preference': { name: 'settings/update-pin-save-storage-preference', value: 'encrypted' },
   'settings/update-privacy-mode': { name: 'settings/update-privacy-mode', enabled: true },
   'settings/update-metadata-policy': {

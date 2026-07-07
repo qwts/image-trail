@@ -25,7 +25,7 @@ import {
   type SearchableMetadataPolicy,
 } from '../core/metadata-policy.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT, isObjectFitMode, type ObjectFitMode } from '../core/preview-style.js';
-import type { PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../core/types.js';
+import type { PinSaveStoragePreference, RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from '../core/types.js';
 
 export interface PlaintextLocalSettings {
   readonly schemaVersion: 1;
@@ -39,6 +39,7 @@ export interface PlaintextLocalSettings {
   readonly recentHistoryLimit: number;
   readonly recentHistoryRetainedLimit: number;
   readonly recentHistoryOverflowBehavior: RecentHistoryOverflowBehavior;
+  readonly recentSparseRowDisplayMode: RecentSparseRowDisplayMode;
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
@@ -69,6 +70,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   recentHistoryLimit: 30,
   recentHistoryRetainedLimit: 30,
   recentHistoryOverflowBehavior: 'drop-oldest',
+  recentSparseRowDisplayMode: 'adaptive',
   bookmarkVisibilityScope: 'global',
   pinSaveStoragePreference: 'encrypted',
   privacyModeEnabled: false,
@@ -149,6 +151,9 @@ export function migrateLocalSettings(input: Partial<PlaintextLocalSettings>): Pl
     recentHistoryLimit,
     recentHistoryRetainedLimit,
     recentHistoryOverflowBehavior,
+    recentSparseRowDisplayMode: isRecentSparseRowDisplayMode(input.recentSparseRowDisplayMode)
+      ? input.recentSparseRowDisplayMode
+      : DEFAULT_LOCAL_SETTINGS.recentSparseRowDisplayMode,
     bookmarkVisibilityScope: input.bookmarkVisibilityScope === 'site' ? 'site' : 'global',
     pinSaveStoragePreference: isPinSaveStoragePreference(input.pinSaveStoragePreference)
       ? input.pinSaveStoragePreference
@@ -190,6 +195,10 @@ export function isPinSaveStoragePreference(value: unknown): value is PinSaveStor
 
 export function isRecentHistoryOverflowBehavior(value: unknown): value is RecentHistoryOverflowBehavior {
   return value === 'drop-oldest' || value === 'keep-session';
+}
+
+export function isRecentSparseRowDisplayMode(value: unknown): value is RecentSparseRowDisplayMode {
+  return value === 'adaptive' || value === 'full' || value === 'half' || value === 'compact';
 }
 
 function isSafeThrottle(value: unknown): value is number {

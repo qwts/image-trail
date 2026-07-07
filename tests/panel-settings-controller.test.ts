@@ -245,6 +245,19 @@ test('updateRecentHistoryRetention normalizes max kept recents to at least visib
   assert.equal(harness.getLocalSettings().recentHistoryRetainedLimit, 40);
 });
 
+test('updateRecentSparseRowDisplayMode persists and renders only on a change', () => {
+  const unchanged = createHarness();
+  unchanged.controller.updateRecentSparseRowDisplayMode('adaptive');
+  assert.deepEqual(unchanged.log, []);
+
+  const changed = createHarness();
+  changed.controller.updateRecentSparseRowDisplayMode('compact');
+  assert.equal(changed.getState().recentSparseRowDisplayMode, 'compact');
+  assert.equal(changed.getLocalSettings().recentSparseRowDisplayMode, 'compact');
+  assert.deepEqual(changed.log, ['render']);
+  assert.equal(changed.saved.length, 1);
+});
+
 test('updatePinSaveStoragePreference persists and renders only on a change', () => {
   const unchanged = createHarness();
   unchanged.controller.updatePinSaveStoragePreference('encrypted');

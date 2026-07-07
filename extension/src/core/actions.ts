@@ -638,6 +638,8 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
         lastUpdatedAt: Date.now(),
       };
     }
+    case 'settings/update-recent-sparse-row-display-mode':
+      return { ...state, recentSparseRowDisplayMode: action.mode, lastUpdatedAt: Date.now() };
     case 'settings/update-pin-save-storage-preference':
       return { ...state, pinSaveStoragePreference: action.value, lastUpdatedAt: Date.now() };
     case 'settings/update-privacy-mode':

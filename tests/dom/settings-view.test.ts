@@ -41,7 +41,7 @@ test('recents settings dispatches visible and max kept limits', () => {
   const actions: PanelAction[] = [];
   const view = createSettingsView(
     30,
-    { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session' },
+    { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session', sparseRowDisplayMode: 'adaptive' },
     false,
     { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' },
     [],
@@ -83,13 +83,23 @@ test('recents settings dispatches visible and max kept limits', () => {
     retainedLimit: 3,
     overflowBehavior: 'keep-session',
   });
+
+  const sparseMode = Array.from(recents.querySelectorAll<HTMLSelectElement>('select')).find((select) => select.value === 'adaptive');
+  assert.ok(sparseMode);
+  sparseMode.value = 'compact';
+  sparseMode.dispatchEvent(new Event('change'));
+
+  assert.deepEqual(actions.at(-1), {
+    name: 'settings/update-recent-sparse-row-display-mode',
+    mode: 'compact',
+  });
 });
 
 test('the Failure feedback control dispatches the selected mode (#450)', () => {
   const actions: PanelAction[] = [];
   const view = createSettingsView(
     30,
-    { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session' },
+    { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session', sparseRowDisplayMode: 'adaptive' },
     false,
     { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' },
     [],
@@ -159,7 +169,7 @@ test('the Searchable metadata control dispatches the updated policy (#451)', () 
 test('settings exposes browser, panel, and legacy shortcut decisions', () => {
   const view = createSettingsView(
     30,
-    { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session' },
+    { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session', sparseRowDisplayMode: 'adaptive' },
     false,
     { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' },
     [],

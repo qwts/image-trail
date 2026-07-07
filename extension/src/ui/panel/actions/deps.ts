@@ -73,6 +73,7 @@ export interface PanelActionDeps {
     readonly retainedLimit: number;
     readonly overflowBehavior: PlaintextLocalSettings['recentHistoryOverflowBehavior'];
   }): Promise<void>;
+  updateRecentSparseRowDisplayMode(mode: PlaintextLocalSettings['recentSparseRowDisplayMode']): void;
   updatePinSaveStoragePreference(value: PlaintextLocalSettings['pinSaveStoragePreference']): void;
   updateUrlReviewStatusRetention(limit: number, clearAfterExport: boolean): Promise<void>;
   updateRequestThrottle(minimumIntervalMs: number, maxRequests: number, windowMs: number): void;

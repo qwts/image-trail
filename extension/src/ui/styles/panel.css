@@ -2370,9 +2370,14 @@
 }
 
 .image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list {
+  --image-trail-history-row-size: 120px;
+  --image-trail-history-row-gap: 6px;
+  --image-trail-history-viewport-size: calc(var(--image-trail-history-row-size) * 3 + var(--image-trail-history-row-gap) * 2);
+  --image-trail-history-half-row-size: calc((var(--image-trail-history-viewport-size) - var(--image-trail-history-row-gap)) / 2);
+
   grid-auto-rows: minmax(120px, max-content);
   align-content: start;
-  max-block-size: calc(120px * 3 + 6px * 2);
+  max-block-size: var(--image-trail-history-viewport-size);
   overflow-x: hidden;
   overflow-y: auto;
   padding-inline-end: 3px;
@@ -2383,6 +2388,40 @@
 
 .image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list.is-user-resized {
   block-size: max(120px, var(--image-trail-history-size));
+  max-block-size: none;
+}
+
+.image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list.is-sparse-adaptive:not(.is-user-resized) {
+  block-size: var(--image-trail-history-viewport-size);
+  grid-auto-rows: minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.image-trail-panel-root
+  .image-trail-panel__history-section
+  .image-trail-panel__record-list.is-sparse-adaptive.has-sparse-count-many:not(.is-user-resized) {
+  grid-auto-rows: minmax(120px, max-content);
+  align-content: start;
+}
+
+.image-trail-panel-root
+  .image-trail-panel__history-section
+  .image-trail-panel__record-list.is-sparse-full.has-sparse-count-1:not(.is-user-resized) {
+  block-size: var(--image-trail-history-viewport-size);
+  grid-auto-rows: minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list.is-sparse-half:not(.is-user-resized) {
+  block-size: var(--image-trail-history-viewport-size);
+  grid-auto-rows: minmax(var(--image-trail-history-half-row-size), max-content);
+  align-content: start;
+}
+
+.image-trail-panel-root
+  .image-trail-panel__detached-body
+  .image-trail-panel__history-section
+  .image-trail-panel__record-list:not(.is-user-resized) {
   max-block-size: none;
 }
 
@@ -2633,6 +2672,10 @@
   overflow: hidden;
 }
 
+.image-trail-panel-root .image-trail-panel__record-list:not(.is-sparse-compact) .image-trail-panel__history-item {
+  align-items: start;
+}
+
 .image-trail-panel-root .image-trail-panel__history-item > .image-trail-panel__record-thumbnail,
 .image-trail-panel-root .image-trail-panel__bookmark-item > .image-trail-panel__record-thumbnail {
   position: absolute;
@@ -2734,6 +2777,10 @@
   min-width: 0;
   max-width: 100%;
   padding: 4px 0 4px 84px;
+}
+
+.image-trail-panel-root .image-trail-panel__record-list:not(.is-sparse-compact) .image-trail-panel__history-label {
+  align-self: start;
 }
 
 .image-trail-panel-root .image-trail-panel__bookmark-label .image-trail-panel__record-extension-wrap,

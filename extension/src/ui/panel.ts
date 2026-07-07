@@ -627,6 +627,7 @@ export class ImageTrailPanel {
       deleteRecallBookmarks: () => this.recordLibrary.deleteRecallBookmarks(),
       updateVisibleBookmarkSoftMax: (value) => this.panelSettings.updateVisibleBookmarkSoftMax(value),
       updateRecentHistoryRetention: (input) => this.panelSettings.updateRecentHistoryRetention(input),
+      updateRecentSparseRowDisplayMode: (mode) => this.panelSettings.updateRecentSparseRowDisplayMode(mode),
       updatePinSaveStoragePreference: (value) => this.panelSettings.updatePinSaveStoragePreference(value),
       updateUrlReviewStatusRetention: (limit, clearAfterExport) =>
         this.panelSettings.updateUrlReviewStatusRetention(limit, clearAfterExport),

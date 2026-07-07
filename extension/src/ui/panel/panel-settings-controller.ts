@@ -70,6 +70,7 @@ export class PanelSettingsController {
       recentHistoryLimit: settings.recentHistoryLimit,
       recentHistoryRetainedLimit: settings.recentHistoryRetainedLimit,
       recentHistoryOverflowBehavior: settings.recentHistoryOverflowBehavior,
+      recentSparseRowDisplayMode: settings.recentSparseRowDisplayMode,
       pinSaveStoragePreference: settings.pinSaveStoragePreference,
       privacyModeEnabled: settings.privacyModeEnabled,
       searchableMetadataPolicy: settings.searchableMetadataPolicy,
@@ -165,6 +166,13 @@ export class PanelSettingsController {
       await this.deps.loadRecentHistory();
       return;
     }
+    this.deps.render();
+  }
+
+  updateRecentSparseRowDisplayMode(mode: PlaintextLocalSettings['recentSparseRowDisplayMode']): void {
+    if (mode === this.deps.getState().recentSparseRowDisplayMode) return;
+    this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'settings/update-recent-sparse-row-display-mode', mode }));
+    this.saveLocalSettings({ ...this.deps.getLocalSettings(), recentSparseRowDisplayMode: mode });
     this.deps.render();
   }
 

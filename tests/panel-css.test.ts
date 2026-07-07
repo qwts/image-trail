@@ -17,7 +17,11 @@ test('Recents list uses stable 120px rows with a one-to-three-row viewport (#446
 
   assert.match(body, /grid-auto-rows:\s*minmax\(120px,\s*max-content\);/u);
   assert.match(body, /align-content:\s*start;/u);
-  assert.match(body, /max-block-size:\s*calc\(120px \* 3 \+ 6px \* 2\);/u);
+  assert.match(
+    body,
+    /--image-trail-history-viewport-size:\s*calc\(var\(--image-trail-history-row-size\) \* 3 \+ var\(--image-trail-history-row-gap\) \* 2\);/u,
+  );
+  assert.match(body, /max-block-size:\s*var\(--image-trail-history-viewport-size\);/u);
   assert.match(body, /overflow-y:\s*auto;/u);
 });
 
@@ -26,4 +30,22 @@ test('user-resized Recents changes the viewport, not the row height (#446)', () 
 
   assert.match(body, /block-size:\s*max\(120px,\s*var\(--image-trail-history-size\)\);/u);
   assert.match(body, /max-block-size:\s*none;/u);
+});
+
+test('Recents sparse-row modes opt into full and half viewport rows (#452)', () => {
+  const adaptive = cssRule(
+    '.image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list.is-sparse-adaptive:not(.is-user-resized)',
+  );
+  const full = cssRule(
+    '.image-trail-panel-root\n  .image-trail-panel__history-section\n  .image-trail-panel__record-list.is-sparse-full.has-sparse-count-1:not(.is-user-resized)',
+  );
+  const half = cssRule(
+    '.image-trail-panel-root .image-trail-panel__history-section .image-trail-panel__record-list.is-sparse-half:not(.is-user-resized)',
+  );
+
+  assert.match(adaptive, /block-size:\s*var\(--image-trail-history-viewport-size\);/u);
+  assert.match(adaptive, /grid-auto-rows:\s*minmax\(0,\s*1fr\);/u);
+  assert.match(full, /block-size:\s*var\(--image-trail-history-viewport-size\);/u);
+  assert.match(full, /grid-auto-rows:\s*minmax\(0,\s*1fr\);/u);
+  assert.match(half, /grid-auto-rows:\s*minmax\(var\(--image-trail-history-half-row-size\),\s*max-content\);/u);
 });

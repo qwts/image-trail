@@ -1,11 +1,19 @@
 import { RECENT_HISTORY_LIMITS, RECENT_HISTORY_RETAINED_LIMITS } from '../../core/settings.js';
-import type { PanelAction, RecentHistoryOverflowBehavior } from '../../core/types.js';
+import type { PanelAction, RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from '../../core/types.js';
+
+const SPARSE_ROW_DISPLAY_MODES: readonly { readonly value: RecentSparseRowDisplayMode; readonly label: string }[] = [
+  { value: 'adaptive', label: 'Adaptive' },
+  { value: 'full', label: 'Full' },
+  { value: 'half', label: 'Half' },
+  { value: 'compact', label: 'Compact' },
+];
 
 export function createRecentsSettingsView(
   state: {
     readonly limit: number;
     readonly retainedLimit: number;
     readonly overflowBehavior: RecentHistoryOverflowBehavior;
+    readonly sparseRowDisplayMode: RecentSparseRowDisplayMode;
   },
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
@@ -26,6 +34,9 @@ export function createRecentsSettingsView(
     createOption('drop-oldest', 'Drop oldest', state.overflowBehavior),
     createOption('keep-session', 'Keep hidden this session', state.overflowBehavior),
   );
+  const sparseModeSelect = document.createElement('select');
+  sparseModeSelect.className = 'image-trail-panel__settings-select';
+  sparseModeSelect.append(...SPARSE_ROW_DISPLAY_MODES.map((option) => createSparseModeOption(option, state.sparseRowDisplayMode)));
 
   const apply = document.createElement('button');
   apply.type = 'submit';
@@ -53,6 +64,11 @@ export function createRecentsSettingsView(
       overflowBehavior: 'keep-session',
     });
   });
+  sparseModeSelect.addEventListener('change', () => {
+    const mode = recentSparseRowDisplayModeFrom(sparseModeSelect.value);
+    if (!mode) return;
+    dispatch({ name: 'settings/update-recent-sparse-row-display-mode', mode });
+  });
 
   const meta = document.createElement('p');
   meta.className = 'image-trail-panel__settings-empty';
@@ -62,6 +78,7 @@ export function createRecentsSettingsView(
     createField('Visible recents', limitInput),
     createField('Max kept recents', retainedLimitInput),
     createField('Overflow', overflowSelect),
+    createField('Sparse rows', sparseModeSelect),
     apply,
     showHidden,
   );
@@ -104,4 +121,19 @@ function createOption(
 
 function recentHistoryOverflowBehaviorFrom(value: string): RecentHistoryOverflowBehavior | null {
   return value === 'drop-oldest' || value === 'keep-session' ? value : null;
+}
+
+function createSparseModeOption(
+  option: { readonly value: RecentSparseRowDisplayMode; readonly label: string },
+  selectedValue: RecentSparseRowDisplayMode,
+): HTMLOptionElement {
+  const element = document.createElement('option');
+  element.value = option.value;
+  element.textContent = option.label;
+  element.selected = option.value === selectedValue;
+  return element;
+}
+
+function recentSparseRowDisplayModeFrom(value: string): RecentSparseRowDisplayMode | null {
+  return value === 'adaptive' || value === 'full' || value === 'half' || value === 'compact' ? value : null;
 }

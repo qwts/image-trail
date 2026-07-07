@@ -3,7 +3,7 @@ import type { ImageProbeMethod } from '../../core/image/request-policy.js';
 import { isLoadFailureFeedback, type LoadFailureFeedback } from '../../core/settings.js';
 import { isSearchableMetadataMode, type SearchableMetadataMode, type SearchableMetadataPolicy } from '../../core/metadata-policy.js';
 import { buildIdentityRows, type BuildIdentity } from '../../core/build-info.js';
-import type { PanelAction, PinSaveStoragePreference, RecentHistoryOverflowBehavior } from '../../core/types.js';
+import type { PanelAction, PinSaveStoragePreference, RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from '../../core/types.js';
 import { createPanelLayoutSettingsView } from './panel-layout-settings-view.js';
 import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from '../../core/url/templates.js';
 import {
@@ -44,6 +44,7 @@ export function createSettingsView(
     readonly limit: number;
     readonly retainedLimit: number;
     readonly overflowBehavior: RecentHistoryOverflowBehavior;
+    readonly sparseRowDisplayMode: RecentSparseRowDisplayMode;
   },
   privacyModeEnabled: boolean,
   searchableMetadataPolicy: SearchableMetadataPolicy,

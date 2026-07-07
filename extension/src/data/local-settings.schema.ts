@@ -19,6 +19,7 @@ export const plaintextLocalSettingsSchema = v.object({
   recentHistoryLimit: v.number(),
   recentHistoryRetainedLimit: v.number(),
   recentHistoryOverflowBehavior: v.picklist(['drop-oldest', 'keep-session']),
+  recentSparseRowDisplayMode: v.picklist(['adaptive', 'full', 'half', 'compact']),
   bookmarkVisibilityScope: v.picklist(['global', 'site']),
   pinSaveStoragePreference: v.picklist(['encrypted', 'plaintext']),
   privacyModeEnabled: v.boolean(),

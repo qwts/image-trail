@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createHistoryView } from '../../extension/src/ui/components/history-view.js';
 import { resetPreviewRowClickTracking } from '../../extension/src/ui/components/record-row-preview-click.js';
 import type { ImageDisplayRecord } from '../../extension/src/core/display-records.js';
+import type { RecentSparseRowDisplayMode } from '../../extension/src/core/types.js';
 
 const record: ImageDisplayRecord = {
   id: 'recent-1',
@@ -18,6 +19,7 @@ function buildHistoryView(
   items: readonly ImageDisplayRecord[] = [record],
   sectionOpen = true,
   collapsible = true,
+  sparseRowDisplayMode: RecentSparseRowDisplayMode = 'adaptive',
 ): HTMLElement {
   return createHistoryView(items, selectedIds, false, true, (action) => actions.push(action), {
     blobKeyAvailable: true,
@@ -25,6 +27,7 @@ function buildHistoryView(
     collapsible,
     listBlockSize: null,
     onListResize: () => undefined,
+    sparseRowDisplayMode,
   });
 }
 
@@ -235,4 +238,38 @@ test('a non-collapsible render (detached window) has no toggle affordance (#441)
 
   header.click();
   assert.deepEqual(actions, [], 'a detached header click must not flip the hidden attached collapse state');
+});
+
+test('recents render the selected sparse-row display mode and sparse count class', () => {
+  const actions: unknown[] = [];
+  const second = { ...record, id: 'recent-2', url: 'https://images.example.test/recent/photo_0043.jpg' };
+  const view = buildHistoryView(actions, [], [record, second], true, true, 'half');
+  const list = view.querySelector<HTMLElement>('.image-trail-panel__record-list');
+
+  assert.ok(list);
+  assert.equal(list.dataset['sparseRowMode'], 'half');
+  assert.equal(list.classList.contains('is-sparse-half'), true);
+  assert.equal(list.classList.contains('has-sparse-count-2'), true);
+});
+
+test('privacy mode keeps masked sparse rows free of record metadata in visible text and titles', () => {
+  const actions: unknown[] = [];
+  const view = createHistoryView([record], [], false, true, (action) => actions.push(action), {
+    blobKeyAvailable: true,
+    sectionOpen: true,
+    collapsible: true,
+    listBlockSize: null,
+    onListResize: () => undefined,
+    sparseRowDisplayMode: 'full',
+    privacyMode: true,
+  });
+  const row = rowFor(view, 'recent-1');
+
+  assert.match(row.textContent ?? '', /Private image/u);
+  assert.doesNotMatch(row.textContent ?? '', /photo_0042\.jpg/u);
+  assert.equal(
+    row.querySelector<HTMLElement>('.image-trail-panel__bookmark-name')?.title,
+    'Privacy mode is hiding this image metadata for screen sharing.',
+  );
+  assert.equal(row.querySelector<HTMLElement>('.image-trail-panel__record-row-meta')?.title, 'Details hidden');
 });

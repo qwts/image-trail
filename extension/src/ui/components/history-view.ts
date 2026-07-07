@@ -1,4 +1,5 @@
 import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
+import type { RecentSparseRowDisplayMode } from '../../core/types.js';
 import { createPrivacyThumbnail, PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordExtensionLabel, recordTitle } from './record-metadata.js';
 import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { selectedRangeIds } from './selection-ranges.js';
@@ -23,6 +24,7 @@ interface HistoryViewOptions {
   readonly collapsible?: boolean;
   readonly listBlockSize: number | null;
   readonly onListResize: (blockSize: number) => void;
+  readonly sparseRowDisplayMode: RecentSparseRowDisplayMode;
   readonly privacyMode?: boolean;
 }
 
@@ -89,7 +91,9 @@ export function createHistoryView(
   }
 
   const list = document.createElement('ol');
-  list.className = 'image-trail-panel__record-list';
+  const sparseRowDisplayMode = options?.sparseRowDisplayMode ?? 'adaptive';
+  list.className = `image-trail-panel__record-list is-sparse-${sparseRowDisplayMode} ${sparseCountClass(items.length)}`;
+  list.dataset['sparseRowMode'] = sparseRowDisplayMode;
   if (options?.listBlockSize !== null && options?.listBlockSize !== undefined) {
     list.classList.add('is-user-resized');
     list.style.setProperty('--image-trail-history-size', `${options.listBlockSize}px`);
@@ -193,7 +197,7 @@ export function createHistoryView(
     const visual = createRecordVisual(item, options);
     const label = document.createElement('div');
     label.className = 'image-trail-panel__history-label';
-    const source = createHistoryExtensionIndicator(item);
+    const source = createHistoryExtensionIndicator(item, options);
     const name = document.createElement('span');
     name.className = 'image-trail-panel__bookmark-name';
     name.textContent = options?.privacyMode && item.privacyStatus !== 'locked' ? PRIVACY_RECORD_NAME : (item.label ?? item.url);
@@ -293,6 +297,13 @@ export function createHistoryView(
   return section;
 }
 
+function sparseCountClass(count: number): string {
+  if (count <= 1) return 'has-sparse-count-1';
+  if (count === 2) return 'has-sparse-count-2';
+  if (count === 3) return 'has-sparse-count-3';
+  return 'has-sparse-count-many';
+}
+
 function isLockedEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked: boolean): boolean {
   return !!encryptedBlobIdForRecord(item) && !blobKeyUnlocked;
 }
@@ -333,13 +344,13 @@ function createRecordVisual(item: ImageDisplayRecord, options: { readonly privac
   return fallback;
 }
 
-function createHistoryExtensionIndicator(item: ImageDisplayRecord): HTMLElement {
+function createHistoryExtensionIndicator(item: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
   const wrapper = document.createElement('span');
   wrapper.className = 'image-trail-panel__record-extension-wrap';
 
   const source = document.createElement('span');
   source.className = 'image-trail-panel__bookmark-source';
-  source.textContent = recordExtensionLabel(item);
+  source.textContent = options.privacyMode && item.privacyStatus !== 'locked' ? 'PRIVATE' : recordExtensionLabel(item);
   source.title = source.textContent;
   wrapper.append(source);
 
