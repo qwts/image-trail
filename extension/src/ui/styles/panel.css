@@ -2784,7 +2784,11 @@
 }
 
 .image-trail-panel-root .image-trail-panel__record-list:not(.is-sparse-compact) .image-trail-panel__history-label {
+  grid-column: 1 / -1;
   align-self: start;
+  justify-self: start;
+  padding: 4px 6px;
+  max-inline-size: calc(100% - 12px);
 }
 
 .image-trail-panel-root .image-trail-panel__bookmark-label .image-trail-panel__record-extension-wrap,

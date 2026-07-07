@@ -49,3 +49,13 @@ test('Recents sparse-row modes opt into full and half viewport rows (#452)', () 
   assert.match(full, /grid-auto-rows:\s*minmax\(0,\s*1fr\);/u);
   assert.match(half, /grid-auto-rows:\s*minmax\(var\(--image-trail-history-half-row-size\),\s*max-content\);/u);
 });
+
+test('Recents non-compact sparse-row metadata anchors to the row top-left (#452)', () => {
+  const body = cssRule('.image-trail-panel-root .image-trail-panel__record-list:not(.is-sparse-compact) .image-trail-panel__history-label');
+
+  assert.match(body, /grid-column:\s*1\s*\/\s*-1;/u);
+  assert.match(body, /align-self:\s*start;/u);
+  assert.match(body, /justify-self:\s*start;/u);
+  assert.match(body, /padding:\s*4px\s+6px;/u);
+  assert.doesNotMatch(body, /padding:[^;]*84px/u);
+});
