@@ -280,11 +280,12 @@ test('Recall is disabled when the queue is empty', () => {
   assert.equal(buttonByText(view, 'Recall').disabled, true);
 });
 
-test('the queue toolbar renders inside the section header row (#430)', () => {
+test('the Queue sort control stays in the section header while actions render below it (#448)', () => {
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions);
   const toolbar = view.querySelector('.image-trail-panel__section-header--with-actions .image-trail-panel__bookmark-toolbar');
-  assert.ok(toolbar, 'the toolbar lives in the header row, not on a floating row below it');
+  assert.ok(toolbar?.querySelector('select[aria-label="Queue order"]'));
+  assert.ok(view.querySelector('.image-trail-panel__bookmark-actions'), 'Queue actions stay outside the constrained header grid');
 });
 
 test('the heading toggle collapses and expands the queue section (#438)', () => {
@@ -301,12 +302,12 @@ test('the heading toggle collapses and expands the queue section (#438)', () => 
   assert.deepEqual(actions, [{ name: 'panel/bookmarks-section-open', open: false }]);
 });
 
-test('a collapsed queue section keeps its header actions but hides the rows (#438)', () => {
+test('a collapsed queue section keeps its actions but hides the rows (#438)', () => {
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions, { sectionOpen: false });
   assert.equal(view.querySelector('.image-trail-panel__record-list'), null, 'the list is hidden while collapsed');
   const pinCurrent = [...view.querySelectorAll('button')].find((button) => button.textContent === 'Pin current');
-  assert.ok(pinCurrent, 'the header toolbar stays usable while collapsed');
+  assert.ok(pinCurrent, 'the action row stays usable while collapsed');
 
   pinCurrent.click();
   assert.deepEqual(actions, [{ name: 'pin/current' }], 'toolbar clicks never toggle the collapse');

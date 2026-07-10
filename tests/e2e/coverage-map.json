@@ -774,7 +774,7 @@
             "tests/dom/bookmarks-view.test.ts",
             "tests/data-crypto.test.ts"
           ],
-          "notes": "Covers stable Recents timestamp order, Queue queueUpdatedAt front/back display paging across the full durable list, preference migration, privacy-inert static control labels, and Front/Back pager behavior without changing Recall's canonical order."
+          "notes": "Covers stable Recents timestamp order, Queue queueUpdatedAt front/back display paging across the full durable list, one-line collapse headers with static sort controls and persistent bulk-action rows, preference migration, privacy-inert static control labels, and Front/Back pager behavior without changing Recall's canonical order."
         },
         {
           "type": "manual",

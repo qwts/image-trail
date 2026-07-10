@@ -125,7 +125,7 @@ test('dragging a section by its heading detaches it at the drop position', () =>
 test('a surface drag starting on an interactive control never detaches', () => {
   const harness = createHarness();
   harness.render(panelState());
-  const toolbarButton = harness.root.querySelector<HTMLButtonElement>('.image-trail-panel__history-toolbar button');
+  const toolbarButton = harness.root.querySelector<HTMLButtonElement>('.image-trail-panel__history-actions button');
   assert.ok(toolbarButton instanceof HTMLButtonElement);
 
   toolbarButton.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 60, clientY: 60, bubbles: true, cancelable: true }));
