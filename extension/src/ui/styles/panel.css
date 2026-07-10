@@ -1272,6 +1272,16 @@
   min-width: 0;
 }
 
+/* Keep bulk controls out of the collapsible heading grid: sorting remains in the header while
+   existing Queue/Recents actions stay available in a predictable row when the list is collapsed. */
+.image-trail-panel-root .image-trail-panel__section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
 .image-trail-panel-root .image-trail-panel__bookmark-toolbar .image-trail-panel__primary-action {
   text-align: center;
 }

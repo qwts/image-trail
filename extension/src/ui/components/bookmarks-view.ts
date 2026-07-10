@@ -201,7 +201,10 @@ export function createBookmarksView(
 
   const toolbar = document.createElement('div');
   toolbar.className = 'image-trail-panel__bookmark-toolbar';
-  toolbar.append(createQueueSortControl(options.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER, dispatch), add, recallButton, queueMenu);
+  toolbar.append(createQueueSortControl(options.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER, dispatch));
+  const sectionActions = document.createElement('div');
+  sectionActions.className = 'image-trail-panel__section-actions image-trail-panel__bookmark-actions';
+  sectionActions.append(add, recallButton, queueMenu);
 
   const pageMeta = document.createElement('p');
   pageMeta.className = 'image-trail-panel__meta';
@@ -390,11 +393,11 @@ export function createBookmarksView(
     selectedIds.length > 0
       ? `${selectedIds.length} queue row(s) selected for export.`
       : 'Cmd/Ctrl-click rows to select queue rows for export. Shift-click selects a range.';
-  // The toolbar lives in the header row (#430) so the heading line carries the section's actions
-  // instead of leaving a dead row above a full-width button strip.
+  // Keep the sort control in the one-line heading. Queue actions stay visible while collapsed, but
+  // render in their own row so they cannot wrap the collapse toggle header (#438/#448).
   header.append(toolbar);
-  section.append(header);
-  // Collapsed (#438): the header row (heading toggle + actions + detach) stays; the content hides.
+  section.append(header, sectionActions);
+  // Collapsed (#438): the heading and action rows stay; the content hides.
   if (sectionOpen) {
     section.append(statusRow, items.length ? selectionMeta : empty);
     if (items.length) section.append(list);

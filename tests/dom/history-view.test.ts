@@ -197,11 +197,12 @@ test('stored recent rows render the original indicator', () => {
   assert.ok(row.querySelector('.image-trail-panel__stored-original-dot'));
 });
 
-test('the recents toolbar renders inside the section header row (#430)', () => {
+test('the Recents sort control stays in the section header while bulk actions render below it (#448)', () => {
   const actions: unknown[] = [];
   const view = buildHistoryView(actions);
   const toolbar = view.querySelector('.image-trail-panel__section-header--with-actions .image-trail-panel__history-toolbar');
-  assert.ok(toolbar, 'the toolbar lives in the header row, not on a floating row below it');
+  assert.ok(toolbar?.querySelector('select[aria-label="Sort Recents"]'));
+  assert.ok(view.querySelector('.image-trail-panel__history-actions'), 'bulk actions stay outside the constrained header grid');
 });
 
 test('Recents sort control orders timestamps stably and dispatches its persisted display setting', () => {
@@ -243,14 +244,14 @@ test('the heading toggle collapses and expands the recents section (#438)', () =
   assert.deepEqual(actions, [{ name: 'panel/history-section-open', open: false }]);
 });
 
-test('a collapsed recents section keeps its header actions but hides the list (#438)', () => {
+test('a collapsed recents section keeps bulk actions but hides the list (#438)', () => {
   const actions: unknown[] = [];
   const view = buildHistoryView(actions, [], [record], false);
   assert.equal(view.querySelector('.image-trail-panel__record-list'), null, 'the list is hidden while collapsed');
   const selectAll = [...view.querySelectorAll('button')].find((button) => button.textContent === 'Select all recents');
-  assert.ok(selectAll, 'the header toolbar stays usable while collapsed');
+  assert.ok(selectAll, 'the bulk-action row stays usable while collapsed');
 
-  // Toolbar clicks are plain sibling buttons — they must never toggle the collapse.
+  // Bulk-action clicks are outside the toggle — they must never toggle the collapse.
   selectAll.click();
   assert.deepEqual(actions, [{ name: 'history-selection/select', ids: [record.id] }]);
 });

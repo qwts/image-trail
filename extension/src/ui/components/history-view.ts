@@ -81,6 +81,8 @@ export function createHistoryView(
   const toolbar = document.createElement('div');
   toolbar.className = 'image-trail-panel__history-toolbar';
   toolbar.append(createRecentSortControl(options?.displayOrder ?? DEFAULT_RECENT_DISPLAY_ORDER, dispatch));
+  const sectionActions = document.createElement('div');
+  sectionActions.className = 'image-trail-panel__section-actions image-trail-panel__history-actions';
   if (displayItems.length > 0) {
     const selectAll = document.createElement('button');
     selectAll.type = 'button';
@@ -92,7 +94,7 @@ export function createHistoryView(
     deleteAll.type = 'button';
     deleteAll.textContent = `Delete recents (${displayItems.length})`;
     deleteAll.addEventListener('click', () => dispatch({ name: 'history/delete-all' }));
-    toolbar.append(selectAll, deleteAll);
+    sectionActions.append(selectAll, deleteAll);
   }
 
   const list = document.createElement('ol');
@@ -295,11 +297,12 @@ export function createHistoryView(
     selectedIds.length > 0
       ? `${selectedIds.length} recent item(s) selected for export.`
       : 'Cmd/Ctrl-click rows to select recent items for export. Shift-click selects a range.';
-  // The toolbar lives in the header row (#430) so the heading line carries the section's actions
-  // instead of leaving a dead row above a floating button strip.
+  // Keep the sort control in the one-line heading. Bulk actions stay visible while collapsed, but
+  // render in their own row so they cannot wrap the collapse toggle header (#438/#448).
   header.append(toolbar);
   section.append(header);
-  // Collapsed (#438): the header row (heading toggle + actions + detach) stays; the content hides.
+  if (displayItems.length) section.append(sectionActions);
+  // Collapsed (#438): the heading and bulk-action rows stay; the list content hides.
   if (sectionOpen) {
     section.append(displayItems.length ? selectionMeta : empty);
     if (displayItems.length) section.append(list);
