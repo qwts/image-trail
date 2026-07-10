@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
 import { IndexedDbBookmarkStore } from '../extension/src/data/bookmarks-controller.js';
-import { createDisplayRecord } from '../extension/src/core/display-records.js';
+import { createDisplayRecord, type ImageDisplayRecord } from '../extension/src/core/display-records.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
 import { deleteImageTrailDb } from './indexeddb-test-helpers.js';
 
@@ -34,6 +34,49 @@ test('IndexedDbBookmarkStore recalls saved bookmarks after a new store instance 
     assert.equal(page.hasNewer, false);
   } finally {
     await reloadedStore.close();
+  }
+});
+
+test('IndexedDbBookmarkStore applies back-first display order before Queue pagination without changing Recall order', async () => {
+  await deleteImageTrailDb();
+  const store = new IndexedDbBookmarkStore();
+  try {
+    const saved: ImageDisplayRecord[] = [];
+    for (const [id, timestamp] of [
+      ['back', '2026-06-19T00:00:00.000Z'],
+      ['middle', '2026-06-19T00:00:01.000Z'],
+      ['front', '2026-06-19T00:00:02.000Z'],
+    ]) {
+      saved.push(
+        await store.save(
+          createDisplayRecord({
+            id: `https://example.test/${id}.jpg`,
+            url: `https://example.test/${id}.jpg`,
+            timestamp,
+            source: 'bookmark',
+          }),
+        ),
+      );
+    }
+
+    const backFirst = await store.loadPage({ offset: 0, limit: 2, displayOrder: 'back-first' });
+    const backFirstNext = await store.loadPage({ offset: 2, limit: 2, displayOrder: 'back-first' });
+    const recall = await store.loadRecallPage({ offset: 0, limit: 3, scope: 'global' });
+
+    assert.deepEqual(
+      backFirst.items.map((item) => item.id),
+      [saved[0]!.id, saved[1]!.id],
+    );
+    assert.deepEqual(
+      backFirstNext.items.map((item) => item.id),
+      [saved[2]!.id],
+    );
+    assert.deepEqual(
+      recall.items.map((item) => item.id),
+      [saved[2]!.id, saved[1]!.id, saved[0]!.id],
+    );
+  } finally {
+    await store.close();
   }
 });
 

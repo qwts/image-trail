@@ -640,6 +640,10 @@ export function reducePanelAction(state: PanelState, action: PanelAction): Panel
     }
     case 'settings/update-recent-sparse-row-display-mode':
       return { ...state, recentSparseRowDisplayMode: action.mode, lastUpdatedAt: Date.now() };
+    case 'history/update-display-order':
+      return { ...state, recentDisplayOrder: action.order, lastUpdatedAt: Date.now() };
+    case 'bookmarks/update-display-order':
+      return { ...state, queueDisplayOrder: action.order, bookmarkOffset: 0, lastUpdatedAt: Date.now() };
     case 'settings/update-pin-save-storage-preference':
       return { ...state, pinSaveStoragePreference: action.value, lastUpdatedAt: Date.now() };
     case 'settings/update-privacy-mode':

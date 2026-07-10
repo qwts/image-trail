@@ -12,6 +12,8 @@ export type PanelSettingsActionName =
   | 'settings/update-visible-bookmark-soft-max'
   | 'settings/update-recent-history-retention'
   | 'settings/update-recent-sparse-row-display-mode'
+  | 'history/update-display-order'
+  | 'bookmarks/update-display-order'
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
   | 'settings/update-metadata-policy'
@@ -96,6 +98,22 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
     'settings/update-recent-sparse-row-display-mode': {
       handle(action) {
         deps.updateRecentSparseRowDisplayMode(action.mode);
+      },
+    },
+    'history/update-display-order': {
+      handle(action) {
+        if (deps.getState().recentDisplayOrder === action.order) return;
+        deps.reduce(action);
+        deps.saveLocalSettings({ ...deps.getLocalSettings(), recentDisplayOrder: action.order });
+        deps.render();
+      },
+    },
+    'bookmarks/update-display-order': {
+      handle(action) {
+        if (deps.getState().queueDisplayOrder === action.order) return;
+        deps.reduce(action);
+        deps.saveLocalSettings({ ...deps.getLocalSettings(), queueDisplayOrder: action.order });
+        void deps.loadBookmarkPage(0, { render: false }).then(() => deps.render());
       },
     },
     'settings/update-pin-save-storage-preference': {

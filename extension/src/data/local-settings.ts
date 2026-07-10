@@ -26,6 +26,14 @@ import {
 } from '../core/metadata-policy.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT, isObjectFitMode, type ObjectFitMode } from '../core/preview-style.js';
 import type { PinSaveStoragePreference, RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from '../core/types.js';
+import {
+  DEFAULT_QUEUE_DISPLAY_ORDER,
+  DEFAULT_RECENT_DISPLAY_ORDER,
+  isQueueDisplayOrder,
+  isRecentDisplayOrder,
+  type QueueDisplayOrder,
+  type RecentDisplayOrder,
+} from '../core/display-order.js';
 
 export interface PlaintextLocalSettings {
   readonly schemaVersion: 1;
@@ -40,7 +48,9 @@ export interface PlaintextLocalSettings {
   readonly recentHistoryRetainedLimit: number;
   readonly recentHistoryOverflowBehavior: RecentHistoryOverflowBehavior;
   readonly recentSparseRowDisplayMode: RecentSparseRowDisplayMode;
+  readonly recentDisplayOrder: RecentDisplayOrder;
   readonly bookmarkVisibilityScope: 'global' | 'site';
+  readonly queueDisplayOrder: QueueDisplayOrder;
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
   readonly searchableMetadataPolicy: SearchableMetadataPolicy;
@@ -71,7 +81,9 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   recentHistoryRetainedLimit: 30,
   recentHistoryOverflowBehavior: 'drop-oldest',
   recentSparseRowDisplayMode: 'adaptive',
+  recentDisplayOrder: DEFAULT_RECENT_DISPLAY_ORDER,
   bookmarkVisibilityScope: 'global',
+  queueDisplayOrder: DEFAULT_QUEUE_DISPLAY_ORDER,
   pinSaveStoragePreference: 'encrypted',
   privacyModeEnabled: false,
   searchableMetadataPolicy: DEFAULT_SEARCHABLE_METADATA_POLICY,
@@ -158,7 +170,9 @@ export function migrateLocalSettings(input: LocalSettingsMigrationInput): Plaint
     recentSparseRowDisplayMode: isRecentSparseRowDisplayMode(input.recentSparseRowDisplayMode)
       ? input.recentSparseRowDisplayMode
       : DEFAULT_LOCAL_SETTINGS.recentSparseRowDisplayMode,
+    recentDisplayOrder: isRecentDisplayOrder(input.recentDisplayOrder) ? input.recentDisplayOrder : DEFAULT_RECENT_DISPLAY_ORDER,
     bookmarkVisibilityScope: input.bookmarkVisibilityScope === 'site' ? 'site' : 'global',
+    queueDisplayOrder: isQueueDisplayOrder(input.queueDisplayOrder) ? input.queueDisplayOrder : DEFAULT_QUEUE_DISPLAY_ORDER,
     pinSaveStoragePreference: isPinSaveStoragePreference(input.pinSaveStoragePreference)
       ? input.pinSaveStoragePreference
       : DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference,

@@ -1,4 +1,5 @@
 import { encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
+import { DEFAULT_QUEUE_DISPLAY_ORDER, type QueueDisplayOrder } from '../../core/display-order.js';
 import { createPrivacyThumbnail, recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitle } from './record-metadata.js';
 import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { selectedRangeIds } from './selection-ranges.js';
@@ -13,8 +14,9 @@ type BookmarkAction =
   | { readonly name: 'bookmark-selection/single'; readonly id: string }
   | { readonly name: 'bookmark-selection/select'; readonly ids: readonly string[]; readonly mode?: 'replace' | 'add' }
   | { readonly name: 'bookmark-selection/clear' }
-  | { readonly name: 'bookmarks/older' }
-  | { readonly name: 'bookmarks/newer' }
+  | { readonly name: 'bookmarks/page-front' }
+  | { readonly name: 'bookmarks/page-back' }
+  | { readonly name: 'bookmarks/update-display-order'; readonly order: QueueDisplayOrder }
   | { readonly name: 'bookmarks/toggle-scope' }
   | { readonly name: 'bookmarks/clear-visible' }
   | { readonly name: 'bookmarks/reload' }
@@ -47,7 +49,12 @@ export function createBookmarksView(
     readonly hasNewer: boolean;
   },
   recall: { readonly recallOpen: boolean },
-  options: { readonly privacyMode?: boolean; readonly sectionOpen?: boolean; readonly collapsible?: boolean },
+  options: {
+    readonly privacyMode?: boolean;
+    readonly sectionOpen?: boolean;
+    readonly collapsible?: boolean;
+    readonly displayOrder?: QueueDisplayOrder | undefined;
+  },
   dispatch: (action: BookmarkAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
@@ -194,7 +201,7 @@ export function createBookmarksView(
 
   const toolbar = document.createElement('div');
   toolbar.className = 'image-trail-panel__bookmark-toolbar';
-  toolbar.append(add, recallButton, queueMenu);
+  toolbar.append(createQueueSortControl(options.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER, dispatch), add, recallButton, queueMenu);
 
   const pageMeta = document.createElement('p');
   pageMeta.className = 'image-trail-panel__meta';
@@ -207,17 +214,18 @@ export function createBookmarksView(
 
   const pager = document.createElement('div');
   pager.className = 'image-trail-panel__bookmark-pager';
-  const newer = document.createElement('button');
-  newer.type = 'button';
-  newer.textContent = 'Newer';
-  newer.disabled = !page.hasNewer;
-  newer.addEventListener('click', () => dispatch({ name: 'bookmarks/newer' }));
-  const older = document.createElement('button');
-  older.type = 'button';
-  older.textContent = 'Older';
-  older.disabled = !page.hasOlder;
-  older.addEventListener('click', () => dispatch({ name: 'bookmarks/older' }));
-  pager.append(newer, older);
+  const displayOrder = options.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER;
+  const front = document.createElement('button');
+  front.type = 'button';
+  front.textContent = 'Front';
+  front.disabled = displayOrder === 'front-first' ? !page.hasNewer : !page.hasOlder;
+  front.addEventListener('click', () => dispatch({ name: 'bookmarks/page-front' }));
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.textContent = 'Back';
+  back.disabled = displayOrder === 'front-first' ? !page.hasOlder : !page.hasNewer;
+  back.addEventListener('click', () => dispatch({ name: 'bookmarks/page-back' }));
+  pager.append(front, back);
   statusRow.append(pageMeta, pager);
 
   const list = document.createElement('ol');
@@ -392,6 +400,27 @@ export function createBookmarksView(
     if (items.length) section.append(list);
   }
   return section;
+}
+
+function createQueueSortControl(order: QueueDisplayOrder, dispatch: (action: BookmarkAction) => void): HTMLSelectElement {
+  const select = document.createElement('select');
+  select.className = 'image-trail-panel__record-sort-select';
+  select.setAttribute('aria-label', 'Queue order');
+  select.append(createQueueSortOption('front-first', 'Front first'), createQueueSortOption('back-first', 'Back first'));
+  select.value = order;
+  select.addEventListener('change', () => {
+    if (select.value === 'front-first' || select.value === 'back-first') {
+      dispatch({ name: 'bookmarks/update-display-order', order: select.value });
+    }
+  });
+  return select;
+}
+
+function createQueueSortOption(value: string, label: string): HTMLOptionElement {
+  const option = document.createElement('option');
+  option.value = value;
+  option.textContent = label;
+  return option;
 }
 
 function createRecordVisual(item: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {

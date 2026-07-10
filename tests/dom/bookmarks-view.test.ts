@@ -20,6 +20,7 @@ function buildBookmarksView(
     readonly total?: number;
     readonly sectionOpen?: boolean;
     readonly collapsible?: boolean;
+    readonly displayOrder?: 'front-first' | 'back-first';
   } = {},
 ): HTMLElement {
   const items = overrides.items ?? [record];
@@ -33,7 +34,7 @@ function buildBookmarksView(
     'global',
     { offset: 0, limit: Math.max(items.length, 1), total: overrides.total ?? items.length, hasOlder: false, hasNewer: false },
     { recallOpen: false },
-    { sectionOpen: overrides.sectionOpen ?? true, collapsible: overrides.collapsible ?? true },
+    { sectionOpen: overrides.sectionOpen ?? true, collapsible: overrides.collapsible ?? true, displayOrder: overrides.displayOrder },
     (action) => actions.push(action),
   );
 }
@@ -205,8 +206,71 @@ test('pager buttons are disabled when there are no other pages', () => {
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions);
 
-  assert.equal(buttonByText(view, 'Older').disabled, true);
-  assert.equal(buttonByText(view, 'Newer').disabled, true);
+  assert.equal(buttonByText(view, 'Front').disabled, true);
+  assert.equal(buttonByText(view, 'Back').disabled, true);
+});
+
+test('Queue order control dispatches a static back-first display setting', () => {
+  const actions: unknown[] = [];
+  const view = buildBookmarksView(actions);
+  const select = view.querySelector<HTMLSelectElement>('select[aria-label="Queue order"]');
+  assert.ok(select);
+  assert.deepEqual(
+    Array.from(select.options, (option) => ({ value: option.value, label: option.textContent })),
+    [
+      { value: 'front-first', label: 'Front first' },
+      { value: 'back-first', label: 'Back first' },
+    ],
+  );
+  select.value = 'back-first';
+  select.dispatchEvent(new Event('change'));
+  assert.deepEqual(actions, [{ name: 'bookmarks/update-display-order', order: 'back-first' }]);
+});
+
+test('Queue pager maps front/back availability to back-first display order', () => {
+  const actions: unknown[] = [];
+  const view = createBookmarksView(
+    'https://images.example.test/current.jpg',
+    [record],
+    [],
+    false,
+    true,
+    true,
+    'global',
+    { offset: 0, limit: 1, total: 2, hasOlder: true, hasNewer: false },
+    { recallOpen: false },
+    { displayOrder: 'back-first' },
+    (action) => actions.push(action),
+  );
+
+  assert.equal(buttonByText(view, 'Front').disabled, false);
+  assert.equal(buttonByText(view, 'Back').disabled, true);
+  buttonByText(view, 'Front').click();
+  assert.deepEqual(actions, [{ name: 'bookmarks/page-front' }]);
+});
+
+test('Queue order control stays static when privacy mode masks a locked private row', () => {
+  const actions: unknown[] = [];
+  const privateRecord = {
+    ...record,
+    id: 'private-row',
+    url: 'image-trail-private:private-row',
+    label: 'secret-photo.jpg',
+    privacyStatus: 'locked' as const,
+    protectedPin: {
+      schemaVersion: 1 as const,
+      plainPinId: 'private-row',
+      queueUpdatedAt: record.timestamp,
+      hasEncryptedMetadata: true,
+      hasEncryptedThumbnail: true,
+      hasStoredOriginal: false,
+    },
+  };
+  const view = buildBookmarksView(actions, { items: [privateRecord] });
+  const select = view.querySelector<HTMLSelectElement>('select[aria-label="Queue order"]');
+  assert.ok(select);
+  assert.ok(!select.outerHTML.includes('secret-photo.jpg'));
+  assert.ok(!select.outerHTML.includes('image-trail-private:private-row'));
 });
 
 test('Recall is disabled when the queue is empty', () => {

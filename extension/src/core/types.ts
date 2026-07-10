@@ -10,6 +10,7 @@ import type { UrlTemplateGrabStrategy } from './url/grab-strategies.js';
 import type { FieldTransformId } from './url/field-transforms.js';
 import type { UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from './url/types.js';
 import type { ObjectFitMode } from './preview-style.js';
+import type { QueueDisplayOrder, RecentDisplayOrder } from './display-order.js';
 import type { DetachableSectionId } from './workspace-layout.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
@@ -198,11 +199,13 @@ export interface PanelState {
   readonly recentHistoryRetainedLimit: number;
   readonly recentHistoryOverflowBehavior: RecentHistoryOverflowBehavior;
   readonly recentSparseRowDisplayMode: RecentSparseRowDisplayMode;
+  readonly recentDisplayOrder: RecentDisplayOrder;
   readonly bookmarks: readonly ImageDisplayRecord[];
   readonly bookmarkOffset: number;
   readonly bookmarkLimit: number;
   readonly bookmarkTotal: number;
   readonly bookmarkVisibilityScope: 'global' | 'site';
+  readonly queueDisplayOrder: QueueDisplayOrder;
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
   readonly searchableMetadataPolicy: SearchableMetadataPolicy;
@@ -314,6 +317,7 @@ export type PanelActionName =
   | 'history/load'
   | 'history/download'
   | 'history/select'
+  | 'history/update-display-order'
   | 'selection/select-visible'
   | 'history-selection/toggle'
   | 'history-selection/select'
@@ -332,9 +336,10 @@ export type PanelActionName =
   | 'bookmark-selection/select'
   | 'bookmark-selection/clear'
   | 'bookmarks/page-loaded'
+  | 'bookmarks/update-display-order'
   | 'gallery/open'
-  | 'bookmarks/older'
-  | 'bookmarks/newer'
+  | 'bookmarks/page-front'
+  | 'bookmarks/page-back'
   | 'bookmarks/toggle-scope'
   | 'bookmarks/reload'
   | 'bookmarks/refresh-thumbnails'
@@ -462,6 +467,7 @@ export type PanelAction =
         | 'history/mark-pinned'
         | 'history/delete-all'
         | 'history/select'
+        | 'history/update-display-order'
         | 'selection/select-visible'
         | 'history-selection/toggle'
         | 'history-selection/select'
@@ -482,6 +488,7 @@ export type PanelAction =
         | 'bookmark-selection/select'
         | 'bookmark-selection/clear'
         | 'bookmarks/page-loaded'
+        | 'bookmarks/update-display-order'
         | 'settings/update-visible-bookmark-soft-max'
         | 'settings/update-recent-history-retention'
         | 'settings/update-recent-sparse-row-display-mode'
@@ -560,6 +567,7 @@ export type PanelAction =
       readonly id: string;
     }
   | { readonly name: 'history/mark-pinned'; readonly id: string; readonly pinnedAt: string; readonly pinnedRecordId: string }
+  | { readonly name: 'history/update-display-order'; readonly order: RecentDisplayOrder }
   | { readonly name: 'selection/select-visible' }
   | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle' | 'bookmark-selection/single'; readonly id: string }
   | {
@@ -578,6 +586,7 @@ export type PanelAction =
       readonly hasOlder: boolean;
       readonly hasNewer: boolean;
     }
+  | { readonly name: 'bookmarks/update-display-order'; readonly order: QueueDisplayOrder }
   | { readonly name: 'history/load' | 'history/download' }
   | { readonly name: 'panel/secondary-controls-open'; readonly open: boolean }
   | { readonly name: 'panel/history-section-open'; readonly open: boolean }
@@ -770,6 +779,7 @@ export interface BookmarkStore {
     readonly limit: number;
     readonly scope?: 'global' | 'site' | undefined;
     readonly currentPageUrl?: string | undefined;
+    readonly displayOrder?: QueueDisplayOrder | undefined;
   }) => Promise<{
     readonly items: readonly ImageDisplayRecord[];
     readonly offset: number;

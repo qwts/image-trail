@@ -761,6 +761,29 @@
       ]
     },
     {
+      "id": "display-only-recents-and-queue-ordering",
+      "acceptance": "Display-only Recents and Queue ordering (issue #448)",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/display-order.test.ts",
+            "tests/indexeddb-bookmark-store.test.ts",
+            "tests/action-dispatch.test.ts",
+            "tests/dom/history-view.test.ts",
+            "tests/dom/bookmarks-view.test.ts",
+            "tests/data-crypto.test.ts"
+          ],
+          "notes": "Covers stable Recents timestamp order, Queue queueUpdatedAt front/back display paging across the full durable list, preference migration, privacy-inert static control labels, and Front/Back pager behavior without changing Recall's canonical order."
+        },
+        {
+          "type": "manual",
+          "reason": "With mixed Queue rows, switch Front first and Back first, page through both directions, open Recall, and confirm Recall remains front-first while neither mode exposes private row metadata."
+        }
+      ],
+      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Tests"
+    },
+    {
       "id": "image-preview-backdrop-no-flash",
       "acceptance": "Image preview backdrop applies instantly without a transition flash (issue #456)",
       "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Image-Preview-Backdrop-No-Flash",

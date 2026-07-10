@@ -501,6 +501,7 @@ function createHistorySection(target: PanelRenderTarget, state: PanelState): HTM
       target.layoutState.historyListBlockSize = blockSize;
     },
     sparseRowDisplayMode: state.recentSparseRowDisplayMode,
+    displayOrder: state.recentDisplayOrder,
     privacyMode: state.privacyModeEnabled,
   });
 }
@@ -524,6 +525,7 @@ function createBookmarksSection(target: PanelRenderTarget, state: PanelState): H
     { recallOpen: state.recall.open },
     {
       privacyMode: state.privacyModeEnabled,
+      displayOrder: state.queueDisplayOrder,
       sectionOpen: state.detachedSections.includes('bookmarks') || state.bookmarksSectionOpen,
       collapsible: !state.detachedSections.includes('bookmarks'),
     },

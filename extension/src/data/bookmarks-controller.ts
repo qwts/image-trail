@@ -14,6 +14,7 @@ import type { KeyReference, StoredKeyRecord } from './crypto/types.js';
 import { generateAesGcmKey } from './crypto/webcrypto.js';
 import { openImageTrailDb } from './db.js';
 import { DEFAULT_LOCAL_SETTINGS } from './local-settings.js';
+import { DEFAULT_QUEUE_DISPLAY_ORDER, queueTimeForRecord, sortQueueRecords, type QueueDisplayOrder } from '../core/display-order.js';
 import { BlobsRepository } from './repositories/blobs-repository.js';
 import { BookmarksRepository, type EncryptedBookmarkRecord } from './repositories/bookmarks-repository.js';
 import { EncryptedPinsRepository, type EncryptedPinRecord } from './repositories/encrypted-pins-repository.js';
@@ -107,6 +108,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     readonly limit: number;
     readonly scope?: 'global' | 'site' | undefined;
     readonly currentPageUrl?: string | undefined;
+    readonly displayOrder?: QueueDisplayOrder | undefined;
   }): Promise<BookmarkPage> {
     const context = await this.openContext();
     const offset = Math.max(0, input.offset);
@@ -114,7 +116,10 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     if (!context) return { items: [], offset, limit, total: 0, hasOlder: false, hasNewer: false };
 
     const loaded = this.options.getActiveBlobKey ? await this.loadMergedRecords(context) : await this.loadPlainRecords(context);
-    const visible = filterByVisibilityScope(loaded, input.scope ?? 'global', input.currentPageUrl);
+    const visible = sortQueueRecords(
+      filterByVisibilityScope(loaded, input.scope ?? 'global', input.currentPageUrl),
+      input.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER,
+    );
     const total = visible.length;
     const clampedOffset = clampPageOffset(offset, limit, total);
     const pageItems = visible.slice(clampedOffset, clampedOffset + limit);
@@ -436,7 +441,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         // Keep the relationship row placeholder if protected metadata cannot be decrypted.
       }
     }
-    const records = [...byId.values()].sort((left, right) => recordQueueTime(right).localeCompare(recordQueueTime(left)));
+    const records = sortQueueRecords([...byId.values()], DEFAULT_QUEUE_DISPLAY_ORDER);
     if (this.mergedRecordsCacheGeneration === cacheGeneration) {
       this.mergedRecordsCache = { keyReference, records };
     }
@@ -879,7 +884,7 @@ function privatePinUrl(plainPinId: string): string {
  * "Storage Rules". Exported so the invariant can be asserted directly (tests/invariants.test.ts).
  */
 export function recordQueueTime(record: ImageDisplayRecord): string {
-  return record.queueUpdatedAt ?? record.timestamp;
+  return queueTimeForRecord(record);
 }
 
 const protectedPinSaveLocks = new Map<string, Promise<void>>();

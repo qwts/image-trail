@@ -15,6 +15,7 @@ import {
   isSaveBookmarkResultMessage,
 } from '../background/messages.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
+import type { QueueDisplayOrder } from '../core/display-order.js';
 import type { BookmarkStore } from '../core/types.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../data/local-settings.js';
 import { sendRuntimeMessage } from './runtime-message.js';
@@ -45,6 +46,7 @@ export class ExtensionBookmarkStore implements BookmarkStore {
     readonly limit: number;
     readonly scope?: 'global' | 'site' | undefined;
     readonly currentPageUrl?: string | undefined;
+    readonly displayOrder?: QueueDisplayOrder | undefined;
   }): Promise<{
     readonly items: readonly ImageDisplayRecord[];
     readonly offset: number;

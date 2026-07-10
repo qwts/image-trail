@@ -243,6 +243,8 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
     overflowBehavior: 'drop-oldest',
   },
   'settings/update-recent-sparse-row-display-mode': { name: 'settings/update-recent-sparse-row-display-mode', mode: 'compact' },
+  'history/update-display-order': { name: 'history/update-display-order', order: 'oldest-first' },
+  'bookmarks/update-display-order': { name: 'bookmarks/update-display-order', order: 'back-first' },
   'settings/update-pin-save-storage-preference': { name: 'settings/update-pin-save-storage-preference', value: 'encrypted' },
   'settings/update-privacy-mode': { name: 'settings/update-privacy-mode', enabled: true },
   'settings/update-metadata-policy': {
@@ -282,8 +284,8 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'bookmark/remove': { name: 'bookmark/remove', id: 'bookmark-1' },
   'bookmark/clear': { name: 'bookmark/clear', id: 'bookmark-1' },
   'bookmarks/clear-visible': { name: 'bookmarks/clear-visible' },
-  'bookmarks/older': { name: 'bookmarks/older' },
-  'bookmarks/newer': { name: 'bookmarks/newer' },
+  'bookmarks/page-front': { name: 'bookmarks/page-front' },
+  'bookmarks/page-back': { name: 'bookmarks/page-back' },
   'bookmarks/toggle-scope': { name: 'bookmarks/toggle-scope' },
   'bookmarks/reload': { name: 'bookmarks/reload' },
   'bookmarks/refresh-thumbnails': { name: 'bookmarks/refresh-thumbnails' },
@@ -472,6 +474,35 @@ test('build info overlay visibility setting persists and applies the overlay', (
   );
   assert.deepEqual(harness.log, ['reduce', 'saveLocalSettings', 'applyBuildInfoOverlayVisibility', 'render']);
   assert.equal(harness.getState().buildInfoOverlayVisible, false);
+});
+
+test('display-order settings persist without mutating Recents or refreshing Recall', async () => {
+  const harness = createHarness();
+  const registry = buildPanelActionRegistry(harness.deps);
+
+  dispatchPanelAction(registry, { name: 'history/update-display-order', order: 'oldest-first' }, () => assert.fail('unexpected fallback'));
+  assert.equal(harness.getState().recentDisplayOrder, 'oldest-first');
+  assert.deepEqual(harness.log, ['reduce', 'saveLocalSettings', 'render']);
+
+  harness.log.length = 0;
+  dispatchPanelAction(registry, { name: 'bookmarks/update-display-order', order: 'back-first' }, () => assert.fail('unexpected fallback'));
+  await Promise.resolve();
+  assert.equal(harness.getState().queueDisplayOrder, 'back-first');
+  assert.deepEqual(harness.log, ['reduce', 'saveLocalSettings', 'loadBookmarkPage:0', 'render']);
+});
+
+test('Queue pager actions preserve front/back semantics across display orders', () => {
+  const harness = createHarness();
+  const registry = buildPanelActionRegistry(harness.deps);
+  harness.patchState({ bookmarkOffset: 10, bookmarkLimit: 10, queueDisplayOrder: 'front-first' });
+
+  dispatchPanelAction(registry, { name: 'bookmarks/page-front' }, () => assert.fail('unexpected fallback'));
+  dispatchPanelAction(registry, { name: 'bookmarks/page-back' }, () => assert.fail('unexpected fallback'));
+  harness.patchState({ queueDisplayOrder: 'back-first' });
+  dispatchPanelAction(registry, { name: 'bookmarks/page-front' }, () => assert.fail('unexpected fallback'));
+  dispatchPanelAction(registry, { name: 'bookmarks/page-back' }, () => assert.fail('unexpected fallback'));
+
+  assert.deepEqual(harness.log, ['loadBookmarkPage:0', 'loadBookmarkPage:20', 'loadBookmarkPage:20', 'loadBookmarkPage:0']);
 });
 
 test('recall/open toggles an already-open drawer shut instead of reopening it', () => {

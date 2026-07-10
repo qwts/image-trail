@@ -22,7 +22,9 @@ const plaintextLocalSettingsEntries = {
   recentHistoryRetainedLimit: v.number(),
   recentHistoryOverflowBehavior: v.picklist(['drop-oldest', 'keep-session']),
   recentSparseRowDisplayMode: recentSparseRowDisplayModeSchema,
+  recentDisplayOrder: v.picklist(['newest-first', 'oldest-first']),
   bookmarkVisibilityScope: v.picklist(['global', 'site']),
+  queueDisplayOrder: v.picklist(['front-first', 'back-first']),
   pinSaveStoragePreference: v.picklist(['encrypted', 'plaintext']),
   privacyModeEnabled: v.boolean(),
   searchableMetadataPolicy: v.object({
@@ -49,6 +51,8 @@ export const plaintextLocalSettingsSchema = v.object(plaintextLocalSettingsEntri
 export const saveLocalSettingsPayloadSchema = v.object({
   ...plaintextLocalSettingsEntries,
   recentSparseRowDisplayMode: v.optional(recentSparseRowDisplayModeSchema),
+  recentDisplayOrder: v.optional(v.picklist(['newest-first', 'oldest-first'])),
+  queueDisplayOrder: v.optional(v.picklist(['front-first', 'back-first'])),
 });
 
 type _AssertPlaintextLocalSettings = Assert<MutuallyAssignable<v.InferOutput<typeof plaintextLocalSettingsSchema>, PlaintextLocalSettings>>;

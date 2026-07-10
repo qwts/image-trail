@@ -11,8 +11,8 @@ export type LibraryActionName =
   | 'bookmark/remove'
   | 'bookmark/clear'
   | 'bookmarks/clear-visible'
-  | 'bookmarks/older'
-  | 'bookmarks/newer'
+  | 'bookmarks/page-front'
+  | 'bookmarks/page-back'
   | 'bookmarks/toggle-scope'
   | 'bookmarks/reload'
   | 'bookmarks/refresh-thumbnails'
@@ -81,14 +81,18 @@ export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<
     },
     'bookmark/clear': reduceAndRefreshRecall,
     'bookmarks/clear-visible': reduceAndRefreshRecall,
-    'bookmarks/older': {
+    'bookmarks/page-front': {
       handle() {
-        void deps.loadBookmarkPage(deps.getState().bookmarkOffset + deps.getState().bookmarkLimit);
+        const state = deps.getState();
+        const delta = state.queueDisplayOrder === 'front-first' ? -state.bookmarkLimit : state.bookmarkLimit;
+        void deps.loadBookmarkPage(Math.max(0, state.bookmarkOffset + delta));
       },
     },
-    'bookmarks/newer': {
+    'bookmarks/page-back': {
       handle() {
-        void deps.loadBookmarkPage(Math.max(0, deps.getState().bookmarkOffset - deps.getState().bookmarkLimit));
+        const state = deps.getState();
+        const delta = state.queueDisplayOrder === 'front-first' ? state.bookmarkLimit : -state.bookmarkLimit;
+        void deps.loadBookmarkPage(Math.max(0, state.bookmarkOffset + delta));
       },
     },
     'bookmarks/toggle-scope': {

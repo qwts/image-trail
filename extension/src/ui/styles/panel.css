@@ -1276,6 +1276,22 @@
   text-align: center;
 }
 
+.image-trail-panel-root .image-trail-panel__record-sort-select {
+  box-sizing: border-box;
+  min-block-size: 28px;
+  max-inline-size: 124px;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 6px;
+  background: rgb(16 22 34 / 92%);
+  color: inherit;
+  font: inherit;
+}
+
+.image-trail-panel-root .image-trail-panel__record-sort-select:focus-visible {
+  outline: 2px solid rgb(114 207 255 / 88%);
+  outline-offset: 2px;
+}
+
 .image-trail-panel-root .image-trail-panel__bookmark-status-row {
   display: flex;
   align-items: center;

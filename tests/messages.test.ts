@@ -901,7 +901,13 @@ test('creates bookmark store messages for extension-origin persistence', () => {
     timestamp: '2026-06-19T00:00:00.000Z',
     source: 'bookmark' as const,
   };
-  const load = createLoadBookmarksMessage({ offset: 0, limit: 30, scope: 'global', currentPageUrl: 'https://example.test/' });
+  const load = createLoadBookmarksMessage({
+    offset: 0,
+    limit: 30,
+    scope: 'global',
+    currentPageUrl: 'https://example.test/',
+    displayOrder: 'back-first',
+  });
   const loadResult = createLoadBookmarksResultMessage({
     items: [record],
     offset: 0,
@@ -924,6 +930,7 @@ test('creates bookmark store messages for extension-origin persistence', () => {
   const removeRecallResult = createRemoveRecallBookmarksResultMessage({ ok: true, removedCount: 3 });
 
   assert.equal(isExtensionRequest(load), true);
+  assert.equal(load.payload.displayOrder, 'back-first');
   assert.equal(isExtensionResponse(loadResult), true);
   assert.equal(isLoadBookmarksResultMessage(loadResult), true);
   assert.deepEqual(loadByIds.payload.ids, ['bookmark-1']);

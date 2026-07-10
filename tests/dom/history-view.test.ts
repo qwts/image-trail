@@ -20,6 +20,7 @@ function buildHistoryView(
   sectionOpen = true,
   collapsible = true,
   sparseRowDisplayMode: RecentSparseRowDisplayMode = 'adaptive',
+  displayOrder?: 'newest-first' | 'oldest-first',
 ): HTMLElement {
   return createHistoryView(items, selectedIds, false, true, (action) => actions.push(action), {
     blobKeyAvailable: true,
@@ -28,6 +29,7 @@ function buildHistoryView(
     listBlockSize: null,
     onListResize: () => undefined,
     sparseRowDisplayMode,
+    displayOrder,
   });
 }
 
@@ -200,6 +202,31 @@ test('the recents toolbar renders inside the section header row (#430)', () => {
   const view = buildHistoryView(actions);
   const toolbar = view.querySelector('.image-trail-panel__section-header--with-actions .image-trail-panel__history-toolbar');
   assert.ok(toolbar, 'the toolbar lives in the header row, not on a floating row below it');
+});
+
+test('Recents sort control orders timestamps stably and dispatches its persisted display setting', () => {
+  const actions: unknown[] = [];
+  const newest = { ...record, id: 'recent-newest', timestamp: '2026-06-26T15:30:00.000Z' };
+  const oldest = { ...record, id: 'recent-oldest', timestamp: '2026-06-24T15:30:00.000Z' };
+  const view = buildHistoryView(actions, [], [newest, oldest], true, true, 'adaptive', 'oldest-first');
+  const rows = Array.from(view.querySelectorAll<HTMLElement>('[data-image-trail-row-id]'));
+  assert.deepEqual(
+    rows.map((row) => row.dataset['imageTrailRowId']),
+    ['recent-oldest', 'recent-newest'],
+  );
+
+  const select = view.querySelector<HTMLSelectElement>('select[aria-label="Sort Recents"]');
+  assert.ok(select);
+  assert.deepEqual(
+    Array.from(select.options, (option) => ({ value: option.value, label: option.textContent })),
+    [
+      { value: 'newest-first', label: 'Newest first' },
+      { value: 'oldest-first', label: 'Oldest first' },
+    ],
+  );
+  select.value = 'newest-first';
+  select.dispatchEvent(new Event('change'));
+  assert.deepEqual(actions, [{ name: 'history/update-display-order', order: 'newest-first' }]);
 });
 
 test('the heading toggle collapses and expands the recents section (#438)', () => {

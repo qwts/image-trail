@@ -1,4 +1,5 @@
 import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
+import { DEFAULT_RECENT_DISPLAY_ORDER, sortRecentRecords, type RecentDisplayOrder } from '../../core/display-order.js';
 import type { RecentSparseRowDisplayMode } from '../../core/types.js';
 import { createPrivacyThumbnail, PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordExtensionLabel, recordTitle } from './record-metadata.js';
 import { registerPreviewRowClick } from './record-row-preview-click.js';
@@ -11,6 +12,7 @@ type HistoryAction =
   | { readonly name: 'history-selection/toggle'; readonly id: string }
   | { readonly name: 'history-selection/select'; readonly ids: readonly string[]; readonly mode?: 'replace' | 'add' }
   | { readonly name: 'history-selection/clear' }
+  | { readonly name: 'history/update-display-order'; readonly order: RecentDisplayOrder }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'history'; readonly sourceRecordId: string }
   | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string | undefined }
   | { readonly name: 'panel/history-section-open'; readonly open: boolean }
@@ -25,6 +27,7 @@ interface HistoryViewOptions {
   readonly listBlockSize: number | null;
   readonly onListResize: (blockSize: number) => void;
   readonly sparseRowDisplayMode: RecentSparseRowDisplayMode;
+  readonly displayOrder?: RecentDisplayOrder | undefined;
   readonly privacyMode?: boolean;
 }
 
@@ -36,6 +39,7 @@ export function createHistoryView(
   dispatch: (action: HistoryAction) => void,
   options?: HistoryViewOptions,
 ): HTMLElement {
+  const displayItems = sortRecentRecords(items, options?.displayOrder ?? DEFAULT_RECENT_DISPLAY_ORDER);
   const section = document.createElement('section');
   section.className = 'image-trail-panel__section image-trail-panel__history-section';
 
@@ -76,23 +80,24 @@ export function createHistoryView(
 
   const toolbar = document.createElement('div');
   toolbar.className = 'image-trail-panel__history-toolbar';
-  if (items.length > 0) {
+  toolbar.append(createRecentSortControl(options?.displayOrder ?? DEFAULT_RECENT_DISPLAY_ORDER, dispatch));
+  if (displayItems.length > 0) {
     const selectAll = document.createElement('button');
     selectAll.type = 'button';
     selectAll.textContent = `Select all recents`;
-    selectAll.disabled = selectedIds.length === items.length;
-    selectAll.addEventListener('click', () => dispatch({ name: 'history-selection/select', ids: items.map((item) => item.id) }));
+    selectAll.disabled = selectedIds.length === displayItems.length;
+    selectAll.addEventListener('click', () => dispatch({ name: 'history-selection/select', ids: displayItems.map((item) => item.id) }));
 
     const deleteAll = document.createElement('button');
     deleteAll.type = 'button';
-    deleteAll.textContent = `Delete recents (${items.length})`;
+    deleteAll.textContent = `Delete recents (${displayItems.length})`;
     deleteAll.addEventListener('click', () => dispatch({ name: 'history/delete-all' }));
     toolbar.append(selectAll, deleteAll);
   }
 
   const list = document.createElement('ol');
   const sparseRowDisplayMode = options?.sparseRowDisplayMode ?? 'adaptive';
-  list.className = `image-trail-panel__record-list is-sparse-${sparseRowDisplayMode} ${sparseCountClass(items.length)}`;
+  list.className = `image-trail-panel__record-list is-sparse-${sparseRowDisplayMode} ${sparseCountClass(displayItems.length)}`;
   list.dataset['sparseRowMode'] = sparseRowDisplayMode;
   if (options?.listBlockSize !== null && options?.listBlockSize !== undefined) {
     list.classList.add('is-user-resized');
@@ -109,7 +114,7 @@ export function createHistoryView(
     if (!list.classList.contains('is-user-resized')) return;
     options?.onListResize(Math.round(list.getBoundingClientRect().height));
   });
-  for (const item of items) {
+  for (const item of displayItems) {
     const capturedBlobId = encryptedBlobIdForRecord(item);
     const encryptedRecord = isEncryptedRecord(item);
     const keyUnavailable = encryptedRecord && !blobKeyUnlocked;
@@ -135,7 +140,7 @@ export function createHistoryView(
         dispatch({
           name: 'history-selection/select',
           ids: selectedRangeIds(
-            items.map((record) => record.id),
+            displayItems.map((record) => record.id),
             selectedIds,
             item.id,
           ),
@@ -175,7 +180,7 @@ export function createHistoryView(
       entry.addEventListener('keydown', (event) => {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
           event.preventDefault();
-          selectAdjacentHistoryRow(items, item.id, event.key === 'ArrowDown' ? 1 : -1, dispatch, queryableRootFor(entry));
+          selectAdjacentHistoryRow(displayItems, item.id, event.key === 'ArrowDown' ? 1 : -1, dispatch, queryableRootFor(entry));
           return;
         }
         if (event.key === 'Enter' && !event.shiftKey) {
@@ -296,10 +301,31 @@ export function createHistoryView(
   section.append(header);
   // Collapsed (#438): the header row (heading toggle + actions + detach) stays; the content hides.
   if (sectionOpen) {
-    section.append(items.length ? selectionMeta : empty);
-    if (items.length) section.append(list);
+    section.append(displayItems.length ? selectionMeta : empty);
+    if (displayItems.length) section.append(list);
   }
   return section;
+}
+
+function createRecentSortControl(order: RecentDisplayOrder, dispatch: (action: HistoryAction) => void): HTMLSelectElement {
+  const select = document.createElement('select');
+  select.className = 'image-trail-panel__record-sort-select';
+  select.setAttribute('aria-label', 'Sort Recents');
+  select.append(createSortOption('newest-first', 'Newest first'), createSortOption('oldest-first', 'Oldest first'));
+  select.value = order;
+  select.addEventListener('change', () => {
+    if (select.value === 'newest-first' || select.value === 'oldest-first') {
+      dispatch({ name: 'history/update-display-order', order: select.value });
+    }
+  });
+  return select;
+}
+
+function createSortOption(value: string, label: string): HTMLOptionElement {
+  const option = document.createElement('option');
+  option.value = value;
+  option.textContent = label;
+  return option;
 }
 
 function sparseCountClass(count: number): string {

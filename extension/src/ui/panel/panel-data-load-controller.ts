@@ -87,6 +87,7 @@ export class PanelDataLoadController {
       limit: state.bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
       scope: state.bookmarkVisibilityScope,
       currentPageUrl: window.location.href,
+      displayOrder: state.queueDisplayOrder,
     });
     this.deps.setState(
       reducePanelAction(this.deps.getState(), {

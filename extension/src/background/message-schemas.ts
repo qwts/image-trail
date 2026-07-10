@@ -64,6 +64,7 @@ export const loadBookmarksRequestSchema = v.object({
   limit: v.number(),
   scope: v.optional(bookmarkScopeSchema),
   currentPageUrl: v.optional(v.string()),
+  displayOrder: v.optional(v.picklist(['front-first', 'back-first'])),
 });
 
 export const loadRecentHistoryRequestSchema = v.object({

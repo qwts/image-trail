@@ -104,7 +104,9 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().recentHistoryRetainedLimit, 30);
   assert.equal(repository.load().recentHistoryOverflowBehavior, 'drop-oldest');
   assert.equal(repository.load().recentSparseRowDisplayMode, 'adaptive');
+  assert.equal(repository.load().recentDisplayOrder, 'newest-first');
   assert.equal(repository.load().bookmarkVisibilityScope, 'global');
+  assert.equal(repository.load().queueDisplayOrder, 'front-first');
   assert.equal(repository.load().pinSaveStoragePreference, 'encrypted');
   assert.equal(repository.load().privacyModeEnabled, false);
   assert.equal(repository.load().previewObjectFit, 'contain');
@@ -132,6 +134,22 @@ test('migrates secondary controls disclosure local setting safely', () => {
 
   assert.equal(open.load().secondaryControlsOpen, true);
   assert.equal(invalid.load().secondaryControlsOpen, false);
+});
+
+test('migrates display-order settings safely', () => {
+  const valid = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentDisplayOrder: 'oldest-first', queueDisplayOrder: 'back-first' }),
+    setItem: () => {},
+  });
+  const invalid = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentDisplayOrder: 'first', queueDisplayOrder: 'latest' }),
+    setItem: () => {},
+  });
+
+  assert.equal(valid.load().recentDisplayOrder, 'oldest-first');
+  assert.equal(valid.load().queueDisplayOrder, 'back-first');
+  assert.equal(invalid.load().recentDisplayOrder, DEFAULT_LOCAL_SETTINGS.recentDisplayOrder);
+  assert.equal(invalid.load().queueDisplayOrder, DEFAULT_LOCAL_SETTINGS.queueDisplayOrder);
 });
 
 test('migrates preview preference local settings safely', () => {

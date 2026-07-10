@@ -452,6 +452,7 @@ export interface LoadBookmarksMessage {
     readonly limit: number;
     readonly scope?: 'global' | 'site' | undefined;
     readonly currentPageUrl?: string | undefined;
+    readonly displayOrder?: import('../core/display-order.js').QueueDisplayOrder | undefined;
   };
 }
 
@@ -734,10 +735,12 @@ export interface LoadLocalSettingsResultMessage {
 
 export type SaveLocalSettingsPayloadSettings = Omit<
   import('../data/local-settings.js').PlaintextLocalSettings,
-  'recentSparseRowDisplayMode'
+  'recentSparseRowDisplayMode' | 'recentDisplayOrder' | 'queueDisplayOrder'
 > & {
   readonly recentSparseRowDisplayMode?:
     import('../data/local-settings.js').PlaintextLocalSettings['recentSparseRowDisplayMode'] | undefined;
+  readonly recentDisplayOrder?: import('../data/local-settings.js').PlaintextLocalSettings['recentDisplayOrder'] | undefined;
+  readonly queueDisplayOrder?: import('../data/local-settings.js').PlaintextLocalSettings['queueDisplayOrder'] | undefined;
 };
 
 export interface SaveLocalSettingsMessage {

@@ -7,6 +7,7 @@ import {
 } from './settings.js';
 import { DEFAULT_GOVERNOR_CONFIG } from './automation/types.js';
 import { DEFAULT_SEARCHABLE_METADATA_POLICY } from './metadata-policy.js';
+import { DEFAULT_QUEUE_DISPLAY_ORDER, DEFAULT_RECENT_DISPLAY_ORDER } from './display-order.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT } from './preview-style.js';
 
 export const EMPTY_TARGET_STATE: TargetState = {
@@ -60,11 +61,13 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     recentHistoryRetainedLimit: 30,
     recentHistoryOverflowBehavior: 'drop-oldest',
     recentSparseRowDisplayMode: 'adaptive',
+    recentDisplayOrder: DEFAULT_RECENT_DISPLAY_ORDER,
     bookmarks: [],
     bookmarkOffset: 0,
     bookmarkLimit: 30,
     bookmarkTotal: 0,
     bookmarkVisibilityScope: 'global',
+    queueDisplayOrder: DEFAULT_QUEUE_DISPLAY_ORDER,
     pinSaveStoragePreference: 'encrypted',
     privacyModeEnabled: false,
     searchableMetadataPolicy: DEFAULT_SEARCHABLE_METADATA_POLICY,
