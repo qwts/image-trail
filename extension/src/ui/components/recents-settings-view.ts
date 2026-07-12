@@ -8,15 +8,14 @@ const SPARSE_ROW_DISPLAY_MODES: readonly { readonly value: RecentSparseRowDispla
   { value: 'compact', label: 'Compact' },
 ];
 
-export function createRecentsSettingsView(
-  state: {
-    readonly limit: number;
-    readonly retainedLimit: number;
-    readonly overflowBehavior: RecentHistoryOverflowBehavior;
-    readonly sparseRowDisplayMode: RecentSparseRowDisplayMode;
-  },
-  dispatch: (action: PanelAction) => void,
-): HTMLElement {
+export interface RecentHistorySettingsState {
+  readonly limit: number;
+  readonly retainedLimit: number;
+  readonly overflowBehavior: RecentHistoryOverflowBehavior;
+  readonly sparseRowDisplayMode: RecentSparseRowDisplayMode;
+}
+
+export function createRecentsSettingsView(state: RecentHistorySettingsState, dispatch: (action: PanelAction) => void): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'image-trail-panel__settings-templates';
 

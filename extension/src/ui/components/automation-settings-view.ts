@@ -29,6 +29,15 @@ export interface UrlReviewStatusSettingsState {
   readonly clearAfterExport: boolean;
 }
 
+interface NeighborPreloadControls {
+  readonly enabledLabel: HTMLLabelElement;
+  readonly enabledInput: HTMLInputElement;
+  readonly radius: { readonly label: HTMLLabelElement; readonly input: HTMLInputElement };
+  readonly cacheLimit: { readonly label: HTMLLabelElement; readonly input: HTMLInputElement };
+  readonly probeMethodSelect: HTMLSelectElement;
+  readonly feedbackSelect: HTMLSelectElement;
+}
+
 export function createRequestThrottleSettingsView(
   state: RequestThrottleSettingsState,
   dispatch: (action: PanelAction) => void,
@@ -104,42 +113,7 @@ export function createNeighborPreloadSettingsView(
   const form = document.createElement('form');
   form.className = 'image-trail-panel__settings-form';
 
-  const enabledLabel = document.createElement('label');
-  enabledLabel.className = 'image-trail-panel__settings-checkbox';
-  const enabledInput = document.createElement('input');
-  enabledInput.type = 'checkbox';
-  enabledInput.checked = state.enabled;
-  const enabledText = document.createElement('span');
-  enabledText.textContent = 'Warm adjacent parsed-field images';
-  enabledLabel.append(enabledInput, enabledText);
-
-  const radius = createNumberSettingField(
-    'Ahead/behind',
-    state.radius,
-    NEIGHBOR_PRELOAD_RADIUS_LIMITS.min,
-    NEIGHBOR_PRELOAD_RADIUS_LIMITS.max,
-  );
-  const cacheLimit = createNumberSettingField(
-    'Cache',
-    state.cacheLimit,
-    NEIGHBOR_PRELOAD_CACHE_LIMITS.min,
-    NEIGHBOR_PRELOAD_CACHE_LIMITS.max,
-  );
-  const probeMethodSelect = createSelect(
-    [
-      { value: 'get', label: 'GET' },
-      { value: 'head', label: 'HEAD' },
-    ],
-    state.probeMethod,
-  );
-  const feedbackSelect = createSelect(
-    [
-      { value: 'alert', label: 'Alert' },
-      { value: 'display', label: 'Display' },
-      { value: 'mute', label: 'Mute' },
-    ],
-    state.feedback,
-  );
+  const { enabledLabel, enabledInput, radius, cacheLimit, probeMethodSelect, feedbackSelect } = createNeighborPreloadControls(state);
   const parsedFeedback = (): LoadFailureFeedback => (isLoadFailureFeedback(feedbackSelect.value) ? feedbackSelect.value : state.feedback);
   const parsedRadius = (): number | null =>
     parseBoundedInteger(radius.input.value, NEIGHBOR_PRELOAD_RADIUS_LIMITS.min, NEIGHBOR_PRELOAD_RADIUS_LIMITS.max);
@@ -210,6 +184,45 @@ export function createNeighborPreloadSettingsView(
   );
   wrapper.append(heading, form, meta);
   return wrapper;
+}
+
+function createNeighborPreloadControls(state: NeighborPreloadSettingsState): NeighborPreloadControls {
+  const enabledLabel = document.createElement('label');
+  enabledLabel.className = 'image-trail-panel__settings-checkbox';
+  const enabledInput = document.createElement('input');
+  enabledInput.type = 'checkbox';
+  enabledInput.checked = state.enabled;
+  const enabledText = document.createElement('span');
+  enabledText.textContent = 'Warm adjacent parsed-field images';
+  enabledLabel.append(enabledInput, enabledText);
+  const radius = createNumberSettingField(
+    'Ahead/behind',
+    state.radius,
+    NEIGHBOR_PRELOAD_RADIUS_LIMITS.min,
+    NEIGHBOR_PRELOAD_RADIUS_LIMITS.max,
+  );
+  const cacheLimit = createNumberSettingField(
+    'Cache',
+    state.cacheLimit,
+    NEIGHBOR_PRELOAD_CACHE_LIMITS.min,
+    NEIGHBOR_PRELOAD_CACHE_LIMITS.max,
+  );
+  const probeMethodSelect = createSelect(
+    [
+      { value: 'get', label: 'GET' },
+      { value: 'head', label: 'HEAD' },
+    ],
+    state.probeMethod,
+  );
+  const feedbackSelect = createSelect(
+    [
+      { value: 'alert', label: 'Alert' },
+      { value: 'display', label: 'Display' },
+      { value: 'mute', label: 'Mute' },
+    ],
+    state.feedback,
+  );
+  return { enabledLabel, enabledInput, radius, cacheLimit, probeMethodSelect, feedbackSelect };
 }
 
 export function createUrlReviewStatusSettingsView(

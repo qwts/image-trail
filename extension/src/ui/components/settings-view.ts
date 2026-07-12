@@ -1,29 +1,32 @@
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
-import type { ImageProbeMethod } from '../../core/image/request-policy.js';
-import type { LoadFailureFeedback } from '../../core/settings.js';
 import type { SearchableMetadataPolicy } from '../../core/metadata-policy.js';
-import type { BuildIdentity } from '../../core/build-info.js';
-import type { PanelAction, PinSaveStoragePreference, RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from '../../core/types.js';
+import type { PanelAction } from '../../core/types.js';
 import type { GrabSourcePattern, UrlTemplateRecord } from '../../core/url/templates.js';
 import type { UrlField } from '../../core/url/types.js';
 import {
   createNeighborPreloadSettingsView,
   createRequestThrottleSettingsView,
   createUrlReviewStatusSettingsView,
+  type NeighborPreloadSettingsState,
+  type RequestThrottleSettingsState,
+  type UrlReviewStatusSettingsState,
 } from './automation-settings-view.js';
 import { createVisiblePinsSettingsView } from './display-settings-view.js';
 import {
   createBuildIdentitySettingsView,
   createDestructiveSettingsView,
   createStorageHealthSettingsView,
+  type BuildIdentitySettingsState,
+  type DestructiveSettingsState,
 } from './maintenance-settings-view.js';
 import { createPanelLayoutSettingsView } from './panel-layout-settings-view.js';
 import {
   createPrivacyModeSettingsView,
   createPrivatePinSettingsView,
   createSearchableMetadataSettingsView,
+  type PrivatePinSettingsState,
 } from './privacy-settings-view.js';
-import { createRecentsSettingsView } from './recents-settings-view.js';
+import { createRecentsSettingsView, type RecentHistorySettingsState } from './recents-settings-view.js';
 import { createShortcutSettingsView } from './shortcut-settings-view.js';
 import { createGrabSourcePatternSettingsView, createTemplateSettingsView } from './url-learning-settings-view.js';
 
@@ -38,49 +41,20 @@ const settingsGroupsOpen = new Map<string, boolean>();
 
 export function createSettingsView(
   visibleBookmarkSoftMax: number,
-  recentHistoryState: {
-    readonly limit: number;
-    readonly retainedLimit: number;
-    readonly overflowBehavior: RecentHistoryOverflowBehavior;
-    readonly sparseRowDisplayMode: RecentSparseRowDisplayMode;
-  },
+  recentHistoryState: RecentHistorySettingsState,
   privacyModeEnabled: boolean,
   searchableMetadataPolicy: SearchableMetadataPolicy,
   templates: readonly UrlTemplateRecord[],
   grabSourcePatterns: readonly GrabSourcePattern[],
   activeTemplateId: string | null,
   currentFields: readonly UrlField[],
-  privatePinState: {
-    readonly pinSaveStoragePreference: PinSaveStoragePreference;
-    readonly blobKeyUnlocked: boolean;
-    readonly blobKeyAvailable: boolean;
-  },
-  destructiveState: {
-    readonly visibleQueueCount: number;
-    readonly recallCount: number;
-    readonly busy: boolean;
-  },
+  privatePinState: PrivatePinSettingsState,
+  destructiveState: DestructiveSettingsState,
   storageUsage: StorageUsageSummary | null,
-  buildIdentityState: {
-    readonly identity: BuildIdentity | null;
-    readonly overlayVisible: boolean;
-  },
-  urlReviewStatusState: {
-    readonly limit: number;
-    readonly clearAfterExport: boolean;
-  },
-  requestThrottleState: {
-    readonly minimumIntervalMs: number;
-    readonly maxRequests: number;
-    readonly windowMs: number;
-  },
-  neighborPreloadState: {
-    readonly enabled: boolean;
-    readonly radius: number;
-    readonly cacheLimit: number;
-    readonly probeMethod: ImageProbeMethod;
-    readonly feedback: LoadFailureFeedback;
-  },
+  buildIdentityState: BuildIdentitySettingsState,
+  urlReviewStatusState: UrlReviewStatusSettingsState,
+  requestThrottleState: RequestThrottleSettingsState,
+  neighborPreloadState: NeighborPreloadSettingsState,
   restoreWorkspaceLayoutEnabled: boolean,
   utilityChildren: readonly HTMLElement[],
   dispatch: (action: PanelAction) => void,
