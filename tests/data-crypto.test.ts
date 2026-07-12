@@ -95,9 +95,12 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   });
 
   assert.deepEqual(repository.load(), DEFAULT_LOCAL_SETTINGS);
-  repository.save({ ...DEFAULT_LOCAL_SETTINGS, showHistoryThumbnails: true, panelDock: 'left' });
-  assert.equal(repository.load().showHistoryThumbnails, true);
-  assert.equal(repository.load().panelDock, 'left');
+  values.set('imageTrail.localSettings', JSON.stringify({ ...DEFAULT_LOCAL_SETTINGS, showHistoryThumbnails: true, panelDock: 'left' }));
+  assert.deepEqual(repository.load(), DEFAULT_LOCAL_SETTINGS);
+  repository.save({ ...repository.load(), privacyModeEnabled: true });
+  const persisted = JSON.parse(values.get('imageTrail.localSettings') ?? '{}') as Record<string, unknown>;
+  assert.equal(persisted['showHistoryThumbnails'], undefined);
+  assert.equal(persisted['panelDock'], undefined);
   assert.equal(repository.load().visibleBookmarkSoftMax, 30);
   assert.equal(repository.load().galleryPageLimit, 72);
   assert.equal(repository.load().recentHistoryLimit, 30);
@@ -108,7 +111,7 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().bookmarkVisibilityScope, 'global');
   assert.equal(repository.load().queueDisplayOrder, 'front-first');
   assert.equal(repository.load().pinSaveStoragePreference, 'encrypted');
-  assert.equal(repository.load().privacyModeEnabled, false);
+  assert.equal(repository.load().privacyModeEnabled, true);
   assert.equal(repository.load().previewObjectFit, 'contain');
   assert.equal(repository.load().previewFillScreen, true);
   assert.equal(repository.load().urlReviewStatusLimit, 5000);
