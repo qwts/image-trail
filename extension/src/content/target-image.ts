@@ -17,6 +17,11 @@ export interface TargetImageInfo {
     | 'linkedPageExtractor';
 }
 
+export interface TargetImageLocator {
+  readonly selector: string;
+  readonly originalUrl: string;
+}
+
 const MIN_VISIBLE_DIMENSION = 32;
 let nextHandleId = 1;
 const handles = new WeakMap<HTMLImageElement, string>();
@@ -89,6 +94,54 @@ function normalizeImageUrl(value: string | null | undefined): string | null {
   } catch {
     return candidate;
   }
+}
+
+export function createTargetImageLocator(image: HTMLImageElement): TargetImageLocator | null {
+  const originalUrl = normalizeImageUrl(getImageUrl(image)?.url);
+  if (!originalUrl || typeof Element === 'undefined' || !(image instanceof Element)) return null;
+
+  const id = image.id.trim();
+  if (id) {
+    const selector = `#${escapeCssIdentifier(id)}`;
+    if (isUniqueMatch(selector, image)) return { selector, originalUrl };
+  }
+
+  const segments: string[] = [];
+  let current: Element | null = image;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    segments.unshift(selectorSegment(current));
+    const selector = segments.join(' > ');
+    if (isUniqueMatch(selector, image)) return { selector, originalUrl };
+    current = current.parentElement;
+  }
+  return null;
+}
+
+function escapeCssIdentifier(value: string): string {
+  if (globalThis.CSS?.escape) return globalThis.CSS.escape(value);
+  return value.replace(/[^a-zA-Z0-9_-]/gu, (character) => `\\${character}`);
+}
+
+export function recoverTargetImage(locator: TargetImageLocator, root: ParentNode = document): HTMLImageElement | null {
+  const matches = Array.from(root.querySelectorAll(locator.selector));
+  if (matches.length !== 1) return null;
+  const match = matches[0];
+  if (!(match instanceof HTMLImageElement)) return null;
+  const candidateUrl = normalizeImageUrl(getImageUrl(match)?.url);
+  return candidateUrl === locator.originalUrl ? match : null;
+}
+
+function isUniqueMatch(selector: string, image: HTMLImageElement): boolean {
+  const matches = document.querySelectorAll(selector);
+  return matches.length === 1 && matches[0] === image;
+}
+
+function selectorSegment(element: Element): string {
+  const tag = element.tagName.toLowerCase();
+  const parent = element.parentElement;
+  if (!parent) return tag;
+  const siblings = Array.from(parent.children).filter((candidate) => candidate.tagName === element.tagName);
+  return siblings.length === 1 ? tag : `${tag}:nth-of-type(${siblings.indexOf(element) + 1})`;
 }
 
 function sourceUrlFromLink(image: HTMLImageElement): string | null {
