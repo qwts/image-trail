@@ -11,11 +11,9 @@ const recentSparseRowDisplayModeSchema = v.picklist(['adaptive', 'full', 'half',
 
 const plaintextLocalSettingsEntries = {
   schemaVersion: v.literal(1),
-  showHistoryThumbnails: v.boolean(),
   requestThrottleMs: v.number(),
   requestThrottleMaxRequests: v.number(),
   requestThrottleWindowMs: v.number(),
-  panelDock: v.picklist(['right', 'left']),
   visibleBookmarkSoftMax: v.number(),
   galleryPageLimit: v.number(),
   recentHistoryLimit: v.number(),

@@ -37,11 +37,9 @@ import {
 
 export interface PlaintextLocalSettings {
   readonly schemaVersion: 1;
-  readonly showHistoryThumbnails: boolean;
   readonly requestThrottleMs: number;
   readonly requestThrottleMaxRequests: number;
   readonly requestThrottleWindowMs: number;
-  readonly panelDock: 'right' | 'left';
   readonly visibleBookmarkSoftMax: number;
   readonly galleryPageLimit: number;
   readonly recentHistoryLimit: number;
@@ -70,11 +68,9 @@ export interface PlaintextLocalSettings {
 
 export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   schemaVersion: 1,
-  showHistoryThumbnails: false,
   requestThrottleMs: DEFAULT_GOVERNOR_CONFIG.minimumIntervalMs,
   requestThrottleMaxRequests: DEFAULT_GOVERNOR_CONFIG.maxRequests,
   requestThrottleWindowMs: DEFAULT_GOVERNOR_CONFIG.windowMs,
-  panelDock: 'right',
   visibleBookmarkSoftMax: 30,
   galleryPageLimit: DEFAULT_GALLERY_PAGE_LIMIT,
   recentHistoryLimit: 30,
@@ -151,7 +147,6 @@ export function migrateLocalSettings(input: LocalSettingsMigrationInput): Plaint
 
   return {
     schemaVersion: 1,
-    showHistoryThumbnails: input.showHistoryThumbnails === true,
     requestThrottleMs: isSafeThrottle(input.requestThrottleMs) ? input.requestThrottleMs : DEFAULT_LOCAL_SETTINGS.requestThrottleMs,
     requestThrottleMaxRequests: isSafeThrottleMaxRequests(input.requestThrottleMaxRequests)
       ? input.requestThrottleMaxRequests
@@ -159,7 +154,6 @@ export function migrateLocalSettings(input: LocalSettingsMigrationInput): Plaint
     requestThrottleWindowMs: isSafeThrottleWindow(input.requestThrottleWindowMs)
       ? input.requestThrottleWindowMs
       : DEFAULT_LOCAL_SETTINGS.requestThrottleWindowMs,
-    panelDock: input.panelDock === 'left' ? 'left' : 'right',
     visibleBookmarkSoftMax: isSafeVisibleBookmarkSoftMax(input.visibleBookmarkSoftMax)
       ? input.visibleBookmarkSoftMax
       : DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,

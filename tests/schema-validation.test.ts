@@ -172,8 +172,13 @@ test('record schemas accept canonical fixtures and reject corrupted mutants with
   assert.equal(v.is(parsedFieldStateRecordSchema, { ...parsedFieldState, hostname: 5 }), false);
 
   assert.equal(v.is(plaintextLocalSettingsSchema, DEFAULT_LOCAL_SETTINGS), true);
-  assert.equal(v.is(plaintextLocalSettingsSchema, { ...DEFAULT_LOCAL_SETTINGS, panelDock: 'up' }), false);
   assert.equal(v.is(saveLocalSettingsRequestSchema, { settings: DEFAULT_LOCAL_SETTINGS }), true);
+  assert.equal(
+    v.is(saveLocalSettingsRequestSchema, {
+      settings: { ...DEFAULT_LOCAL_SETTINGS, showHistoryThumbnails: true, panelDock: 'left' },
+    }),
+    true,
+  );
   assert.equal(v.is(saveLocalSettingsRequestSchema, { settings: omitKey(DEFAULT_LOCAL_SETTINGS, 'recentSparseRowDisplayMode') }), true);
   assert.equal(
     v.is(saveLocalSettingsRequestSchema, { settings: { ...DEFAULT_LOCAL_SETTINGS, recentSparseRowDisplayMode: 'stretchy' } }),
