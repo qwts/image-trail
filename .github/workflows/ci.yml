@@ -193,7 +193,7 @@ jobs:
           exit 1
 
   # Publishes the Playwright HTML report to GitHub Pages at a stable per-PR URL:
-  #   https://qwtm.github.io/image-trail/reports/pr-<number>/
+  #   https://qwts.github.io/image-trail/reports/pr-<number>/
   # Each run replaces that PR's report (bounded growth); the artifact above keeps 14 days of
   # history. Publishes ONLY when the E2E job fails — the browsable report exists to debug red
   # runs (traces/screenshots/videos), and green runs deploying to Pages on every push was pure
@@ -298,7 +298,7 @@ jobs:
           {
             echo "### Playwright E2E report"
             echo ""
-            echo "https://qwtm.github.io/image-trail/reports/pr-${{ github.event.pull_request.number }}/"
+            echo "https://qwts.github.io/image-trail/reports/pr-${{ github.event.pull_request.number }}/"
             echo ""
             echo "_Traces, screenshots, and videos are attached to failed tests._"
           } >> "$GITHUB_STEP_SUMMARY"

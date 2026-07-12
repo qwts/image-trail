@@ -86,11 +86,11 @@ Current inspectable surfaces live in Storybook under `Extension UI/*`:
 
 Design review should start from Storybook and the canonical acceptance pages:
 
-- [Storybook UI Review](https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Storybook-UI-Review)
-- [Row And List Visual System](https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Row-And-List-Visual-System)
-- [Panel Layout Stability](https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Panel-Layout-Stability)
-- [Queue And Recall Clear/Delete Semantics](https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics)
-- [pCloud Provider Boundary](https://github.com/qwtm/image-trail/wiki/Acceptance-Test-pCloud-Provider-Boundary)
+- [Storybook UI Review](https://github.com/qwts/image-trail/wiki/Acceptance-Test-Storybook-UI-Review)
+- [Row And List Visual System](https://github.com/qwts/image-trail/wiki/Acceptance-Test-Row-And-List-Visual-System)
+- [Panel Layout Stability](https://github.com/qwts/image-trail/wiki/Acceptance-Test-Panel-Layout-Stability)
+- [Queue And Recall Clear/Delete Semantics](https://github.com/qwts/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics)
+- [pCloud Provider Boundary](https://github.com/qwts/image-trail/wiki/Acceptance-Test-pCloud-Provider-Boundary)
 
 ## Stable Visual Primitives
 

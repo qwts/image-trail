@@ -1,6 +1,6 @@
 # Image Trail
 
-[![CI](https://github.com/qwtm/image-trail/actions/workflows/ci.yml/badge.svg)](https://github.com/qwtm/image-trail/actions/workflows/ci.yml)
+[![CI](https://github.com/qwts/image-trail/actions/workflows/ci.yml/badge.svg)](https://github.com/qwts/image-trail/actions/workflows/ci.yml)
 ![status: pre-release](https://img.shields.io/badge/status-pre--release-orange)
 ![install: source only](https://img.shields.io/badge/install-source%20only-blue)
 ![node: 24.18.0](https://img.shields.io/badge/node-24.18.0-339933)
@@ -65,14 +65,14 @@ ships the built MV3 service worker/content-script bundle from `extension/dist/`.
 Canonical long-lived documentation lives in the GitHub wiki, with root
 `DESIGN.md` as the design-editor exception:
 
-- [Image Trail Wiki](https://github.com/qwtm/image-trail/wiki)
-- [Contributing](https://github.com/qwtm/image-trail/wiki/Contributing)
-- [Testing Strategy](https://github.com/qwtm/image-trail/wiki/Testing-Strategy)
-- [Acceptance Tests](https://github.com/qwtm/image-trail/wiki/Acceptance-Tests)
-- [User Stories](https://github.com/qwtm/image-trail/wiki/User-Stories)
-- [Repo Documentation Pointer Map](https://github.com/qwtm/image-trail/wiki/Repo-Documentation-Pointer-Map)
+- [Image Trail Wiki](https://github.com/qwts/image-trail/wiki)
+- [Contributing](https://github.com/qwts/image-trail/wiki/Contributing)
+- [Testing Strategy](https://github.com/qwts/image-trail/wiki/Testing-Strategy)
+- [Acceptance Tests](https://github.com/qwts/image-trail/wiki/Acceptance-Tests)
+- [User Stories](https://github.com/qwts/image-trail/wiki/User-Stories)
+- [Repo Documentation Pointer Map](https://github.com/qwts/image-trail/wiki/Repo-Documentation-Pointer-Map)
 - [Design brief](DESIGN.md)
-- [Versioning automation planning](https://github.com/qwtm/image-trail/issues/387)
+- [Versioning automation planning](https://github.com/qwts/image-trail/issues/387)
 
 Repository markdown files are pointer stubs unless they are agent instruction
 files, `README.md`, `CONTRIBUTING.md`, root `DESIGN.md`, or GitHub issue and

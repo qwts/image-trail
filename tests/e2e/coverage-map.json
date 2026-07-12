@@ -6,7 +6,7 @@
     {
       "id": "automation-keybindings-and-request-governance",
       "acceptance": "M08 automation, keybindings, and request governance",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/User-Story-M08-Automation-Keybindings-And-Request-Governance",
+      "wiki": "https://github.com/qwts/image-trail/wiki/User-Story-M08-Automation-Keybindings-And-Request-Governance",
       "coverage": [
         {
           "type": "playwright-e2e",
@@ -49,7 +49,7 @@
     {
       "id": "extension-smoke",
       "acceptance": "Extension port acceptance baseline",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Extension-Port-Acceptance-Baseline",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Extension-Port-Acceptance-Baseline",
       "coverage": [
         {
           "type": "playwright-e2e",
@@ -62,7 +62,7 @@
       "id": "durable-gallery-tab",
       "acceptance": "Dedicated durable gallery tab",
       "repoPath": "tests/dom/gallery-view.test.ts",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Dedicated-Durable-Gallery-Tab",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Dedicated-Durable-Gallery-Tab",
       "coverage": [
         {
           "type": "unit-dom",
@@ -85,7 +85,7 @@
       "id": "gallery-search",
       "acceptance": "Gallery search",
       "repoPath": "tests/gallery-search.test.ts",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Gallery-Search",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Gallery-Search",
       "coverage": [
         {
           "type": "unit-dom",
@@ -103,7 +103,7 @@
       "id": "gallery-albums",
       "acceptance": "Gallery albums",
       "repoPath": "docs/acceptance-tests/gallery-albums.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Gallery-Albums",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Gallery-Albums",
       "coverage": [
         {
           "type": "unit-dom",
@@ -131,7 +131,7 @@
       "id": "host-image-projection-ownership",
       "acceptance": "Host image projection ownership",
       "repoPath": "docs/acceptance-tests/host-image-projection-ownership.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Host-Image-Projection-Ownership",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Host-Image-Projection-Ownership",
       "coverage": [
         {
           "type": "unit-dom",
@@ -190,7 +190,7 @@
       "id": "panel-layout-stability",
       "acceptance": "Panel layout stability",
       "repoPath": "docs/acceptance-tests/panel-layout-stability.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Panel-Layout-Stability",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Panel-Layout-Stability",
       "coverage": [
         {
           "type": "playwright-e2e",
@@ -222,7 +222,7 @@
       "id": "target-picker-captures-only-selected-image",
       "acceptance": "Target picker captures only the selected image",
       "repoPath": "docs/acceptance-tests/target-picker-captures-only-selected-image.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Target-Picker-Captures-Only-The-Selected-Image",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Target-Picker-Captures-Only-The-Selected-Image",
       "coverage": [
         {
           "type": "playwright-e2e",
@@ -235,7 +235,7 @@
       "id": "url-template-learning",
       "acceptance": "URL template learning",
       "repoPath": "docs/acceptance-tests/url-template-learning.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-URL-Template-Learning",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-URL-Template-Learning",
       "coverage": [
         {
           "type": "unit-dom",
@@ -263,7 +263,7 @@
       "id": "url-review-status-import-export",
       "acceptance": "URL review status import/export",
       "repoPath": "docs/acceptance-tests/url-review-status-import-export.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-URL-Review-Status-Import-Export",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-URL-Review-Status-Import-Export",
       "coverage": [
         {
           "type": "unit-dom",
@@ -280,7 +280,7 @@
       "id": "queue-recall-clear-delete",
       "acceptance": "Queue and Recall clear/delete semantics",
       "repoPath": "docs/acceptance-tests/queue-recall-clear-delete.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics",
       "coverage": [
         {
           "type": "unit-dom",
@@ -297,7 +297,7 @@
       "id": "recents-retention-settings",
       "acceptance": "Recents retention settings",
       "repoPath": "docs/acceptance-tests/recents-retention-settings.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Recents-Retention-Settings",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Recents-Retention-Settings",
       "coverage": [
         {
           "type": "unit-dom",
@@ -324,7 +324,7 @@
       "id": "recents-to-queue-state-unification",
       "issue": 155,
       "acceptance": "Unified Recents-to-Queue saved state",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics",
       "coverage": [
         {
           "type": "unit-dom",
@@ -351,7 +351,7 @@
       "id": "multi-select-image-download",
       "acceptance": "Multi-select image download",
       "repoPath": "docs/acceptance-tests/multi-select-image-download.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Multi-Select-Image-Download",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Multi-Select-Image-Download",
       "coverage": [
         {
           "type": "unit-dom",
@@ -374,7 +374,7 @@
       "id": "encrypted-image-downloads",
       "acceptance": "Encrypted image downloads",
       "repoPath": "docs/acceptance-tests/encrypted-image-downloads.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Encrypted-Image-Downloads",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Encrypted-Image-Downloads",
       "coverage": [
         {
           "type": "unit-dom",
@@ -397,7 +397,7 @@
       "id": "local-original-capture-survives-remote-loss",
       "acceptance": "Local original capture survives remote loss",
       "repoPath": "docs/acceptance-tests/local-original-capture-survives-remote-loss.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Local-Original-Capture-Survives-Remote-Loss",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Local-Original-Capture-Survives-Remote-Loss",
       "coverage": [
         {
           "type": "unit-dom",
@@ -414,7 +414,7 @@
       "id": "oversized-original-is-bounded",
       "acceptance": "Oversized original is bounded",
       "repoPath": "docs/acceptance-tests/oversized-original-is-bounded.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Oversized-Original-Is-Bounded",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Oversized-Original-Is-Bounded",
       "coverage": [
         {
           "type": "unit-dom",
@@ -431,7 +431,7 @@
       "id": "key-backup-restore",
       "acceptance": "Key backup restore",
       "repoPath": "docs/acceptance-tests/key-backup-restore.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Key-Backup-Restore",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Key-Backup-Restore",
       "coverage": [
         {
           "type": "unit-dom",
@@ -448,7 +448,7 @@
       "id": "settings-utility-layout",
       "acceptance": "Settings utility layout",
       "repoPath": "docs/acceptance-tests/settings-utility-layout.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Settings-Utility-Layout",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Settings-Utility-Layout",
       "coverage": [
         {
           "type": "storybook",
@@ -470,7 +470,7 @@
       "id": "pcloud-provider-boundary",
       "acceptance": "pCloud provider boundary",
       "repoPath": "docs/acceptance-tests/pcloud-provider-boundary.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-pCloud-Provider-Boundary",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-pCloud-Provider-Boundary",
       "coverage": [
         {
           "type": "unit-dom",
@@ -491,7 +491,7 @@
       "id": "pcloud-api-spike",
       "acceptance": "pCloud API spike",
       "repoPath": "docs/acceptance-tests/pcloud-api-spike.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-pCloud-API-Spike",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-pCloud-API-Spike",
       "coverage": [
         {
           "type": "manual",
@@ -508,7 +508,7 @@
       "id": "bounded-neighbor-preloading",
       "acceptance": "Bounded neighbor preloading",
       "repoPath": "docs/acceptance-tests/bounded-neighbor-preloading.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Bounded-Neighbor-Preloading",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Bounded-Neighbor-Preloading",
       "coverage": [
         {
           "type": "unit-dom",
@@ -540,7 +540,7 @@
       "id": "third-party-cdn-permission-flow",
       "acceptance": "Third-party CDN permission flow",
       "repoPath": "docs/acceptance-tests/third-party-cdn-permission-flow.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Third-Party-CDN-Permission-Flow",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Third-Party-CDN-Permission-Flow",
       "coverage": [
         {
           "type": "unit-dom",
@@ -561,7 +561,7 @@
       "id": "grab-mode-strategies",
       "acceptance": "Grab mode strategies",
       "repoPath": "docs/acceptance-tests/grab-mode-strategies.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Grab-Mode-Strategies",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Grab-Mode-Strategies",
       "coverage": [
         {
           "type": "unit-dom",
@@ -578,7 +578,7 @@
       "id": "storybook-ui-review",
       "acceptance": "Storybook UI review",
       "repoPath": "docs/acceptance-tests/storybook-ui-review.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Storybook-UI-Review",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Storybook-UI-Review",
       "coverage": [
         {
           "type": "storybook",
@@ -594,7 +594,7 @@
       "id": "form-control-consistency",
       "acceptance": "Form control consistency",
       "repoPath": "docs/acceptance-tests/form-control-consistency.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Form-Control-Consistency",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Form-Control-Consistency",
       "coverage": [
         {
           "type": "storybook",
@@ -610,7 +610,7 @@
       "id": "settings-action-hierarchy",
       "acceptance": "Settings action hierarchy",
       "repoPath": "docs/acceptance-tests/settings-action-hierarchy.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Settings-Action-Hierarchy",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Settings-Action-Hierarchy",
       "coverage": [
         {
           "type": "storybook",
@@ -626,7 +626,7 @@
       "id": "row-list-visual-system",
       "acceptance": "Row and list visual system",
       "repoPath": "docs/acceptance-tests/row-list-visual-system.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Row-And-List-Visual-System",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Row-And-List-Visual-System",
       "coverage": [
         {
           "type": "storybook",
@@ -679,7 +679,7 @@
       "id": "m00-planning-baseline-review",
       "acceptance": "M00 planning baseline review",
       "repoPath": "docs/acceptance-tests/m00-planning-baseline-review.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-M00-Planning-Baseline-Review",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-M00-Planning-Baseline-Review",
       "coverage": [
         {
           "type": "manual",
@@ -691,7 +691,7 @@
       "id": "detachable-sections",
       "acceptance": "Detachable sections",
       "repoPath": "docs/acceptance-tests/detachable-sections.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Detachable-Sections",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Detachable-Sections",
       "coverage": [
         {
           "type": "unit-dom",
@@ -736,13 +736,13 @@
           "notes": "Covers help/toggle reduction, the shared shortcut registry rendering (labels come from the same source the keyboard router uses), feature-guide completeness for the major panel areas, and the privacy-inert static-copy guarantee (no URL or blob values in Help content)."
         }
       ],
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-In-Panel-Help"
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-In-Panel-Help"
     },
     {
       "id": "searchable-metadata-privacy-policy",
       "acceptance": "User-controlled searchable metadata privacy policy (issue #451) — Slice 1: policy framework, settings surface, and opt-in URL-derived enforcement for new records",
       "repoPath": "docs/acceptance-tests/searchable-metadata-privacy-policy.md",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Searchable-Metadata-Privacy-Policy",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Searchable-Metadata-Privacy-Policy",
       "coverage": [
         {
           "type": "unit-dom",
@@ -781,12 +781,12 @@
           "reason": "With mixed Queue rows, switch Front first and Back first, page through both directions, open Recall, and confirm Recall remains front-first while neither mode exposes private row metadata."
         }
       ],
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Tests"
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Tests"
     },
     {
       "id": "image-preview-backdrop-no-flash",
       "acceptance": "Image preview backdrop applies instantly without a transition flash (issue #456)",
-      "wiki": "https://github.com/qwtm/image-trail/wiki/Acceptance-Test-Image-Preview-Backdrop-No-Flash",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Image-Preview-Backdrop-No-Flash",
       "coverage": [
         {
           "type": "unit-dom",

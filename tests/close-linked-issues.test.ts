@@ -16,21 +16,21 @@ const closeLinkedIssues = (await import(
 )) as CloseLinkedIssuesModule;
 
 test('extractClosingIssueNumbers finds same-repo closing references in first-seen order', () => {
-  const body = ['Closes #156.', 'Fixes qwtm/image-trail#161 and resolves #156.', 'Resolved other-owner/image-trail#999.'].join('\n');
+  const body = ['Closes #156.', 'Fixes qwts/image-trail#161 and resolves #156.', 'Resolved other-owner/image-trail#999.'].join('\n');
 
-  assert.deepEqual(closeLinkedIssues.extractClosingIssueNumbers(body, 'qwtm/image-trail'), [156, 161]);
+  assert.deepEqual(closeLinkedIssues.extractClosingIssueNumbers(body, 'qwts/image-trail'), [156, 161]);
 });
 
 test('extractClosingIssueNumbers ignores non-closing references', () => {
   const body = 'Related to #10. See #11. Fixes #12.';
 
-  assert.deepEqual(closeLinkedIssues.extractClosingIssueNumbers(body, 'qwtm/image-trail'), [12]);
+  assert.deepEqual(closeLinkedIssues.extractClosingIssueNumbers(body, 'qwts/image-trail'), [12]);
 });
 
 test('extractClosingIssueNumbers stops before unrelated same-line references', () => {
   const body = 'Closes #10. Follow-up tracked in #11.';
 
-  assert.deepEqual(closeLinkedIssues.extractClosingIssueNumbers(body, 'qwtm/image-trail'), [10]);
+  assert.deepEqual(closeLinkedIssues.extractClosingIssueNumbers(body, 'qwts/image-trail'), [10]);
 });
 
 test('removeWipPrefix removes only the leading WIP marker', () => {
