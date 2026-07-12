@@ -18,7 +18,7 @@ import { collectUrlFields } from '../extension/src/core/url/tokenize-fields.js';
 test('field transform registry defines current parsed-field behaviors', () => {
   assert.deepEqual(
     FIELD_TRANSFORM_REGISTRY.map((definition) => definition.id),
-    ['set-value', 'step', 'digit-width', 'split-apply', 'split-clear', 'reset-field', 'reset-all'],
+    ['set-value', 'step', 'digit-width', 'split-apply', 'split-clear', 'reset-field', 'reset-structure', 'reset-all'],
   );
   assert.equal(fieldTransformDefinition('set-value').kind, 'url');
   assert.equal(fieldTransformDefinition('split-clear').kind, 'state');
@@ -84,6 +84,38 @@ test('set-value transform reports same URL when value is unchanged', () => {
 
   assert.equal(result.url, url);
   assert.deepEqual(result.attemptedFieldIds, [field.id]);
+});
+
+test('set-value accepts empty text and lets the reparsed URL define the resulting fields', () => {
+  const pathModel = parseUrl('https://example.test/images/word');
+  const pathField = collectUrlFields(pathModel).find((candidate) => candidate.value === 'word');
+  assert.ok(pathField);
+  const emptyPath = applySetFieldValueTransform(pathModel, pathField, '   ');
+  assert.equal(emptyPath.url, 'https://example.test/images/');
+  assert.equal(
+    collectUrlFields(parseUrl(emptyPath.url)).some((candidate) => candidate.value === 'word'),
+    false,
+  );
+
+  const queryModel = parseUrl('https://example.test/image?q=word');
+  const queryField = collectUrlFields(queryModel).find((candidate) => candidate.label === 'query q');
+  assert.ok(queryField);
+  const emptyQuery = applySetFieldValueTransform(queryModel, queryField, '');
+  assert.equal(emptyQuery.url, 'https://example.test/image?q=');
+  assert.equal(collectUrlFields(parseUrl(emptyQuery.url))[1]?.value, '');
+});
+
+test('set-value accepts raw and encoded delimiters through location-specific rebuilding', () => {
+  const pathModel = parseUrl('https://example.test/images/word');
+  const pathField = collectUrlFields(pathModel).find((candidate) => candidate.value === 'word');
+  assert.ok(pathField);
+  assert.equal(applySetFieldValueTransform(pathModel, pathField, '/').url, 'https://example.test/images/%2F');
+  assert.equal(applySetFieldValueTransform(pathModel, pathField, '%2F').url, 'https://example.test/images/%252F');
+
+  const queryModel = parseUrl('https://example.test/image?q=word');
+  const queryField = collectUrlFields(queryModel).find((candidate) => candidate.label === 'query q');
+  assert.ok(queryField);
+  assert.equal(applySetFieldValueTransform(queryModel, queryField, '/&=#?').url, 'https://example.test/image?q=%2F%26%3D%23%3F');
 });
 
 test('step transform preserves numeric padding and clamping', () => {

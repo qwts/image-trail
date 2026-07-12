@@ -1,10 +1,10 @@
 import type { PanelState, ParsedFieldResetBaseline, ParsedFieldStateRecord } from '../../core/types.js';
 import { imageResourceUrlsEqual } from '../../core/image/image-navigation.js';
-import { applyFieldSplitSpecs } from '../../core/url/field-splits.js';
+import { applyFieldSplitSpecs, validFieldSplitSpecsForModel } from '../../core/url/field-splits.js';
 import { applyFieldDigitWidthSpecs, fieldDigitWidthSpecsEqual } from '../../core/url/field-widths.js';
 import { parseUrl } from '../../core/url/parse-url.js';
 import { collectUrlFields } from '../../core/url/tokenize-fields.js';
-import type { UrlField, UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from '../../core/url/types.js';
+import type { ParsedUrlModel, UrlField, UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from '../../core/url/types.js';
 
 type ParsedFieldResetSlice = Pick<
   PanelState,
@@ -56,6 +56,34 @@ export function parsedFieldResetAllAvailable(state: PanelState, currentUrl: stri
   return !imageResourceUrlsEqual(baseline.sourceUrl, currentUrl) || !resetSlicesEqual(state, baseline);
 }
 
+export function parsedFieldStructureResetAvailable(state: PanelState, currentUrl: string): boolean {
+  const baseline = state.parsedFieldResetBaseline;
+  if (!baseline) return false;
+  try {
+    return !parsedUrlStructuresEqual(parseUrl(currentUrl), parseUrl(baseline.sourceUrl));
+  } catch {
+    return false;
+  }
+}
+
+export function parsedUrlStructuresEqual(left: ParsedUrlModel, right: ParsedUrlModel): boolean {
+  return parsedUrlStructureSignature(left) === parsedUrlStructureSignature(right);
+}
+
+function parsedUrlStructureSignature(model: ParsedUrlModel): string {
+  return JSON.stringify({
+    path: model.pathParts.map((part) =>
+      part.type === 'sep' ? { type: part.type, raw: part.raw } : { type: part.type, tokenKinds: part.tokens.map((token) => token.kind) },
+    ),
+    queryPrefix: model.queryPrefix,
+    query: model.queryFields.map((field) => ({
+      key: field.key,
+      hasEquals: field.hasEquals,
+      tokenKinds: field.valueTokens.map((token) => token.kind),
+    })),
+  });
+}
+
 export function resettableFieldIdsForFields(fields: readonly UrlField[], state: PanelState, currentUrl: string): ReadonlySet<string> {
   const baseline = state.parsedFieldResetBaseline;
   if (!baseline) return new Set<string>();
@@ -79,6 +107,30 @@ export function resetAllParsedFieldState(state: PanelState, baseline: ParsedFiel
     parsedFieldResetBaseline: null,
     status: 'ready',
     message: 'Parsed fields reset.',
+    lastUpdatedAt: Date.now(),
+  };
+}
+
+export function resetParsedFieldStructureState(state: PanelState, baseline: ParsedFieldResetBaseline): PanelState {
+  const baselineModel = parseUrl(baseline.sourceUrl);
+  const fieldSplitSpecs = validFieldSplitSpecsForModel(baselineModel, state.fieldSplitSpecs);
+  const splitModel = applyFieldSplitSpecs(baselineModel, fieldSplitSpecs);
+  const validFieldIds = new Set(collectUrlFields(splitModel).map((field) => field.id));
+  const keepMarker = (fieldId: string | null): string | null => (fieldId && validFieldIds.has(fieldId) ? fieldId : null);
+  const keepIds = (fieldIds: readonly string[]): readonly string[] => fieldIds.filter((fieldId) => validFieldIds.has(fieldId));
+
+  return {
+    ...state,
+    activeFieldId: keepMarker(state.activeFieldId),
+    failedFieldId: keepMarker(state.failedFieldId),
+    successfulFieldIds: keepIds(state.successfulFieldIds),
+    unchangedFieldIds: keepIds(state.unchangedFieldIds),
+    unlockedFieldIds: keepIds(state.unlockedFieldIds),
+    manuallyExcludedFieldIds: keepIds(state.manuallyExcludedFieldIds),
+    fieldSplitSpecs,
+    fieldDigitWidthSpecs: state.fieldDigitWidthSpecs.filter((spec) => validFieldIds.has(spec.fieldId)),
+    status: 'ready',
+    message: 'Parsed field structure reset.',
     lastUpdatedAt: Date.now(),
   };
 }

@@ -82,6 +82,8 @@ export const Narrow: Story = {
 
 const valueChangeSpy = fn();
 const stepSpy = fn();
+const invalidValueSpy = fn();
+const resetStructureSpy = fn();
 
 export const EditsField: Story = {
   render: () => fieldsStory({ callbacks: { onValueChange: valueChangeSpy, onStep: stepSpy } }),
@@ -96,6 +98,27 @@ export const EditsField: Story = {
     await expect(valueChangeSpy).toHaveBeenCalledTimes(1);
     await userEvent.click(canvas.getByLabelText('Increment page'));
     await expect(stepSpy).toHaveBeenCalledWith('query-page', 1);
+  },
+};
+
+export const CommitContractAndResetControls: Story = {
+  render: () =>
+    fieldsStory({
+      callbacks: { onInvalidValueCommit: invalidValueSpy, onResetStructure: resetStructureSpy },
+      options: { resetAllAvailable: true, resetStructureAvailable: true },
+    }),
+  play: async ({ canvasElement }) => {
+    invalidValueSpy.mockClear();
+    resetStructureSpy.mockClear();
+    const canvas = within(canvasElement);
+    const input = canvas.getByLabelText('Edit page');
+    await userEvent.clear(input);
+    await userEvent.type(input, '{Enter}');
+    await expect(input).toHaveValue('17');
+    await expect(invalidValueSpy).toHaveBeenCalledTimes(1);
+    await userEvent.click(canvas.getByLabelText('Reset parsed field structure'));
+    await expect(resetStructureSpy).toHaveBeenCalledTimes(1);
+    await expect(canvas.getByLabelText('Reset all parsed fields')).toBeVisible();
   },
 };
 
@@ -150,6 +173,7 @@ function mockFieldsCallbacks(): FieldsViewCallbacks {
   const dispatch = mockDispatch('fields story action');
   return {
     onValueChange: (fieldId, value) => dispatch({ type: 'value-change', fieldId, value }),
+    onInvalidValueCommit: () => dispatch({ type: 'invalid-value-commit' }),
     onStep: (fieldId, delta) => dispatch({ type: 'step', fieldId, delta }),
     onDigitWidthChange: (fieldId, value) => dispatch({ type: 'digit-width-change', fieldId, value }),
     onActivate: (fieldId) => dispatch({ type: 'activate', fieldId }),
@@ -158,6 +182,7 @@ function mockFieldsCallbacks(): FieldsViewCallbacks {
     onApplySplit: (fieldId, pattern) => dispatch({ type: 'apply-split', fieldId, pattern }),
     onClearSplit: (baseFieldId) => dispatch({ type: 'clear-split', baseFieldId }),
     onResetField: (fieldId) => dispatch({ type: 'reset-field', fieldId }),
+    onResetStructure: () => dispatch({ type: 'reset-structure' }),
     onResetAll: () => dispatch({ type: 'reset-all' }),
     onOpenChange: (open, blockSize) => dispatch({ type: 'open-change', open, blockSize }),
     onResize: (blockSize) => dispatch({ type: 'resize', blockSize }),

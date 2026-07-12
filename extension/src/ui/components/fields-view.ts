@@ -9,6 +9,7 @@ export interface EditableField {
 
 export interface FieldsViewCallbacks {
   readonly onValueChange: (fieldId: string, value: string) => void;
+  readonly onInvalidValueCommit: () => void;
   readonly onStep: (fieldId: string, delta: 1 | -1) => void;
   readonly onDigitWidthChange: (fieldId: string, value: string) => void;
   readonly onActivate: (fieldId: string) => void;
@@ -17,6 +18,7 @@ export interface FieldsViewCallbacks {
   readonly onApplySplit: (fieldId: string, pattern: string) => void;
   readonly onClearSplit: (baseFieldId: string) => void;
   readonly onResetField: (fieldId: string) => void;
+  readonly onResetStructure: () => void;
   readonly onResetAll: () => void;
   readonly onOpenChange: (open: boolean, blockSize: number | null) => void;
   readonly onResize: (blockSize: number) => void;
@@ -29,6 +31,7 @@ export interface FieldsViewOptions {
   readonly numericDisplayModes?: ReadonlyMap<string, NumericFieldDisplayMode>;
   readonly resettableFieldIds?: ReadonlySet<string>;
   readonly resetAllAvailable?: boolean;
+  readonly resetStructureAvailable?: boolean;
   // Failure-feedback mode (#450): when false (Mute), a field that failed to load is not painted with
   // the red `is-error` ring. `failedFieldId` itself stays set (it re-bases navigation); this only
   // gates the visible ring.
@@ -229,18 +232,36 @@ export function createFieldsView(
   const heading = document.createElement('h3');
   heading.textContent = 'Parsed fields';
   summary.append(heading);
-  if (options.resetAllAvailable === true) {
-    const resetAll = document.createElement('button');
-    resetAll.type = 'button';
-    resetAll.className = 'image-trail-panel__fields-reset-all';
-    resetAll.textContent = 'Reset all';
-    resetAll.title = options.privacyMode ? 'Reset private parsed fields' : 'Reset all parsed fields';
-    resetAll.setAttribute('aria-label', resetAll.title);
-    resetAll.addEventListener('click', (event) => {
-      event.preventDefault();
-      callbacks.onResetAll();
-    });
-    summary.append(resetAll);
+  if (options.resetAllAvailable === true || options.resetStructureAvailable === true) {
+    const resetControls = document.createElement('span');
+    resetControls.className = 'image-trail-panel__fields-reset-controls';
+    if (options.resetStructureAvailable === true) {
+      const resetStructure = document.createElement('button');
+      resetStructure.type = 'button';
+      resetStructure.className = 'image-trail-panel__fields-reset-all';
+      resetStructure.textContent = 'Reset structure';
+      resetStructure.title = options.privacyMode ? 'Reset private parsed field structure' : 'Reset parsed field structure';
+      resetStructure.setAttribute('aria-label', resetStructure.title);
+      resetStructure.addEventListener('click', (event) => {
+        event.preventDefault();
+        callbacks.onResetStructure();
+      });
+      resetControls.append(resetStructure);
+    }
+    if (options.resetAllAvailable === true) {
+      const resetAll = document.createElement('button');
+      resetAll.type = 'button';
+      resetAll.className = 'image-trail-panel__fields-reset-all';
+      resetAll.textContent = 'Reset all';
+      resetAll.title = options.privacyMode ? 'Reset private parsed fields' : 'Reset all parsed fields';
+      resetAll.setAttribute('aria-label', resetAll.title);
+      resetAll.addEventListener('click', (event) => {
+        event.preventDefault();
+        callbacks.onResetAll();
+      });
+      resetControls.append(resetAll);
+    }
+    summary.append(resetControls);
   }
 
   const body = document.createElement('div');
@@ -293,6 +314,7 @@ export function createFieldsView(
       const nextValue = numericDisplayMode === null ? value.value : numericFieldCommitValue(field.field, numericDisplayMode, value.value);
       if (nextValue === null) {
         value.value = fieldInputReferenceValue;
+        callbacks.onInvalidValueCommit();
         return;
       }
       if (nextValue === field.value) return;

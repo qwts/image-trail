@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 
 import { createInitialPanelState } from '../extension/src/core/state.js';
 import type { PanelState } from '../extension/src/core/types.js';
-import { parsedFieldResetAllAvailable, parsedFieldResetBaselineFromState } from '../extension/src/ui/panel/parsed-field-reset-baseline.js';
+import { parseUrl } from '../extension/src/core/url/parse-url.js';
+import {
+  parsedFieldResetAllAvailable,
+  parsedFieldResetBaselineFromState,
+  parsedFieldStructureResetAvailable,
+  parsedUrlStructuresEqual,
+  resetParsedFieldStructureState,
+} from '../extension/src/ui/panel/parsed-field-reset-baseline.js';
 
 const SOURCE_URL = 'https://images.example.test/gallery/photo-001.jpg';
 
@@ -41,4 +48,45 @@ test('Reset all appears after navigating to a different image or changing field 
 
   const edited = stateWithBaseline(SOURCE_URL);
   assert.equal(parsedFieldResetAllAvailable({ ...edited, unlockedFieldIds: ['p:2:0'] }, SOURCE_URL), true);
+});
+
+test('parsed URL structure ignores values but detects separators, query shape, and token kinds', () => {
+  assert.equal(
+    parsedUrlStructuresEqual(parseUrl('https://example.test/image-001?q=2'), parseUrl('https://example.test/image-999?q=7')),
+    true,
+  );
+  assert.equal(
+    parsedUrlStructuresEqual(parseUrl('https://example.test/image-001?q=2'), parseUrl('https://example.test/image/001?q=2')),
+    false,
+  );
+  assert.equal(parsedUrlStructuresEqual(parseUrl('https://example.test/image?q=2'), parseUrl('https://example.test/image?q=word')), false);
+  assert.equal(parsedUrlStructuresEqual(parseUrl('https://example.test/image?q=2'), parseUrl('https://example.test/image?other=2')), false);
+});
+
+test('Reset structure appears only after topology changes', () => {
+  const state = stateWithBaseline('https://example.test/image?q=2');
+  assert.equal(parsedFieldStructureResetAvailable(state, 'https://example.test/image?q=7'), false);
+  assert.equal(parsedFieldStructureResetAvailable(state, 'https://example.test/image?q='), true);
+});
+
+test('structure reset preserves valid current settings and keeps the baseline', () => {
+  const baselineUrl = 'https://example.test/image?q=12';
+  const state = stateWithBaseline(baselineUrl, {
+    activeFieldId: 'q:0:0',
+    unlockedFieldIds: ['q:0:0', 'missing'],
+    manuallyExcludedFieldIds: ['missing'],
+    fieldDigitWidthSpecs: [
+      { fieldId: 'q:0:0', width: 3, sourceWidth: undefined },
+      { fieldId: 'missing', width: 2, sourceWidth: undefined },
+    ],
+  });
+  const result = resetParsedFieldStructureState(state, state.parsedFieldResetBaseline!);
+  assert.equal(result.activeFieldId, 'q:0:0');
+  assert.deepEqual(result.unlockedFieldIds, ['q:0:0']);
+  assert.deepEqual(result.manuallyExcludedFieldIds, []);
+  assert.deepEqual(
+    result.fieldDigitWidthSpecs.map((spec) => spec.fieldId),
+    ['q:0:0'],
+  );
+  assert.equal(result.parsedFieldResetBaseline, state.parsedFieldResetBaseline);
 });

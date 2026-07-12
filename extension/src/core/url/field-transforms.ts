@@ -9,7 +9,8 @@ import { bumpUrlField, rebuildUrl, setUrlFieldValue } from './rebuild-url.js';
 import { collectUrlFields } from './tokenize-fields.js';
 import type { ParsedUrlModel, UrlField, UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from './types.js';
 
-export type FieldTransformId = 'set-value' | 'step' | 'digit-width' | 'split-apply' | 'split-clear' | 'reset-field' | 'reset-all';
+export type FieldTransformId =
+  'set-value' | 'step' | 'digit-width' | 'split-apply' | 'split-clear' | 'reset-field' | 'reset-structure' | 'reset-all';
 
 export type FieldTransformKind = 'url' | 'state';
 
@@ -26,6 +27,7 @@ export const FIELD_TRANSFORM_REGISTRY: readonly FieldTransformDefinition[] = [
   { id: 'split-apply', kind: 'state', description: 'Split a parsed field into smaller editable parts.' },
   { id: 'split-clear', kind: 'state', description: 'Clear a parsed field split.' },
   { id: 'reset-field', kind: 'url', description: 'Reset one parsed field back to the edit-session baseline.' },
+  { id: 'reset-structure', kind: 'url', description: 'Reset parsed URL structure back to the edit-session baseline.' },
   { id: 'reset-all', kind: 'url', description: 'Reset all parsed fields back to the edit-session baseline.' },
 ] as const;
 

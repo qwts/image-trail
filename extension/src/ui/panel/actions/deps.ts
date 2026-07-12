@@ -95,6 +95,7 @@ export interface PanelActionDeps {
   loadRecallCandidates(input: { readonly offset: number; readonly append: boolean }): Promise<void>;
   recallSelectedRecords(): Promise<void>;
   enqueueFieldTransform(action: FieldTransformPanelAction): void;
+  enqueueRejectedFieldCommit(): void;
   enqueueSelectedUrlApply(url: string): void;
   rejectUrlEditorInput(): void;
   captureImage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<void>;

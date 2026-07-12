@@ -251,7 +251,7 @@
             "tests/panel-state.test.ts",
             "tests/dom/fields-view.test.ts"
           ],
-          "notes": "Covers parsed-field state sync plus Parsed fields UI controls, including split length hints, Dec/Hex display toggles, alternate-base edit commits, reset-field/reset-all baseline restoration, digit-width and split reset behavior, privacy-safe reset labels, stable reset layout, reset-before-Include/Exclude ordering, stale cached numeric-mode isolation, and privacy masking."
+          "notes": "Covers parsed-field state sync plus Parsed fields UI controls, including empty and delimiter-changing commits, split-invalidating and invalid-numeric rejection feedback, split length hints, Dec/Hex display toggles, alternate-base edit commits, reset-field/reset-structure/reset-all baseline restoration, preserved valid field settings, digit-width and split reset behavior, privacy-safe reset labels, stable reset layout, reset-before-Include/Exclude ordering, stale cached numeric-mode isolation, and privacy masking."
         },
         {
           "type": "storybook",

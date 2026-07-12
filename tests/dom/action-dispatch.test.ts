@@ -110,6 +110,7 @@ function createHarness(): Harness {
     loadRecallCandidates: noopAsync,
     recallSelectedRecords: noopAsync,
     enqueueFieldTransform: noop,
+    enqueueRejectedFieldCommit: noop,
     enqueueSelectedUrlApply: noop,
     rejectUrlEditorInput: noop,
     captureImage: noopAsync,

@@ -4,6 +4,7 @@ import type { PanelActionDeps } from './deps.js';
 
 export type FieldActionName =
   | 'field/transform'
+  | 'field/commit-rejected'
   | 'active-field/set'
   | 'field-unlock/toggle'
   | 'selected-url/apply'
@@ -20,6 +21,11 @@ export function buildFieldActionEntries(deps: PanelActionDeps): ActionEntries<Fi
     'field/transform': {
       handle(action) {
         deps.enqueueFieldTransform(action);
+      },
+    },
+    'field/commit-rejected': {
+      handle() {
+        deps.enqueueRejectedFieldCommit();
       },
     },
     'active-field/set': {

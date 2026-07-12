@@ -646,6 +646,7 @@ export class ImageTrailPanel {
       loadRecallCandidates: (input) => this.recallDrawer.loadRecallCandidates(input),
       recallSelectedRecords: () => this.recallDrawer.recallSelectedRecords(),
       enqueueFieldTransform: (action) => this.fieldEditor.enqueueFieldTransform(action),
+      enqueueRejectedFieldCommit: () => this.fieldEditor.enqueueRejectedFieldCommit(),
       enqueueSelectedUrlApply: (url) => this.fieldEditor.enqueueSelectedUrlApply(url),
       rejectUrlEditorInput: () => this.fieldEditor.rejectUrlEditorInput(),
       captureImage: (url, sourceType, sourceRecordId) => this.capturedOriginals.captureImage(url, sourceType, sourceRecordId),

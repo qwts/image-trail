@@ -1,6 +1,6 @@
 import { applyFieldSplitSpecToState, reducePanelAction } from '../../core/actions.js';
 import type { PanelAction, PanelState } from '../../core/types.js';
-import { applyFieldSplitSpecs } from '../../core/url/field-splits.js';
+import { applyFieldSplitSpecs, validFieldSplitSpecsForModel } from '../../core/url/field-splits.js';
 import {
   applyFieldDigitWidthTransform,
   applyResetFieldTransform,
@@ -14,14 +14,25 @@ import { parseUrl } from '../../core/url/parse-url.js';
 import { collectUrlFields } from '../../core/url/tokenize-fields.js';
 import type { ParsedUrlModel } from '../../core/url/types.js';
 import { isUnsupportedUrlEditorInput } from '../components/url-editor-view.js';
-import { parsedFieldResetBaselineFromState, resetAllParsedFieldState, resetOneParsedFieldState } from './parsed-field-reset-baseline.js';
+import {
+  parsedFieldResetBaselineFromState,
+  resetAllParsedFieldState,
+  resetOneParsedFieldState,
+  resetParsedFieldStructureState,
+} from './parsed-field-reset-baseline.js';
 
 // The intermediate result of a field-editor transform: `noop` skips application, `state` applies a
 // pure panel-state update, `project` applies an optional state update and then loads a new URL
 // through the projection controller (optionally saving the URL template on a successful load).
 type FieldEditorEffect =
   | { readonly kind: 'noop' }
-  | { readonly kind: 'state'; readonly state: PanelState; readonly saveParsedFieldState?: boolean; readonly render?: boolean }
+  | {
+      readonly kind: 'state';
+      readonly state: PanelState;
+      readonly saveParsedFieldState?: boolean;
+      readonly render?: boolean;
+      readonly scheduleStatusReset?: boolean;
+    }
   | {
       readonly kind: 'project';
       readonly state?: PanelState;
@@ -98,6 +109,13 @@ export class FieldEditorController {
     this.enqueueFieldInteraction(() => this.applyUrlEditorUrl(url));
   }
 
+  enqueueRejectedFieldCommit(): void {
+    this.mergeableQueuedStep = null;
+    this.enqueueFieldInteraction(() =>
+      this.runFieldEditorEffect(this.rejectedCommitEffect('Parsed field value is invalid.')).then(() => undefined),
+    );
+  }
+
   rejectUrlEditorInput(): void {
     this.deps.setState({
       ...this.deps.getState(),
@@ -158,6 +176,7 @@ export class FieldEditorController {
     coalescedStepDelta?: number,
   ): FieldEditorEffect {
     if (action.transformId === 'reset-all') return this.resetAllFieldsEffect();
+    if (action.transformId === 'reset-structure') return this.resetStructureEffect();
     if (action.transformId === 'reset-field') return this.resetOneFieldEffect(action.fieldId);
 
     if (action.transformId === 'digit-width') {
@@ -241,6 +260,14 @@ export class FieldEditorController {
         ? applySetFieldValueTransform(model, field, action.value)
         : applyStepFieldValueTransform(model, field, coalescedStepDelta ?? action.delta);
 
+    if (action.transformId === 'set-value' && field.splitBaseId) {
+      const splitSpec = this.deps.getState().fieldSplitSpecs.find((spec) => spec.baseFieldId === field.splitBaseId);
+      if (splitSpec) {
+        const splitRemainsValid = validFieldSplitSpecsForModel(parseUrl(transform.url), [splitSpec]).length === 1;
+        if (!splitRemainsValid) return this.rejectedCommitEffect('That edit would invalidate the field split.');
+      }
+    }
+
     const state =
       action.transformId === 'step'
         ? reducePanelAction(this.deps.getState(), { name: 'active-field/set', id: action.fieldId })
@@ -282,6 +309,28 @@ export class FieldEditorController {
     };
   }
 
+  private resetStructureEffect(): FieldEditorEffect {
+    const baseline = this.deps.getState().parsedFieldResetBaseline;
+    if (!baseline) return { kind: 'noop' };
+    const state = resetParsedFieldStructureState(this.deps.getState(), baseline);
+    if (baseline.sourceUrl === this.deps.currentRawUrl()) return { kind: 'state', state };
+    return {
+      kind: 'project',
+      state,
+      url: baseline.sourceUrl,
+      attemptedFieldIds: [],
+      saveTemplateOnLoad: 'never',
+    };
+  }
+
+  private rejectedCommitEffect(message: string): FieldEditorEffect {
+    return {
+      kind: 'state',
+      state: { ...this.deps.getState(), status: 'error', message, lastUpdatedAt: Date.now() },
+      scheduleStatusReset: true,
+    };
+  }
+
   private resetOneFieldEffect(fieldId: string): FieldEditorEffect {
     const baseline = this.deps.getState().parsedFieldResetBaseline;
     if (!baseline) return { kind: 'noop' };
@@ -316,10 +365,12 @@ export class FieldEditorController {
   private async runFieldEditorEffect(effect: FieldEditorEffect): Promise<boolean> {
     if (effect.kind === 'noop') return false;
     if (effect.kind === 'state') {
-      return this.deps.applyPanelState(effect.state, {
+      const applied = this.deps.applyPanelState(effect.state, {
         saveParsedFieldState: effect.saveParsedFieldState ?? true,
         render: effect.render ?? true,
       });
+      if (effect.scheduleStatusReset) this.deps.scheduleFiniteCaptureErrorReset(effect.state.lastUpdatedAt, 'status');
+      return applied;
     }
     if (effect.state) this.deps.applyPanelState(effect.state);
     const loaded = await this.deps.applySelectedUrl(effect.url, effect.attemptedFieldIds);

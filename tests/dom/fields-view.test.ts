@@ -21,6 +21,7 @@ const pageField: EditableField = {
 function recordingCallbacks(calls: CallbackCall[]): FieldsViewCallbacks {
   return {
     onValueChange: (fieldId, value) => calls.push({ name: 'onValueChange', args: [fieldId, value] }),
+    onInvalidValueCommit: () => calls.push({ name: 'onInvalidValueCommit', args: [] }),
     onStep: (fieldId, delta) => calls.push({ name: 'onStep', args: [fieldId, delta] }),
     onDigitWidthChange: (fieldId, value) => calls.push({ name: 'onDigitWidthChange', args: [fieldId, value] }),
     onActivate: (fieldId) => calls.push({ name: 'onActivate', args: [fieldId] }),
@@ -29,6 +30,7 @@ function recordingCallbacks(calls: CallbackCall[]): FieldsViewCallbacks {
     onApplySplit: (fieldId, pattern) => calls.push({ name: 'onApplySplit', args: [fieldId, pattern] }),
     onClearSplit: (baseFieldId) => calls.push({ name: 'onClearSplit', args: [baseFieldId] }),
     onResetField: (fieldId) => calls.push({ name: 'onResetField', args: [fieldId] }),
+    onResetStructure: () => calls.push({ name: 'onResetStructure', args: [] }),
     onResetAll: () => calls.push({ name: 'onResetAll', args: [] }),
     onOpenChange: (open, blockSize) => calls.push({ name: 'onOpenChange', args: [open, blockSize] }),
     onResize: (blockSize) => calls.push({ name: 'onResize', args: [blockSize] }),
@@ -179,6 +181,48 @@ test('reset-all button dispatches without exposing values in privacy mode', () =
   buttonByLabel(view, 'Reset private parsed fields').click();
 
   assert.deepEqual(calls, [{ name: 'onResetAll', args: [] }]);
+});
+
+test('reset-structure sits beside Reset all and dispatches without exposing values in privacy mode', () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls, {
+    options: { open: true, blockSize: null, privacyMode: true, resetAllAvailable: true, resetStructureAvailable: true },
+  });
+  const controls = view.querySelector('.image-trail-panel__fields-reset-controls');
+  assert.ok(controls);
+  assert.deepEqual(
+    Array.from(controls.querySelectorAll('button')).map((button) => button.textContent),
+    ['Reset structure', 'Reset all'],
+  );
+
+  buttonByLabel(view, 'Reset private parsed field structure').click();
+  assert.deepEqual(calls, [{ name: 'onResetStructure', args: [] }]);
+});
+
+test('empty numeric input restores its canonical value and reports an invalid commit', () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls);
+  const input = inputByLabel(view, 'Edit page');
+  input.value = '';
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }));
+  assert.equal(input.value, '17');
+  assert.deepEqual(calls, [{ name: 'onInvalidValueCommit', args: [] }]);
+});
+
+test('empty text input dispatches a normal value commit', () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls, {
+    fields: [
+      {
+        field: { id: 'query-slug', location: 'query', label: 'slug', value: 'word', tokenKind: 'text', queryIndex: 0, tokenIndex: 0 },
+        value: 'word',
+      },
+    ],
+  });
+  const input = inputByLabel(view, 'Edit slug');
+  input.value = '';
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }));
+  assert.deepEqual(calls, [{ name: 'onValueChange', args: ['query-slug', ''] }]);
 });
 
 test('numeric display toggle changes the input display without committing a value', () => {

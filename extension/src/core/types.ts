@@ -325,6 +325,7 @@ export type PanelActionName =
   | 'active-field/set'
   | 'field-unlock/toggle'
   | 'field/transform'
+  | 'field/commit-rejected'
   | 'selected-url/apply'
   | 'selected-url/reject-unsupported-input'
   | 'pin/current'
@@ -455,6 +456,7 @@ export type FieldTransformPanelAction =
     }
   | { readonly name: 'field/transform'; readonly fieldId: string; readonly transformId: Extract<FieldTransformId, 'split-clear'> }
   | { readonly name: 'field/transform'; readonly fieldId: string; readonly transformId: Extract<FieldTransformId, 'reset-field'> }
+  | { readonly name: 'field/transform'; readonly transformId: Extract<FieldTransformId, 'reset-structure'> }
   | { readonly name: 'field/transform'; readonly transformId: Extract<FieldTransformId, 'reset-all'> };
 
 export type PanelAction =

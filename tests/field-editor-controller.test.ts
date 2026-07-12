@@ -4,9 +4,11 @@ import assert from 'node:assert/strict';
 import { createInitialPanelState } from '../extension/src/core/state.js';
 import type { PanelState } from '../extension/src/core/types.js';
 import { parseUrl } from '../extension/src/core/url/parse-url.js';
+import { applyFieldSplitSpecs } from '../extension/src/core/url/field-splits.js';
 import { collectUrlFields } from '../extension/src/core/url/tokenize-fields.js';
 import type { ParsedUrlModel } from '../extension/src/core/url/types.js';
 import { FieldEditorController, type FieldEditorControllerDeps } from '../extension/src/ui/panel/field-editor-controller.js';
+import { parsedFieldResetBaselineFromState } from '../extension/src/ui/panel/parsed-field-reset-baseline.js';
 
 // Window-free paths only: the controller reaches the panel root, DOM, and the projection load exclusively
 // through injected callbacks, so every collaborator here is a fake that records into `log`/`applyCalls`.
@@ -220,6 +222,75 @@ test('set-value with an unchanged value is a silent no-op', async () => {
   await harness.settle();
   assert.deepEqual(harness.applyCalls, []);
   assert.deepEqual(harness.log, []);
+});
+
+test('set-value accepts a retokenizing empty text commit', async () => {
+  const harness = createHarness({ rawUrl: 'https://example.test/image?q=word' });
+  const fieldId = harness.fieldId('query q');
+  harness.controller.enqueueFieldTransform({ name: 'field/transform', fieldId, transformId: 'set-value', value: '' });
+  await harness.settle();
+  assert.equal(harness.applyCalls[0]?.url, 'https://example.test/image?q=');
+});
+
+test('split-child set-value accepts a valid replacement and rejects invalidation', async () => {
+  const rawUrl = 'https://example.test/image?date=0101';
+  const splitSpec = {
+    baseFieldId: 'q:0:0',
+    location: 'query' as const,
+    queryIndex: 0,
+    tokenIndex: 0,
+    lengths: [2, 2],
+    pattern: '2-2',
+  };
+  const valid = createHarness({ rawUrl, currentUrlModel: () => applyFieldSplitSpecs(parseUrl(rawUrl), [splitSpec]) });
+  valid.patchState({ fieldSplitSpecs: [splitSpec] });
+  valid.controller.enqueueFieldTransform({ name: 'field/transform', fieldId: 'q:0:1', transformId: 'set-value', value: '02' });
+  await valid.settle();
+  assert.equal(valid.applyCalls[0]?.url, 'https://example.test/image?date=0102');
+
+  const invalid = createHarness({ rawUrl, currentUrlModel: () => applyFieldSplitSpecs(parseUrl(rawUrl), [splitSpec]) });
+  invalid.patchState({ fieldSplitSpecs: [splitSpec] });
+  invalid.controller.enqueueFieldTransform({ name: 'field/transform', fieldId: 'q:0:1', transformId: 'set-value', value: '' });
+  await invalid.settle();
+  assert.deepEqual(invalid.applyCalls, []);
+  assert.equal(invalid.getState().status, 'error');
+  assert.equal(invalid.getState().message, 'That edit would invalidate the field split.');
+  assert.equal(invalid.resetCalls.length, 1);
+});
+
+test('invalid numeric commits use bounded generic feedback without projection', async () => {
+  const harness = createHarness();
+  harness.controller.enqueueRejectedFieldCommit();
+  await harness.settle();
+  assert.deepEqual(harness.applyCalls, []);
+  assert.equal(harness.getState().message, 'Parsed field value is invalid.');
+  assert.equal(harness.resetCalls.length, 1);
+});
+
+test('reset-structure restores the baseline URL, preserves valid settings, and keeps Reset all available', async () => {
+  const harness = createHarness({ rawUrl: 'https://example.test/image?q=' });
+  const state = harness.getState();
+  const baseline = parsedFieldResetBaselineFromState(state, 'https://example.test/image?q=12');
+  harness.patchState({
+    parsedFieldResetBaseline: baseline,
+    activeFieldId: 'q:0:0',
+    unlockedFieldIds: ['q:0:0', 'missing'],
+    fieldDigitWidthSpecs: [
+      { fieldId: 'q:0:0', width: 3, sourceWidth: undefined },
+      { fieldId: 'missing', width: 2, sourceWidth: undefined },
+    ],
+  });
+  harness.controller.enqueueFieldTransform({ name: 'field/transform', transformId: 'reset-structure' });
+  await harness.settle();
+  assert.equal(harness.applyCalls[0]?.url, baseline.sourceUrl);
+  assert.equal(harness.getState().activeFieldId, 'q:0:0');
+  assert.deepEqual(harness.getState().unlockedFieldIds, ['q:0:0']);
+  assert.deepEqual(
+    harness.getState().fieldDigitWidthSpecs.map((spec) => spec.fieldId),
+    ['q:0:0'],
+  );
+  assert.equal(harness.getState().parsedFieldResetBaseline, baseline);
+  assert.ok(!harness.log.includes('saveTemplate'));
 });
 
 test('set-value on an unknown field is a no-op', async () => {
