@@ -13,6 +13,7 @@ import { createSettingsSection } from './settings-section.js';
 import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
 import { activeUrlFieldsForState } from './active-url-fields.js';
+import { createFieldEditorViewModel } from './field-editor-view-model.js';
 
 import { createParsedFieldsSection, type NumericFieldDisplayMode } from './parsed-fields-section.js';
 
@@ -21,12 +22,22 @@ import { createParsedFieldsSection, type NumericFieldDisplayMode } from './parse
 // the page href too: the derivation falls back to window.location.href (no selected URL, or a
 // data: URL), and an SPA navigation can re-render with the same state object.
 const activeUrlFieldsCache = new WeakMap<PanelState, { href: string; value: ReturnType<typeof activeUrlFieldsForState> }>();
+const fieldEditorViewModelCache = new WeakMap<PanelState, { href: string; value: ReturnType<typeof createFieldEditorViewModel> }>();
 function cachedActiveUrlFields(state: PanelState): ReturnType<typeof activeUrlFieldsForState> {
   const href = window.location.href;
   const cached = activeUrlFieldsCache.get(state);
   if (cached && cached.href === href) return cached.value;
   const value = activeUrlFieldsForState(state, href);
   activeUrlFieldsCache.set(state, { href, value });
+  return value;
+}
+
+function cachedFieldEditorViewModel(state: PanelState): ReturnType<typeof createFieldEditorViewModel> {
+  const href = window.location.href;
+  const cached = fieldEditorViewModelCache.get(state);
+  if (cached && cached.href === href) return cached.value;
+  const value = createFieldEditorViewModel(state, cachedActiveUrlFields(state));
+  fieldEditorViewModelCache.set(state, { href, value });
   return value;
 }
 
@@ -401,10 +412,7 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [
     id: 'fields',
     title: 'Parsed fields',
     windowInlineSize: 380,
-    create: (target, state) => {
-      const { activeUrl, editableFields } = cachedActiveUrlFields(state);
-      return createParsedFieldsSection(editableFields, state, activeUrl, target);
-    },
+    create: (target, state) => createParsedFieldsSection(cachedFieldEditorViewModel(state), target),
   },
   { id: 'controls', title: 'Manual controls', create: createManualControlsSection },
   { id: 'history', title: 'Recent history', create: createHistorySection },
@@ -412,20 +420,10 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [
 ];
 
 function createManualControlsSection(target: PanelRenderTarget, state: PanelState): HTMLElement {
-  const { visibleFields } = cachedActiveUrlFields(state);
+  const fieldEditor = cachedFieldEditorViewModel(state);
   const dispatchActiveField = (delta: -1 | 1): void => {
-    if (visibleFields.length === 0) return;
-    const currentIndex = visibleFields.findIndex((field) => field.id === state.activeFieldId);
-    let nextIndex: number;
-    if (currentIndex === -1) {
-      nextIndex = delta > 0 ? 0 : visibleFields.length - 1;
-    } else {
-      nextIndex = Math.max(0, Math.min(visibleFields.length - 1, currentIndex + delta));
-    }
-    const nextField = visibleFields[nextIndex];
-    if (nextField) {
-      target.dispatch({ name: 'active-field/set', id: nextField.id });
-    }
+    const fieldId = delta < 0 ? fieldEditor.previousFieldId : fieldEditor.nextFieldId;
+    if (fieldId) target.dispatch({ name: 'active-field/set', id: fieldId });
   };
 
   const isNoTarget = !state.target.selectedUrl;

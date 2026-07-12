@@ -1,12 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { createInitialPanelState } from '../../extension/src/core/state.js';
+import type { ActiveUrlFields } from '../../extension/src/ui/active-url-fields.js';
+import { createFieldEditorViewModel } from '../../extension/src/ui/field-editor-view-model.js';
 import {
   createFieldsView,
   type EditableField,
   type FieldsViewCallbacks,
   type FieldsViewOptions,
 } from '../../extension/src/ui/components/fields-view.js';
+
+interface TestFieldsViewOptions extends FieldsViewOptions {
+  readonly privacyMode?: boolean;
+  readonly resettableFieldIds?: ReadonlySet<string>;
+  readonly resetAllAvailable?: boolean;
+  readonly resetStructureAvailable?: boolean;
+  readonly showFieldFailure?: boolean;
+}
 
 interface CallbackCall {
   readonly name: string;
@@ -41,21 +52,50 @@ function buildFieldsView(
   calls: CallbackCall[],
   overrides: {
     readonly fields?: EditableField[];
+    readonly activeFieldId?: string | null;
+    readonly failedFieldId?: string | null;
     readonly successfulFieldIds?: readonly string[];
-    readonly options?: FieldsViewOptions;
+    readonly unchangedFieldIds?: readonly string[];
+    readonly unlockedFieldIds?: readonly string[];
+    readonly options?: TestFieldsViewOptions;
   } = {},
 ): HTMLElement {
-  return createFieldsView(
-    overrides.fields ?? [pageField],
-    null,
-    null,
-    overrides.successfulFieldIds ?? [],
-    [],
-    [],
-    [],
-    recordingCallbacks(calls),
-    overrides.options ?? { open: true, blockSize: null },
-  );
+  const fields = overrides.fields ?? [pageField];
+  const viewOptions = overrides.options ?? { open: true, blockSize: null };
+  const state = {
+    ...createInitialPanelState(),
+    activeFieldId: overrides.activeFieldId ?? null,
+    failedFieldId: overrides.failedFieldId ?? null,
+    successfulFieldIds: overrides.successfulFieldIds ?? [],
+    unchangedFieldIds: overrides.unchangedFieldIds ?? [],
+    unlockedFieldIds: overrides.unlockedFieldIds ?? [],
+    privacyModeEnabled: viewOptions.privacyMode ?? false,
+    loadFailureFeedback: viewOptions.showFieldFailure === false ? ('mute' as const) : ('display' as const),
+  };
+  const activeUrlFields: ActiveUrlFields = {
+    activeUrl: 'https://example.test/image?page=17',
+    fields: fields.map((field) => field.field),
+    visibleFields: fields.map((field) => field.field),
+    editableFields: fields,
+    activeTemplate: null,
+  };
+  const derivedModel = createFieldEditorViewModel(state, activeUrlFields);
+  const resettableFieldIds = viewOptions.resettableFieldIds ?? new Set<string>();
+  const model = {
+    ...derivedModel,
+    rows: derivedModel.rows.map((row) =>
+      resettableFieldIds.has(row.field.id) ? { ...row, availableTransforms: [...row.availableTransforms, 'reset-field' as const] } : row,
+    ),
+    availableTransforms: [
+      ...(viewOptions.resetStructureAvailable ? (['reset-structure'] as const) : []),
+      ...(viewOptions.resetAllAvailable ? (['reset-all'] as const) : []),
+    ],
+  };
+  return createFieldsView(model, recordingCallbacks(calls), {
+    open: viewOptions.open,
+    blockSize: viewOptions.blockSize,
+    ...(viewOptions.numericDisplayModes ? { numericDisplayModes: viewOptions.numericDisplayModes } : {}),
+  });
 }
 
 function inputByLabel(view: HTMLElement, label: string): HTMLInputElement {
@@ -123,7 +163,7 @@ test('field commands commit a focused pending edit before dispatching their acti
   const scenarios: ReadonlyArray<{
     readonly label: string;
     readonly successfulFieldIds?: readonly string[];
-    readonly options?: FieldsViewOptions;
+    readonly options?: TestFieldsViewOptions;
     readonly expectedCommand: CallbackCall;
   }> = [
     { label: 'Increment page', expectedCommand: { name: 'onStep', args: ['query-page', 1] } },
@@ -385,17 +425,15 @@ test('the failed-field ring renders unless showFieldFailure is false (Mute) (#45
   const calls: CallbackCall[] = [];
   const errorRows = (view: HTMLElement): number => view.querySelectorAll('.image-trail-panel__field-row.is-error').length;
 
-  const shown = createFieldsView([pageField], null, 'query-page', [], [], [], [], recordingCallbacks(calls), {
-    open: true,
-    blockSize: null,
-    showFieldFailure: true,
+  const shown = buildFieldsView(calls, {
+    failedFieldId: 'query-page',
+    options: { open: true, blockSize: null, showFieldFailure: true },
   });
   assert.equal(errorRows(shown), 1, 'Display/Alert paints the red ring for the failed field');
 
-  const muted = createFieldsView([pageField], null, 'query-page', [], [], [], [], recordingCallbacks(calls), {
-    open: true,
-    blockSize: null,
-    showFieldFailure: false,
+  const muted = buildFieldsView(calls, {
+    failedFieldId: 'query-page',
+    options: { open: true, blockSize: null, showFieldFailure: false },
   });
   assert.equal(errorRows(muted), 0, 'Mute hides the ring even though failedFieldId is set');
 });
