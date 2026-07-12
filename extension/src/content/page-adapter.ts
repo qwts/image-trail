@@ -16,10 +16,13 @@ import {
 import { DomObserver } from './dom-observer.js';
 import {
   createLoadedTargetImageInfo,
+  createTargetImageLocator,
   createTargetImageInfo,
   findQualifyingImages,
   getImageRejectionReason,
   isQualifyingImage,
+  recoverTargetImage,
+  type TargetImageLocator,
   type TargetImageInfo,
 } from './target-image.js';
 import {
@@ -118,6 +121,9 @@ function isBodyOnlyImageDocument(image: HTMLImageElement | undefined): boolean {
 
 export class PageAdapter {
   private selected: HTMLImageElement | null = null;
+  private selectedHandleId: string | null = null;
+  private selectedLocator: TargetImageLocator | null = null;
+  private targetObserver: MutationObserver | null = null;
   private hovered: HTMLImageElement | null = null;
   private candidates = new Set<HTMLImageElement>();
   private detectedCandidateCount = 0;
@@ -295,6 +301,8 @@ export class PageAdapter {
     this.clearGrabPreview();
     this.stopPickMode();
     this.restoreSelectedTargetStyles();
+    this.stopTargetRecovery();
+    this.selectedLocator = null;
     this.mode = 'none';
   }
 
@@ -647,6 +655,7 @@ export class PageAdapter {
     const originalSnapshot = captureImageNavigationSnapshot(image);
     this.restoreSelectedTarget();
     this.selected = image;
+    this.selectedLocator = createTargetImageLocator(image);
     this.selectedOriginalUrl = originalUrl;
     this.selectedOriginalSnapshot = originalSnapshot;
     this.selectedActiveUrl = originalUrl;
@@ -655,9 +664,11 @@ export class PageAdapter {
     this.selectedProjectionReason = null;
     this.mode = mode;
     const handleId = createTargetImageInfo(image)?.handleId;
+    this.selectedHandleId = handleId ?? null;
     if (handleId) image.setAttribute('data-image-trail-handle', handleId);
     markSelectedTarget(image, { lockBox: this.selectedFillScreen, objectFit: this.selectedObjectFit });
     this.watchSelectedLoad(image);
+    this.startTargetRecovery();
   }
 
   private restoreSelectedTarget(): void {
@@ -673,13 +684,42 @@ export class PageAdapter {
     }
     if (this.preparedStandaloneBackdrop === this.selected) this.preparedStandaloneBackdrop = null;
     this.clearPendingLoadTarget();
+    this.stopTargetRecovery();
     this.selected = null;
+    this.selectedHandleId = null;
+    this.selectedLocator = null;
     this.selectedOriginalUrl = null;
     this.selectedOriginalSnapshot = null;
     this.selectedActiveUrl = null;
     this.selectedDisplayUrl = null;
     this.selectedProjectionId = null;
     this.selectedProjectionReason = null;
+  }
+
+  private startTargetRecovery(): void {
+    this.stopTargetRecovery();
+    if (!this.selectedLocator || typeof MutationObserver === 'undefined') return;
+    this.targetObserver = new MutationObserver(() => this.recoverSelectedTarget());
+    this.targetObserver.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  private stopTargetRecovery(): void {
+    this.targetObserver?.disconnect();
+    this.targetObserver = null;
+  }
+
+  private recoverSelectedTarget(): void {
+    if (this.selected?.isConnected || !this.selectedLocator) return;
+    const replacement = recoverTargetImage(this.selectedLocator);
+    if (!replacement) return;
+
+    this.clearPendingLoadTarget();
+    this.selected = replacement;
+    this.selectedOriginalSnapshot = captureImageNavigationSnapshot(replacement);
+    if (this.selectedHandleId) replacement.setAttribute('data-image-trail-handle', this.selectedHandleId);
+    markSelectedTarget(replacement, { lockBox: this.selectedFillScreen, objectFit: this.selectedObjectFit });
+    if (this.selectedDisplayUrl) applyImageUrl(replacement, this.selectedDisplayUrl);
+    this.watchSelectedLoad(replacement);
   }
 
   private restorePreparedStandaloneBackdrop(): void {

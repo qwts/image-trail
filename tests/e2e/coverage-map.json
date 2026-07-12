@@ -150,6 +150,11 @@
           "notes": "Covers Recent preview projection into the selected host image, #390 focused-row click then ArrowDown then Enter loading, failed projection preserving the previous successful image, same-current already-projected reporting, and release/close restoration of host image src/srcset/sizes and extension-owned styles."
         },
         {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/target-recovery.spec.ts",
+          "notes": "Covers #392 session-only recovery when a redraw-heavy page replaces the selected image node: the active projection, responsive-attribute clearing, selected styling, and handle are restored before the next animation frame; release restores the replacement node's host-owned state, and changed-content replacements are rejected."
+        },
+        {
           "type": "unit-dom",
           "paths": ["tests/dom/projection-application-controller.test.ts"],
           "notes": "Covers #429: a successful record preview clears a stale failed draftUrl so the URL editor and parsed fields rebuild from the projected URL."

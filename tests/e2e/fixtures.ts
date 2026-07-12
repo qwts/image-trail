@@ -30,6 +30,7 @@ const fixturePaths = {
   brokenImage: '/broken-image.html',
   gallerySequence: '/gallery-sequence.html',
   oversizedImage: '/oversized-image.html',
+  redrawImage: '/redraw-image.html',
 } as const;
 const fixtureAssetPaths = {
   assetOne: '/assets/asset-one.svg',

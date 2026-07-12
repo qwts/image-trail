@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Trail redraw fixture</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #20242a;
+      }
+      #target-shell {
+        width: 180px;
+        height: 120px;
+      }
+      #redraw-target {
+        width: 180px;
+        height: 120px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="target-shell">
+      <picture>
+        <source srcset="/assets/asset-one.svg 1x" sizes="180px" />
+        <img
+          id="redraw-target"
+          src="/assets/asset-one.svg"
+          srcset="/assets/asset-one.svg 1x"
+          sizes="180px"
+          alt="Redraw target"
+          style="border: 2px solid rgb(255, 0, 0)"
+        />
+      </picture>
+    </div>
+    <script>
+      window.replaceRedrawTarget = (src = '/assets/asset-one.svg') =>
+        new Promise((resolve) => {
+          const current = document.querySelector('#redraw-target');
+          const picture = document.createElement('picture');
+          picture.innerHTML = `<source srcset="${src} 1x" sizes="180px"><img id="redraw-target" src="${src}" srcset="${src} 1x" sizes="180px" alt="Redraw target" style="border: 2px solid rgb(255, 0, 0)">`;
+          current.closest('picture').replaceWith(picture);
+          requestAnimationFrame(() => {
+            const image = picture.querySelector('img');
+            const source = picture.querySelector('source');
+            resolve({
+              src: image.getAttribute('src'),
+              srcset: image.getAttribute('srcset'),
+              sizes: image.getAttribute('sizes'),
+              selected: image.getAttribute('data-image-trail-selected'),
+              handle: image.getAttribute('data-image-trail-handle'),
+              lockBox: image.getAttribute('data-image-trail-lock-box'),
+              sourceSrcset: source.getAttribute('srcset'),
+              sourceSizes: source.getAttribute('sizes'),
+            });
+          });
+        });
+    </script>
+  </body>
+</html>
