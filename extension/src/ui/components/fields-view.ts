@@ -311,7 +311,11 @@ export function createFieldsView(
     const commitValueChange = (): void => {
       if (value.value === fieldInputReferenceValue) return;
       if (suppressedValueChange === value.value) return;
-      const nextValue = numericDisplayMode === null ? value.value : numericFieldCommitValue(field.field, numericDisplayMode, value.value);
+      const isStructuralCommit = value.value.trim() === '' || /[/&=?#]|%(?:2f|3f|26|3d|23)/iu.test(value.value);
+      const nextValue =
+        numericDisplayMode === null || isStructuralCommit
+          ? value.value
+          : numericFieldCommitValue(field.field, numericDisplayMode, value.value);
       if (nextValue === null) {
         value.value = fieldInputReferenceValue;
         callbacks.onInvalidValueCommit();

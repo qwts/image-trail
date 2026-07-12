@@ -42,6 +42,13 @@ async function installDynamicImageRoute(page: Page, failedFrames: readonly strin
   });
 }
 
+async function installRetokenizingPathRoute(page: Page): Promise<void> {
+  await page.context().route(/\/parsed-field(?:\/.*)?$/u, async (route) => {
+    const frame = new URL(route.request().url()).pathname.replace(/\D/gu, '') || '0';
+    await route.fulfill({ status: 200, contentType: 'image/svg+xml', body: dynamicSvg(frame) });
+  });
+}
+
 async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
@@ -193,6 +200,23 @@ async function expectFrame(page: Page, frame: string): Promise<void> {
   const snapshot = await imageNavigationSnapshot(page, primaryImage);
   expect(snapshot.src).toMatch(/^data:image\/svg\+xml;base64,/u);
 }
+
+test('a delimiter-changing numeric field commit reparses the projected Field Editors', async ({ page, serviceWorker }) => {
+  await installRetokenizingPathRoute(page);
+  await openPanel(page, serviceWorker);
+  await applyUrlInEditor(page, fixtureUrl('/parsed-field/400'));
+  await openParsedFields(page);
+
+  const field = page.getByLabel('Edit path 3.0');
+  await field.click();
+  await expect(field.locator('xpath=ancestor::div[contains(@class, "image-trail-panel__field-row")][1]')).toHaveClass(/is-active/u);
+  await page.getByLabel('Edit path 3.0').fill('400/53');
+  await page.getByLabel('Edit path 3.0').press('Enter');
+
+  await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl('/parsed-field/400/53'));
+  await expect(page.getByLabel('Edit path 3.0')).toHaveValue('400');
+  await expect(page.getByLabel('Edit path 5.0')).toHaveValue('53');
+});
 
 test('URL editor and parsed fields load, fail closed, navigate, learn templates, and restore same-image context', async ({
   page,

@@ -5,7 +5,7 @@ import {
   normalizeFieldDigitWidth,
   upsertFieldDigitWidthSpec,
 } from './field-widths.js';
-import { bumpUrlField, rebuildUrl, setUrlFieldValue } from './rebuild-url.js';
+import { bumpUrlField, rebuildUrl, rebuildUrlWithRawFieldValue, setUrlFieldValue } from './rebuild-url.js';
 import { collectUrlFields } from './tokenize-fields.js';
 import type { ParsedUrlModel, UrlField, UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from './types.js';
 
@@ -81,7 +81,14 @@ export type FieldResetTransformResult = FieldTransformResult<{
 }>;
 
 export function applySetFieldValueTransform(model: ParsedUrlModel, field: UrlField, nextValue: string): FieldUrlTransformResult {
-  return toUrlTransformResult('set-value', setUrlFieldValue(model, field, nextValue), [field.id]);
+  return {
+    ok: true,
+    id: 'set-value',
+    kind: 'url',
+    model,
+    url: rebuildUrlWithRawFieldValue(model, field, nextValue),
+    attemptedFieldIds: [field.id],
+  };
 }
 
 export function applyStepFieldValueTransform(model: ParsedUrlModel, field: UrlField, delta: number): FieldUrlTransformResult {

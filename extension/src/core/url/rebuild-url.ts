@@ -16,6 +16,14 @@ export function setUrlFieldValue(model: ParsedUrlModel, field: UrlField, nextVal
   return setUrlFieldToken(model, field, (token) => setTokenValue(token, normalized));
 }
 
+export function rebuildUrlWithRawFieldValue(model: ParsedUrlModel, field: UrlField, nextValue: string): string {
+  const currentUrl = rebuildUrl(model);
+  let marker = '__IMAGE_TRAIL_RAW_FIELD_VALUE__';
+  while (currentUrl.includes(marker)) marker += '_';
+  const markedUrl = rebuildUrl(setUrlFieldValue(model, field, marker));
+  return markedUrl.replace(marker, normalizeTokenValue(nextValue));
+}
+
 function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token: UrlToken) => UrlToken): ParsedUrlModel {
   if (field.location === 'path' && field.partIndex !== undefined) {
     return {

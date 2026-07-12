@@ -104,16 +104,22 @@ export const EditsField: Story = {
 export const CommitContractAndResetControls: Story = {
   render: () =>
     fieldsStory({
-      callbacks: { onInvalidValueCommit: invalidValueSpy, onResetStructure: resetStructureSpy },
+      callbacks: { onValueChange: valueChangeSpy, onInvalidValueCommit: invalidValueSpy, onResetStructure: resetStructureSpy },
       options: { resetAllAvailable: true, resetStructureAvailable: true },
     }),
   play: async ({ canvasElement }) => {
     invalidValueSpy.mockClear();
+    valueChangeSpy.mockClear();
     resetStructureSpy.mockClear();
     const canvas = within(canvasElement);
     const input = canvas.getByLabelText('Edit page');
     await userEvent.clear(input);
     await userEvent.type(input, '{Enter}');
+    await expect(valueChangeSpy).toHaveBeenCalledWith('query-page', '');
+    await userEvent.type(input, '400/53{Enter}');
+    await expect(valueChangeSpy).toHaveBeenCalledWith('query-page', '400/53');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'invalid{Enter}');
     await expect(input).toHaveValue('17');
     await expect(invalidValueSpy).toHaveBeenCalledTimes(1);
     await userEvent.click(canvas.getByLabelText('Reset parsed field structure'));

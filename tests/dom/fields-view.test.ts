@@ -199,14 +199,20 @@ test('reset-structure sits beside Reset all and dispatches without exposing valu
   assert.deepEqual(calls, [{ name: 'onResetStructure', args: [] }]);
 });
 
-test('empty numeric input restores its canonical value and reports an invalid commit', () => {
+test('empty and delimiter-changing numeric input dispatch normal value commits', () => {
   const calls: CallbackCall[] = [];
   const view = buildFieldsView(calls);
   const input = inputByLabel(view, 'Edit page');
   input.value = '';
   input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }));
-  assert.equal(input.value, '17');
-  assert.deepEqual(calls, [{ name: 'onInvalidValueCommit', args: [] }]);
+  assert.deepEqual(calls, [{ name: 'onValueChange', args: ['query-page', ''] }]);
+
+  const delimiterCalls: CallbackCall[] = [];
+  const delimiterView = buildFieldsView(delimiterCalls);
+  const delimiterInput = inputByLabel(delimiterView, 'Edit page');
+  delimiterInput.value = '400/53';
+  delimiterInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }));
+  assert.deepEqual(delimiterCalls, [{ name: 'onValueChange', args: ['query-page', '400/53'] }]);
 });
 
 test('empty text input dispatches a normal value commit', () => {

@@ -232,6 +232,14 @@ test('set-value accepts a retokenizing empty text commit', async () => {
   assert.equal(harness.applyCalls[0]?.url, 'https://example.test/image?q=');
 });
 
+test('set-value projects delimiter-changing numeric text for reparsing', async () => {
+  const harness = createHarness({ rawUrl: 'https://example.test/images/400' });
+  const fieldId = harness.fieldId('path 3.0');
+  harness.controller.enqueueFieldTransform({ name: 'field/transform', fieldId, transformId: 'set-value', value: '400/53' });
+  await harness.settle();
+  assert.equal(harness.applyCalls[0]?.url, 'https://example.test/images/400/53');
+});
+
 test('split-child set-value accepts a valid replacement and rejects invalidation', async () => {
   const rawUrl = 'https://example.test/image?date=0101';
   const splitSpec = {

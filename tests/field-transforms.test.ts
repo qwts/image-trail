@@ -106,16 +106,28 @@ test('set-value accepts empty text and lets the reparsed URL define the resultin
 });
 
 test('set-value accepts raw and encoded delimiters through location-specific rebuilding', () => {
-  const pathModel = parseUrl('https://example.test/images/word');
-  const pathField = collectUrlFields(pathModel).find((candidate) => candidate.value === 'word');
+  const pathModel = parseUrl('https://example.test/images/400');
+  const pathField = collectUrlFields(pathModel).find((candidate) => candidate.value === '400');
   assert.ok(pathField);
-  assert.equal(applySetFieldValueTransform(pathModel, pathField, '/').url, 'https://example.test/images/%2F');
-  assert.equal(applySetFieldValueTransform(pathModel, pathField, '%2F').url, 'https://example.test/images/%252F');
+  const splitPath = applySetFieldValueTransform(pathModel, pathField, '400/53');
+  assert.equal(splitPath.url, 'https://example.test/images/400/53');
+  assert.deepEqual(
+    collectUrlFields(parseUrl(splitPath.url)).map((field) => field.value),
+    ['images', '400', '53'],
+  );
+  assert.equal(applySetFieldValueTransform(pathModel, pathField, '%2F').url, 'https://example.test/images/%2F');
+  assert.equal(applySetFieldValueTransform(pathModel, pathField, '400?size=53').url, 'https://example.test/images/400?size=53');
+  assert.equal(applySetFieldValueTransform(pathModel, pathField, '400#53').url, 'https://example.test/images/400#53');
 
   const queryModel = parseUrl('https://example.test/image?q=word');
   const queryField = collectUrlFields(queryModel).find((candidate) => candidate.label === 'query q');
   assert.ok(queryField);
-  assert.equal(applySetFieldValueTransform(queryModel, queryField, '/&=#?').url, 'https://example.test/image?q=%2F%26%3D%23%3F');
+  assert.equal(
+    applySetFieldValueTransform(queryModel, queryField, 'word&size=53#part').url,
+    'https://example.test/image?q=word&size=53#part',
+  );
+  assert.equal(applySetFieldValueTransform(queryModel, queryField, 'word=53').url, 'https://example.test/image?q=word=53');
+  assert.equal(applySetFieldValueTransform(queryModel, queryField, '%26size%3D53').url, 'https://example.test/image?q=%26size%3D53');
 });
 
 test('step transform preserves numeric padding and clamping', () => {
