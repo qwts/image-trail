@@ -84,6 +84,7 @@ const valueChangeSpy = fn();
 const stepSpy = fn();
 const invalidValueSpy = fn();
 const resetStructureSpy = fn();
+const resetAllSpy = fn();
 
 export const EditsField: Story = {
   render: () => fieldsStory({ callbacks: { onValueChange: valueChangeSpy, onStep: stepSpy } }),
@@ -104,13 +105,19 @@ export const EditsField: Story = {
 export const CommitContractAndResetControls: Story = {
   render: () =>
     fieldsStory({
-      callbacks: { onValueChange: valueChangeSpy, onInvalidValueCommit: invalidValueSpy, onResetStructure: resetStructureSpy },
+      callbacks: {
+        onValueChange: valueChangeSpy,
+        onInvalidValueCommit: invalidValueSpy,
+        onResetStructure: resetStructureSpy,
+        onResetAll: resetAllSpy,
+      },
       options: { resetAllAvailable: true, resetStructureAvailable: true },
     }),
   play: async ({ canvasElement }) => {
     invalidValueSpy.mockClear();
     valueChangeSpy.mockClear();
     resetStructureSpy.mockClear();
+    resetAllSpy.mockClear();
     const canvas = within(canvasElement);
     const input = canvas.getByLabelText('Edit page');
     await userEvent.clear(input);
@@ -124,7 +131,8 @@ export const CommitContractAndResetControls: Story = {
     await expect(invalidValueSpy).toHaveBeenCalledTimes(1);
     await userEvent.click(canvas.getByLabelText('Reset parsed field structure'));
     await expect(resetStructureSpy).toHaveBeenCalledTimes(1);
-    await expect(canvas.getByLabelText('Reset all parsed fields')).toBeVisible();
+    await userEvent.click(canvas.getByLabelText('Reset all parsed fields'));
+    await expect(resetAllSpy).toHaveBeenCalledTimes(1);
   },
 };
 

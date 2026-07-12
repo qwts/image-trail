@@ -1,6 +1,8 @@
 import type { UrlField, UrlFieldDigitWidthSpec } from '../../core/url/types.js';
+import { createFieldValueCommitController, type NumericFieldDisplayMode } from './field-value-commit-controller.js';
+import { createFieldsResetControls } from './fields-reset-controls.js';
 
-export type NumericFieldDisplayMode = 'decimal' | 'hex';
+export { type NumericFieldDisplayMode, numericFieldCommitValue } from './field-value-commit-controller.js';
 
 export interface EditableField {
   readonly field: UrlField;
@@ -99,14 +101,6 @@ export function numericFieldInputDisplayValue(field: UrlField, mode: NumericFiel
   return `0x${value.toString(16)}`;
 }
 
-export function numericFieldCommitValue(field: UrlField, mode: NumericFieldDisplayMode, raw: string): string | null {
-  const value = parseNumericInput(raw, mode);
-  if (value === null) return null;
-  if (field.tokenKind === 'int') return value.toString(10);
-  if (field.tokenKind === 'hex') return formatHexSourceValue(field.value, value);
-  return raw.trim();
-}
-
 export function fieldDigitWidthInputDisplay(
   field: UrlField,
   digitWidth: number | undefined,
@@ -123,11 +117,6 @@ function parseNumericFieldSourceValue(field: UrlField): bigint | null {
   if (field.tokenKind === 'int') return parseDecimal(field.value);
   if (field.tokenKind === 'hex') return parseHex(field.value);
   return null;
-}
-
-function parseNumericInput(raw: string, mode: NumericFieldDisplayMode): bigint | null {
-  const value = raw.trim();
-  return mode === 'decimal' ? parseDecimal(value) : parseHex(value);
 }
 
 function parseDecimal(value: string): bigint | null {
@@ -149,28 +138,8 @@ function parseHex(value: string): bigint | null {
   }
 }
 
-function formatHexSourceValue(source: string, value: bigint): string {
-  const prefix = source.match(/^0[xX]/u)?.[0] ?? '';
-  const sourceDigits = source.replace(/^0[xX]/u, '');
-  const width = sourceDigits.startsWith('0') ? sourceDigits.length : undefined;
-  const raw = value.toString(16).padStart(width ?? 0, '0');
-  const digits = /[A-F]/u.test(sourceDigits) ? raw.toUpperCase() : raw.toLowerCase();
-  return `${prefix}${digits}`;
-}
-
 export function fieldReservesTrailControlSlot(field: UrlField): boolean {
   return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
-}
-
-function isFocusedWithinRoot(input: HTMLInputElement): boolean {
-  const root = input.getRootNode();
-  return 'activeElement' in root ? root.activeElement === input : document.activeElement === input;
-}
-
-function commitAndBlurFocusedValue(input: HTMLInputElement, currentValue: string, privacyMode: boolean, commit: () => void): void {
-  if (privacyMode || !isFocusedWithinRoot(input)) return;
-  if (input.value !== currentValue) commit();
-  input.blur();
 }
 
 export function createFieldsView(
@@ -232,37 +201,14 @@ export function createFieldsView(
   const heading = document.createElement('h3');
   heading.textContent = 'Parsed fields';
   summary.append(heading);
-  if (options.resetAllAvailable === true || options.resetStructureAvailable === true) {
-    const resetControls = document.createElement('span');
-    resetControls.className = 'image-trail-panel__fields-reset-controls';
-    if (options.resetStructureAvailable === true) {
-      const resetStructure = document.createElement('button');
-      resetStructure.type = 'button';
-      resetStructure.className = 'image-trail-panel__fields-reset-all';
-      resetStructure.textContent = 'Reset structure';
-      resetStructure.title = options.privacyMode ? 'Reset private parsed field structure' : 'Reset parsed field structure';
-      resetStructure.setAttribute('aria-label', resetStructure.title);
-      resetStructure.addEventListener('click', (event) => {
-        event.preventDefault();
-        callbacks.onResetStructure();
-      });
-      resetControls.append(resetStructure);
-    }
-    if (options.resetAllAvailable === true) {
-      const resetAll = document.createElement('button');
-      resetAll.type = 'button';
-      resetAll.className = 'image-trail-panel__fields-reset-all';
-      resetAll.textContent = 'Reset all';
-      resetAll.title = options.privacyMode ? 'Reset private parsed fields' : 'Reset all parsed fields';
-      resetAll.setAttribute('aria-label', resetAll.title);
-      resetAll.addEventListener('click', (event) => {
-        event.preventDefault();
-        callbacks.onResetAll();
-      });
-      resetControls.append(resetAll);
-    }
-    summary.append(resetControls);
-  }
+  const resetControls = createFieldsResetControls({
+    privacyMode: options.privacyMode === true,
+    resetAllAvailable: options.resetAllAvailable === true,
+    resetStructureAvailable: options.resetStructureAvailable === true,
+    onResetStructure: callbacks.onResetStructure,
+    onResetAll: callbacks.onResetAll,
+  });
+  if (resetControls) summary.append(resetControls);
 
   const body = document.createElement('div');
   body.className = 'image-trail-panel__fields-body';
@@ -307,24 +253,15 @@ export function createFieldsView(
     value.title = options.privacyMode ? 'Privacy mode is hiding this URL field for screen sharing.' : field.value;
     value.setAttribute('aria-label', options.privacyMode ? 'Private URL field' : `Edit ${field.field.label}`);
     value.dataset['fieldId'] = field.field.id;
-    let suppressedValueChange: string | null = null;
-    const commitValueChange = (): void => {
-      if (value.value === fieldInputReferenceValue) return;
-      if (suppressedValueChange === value.value) return;
-      const isStructuralCommit = value.value.trim() === '' || /[/&=?#]|%(?:2f|3f|26|3d|23)/iu.test(value.value);
-      const nextValue =
-        numericDisplayMode === null || isStructuralCommit
-          ? value.value
-          : numericFieldCommitValue(field.field, numericDisplayMode, value.value);
-      if (nextValue === null) {
-        value.value = fieldInputReferenceValue;
-        callbacks.onInvalidValueCommit();
-        return;
-      }
-      if (nextValue === field.value) return;
-      suppressedValueChange = value.value;
-      callbacks.onValueChange(field.field.id, nextValue);
-    };
+    const valueCommitController = createFieldValueCommitController({
+      input: value,
+      field: field.field,
+      privacyMode: options.privacyMode === true,
+      getDisplayMode: () => numericDisplayMode,
+      getReferenceValue: () => fieldInputReferenceValue,
+      onValueChange: callbacks.onValueChange,
+      onInvalidValueCommit: callbacks.onInvalidValueCommit,
+    });
     value.addEventListener('focus', () => {
       if (field.field.id !== activeFieldId) callbacks.onActivate(field.field.id);
     });
@@ -419,7 +356,7 @@ export function createFieldsView(
         event.preventDefault();
       });
       decrement.addEventListener('click', () => {
-        commitAndBlurFocusedValue(value, fieldInputReferenceValue, options.privacyMode === true, commitValueChange);
+        valueCommitController.commitAndBlurFocusedValue();
         callbacks.onStep(field.field.id, -1);
       });
 
@@ -434,7 +371,7 @@ export function createFieldsView(
         event.preventDefault();
       });
       increment.addEventListener('click', () => {
-        commitAndBlurFocusedValue(value, fieldInputReferenceValue, options.privacyMode === true, commitValueChange);
+        valueCommitController.commitAndBlurFocusedValue();
         callbacks.onStep(field.field.id, 1);
       });
 
@@ -453,7 +390,7 @@ export function createFieldsView(
         event.preventDefault();
       });
       reset.addEventListener('click', () => {
-        commitAndBlurFocusedValue(value, fieldInputReferenceValue, options.privacyMode === true, commitValueChange);
+        valueCommitController.commitAndBlurFocusedValue();
         callbacks.onResetField(field.field.id);
       });
       controls.append(reset);
@@ -479,7 +416,7 @@ export function createFieldsView(
         event.preventDefault();
       });
       trail.addEventListener('click', () => {
-        commitAndBlurFocusedValue(value, fieldInputReferenceValue, options.privacyMode === true, commitValueChange);
+        valueCommitController.commitAndBlurFocusedValue();
         const nextIncluded = !trail.classList.contains('is-included');
         trail.classList.toggle('is-included', nextIncluded);
         trail.textContent = nextIncluded ? 'Exclude' : 'Include';
@@ -522,7 +459,7 @@ export function createFieldsView(
         applySplit.title = options.privacyMode ? 'Split private field' : `Split ${field.field.label}`;
         applySplit.setAttribute('aria-label', applySplit.title);
         applySplit.addEventListener('click', () => {
-          commitAndBlurFocusedValue(value, fieldInputReferenceValue, options.privacyMode === true, commitValueChange);
+          valueCommitController.commitAndBlurFocusedValue();
           callbacks.onApplySplit(field.field.id, splitPattern.value);
         });
         splitPattern.addEventListener('keydown', (event) => {
@@ -545,29 +482,15 @@ export function createFieldsView(
           : `Collapse ${field.field.label} back into one field`;
         clearSplit.setAttribute('aria-label', clearSplit.title);
         clearSplit.addEventListener('click', () => {
-          commitAndBlurFocusedValue(value, fieldInputReferenceValue, options.privacyMode === true, commitValueChange);
+          valueCommitController.commitAndBlurFocusedValue();
           callbacks.onClearSplit(field.field.splitBaseId ?? field.field.id);
         });
         splitControls.append(clearSplit);
       }
     }
 
-    value.addEventListener('change', () => {
-      if (options.privacyMode) return;
-      if (suppressedValueChange === value.value) {
-        suppressedValueChange = null;
-        return;
-      }
-      commitValueChange();
-    });
-    value.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        if (options.privacyMode) return;
-        commitValueChange();
-        value.blur();
-      }
-    });
+    value.addEventListener('change', valueCommitController.handleChange);
+    value.addEventListener('keydown', valueCommitController.handleKeydown);
 
     function createNumericDisplayModeButton(label: string, mode: NumericFieldDisplayMode): HTMLButtonElement {
       const button = document.createElement('button');

@@ -119,6 +119,74 @@ test('step buttons step the field without committing the untouched input', () =>
   ]);
 });
 
+test('field commands commit a focused pending edit before dispatching their action', () => {
+  const scenarios: ReadonlyArray<{
+    readonly label: string;
+    readonly successfulFieldIds?: readonly string[];
+    readonly options?: FieldsViewOptions;
+    readonly expectedCommand: CallbackCall;
+  }> = [
+    { label: 'Increment page', expectedCommand: { name: 'onStep', args: ['query-page', 1] } },
+    {
+      label: 'Reset page',
+      options: { open: true, blockSize: null, resettableFieldIds: new Set(['query-page']) },
+      expectedCommand: { name: 'onResetField', args: ['query-page'] },
+    },
+    { label: 'Split page', expectedCommand: { name: 'onApplySplit', args: ['query-page', ''] } },
+    {
+      label: 'Include page in Previous/Next',
+      successfulFieldIds: ['query-page'],
+      expectedCommand: { name: 'onToggleUnlock', args: ['query-page'] },
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    const calls: CallbackCall[] = [];
+    const view = buildFieldsView(calls, {
+      successfulFieldIds: scenario.successfulFieldIds ?? [],
+      options: scenario.options ?? { open: true, blockSize: null },
+    });
+    document.body.replaceChildren(view);
+    const input = inputByLabel(view, 'Edit page');
+    input.focus();
+    calls.length = 0;
+    input.value = '18';
+
+    buttonByLabel(view, scenario.label).click();
+
+    assert.deepEqual(calls, [{ name: 'onValueChange', args: ['query-page', '18'] }, scenario.expectedCommand]);
+  }
+});
+
+test('clear split commits a focused split-child edit before dispatching the base field id', () => {
+  const calls: CallbackCall[] = [];
+  const splitChild: EditableField = {
+    field: {
+      ...pageField.field,
+      id: 'query-page-a',
+      label: 'page part 1',
+      value: '1',
+      splitBaseId: 'query-page',
+      splitPartIndex: 0,
+      splitPartCount: 2,
+    },
+    value: '1',
+  };
+  const view = buildFieldsView(calls, { fields: [splitChild] });
+  document.body.replaceChildren(view);
+  const input = inputByLabel(view, 'Edit page part 1');
+  input.focus();
+  calls.length = 0;
+  input.value = '2';
+
+  buttonByLabel(view, 'Collapse page part 1 back into one field').click();
+
+  assert.deepEqual(calls, [
+    { name: 'onValueChange', args: ['query-page-a', '2'] },
+    { name: 'onClearSplit', args: ['query-page'] },
+  ]);
+});
+
 test('a change event on the digit-width input reports the new width', () => {
   const calls: CallbackCall[] = [];
   const view = buildFieldsView(calls);
