@@ -1,4 +1,5 @@
-import type { UrlField, UrlFieldDigitWidthSpec } from '../../core/url/types.js';
+import type { UrlField } from '../../core/url/types.js';
+import { fieldSupportsTrailNavigation, type FieldEditorViewModel } from '../field-editor-view-model.js';
 import { createFieldValueCommitController, type NumericFieldDisplayMode } from './field-value-commit-controller.js';
 import { createFieldsResetControls } from './fields-reset-controls.js';
 
@@ -29,15 +30,7 @@ export interface FieldsViewCallbacks {
 export interface FieldsViewOptions {
   readonly open: boolean;
   readonly blockSize: number | null;
-  readonly privacyMode?: boolean;
   readonly numericDisplayModes?: ReadonlyMap<string, NumericFieldDisplayMode>;
-  readonly resettableFieldIds?: ReadonlySet<string>;
-  readonly resetAllAvailable?: boolean;
-  readonly resetStructureAvailable?: boolean;
-  // Failure-feedback mode (#450): when false (Mute), a field that failed to load is not painted with
-  // the red `is-error` ring. `failedFieldId` itself stays set (it re-bases navigation); this only
-  // gates the visible ring.
-  readonly showFieldFailure?: boolean;
 }
 
 function computedPixelValue(styles: CSSStyleDeclaration, property: string): number {
@@ -139,23 +132,13 @@ function parseHex(value: string): bigint | null {
 }
 
 export function fieldReservesTrailControlSlot(field: UrlField): boolean {
-  return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
+  return fieldSupportsTrailNavigation(field);
 }
 
-export function createFieldsView(
-  fields: EditableField[],
-  activeFieldId: string | null,
-  failedFieldId: string | null,
-  successfulFieldIds: readonly string[],
-  unchangedFieldIds: readonly string[],
-  unlockedFieldIds: readonly string[],
-  fieldDigitWidthSpecs: readonly UrlFieldDigitWidthSpec[],
-  callbacks: FieldsViewCallbacks,
-  options: FieldsViewOptions,
-): HTMLElement {
+export function createFieldsView(model: FieldEditorViewModel, callbacks: FieldsViewCallbacks, options: FieldsViewOptions): HTMLElement {
   const wrapper = document.createElement('details');
   wrapper.className = 'image-trail-panel__section image-trail-panel__fields';
-  if (options.privacyMode) wrapper.classList.add('is-privacy-masked');
+  if (model.privacyMode) wrapper.classList.add('is-privacy-masked');
   wrapper.open = options.open;
   if (options.blockSize !== null) {
     wrapper.classList.add('is-height-locked');
@@ -202,9 +185,9 @@ export function createFieldsView(
   heading.textContent = 'Parsed fields';
   summary.append(heading);
   const resetControls = createFieldsResetControls({
-    privacyMode: options.privacyMode === true,
-    resetAllAvailable: options.resetAllAvailable === true,
-    resetStructureAvailable: options.resetStructureAvailable === true,
+    privacyMode: model.privacyMode,
+    resetAllAvailable: model.availableTransforms.includes('reset-all'),
+    resetStructureAvailable: model.availableTransforms.includes('reset-structure'),
     onResetStructure: callbacks.onResetStructure,
     onResetAll: callbacks.onResetAll,
   });
@@ -214,76 +197,68 @@ export function createFieldsView(
   body.className = 'image-trail-panel__fields-body';
   const intro = document.createElement('p');
   intro.className = 'image-trail-panel__meta';
-  intro.textContent = options.privacyMode
+  intro.textContent = model.privacyMode
     ? 'Parsed URL fields are hidden for screen sharing.'
-    : fields.length
-      ? `${fields.length} token${fields.length === 1 ? '' : 's'} parsed from the selected image URL.`
+    : model.rows.length
+      ? `${model.rows.length} token${model.rows.length === 1 ? '' : 's'} parsed from the selected image URL.`
       : 'Select a target image to inspect its parsed URL tokens.';
   const list = document.createElement('ul');
   list.className = 'image-trail-panel__field-list';
-  for (const field of fields) {
+  for (const row of model.rows) {
+    const field: EditableField = row;
     const item = document.createElement('li');
     item.className = 'image-trail-panel__field-item';
     const container = document.createElement('div');
-    const isFailed = options.showFieldFailure !== false && field.field.id === failedFieldId;
-    const isSuccessful = successfulFieldIds.includes(field.field.id);
-    const isUnchanged = unchangedFieldIds.includes(field.field.id);
-    const isIncludedInTrail = unlockedFieldIds.includes(field.field.id);
-    const isSplitField = field.field.splitBaseId !== undefined;
-    const isResettable = options.resettableFieldIds?.has(field.field.id) === true;
-    const digitWidth = fieldDigitWidthSpecs.find((spec) => spec.fieldId === field.field.id)?.width;
-    const reservesTrailControlSlot = fieldReservesTrailControlSlot(field.field);
-    const canUnlock = (isSuccessful || isIncludedInTrail) && reservesTrailControlSlot;
-    const canSplit = !isSplitField && field.value.length > 1;
-    const fieldLabel = options.privacyMode ? 'Private field' : field.field.label;
+    const isFailed = row.status.failureVisible;
+    const isSuccessful = row.status.successful;
+    const isUnchanged = row.status.unchanged;
+    const isIncludedInTrail = row.status.included;
+    const isSplitField = row.split !== null;
+    const isResettable = row.availableTransforms.includes('reset-field');
+    const digitWidth = row.digitWidth ?? undefined;
+    const reservesTrailControlSlot = row.navigationEligible;
+    const canUnlock = row.canToggleNavigationInclusion;
+    const canSplit = row.availableTransforms.includes('split-apply');
+    const fieldLabel = model.privacyMode ? 'Private field' : field.field.label;
     const defaultNumericDisplayMode = defaultNumericFieldDisplayMode(field.field);
     let numericDisplayMode =
       defaultNumericDisplayMode === null ? null : (options.numericDisplayModes?.get(field.field.id) ?? defaultNumericDisplayMode);
     let fieldInputReferenceValue =
       numericDisplayMode === null ? field.value : numericFieldInputDisplayValue(field.field, numericDisplayMode);
-    container.className = `image-trail-panel__field-row${field.field.id === activeFieldId ? ' is-active' : ''}${isSuccessful ? ' is-success' : ''}${isUnchanged ? ' is-unchanged' : ''}${isFailed ? ' is-error' : ''}`;
+    container.className = `image-trail-panel__field-row${row.status.active ? ' is-active' : ''}${isSuccessful ? ' is-success' : ''}${isUnchanged ? ' is-unchanged' : ''}${isFailed ? ' is-error' : ''}`;
 
     const value = document.createElement('input');
     value.type = 'text';
-    value.value = options.privacyMode ? 'Private value' : fieldInputReferenceValue;
+    value.value = model.privacyMode ? 'Private value' : fieldInputReferenceValue;
     value.placeholder = fieldLabel;
     value.className = 'image-trail-panel__field-input';
-    if (options.privacyMode) value.classList.add('is-privacy-masked');
-    value.readOnly = options.privacyMode === true;
-    value.title = options.privacyMode ? 'Privacy mode is hiding this URL field for screen sharing.' : field.value;
-    value.setAttribute('aria-label', options.privacyMode ? 'Private URL field' : `Edit ${field.field.label}`);
+    if (model.privacyMode) value.classList.add('is-privacy-masked');
+    value.readOnly = model.privacyMode;
+    value.title = model.privacyMode ? 'Privacy mode is hiding this URL field for screen sharing.' : field.value;
+    value.setAttribute('aria-label', model.privacyMode ? 'Private URL field' : `Edit ${field.field.label}`);
     value.dataset['fieldId'] = field.field.id;
     const valueCommitController = createFieldValueCommitController({
       input: value,
       field: field.field,
-      privacyMode: options.privacyMode === true,
+      privacyMode: model.privacyMode,
       getDisplayMode: () => numericDisplayMode,
       getReferenceValue: () => fieldInputReferenceValue,
       onValueChange: callbacks.onValueChange,
       onInvalidValueCommit: callbacks.onInvalidValueCommit,
     });
     value.addEventListener('focus', () => {
-      if (field.field.id !== activeFieldId) callbacks.onActivate(field.field.id);
+      if (!row.status.active) callbacks.onActivate(field.field.id);
     });
 
     const label = document.createElement('span');
     label.className = 'image-trail-panel__field-label';
     label.textContent = fieldLabel;
-    label.title = options.privacyMode ? 'Privacy mode is hiding this field label for screen sharing.' : field.field.label;
+    label.title = model.privacyMode ? 'Privacy mode is hiding this field label for screen sharing.' : field.field.label;
 
     const meta = document.createElement('span');
     meta.className = 'image-trail-panel__field-meta';
-    const statuses = [
-      field.field.id === activeFieldId ? 'active' : '',
-      isSuccessful ? 'loads' : '',
-      isIncludedInTrail ? 'included' : '',
-      isSplitField && field.field.splitPartIndex !== undefined && field.field.splitPartCount !== undefined
-        ? `split ${field.field.splitPartIndex + 1}/${field.field.splitPartCount}`
-        : '',
-      isUnchanged ? 'unchanged' : '',
-      isFailed ? 'failed load' : '',
-    ].filter(Boolean);
-    meta.textContent = options.privacyMode
+    const statuses = row.statusChips.map((chip) => chip.label);
+    meta.textContent = model.privacyMode
       ? `Details hidden${statuses.length ? ` · ${statuses.join(' · ')}` : ''}`
       : `${field.field.location} · ${field.field.tokenKind} · ${fieldDisplayValue(field)}${statuses.length ? ` · ${statuses.join(' · ')}` : ''}`;
     meta.title = meta.textContent;
@@ -297,7 +272,7 @@ export function createFieldsView(
     let hexModeButton: HTMLButtonElement | null = null;
 
     const refreshNumericDisplayMode = (): void => {
-      if (numericDisplayMode === null || options.privacyMode) return;
+      if (numericDisplayMode === null || model.privacyMode) return;
       fieldInputReferenceValue = numericFieldInputDisplayValue(field.field, numericDisplayMode);
       value.value = fieldInputReferenceValue;
       value.title = fieldInputReferenceValue;
@@ -312,13 +287,13 @@ export function createFieldsView(
       const numericToggle = document.createElement('span');
       numericToggle.className = 'image-trail-panel__field-radix-toggle';
       numericToggle.setAttribute('role', 'group');
-      numericToggle.setAttribute('aria-label', options.privacyMode ? 'Private numeric display' : `Display mode for ${field.field.label}`);
+      numericToggle.setAttribute('aria-label', model.privacyMode ? 'Private numeric display' : `Display mode for ${field.field.label}`);
 
       decimalModeButton = createNumericDisplayModeButton('Dec', 'decimal');
       hexModeButton = createNumericDisplayModeButton('Hex', 'hex');
       numericToggle.append(decimalModeButton, hexModeButton);
 
-      const digitWidthDisplay = fieldDigitWidthInputDisplay(field.field, digitWidth, options.privacyMode === true);
+      const digitWidthDisplay = fieldDigitWidthInputDisplay(field.field, digitWidth, model.privacyMode);
       const digitWidthInput = document.createElement('input');
       digitWidthInput.type = 'text';
       digitWidthInput.inputMode = 'numeric';
@@ -326,20 +301,17 @@ export function createFieldsView(
       digitWidthInput.value = digitWidthDisplay.value;
       digitWidthInput.placeholder = digitWidthDisplay.placeholder;
       digitWidthInput.className = 'image-trail-panel__field-width-input';
-      digitWidthInput.readOnly = options.privacyMode === true;
-      digitWidthInput.title = options.privacyMode ? 'Privacy mode is hiding this digit width.' : `Digit width for ${field.field.label}`;
-      digitWidthInput.setAttribute(
-        'aria-label',
-        options.privacyMode ? 'Private field digit width' : `Digit width for ${field.field.label}`,
-      );
+      digitWidthInput.readOnly = model.privacyMode;
+      digitWidthInput.title = model.privacyMode ? 'Privacy mode is hiding this digit width.' : `Digit width for ${field.field.label}`;
+      digitWidthInput.setAttribute('aria-label', model.privacyMode ? 'Private field digit width' : `Digit width for ${field.field.label}`);
       digitWidthInput.addEventListener('change', () => {
-        if (options.privacyMode) return;
+        if (model.privacyMode) return;
         callbacks.onDigitWidthChange(field.field.id, digitWidthInput.value);
       });
       digitWidthInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
           event.preventDefault();
-          if (options.privacyMode) return;
+          if (model.privacyMode) return;
           callbacks.onDigitWidthChange(field.field.id, digitWidthInput.value);
           digitWidthInput.blur();
         }
@@ -349,7 +321,7 @@ export function createFieldsView(
       decrement.type = 'button';
       decrement.className = 'image-trail-panel__field-step-button';
       decrement.textContent = '-';
-      decrement.title = options.privacyMode ? 'Decrement private field' : `Decrement ${field.field.label}`;
+      decrement.title = model.privacyMode ? 'Decrement private field' : `Decrement ${field.field.label}`;
       decrement.setAttribute('aria-label', decrement.title);
       decrement.addEventListener('pointerdown', (event) => {
         if (event.button !== 0) return;
@@ -364,7 +336,7 @@ export function createFieldsView(
       increment.type = 'button';
       increment.className = 'image-trail-panel__field-step-button';
       increment.textContent = '+';
-      increment.title = options.privacyMode ? 'Increment private field' : `Increment ${field.field.label}`;
+      increment.title = model.privacyMode ? 'Increment private field' : `Increment ${field.field.label}`;
       increment.setAttribute('aria-label', increment.title);
       increment.addEventListener('pointerdown', (event) => {
         if (event.button !== 0) return;
@@ -383,7 +355,7 @@ export function createFieldsView(
       reset.type = 'button';
       reset.className = 'image-trail-panel__field-reset-button';
       reset.textContent = 'Reset';
-      reset.title = options.privacyMode ? 'Reset private field' : `Reset ${field.field.label}`;
+      reset.title = model.privacyMode ? 'Reset private field' : `Reset ${field.field.label}`;
       reset.setAttribute('aria-label', reset.title);
       reset.addEventListener('pointerdown', (event) => {
         if (event.button !== 0) return;
@@ -406,7 +378,7 @@ export function createFieldsView(
       trail.type = 'button';
       trail.className = `image-trail-panel__field-trail-button${isIncludedInTrail ? ' is-included' : ''}`;
       trail.textContent = isIncludedInTrail ? 'Exclude' : 'Include';
-      trail.title = options.privacyMode
+      trail.title = model.privacyMode
         ? `${isIncludedInTrail ? 'Exclude' : 'Include'} private field in Previous/Next`
         : isIncludedInTrail
           ? `Exclude ${field.field.label} from Previous/Next`
@@ -420,7 +392,7 @@ export function createFieldsView(
         const nextIncluded = !trail.classList.contains('is-included');
         trail.classList.toggle('is-included', nextIncluded);
         trail.textContent = nextIncluded ? 'Exclude' : 'Include';
-        trail.title = options.privacyMode
+        trail.title = model.privacyMode
           ? `${nextIncluded ? 'Exclude' : 'Include'} private field in Previous/Next`
           : nextIncluded
             ? `Exclude ${field.field.label} from Previous/Next`
@@ -439,8 +411,8 @@ export function createFieldsView(
         splitControls.classList.add('has-split-input');
         const splitLength = document.createElement('span');
         splitLength.className = 'image-trail-panel__field-split-length';
-        splitLength.textContent = fieldSplitLengthLabel(field, options.privacyMode === true);
-        splitLength.title = options.privacyMode ? 'Privacy mode is hiding this field length.' : 'Target length for the split pattern.';
+        splitLength.textContent = fieldSplitLengthLabel(field, model.privacyMode);
+        splitLength.title = model.privacyMode ? 'Privacy mode is hiding this field length.' : 'Target length for the split pattern.';
 
         const splitPattern = document.createElement('input');
         splitPattern.type = 'text';
@@ -449,14 +421,14 @@ export function createFieldsView(
         splitPattern.className = 'image-trail-panel__field-split-input';
         splitPattern.setAttribute(
           'aria-label',
-          options.privacyMode ? 'Split pattern for private field' : `Split pattern for ${field.field.label}`,
+          model.privacyMode ? 'Split pattern for private field' : `Split pattern for ${field.field.label}`,
         );
 
         const applySplit = document.createElement('button');
         applySplit.type = 'button';
         applySplit.className = 'image-trail-panel__field-split-button';
         applySplit.textContent = 'Split';
-        applySplit.title = options.privacyMode ? 'Split private field' : `Split ${field.field.label}`;
+        applySplit.title = model.privacyMode ? 'Split private field' : `Split ${field.field.label}`;
         applySplit.setAttribute('aria-label', applySplit.title);
         applySplit.addEventListener('click', () => {
           valueCommitController.commitAndBlurFocusedValue();
@@ -477,7 +449,7 @@ export function createFieldsView(
         clearSplit.type = 'button';
         clearSplit.className = 'image-trail-panel__field-split-button';
         clearSplit.textContent = 'Clear split';
-        clearSplit.title = options.privacyMode
+        clearSplit.title = model.privacyMode
           ? 'Collapse private field back into one field'
           : `Collapse ${field.field.label} back into one field`;
         clearSplit.setAttribute('aria-label', clearSplit.title);
@@ -497,7 +469,7 @@ export function createFieldsView(
       button.type = 'button';
       button.className = `image-trail-panel__field-radix-button${numericDisplayMode === mode ? ' is-active' : ''}`;
       button.textContent = label;
-      button.title = options.privacyMode ? `${label} display for private field` : `Show ${field.field.label} as ${label}`;
+      button.title = model.privacyMode ? `${label} display for private field` : `Show ${field.field.label} as ${label}`;
       button.setAttribute('aria-label', button.title);
       button.setAttribute('aria-pressed', String(numericDisplayMode === mode));
       button.addEventListener('pointerdown', (event) => {
@@ -505,7 +477,7 @@ export function createFieldsView(
         event.preventDefault();
       });
       button.addEventListener('click', () => {
-        if (options.privacyMode || numericDisplayMode === mode) return;
+        if (model.privacyMode || numericDisplayMode === mode) return;
         numericDisplayMode = mode;
         callbacks.onNumericDisplayModeChange(field.field.id, mode);
         refreshNumericDisplayMode();
@@ -518,7 +490,7 @@ export function createFieldsView(
     item.append(container);
     list.append(item);
   }
-  if (fields.length === 0) {
+  if (model.rows.length === 0) {
     const item = document.createElement('li');
     item.className = 'image-trail-panel__field-empty';
     item.textContent = 'No parsed fields available yet.';

@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/html-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
-import type { FieldsViewCallbacks, FieldsViewOptions } from './fields-view.js';
+import { createInitialPanelState } from '../../core/state.js';
+import type { FieldTransformId } from '../../core/url/field-transforms.js';
+import type { ActiveUrlFields } from '../active-url-fields.js';
+import { createFieldEditorViewModel } from '../field-editor-view-model.js';
+import type { EditableField, FieldsViewCallbacks, FieldsViewOptions } from './fields-view.js';
 import { createFieldsView } from './fields-view.js';
 import { parsedFieldDigitWidthSpecs, parsedFieldFixtures, splitParsedFieldFixtures } from '../stories/fixtures.js';
 import { mockDispatch, panelStory } from '../stories/story-host.js';
@@ -41,6 +45,7 @@ export const FailedLoad: Story = {
       activeFieldId: 'query-page',
       failedFieldId: 'query-page',
       successfulFieldIds: ['query-color'],
+      loadFailureFeedback: 'display',
     }),
 };
 
@@ -60,7 +65,7 @@ export const PrivacyMasked: Story = {
       activeFieldId: 'query-color',
       successfulFieldIds: ['query-page', 'query-color'],
       unlockedFieldIds: ['query-color'],
-      options: { privacyMode: true },
+      privacyMode: true,
     }),
 };
 
@@ -111,7 +116,7 @@ export const CommitContractAndResetControls: Story = {
         onResetStructure: resetStructureSpy,
         onResetAll: resetAllSpy,
       },
-      options: { resetAllAvailable: true, resetStructureAvailable: true },
+      availableTransforms: ['reset-structure', 'reset-all'],
     }),
   play: async ({ canvasElement }) => {
     invalidValueSpy.mockClear();
@@ -151,34 +156,48 @@ export const AutoDigitWidthNarrow: Story = {
 
 function fieldsStory(
   overrides: {
-    readonly fields?: Parameters<typeof createFieldsView>[0];
+    readonly fields?: readonly EditableField[];
     readonly activeFieldId?: string | null;
     readonly failedFieldId?: string | null;
     readonly successfulFieldIds?: readonly string[];
     readonly unchangedFieldIds?: readonly string[];
     readonly unlockedFieldIds?: readonly string[];
+    readonly loadFailureFeedback?: 'alert' | 'display' | 'mute';
+    readonly privacyMode?: boolean;
+    readonly availableTransforms?: readonly FieldTransformId[];
     readonly options?: Partial<FieldsViewOptions>;
     readonly callbacks?: Partial<FieldsViewCallbacks>;
   } = {},
   storyOptions: { readonly width?: number } = {},
 ) {
   const callbacks = { ...mockFieldsCallbacks(), ...overrides.callbacks };
+  const fields = overrides.fields ?? parsedFieldFixtures;
+  const state = {
+    ...createInitialPanelState(),
+    activeFieldId: overrides.activeFieldId ?? null,
+    failedFieldId: overrides.failedFieldId ?? null,
+    successfulFieldIds: overrides.successfulFieldIds ?? ['query-page'],
+    unchangedFieldIds: overrides.unchangedFieldIds ?? [],
+    unlockedFieldIds: overrides.unlockedFieldIds ?? [],
+    fieldDigitWidthSpecs: parsedFieldDigitWidthSpecs,
+    privacyModeEnabled: overrides.privacyMode ?? false,
+    loadFailureFeedback: overrides.loadFailureFeedback ?? 'mute',
+  };
+  const activeUrlFields: ActiveUrlFields = {
+    activeUrl: 'https://images.example.test/gallery/frame-17.jpg?page=17&color=ff',
+    fields: fields.map((field) => field.field),
+    visibleFields: fields.map((field) => field.field),
+    editableFields: fields,
+    activeTemplate: null,
+  };
+  const derivedModel = createFieldEditorViewModel(state, activeUrlFields);
+  const model = overrides.availableTransforms ? { ...derivedModel, availableTransforms: overrides.availableTransforms } : derivedModel;
   return panelStory(
-    createFieldsView(
-      overrides.fields ?? parsedFieldFixtures,
-      overrides.activeFieldId ?? null,
-      overrides.failedFieldId ?? null,
-      overrides.successfulFieldIds ?? ['query-page'],
-      overrides.unchangedFieldIds ?? [],
-      overrides.unlockedFieldIds ?? [],
-      parsedFieldDigitWidthSpecs,
-      callbacks,
-      {
-        open: true,
-        blockSize: null,
-        ...overrides.options,
-      },
-    ),
+    createFieldsView(model, callbacks, {
+      open: true,
+      blockSize: null,
+      ...overrides.options,
+    }),
     storyOptions,
   );
 }

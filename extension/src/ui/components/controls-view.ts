@@ -8,11 +8,11 @@ export function createControlsView(callbacks: ControlsViewCallbacks): HTMLElemen
   wrapper.className = 'image-trail-panel__actions';
   const previous = document.createElement('button');
   previous.type = 'button';
-  previous.textContent = 'Previous field value';
+  previous.textContent = 'Previous field';
   previous.addEventListener('click', callbacks.onPrevious);
   const next = document.createElement('button');
   next.type = 'button';
-  next.textContent = 'Next field value';
+  next.textContent = 'Next field';
   next.addEventListener('click', callbacks.onNext);
   wrapper.append(previous, next);
   return wrapper;
