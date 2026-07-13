@@ -1,6 +1,6 @@
 import type { AutomationPhase } from './automation/types.js';
 import type { BuildIdentity } from './build-info.js';
-import type { CaptureResult, StorageUsageSummary } from './image/capture-result.js';
+import type { CaptureResult, CaptureRetryRequest, CaptureSourceType, StorageUsageSummary } from './image/capture-result.js';
 import type { ImageDisplayRecord } from './display-records.js';
 import type { ImageProbeMethod } from './image/request-policy.js';
 import type { LoadFailureFeedback } from './settings.js';
@@ -259,14 +259,6 @@ export interface PanelState {
   readonly grabSourcePatterns: readonly GrabSourcePattern[];
   readonly activeUrlTemplateId: string | null;
   readonly currentImageFingerprint: string | null;
-}
-
-export type CaptureSourceType = 'target' | 'history' | 'bookmark';
-
-export interface CaptureRetryRequest {
-  readonly url: string;
-  readonly sourceType: CaptureSourceType;
-  readonly sourceRecordId?: string | undefined;
 }
 
 export interface ImportRestorePreviewState {

@@ -573,7 +573,7 @@
           "type": "unit-dom",
           "paths": [
             "tests/image-request-manager.test.ts",
-            "tests/runtime-history-bookmarks.test.ts",
+            "tests/capture-retry-state.test.ts",
             "tests/action-dispatch.test.ts",
             "tests/captured-originals-controller.test.ts",
             "tests/permissions.test.ts",
