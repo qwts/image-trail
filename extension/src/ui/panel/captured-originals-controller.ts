@@ -8,8 +8,8 @@ import {
   withoutStoredOriginal,
 } from '../../core/display-records.js';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
-import { isCapturedResult, type CaptureResult } from '../../core/image/capture-result.js';
-import type { BookmarkStore, CaptureRetryRequest, CaptureSourceType, PanelState } from '../../core/types.js';
+import { isCapturedResult, type CaptureResult, type CaptureRetryRequest, type CaptureSourceType } from '../../core/image/capture-result.js';
+import type { BookmarkStore, PanelState } from '../../core/types.js';
 import { bookmarkSaveMessage, recordHasBlobId } from './record-export-helpers.js';
 
 function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {

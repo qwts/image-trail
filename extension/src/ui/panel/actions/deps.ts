@@ -4,8 +4,9 @@ import type { PlaintextLocalSettings } from '../../../content/panel-services.js'
 import type { Retry404 } from '../../../core/automation/retry-404.js';
 import type { Slideshow } from '../../../core/automation/slideshow.js';
 import type { ImageProbeMethod } from '../../../core/image/request-policy.js';
+import type { CaptureRetryRequest, CaptureSourceType } from '../../../core/image/capture-result.js';
 import type { LoadFailureFeedback } from '../../../core/settings.js';
-import type { CaptureRetryRequest, CaptureSourceType, FieldTransformPanelAction, PanelAction, PanelState } from '../../../core/types.js';
+import type { FieldTransformPanelAction, PanelAction, PanelState } from '../../../core/types.js';
 import type { BufferedNavigationController } from '../buffered-navigation-controller.js';
 import type { PanelMount } from '../panel-mount.js';
 import type { ParsedFieldStateSync } from '../parsed-field-state-sync.js';

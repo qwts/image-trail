@@ -190,7 +190,7 @@ export class ImageTrailPanel {
       this.state = state;
     },
     render: () => this.render(),
-    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     getLocalSettings: () => this.localSettings,
     findSelectedImage: (handleId) => this.findSelectedImage(handleId),
@@ -209,7 +209,7 @@ export class ImageTrailPanel {
       this.state = state;
     },
     render: () => this.render(),
-    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     loadRecentHistory: (options) => this.panelDataLoad.loadRecentHistory(options),
     refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
@@ -231,7 +231,7 @@ export class ImageTrailPanel {
       this.state = state;
     },
     render: () => this.render(),
-    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
     scheduleFiniteCaptureErrorReset: (updatedAt, mode) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode),
@@ -252,7 +252,7 @@ export class ImageTrailPanel {
       this.state = state;
     },
     render: (options) => this.render(options),
-    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
     applyStorageUsage: (usage) => this.panelDataLoad.applyStorageUsage(usage),
@@ -324,7 +324,7 @@ export class ImageTrailPanel {
     },
     render: () => this.render(),
     renderRecallOnly: () => this.renderRecallOnly(),
-    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     ensurePanelPositionRestored: () => this.panelPosition.ensurePanelPositionRestored(),
     refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
@@ -341,7 +341,7 @@ export class ImageTrailPanel {
       this.localSettings = settings;
     },
     render: () => this.render(),
-    renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+    renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     loadRecentHistory: (options) => this.panelDataLoad.loadRecentHistory(options),
     currentNavigationBaseModel: () => this.currentNavigationBaseModel(),
@@ -578,10 +578,6 @@ export class ImageTrailPanel {
     this.panelRender.scheduleFiniteCaptureErrorReset(updatedAt, mode, durationMs);
   }
 
-  private renderPanelAndRefreshRecall(): void {
-    this.panelRender.renderPanelAndRefreshRecall();
-  }
-
   private createActionDeps(): PanelActionDeps {
     return {
       getState: () => this.state,
@@ -593,7 +589,7 @@ export class ImageTrailPanel {
         this.state = setTargetState(this.state, toTargetState(snapshot));
       },
       render: (options) => this.render(options),
-      renderPanelAndRefreshRecall: () => this.renderPanelAndRefreshRecall(),
+      renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
       refreshRecallIfOpen: () => this.recallDrawer.refreshRecallIfOpen(),
       clearRecallMessageTimer: () => this.recallDrawer.clearRecallMessageTimer(),
       getLocalSettings: () => this.localSettings,

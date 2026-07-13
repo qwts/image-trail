@@ -11,6 +11,14 @@ export type CaptureFailureReason =
 
 export type CaptureStatus = 'captured' | 'remote-only' | 'failed';
 
+export type CaptureSourceType = 'target' | 'history' | 'bookmark';
+
+export interface CaptureRetryRequest {
+  readonly url: string;
+  readonly sourceType: CaptureSourceType;
+  readonly sourceRecordId?: string | undefined;
+}
+
 export type CaptureResult =
   | {
       readonly status: 'captured';
