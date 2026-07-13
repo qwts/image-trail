@@ -12,6 +12,10 @@ import { isCapturedResult, type CaptureResult, type CaptureRetryRequest, type Ca
 import type { BookmarkStore, PanelState } from '../../core/types.js';
 import { bookmarkSaveMessage, recordHasBlobId } from './record-export-helpers.js';
 
+function captureRetryMatches(left: CaptureRetryRequest | null, right: CaptureRetryRequest): boolean {
+  return left?.url === right.url && left.sourceType === right.sourceType && left.sourceRecordId === right.sourceRecordId;
+}
+
 function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {
   const match = value?.match(/^\s*(\d+)\s*[x×]\s*(\d+)\s*$/iu);
   if (!match) return {};
@@ -119,6 +123,7 @@ export class CapturedOriginalsController {
   async retryCaptureWithPermission(request: CaptureRetryRequest): Promise<void> {
     const captureStore = this.deps.captureStore();
     if (!captureStore || this.deps.getState().captureInProgress || this.capturePreflightInProgress) return;
+    if (!captureRetryMatches(this.deps.getState().captureRetryRequest, request)) return;
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'capture/start', request }));
     this.deps.render();
     const result = await captureStore.requestPermissionAndRetry(request.url, request.sourceType, request.sourceRecordId);
@@ -126,6 +131,11 @@ export class CapturedOriginalsController {
   }
 
   private async completeCapture(result: CaptureResult, url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<void> {
+    const request = { url, sourceType, sourceRecordId };
+    if (isCapturedResult(result) && sourceType !== 'target' && !captureRetryMatches(this.deps.getState().captureRetryRequest, request)) {
+      await this.discardDetachedCapture(result, sourceType);
+      return;
+    }
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'capture/complete', result, sourceRecordId }));
     let queueChanged = false;
     const finiteCaptureResultError =
@@ -235,6 +245,23 @@ export class CapturedOriginalsController {
     } else {
       this.deps.render();
     }
+  }
+
+  private async discardDetachedCapture(
+    result: CaptureResult & { readonly status: 'captured' },
+    sourceType: CaptureSourceType,
+  ): Promise<void> {
+    await this.removeCapturedBlobReference(result.blobId);
+    const sourceLabel = sourceType === 'history' ? 'recent row' : 'queue row';
+    const message = `Captured original was discarded because its ${sourceLabel} was removed.`;
+    this.deps.setState(
+      reducePanelAction(this.deps.getState(), {
+        name: 'capture/complete',
+        result: { status: 'failed', reason: 'unknown', message },
+      }),
+    );
+    this.deps.setState({ ...this.deps.getState(), message, status: 'error', lastUpdatedAt: Date.now() });
+    this.deps.render();
   }
 
   async deleteCapturedBlob(recordId: string, blobId: string): Promise<void> {

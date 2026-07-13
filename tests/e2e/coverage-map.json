@@ -574,13 +574,14 @@
           "paths": [
             "tests/image-request-manager.test.ts",
             "tests/capture-retry-state.test.ts",
+            "tests/capture-retry-deletion-actions.test.ts",
             "tests/action-dispatch.test.ts",
             "tests/captured-originals-controller.test.ts",
             "tests/permissions.test.ts",
             "tests/runtime-message.test.ts",
             "tests/dom/status-view.test.ts"
           ],
-          "notes": "Covers #62 retry-context lifecycle, permission CTA routing, immediate permission-request handoff, grant success through the normal capture completion path, denial retention, dismissal, and non-permission failures."
+          "notes": "Covers #62 retry-context lifecycle, permission CTA routing, immediate permission-request handoff, grant success through the normal capture completion path, denial retention, dismissal, source deletion before retry, deletion during capture completion, orphan cleanup, and non-permission failures."
         },
         {
           "type": "storybook",
