@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.2.2
+
+### Patch Changes
+
+- b93864e: Add a queue repair flow that re-captures missing encrypted originals for selected durable pins without changing queue order.
+
 ## 0.2.1
 
 ### Patch Changes
