@@ -1,37 +1,11 @@
 import { encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import { DEFAULT_QUEUE_DISPLAY_ORDER, type QueueDisplayOrder } from '../../core/display-order.js';
+import type { BookmarkAction } from './bookmarks-view-actions.js';
 import { createPrivacyThumbnail, recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitle } from './record-metadata.js';
 import { registerPreviewRowClick } from './record-row-preview-click.js';
+import { createQueueRepairButton, createQueueSelectionButton } from './queue-repair-button.js';
+import { createQueueSortControl } from './queue-sort-control.js';
 import { selectedRangeIds } from './selection-ranges.js';
-
-type BookmarkAction =
-  | { readonly name: 'pin/current' }
-  | { readonly name: 'bookmark/current' }
-  | { readonly name: 'bookmark/load'; readonly id: string }
-  | { readonly name: 'bookmark/remove'; readonly id: string }
-  | { readonly name: 'bookmark/clear'; readonly id: string }
-  | { readonly name: 'bookmark-selection/toggle'; readonly id: string }
-  | { readonly name: 'bookmark-selection/single'; readonly id: string }
-  | { readonly name: 'bookmark-selection/select'; readonly ids: readonly string[]; readonly mode?: 'replace' | 'add' }
-  | { readonly name: 'bookmark-selection/clear' }
-  | { readonly name: 'bookmarks/page-front' }
-  | { readonly name: 'bookmarks/page-back' }
-  | { readonly name: 'bookmarks/update-display-order'; readonly order: QueueDisplayOrder }
-  | { readonly name: 'bookmarks/toggle-scope' }
-  | { readonly name: 'bookmarks/clear-visible' }
-  | { readonly name: 'bookmarks/reload' }
-  | { readonly name: 'bookmarks/refresh-thumbnails' }
-  | { readonly name: 'gallery/open' }
-  | { readonly name: 'recall/open'; readonly side: 'left' | 'right' }
-  | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'bookmark'; readonly sourceRecordId: string }
-  | {
-      readonly name: 'capture/preview';
-      readonly url: string;
-      readonly blobId?: string | undefined;
-      readonly scrollAnchorId?: string | undefined;
-    }
-  | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string }
-  | { readonly name: 'panel/bookmarks-section-open'; readonly open: boolean };
 
 export function createBookmarksView(
   currentUrl: string | null,
@@ -167,23 +141,33 @@ export function createBookmarksView(
   });
 
   const queuePins = items.filter((item) => !isCapturedOriginalRecord(item));
-  const selectPins = document.createElement('button');
-  selectPins.type = 'button';
-  selectPins.textContent = 'Select queue pins';
-  selectPins.disabled = queuePins.length === 0;
-  selectPins.addEventListener('click', () => {
-    queueMenu.open = false;
-    dispatch({ name: 'bookmark-selection/select', ids: queuePins.map((item) => item.id) });
-  });
+  const selectPins = createQueueSelectionButton(
+    'Select queue pins',
+    queuePins.map((item) => item.id),
+    (ids) => {
+      queueMenu.open = false;
+      dispatch({ name: 'bookmark-selection/select', ids });
+    },
+  );
 
   const queueBookmarks = items.filter(isCapturedOriginalRecord);
-  const selectBookmarks = document.createElement('button');
-  selectBookmarks.type = 'button';
-  selectBookmarks.textContent = 'Select captured bookmarks';
-  selectBookmarks.disabled = queueBookmarks.length === 0;
-  selectBookmarks.addEventListener('click', () => {
-    queueMenu.open = false;
-    dispatch({ name: 'bookmark-selection/select', ids: queueBookmarks.map((item) => item.id) });
+  const selectBookmarks = createQueueSelectionButton(
+    'Select captured bookmarks',
+    queueBookmarks.map((item) => item.id),
+    (ids) => {
+      queueMenu.open = false;
+      dispatch({ name: 'bookmark-selection/select', ids });
+    },
+  );
+
+  const repairSelected = createQueueRepairButton({
+    selectedIds,
+    captureInProgress,
+    blobKeyUnlocked,
+    onRepair: (ids) => {
+      queueMenu.open = false;
+      dispatch({ name: 'capture/repair-selected', ids });
+    },
   });
 
   const clearQueue = document.createElement('button');
@@ -196,7 +180,17 @@ export function createBookmarksView(
     dispatch({ name: 'bookmarks/clear-visible' });
   });
 
-  queueMenuActions.append(scope, reload, gallery, selectAllQueue, selectPins, selectBookmarks, refreshThumbnails, clearQueue);
+  queueMenuActions.append(
+    scope,
+    reload,
+    gallery,
+    selectAllQueue,
+    selectPins,
+    selectBookmarks,
+    repairSelected,
+    refreshThumbnails,
+    clearQueue,
+  );
   queueMenu.append(queueMenuActions);
 
   const toolbar = document.createElement('div');
@@ -403,27 +397,6 @@ export function createBookmarksView(
     if (items.length) section.append(list);
   }
   return section;
-}
-
-function createQueueSortControl(order: QueueDisplayOrder, dispatch: (action: BookmarkAction) => void): HTMLSelectElement {
-  const select = document.createElement('select');
-  select.className = 'image-trail-panel__record-sort-select';
-  select.setAttribute('aria-label', 'Queue order');
-  select.append(createQueueSortOption('front-first', 'Front first'), createQueueSortOption('back-first', 'Back first'));
-  select.value = order;
-  select.addEventListener('change', () => {
-    if (select.value === 'front-first' || select.value === 'back-first') {
-      dispatch({ name: 'bookmarks/update-display-order', order: select.value });
-    }
-  });
-  return select;
-}
-
-function createQueueSortOption(value: string, label: string): HTMLOptionElement {
-  const option = document.createElement('option');
-  option.value = value;
-  option.textContent = label;
-  return option;
 }
 
 function createRecordVisual(item: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {

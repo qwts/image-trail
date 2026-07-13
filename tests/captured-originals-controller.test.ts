@@ -281,6 +281,41 @@ test('captureImage skips target capture when a saved row already has an original
   assert.deepEqual(harness.log, ['loadBookmarkPage:0:false', 'renderPanelAndRefreshRecall']);
 });
 
+test('repairBookmarkOriginal bypasses stale stored-original metadata and preserves queue time', async () => {
+  const existing = createDisplayRecord({
+    id: 'bookmark-existing',
+    url: 'https://example.test/pic.jpg',
+    source: 'bookmark',
+    queueUpdatedAt: '2026-06-19T00:00:01.000Z',
+    captureStatus: 'captured',
+    blobId: 'blob-missing',
+    storedOriginal: {
+      blobId: 'blob-missing',
+      mimeType: 'image/jpeg',
+      byteLength: 4096,
+      capturedAt: '2026-06-19T00:00:01.000Z',
+    },
+  });
+  const savedDrafts: ImageDisplayRecord[] = [];
+  const harness = createHarness({
+    bookmarkStore: {
+      findByUrl: async () => existing,
+      save: async (record) => {
+        savedDrafts.push(record);
+        return record;
+      },
+    },
+  });
+  harness.patchState({ bookmarks: [existing] });
+
+  const result = await harness.controller.repairBookmarkOriginal(existing);
+
+  assert.equal(result?.status, 'captured');
+  assert.ok(harness.log.includes('requestCapture:https://example.test/pic.jpg:bookmark'));
+  assert.equal(savedDrafts[0]?.storedOriginal?.blobId, 'blob-1');
+  assert.equal(savedDrafts[0]?.queueUpdatedAt, existing.queueUpdatedAt);
+});
+
 test('captureImage target flow updates an existing uncaptured saved row', async () => {
   const existing = createDisplayRecord({ id: 'bookmark-existing', url: 'https://example.test/pic.jpg', source: 'bookmark' });
   const savedDrafts: ImageDisplayRecord[] = [];

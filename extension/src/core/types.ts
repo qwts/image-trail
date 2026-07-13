@@ -342,7 +342,6 @@ export type PanelActionName =
   | 'grab-source-pattern/remove'
   | 'grab-source-pattern/update-settings'
   | 'parsed-field-state/restore'
-  | 'capture/request'
   | 'capture/permission-retry'
   | 'capture/start'
   | 'capture/complete'
@@ -486,7 +485,6 @@ export type PanelAction =
         | 'grab-source-pattern/remove'
         | 'grab-source-pattern/update-settings'
         | 'parsed-field-state/restore'
-        | 'capture/request'
         | 'capture/start'
         | 'capture/complete'
         | 'capture/clear'
@@ -629,6 +627,7 @@ export type PanelAction =
   | FieldTransformPanelAction
   | { readonly name: 'selected-url/apply'; readonly url: string }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: CaptureSourceType; readonly sourceRecordId?: string }
+  | { readonly name: 'capture/repair-selected'; readonly ids: readonly string[] }
   | { readonly name: 'capture/start'; readonly request?: CaptureRetryRequest | undefined }
   | { readonly name: 'capture/complete'; readonly result: CaptureResult; readonly sourceRecordId?: string | undefined }
   | { readonly name: 'capture/clear' }

@@ -340,6 +340,7 @@ export function reduceQueueRecentsAction(state: PanelState, action: QueueRecents
     case 'bookmarks/refresh-thumbnails':
     case 'bookmarks/delete-visible':
     case 'capture/request':
+    case 'capture/repair-selected':
     case 'capture/permission-retry':
     case 'capture/cleanup-orphans':
     case 'capture/preview':

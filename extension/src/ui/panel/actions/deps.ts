@@ -100,6 +100,7 @@ export interface PanelActionDeps {
   enqueueSelectedUrlApply(url: string): void;
   rejectUrlEditorInput(): void;
   captureImage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<void>;
+  repairMissingOriginals(ids: readonly string[]): Promise<void>;
   retryCaptureWithPermission(request: CaptureRetryRequest): Promise<void>;
   deleteCapturedBlob(recordId: string, blobId: string): Promise<void>;
   cleanupOrphanedBlobs(): Promise<void>;

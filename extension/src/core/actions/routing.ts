@@ -84,6 +84,7 @@ export const PANEL_ACTION_DOMAINS = {
   'grab-source-pattern/update-settings': 'parsed-fields',
   'parsed-field-state/restore': 'parsed-fields',
   'capture/request': 'queue-recents',
+  'capture/repair-selected': 'queue-recents',
   'capture/permission-retry': 'queue-recents',
   'capture/start': 'queue-recents',
   'capture/complete': 'queue-recents',

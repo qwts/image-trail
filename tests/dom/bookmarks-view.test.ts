@@ -202,6 +202,20 @@ test('Open gallery dispatches gallery/open from the Queue menu', () => {
   assert.deepEqual(actions, [{ name: 'gallery/open' }]);
 });
 
+test('Repair selected originals is selection-gated and dispatches durable queue ids', () => {
+  const unselectedActions: unknown[] = [];
+  const unselected = buildBookmarksView(unselectedActions);
+  assert.equal(buttonByText(unselected, 'Repair selected originals').disabled, true);
+
+  const actions: unknown[] = [];
+  const selected = buildBookmarksView(actions, { selectedIds: ['row-1'] });
+  const repair = buttonByText(selected, 'Repair selected originals');
+  assert.equal(repair.disabled, false);
+  repair.click();
+
+  assert.deepEqual(actions, [{ name: 'capture/repair-selected', ids: ['row-1'] }]);
+});
+
 test('pager buttons are disabled when there are no other pages', () => {
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions);

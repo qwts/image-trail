@@ -11,6 +11,7 @@ import type { ImageDisplayRecord } from '../../core/display-records.js';
 import { isCapturedResult, type CaptureResult, type CaptureRetryRequest, type CaptureSourceType } from '../../core/image/capture-result.js';
 import type { BookmarkStore, PanelState } from '../../core/types.js';
 import { bookmarkSaveMessage, recordHasBlobId } from './record-export-helpers.js';
+import { MissingOriginalRepairController } from './missing-original-repair-controller.js';
 
 function captureRetryMatches(left: CaptureRetryRequest | null, right: CaptureRetryRequest): boolean {
   return left?.url === right.url && left.sourceType === right.sourceType && left.sourceRecordId === right.sourceRecordId;
@@ -53,8 +54,18 @@ export interface CapturedOriginalsControllerDeps {
  */
 export class CapturedOriginalsController {
   private capturePreflightInProgress = false;
+  private readonly missingOriginalRepair: MissingOriginalRepairController;
 
-  constructor(private readonly deps: CapturedOriginalsControllerDeps) {}
+  constructor(private readonly deps: CapturedOriginalsControllerDeps) {
+    this.missingOriginalRepair = new MissingOriginalRepairController({
+      ...deps,
+      captureBookmark: (record) => this.repairBookmarkOriginal(record),
+    });
+  }
+
+  repairSelectedOriginals(ids: readonly string[]): Promise<void> {
+    return this.missingOriginalRepair.repairSelected(ids);
+  }
 
   async removeCapturedBlobReference(blobId: string, options: { readonly render?: boolean } = {}): Promise<void> {
     const captureStore = this.deps.captureStore();
@@ -88,9 +99,22 @@ export class CapturedOriginalsController {
   }
 
   async captureImage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<void> {
+    await this.captureImageWithOptions(url, sourceType, sourceRecordId);
+  }
+
+  async repairBookmarkOriginal(record: ImageDisplayRecord): Promise<CaptureResult | null> {
+    return this.captureImageWithOptions(record.url, 'bookmark', record.id, { skipStoredOriginalPreflight: true });
+  }
+
+  private async captureImageWithOptions(
+    url: string,
+    sourceType: CaptureSourceType,
+    sourceRecordId?: string,
+    options: { readonly skipStoredOriginalPreflight?: boolean } = {},
+  ): Promise<CaptureResult | null> {
     const captureStore = this.deps.captureStore();
-    if (!captureStore) return;
-    if (this.deps.getState().captureInProgress || this.capturePreflightInProgress) return;
+    if (!captureStore) return null;
+    if (this.deps.getState().captureInProgress || this.capturePreflightInProgress) return null;
     const isImportedImage = url.startsWith('data:image/');
     if (!isImportedImage && !isDurableImageSourceUrl(url)) {
       const lastUpdatedAt = Date.now();
@@ -102,18 +126,21 @@ export class CapturedOriginalsController {
       });
       this.deps.render();
       this.deps.scheduleFiniteCaptureErrorReset(lastUpdatedAt, 'status');
-      return;
+      return null;
     }
-    const existingSavedRecord = await this.findSavedRecordDuringCapturePreflight(url);
-    if (existingSavedRecord && recordHasStoredOriginal(existingSavedRecord)) {
-      await this.useExistingStoredOriginal(url, sourceType, sourceRecordId, existingSavedRecord);
-      return;
+    if (!options.skipStoredOriginalPreflight) {
+      const existingSavedRecord = await this.findSavedRecordDuringCapturePreflight(url);
+      if (existingSavedRecord && recordHasStoredOriginal(existingSavedRecord)) {
+        await this.useExistingStoredOriginal(url, sourceType, sourceRecordId, existingSavedRecord);
+        return null;
+      }
     }
     const request: CaptureRetryRequest = { url, sourceType, sourceRecordId };
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'capture/start', request }));
     this.deps.render();
     const result = await captureStore.requestCapture(url, sourceType, sourceRecordId);
     await this.completeCapture(result, url, sourceType, sourceRecordId);
+    return result;
   }
 
   /**

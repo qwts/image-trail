@@ -107,6 +107,9 @@ export class ImageTrailPanel {
     return this.panelMount.toastRoot;
   }
   private state: PanelState = createInitialPanelState();
+  private readonly replaceState = (state: PanelState): void => {
+    this.state = state;
+  };
 
   private readonly governor = new RequestGovernor();
   private readonly projections = new ProjectionSessionController();
@@ -175,9 +178,7 @@ export class ImageTrailPanel {
   private readonly urlTemplateSettings = new UrlTemplateSettingsController({
     store: () => this.urlTemplateStore,
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     currentUrlModel: () => this.currentUrlModel(),
     setUrlTemplates: (templates, activeId) => this.pageAdapter.setUrlTemplates(templates, activeId),
@@ -186,9 +187,7 @@ export class ImageTrailPanel {
   });
   private readonly recallExport = new RecallExportController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
@@ -205,9 +204,7 @@ export class ImageTrailPanel {
   });
   private readonly recallRestore = new RecallRestoreController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
@@ -227,9 +224,7 @@ export class ImageTrailPanel {
   });
   private readonly recordLibrary: RecordLibraryController = new RecordLibraryController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
@@ -248,9 +243,7 @@ export class ImageTrailPanel {
   });
   private readonly capturedOriginals: CapturedOriginalsController = new CapturedOriginalsController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: (options) => this.render(options),
     renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
@@ -267,9 +260,7 @@ export class ImageTrailPanel {
   });
   private readonly projectionApplication: ProjectionApplicationController = new ProjectionApplicationController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     loadGrabSettings: () => this.panelDataLoad.loadGrabSettings(),
     scheduleFiniteCaptureErrorReset: (updatedAt, mode, durationMs) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode, durationMs),
@@ -296,9 +287,7 @@ export class ImageTrailPanel {
   });
   private readonly panelPosition: PanelPositionController = new PanelPositionController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     renderRecallOnly: () => this.renderRecallOnly(),
     whenStylesReady: () => this.panelMount.whenStylesReady(),
@@ -307,9 +296,7 @@ export class ImageTrailPanel {
   });
   private readonly workspaceLayout: WorkspaceLayoutController = new WorkspaceLayoutController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     workspaceLayoutStore: () => this.workspaceLayoutStore,
     getLocalSettings: () => this.localSettings,
@@ -319,9 +306,7 @@ export class ImageTrailPanel {
   });
   private readonly recallDrawer: RecallDrawerController = new RecallDrawerController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     renderRecallOnly: () => this.renderRecallOnly(),
     renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
@@ -333,9 +318,7 @@ export class ImageTrailPanel {
   });
   private readonly panelSettings: PanelSettingsController = new PanelSettingsController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     getLocalSettings: () => this.localSettings,
     setLocalSettings: (settings) => {
       this.localSettings = settings;
@@ -354,9 +337,7 @@ export class ImageTrailPanel {
   });
   private readonly parsedFieldNavigation: ParsedFieldNavigationController = new ParsedFieldNavigationController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     loadGrabSettings: () => this.panelDataLoad.loadGrabSettings(),
     saveFieldState: () => this.fieldStateSync.save(),
@@ -378,9 +359,7 @@ export class ImageTrailPanel {
   });
   private readonly fieldEditor: FieldEditorController = new FieldEditorController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     scheduleFiniteCaptureErrorReset: (updatedAt, mode) => this.scheduleFiniteCaptureErrorReset(updatedAt, mode),
     currentRawUrl: () => this.currentRawUrl(),
@@ -394,9 +373,7 @@ export class ImageTrailPanel {
   });
   private readonly panelRender: PanelRenderController = new PanelRenderController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     dispatch: (action) => this.dispatch(action),
     root: () => this.root,
     recallRoot: () => this.recallRoot,
@@ -413,9 +390,7 @@ export class ImageTrailPanel {
   });
   private readonly parsedFieldStateRecord: ParsedFieldStateRecordController = new ParsedFieldStateRecordController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     currentRawUrl: () => this.currentRawUrl(),
     applySelectedUrl: (url, attemptedFieldIds, options) => this.projectionApplication.applySelectedUrl(url, attemptedFieldIds, options),
@@ -428,9 +403,7 @@ export class ImageTrailPanel {
   });
   private readonly urlReviewStatus: UrlReviewStatusController = new UrlReviewStatusController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     urlReviewStatusStore: () => this.urlReviewStatusStore,
     urlReviewStatusLimit: () => this.localSettings.urlReviewStatusLimit,
@@ -438,9 +411,7 @@ export class ImageTrailPanel {
   });
   private readonly panelDataLoad: PanelDataLoadController = new PanelDataLoadController({
     getState: () => this.state,
-    setState: (state) => {
-      this.state = state;
-    },
+    setState: this.replaceState,
     render: () => this.render(),
     bookmarkStore: () => this.bookmarkStore,
     recentHistoryStore: () => this.recentHistoryStore,
@@ -646,6 +617,7 @@ export class ImageTrailPanel {
       enqueueSelectedUrlApply: (url) => this.fieldEditor.enqueueSelectedUrlApply(url),
       rejectUrlEditorInput: () => this.fieldEditor.rejectUrlEditorInput(),
       captureImage: (url, sourceType, sourceRecordId) => this.capturedOriginals.captureImage(url, sourceType, sourceRecordId),
+      repairMissingOriginals: (ids) => this.capturedOriginals.repairSelectedOriginals(ids),
       retryCaptureWithPermission: (request) => this.capturedOriginals.retryCaptureWithPermission(request),
       deleteCapturedBlob: (recordId, blobId) => this.capturedOriginals.deleteCapturedBlob(recordId, blobId),
       cleanupOrphanedBlobs: () => this.capturedOriginals.cleanupOrphanedBlobs(),
