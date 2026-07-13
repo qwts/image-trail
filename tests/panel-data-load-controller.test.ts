@@ -80,6 +80,13 @@ test('loadGrabSettings honors render:false', async () => {
   assert.ok(!harness.log.includes('render'));
 });
 
+test('loadGrabSettings can reload saved presets without priming neighbor requests', async () => {
+  const harness = createHarness();
+  await harness.controller.loadGrabSettings({ primeBufferedNav: false });
+  assert.ok(!harness.log.includes('primeBufferedNav'));
+  assert.ok(harness.log.includes('syncGrabSettings'));
+});
+
 test('applyStorageUsage folds the usage summary into panel state', () => {
   const harness = createHarness();
   harness.controller.applyStorageUsage({ blobCount: 5, totalBytes: 999 });

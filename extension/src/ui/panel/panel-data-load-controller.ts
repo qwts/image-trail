@@ -43,7 +43,7 @@ export class PanelDataLoadController {
     this.deps.render();
   };
 
-  async loadGrabSettings(options: { readonly render?: boolean } = {}): Promise<void> {
+  async loadGrabSettings(options: { readonly render?: boolean; readonly primeBufferedNav?: boolean } = {}): Promise<void> {
     const urlTemplateStore = this.deps.urlTemplateStore();
     if (!urlTemplateStore) return;
     const hostname = this.deps.currentUrlTemplateHostname();
@@ -66,7 +66,7 @@ export class PanelDataLoadController {
       }),
     );
     this.deps.syncGrabSettings();
-    this.deps.primeBufferedNav();
+    if (options.primeBufferedNav !== false) this.deps.primeBufferedNav();
     if (options.render !== false) this.deps.render();
   }
 
