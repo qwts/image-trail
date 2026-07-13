@@ -2700,7 +2700,7 @@
   overflow: hidden;
 }
 
-.image-trail-panel-root .image-trail-panel__record-list:not(.is-sparse-compact) .image-trail-panel__history-item {
+.image-trail-panel-root .image-trail-panel__record-list.has-top-left-metadata .image-trail-panel__history-item {
   align-items: start;
 }
 
@@ -2807,7 +2807,7 @@
   padding: 4px 0 4px 84px;
 }
 
-.image-trail-panel-root .image-trail-panel__record-list:not(.is-sparse-compact) .image-trail-panel__history-label {
+.image-trail-panel-root .image-trail-panel__record-list.has-top-left-metadata .image-trail-panel__history-label {
   grid-column: 1 / -1;
   align-self: start;
   justify-self: start;

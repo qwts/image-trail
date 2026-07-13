@@ -278,6 +278,23 @@ test('recents render the selected sparse-row display mode and sparse count class
   assert.equal(list.dataset['sparseRowMode'], 'half');
   assert.equal(list.classList.contains('is-sparse-half'), true);
   assert.equal(list.classList.contains('has-sparse-count-2'), true);
+  assert.equal(list.classList.contains('has-top-left-metadata'), true);
+});
+
+test('Adaptive Recents center metadata at three or more rows (#478)', () => {
+  const actions: unknown[] = [];
+  const second = { ...record, id: 'recent-2', url: 'https://images.example.test/recent/photo_0043.jpg' };
+  const third = { ...record, id: 'recent-3', url: 'https://images.example.test/recent/photo_0044.jpg' };
+  const threeRows = buildHistoryView(actions, [], [record, second, third]);
+  const twoRows = buildHistoryView(actions, [], [record, second]);
+  const threeRowList = threeRows.querySelector<HTMLElement>('.image-trail-panel__record-list');
+  const twoRowList = twoRows.querySelector<HTMLElement>('.image-trail-panel__record-list');
+
+  assert.ok(threeRowList);
+  assert.ok(twoRowList);
+  assert.equal(threeRowList.classList.contains('has-sparse-count-3'), true);
+  assert.equal(threeRowList.classList.contains('has-top-left-metadata'), false);
+  assert.equal(twoRowList.classList.contains('has-top-left-metadata'), true);
 });
 
 test('Backspace removes the selected recent even when encrypted-original keys are unavailable', () => {
