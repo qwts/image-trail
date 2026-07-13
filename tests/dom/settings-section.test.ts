@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { reducePanelAction } from '../../extension/src/core/actions.js';
 import { createInitialPanelState } from '../../extension/src/core/state.js';
 import type { PanelState } from '../../extension/src/core/types.js';
 import { createSettingsSection } from '../../extension/src/ui/settings-section.js';
@@ -76,4 +77,31 @@ test('createSettingsSection reflects populated backup, restore, and selection st
   assert.match(section.textContent ?? '', /Image Trail SHA-256/u, 'history identifies the locally computed verification hash');
   assert.match(section.textContent ?? '', /Downloaded bytes matched export/u, 'history explains the verification method');
   assert.match(section.textContent ?? '', /Exported 3 rows\./u, 'the import–export message surfaces');
+});
+
+test('an authoritative empty backup history removes stale backup metadata', () => {
+  const initial = createInitialPanelState(0);
+  const stale: PanelState = {
+    ...initial,
+    pcloudBackup: {
+      ...initial.pcloudBackup,
+      lastBackupAt: '2026-06-25T15:31:00.000Z',
+      lastBackupFileName: 'stale-backup.json',
+      lastBackupSizeBytes: 2048,
+      lastBackupOriginalCount: 2,
+      lastBackupOriginalBytes: 1_500_000,
+      lastBackupMissingOriginalCount: 1,
+      lastBackupSha256: 'a'.repeat(64),
+    },
+  };
+  const cleared = reducePanelAction(stale, {
+    name: 'pcloud-backup/status',
+    status: { connected: false, backupHistory: [] },
+  });
+
+  const cloudBackup = build(cleared).querySelector('.image-trail-panel__cloud-backup');
+  assert.ok(cloudBackup);
+  const text = cloudBackup.textContent ?? '';
+  assert.doesNotMatch(text, /stale-backup\.json/u);
+  assert.doesNotMatch(text, /Last backup|Encrypted originals|Original bytes|Missing originals|SHA-256/u);
 });

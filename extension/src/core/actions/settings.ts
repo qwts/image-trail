@@ -26,6 +26,21 @@ function failedPCloudConnectionState(
         : state.pcloudBackup.connectionState;
 }
 
+function pCloudBackupHistoryUpdate(backupHistory: PanelState['pcloudBackup']['backupHistory']) {
+  if (backupHistory === undefined) return {};
+  const latestBackup = backupHistory[0];
+  return {
+    backupHistory,
+    lastBackupAt: latestBackup?.completedAt,
+    lastBackupFileName: latestBackup?.fileName,
+    lastBackupSizeBytes: latestBackup?.sizeBytes,
+    lastBackupSha256: latestBackup?.sha256,
+    lastBackupOriginalCount: undefined,
+    lastBackupOriginalBytes: undefined,
+    lastBackupMissingOriginalCount: undefined,
+  };
+}
+
 export function reduceSettingsAction(state: PanelState, action: SettingsAction): PanelState {
   switch (action.name) {
     case 'settings/toggle':
@@ -144,8 +159,6 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
         lastUpdatedAt: Date.now(),
       };
     case 'pcloud-backup/status': {
-      const backupHistory = action.status.backupHistory ?? state.pcloudBackup.backupHistory;
-      const latestBackup = backupHistory?.[0];
       return {
         ...state,
         pcloudBackup: {
@@ -156,11 +169,7 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
           accountPremium: action.status.accountPremium,
           quotaBytes: action.status.quotaBytes,
           usedQuotaBytes: action.status.usedQuotaBytes,
-          backupHistory,
-          lastBackupAt: latestBackup?.completedAt ?? state.pcloudBackup.lastBackupAt,
-          lastBackupFileName: latestBackup?.fileName ?? state.pcloudBackup.lastBackupFileName,
-          lastBackupSizeBytes: latestBackup?.sizeBytes ?? state.pcloudBackup.lastBackupSizeBytes,
-          lastBackupSha256: latestBackup?.sha256 ?? state.pcloudBackup.lastBackupSha256,
+          ...pCloudBackupHistoryUpdate(action.status.backupHistory),
           pendingOperation: undefined,
           message: action.status.message,
           messageIsError: action.status.messageIsError === true,

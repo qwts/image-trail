@@ -264,29 +264,75 @@ test('pCloud backup reducer tracks backing-up state and verified upload metadata
 });
 
 test('pCloud status hydrates persisted backup history while disconnected', () => {
-  const state = reducePanelAction(createInitialPanelState(), {
-    name: 'pcloud-backup/status',
-    status: {
-      connected: false,
-      backupHistory: [
-        {
-          schemaVersion: 1,
-          provider: 'pcloud',
-          destination: '/Image Trail/backups',
-          fileName: 'persisted.image-trail-encrypted.json',
-          completedAt: '2026-06-27T00:00:01.000Z',
-          sizeBytes: 768,
-          sha256: 'c'.repeat(64),
-          verificationMethod: 'provider-checksum',
-        },
-      ],
+  const initial = createInitialPanelState();
+  const state = reducePanelAction(
+    {
+      ...initial,
+      pcloudBackup: {
+        ...initial.pcloudBackup,
+        lastBackupOriginalCount: 2,
+        lastBackupOriginalBytes: 1_500_000,
+        lastBackupMissingOriginalCount: 1,
+      },
     },
-  });
+    {
+      name: 'pcloud-backup/status',
+      status: {
+        connected: false,
+        backupHistory: [
+          {
+            schemaVersion: 1,
+            provider: 'pcloud',
+            destination: '/Image Trail/backups',
+            fileName: 'persisted.image-trail-encrypted.json',
+            completedAt: '2026-06-27T00:00:01.000Z',
+            sizeBytes: 768,
+            sha256: 'c'.repeat(64),
+            verificationMethod: 'provider-checksum',
+          },
+        ],
+      },
+    },
+  );
 
   assert.equal(state.pcloudBackup.connectionState, 'disconnected');
   assert.equal(state.pcloudBackup.lastBackupFileName, 'persisted.image-trail-encrypted.json');
   assert.equal(state.pcloudBackup.lastBackupSizeBytes, 768);
   assert.equal(state.pcloudBackup.backupHistory?.[0]?.sha256, 'c'.repeat(64));
+  assert.equal(state.pcloudBackup.lastBackupOriginalCount, undefined);
+  assert.equal(state.pcloudBackup.lastBackupOriginalBytes, undefined);
+  assert.equal(state.pcloudBackup.lastBackupMissingOriginalCount, undefined);
+});
+
+test('pCloud status distinguishes omitted history from an authoritative empty history', () => {
+  const initial = createInitialPanelState();
+  const stale = {
+    ...initial,
+    pcloudBackup: {
+      ...initial.pcloudBackup,
+      lastBackupAt: '2026-06-27T00:00:01.000Z',
+      lastBackupFileName: 'stale.image-trail-encrypted.json',
+      lastBackupSizeBytes: 768,
+      lastBackupSha256: 'c'.repeat(64),
+      lastBackupOriginalCount: 2,
+      lastBackupOriginalBytes: 1_500_000,
+      lastBackupMissingOriginalCount: 1,
+    },
+  };
+
+  const preserved = reducePanelAction(stale, { name: 'pcloud-backup/status', status: { connected: true } });
+  assert.equal(preserved.pcloudBackup.lastBackupFileName, 'stale.image-trail-encrypted.json');
+  assert.equal(preserved.pcloudBackup.lastBackupOriginalCount, 2);
+
+  const cleared = reducePanelAction(stale, { name: 'pcloud-backup/status', status: { connected: true, backupHistory: [] } });
+  assert.deepEqual(cleared.pcloudBackup.backupHistory, []);
+  assert.equal(cleared.pcloudBackup.lastBackupAt, undefined);
+  assert.equal(cleared.pcloudBackup.lastBackupFileName, undefined);
+  assert.equal(cleared.pcloudBackup.lastBackupSizeBytes, undefined);
+  assert.equal(cleared.pcloudBackup.lastBackupSha256, undefined);
+  assert.equal(cleared.pcloudBackup.lastBackupOriginalCount, undefined);
+  assert.equal(cleared.pcloudBackup.lastBackupOriginalBytes, undefined);
+  assert.equal(cleared.pcloudBackup.lastBackupMissingOriginalCount, undefined);
 });
 
 test('pCloud full backup collects captured blob ids from durable records', () => {
