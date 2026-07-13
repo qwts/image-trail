@@ -259,14 +259,17 @@ test('URL editor and parsed fields load, fail closed, navigate, learn templates,
   await expectFrame(page, '2');
 
   await openUrlLearning(page);
-  await expect(page.locator('.image-trail-panel__settings-template-url')).toContainText('/dynamic-image.svg?frame={query-frame}');
+  const savedTemplate = page
+    .locator('.image-trail-panel__settings-template-url')
+    .filter({ hasText: '/dynamic-image.svg?frame={query-frame}' });
+  await expect(savedTemplate).toHaveCount(1);
 
   await page.getByRole('button', { name: 'Close panel' }).click();
   await expectPanelClosed(page);
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
   await openUrlLearning(page);
-  await expect(page.locator('.image-trail-panel__settings-template-url')).toContainText('/dynamic-image.svg?frame={query-frame}');
+  await expect(savedTemplate).toHaveCount(1);
   await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=2'));
   await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?frame=2/u);
   await closeSettingsIfOpen(page);
