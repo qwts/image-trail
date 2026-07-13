@@ -181,6 +181,7 @@ test('retryCaptureWithPermission preserves context after denial', async () => {
   const harness = createHarness({
     permissionRetryResult: { status: 'failed', reason: 'permission-needed', message: 'Permission was not granted.' },
   });
+  harness.patchState({ captureRetryRequest: request });
 
   await harness.controller.retryCaptureWithPermission(request);
 
@@ -197,6 +198,7 @@ test('retryCaptureWithPermission preserves context after denial', async () => {
 test('retryCaptureWithPermission uses normal target completion after grant', async () => {
   const request = { url: 'https://cdn.example.test/pic.jpg', sourceType: 'target' as const };
   const harness = createHarness();
+  harness.patchState({ captureRetryRequest: request });
 
   await harness.controller.retryCaptureWithPermission(request);
 
@@ -204,6 +206,55 @@ test('retryCaptureWithPermission uses normal target completion after grant', asy
   assert.ok(harness.log.includes('requestPermissionAndRetry:https://cdn.example.test/pic.jpg:target:'));
   assert.ok(harness.log.includes('bookmarkSave:https://cdn.example.test/pic.jpg'));
   assert.equal(harness.log.at(-1), 'renderPanelAndRefreshRecall');
+});
+
+test('retryCaptureWithPermission ignores a request that is no longer retained', async () => {
+  const harness = createHarness();
+
+  await harness.controller.retryCaptureWithPermission({
+    url: 'https://cdn.example.test/pic.jpg',
+    sourceType: 'history',
+    sourceRecordId: 'recent-deleted',
+  });
+
+  assert.deepEqual(harness.log, []);
+});
+
+test('permission retry deletes a captured blob when its retained row is removed in flight', async () => {
+  for (const sourceType of ['history', 'bookmark'] as const) {
+    let resolveRetry: (result: CaptureResult) => void = () => {};
+    const retryResult = new Promise<CaptureResult>((resolve) => {
+      resolveRetry = resolve;
+    });
+    const request = {
+      url: `https://cdn.example.test/${sourceType}.jpg`,
+      sourceType,
+      sourceRecordId: `${sourceType}-deleted`,
+    };
+    const harness = createHarness({
+      captureStore: { requestPermissionAndRetry: async () => retryResult },
+    });
+    harness.patchState({ captureRetryRequest: request });
+
+    const pending = harness.controller.retryCaptureWithPermission(request);
+    await Promise.resolve();
+    harness.patchState({ captureRetryRequest: null });
+    resolveRetry(CAPTURED);
+    await pending;
+
+    assert.ok(harness.log.includes('requestDeleteBlob:blob-1'), sourceType);
+    assert.equal(
+      harness.log.some((entry) => entry.startsWith('bookmarkSave:')),
+      false,
+      sourceType,
+    );
+    assert.equal(harness.getState().captureInProgress, false, sourceType);
+    assert.equal(harness.getState().captureResult?.status, 'failed', sourceType);
+    assert.equal(
+      harness.getState().message,
+      `Captured original was discarded because its ${sourceType === 'history' ? 'recent' : 'queue'} row was removed.`,
+    );
+  }
 });
 
 test('captureImage skips target capture when a saved row already has an original', async () => {

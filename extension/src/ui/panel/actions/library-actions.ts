@@ -27,6 +27,13 @@ export type LibraryActionName =
   | 'bookmark-selection/clear'
   | 'gallery/open';
 
+function clearMatchingCaptureRetry(deps: PanelActionDeps, sourceType: 'history' | 'bookmark', sourceRecordIds?: readonly string[]): void {
+  const request = deps.getState().captureRetryRequest;
+  if (!request || request.sourceType !== sourceType) return;
+  if (sourceRecordIds && (!request.sourceRecordId || !sourceRecordIds.includes(request.sourceRecordId))) return;
+  deps.reduce({ name: 'capture/clear' });
+}
+
 /** Recent history, bookmarks, and row selection. Bodies moved verbatim from the panel dispatch chain. */
 export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<LibraryActionName> {
   const bookmarkCurrent: AnyActionDef = {
@@ -51,11 +58,13 @@ export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<
     'bookmark/current': bookmarkCurrent,
     'history/remove': {
       handle(action) {
+        clearMatchingCaptureRetry(deps, 'history', [action.id]);
         void deps.removeRecentHistory(action.id);
       },
     },
     'history/delete-all': {
       handle() {
+        clearMatchingCaptureRetry(deps, 'history');
         void deps.deleteRecentHistory();
       },
     },
@@ -71,6 +80,7 @@ export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<
     },
     'bookmark/remove': {
       handle(action) {
+        clearMatchingCaptureRetry(deps, 'bookmark', [action.id]);
         void deps.removeBookmark(action.id);
       },
     },
@@ -114,6 +124,11 @@ export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<
     },
     'bookmarks/delete-visible': {
       handle() {
+        clearMatchingCaptureRetry(
+          deps,
+          'bookmark',
+          deps.getState().bookmarks.map((bookmark) => bookmark.id),
+        );
         void deps.deleteVisibleBookmarks();
       },
     },
