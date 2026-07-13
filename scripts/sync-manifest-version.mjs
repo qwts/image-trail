@@ -5,10 +5,18 @@
 // that is what ties CHANGELOG.md entries to the extension version users actually install.
 
 import { readFile, writeFile } from 'node:fs/promises';
+import { validateChromeExtensionVersion } from './check-version-policy.mjs';
 
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 const manifestText = await readFile('extension/manifest.json', 'utf8');
 const manifest = JSON.parse(manifestText);
+const versionErrors = validateChromeExtensionVersion(pkg.version);
+
+if (versionErrors.length > 0) {
+  console.error(`Refusing to copy invalid Chrome extension version "${String(pkg.version)}":`);
+  for (const error of versionErrors) console.error(`  - ${error}`);
+  process.exit(1);
+}
 
 if (manifest.version === pkg.version) {
   console.log(`extension/manifest.json already at ${pkg.version}.`);
