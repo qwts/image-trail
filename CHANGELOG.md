@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.2.3
+
+### Patch Changes
+
+- 9711f90: Add reviewable saved URL stepping presets for numbered filenames, gallery paths, and query parameters.
+
 ## 0.2.2
 
 ### Patch Changes
