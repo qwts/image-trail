@@ -98,6 +98,12 @@ test('registers assignable action commands for Chromium shortcut settings', asyn
 
 test('ignores browser shortcut action messages while the panel is closed', async ({ page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
+  // On-demand injection means a never-invoked page has no message listener.
+  // Open and close once so this test exercises the closed-panel listener state.
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelClosed(page);
 
   const result = await serviceWorker.evaluate(async (activeUrl) => {
     const [tab] = await chrome.tabs.query({ url: activeUrl });
