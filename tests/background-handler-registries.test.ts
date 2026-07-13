@@ -879,7 +879,7 @@ test('pcloud status and disconnect resolve to their disconnected payloads withou
     createPCloudProviderStatusMessage(),
   );
   assert.equal(status.type, MessageType.PCloudProviderStatusResult);
-  assert.deepEqual(status.payload, { connected: false });
+  assert.deepEqual(status.payload, { connected: false, backupHistory: [] });
 
   const disconnected = await handleAndRespond<DisconnectPCloudProviderResultMessage>(
     pcloudRegistry[MessageType.DisconnectPCloudProvider],
