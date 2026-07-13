@@ -27,6 +27,7 @@ interface Harness {
   readonly removePatternLog: { readonly hostname: string; readonly id: string }[];
   readonly pageTemplates: { readonly templates: readonly UrlTemplateRecord[]; readonly activeId: string | null }[];
   readonly pagePatterns: (readonly GrabSourcePattern[])[];
+  readonly loadOptions: ({ readonly render?: boolean; readonly primeBufferedNav?: boolean } | undefined)[];
   renderCount(): number;
   loadCount(): number;
 }
@@ -45,6 +46,7 @@ function createHarness(model: ParsedUrlModel = parseUrl(SOURCE_URL)): Harness {
   const removePatternLog: { readonly hostname: string; readonly id: string }[] = [];
   const pageTemplates: { readonly templates: readonly UrlTemplateRecord[]; readonly activeId: string | null }[] = [];
   const pagePatterns: (readonly GrabSourcePattern[])[] = [];
+  const loadOptions: ({ readonly render?: boolean; readonly primeBufferedNav?: boolean } | undefined)[] = [];
   let renders = 0;
   let loads = 0;
 
@@ -93,7 +95,8 @@ function createHarness(model: ParsedUrlModel = parseUrl(SOURCE_URL)): Harness {
     setGrabSourcePatterns: (patterns) => {
       pagePatterns.push(patterns);
     },
-    loadGrabSettings: async () => {
+    loadGrabSettings: async (options) => {
+      loadOptions.push(options);
       const hostname = controller.currentUrlTemplateHostname();
       if (!hostname) return;
       const [templates, grabSourcePatterns] = await Promise.all([store.load(hostname), store.loadGrabSourcePatterns(hostname)]);
@@ -129,6 +132,7 @@ function createHarness(model: ParsedUrlModel = parseUrl(SOURCE_URL)): Harness {
     removePatternLog,
     pageTemplates,
     pagePatterns,
+    loadOptions,
     renderCount: () => renders,
     loadCount: () => loads,
   };
@@ -171,6 +175,7 @@ test('saveSteppingPreset persists reviewed fields through the existing template 
   assert.equal(harness.getState().status, 'ready');
   assert.match(harness.getState().message, /Saved numbered filename preset with 1 field\./u);
   assert.equal(harness.loadCount(), 1);
+  assert.deepEqual(harness.loadOptions, [{ render: false, primeBufferedNav: false }]);
   assert.equal(harness.renderCount(), 1);
 });
 

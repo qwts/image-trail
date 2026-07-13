@@ -261,6 +261,7 @@
             "tests/dom/fields-reset-controls.test.ts",
             "tests/dom/url-learning-settings-view.test.ts",
             "tests/dom/url-stepping-preset-view.test.ts",
+            "tests/panel-data-load-controller.test.ts",
             "tests/url-stepping-presets.test.ts",
             "tests/url-template-settings-controller.test.ts"
           ],
