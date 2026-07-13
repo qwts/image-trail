@@ -25,6 +25,14 @@ import {
   loadPCloudProviderStatus,
   uploadPCloudBackup,
 } from '../pcloud-provider.js';
+import { PCLOUD_HOST_PERMISSION, requestHostPermission } from '../permissions.js';
+
+async function connectPCloudWithPermission(): ReturnType<typeof connectPCloudProvider> {
+  const granted = await requestHostPermission(PCLOUD_HOST_PERMISSION);
+  if (granted) return connectPCloudProvider();
+  const message = 'pCloud access was not granted. Connect again to approve access only to pCloud hosts.';
+  return { ok: false, status: { connected: false, message, messageIsError: true }, message };
+}
 
 type PCloudRequestType =
   | typeof MessageType.PCloudProviderStatus
@@ -44,7 +52,7 @@ export function createPCloudMessageRegistry(): Record<PCloudRequestType, Message
     }),
     [MessageType.ConnectPCloudProvider]: defineMessage({
       requestSchema: requestSchemas.emptyPayloadSchema,
-      handle: (_message: ConnectPCloudProviderMessage) => connectPCloudProvider(),
+      handle: (_message: ConnectPCloudProviderMessage) => connectPCloudWithPermission(),
       respond: (result) => createConnectPCloudProviderResultMessage(result),
       fallback: () =>
         createConnectPCloudProviderResultMessage({

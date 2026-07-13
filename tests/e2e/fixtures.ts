@@ -112,10 +112,7 @@ export async function togglePanelFromExtensionAction(page: Page, serviceWorker: 
   const result = await serviceWorker.evaluate(async (activeUrl) => {
     const findTargetTab = async (): Promise<chrome.tabs.Tab | undefined> => {
       const tabs = await chrome.tabs.query({ currentWindow: true });
-      return (
-        tabs.find((candidate) => candidate.url === activeUrl) ??
-        tabs.find((candidate) => candidate.active && candidate.url?.startsWith('http'))
-      );
+      return tabs.find((candidate) => candidate.url === activeUrl) ?? tabs.find((candidate) => candidate.active);
     };
 
     const sendStatusMessage = async (tabId: number, type: 'imageTrail.ping' | 'imageTrail.togglePanel') => {
@@ -128,21 +125,28 @@ export async function togglePanelFromExtensionAction(page: Page, serviceWorker: 
 
     const sleep = (delayMs: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, delayMs));
     let tabId: number | undefined;
-    for (let attempt = 0; attempt < 20; attempt += 1) {
+    let scriptReady = false;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
       const tab = await findTargetTab();
       tabId = tab?.id;
       if (typeof tabId === 'number') {
         try {
           const response = await sendStatusMessage(tabId, 'imageTrail.ping');
-          if (response?.type === 'imageTrail.status') break;
+          if (response?.type === 'imageTrail.status') {
+            scriptReady = true;
+            break;
+          }
         } catch {
-          // Content script is declared at document_idle; keep polling until its listener is ready.
+          // The production manifest injects only after an explicit activeTab gesture.
         }
       }
       await sleep(100);
     }
 
     if (typeof tabId !== 'number') throw new Error(`Could not find tab for ${activeUrl}`);
+    if (!scriptReady) {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['src/content/content-script.js'] });
+    }
     const response = await sendStatusMessage(tabId, 'imageTrail.togglePanel');
     return response;
   }, url);

@@ -155,7 +155,7 @@ export class RecallExportController {
       reducePanelAction(this.deps.getState(), {
         name: 'pcloud-backup/busy',
         pendingOperation: 'connecting',
-        message: 'Opening pCloud authorization...',
+        message: 'Requesting pCloud access...',
       }),
     );
     this.deps.render();

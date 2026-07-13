@@ -46,15 +46,8 @@
     "service_worker": "src/background/service-worker.js",
     "type": "module"
   },
-  "content_scripts": [
-    {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/content/content-script.js"],
-      "run_at": "document_idle"
-    }
-  ],
   "permissions": ["activeTab", "scripting", "downloads", "identity", "storage", "declarativeNetRequestWithHostAccess"],
-  "host_permissions": ["http://*/*", "https://*/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "web_accessible_resources": [
     {
       "resources": ["src/ui/styles/panel.css", "src/ui/styles/fields.css"],

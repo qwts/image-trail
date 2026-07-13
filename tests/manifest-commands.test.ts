@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 interface ExtensionCommandManifest {
+  readonly permissions?: readonly string[];
+  readonly host_permissions?: readonly string[];
+  readonly optional_host_permissions?: readonly string[];
+  readonly content_scripts?: readonly unknown[];
   readonly commands?: Record<
     string,
     {
@@ -17,6 +21,16 @@ interface ExtensionCommandManifest {
     readonly resources?: readonly string[];
   }[];
 }
+
+test('manifest uses activeTab injection and optional per-origin host grants', () => {
+  const manifest = loadManifest();
+
+  assert.ok(manifest.permissions?.includes('activeTab'));
+  assert.ok(manifest.permissions?.includes('scripting'));
+  assert.deepEqual(manifest.host_permissions ?? [], []);
+  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*']);
+  assert.deepEqual(manifest.content_scripts ?? [], []);
+});
 
 function loadManifest(): ExtensionCommandManifest {
   return JSON.parse(readFileSync('extension/manifest.json', 'utf8')) as ExtensionCommandManifest;

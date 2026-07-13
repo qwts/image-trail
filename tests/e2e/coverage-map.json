@@ -54,7 +54,12 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
-          "notes": "Covers service-worker/id resolution, extension-action panel open/close, single-image auto-select, multi-image target picking, minimize/expand/close/reopen lifecycle, duplicate-DOM prevention, and close cleanup."
+          "notes": "Covers service-worker/id resolution, programmatic injection with a test-build grant limited to the local fixture origin, panel open/close, single-image auto-select, multi-image target picking, minimize/expand/close/reopen lifecycle, duplicate-DOM prevention, and close cleanup. The production activeTab toolbar gesture and optional prompt remain manual browser checks."
+        },
+        {
+          "type": "unit-dom",
+          "paths": ["tests/manifest-commands.test.ts", "tests/permissions.test.ts"],
+          "notes": "Covers removal of static all-sites injection and required host access, retention of activeTab plus scripting, optional http/https declarations, and exact per-origin permission requests."
         }
       ]
     },
@@ -501,11 +506,12 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "path": "tests/pcloud-upload-provider.test.ts"
+          "paths": ["tests/pcloud-upload-provider.test.ts", "tests/pcloud-permissions.test.ts"],
+          "notes": "Covers provider operations plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
         },
         {
           "type": "manual",
-          "reason": "Live pCloud OAuth and backup/restore proof requires user-controlled provider credentials."
+          "reason": "Live pCloud permission approval, OAuth, and backup/restore proof requires user-controlled provider credentials."
         },
         {
           "type": "playwright-e2e",
