@@ -11,7 +11,7 @@ import { parsedFieldDigitWidthSpecs, parsedFieldFixtures, splitParsedFieldFixtur
 import { mockDispatch, panelStory } from '../stories/story-host.js';
 
 const meta = {
-  title: 'Extension UI/Parsed fields',
+  title: 'Extension UI/Field Editor',
   render: () => fieldsStory(),
 } satisfies Meta;
 

@@ -17,7 +17,7 @@ const HELP_FEATURES: readonly HelpFeatureEntry[] = [
     description: 'Inspect the current image address or paste an http/https image URL and Apply to load it.',
   },
   {
-    label: 'Parsed fields',
+    label: 'Field Editor',
     description:
       'Numeric URL segments become steppable fields. Step one with −/+, or Include fields so Prev/Next and the arrow keys walk them together. Reset all returns to the first edit of the session.',
   },

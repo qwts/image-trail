@@ -182,7 +182,7 @@ export function createFieldsView(model: FieldEditorViewModel, callbacks: FieldsV
   const summary = document.createElement('summary');
   summary.className = 'image-trail-panel__fields-summary';
   const heading = document.createElement('h3');
-  heading.textContent = 'Parsed fields';
+  heading.textContent = 'Field Editor';
   summary.append(heading);
   const resetControls = createFieldsResetControls({
     privacyMode: model.privacyMode,

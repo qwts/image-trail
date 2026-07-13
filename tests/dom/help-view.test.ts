@@ -30,7 +30,7 @@ test('the Help view renders the shared shortcut reference with panel and browser
 test('the Help view renders the feature guide for every major panel area', () => {
   const view = createHelpView();
   const labels = [...view.querySelectorAll('.image-trail-panel__help-features dt')].map((dt) => dt.textContent);
-  for (const area of ['Host target', 'URL editor', 'Parsed fields', 'Recents', 'Queue', 'Captured originals', 'Automation', 'Settings']) {
+  for (const area of ['Host target', 'URL editor', 'Field Editor', 'Recents', 'Queue', 'Captured originals', 'Automation', 'Settings']) {
     assert.ok(labels.includes(area), `feature guide covers ${area}`);
   }
 });

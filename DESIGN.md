@@ -73,7 +73,7 @@ Current inspectable surfaces live in Storybook under `Extension UI/*`:
 - Panel layout: `extension/src/ui/render.stories.ts`
 - Host target: `extension/src/ui/components/target-picker-view.stories.ts`
 - URL editor: `extension/src/ui/components/url-editor-view.stories.ts`
-- Parsed fields: `extension/src/ui/components/fields-view.stories.ts`
+- Field Editor: `extension/src/ui/components/fields-view.stories.ts`
 - Status and async cues: `extension/src/ui/components/status-view.stories.ts`
 - Recent history: `extension/src/ui/components/history-view.stories.ts`
 - Queue: `extension/src/ui/components/bookmarks-view.stories.ts`
