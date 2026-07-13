@@ -9,13 +9,14 @@ import { DATA_STORE_NAMES, IMAGE_TRAIL_DB_NAME, IMAGE_TRAIL_DB_VERSION } from '.
 
 test('defines a versioned IndexedDB schema with durable encrypted stores', () => {
   assert.equal(IMAGE_TRAIL_DB_NAME, 'image-trail');
-  assert.equal(IMAGE_TRAIL_DB_VERSION, 8);
+  assert.equal(IMAGE_TRAIL_DB_VERSION, 9);
   assert.deepEqual(DATA_STORE_NAMES, [
     'metadata',
     'keys',
     'history',
     'bookmarks',
     'blobs',
+    'originalBlobIndex',
     'downloads',
     'encryptedPins',
     'encryptedPinThumbnails',

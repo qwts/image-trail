@@ -6,6 +6,7 @@ export type DataStoreName =
   | 'history'
   | 'bookmarks'
   | 'blobs'
+  | 'originalBlobIndex'
   | 'downloads'
   | 'encryptedPins'
   | 'encryptedPinThumbnails'

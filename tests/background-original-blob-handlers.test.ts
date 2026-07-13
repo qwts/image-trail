@@ -19,6 +19,7 @@ import { createKeyReference } from '../extension/src/data/crypto/key-reference.j
 import { BlobsRepository } from '../extension/src/data/repositories/blobs-repository.js';
 import type { StoredBlobRecord } from '../extension/src/data/types.js';
 import { openFreshImageTrailDb } from './indexeddb-test-helpers.js';
+import { DataStore } from '../extension/src/data/schema.js';
 
 type AnyEntry = MessageDef<ExtensionRequest, ExtensionResponse>;
 
@@ -45,6 +46,13 @@ test('original check returns only missing ids without hydrating ciphertext', asy
   const db = await openFreshImageTrailDb();
   t.after(() => db.close());
   await new BlobsRepository(db).put(record('present-original'));
+  await new BlobsRepository(db).put({ ...record('present-thumbnail'), kind: 'thumbnail' });
+  const corruptWrite = db.transaction(DataStore.Blobs, 'readwrite');
+  corruptWrite.objectStore(DataStore.Blobs).put({ id: 'malformed-row', kind: 'not-a-kind', schemaVersion: 99 });
+  await new Promise<void>((resolve, reject) => {
+    corruptWrite.oncomplete = () => resolve();
+    corruptWrite.onerror = () => reject(corruptWrite.error);
+  });
   const registry = createOriginalBlobMessageRegistry({ getDb: async () => db });
   const originalGet = BlobsRepository.prototype.get;
   BlobsRepository.prototype.get = () => {
@@ -56,11 +64,14 @@ test('original check returns only missing ids without hydrating ciphertext', asy
 
   const result = await handleAndRespond<CheckOriginalBlobsResultMessage>(
     registry[MessageType.CheckOriginalBlobs],
-    createCheckOriginalBlobsMessage(['missing-a', 'present-original', 'missing-a', 'missing-b']),
+    createCheckOriginalBlobsMessage(['missing-a', 'present-original', 'present-thumbnail', 'malformed-row', 'missing-a', 'missing-b']),
   );
 
   assert.equal(result.type, MessageType.CheckOriginalBlobsResult);
-  assert.deepEqual(result.payload, { ok: true, missingBlobIds: ['missing-a', 'missing-b'] });
+  assert.deepEqual(result.payload, {
+    ok: true,
+    missingBlobIds: ['missing-a', 'present-thumbnail', 'malformed-row', 'missing-b'],
+  });
 });
 
 test('original check reports database and dispatch fallback failures', async () => {

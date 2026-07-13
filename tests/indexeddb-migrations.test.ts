@@ -13,6 +13,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
     asArray(db.objectStoreNames),
     [
       DataStore.Blobs,
+      DataStore.OriginalBlobIndex,
       DataStore.Bookmarks,
       DataStore.Downloads,
       DataStore.EncryptedPins,
@@ -32,6 +33,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
       DataStore.History,
       DataStore.Bookmarks,
       DataStore.Blobs,
+      DataStore.OriginalBlobIndex,
       DataStore.Downloads,
       DataStore.EncryptedPins,
       DataStore.EncryptedPinThumbnails,
@@ -44,6 +46,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   const history = transaction.objectStore(DataStore.History);
   const bookmarks = transaction.objectStore(DataStore.Bookmarks);
   const blobs = transaction.objectStore(DataStore.Blobs);
+  const originalBlobIndex = transaction.objectStore(DataStore.OriginalBlobIndex);
   const downloads = transaction.objectStore(DataStore.Downloads);
   const encryptedPins = transaction.objectStore(DataStore.EncryptedPins);
   const encryptedPinThumbnails = transaction.objectStore(DataStore.EncryptedPinThumbnails);
@@ -62,6 +65,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
     ].sort(),
   );
   assert.deepEqual(asArray(blobs.indexNames), [SchemaIndex.BlobsByCreatedAt, SchemaIndex.BlobsByKeyReference].sort());
+  assert.deepEqual(asArray(originalBlobIndex.indexNames), []);
   assert.deepEqual(asArray(downloads.indexNames), [SchemaIndex.DownloadsByDownloadedAt, SchemaIndex.DownloadsByKeyReference].sort());
   assert.deepEqual(
     asArray(encryptedPins.indexNames),
@@ -99,6 +103,46 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   });
   assert.equal((metadata as { databaseVersion: number }).databaseVersion, db.version);
   assert.match((metadata as { migratedAt: string }).migratedAt, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test('IndexedDB v9 migration indexes only schema-valid original blobs', async (t) => {
+  await deleteImageTrailDb();
+  const legacyDb = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(IMAGE_TRAIL_DB_NAME, 8);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(DataStore.Metadata, { keyPath: 'key' });
+      request.result.createObjectStore(DataStore.Blobs, { keyPath: 'id' });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  const write = legacyDb.transaction(DataStore.Blobs, 'readwrite');
+  write.objectStore(DataStore.Blobs).put({
+    id: 'valid-original',
+    kind: 'original',
+    schemaVersion: 1,
+    algorithm: 'AES-GCM',
+    iv: 'AAAAAAAAAAAAAAAA',
+    ciphertext: new ArrayBuffer(8),
+    encryptedByteLength: 8,
+    createdAt: '2026-07-13T00:00:00.000Z',
+    key: { kind: 'blob', uuid: 'key-1', reference: 'blob:key-1' },
+    referenceCount: 1,
+  });
+  write.objectStore(DataStore.Blobs).put({ id: 'thumbnail', kind: 'thumbnail', schemaVersion: 1 });
+  write.objectStore(DataStore.Blobs).put({ id: 'malformed-original', kind: 'original', schemaVersion: 1 });
+  await transactionDone(write);
+  legacyDb.close();
+
+  const opened = await openImageTrailDb();
+  assert.equal(opened.status.ok, true, opened.status.message);
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+
+  const read = opened.db.transaction(DataStore.OriginalBlobIndex, 'readonly');
+  const indexed = await requestToPromise<unknown[]>(read.objectStore(DataStore.OriginalBlobIndex).getAll());
+  await transactionDone(read);
+  assert.deepEqual(indexed, [{ id: 'valid-original' }]);
 });
 
 test('IndexedDB v4 migration preserves existing blob records', async (t) => {

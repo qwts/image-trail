@@ -33,7 +33,7 @@ export function createOriginalBlobMessageRegistry({
   async function handleCheckOriginalBlobs(message: CheckOriginalBlobsMessage): Promise<CheckOriginalBlobsResultMessage['payload']> {
     const db = await getDb();
     if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
-    return { ok: true, missingBlobIds: await new BlobsRepository(db).findMissingIds(message.payload.blobIds) };
+    return { ok: true, missingBlobIds: await new BlobsRepository(db).findMissingOriginalIds(message.payload.blobIds) };
   }
 
   async function handleExportOriginalBlobs(message: ExportOriginalBlobsMessage): Promise<ExportOriginalBlobsResultMessage['payload']> {

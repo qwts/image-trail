@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openImageTrailDb } from '../extension/src/data/db.js';
-import { IMAGE_TRAIL_DB_NAME } from '../extension/src/data/schema.js';
+import { DataStore, IMAGE_TRAIL_DB_NAME } from '../extension/src/data/schema.js';
 import { BlobsRepository } from '../extension/src/data/repositories/blobs-repository.js';
 import type { StoredBlobRecord } from '../extension/src/data/types.js';
 import { createKeyReference } from '../extension/src/data/crypto/key-reference.js';
@@ -71,20 +71,34 @@ test('BlobsRepository stores duplicate encrypted captures separately', async (t)
   assert.ok(await repo.get('blob-b'));
 });
 
-test('BlobsRepository finds missing ids without hydrating encrypted records', async (t) => {
+test('BlobsRepository finds missing original ids without hydrating encrypted records', async (t) => {
   const db = await openFreshDb();
   t.after(() => db.close());
   const repo = new BlobsRepository(db);
 
   await repo.put(makeBlobRecord({ id: 'present-original', ciphertext: new ArrayBuffer(1_000_000) }));
+  await repo.put(makeBlobRecord({ id: 'present-thumbnail', kind: 'thumbnail' }));
+  const corruptWrite = db.transaction(DataStore.Blobs, 'readwrite');
+  corruptWrite.objectStore(DataStore.Blobs).put({ id: 'malformed-row', kind: 'not-a-kind', schemaVersion: 99 });
+  await new Promise<void>((resolve, reject) => {
+    corruptWrite.oncomplete = () => resolve();
+    corruptWrite.onerror = () => reject(corruptWrite.error);
+  });
   repo.get = () => {
     throw new Error('existence checks must not hydrate blob records');
   };
 
-  const missing = await repo.findMissingIds(['missing-a', 'present-original', 'missing-a', 'missing-b']);
+  const missing = await repo.findMissingOriginalIds([
+    'missing-a',
+    'present-original',
+    'present-thumbnail',
+    'malformed-row',
+    'missing-a',
+    'missing-b',
+  ]);
 
-  assert.deepEqual(missing, ['missing-a', 'missing-b']);
-  assert.deepEqual(await repo.findMissingIds([]), []);
+  assert.deepEqual(missing, ['missing-a', 'present-thumbnail', 'malformed-row', 'missing-b']);
+  assert.deepEqual(await repo.findMissingOriginalIds([]), []);
 });
 
 test('BlobsRepository decrements reference count and deletes at zero', async (t) => {

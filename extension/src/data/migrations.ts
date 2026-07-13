@@ -1,5 +1,7 @@
+import * as v from 'valibot';
 import { DataStore, SchemaIndex, IMAGE_TRAIL_DB_VERSION } from './schema.js';
 import type { VersionMetadataRecord } from './types.js';
+import { storedBlobRecordSchema } from './types.schema.js';
 
 export function migrateImageTrailDb(db: IDBDatabase, oldVersion: number, transaction?: IDBTransaction): void {
   if (oldVersion < 1) {
@@ -139,6 +141,23 @@ export function migrateImageTrailDb(db: IDBDatabase, oldVersion: number, transac
     if (!memberships.indexNames.contains(SchemaIndex.AlbumMembershipsByAlbumRecord)) {
       memberships.createIndex(SchemaIndex.AlbumMembershipsByAlbumRecord, ['albumId', 'recordId'], { unique: true });
     }
+  }
+
+  if (oldVersion < 9) {
+    const originalBlobIndex = db.objectStoreNames.contains(DataStore.OriginalBlobIndex)
+      ? requireUpgradeTransaction(transaction).objectStore(DataStore.OriginalBlobIndex)
+      : db.createObjectStore(DataStore.OriginalBlobIndex, { keyPath: 'id' });
+    const blobs = requireUpgradeTransaction(transaction).objectStore(DataStore.Blobs);
+    const request = blobs.openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      const parsed = v.safeParse(storedBlobRecordSchema, cursor.value);
+      if (parsed.success && parsed.output.kind === 'original') {
+        originalBlobIndex.put({ id: parsed.output.id });
+      }
+      cursor.continue();
+    };
   }
 
   const metadata = transaction?.objectStore(DataStore.Metadata);

@@ -1,7 +1,7 @@
 import type { DataStoreName } from './types.js';
 
 export const IMAGE_TRAIL_DB_NAME = 'image-trail';
-export const IMAGE_TRAIL_DB_VERSION = 8;
+export const IMAGE_TRAIL_DB_VERSION = 9;
 
 export const DataStore = {
   Metadata: 'metadata',
@@ -9,6 +9,7 @@ export const DataStore = {
   History: 'history',
   Bookmarks: 'bookmarks',
   Blobs: 'blobs',
+  OriginalBlobIndex: 'originalBlobIndex',
   Downloads: 'downloads',
   EncryptedPins: 'encryptedPins',
   EncryptedPinThumbnails: 'encryptedPinThumbnails',

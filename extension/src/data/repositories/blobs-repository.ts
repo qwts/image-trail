@@ -1,3 +1,4 @@
+import * as v from 'valibot';
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore } from '../schema.js';
@@ -9,8 +10,12 @@ export class BlobsRepository {
   constructor(private readonly db: IDBDatabase) {}
 
   async put(record: StoredBlobRecord): Promise<StoredBlobRecord> {
-    const transaction = this.db.transaction(DataStore.Blobs, 'readwrite');
+    const transaction = this.db.transaction([DataStore.Blobs, DataStore.OriginalBlobIndex], 'readwrite');
     transaction.objectStore(DataStore.Blobs).put(record);
+    const originalBlobIndex = transaction.objectStore(DataStore.OriginalBlobIndex);
+    const parsed = v.safeParse(storedBlobRecordSchema, record);
+    if (parsed.success && parsed.output.kind === 'original') originalBlobIndex.put({ id: parsed.output.id });
+    else originalBlobIndex.delete(record.id);
     await transactionDone(transaction);
     return record;
   }
@@ -22,12 +27,12 @@ export class BlobsRepository {
     return hydrateRecord(DataStore.Blobs, storedBlobRecordSchema, result);
   }
 
-  async findMissingIds(ids: readonly string[]): Promise<readonly string[]> {
+  async findMissingOriginalIds(ids: readonly string[]): Promise<readonly string[]> {
     const uniqueIds = [...new Set(ids)];
     if (uniqueIds.length === 0) return [];
 
-    const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
-    const store = transaction.objectStore(DataStore.Blobs);
+    const transaction = this.db.transaction(DataStore.OriginalBlobIndex, 'readonly');
+    const store = transaction.objectStore(DataStore.OriginalBlobIndex);
     const keys = await Promise.all(uniqueIds.map((id) => requestToPromise<IDBValidKey | undefined>(store.getKey(id))));
     await transactionDone(transaction);
     return uniqueIds.filter((_id, index) => keys[index] === undefined);
@@ -44,10 +49,11 @@ export class BlobsRepository {
     const existing = await this.get(id);
     if (!existing) return;
 
-    const transaction = this.db.transaction(DataStore.Blobs, 'readwrite');
+    const transaction = this.db.transaction([DataStore.Blobs, DataStore.OriginalBlobIndex], 'readwrite');
     const store = transaction.objectStore(DataStore.Blobs);
     if (existing.referenceCount <= 1) {
       store.delete(id);
+      transaction.objectStore(DataStore.OriginalBlobIndex).delete(id);
     } else {
       const updated: StoredBlobRecord = { ...existing, referenceCount: existing.referenceCount - 1 };
       store.put(updated);
@@ -58,10 +64,14 @@ export class BlobsRepository {
   async deleteMany(ids: readonly string[]): Promise<number> {
     if (ids.length === 0) return 0;
 
-    const transaction = this.db.transaction(DataStore.Blobs, 'readwrite');
+    const transaction = this.db.transaction([DataStore.Blobs, DataStore.OriginalBlobIndex], 'readwrite');
     const store = transaction.objectStore(DataStore.Blobs);
+    const originalBlobIndex = transaction.objectStore(DataStore.OriginalBlobIndex);
     const uniqueIds = [...new Set(ids)];
-    for (const id of uniqueIds) store.delete(id);
+    for (const id of uniqueIds) {
+      store.delete(id);
+      originalBlobIndex.delete(id);
+    }
     await transactionDone(transaction);
     return uniqueIds.length;
   }
