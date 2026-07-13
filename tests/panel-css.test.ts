@@ -52,7 +52,7 @@ test('Recents sparse-row modes opt into full and half viewport rows (#452)', () 
 });
 
 test('Recents non-compact sparse-row metadata anchors to the row top-left (#452)', () => {
-  const body = cssRule('.image-trail-panel-root .image-trail-panel__record-list:not(.is-sparse-compact) .image-trail-panel__history-label');
+  const body = cssRule('.image-trail-panel-root .image-trail-panel__record-list.has-top-left-metadata .image-trail-panel__history-label');
 
   assert.match(body, /grid-column:\s*1\s*\/\s*-1;/u);
   assert.match(body, /align-self:\s*start;/u);

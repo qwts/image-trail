@@ -34,6 +34,21 @@ export const Selected: Story = {
 
 export const PinnedAndCaptured: Story = {
   render: () => historyStory([pinnedRecentRecord, capturedRecord], []),
+  play: async ({ canvasElement }) => {
+    const label = canvasElement.querySelector<HTMLElement>('.image-trail-panel__history-label');
+    if (!label) throw new Error('expected a two-row Recent label to render');
+    await expect(getComputedStyle(label).alignSelf).toBe('start');
+  },
+};
+
+export const ThreeRowsCentered: Story = {
+  render: () => historyStory(recentFixtures.slice(0, 3), []),
+  play: async ({ canvasElement }) => {
+    const label = canvasElement.querySelector<HTMLElement>('.image-trail-panel__history-label');
+    if (!label) throw new Error('expected a three-row Recent label to render');
+    await expect(getComputedStyle(label).alignSelf).toBe('center');
+    await expect(getComputedStyle(label).paddingLeft).toBe('84px');
+  },
 };
 
 export const LockedPrivate: Story = {

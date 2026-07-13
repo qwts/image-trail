@@ -96,10 +96,10 @@ export function createHistoryView(
     deleteAll.addEventListener('click', () => dispatch({ name: 'history/delete-all' }));
     sectionActions.append(selectAll, deleteAll);
   }
-
   const list = document.createElement('ol');
   const sparseRowDisplayMode = options?.sparseRowDisplayMode ?? 'adaptive';
-  list.className = `image-trail-panel__record-list is-sparse-${sparseRowDisplayMode} ${sparseCountClass(displayItems.length)}`;
+  const topLeftMetadata = sparseRowDisplayMode !== 'compact' && (sparseRowDisplayMode !== 'adaptive' || displayItems.length <= 2);
+  list.className = `image-trail-panel__record-list is-sparse-${sparseRowDisplayMode} ${sparseCountClass(displayItems.length)}${topLeftMetadata ? ' has-top-left-metadata' : ''}`;
   list.dataset['sparseRowMode'] = sparseRowDisplayMode;
   if (options?.listBlockSize !== null && options?.listBlockSize !== undefined) {
     list.classList.add('is-user-resized');
