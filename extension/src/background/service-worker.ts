@@ -701,7 +701,7 @@ async function handleGrantPermissionAndCapture(
 
   const granted = await requestOriginPermission(origin);
   if (!granted) {
-    return { status: 'failed', reason: 'permission-needed', message: 'Permission was not granted.' };
+    return { status: 'failed', reason: 'permission-needed', message: `Permission was not granted for ${origin}.`, origin };
   }
 
   return handleCaptureImage(createCaptureImageMessage(url, sourceType, sourceRecordId));

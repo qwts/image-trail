@@ -7,7 +7,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-type StatusAction = { readonly name: 'capture/clear' };
+type StatusAction = { readonly name: 'capture/clear' | 'capture/permission-retry' };
 
 export function createStatusView(state: PanelState, dispatch: (action: StatusAction) => void, existing?: HTMLElement | null): HTMLElement {
   const wrapper = existing ?? document.createElement('section');
@@ -38,6 +38,14 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
     error.className = 'image-trail-panel__capture-error';
     error.setAttribute('role', 'alert');
     error.textContent = state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
+    if (state.captureResult.reason === 'permission-needed' && state.captureRetryRequest) {
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'image-trail-panel__primary-action';
+      retry.textContent = 'Grant permission and retry';
+      retry.addEventListener('click', () => dispatch({ name: 'capture/permission-retry' }));
+      error.append(document.createTextNode(' '), retry);
+    }
     const dismiss = document.createElement('button');
     dismiss.type = 'button';
     dismiss.textContent = 'Dismiss';

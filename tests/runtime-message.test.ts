@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createSaveBookmarkResultMessage } from '../extension/src/background/messages.js';
+import { createCaptureResultMessage, createSaveBookmarkResultMessage } from '../extension/src/background/messages.js';
+import { CaptureController } from '../extension/src/content/capture-controller.js';
 import { ExtensionBookmarkStore } from '../extension/src/content/extension-bookmark-store.js';
 import {
   connectPCloudProvider,
@@ -86,6 +87,45 @@ test('sendRuntimeMessage rethrows unexpected runtime errors', async () => {
 
   try {
     await assert.rejects(() => sendRuntimeMessage({ type: 'imageTrail.cleanupOrphanedBlobs' }), /Background exploded/);
+  } finally {
+    globalThis.chrome = originalChrome;
+  }
+});
+
+test('CaptureController sends the retained source context for permission retry', async () => {
+  const originalChrome = globalThis.chrome;
+  const sent: unknown[] = [];
+  globalThis.chrome = {
+    runtime: {
+      id: 'test-extension',
+      sendMessage: async (message: unknown) => {
+        sent.push(message);
+        return createCaptureResultMessage({
+          status: 'failed',
+          reason: 'permission-needed',
+          message: 'Permission was not granted for https://cdn.example.test.',
+          origin: 'https://cdn.example.test',
+        });
+      },
+    },
+  } as unknown as typeof chrome;
+
+  try {
+    const result = await new CaptureController().requestPermissionAndRetry('https://cdn.example.test/image.jpg', 'bookmark', 'bookmark-1');
+    assert.deepEqual(sent, [
+      {
+        type: 'imageTrail.grantPermissionAndCapture',
+        version: 1,
+        payload: {
+          url: 'https://cdn.example.test/image.jpg',
+          sourceType: 'bookmark',
+          sourceRecordId: 'bookmark-1',
+        },
+      },
+    ]);
+    if (result.status === 'captured') assert.fail('permission denial must remain a failed capture');
+    assert.equal(result.reason, 'permission-needed');
+    assert.equal(result.origin, 'https://cdn.example.test');
   } finally {
     globalThis.chrome = originalChrome;
   }

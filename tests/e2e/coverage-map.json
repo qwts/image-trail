@@ -571,11 +571,25 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "path": "tests/image-request-manager.test.ts"
+          "paths": [
+            "tests/image-request-manager.test.ts",
+            "tests/runtime-history-bookmarks.test.ts",
+            "tests/action-dispatch.test.ts",
+            "tests/captured-originals-controller.test.ts",
+            "tests/permissions.test.ts",
+            "tests/runtime-message.test.ts",
+            "tests/dom/status-view.test.ts"
+          ],
+          "notes": "Covers #62 retry-context lifecycle, permission CTA routing, immediate permission-request handoff, grant success through the normal capture completion path, denial retention, dismissal, and non-permission failures."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/status-view.stories.ts",
+          "notes": "CapturePermissionError exposes the origin-specific Grant permission and retry action."
         },
         {
           "type": "manual",
-          "reason": "Browser permission prompts remain manual until the permission UI is stable enough for deterministic automation."
+          "reason": "The current broad host_permissions make a missing-origin prompt unreachable; execute the live grant/deny flow with #57 when permissions are narrowed."
         },
         {
           "type": "deferred",

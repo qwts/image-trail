@@ -38,6 +38,10 @@ export const CapturePermissionError: Story = {
         message: '',
         origin: 'https://cdn.example.test',
       },
+      captureRetryRequest: {
+        url: 'https://cdn.example.test/gallery/current.jpg',
+        sourceType: 'target',
+      },
     }),
 };
 
@@ -52,6 +56,11 @@ export const PrivacyMaskedErrorToast: Story = {
         reason: 'permission-needed',
         message: '',
         origin: 'https://private.example.test',
+      },
+      captureRetryRequest: {
+        url: 'https://private.example.test/originals/private-image.jpg',
+        sourceType: 'bookmark',
+        sourceRecordId: 'bookmark-private',
       },
     }),
 };
@@ -264,6 +273,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     hasNewerBookmarks: false,
     captureInProgress: false,
     captureResult: null,
+    captureRetryRequest: null,
     storageUsage: null,
     blobKeyUnlocked: true,
     blobKeyAvailable: true,
