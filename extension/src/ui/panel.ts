@@ -164,7 +164,7 @@ export class ImageTrailPanel {
     currentNavigationBaseRawUrl: () => this.currentNavigationBaseRawUrl(),
     currentNavigationBaseModel: () => this.currentNavigationBaseModel(),
     currentPageHref: () => window.location.href,
-    isNavigableQueryField: (field) => this.isNavigableQueryField(field),
+    isNavigableField: (field) => this.isNavigableField(field),
     currentFieldContextKeyParts: () => ({
       fieldSplitSpecs: this.state.fieldSplitSpecs,
       fieldDigitWidthSpecs: this.state.fieldDigitWidthSpecs,
@@ -349,7 +349,7 @@ export class ImageTrailPanel {
       this.applyFieldLoadResult(state, attemptedFieldIds, nextFingerprint, previousFingerprint),
     saveUrlReviewStatus: (status, sourceUrl, fieldIds, reason) =>
       this.urlReviewStatus.saveUrlReviewStatus(status, sourceUrl, fieldIds, reason),
-    isNavigableQueryField: (field) => this.isNavigableQueryField(field),
+    isNavigableField: (field) => this.isNavigableField(field),
     neighborPreloadRadius: () => this.localSettings.neighborPreloadRadius,
     governor: () => this.governor,
     bufferedNav: () => this.bufferedNav,
@@ -748,11 +748,11 @@ export class ImageTrailPanel {
   private isAutoUnlockableField(fieldId: string): boolean {
     const model = this.currentUrlModel();
     const field = collectUrlFields(model).find((candidate) => candidate.id === fieldId);
-    return field ? this.isNavigableQueryField(field) : false;
+    return field ? this.isNavigableField(field) : false;
   }
 
-  private isNavigableQueryField(field: UrlField): boolean {
-    return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
+  private isNavigableField(field: UrlField): boolean {
+    return field.tokenKind === 'int' || field.tokenKind === 'hex';
   }
 
   private async tryReloadCurrent(): Promise<boolean> {

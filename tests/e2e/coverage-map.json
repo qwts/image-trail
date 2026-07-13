@@ -257,6 +257,7 @@
             "tests/panel-state-parsed-fields.test.ts",
             "tests/dom/controls-view.test.ts",
             "tests/dom/fields-view.test.ts",
+            "tests/dom/parsed-field-navigation-controller.test.ts",
             "tests/dom/field-value-commit-controller.test.ts",
             "tests/dom/fields-reset-controls.test.ts",
             "tests/dom/url-learning-settings-view.test.ts",

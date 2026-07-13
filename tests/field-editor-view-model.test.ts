@@ -46,6 +46,19 @@ const slugField: EditableField = {
   value: 'frame',
 };
 
+const fileNumberField: EditableField = {
+  field: {
+    id: 'path-file-number',
+    location: 'path',
+    label: 'file 1',
+    value: '0042',
+    tokenKind: 'int',
+    partIndex: 2,
+    tokenIndex: 1,
+  },
+  value: '0042',
+};
+
 function activeFields(editableFields: readonly EditableField[], activeUrl = 'https://example.test/frame?page=17'): ActiveUrlFields {
   const fields = editableFields.map((field) => field.field);
   return { activeUrl, fields, visibleFields: fields, editableFields, activeTemplate: null };
@@ -158,6 +171,12 @@ test('derives transform availability for numeric, text, split, inclusion, and re
   assert.deepEqual(text.availableTransforms, ['set-value', 'split-apply']);
   assert.equal(text.navigationEligible, false);
   assert.equal(text.canToggleNavigationInclusion, false);
+
+  const pathNumber = modelFor([fileNumberField], {
+    successfulFieldIds: [fileNumberField.field.id],
+  }).rows[0];
+  assert.equal(pathNumber?.navigationEligible, true);
+  assert.equal(pathNumber?.canToggleNavigationInclusion, true);
 });
 
 test('uses only visible rows and returns JSON-serializable production data in privacy mode', () => {

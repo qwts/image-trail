@@ -40,7 +40,7 @@ function createHarness(overrides: Partial<NeighborPreloadControllerDeps> = {}): 
     currentNavigationBaseRawUrl: () => BASE_URL,
     currentNavigationBaseModel: () => baseModel(),
     currentPageHref: () => 'https://example.test/gallery',
-    isNavigableQueryField: () => true,
+    isNavigableField: () => true,
     currentFieldContextKeyParts: () => ({ fieldSplitSpecs: [], fieldDigitWidthSpecs: [], selectedHandleId: null }),
     fetchThumbnail: async (url) => {
       fetchCalls.push(url);

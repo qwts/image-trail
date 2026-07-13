@@ -159,7 +159,7 @@ test('fieldDigitWidthInputDisplay shows auto when no natural width is available'
   assert.deepEqual(fieldDigitWidthInputDisplay(field, undefined, true), { value: '', placeholder: '' });
 });
 
-test('fieldReservesTrailControlSlot reserves space only for query step fields', () => {
+test('fieldReservesTrailControlSlot reserves space for numeric step fields', () => {
   assert.equal(
     fieldReservesTrailControlSlot({
       id: 'q:0:0',
@@ -194,7 +194,7 @@ test('fieldReservesTrailControlSlot reserves space only for query step fields', 
       partIndex: 0,
       tokenIndex: 0,
     }),
-    false,
+    true,
   );
   assert.equal(
     fieldReservesTrailControlSlot({

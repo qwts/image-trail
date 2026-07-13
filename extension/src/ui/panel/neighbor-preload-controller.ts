@@ -41,7 +41,7 @@ export interface NeighborPreloadControllerDeps {
   currentNavigationBaseRawUrl(): string;
   currentNavigationBaseModel(): ParsedUrlModel;
   currentPageHref(): string;
-  isNavigableQueryField(field: UrlField): boolean;
+  isNavigableField(field: UrlField): boolean;
   currentFieldContextKeyParts(): FieldContextKeyParts;
   fetchThumbnail(
     url: string,
@@ -228,7 +228,7 @@ export class NeighborPreloadController {
     } catch {
       return;
     }
-    const fields = fieldsById(collectUrlFields(model), attemptedFieldIds).filter((field) => this.deps.isNavigableQueryField(field));
+    const fields = fieldsById(collectUrlFields(model), attemptedFieldIds).filter((field) => this.deps.isNavigableField(field));
     const candidates = this.fillCandidates(model, fields, direction);
     if (candidates.length === 0) return;
     void this.runBatch(candidates, runId, attemptedFieldIds);

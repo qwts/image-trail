@@ -24,12 +24,12 @@ function baseModel(): ParsedUrlModel {
   return parseUrl(BASE_URL);
 }
 
-function navigableQueryField(field: UrlField): boolean {
-  return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
+function navigableNumericField(field: UrlField): boolean {
+  return field.tokenKind === 'int' || field.tokenKind === 'hex';
 }
 
 function intFieldId(): string {
-  const found = collectUrlFields(baseModel()).find(navigableQueryField);
+  const found = collectUrlFields(baseModel()).find(navigableNumericField);
   assert.ok(found, 'expected a navigable int query field in the base URL');
   return found.id;
 }
@@ -101,7 +101,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
     currentKnownImageFingerprint: () => null,
     applyFieldLoadResult: (input) => input,
     saveUrlReviewStatus: async () => {},
-    isNavigableQueryField: navigableQueryField,
+    isNavigableField: navigableNumericField,
     neighborPreloadRadius: () => options.neighborPreloadRadius ?? 3,
     governor: () => ({
       request: <T>(operation: () => T) => {
@@ -183,13 +183,30 @@ test('the candidate scan applies the nearest neighbor as a direction-tagged pars
   assert.ok(harness.log.includes('saveUrlTemplate'));
 });
 
+test('a saved numbered-filename field steps through the governed candidate scan', async () => {
+  const filenameUrl = 'https://example.test/gallery/photo_0042.jpg';
+  const harness = createHarness({ baseUrl: filenameUrl });
+  const filenameField = collectUrlFields(parseUrl(filenameUrl)).find(
+    (field) => field.location === 'path' && field.label.startsWith('file ') && navigableNumericField(field),
+  );
+  assert.ok(filenameField);
+  harness.patchState({ unlockedFieldIds: [filenameField.id] });
+
+  harness.controller.navigateBy(1);
+  await until(() => harness.applyCalls.length >= 1);
+
+  assert.equal(harness.applyCalls[0]?.url, 'https://example.test/gallery/photo_0043.jpg');
+  assert.deepEqual(harness.applyCalls[0]?.attemptedFieldIds, [filenameField.id]);
+  assert.deepEqual(harness.applyCalls[0]?.options, { preloadDirection: 1 });
+});
+
 test('one press steps every included field into a single combined URL (the image-trail walk)', async () => {
   // Two navigable int query fields, both included; success history on only one of them must not
   // shrink the step to that field (#263).
   const twoFieldUrl = 'https://example.test/gallery?album=3&image=10';
   const harness = createHarness({ baseUrl: twoFieldUrl });
   const fieldIds = collectUrlFields(parseUrl(twoFieldUrl))
-    .filter(navigableQueryField)
+    .filter(navigableNumericField)
     .map((f) => f.id);
   assert.equal(fieldIds.length, 2, 'expected two navigable int query fields');
   harness.patchState({ unlockedFieldIds: fieldIds, successfulFieldIds: [fieldIds[1]!] });

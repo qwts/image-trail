@@ -75,7 +75,7 @@ export interface FieldEditorViewModel {
 }
 
 export function fieldSupportsTrailNavigation(field: UrlField): boolean {
-  return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
+  return field.tokenKind === 'int' || field.tokenKind === 'hex';
 }
 
 export function createFieldEditorViewModel(state: PanelState, activeUrlFields: ActiveUrlFields): FieldEditorViewModel {

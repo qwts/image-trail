@@ -56,7 +56,7 @@ export interface ParsedFieldNavigationControllerDeps {
     previousFingerprint: string | null,
   ): PanelState;
   saveUrlReviewStatus(status: UrlReviewStatus, sourceUrl: string, fieldIds: readonly string[], reason?: string): Promise<void>;
-  isNavigableQueryField(field: UrlField): boolean;
+  isNavigableField(field: UrlField): boolean;
   // The user's neighbor-preload radius; raises the consecutive-miss short-circuit above its floor.
   neighborPreloadRadius(): number;
   // Collaborators are Pick-typed so test fakes compile despite the classes' private members.
@@ -414,6 +414,6 @@ export class ParsedFieldNavigationController {
   }
 
   private isUnlockedNavigableField(field: UrlField): boolean {
-    return this.deps.getState().unlockedFieldIds.includes(field.id) && this.deps.isNavigableQueryField(field);
+    return this.deps.getState().unlockedFieldIds.includes(field.id) && this.deps.isNavigableField(field);
   }
 }

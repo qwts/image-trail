@@ -23,12 +23,12 @@ function baseModel(): ParsedUrlModel {
   return parseUrl(BASE_URL);
 }
 
-function navigableQueryField(field: UrlField): boolean {
-  return field.location === 'query' && (field.tokenKind === 'int' || field.tokenKind === 'hex');
+function navigableNumericField(field: UrlField): boolean {
+  return field.tokenKind === 'int' || field.tokenKind === 'hex';
 }
 
 function intFieldId(): string {
-  const field = collectUrlFields(baseModel()).find(navigableQueryField);
+  const field = collectUrlFields(baseModel()).find(navigableNumericField);
   assert.ok(field, 'expected a navigable int query field in the base URL');
   return field.id;
 }
@@ -125,7 +125,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
     saveUrlReviewStatus: async (status, sourceUrl, fieldIds) => {
       log.push(`saveUrlReviewStatus:${status}:${sourceUrl}:${fieldIds.join(',')}`);
     },
-    isNavigableQueryField: navigableQueryField,
+    isNavigableField: navigableNumericField,
     neighborPreloadRadius: () => 3,
     governor: () => ({
       request: <T>(operation: () => T) =>
@@ -221,7 +221,7 @@ test('navigateBy hands every included field to the buffered step so one press wa
     bufferedStep: async () => 'loaded',
   });
   const fieldIds = collectUrlFields(parseUrl(twoFieldUrl))
-    .filter(navigableQueryField)
+    .filter(navigableNumericField)
     .map((f) => f.id);
   assert.equal(fieldIds.length, 2, 'expected two navigable int query fields');
   harness.patchState({ unlockedFieldIds: fieldIds, successfulFieldIds: [fieldIds[0]!] });
