@@ -500,7 +500,7 @@ export class ImageTrailPanel {
     void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore());
     void this.panelDataLoad.refreshStorageUsage();
     void this.recallExport.refreshBlobKeyStatus();
-    void this.recallExport.refreshPCloudProviderStatus({ render: false });
+    void this.recallExport.refreshPCloudProviderStatus();
 
     this.keyboard = new KeyboardRouter((action) => this.handleShortcutAction(action));
 

@@ -1,5 +1,4 @@
 import {
-  normalizePCloudApiHost,
   parsePCloudOAuthRedirect,
   type PCloudBackupDownloadInput,
   type PCloudBackupDownloadResult,
@@ -11,19 +10,15 @@ import {
   type PCloudProviderResult,
   type PCloudProviderStatus,
 } from '../core/cloud/pcloud-provider.js';
+import { appendBackupHistory, loadBackupHistory } from './backup-history-store.js';
+import {
+  clearPCloudConnectionRecord,
+  loadPCloudConnectionRecord,
+  pcloudStatusFromRecord,
+  savePCloudConnectionRecord,
+  type PCloudConnectionRecord,
+} from './pcloud-connection-store.js';
 
-interface PCloudConnectionRecord {
-  readonly schemaVersion: 1;
-  readonly provider: 'pcloud';
-  readonly accessToken: string;
-  readonly apiHost: PCloudApiHost;
-  readonly connectedAt: string;
-  readonly accountPremium?: boolean | undefined;
-  readonly quotaBytes?: number | undefined;
-  readonly usedQuotaBytes?: number | undefined;
-}
-
-const PCLOUD_CONNECTION_KEY = 'imageTrail.pcloudConnection';
 const PCLOUD_CLIENT_ID = '83ag1CIbJd7';
 const PCLOUD_AUTHORIZE_URL = 'https://my.pcloud.com/oauth2/authorize';
 const PCLOUD_DOWNLOAD_REFERRER = 'https://my.pcloud.com/';
@@ -36,25 +31,8 @@ const PCLOUD_LIST_RETRY_ATTEMPTS = 5;
 const PCLOUD_LIST_RETRY_BASE_MS = 500;
 let pcloudRequestHeaderRuleId = PCLOUD_REQUEST_HEADER_RULE_ID_BASE;
 
-function hasChromeStorage(): boolean {
-  return typeof chrome !== 'undefined' && !!chrome.storage?.local;
-}
-
 function hasChromeIdentity(): boolean {
   return typeof chrome !== 'undefined' && !!chrome.identity?.launchWebAuthFlow && !!chrome.identity?.getRedirectURL;
-}
-
-function pcloudStatusFromRecord(record: PCloudConnectionRecord | null, message?: string): PCloudProviderStatus {
-  if (!record) return { connected: false, message };
-  return {
-    connected: true,
-    apiHost: record.apiHost,
-    connectedAt: record.connectedAt,
-    accountPremium: record.accountPremium,
-    quotaBytes: record.quotaBytes,
-    usedQuotaBytes: record.usedQuotaBytes,
-    message,
-  };
 }
 
 function sanitizeError(error: unknown): string {
@@ -71,55 +49,8 @@ function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
-function booleanOrUndefined(value: unknown): boolean | undefined {
-  return typeof value === 'boolean' ? value : undefined;
-}
-
 function recordOrNull(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
-async function restrictStorageToTrustedContexts(): Promise<void> {
-  if (!hasChromeStorage()) throw new Error('Extension storage is unavailable.');
-  if (typeof chrome.storage.local.setAccessLevel !== 'function') throw new Error('Trusted extension storage is unavailable.');
-  await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
-}
-
-async function loadConnectionRecord(): Promise<PCloudConnectionRecord | null> {
-  if (!hasChromeStorage()) return null;
-  await restrictStorageToTrustedContexts();
-  const value = await chrome.storage.local.get(PCLOUD_CONNECTION_KEY);
-  const candidate = recordOrNull(value[PCLOUD_CONNECTION_KEY]);
-  if (!candidate || candidate['schemaVersion'] !== 1 || candidate['provider'] !== 'pcloud') return null;
-  const accessToken = stringOrUndefined(candidate['accessToken']);
-  if (!accessToken) return null;
-  let apiHost: PCloudApiHost;
-  try {
-    apiHost = normalizePCloudApiHost(stringOrUndefined(candidate['apiHost']));
-  } catch {
-    return null;
-  }
-  return {
-    schemaVersion: 1,
-    provider: 'pcloud',
-    accessToken,
-    apiHost,
-    connectedAt: stringOrUndefined(candidate['connectedAt']) ?? new Date(0).toISOString(),
-    accountPremium: booleanOrUndefined(candidate['accountPremium']),
-    quotaBytes: numberOrUndefined(candidate['quotaBytes']),
-    usedQuotaBytes: numberOrUndefined(candidate['usedQuotaBytes']),
-  };
-}
-
-async function saveConnectionRecord(record: PCloudConnectionRecord): Promise<void> {
-  await restrictStorageToTrustedContexts();
-  await chrome.storage.local.set({ [PCLOUD_CONNECTION_KEY]: record });
-}
-
-async function clearConnectionRecord(): Promise<void> {
-  if (!hasChromeStorage()) return;
-  await restrictStorageToTrustedContexts();
-  await chrome.storage.local.remove(PCLOUD_CONNECTION_KEY);
 }
 
 function launchWebAuthFlow(url: string): Promise<string> {
@@ -203,7 +134,7 @@ async function loadValidatedStatus(record: PCloudConnectionRecord): Promise<PClo
     quotaBytes: numberOrUndefined(userInfo['quota']),
     usedQuotaBytes: numberOrUndefined(userInfo['usedquota']),
   };
-  await saveConnectionRecord(refreshed);
+  await savePCloudConnectionRecord(refreshed);
   return pcloudStatusFromRecord(refreshed, 'pCloud is connected.');
 }
 
@@ -479,12 +410,13 @@ async function failVerifiedUpload(
 }
 
 export async function loadPCloudProviderStatus(): Promise<PCloudProviderStatus> {
-  const record = await loadConnectionRecord();
-  if (!record) return { connected: false };
+  const backupHistory = await loadBackupHistory().catch(() => []);
+  const record = await loadPCloudConnectionRecord();
+  if (!record) return { connected: false, backupHistory };
   try {
-    return await loadValidatedStatus(record);
+    return { ...(await loadValidatedStatus(record)), backupHistory };
   } catch (error) {
-    return { ...pcloudStatusFromRecord(record), message: sanitizeError(error), messageIsError: true };
+    return { ...pcloudStatusFromRecord(record), backupHistory, message: sanitizeError(error), messageIsError: true };
   }
 }
 
@@ -511,7 +443,7 @@ export async function connectPCloudProvider(): Promise<PCloudProviderResult> {
       quotaBytes: numberOrUndefined(userInfo['quota']),
       usedQuotaBytes: numberOrUndefined(userInfo['usedquota']),
     };
-    await saveConnectionRecord(record);
+    await savePCloudConnectionRecord(record);
     const status = pcloudStatusFromRecord(record, 'pCloud is connected.');
     return { ok: true, status, message: 'pCloud is connected.' };
   } catch (error) {
@@ -521,7 +453,7 @@ export async function connectPCloudProvider(): Promise<PCloudProviderResult> {
 }
 
 export async function disconnectPCloudProvider(): Promise<PCloudProviderResult> {
-  await clearConnectionRecord();
+  await clearPCloudConnectionRecord();
   const status = { connected: false, message: 'pCloud disconnected.' };
   return { ok: true, status, message: status.message };
 }
@@ -532,7 +464,7 @@ export async function uploadPCloudBackup(input: PCloudBackupUploadInput): Promis
     return failedUploadResult(null, 'invalid-input', 'A backup file name and encrypted file content are required.');
   }
 
-  const record = await loadConnectionRecord();
+  const record = await loadPCloudConnectionRecord();
   if (!record) return failedUploadResult(null, 'not-connected', 'Connect pCloud before backing up.');
 
   try {
@@ -551,10 +483,27 @@ export async function uploadPCloudBackup(input: PCloudBackupUploadInput): Promis
     }
 
     const uploadedAt = new Date().toISOString();
-    const message =
+    const historyRecord = {
+      schemaVersion: 1,
+      provider: 'pcloud',
+      destination: PCLOUD_BACKUP_FOLDER_PATH,
+      fileName: uploaded.fileName,
+      completedAt: uploadedAt,
+      sizeBytes: uploaded.sizeBytes,
+      sha256,
+      verificationMethod: verificationMethod === 'download' ? 'download-byte-match' : 'provider-checksum',
+    } as const;
+    let historyPersisted = true;
+    try {
+      await appendBackupHistory(historyRecord);
+    } catch {
+      historyPersisted = false;
+    }
+    let message =
       verificationMethod === 'download'
         ? `Uploaded and verified ${uploaded.fileName}.`
         : `Uploaded and verified ${uploaded.fileName} with pCloud checksum.`;
+    if (!historyPersisted) message += ' Backup history could not be saved.';
     return {
       ok: true,
       status: pcloudStatusFromRecord(record, message),
@@ -565,6 +514,9 @@ export async function uploadPCloudBackup(input: PCloudBackupUploadInput): Promis
       sizeBytes: uploaded.sizeBytes,
       sha256,
       uploadedAt,
+      verificationMethod: historyRecord.verificationMethod,
+      historyRecord,
+      historyPersisted,
       message,
     };
   } catch (error) {
@@ -573,7 +525,7 @@ export async function uploadPCloudBackup(input: PCloudBackupUploadInput): Promis
 }
 
 export async function listPCloudBackups(): Promise<PCloudBackupListResult> {
-  const record = await loadConnectionRecord();
+  const record = await loadPCloudConnectionRecord();
   if (!record) return failedListResult(null, 'not-connected', 'Connect pCloud before choosing a restore file.');
 
   try {
@@ -614,7 +566,7 @@ export async function downloadPCloudBackup(input: PCloudBackupDownloadInput): Pr
     return failedDownloadResult(null, 'invalid-input', 'Choose a valid pCloud backup file before restoring.');
   }
 
-  const record = await loadConnectionRecord();
+  const record = await loadPCloudConnectionRecord();
   if (!record) return failedDownloadResult(null, 'not-connected', 'Connect pCloud before restoring.');
 
   try {

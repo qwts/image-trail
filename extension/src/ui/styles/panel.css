@@ -1,4 +1,5 @@
 @import './fields.css';
+@import './backup-history.css';
 
 .image-trail-panel-root.image-trail-panel {
   all: initial;
@@ -1507,14 +1508,6 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__cloud-provider-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
 }
 
 .image-trail-panel-root .image-trail-panel__cloud-provider-status {

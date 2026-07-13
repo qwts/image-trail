@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import { downloadPCloudBackup, listPCloudBackups, uploadPCloudBackup } from '../extension/src/background/pcloud-provider.js';
+import { BACKUP_HISTORY_STORAGE_KEY } from '../extension/src/background/backup-history-store.js';
 
 const CONNECTION_KEY = 'imageTrail.pcloudConnection';
 
@@ -47,23 +48,26 @@ function mockedFolderId(init: RequestInit | undefined): number {
   throw new Error(`Unexpected folder creation parent=${parentFolderId ?? ''} name=${name ?? ''}`);
 }
 
-function installPCloudConnection(options: { readonly dnrCalls?: unknown[] } = {}): () => void {
+function installPCloudConnection(options: { readonly dnrCalls?: unknown[]; readonly storage?: Record<string, unknown> } = {}): () => void {
   const originalChrome = globalThis.chrome;
+  const storage = options.storage ?? {};
+  storage[CONNECTION_KEY] = {
+    schemaVersion: 1,
+    provider: 'pcloud',
+    accessToken: 'token-secret',
+    apiHost: 'api.pcloud.com',
+    connectedAt: '2026-06-27T00:00:00.000Z',
+  };
   globalThis.chrome = {
     storage: {
       local: {
         setAccessLevel: async function (this: chrome.storage.StorageArea) {
           assert.equal(this, chrome.storage.local);
         },
-        get: async () => ({
-          [CONNECTION_KEY]: {
-            schemaVersion: 1,
-            provider: 'pcloud',
-            accessToken: 'token-secret',
-            apiHost: 'api.pcloud.com',
-            connectedAt: '2026-06-27T00:00:00.000Z',
-          },
-        }),
+        get: async () => ({ ...storage }),
+        set: async (items: Record<string, unknown>) => {
+          Object.assign(storage, items);
+        },
       },
     },
     declarativeNetRequest: options.dnrCalls
@@ -90,7 +94,8 @@ function installPCloudConnection(options: { readonly dnrCalls?: unknown[] } = {}
 }
 
 test('uploadPCloudBackup creates folders, uploads, retries listfolder, and verifies downloaded bytes', async () => {
-  const restoreChrome = installPCloudConnection();
+  const storage: Record<string, unknown> = {};
+  const restoreChrome = installPCloudConnection({ storage });
   const originalFetch = globalThis.fetch;
   const calls: FetchCall[] = [];
   let listAttempts = 0;
@@ -147,6 +152,9 @@ test('uploadPCloudBackup creates folders, uploads, retries listfolder, and verif
       assert.equal(result.apiHost, 'api.pcloud.com');
       assert.equal(result.sizeBytes, encryptedContent.length);
       assert.match(result.sha256, /^[a-f0-9]{64}$/u);
+      assert.equal(result.verificationMethod, 'download-byte-match');
+      assert.equal(result.historyPersisted, true);
+      assert.equal(result.historyRecord.destination, '/Image Trail/backups');
     }
     assert.equal(listAttempts, 2);
     assert.deepEqual(
@@ -154,6 +162,8 @@ test('uploadPCloudBackup creates folders, uploads, retries listfolder, and verif
       ['createfolderifnotexists', 'createfolderifnotexists', 'uploadfile', 'listfolder', 'listfolder', 'getfilelink'],
     );
     assert.equal(JSON.stringify(result).includes('token-secret'), false);
+    assert.equal(JSON.stringify(storage[BACKUP_HISTORY_STORAGE_KEY]).includes('token-secret'), false);
+    assert.equal(JSON.stringify(storage[BACKUP_HISTORY_STORAGE_KEY]).includes(encryptedContent), false);
   } finally {
     globalThis.fetch = originalFetch;
     restoreChrome();

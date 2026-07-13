@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/html-vite';
 
 import { createCloudBackupView, createImageTransferView, createImportExportView } from './import-export-view.js';
 import { mockDispatch, panelStory } from '../stories/story-host.js';
+import { VERIFIED_BACKUP_HISTORY } from '../stories/cloud-backup-fixtures.js';
 
 type ImportExportStoryState = Parameters<typeof createImportExportView>[0];
 type CloudBackupStoryState = Parameters<typeof createCloudBackupView>[0];
@@ -237,6 +238,7 @@ export const CloudBackupVerified: Story = {
       lastBackupAt: '2026-06-27 11:24 AM',
       lastBackupSize: '428 KB',
       lastBackupSha256: 'b6d9a5b7e33e4c0d8fbd8f9fd2a31e4282d9a89db3df91d7b0f8d2a5b0ec8d67',
+      backupHistory: VERIFIED_BACKUP_HISTORY,
       message: 'Last backup uploaded and verified byte-for-byte.',
     }),
 };

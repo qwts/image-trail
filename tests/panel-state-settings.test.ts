@@ -235,14 +235,19 @@ test('pCloud backup reducer tracks backing-up state and verified upload metadata
   const uploaded = reducePanelAction(backingUp, {
     name: 'pcloud-backup/upload-complete',
     apiHost: 'api.pcloud.com',
-    folderPath: '/Image Trail/backups',
-    fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
-    sizeBytes: 512,
-    sha256: 'b'.repeat(64),
     originalCount: 1,
     originalBytes: 96937,
     missingOriginalCount: 0,
-    uploadedAt: '2026-06-27T00:00:01.000Z',
+    historyRecord: {
+      schemaVersion: 1,
+      provider: 'pcloud',
+      destination: '/Image Trail/backups',
+      fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
+      completedAt: '2026-06-27T00:00:01.000Z',
+      sizeBytes: 512,
+      sha256: 'b'.repeat(64),
+      verificationMethod: 'download-byte-match',
+    },
     message: 'Uploaded and verified backup.',
   });
 
@@ -254,7 +259,34 @@ test('pCloud backup reducer tracks backing-up state and verified upload metadata
   assert.equal(uploaded.pcloudBackup.lastBackupOriginalCount, 1);
   assert.equal(uploaded.pcloudBackup.lastBackupOriginalBytes, 96937);
   assert.equal(uploaded.pcloudBackup.lastBackupMissingOriginalCount, 0);
+  assert.equal(uploaded.pcloudBackup.backupHistory?.[0]?.verificationMethod, 'download-byte-match');
   assert.equal(uploaded.pcloudBackup.messageIsError, false);
+});
+
+test('pCloud status hydrates persisted backup history while disconnected', () => {
+  const state = reducePanelAction(createInitialPanelState(), {
+    name: 'pcloud-backup/status',
+    status: {
+      connected: false,
+      backupHistory: [
+        {
+          schemaVersion: 1,
+          provider: 'pcloud',
+          destination: '/Image Trail/backups',
+          fileName: 'persisted.image-trail-encrypted.json',
+          completedAt: '2026-06-27T00:00:01.000Z',
+          sizeBytes: 768,
+          sha256: 'c'.repeat(64),
+          verificationMethod: 'provider-checksum',
+        },
+      ],
+    },
+  });
+
+  assert.equal(state.pcloudBackup.connectionState, 'disconnected');
+  assert.equal(state.pcloudBackup.lastBackupFileName, 'persisted.image-trail-encrypted.json');
+  assert.equal(state.pcloudBackup.lastBackupSizeBytes, 768);
+  assert.equal(state.pcloudBackup.backupHistory?.[0]?.sha256, 'c'.repeat(64));
 });
 
 test('pCloud full backup collects captured blob ids from durable records', () => {

@@ -65,6 +65,15 @@ export function createSettingsSection(
         : formatCloudBackupBytes(state.pcloudBackup.lastBackupOriginalBytes),
     lastBackupMissingOriginalCount: state.pcloudBackup.lastBackupMissingOriginalCount,
     lastBackupSha256: state.pcloudBackup.lastBackupSha256,
+    backupHistory: state.pcloudBackup.backupHistory?.map((record) => ({
+      provider: record.provider,
+      destination: record.destination,
+      fileName: record.fileName,
+      completedAt: record.completedAt,
+      size: formatCloudBackupBytes(record.sizeBytes),
+      sha256: record.sha256,
+      verificationMethod: record.verificationMethod,
+    })),
     restoreCandidates: state.pcloudBackup.restoreCandidates?.map((candidate) => ({
       fileId: candidate.fileId,
       fileName: candidate.fileName,

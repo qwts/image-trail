@@ -431,20 +431,27 @@ test('settings utilities persist through rerenders and pCloud remains a mocked m
 
     await page.getByLabel('Cloud backup password').fill(backupPassword);
     await page.getByRole('button', { name: 'Back up now' }).click();
-    await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText(
-      /Uploaded and verified .*\.image-trail-encrypted\.json/u,
-    );
-    await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText('/Image Trail/backups');
+    const cloudProvider = page.locator('.image-trail-panel__cloud-provider');
+    await expect(cloudProvider).toContainText(/Uploaded and verified .*\.image-trail-encrypted\.json/u);
+    await expect(cloudProvider).toContainText('/Image Trail/backups');
+    await expect(cloudProvider.getByRole('heading', { name: 'Backup history (1)' })).toBeVisible();
+    await expect(cloudProvider.locator('.image-trail-panel__backup-history-item')).toContainText('Image Trail SHA-256');
+    await expect(cloudProvider.locator('.image-trail-panel__backup-history-item')).toContainText('Downloaded bytes matched export');
 
     await page.getByRole('button', { name: 'Choose restore file' }).click();
     await expect(page.locator('.image-trail-panel__cloud-provider')).toContainText('Found 1 encrypted pCloud backup.');
     await page.getByLabel('Cloud backup password').fill(backupPassword);
     await page.locator('.image-trail-panel__cloud-restore-row').click();
-    const cloudProvider = page.locator('.image-trail-panel__cloud-provider');
     await expect(cloudProvider.locator('.image-trail-panel__restore-preview')).toContainText('Bookmarks');
     await cloudProvider.getByRole('button', { name: 'Cancel' }).click();
     await page.getByRole('button', { name: 'Disconnect' }).click();
     await expect(cloudProvider).toContainText('pCloud disconnected.');
+    await expect(cloudProvider.getByRole('heading', { name: 'Backup history (1)' })).toBeVisible();
+    await page.reload();
+    await openPanel(page, serviceWorker);
+    await showSettings(page);
+    await openPCloud(page);
+    await expect(page.getByRole('heading', { name: 'Backup history (1)' })).toBeVisible();
   } finally {
     await uninstallPCloudMock(serviceWorker);
   }

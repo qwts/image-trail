@@ -12,6 +12,7 @@ import type { UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from './url/types.js';
 import type { ObjectFitMode } from './preview-style.js';
 import type { QueueDisplayOrder, RecentDisplayOrder } from './display-order.js';
 import type { DetachableSectionId } from './workspace-layout.js';
+import type { PCloudBackupState } from './cloud/pcloud-provider.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
@@ -154,32 +155,6 @@ export interface RecallState {
   readonly hasMore: boolean;
   readonly total: number;
   readonly failedCount: number;
-  readonly message?: string | undefined;
-  readonly messageIsError?: boolean | undefined;
-}
-
-export type PCloudBackupConnectionState = 'disconnected' | 'connected' | 'busy' | 'error';
-
-export interface PCloudBackupState {
-  readonly connectionState: PCloudBackupConnectionState;
-  readonly apiHost?: string | undefined;
-  readonly connectedAt?: string | undefined;
-  readonly accountPremium?: boolean | undefined;
-  readonly quotaBytes?: number | undefined;
-  readonly usedQuotaBytes?: number | undefined;
-  readonly pendingOperation?: 'connecting' | 'disconnecting' | 'backing-up' | 'restoring' | undefined;
-  readonly lastBackupAt?: string | undefined;
-  readonly lastBackupFileName?: string | undefined;
-  readonly lastBackupSizeBytes?: number | undefined;
-  readonly lastBackupSha256?: string | undefined;
-  readonly lastBackupOriginalCount?: number | undefined;
-  readonly lastBackupOriginalBytes?: number | undefined;
-  readonly lastBackupMissingOriginalCount?: number | undefined;
-  readonly restoreCandidates?: readonly import('./cloud/pcloud-provider.js').PCloudBackupRestoreCandidate[] | undefined;
-  readonly lastRestoreFileName?: string | undefined;
-  readonly lastRestoreSizeBytes?: number | undefined;
-  readonly lastRestoreSha256?: string | undefined;
-  readonly lastRestoreDownloadedAt?: string | undefined;
   readonly message?: string | undefined;
   readonly messageIsError?: boolean | undefined;
 }
@@ -682,15 +657,11 @@ export type PanelAction =
   | { readonly name: 'pcloud-backup/message'; readonly message: string }
   | {
       readonly name: 'pcloud-backup/upload-complete';
-      readonly fileName: string;
-      readonly folderPath: string;
       readonly apiHost: string;
-      readonly sizeBytes: number;
-      readonly sha256: string;
       readonly originalCount?: number;
       readonly originalBytes?: number;
       readonly missingOriginalCount?: number;
-      readonly uploadedAt: string;
+      readonly historyRecord: import('./cloud/pcloud-provider.js').BackupHistoryRecord;
       readonly message: string;
     }
   | {

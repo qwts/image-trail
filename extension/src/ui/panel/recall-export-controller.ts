@@ -144,10 +144,10 @@ export class RecallExportController {
     this.deps.render();
   }
 
-  async refreshPCloudProviderStatus(options: { readonly render?: boolean } = {}): Promise<void> {
+  async refreshPCloudProviderStatus(): Promise<void> {
     const status = await this.deps.loadPCloudProviderStatus();
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'pcloud-backup/status', status }));
-    if (options.render !== false) this.deps.render();
+    this.deps.render();
   }
 
   async connectPCloudBackup(): Promise<void> {
@@ -292,15 +292,11 @@ export class RecallExportController {
     this.deps.setState(
       reducePanelAction(this.deps.getState(), {
         name: 'pcloud-backup/upload-complete',
-        fileName: upload.fileName,
-        folderPath: upload.folderPath,
         apiHost: upload.apiHost,
-        sizeBytes: upload.sizeBytes,
-        sha256: upload.sha256,
         originalCount: originalBlobRecords.length,
         originalBytes,
         missingOriginalCount: originalBlobResult.missingBlobIds.length,
-        uploadedAt: upload.uploadedAt,
+        historyRecord: upload.historyRecord,
         message: pcloudBackupUploadMessage(
           upload.message,
           originalBlobRecords.length,

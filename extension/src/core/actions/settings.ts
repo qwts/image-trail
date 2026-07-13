@@ -1,4 +1,5 @@
 import type { PanelState } from '../types.js';
+import { BACKUP_HISTORY_LIMIT } from '../cloud/pcloud-provider.js';
 import { assertNeverAction } from './routing.js';
 import type { PanelActionForDomain } from './routing.js';
 
@@ -142,7 +143,9 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
         status: 'ready',
         lastUpdatedAt: Date.now(),
       };
-    case 'pcloud-backup/status':
+    case 'pcloud-backup/status': {
+      const backupHistory = action.status.backupHistory ?? state.pcloudBackup.backupHistory;
+      const latestBackup = backupHistory?.[0];
       return {
         ...state,
         pcloudBackup: {
@@ -153,12 +156,18 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
           accountPremium: action.status.accountPremium,
           quotaBytes: action.status.quotaBytes,
           usedQuotaBytes: action.status.usedQuotaBytes,
+          backupHistory,
+          lastBackupAt: latestBackup?.completedAt ?? state.pcloudBackup.lastBackupAt,
+          lastBackupFileName: latestBackup?.fileName ?? state.pcloudBackup.lastBackupFileName,
+          lastBackupSizeBytes: latestBackup?.sizeBytes ?? state.pcloudBackup.lastBackupSizeBytes,
+          lastBackupSha256: latestBackup?.sha256 ?? state.pcloudBackup.lastBackupSha256,
           pendingOperation: undefined,
           message: action.status.message,
           messageIsError: action.status.messageIsError === true,
         },
         lastUpdatedAt: Date.now(),
       };
+    }
     case 'pcloud-backup/busy':
       return {
         ...state,
@@ -187,13 +196,19 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
           connectionState: 'connected',
           pendingOperation: undefined,
           apiHost: action.apiHost,
-          lastBackupAt: action.uploadedAt,
-          lastBackupFileName: action.fileName,
-          lastBackupSizeBytes: action.sizeBytes,
-          lastBackupSha256: action.sha256,
+          lastBackupAt: action.historyRecord.completedAt,
+          lastBackupFileName: action.historyRecord.fileName,
+          lastBackupSizeBytes: action.historyRecord.sizeBytes,
+          lastBackupSha256: action.historyRecord.sha256,
           lastBackupOriginalCount: action.originalCount,
           lastBackupOriginalBytes: action.originalBytes,
           lastBackupMissingOriginalCount: action.missingOriginalCount,
+          backupHistory: [
+            action.historyRecord,
+            ...(state.pcloudBackup.backupHistory ?? []).filter(
+              (record) => record.completedAt !== action.historyRecord.completedAt || record.sha256 !== action.historyRecord.sha256,
+            ),
+          ].slice(0, BACKUP_HISTORY_LIMIT),
           message: action.message,
           messageIsError: false,
         },

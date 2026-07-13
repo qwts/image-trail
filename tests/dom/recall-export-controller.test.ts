@@ -85,6 +85,8 @@ function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
     })) as RecallExportControllerDeps['disconnectPCloudProvider'],
     uploadPCloudBackup: (async (input: { readonly fileName: string; readonly fileContent: string }) => {
       uploads.push({ fileName: input.fileName, fileContent: input.fileContent });
+      const uploadedAt = '2026-06-20T00:00:00.000Z';
+      const sha256 = 'a'.repeat(64);
       return {
         ok: true,
         status: CONNECTED_STATUS,
@@ -93,8 +95,20 @@ function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
         folderPath: '/Image Trail',
         apiHost: 'api.pcloud.com',
         sizeBytes: input.fileContent.length,
-        sha256: 'a'.repeat(64),
-        uploadedAt: '2026-06-20T00:00:00.000Z',
+        sha256,
+        uploadedAt,
+        verificationMethod: 'download-byte-match',
+        historyRecord: {
+          schemaVersion: 1,
+          provider: 'pcloud',
+          destination: '/Image Trail/backups',
+          fileName: input.fileName,
+          completedAt: uploadedAt,
+          sizeBytes: input.fileContent.length,
+          sha256,
+          verificationMethod: 'download-byte-match',
+        },
+        historyPersisted: true,
         message: 'Uploaded encrypted backup to pCloud.',
       };
     }) as RecallExportControllerDeps['uploadPCloudBackup'],

@@ -506,8 +506,19 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/pcloud-upload-provider.test.ts", "tests/pcloud-permissions.test.ts"],
-          "notes": "Covers provider operations plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
+          "paths": [
+            "tests/backup-history-store.test.ts",
+            "tests/pcloud-upload-provider.test.ts",
+            "tests/pcloud-permissions.test.ts",
+            "tests/panel-state-settings.test.ts",
+            "tests/dom/settings-section.test.ts"
+          ],
+          "notes": "Covers provider operations, trusted and sanitized bounded backup-history persistence, disconnected-state hydration, verification-method rendering, plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/import-export-view.stories.ts",
+          "notes": "Covers multi-entry backup history with downloaded-byte and provider-checksum verification details in the live pCloud utility layout."
         },
         {
           "type": "manual",
@@ -516,7 +527,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/import-export-settings.spec.ts",
-          "notes": "Covers mocked pCloud connect, token-hiding UI boundary, manual encrypted backup upload metadata, restore candidate listing, restore preview, and disconnect without real pCloud secrets."
+          "notes": "Covers mocked pCloud connect, token-hiding UI boundary, manual encrypted backup upload metadata, persistent backup history across disconnect and Settings rerender, restore candidate listing, and restore preview without real pCloud secrets."
         }
       ]
     },

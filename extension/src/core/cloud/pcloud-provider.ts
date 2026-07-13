@@ -1,5 +1,46 @@
 export type PCloudApiHost = 'api.pcloud.com' | 'eapi.pcloud.com';
 
+export type BackupHistoryVerificationMethod = 'download-byte-match' | 'provider-checksum';
+export const BACKUP_HISTORY_LIMIT = 20;
+
+export interface BackupHistoryRecord {
+  readonly schemaVersion: 1;
+  readonly provider: 'pcloud';
+  readonly destination: string;
+  readonly fileName: string;
+  readonly completedAt: string;
+  readonly sizeBytes: number;
+  readonly sha256: string;
+  readonly verificationMethod: BackupHistoryVerificationMethod;
+}
+
+export type PCloudBackupConnectionState = 'disconnected' | 'connected' | 'busy' | 'error';
+
+export interface PCloudBackupState {
+  readonly connectionState: PCloudBackupConnectionState;
+  readonly apiHost?: string | undefined;
+  readonly connectedAt?: string | undefined;
+  readonly accountPremium?: boolean | undefined;
+  readonly quotaBytes?: number | undefined;
+  readonly usedQuotaBytes?: number | undefined;
+  readonly backupHistory?: readonly BackupHistoryRecord[] | undefined;
+  readonly pendingOperation?: 'connecting' | 'disconnecting' | 'backing-up' | 'restoring' | undefined;
+  readonly lastBackupAt?: string | undefined;
+  readonly lastBackupFileName?: string | undefined;
+  readonly lastBackupSizeBytes?: number | undefined;
+  readonly lastBackupSha256?: string | undefined;
+  readonly lastBackupOriginalCount?: number | undefined;
+  readonly lastBackupOriginalBytes?: number | undefined;
+  readonly lastBackupMissingOriginalCount?: number | undefined;
+  readonly restoreCandidates?: readonly PCloudBackupRestoreCandidate[] | undefined;
+  readonly lastRestoreFileName?: string | undefined;
+  readonly lastRestoreSizeBytes?: number | undefined;
+  readonly lastRestoreSha256?: string | undefined;
+  readonly lastRestoreDownloadedAt?: string | undefined;
+  readonly message?: string | undefined;
+  readonly messageIsError?: boolean | undefined;
+}
+
 export interface PCloudProviderStatus {
   readonly connected: boolean;
   readonly apiHost?: PCloudApiHost | undefined;
@@ -7,6 +48,7 @@ export interface PCloudProviderStatus {
   readonly accountPremium?: boolean | undefined;
   readonly quotaBytes?: number | undefined;
   readonly usedQuotaBytes?: number | undefined;
+  readonly backupHistory?: readonly BackupHistoryRecord[] | undefined;
   readonly message?: string | undefined;
   readonly messageIsError?: boolean | undefined;
 }
@@ -46,6 +88,9 @@ export type PCloudBackupUploadResult =
       readonly sizeBytes: number;
       readonly sha256: string;
       readonly uploadedAt: string;
+      readonly verificationMethod: BackupHistoryVerificationMethod;
+      readonly historyRecord: BackupHistoryRecord;
+      readonly historyPersisted: boolean;
       readonly message: string;
     }
   | {

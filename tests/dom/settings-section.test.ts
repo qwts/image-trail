@@ -39,6 +39,18 @@ test('createSettingsSection reflects populated backup, restore, and selection st
       lastBackupOriginalBytes: 1_500_000,
       lastBackupMissingOriginalCount: 0,
       lastBackupSha256: 'a'.repeat(64),
+      backupHistory: [
+        {
+          schemaVersion: 1,
+          provider: 'pcloud',
+          destination: '/Image Trail/backups',
+          fileName: 'image-trail-backup.json',
+          completedAt: '2026-06-25T15:31:00.000Z',
+          sizeBytes: 2048,
+          sha256: 'a'.repeat(64),
+          verificationMethod: 'download-byte-match',
+        },
+      ],
       restoreCandidates: [
         {
           fileId: 7,
@@ -60,5 +72,8 @@ test('createSettingsSection reflects populated backup, restore, and selection st
 
   assert.match(section.textContent ?? '', /2\.0 KB/u, 'backup sizes format through formatCloudBackupBytes');
   assert.match(section.textContent ?? '', /Backup complete\./u, 'the cloud backup message surfaces');
+  assert.match(section.textContent ?? '', /Backup history \(1\)/u, 'persisted backup history surfaces');
+  assert.match(section.textContent ?? '', /Image Trail SHA-256/u, 'history identifies the locally computed verification hash');
+  assert.match(section.textContent ?? '', /Downloaded bytes matched export/u, 'history explains the verification method');
   assert.match(section.textContent ?? '', /Exported 3 rows\./u, 'the import–export message surfaces');
 });

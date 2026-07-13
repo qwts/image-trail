@@ -1,6 +1,7 @@
 import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePreviewState } from '../../core/types.js';
 import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
+import { createBackupHistory, createCloudBackupMetadata, type CloudBackupHistoryViewRecord } from './cloud-backup-metadata.js';
 
 type UrlReviewStatusClearScope = 'hostname' | 'page' | 'source' | 'all';
 
@@ -55,6 +56,7 @@ export interface CloudBackupProviderState {
   readonly lastBackupOriginalCount?: number | undefined;
   readonly lastBackupOriginalBytes?: string | undefined;
   readonly lastBackupMissingOriginalCount?: number | undefined;
+  readonly backupHistory?: readonly CloudBackupHistoryViewRecord[] | undefined;
   readonly pendingOperation?: 'connecting' | 'disconnecting' | 'backing-up' | 'restoring' | undefined;
   readonly restoreCandidates?:
     | readonly {
@@ -175,8 +177,7 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
     group.append(message);
   }
 
-  const metadata = cloudBackupMetadata(state);
-  if (metadata.length > 0) group.append(createCloudBackupMetadata(metadata));
+  appendCloudBackupMetadata(group, state);
 
   if (state.restorePreview) {
     group.append(
@@ -824,18 +825,10 @@ function cloudBackupMetadata(state: CloudBackupProviderState): ReadonlyArray<rea
   return rows;
 }
 
-function createCloudBackupMetadata(rows: ReadonlyArray<readonly [string, string]>): HTMLElement {
-  const list = document.createElement('dl');
-  list.className = 'image-trail-panel__cloud-provider-metadata';
-  for (const [label, value] of rows) {
-    const term = document.createElement('dt');
-    term.textContent = label;
-    const detail = document.createElement('dd');
-    detail.textContent = value;
-    detail.title = value;
-    list.append(term, detail);
-  }
-  return list;
+function appendCloudBackupMetadata(group: HTMLElement, state: CloudBackupProviderState): void {
+  const metadata = cloudBackupMetadata(state);
+  if (metadata.length > 0) group.append(createCloudBackupMetadata(metadata));
+  if (state.backupHistory?.length) group.append(createBackupHistory(state.backupHistory));
 }
 
 function createToggle(text: string): { readonly label: HTMLLabelElement; readonly input: HTMLInputElement } {
