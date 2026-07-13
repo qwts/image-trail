@@ -30,7 +30,17 @@ type VersionPolicyModule = {
   };
 };
 
+type ReleasePackageModule = {
+  expectedReleaseTag(version: string): string;
+  validateReleaseTag(tag: string, version: string): string[];
+  validateArchiveEntries(entries: string[]): string[];
+  releaseArtifactNames(version: string): { archive: string; checksum: string };
+};
+
 const policy = (await import(pathToFileURL(join(process.cwd(), 'scripts/check-version-policy.mjs')).href)) as VersionPolicyModule;
+const releasePackage = (await import(
+  pathToFileURL(join(process.cwd(), 'scripts/package-extension-release.mjs')).href
+)) as ReleasePackageModule;
 
 function versionArtifacts(packageVersion = '0.1.0', manifestVersion = packageVersion) {
   return { packageVersion, manifestVersion, lockVersion: packageVersion, lockRootVersion: packageVersion };
@@ -191,6 +201,39 @@ test('required CI retains PR base history for consumed-changeset validation', ()
 
   assert.ok(ciJob.includes('uses: actions/checkout@v7'));
   assert.ok(ciJob.includes('fetch-depth: 0'));
+});
+
+test('release packaging requires an exact version tag and stable artifact names', () => {
+  assert.equal(releasePackage.expectedReleaseTag('1.2.3'), 'v1.2.3');
+  assert.deepEqual(releasePackage.validateReleaseTag('v1.2.3', '1.2.3'), []);
+  assert.match(releasePackage.validateReleaseTag('1.2.3', '1.2.3').join(' '), /exactly "v1\.2\.3"/u);
+  assert.match(releasePackage.validateReleaseTag('v1.2.3', '1.2.3-beta.1').join(' '), /stable three-component semver/u);
+  assert.deepEqual(releasePackage.releaseArtifactNames('1.2.3'), {
+    archive: 'image-trail-v1.2.3.zip',
+    checksum: 'image-trail-v1.2.3.zip.sha256',
+  });
+});
+
+test('release packaging enforces a Chrome Web Store-compatible archive root', () => {
+  assert.deepEqual(releasePackage.validateArchiveEntries(['build-info.json', 'manifest.json', 'src/content/content-script.js']), []);
+  assert.match(releasePackage.validateArchiveEntries(['extension/dist/manifest.json']).join(' '), /manifest\.json at its root/u);
+  assert.match(releasePackage.validateArchiveEntries(['manifest.json', '../secret', '.DS_Store']).join(' '), /safe relative.*forbidden/u);
+});
+
+test('release workflow validates, tags, and publishes assets without store publication', () => {
+  const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
+
+  assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(workflow, /tags:\s*\n\s*- 'v\*\.\*\.\*'/u);
+  assert.match(workflow, /run: npm run ci/u);
+  assert.match(workflow, /npm run package:release -- --tag/u);
+  assert.match(workflow, /Release tag must be stable three-component semver/u);
+  assert.match(workflow, /git merge-base --is-ancestor "\$GITHUB_SHA" origin\/main/u);
+  assert.match(workflow, /gh release create/u);
+  assert.match(workflow, /--prerelease/u);
+  assert.match(workflow, /gh release edit.*--prerelease/u);
+  assert.match(workflow, /gh release upload.*--clobber/u);
+  assert.doesNotMatch(workflow, /chrome-webstore-upload|webstore.*publish/iu);
 });
 
 test('version sync updates manifest and lockfile versions and refuses invalid Chrome versions', (t) => {

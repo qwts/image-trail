@@ -24,6 +24,7 @@
     "build:storybook": "storybook build",
     "build": "npm run clean && tsc -p tsconfig.json && node scripts/build-content-script.mjs && node scripts/build-service-worker.mjs && node scripts/build-gallery-page.mjs && node scripts/copy-extension-assets.mjs && node scripts/check-version-policy.mjs --artifacts-only --build-info",
     "build:release": "IMAGE_TRAIL_RELEASE_BUILD=1 npm run build && node scripts/check-version-policy.mjs --artifacts-only --build-info --require-build-mode=release",
+    "package:release": "npm run build:release && node scripts/package-extension-release.mjs",
     "test:compile": "rm -rf .test-dist && tsc -p tsconfig.test.json",
     "test:unit": "npm run test:compile && npm run test:unit:run",
     "test:unit:run": "node --test .test-dist/tests/*.test.js",

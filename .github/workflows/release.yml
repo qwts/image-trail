@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Exact package version to release, without the v prefix'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+# Release creation is explicit: a matching version tag push or a manual dispatch from main.
+# This workflow packages and publishes GitHub Release assets only. It does not merge version
+# PRs or submit to the Chrome Web Store.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Validate and cut release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main for manual releases
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Manual releases must be dispatched from main, got $GITHUB_REF." >&2
+            exit 1
+          fi
+
+      - name: Resolve release tag
+        id: release
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            tag="v${DISPATCH_VERSION}"
+          else
+            tag="$GITHUB_REF_NAME"
+          fi
+          if [[ ! "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Release tag must be stable three-component semver with a v prefix, got $tag." >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout release source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Require tagged source to be on main
+        if: github.event_name == 'push'
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run required validation
+        run: npm run ci
+
+      - name: Build and package release
+        run: npm run package:release -- --tag "${{ steps.release.outputs.tag }}"
+
+      - name: Create version tag for a manual release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TAG_NAME: ${{ steps.release.outputs.tag }}
+        run: |
+          if git rev-parse --verify --quiet "refs/tags/$TAG_NAME"; then
+            test "$(git rev-list -n 1 "$TAG_NAME")" = "$GITHUB_SHA"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG_NAME" -m "Image Trail $TAG_NAME"
+            git push origin "$TAG_NAME"
+          fi
+
+      - name: Create or refresh GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.release.outputs.tag }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release edit "$TAG_NAME" --prerelease
+            gh release upload "$TAG_NAME" release/*.zip release/*.sha256 --clobber
+          else
+            gh release create "$TAG_NAME" release/*.zip release/*.sha256 \
+              --verify-tag \
+              --generate-notes \
+              --prerelease \
+              --title "Image Trail $TAG_NAME"
+          fi

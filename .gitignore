@@ -1,6 +1,7 @@
 node_modules/
 dist/
 storybook-static/
+release/
 .DS_Store
 .env
 .env.*
