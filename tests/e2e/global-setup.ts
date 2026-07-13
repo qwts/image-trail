@@ -13,6 +13,9 @@ export default function globalSetup(): void {
   execFileSync('npm', ['run', 'build'], { cwd: repoRoot, stdio: 'inherit', env: process.env });
   const manifestPath = path.join(repoRoot, 'extension/dist/manifest.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
-  manifest['host_permissions'] = ['http://127.0.0.1/*'];
+  // Production keeps both origins optional. The E2E build pre-grants only the
+  // local fixture and mocked pCloud hosts so headless Chromium never blocks on
+  // browser-chrome permission sheets that Playwright cannot operate.
+  manifest['host_permissions'] = ['http://127.0.0.1/*', 'https://*.pcloud.com/*'];
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
