@@ -279,10 +279,24 @@ export function reduceQueueRecentsAction(state: PanelState, action: QueueRecents
     case 'history/update-display-order':
       return { ...state, recentDisplayOrder: action.order, lastUpdatedAt: Date.now() };
     case 'capture/start':
-      return { ...state, captureInProgress: true, captureResult: null, lastUpdatedAt: Date.now() };
+      return {
+        ...state,
+        captureInProgress: true,
+        captureResult: null,
+        captureRetryRequest: action.request ?? null,
+        lastUpdatedAt: Date.now(),
+      };
     case 'capture/complete': {
       const now = new Date();
-      const updated = { ...state, captureInProgress: false, captureResult: action.result, lastUpdatedAt: now.getTime() };
+      const retryable =
+        (action.result.status === 'failed' || action.result.status === 'remote-only') && action.result.reason === 'permission-needed';
+      const updated = {
+        ...state,
+        captureInProgress: false,
+        captureResult: action.result,
+        captureRetryRequest: retryable ? state.captureRetryRequest : null,
+        lastUpdatedAt: now.getTime(),
+      };
       if (!isCapturedResult(action.result) || !action.sourceRecordId) return updated;
       const capturedAt = now.toISOString();
       return {
@@ -293,7 +307,7 @@ export function reduceQueueRecentsAction(state: PanelState, action: QueueRecents
       };
     }
     case 'capture/clear':
-      return { ...state, captureResult: null, lastUpdatedAt: Date.now() };
+      return { ...state, captureResult: null, captureRetryRequest: null, lastUpdatedAt: Date.now() };
     case 'capture/delete':
       return {
         ...state,

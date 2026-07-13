@@ -91,6 +91,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     hasNewerBookmarks: false,
     captureInProgress: false,
     captureResult: null,
+    captureRetryRequest: null,
     storageUsage: null,
     buildIdentity: null,
     blobKeyUnlocked: false,

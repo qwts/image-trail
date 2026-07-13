@@ -229,6 +229,7 @@ export interface PanelState {
   readonly hasNewerBookmarks: boolean;
   readonly captureInProgress: boolean;
   readonly captureResult: CaptureResult | null;
+  readonly captureRetryRequest: CaptureRetryRequest | null;
   readonly storageUsage: StorageUsageSummary | null;
   readonly buildIdentity: BuildIdentity | null;
   readonly blobKeyUnlocked: boolean;
@@ -261,6 +262,12 @@ export interface PanelState {
 }
 
 export type CaptureSourceType = 'target' | 'history' | 'bookmark';
+
+export interface CaptureRetryRequest {
+  readonly url: string;
+  readonly sourceType: CaptureSourceType;
+  readonly sourceRecordId?: string | undefined;
+}
 
 export interface ImportRestorePreviewState {
   readonly fileName: string;
@@ -654,7 +661,7 @@ export type PanelAction =
   | FieldTransformPanelAction
   | { readonly name: 'selected-url/apply'; readonly url: string }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: CaptureSourceType; readonly sourceRecordId?: string }
-  | { readonly name: 'capture/start' }
+  | { readonly name: 'capture/start'; readonly request?: CaptureRetryRequest | undefined }
   | { readonly name: 'capture/complete'; readonly result: CaptureResult; readonly sourceRecordId?: string | undefined }
   | { readonly name: 'capture/clear' }
   | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string }

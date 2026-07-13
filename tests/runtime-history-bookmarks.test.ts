@@ -346,15 +346,49 @@ test('capture/complete with failed result does not modify records', () => {
 });
 
 test('capture/clear dismisses the current capture result', () => {
-  let state = reducePanelAction(createInitialPanelState(0), { name: 'capture/start' });
+  let state = reducePanelAction(createInitialPanelState(0), {
+    name: 'capture/start',
+    request: { url: 'https://cdn.example.test/image.jpg', sourceType: 'target' },
+  });
+  state = reducePanelAction(state, {
+    name: 'capture/complete',
+    result: {
+      status: 'remote-only',
+      reason: 'permission-needed',
+      message: 'Permission needed.',
+      origin: 'https://cdn.example.test',
+    },
+  });
+  assert.ok(state.captureResult);
+  assert.deepEqual(state.captureRetryRequest, { url: 'https://cdn.example.test/image.jpg', sourceType: 'target' });
+
+  state = reducePanelAction(state, { name: 'capture/clear' });
+  assert.equal(state.captureResult, null);
+  assert.equal(state.captureRetryRequest, null);
+});
+
+test('capture retry context survives permission denial and clears for terminal results', () => {
+  const request = { url: 'https://cdn.example.test/image.jpg', sourceType: 'history' as const, sourceRecordId: 'recent-1' };
+  let state = reducePanelAction(createInitialPanelState(0), { name: 'capture/start', request });
+  state = reducePanelAction(state, {
+    name: 'capture/complete',
+    result: { status: 'failed', reason: 'permission-needed', message: 'Permission was not granted.' },
+  });
+  assert.deepEqual(state.captureRetryRequest, request);
+
+  state = reducePanelAction(state, { name: 'capture/start', request });
   state = reducePanelAction(state, {
     name: 'capture/complete',
     result: { status: 'failed', reason: 'network-error', message: 'Network down.' },
   });
-  assert.ok(state.captureResult);
+  assert.equal(state.captureRetryRequest, null);
 
-  state = reducePanelAction(state, { name: 'capture/clear' });
-  assert.equal(state.captureResult, null);
+  state = reducePanelAction(state, { name: 'capture/start', request });
+  state = reducePanelAction(state, {
+    name: 'capture/complete',
+    result: { status: 'captured', blobId: 'blob-1', mimeType: 'image/jpeg', byteLength: 1024 },
+  });
+  assert.equal(state.captureRetryRequest, null);
 });
 
 test('capture/delete clears capture status and blobId from matching records', () => {
