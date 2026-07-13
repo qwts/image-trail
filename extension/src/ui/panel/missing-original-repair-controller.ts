@@ -24,6 +24,11 @@ function uniqueIds(ids: readonly string[]): readonly string[] {
   return [...new Set(ids.filter(Boolean))];
 }
 
+function repairSummary(repairedCount: number, skippedCount: number): string {
+  const skipped = skippedCount > 0 ? ` Skipped ${skippedCount} row${skippedCount === 1 ? '' : 's'} without a usable source URL.` : '';
+  return `Repaired ${repairedCount} missing original${repairedCount === 1 ? '' : 's'} without changing queue order.${skipped}`;
+}
+
 export class MissingOriginalRepairController {
   private repairInProgress = false;
 
@@ -84,11 +89,7 @@ export class MissingOriginalRepairController {
         repairedCount += 1;
       }
       const skippedCount = missing.length - repairable.length;
-      const skipped = skippedCount > 0 ? ` Skipped ${skippedCount} row${skippedCount === 1 ? '' : 's'} without a usable source URL.` : '';
-      this.setMessage(
-        `Repaired ${repairedCount} missing original${repairedCount === 1 ? '' : 's'} without changing queue order.${skipped}`,
-        'ready',
-      );
+      this.setMessage(repairSummary(repairedCount, skippedCount), 'ready');
     } finally {
       this.repairInProgress = false;
     }
