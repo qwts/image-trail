@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createCaptureResultMessage, createSaveBookmarkResultMessage } from '../extension/src/background/messages.js';
+import {
+  createCaptureResultMessage,
+  createCheckOriginalBlobsResultMessage,
+  createSaveBookmarkResultMessage,
+} from '../extension/src/background/messages.js';
 import { CaptureController } from '../extension/src/content/capture-controller.js';
 import { ExtensionBookmarkStore } from '../extension/src/content/extension-bookmark-store.js';
 import {
@@ -126,6 +130,34 @@ test('CaptureController sends the retained source context for permission retry',
     if (result.status === 'captured') assert.fail('permission denial must remain a failed capture');
     assert.equal(result.reason, 'permission-needed');
     assert.equal(result.origin, 'https://cdn.example.test');
+  } finally {
+    globalThis.chrome = originalChrome;
+  }
+});
+
+test('CaptureController requests missing original ids without exporting encrypted records', async () => {
+  const originalChrome = globalThis.chrome;
+  const sent: unknown[] = [];
+  globalThis.chrome = {
+    runtime: {
+      id: 'test-extension',
+      sendMessage: async (message: unknown) => {
+        sent.push(message);
+        return createCheckOriginalBlobsResultMessage({ ok: true, missingBlobIds: ['blob-missing'] });
+      },
+    },
+  } as unknown as typeof chrome;
+
+  try {
+    const result = await new CaptureController().requestMissingOriginalBlobIds(['blob-present', 'blob-missing']);
+    assert.deepEqual(result, { ok: true, missingBlobIds: ['blob-missing'] });
+    assert.deepEqual(sent, [
+      {
+        type: 'imageTrail.checkOriginalBlobs',
+        version: 1,
+        payload: { blobIds: ['blob-present', 'blob-missing'] },
+      },
+    ]);
   } finally {
     globalThis.chrome = originalChrome;
   }

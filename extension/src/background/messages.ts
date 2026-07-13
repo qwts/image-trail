@@ -20,10 +20,12 @@ import type {
   SaveWorkspaceLayoutMessage,
   SaveWorkspaceLayoutResultMessage,
 } from './layout-messages.js';
+import type { OriginalBlobRequest, OriginalBlobResponse } from './original-blob-messages.js';
 
 export { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
 export * from './album-messages.js';
 export * from './layout-messages.js';
+export * from './original-blob-messages.js';
 
 const deleteBlobResultPayloadSchema = v.object({
   deleted: v.boolean(),
@@ -202,37 +204,6 @@ export interface RetrieveBlobResultMessage {
         readonly capturedAt: string;
       }
     | { readonly ok: false; readonly reason: string; readonly message: string };
-}
-
-export interface ExportOriginalBlobsMessage {
-  readonly type: typeof MessageType.ExportOriginalBlobs;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly blobIds: readonly string[] };
-}
-
-export interface ExportOriginalBlobsResultMessage {
-  readonly type: typeof MessageType.ExportOriginalBlobsResult;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload:
-    | {
-        readonly ok: true;
-        readonly records: readonly import('../data/import-export/full-backup.js').PortableStoredBlobRecord[];
-        readonly missingBlobIds: readonly string[];
-      }
-    | { readonly ok: false; readonly reason: string; readonly message: string };
-}
-
-export interface ImportOriginalBlobsMessage {
-  readonly type: typeof MessageType.ImportOriginalBlobs;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly records: readonly import('../data/import-export/full-backup.js').PortableStoredBlobRecord[] };
-}
-
-export interface ImportOriginalBlobsResultMessage {
-  readonly type: typeof MessageType.ImportOriginalBlobsResult;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload:
-    { readonly ok: true; readonly importedCount: number } | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 
 export interface CreateBlobPreviewMessage {
@@ -918,8 +889,7 @@ export type ExtensionRequest =
   | DeleteBlobMessage
   | CleanupOrphanedBlobsMessage
   | RetrieveBlobMessage
-  | ExportOriginalBlobsMessage
-  | ImportOriginalBlobsMessage
+  | OriginalBlobRequest
   | CreateBlobPreviewMessage
   | CreateDataUrlPreviewMessage
   | FetchThumbnailSourceMessage
@@ -987,8 +957,7 @@ export type ExtensionResponse =
   | DeleteBlobResultMessage
   | CleanupOrphanedBlobsResultMessage
   | RetrieveBlobResultMessage
-  | ExportOriginalBlobsResultMessage
-  | ImportOriginalBlobsResultMessage
+  | OriginalBlobResponse
   | CreateBlobPreviewResultMessage
   | FetchThumbnailSourceResultMessage
   | ProbeImageSourceResultMessage
@@ -1123,28 +1092,6 @@ export function createCleanupOrphanedBlobsMessage(): CleanupOrphanedBlobsMessage
 
 export function createRetrieveBlobMessage(blobId: string): RetrieveBlobMessage {
   return { type: MessageType.RetrieveBlob, version: MESSAGE_PROTOCOL_VERSION, payload: { blobId } };
-}
-
-export function createExportOriginalBlobsMessage(blobIds: readonly string[]): ExportOriginalBlobsMessage {
-  return { type: MessageType.ExportOriginalBlobs, version: MESSAGE_PROTOCOL_VERSION, payload: { blobIds } };
-}
-
-export function createExportOriginalBlobsResultMessage(
-  payload: ExportOriginalBlobsResultMessage['payload'],
-): ExportOriginalBlobsResultMessage {
-  return { type: MessageType.ExportOriginalBlobsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
-}
-
-export function createImportOriginalBlobsMessage(
-  records: readonly import('../data/import-export/full-backup.js').PortableStoredBlobRecord[],
-): ImportOriginalBlobsMessage {
-  return { type: MessageType.ImportOriginalBlobs, version: MESSAGE_PROTOCOL_VERSION, payload: { records } };
-}
-
-export function createImportOriginalBlobsResultMessage(
-  payload: ImportOriginalBlobsResultMessage['payload'],
-): ImportOriginalBlobsResultMessage {
-  return { type: MessageType.ImportOriginalBlobsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
 export function createCreateBlobPreviewMessage(blobId: string): CreateBlobPreviewMessage {
@@ -1653,16 +1600,6 @@ export function isBlobKeyStatusResultMessage(value: unknown): value is BlobKeySt
 export function isRetrieveBlobResultMessage(value: unknown): value is RetrieveBlobResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.RetrieveBlobResult;
-}
-
-export function isExportOriginalBlobsResultMessage(value: unknown): value is ExportOriginalBlobsResultMessage {
-  if (!hasVersionedObjectShape(value)) return false;
-  return value.type === MessageType.ExportOriginalBlobsResult;
-}
-
-export function isImportOriginalBlobsResultMessage(value: unknown): value is ImportOriginalBlobsResultMessage {
-  if (!hasVersionedObjectShape(value)) return false;
-  return value.type === MessageType.ImportOriginalBlobsResult;
 }
 
 export function isCleanupOrphanedBlobsResultMessage(value: unknown): value is CleanupOrphanedBlobsResultMessage {

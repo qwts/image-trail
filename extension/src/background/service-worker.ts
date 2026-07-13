@@ -12,11 +12,6 @@ import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, migrateLocalSettings } from
 import { getActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
 import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFileHeader } from '../data/import-export/encrypted-image.js';
-import {
-  portableStoredBlobRecord,
-  storedBlobRecordFromPortable,
-  type PortableStoredBlobRecord,
-} from '../data/import-export/full-backup.js';
 import { openImageTrailDb } from '../data/db.js';
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
 import { EncryptedPinsRepository } from '../data/repositories/encrypted-pins-repository.js';
@@ -49,8 +44,6 @@ import {
   createSaveUrlReviewStatusResultMessage,
   createSaveLocalSettingsResultMessage,
   createFetchBufferedImageSourceResultMessage,
-  createExportOriginalBlobsResultMessage,
-  createImportOriginalBlobsResultMessage,
   createPingMessage,
   createProbeImageSourceResultMessage,
   createRetrieveBlobResultMessage,
@@ -65,8 +58,6 @@ import type {
   DeleteBlobMessage,
   DownloadImageMessage,
   ExportEncryptedImageMessage,
-  ExportOriginalBlobsMessage,
-  ImportOriginalBlobsMessage,
   RetrieveBlobMessage,
   GrantPermissionAndCaptureMessage,
 } from './messages.js';
@@ -106,6 +97,7 @@ import { createPanelPositionMessageRegistry } from './handlers/panel-position-ha
 import { createRecentHistoryMessageRegistry } from './handlers/recent-history-handlers.js';
 import { createRecallMessageRegistry } from './handlers/recall-handlers.js';
 import { createBlobKeyMessageRegistry } from './handlers/blob-key-handlers.js';
+import { createOriginalBlobMessageRegistry } from './handlers/original-blob-handlers.js';
 import { createGalleryMessageRegistry } from './handlers/gallery-page-handler.js';
 import { createPCloudMessageRegistry } from './handlers/pcloud-handlers.js';
 import { createUrlTemplateMessageRegistry } from './handlers/url-template-handlers.js';
@@ -360,44 +352,6 @@ async function handleCleanupOrphanedBlobs(): Promise<import('./messages.js').Cle
   const deletedCount = await blobs.deleteMany(orphanedBlobIds);
 
   return { deletedCount, usage: await handleStorageUsage() };
-}
-
-async function handleExportOriginalBlobs(
-  message: ExportOriginalBlobsMessage,
-): Promise<import('./messages.js').ExportOriginalBlobsResultMessage['payload']> {
-  const db = await getDb();
-  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
-  const blobs = new BlobsRepository(db);
-  const records: PortableStoredBlobRecord[] = [];
-  const missingBlobIds: string[] = [];
-  for (const blobId of [...new Set(message.payload.blobIds)]) {
-    const record = await blobs.get(blobId);
-    if (record?.kind === 'original') {
-      records.push(portableStoredBlobRecord(record));
-    } else {
-      missingBlobIds.push(blobId);
-    }
-  }
-  return { ok: true, records, missingBlobIds };
-}
-
-async function handleImportOriginalBlobs(
-  message: ImportOriginalBlobsMessage,
-): Promise<import('./messages.js').ImportOriginalBlobsResultMessage['payload']> {
-  const db = await getDb();
-  if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
-  const blobs = new BlobsRepository(db);
-  let importedCount = 0;
-  try {
-    for (const record of message.payload.records) {
-      if (record.kind !== 'original') continue;
-      await blobs.put(storedBlobRecordFromPortable(record));
-      importedCount += 1;
-    }
-  } catch {
-    return { ok: false, reason: 'invalid-original', message: 'Encrypted original backup payload was invalid.' };
-  }
-  return { ok: true, importedCount };
 }
 
 async function handleRetrieveBlob(message: RetrieveBlobMessage): Promise<import('./messages.js').RetrieveBlobResultMessage['payload']> {
@@ -994,18 +948,7 @@ const messageRegistry = {
     respond: (result) => createRetrieveBlobResultMessage(result),
     fallback: () => createRetrieveBlobResultMessage({ ok: false, reason: 'unknown', message: 'Blob retrieval failed.' }),
   }),
-  [MessageType.ExportOriginalBlobs]: defineMessage({
-    requestSchema: requestSchemas.exportOriginalBlobsRequestSchema,
-    handle: (message: ExportOriginalBlobsMessage) => handleExportOriginalBlobs(message),
-    respond: (result) => createExportOriginalBlobsResultMessage(result),
-    fallback: () => createExportOriginalBlobsResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted originals export failed.' }),
-  }),
-  [MessageType.ImportOriginalBlobs]: defineMessage({
-    requestSchema: requestSchemas.importOriginalBlobsRequestSchema,
-    handle: (message: ImportOriginalBlobsMessage) => handleImportOriginalBlobs(message),
-    respond: (result) => createImportOriginalBlobsResultMessage(result),
-    fallback: () => createImportOriginalBlobsResultMessage({ ok: false, reason: 'unknown', message: 'Encrypted originals import failed.' }),
-  }),
+  ...createOriginalBlobMessageRegistry(context),
   [MessageType.CreateBlobPreview]: defineMessage({
     requestSchema: requestSchemas.createBlobPreviewRequestSchema,
     handle: (message: CreateBlobPreviewMessage) => handleCreateBlobPreview(message),

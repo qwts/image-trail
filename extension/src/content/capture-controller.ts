@@ -1,6 +1,7 @@
 import type { CaptureResult, StorageUsageSummary } from '../core/image/capture-result.js';
 import {
   createCaptureImageMessage,
+  createCheckOriginalBlobsMessage,
   createCleanupOrphanedBlobsMessage,
   createCreateDataUrlPreviewMessage,
   createCreateBlobPreviewMessage,
@@ -19,6 +20,7 @@ import {
   isBlobKeyStatusResultMessage,
   isBlobKeyResultMessage,
   isCaptureResultMessage,
+  isCheckOriginalBlobsResultMessage,
   isCleanupOrphanedBlobsResultMessage,
   isCreateBlobPreviewResultMessage,
   isDeleteBlobResultMessage,
@@ -33,6 +35,7 @@ import type { CaptureSourceType } from '../background/messages.js';
 import type {
   BlobKeyResultMessage,
   BlobKeyStatusResultMessage,
+  CheckOriginalBlobsResultMessage,
   CreateBlobPreviewResultMessage,
   ExportBlobKeyBackupResultMessage,
   ImportBlobKeyBackupResultMessage,
@@ -45,6 +48,7 @@ export interface CaptureStore {
   readonly requestDeleteBlob: (blobId: string) => Promise<{ deleted: boolean; usage: StorageUsageSummary }>;
   readonly requestCleanupOrphanedBlobs: () => Promise<{ deletedCount: number; usage: StorageUsageSummary }>;
   readonly requestRetrieveBlob: (blobId: string) => Promise<RetrieveBlobResultMessage['payload']>;
+  readonly requestMissingOriginalBlobIds: (blobIds: readonly string[]) => Promise<CheckOriginalBlobsResultMessage['payload']>;
   readonly requestOriginalBlobRecords: (
     blobIds: readonly string[],
   ) => Promise<import('../background/messages.js').ExportOriginalBlobsResultMessage['payload']>;
@@ -97,6 +101,12 @@ export class CaptureController implements CaptureStore {
   async requestRetrieveBlob(blobId: string): Promise<RetrieveBlobResultMessage['payload']> {
     const response = await sendRuntimeMessage(createRetrieveBlobMessage(blobId));
     if (isRetrieveBlobResultMessage(response)) return response.payload;
+    return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
+  }
+
+  async requestMissingOriginalBlobIds(blobIds: readonly string[]): Promise<CheckOriginalBlobsResultMessage['payload']> {
+    const response = await sendRuntimeMessage(createCheckOriginalBlobsMessage(blobIds));
+    if (isCheckOriginalBlobsResultMessage(response)) return response.payload;
     return { ok: false, reason: 'unknown', message: 'Invalid response from background.' };
   }
 

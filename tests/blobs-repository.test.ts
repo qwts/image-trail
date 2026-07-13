@@ -71,6 +71,22 @@ test('BlobsRepository stores duplicate encrypted captures separately', async (t)
   assert.ok(await repo.get('blob-b'));
 });
 
+test('BlobsRepository finds missing ids without hydrating encrypted records', async (t) => {
+  const db = await openFreshDb();
+  t.after(() => db.close());
+  const repo = new BlobsRepository(db);
+
+  await repo.put(makeBlobRecord({ id: 'present-original', ciphertext: new ArrayBuffer(1_000_000) }));
+  repo.get = () => {
+    throw new Error('existence checks must not hydrate blob records');
+  };
+
+  const missing = await repo.findMissingIds(['missing-a', 'present-original', 'missing-a', 'missing-b']);
+
+  assert.deepEqual(missing, ['missing-a', 'missing-b']);
+  assert.deepEqual(await repo.findMissingIds([]), []);
+});
+
 test('BlobsRepository decrements reference count and deletes at zero', async (t) => {
   const db = await openFreshDb();
   t.after(() => db.close());

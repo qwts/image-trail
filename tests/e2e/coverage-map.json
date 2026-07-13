@@ -428,11 +428,13 @@
           "paths": [
             "tests/indexeddb-protected-pins.test.ts",
             "tests/encrypted-blobs.test.ts",
+            "tests/blobs-repository.test.ts",
+            "tests/background-original-blob-handlers.test.ts",
             "tests/captured-originals-controller.test.ts",
             "tests/missing-original-repair-controller.test.ts",
             "tests/dom/bookmarks-view.test.ts"
           ],
-          "notes": "Covers selected durable-pin repair: existing encrypted blob references are verified, missing or metadata-only originals are re-captured through the existing capture path, private rows without a source URL are rejected, permission-needed capture pauses the batch, and queue timestamps remain unchanged."
+          "notes": "Covers selected durable-pin repair: existing encrypted blob references are verified through key-only IndexedDB reads without hydrating encrypted bytes, missing or metadata-only originals are re-captured through the existing capture path, private rows without a source URL are rejected, permission-needed capture pauses the batch, and queue timestamps remain unchanged."
         },
         {
           "type": "playwright-e2e",

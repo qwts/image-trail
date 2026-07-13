@@ -162,6 +162,8 @@ export const deleteBlobRequestSchema = v.object({ blobId: v.string() });
 
 export const retrieveBlobRequestSchema = v.object({ blobId: v.string() });
 
+export const checkOriginalBlobsRequestSchema = v.object({ blobIds: stringArraySchema });
+
 export const exportOriginalBlobsRequestSchema = v.object({ blobIds: stringArraySchema });
 
 export const importOriginalBlobsRequestSchema = v.object({

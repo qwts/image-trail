@@ -22,6 +22,21 @@ export class BlobsRepository {
     return hydrateRecord(DataStore.Blobs, storedBlobRecordSchema, result);
   }
 
+  async findMissingIds(ids: readonly string[]): Promise<readonly string[]> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) return [];
+
+    const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
+    const store = transaction.objectStore(DataStore.Blobs);
+    const missing: string[] = [];
+    for (const id of uniqueIds) {
+      const key = await requestToPromise<IDBValidKey | undefined>(store.getKey(id));
+      if (key === undefined) missing.push(id);
+    }
+    await transactionDone(transaction);
+    return missing;
+  }
+
   async list(): Promise<readonly StoredBlobRecord[]> {
     const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
     const result = await requestToPromise<unknown[]>(transaction.objectStore(DataStore.Blobs).getAll());

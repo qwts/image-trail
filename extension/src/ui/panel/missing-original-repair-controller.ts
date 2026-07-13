@@ -53,7 +53,7 @@ export class MissingOriginalRepairController {
       }
 
       const referencedBlobIds = selected.map(originalBlobId).filter((blobId): blobId is string => !!blobId);
-      const verification = await captureStore.requestOriginalBlobRecords(referencedBlobIds);
+      const verification = await captureStore.requestMissingOriginalBlobIds(referencedBlobIds);
       if (!verification.ok) {
         this.setMessage(`Could not verify selected originals: ${verification.message}`, 'error');
         return;

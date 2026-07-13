@@ -37,11 +37,11 @@ function createHarness(options: {
   const log: string[] = [];
   const captureResults = [...(options.captureResults ?? [])];
   const captureStore = {
-    requestOriginalBlobRecords: async (blobIds: readonly string[]) => {
+    requestMissingOriginalBlobIds: async (blobIds: readonly string[]) => {
       log.push(`verify:${blobIds.join(',')}`);
       return options.verificationError
         ? ({ ok: false, reason: 'db-unavailable', message: options.verificationError } as const)
-        : ({ ok: true, records: [], missingBlobIds: options.missingBlobIds ?? [] } as const);
+        : ({ ok: true, missingBlobIds: options.missingBlobIds ?? [] } as const);
     },
   } as unknown as CaptureStore;
   const bookmarkStore = {
