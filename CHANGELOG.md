@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.2.4
+
+### Patch Changes
+
+- a2fae10: Verify repairable encrypted originals without loading their ciphertext into memory.
+
 ## 0.2.3
 
 ### Patch Changes
