@@ -410,7 +410,7 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [
   },
   {
     id: 'fields',
-    title: 'Parsed fields',
+    title: 'Field Editor',
     windowInlineSize: 380,
     create: (target, state) => createParsedFieldsSection(cachedFieldEditorViewModel(state), target),
   },

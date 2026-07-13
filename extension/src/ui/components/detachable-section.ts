@@ -127,7 +127,7 @@ export function attachSectionDragOut(sectionEl: HTMLElement, options: DragOutOpt
     const collapsibleHeaderOrigin =
       origin.closest('.image-trail-panel__section-header--collapsible') && !origin.closest('button, summary, details, input, select, a');
     if (!collapsibleHeaderOrigin && origin.closest(INTERACTIVE_DRAG_ORIGIN)) return;
-    // A CSS-resizable surface (Parsed fields' details is `resize: vertical`) owns its resize
+    // A CSS-resizable surface (Field Editor's details is `resize: vertical`) owns its resize
     // corner: pointerdowns targeting it must resize, not drag out.
     if (origin instanceof HTMLElement && isNativelyResizable(origin)) return;
     beginDragOut(event, sectionEl, {
@@ -178,7 +178,7 @@ export function createSectionDetachControl(
   detach.title = `Detach ${sectionTitle} into a floating window (drag to place)`;
   let suppressClick = false;
   detach.addEventListener('click', (event) => {
-    // The control may live inside a <details> summary (Host target, Parsed fields, Manual
+    // The control may live inside a <details> summary (Host target, Field Editor, Manual
     // controls) — activating it must not toggle the group.
     event.preventDefault();
     event.stopPropagation();

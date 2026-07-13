@@ -110,6 +110,12 @@ function buttonByLabel(view: HTMLElement, label: string): HTMLButtonElement {
   return button;
 }
 
+test('the section uses the Field Editor feature name', () => {
+  const view = buildFieldsView([]);
+
+  assert.equal(view.querySelector('h3')?.textContent, 'Field Editor');
+});
+
 test('a change event on the value input commits the new value', () => {
   const calls: CallbackCall[] = [];
   const view = buildFieldsView(calls);

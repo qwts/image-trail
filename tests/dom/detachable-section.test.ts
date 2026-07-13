@@ -76,7 +76,7 @@ const REGISTRY_EXPECTATIONS: readonly {
   { id: 'settings', title: 'Settings', contentClass: 'image-trail-panel__settings-section', overrides: { settingsOpen: true } },
   { id: 'url-editor', title: 'URL editor', contentClass: 'image-trail-panel__url-editor' },
   { id: 'target', title: 'Host target', contentClass: 'image-trail-panel__target-utility' },
-  { id: 'fields', title: 'Parsed fields', contentClass: 'image-trail-panel__fields' },
+  { id: 'fields', title: 'Field Editor', contentClass: 'image-trail-panel__fields' },
   { id: 'controls', title: 'Manual controls', contentClass: 'image-trail-panel__secondary-controls' },
   { id: 'history', title: 'Recent history', contentClass: 'image-trail-panel__history-section' },
   { id: 'bookmarks', title: 'Queue', contentClass: 'image-trail-panel__bookmarks-section' },
@@ -201,7 +201,7 @@ test('a pointerdown on a natively resizable surface resizes instead of starting 
   assert.deepEqual(harness.actions, [], 'the resize corner never starts a drag-out');
 });
 
-test('a focused field input in the detached Parsed fields window survives a rerender with value and selection', async () => {
+test('a focused field input in the detached Field Editor window survives a rerender with value and selection', async () => {
   const harness = createHarness();
   const withTarget = (): PanelState =>
     panelState({
