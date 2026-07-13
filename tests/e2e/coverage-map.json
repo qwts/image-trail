@@ -325,7 +325,7 @@
             "tests/dom/history-view.test.ts",
             "tests/dom/recents-settings-view.test.ts"
           ],
-          "notes": "Covers Recents retention plus #452 sparse-row display-mode persistence, Settings UI dispatch, mode-specific Recents row classes, privacy-masked Recents labels, the CSS contract for adaptive/full/half/compact row sizing, and #478 centered Adaptive metadata at three or more rows while one or two rows remain top-left."
+          "notes": "Covers Recents retention plus #452 sparse-row display-mode persistence, Settings UI dispatch, mode-specific Recents row classes, privacy-masked Recents labels, the CSS contract for adaptive/full/half/compact row sizing, and #478 centered Adaptive metadata at three or more rows while one or two rows remain top-left and two-row thumbnails retain the full-width background effect."
         },
         {
           "type": "playwright-e2e",

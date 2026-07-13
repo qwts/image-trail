@@ -2700,8 +2700,8 @@
   overflow: hidden;
 }
 
-.image-trail-panel-root .image-trail-panel__record-list.has-top-left-metadata .image-trail-panel__history-item {
-  align-items: start;
+.image-trail-panel-root .image-trail-panel__record-list.is-sparse-adaptive.has-sparse-count-2 .image-trail-panel__history-item {
+  --image-trail-history-thumbnail-inline-size: 100%;
 }
 
 .image-trail-panel-root .image-trail-panel__history-item > .image-trail-panel__record-thumbnail,
@@ -2711,7 +2711,7 @@
   inset-inline-start: 0;
   z-index: 0;
   min-inline-size: 132px;
-  inline-size: auto;
+  inline-size: var(--image-trail-history-thumbnail-inline-size, auto);
   block-size: 100%;
   max-inline-size: none;
   object-fit: cover;

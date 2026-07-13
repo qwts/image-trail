@@ -60,3 +60,15 @@ test('Recents non-compact sparse-row metadata anchors to the row top-left (#452)
   assert.match(body, /padding:\s*4px\s+6px;/u);
   assert.doesNotMatch(body, /padding:[^;]*84px/u);
 });
+
+test('Adaptive two-row Recents keep the full-width thumbnail background effect (#478)', () => {
+  const item = cssRule(
+    '.image-trail-panel-root .image-trail-panel__record-list.is-sparse-adaptive.has-sparse-count-2 .image-trail-panel__history-item',
+  );
+  const thumbnail = cssRule(
+    '.image-trail-panel-root .image-trail-panel__history-item > .image-trail-panel__record-thumbnail,\n.image-trail-panel-root .image-trail-panel__bookmark-item > .image-trail-panel__record-thumbnail',
+  );
+
+  assert.match(item, /--image-trail-history-thumbnail-inline-size:\s*100%;/u);
+  assert.match(thumbnail, /inline-size:\s*var\(--image-trail-history-thumbnail-inline-size,\s*auto\);/u);
+});
