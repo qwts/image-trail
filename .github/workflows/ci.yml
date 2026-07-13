@@ -58,6 +58,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # Version policy compares package.json at the PR base when Changesets entries are
+          # consumed. Keep the base commit available instead of checking out only the merge ref.
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v6

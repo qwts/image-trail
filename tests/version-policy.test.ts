@@ -185,6 +185,13 @@ test('required CI runs the version-policy gate', () => {
   assert.match(workflow, /run: npm run check:version-policy/u);
 });
 
+test('required CI retains PR base history for consumed-changeset validation', () => {
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const ciJob = workflow.slice(workflow.indexOf('\n  ci:'), workflow.indexOf('\n  e2e:'));
+
+  assert.match(ciJob, /uses: actions\/checkout@v7\s+with:\s+(?:#[^\n]*\s+)*fetch-depth: 0/u);
+});
+
 test('version sync updates manifest and lockfile versions and refuses invalid Chrome versions', (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'image-trail-version-sync-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
