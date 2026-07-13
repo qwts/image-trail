@@ -61,7 +61,7 @@ test('Recents non-compact sparse-row metadata anchors to the row top-left (#452)
   assert.doesNotMatch(body, /padding:[^;]*84px/u);
 });
 
-test('Adaptive two-row Recents keep the full-width thumbnail background effect (#478)', () => {
+test('Adaptive two-row Recents keep the full-width, center-visible thumbnail background effect (#478)', () => {
   const item = cssRule(
     '.image-trail-panel-root .image-trail-panel__record-list.is-sparse-adaptive.has-sparse-count-2 .image-trail-panel__history-item',
   );
@@ -70,5 +70,10 @@ test('Adaptive two-row Recents keep the full-width thumbnail background effect (
   );
 
   assert.match(item, /--image-trail-history-thumbnail-inline-size:\s*100%;/u);
+  assert.match(
+    item,
+    /--image-trail-history-thumbnail-mask:\s*linear-gradient\(\s*to right,\s*#0000 0%,\s*#000 30%,\s*#000 70%,\s*#0000 100%\s*\);/u,
+  );
   assert.match(thumbnail, /inline-size:\s*var\(--image-trail-history-thumbnail-inline-size,\s*auto\);/u);
+  assert.match(thumbnail, /mask-image:\s*var\(--image-trail-history-thumbnail-mask,/u);
 });

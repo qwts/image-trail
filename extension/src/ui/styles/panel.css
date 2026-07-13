@@ -2699,9 +2699,9 @@
   min-block-size: 120px;
   overflow: hidden;
 }
-
 .image-trail-panel-root .image-trail-panel__record-list.is-sparse-adaptive.has-sparse-count-2 .image-trail-panel__history-item {
   --image-trail-history-thumbnail-inline-size: 100%;
+  --image-trail-history-thumbnail-mask: linear-gradient(to right, #0000 0%, #000 30%, #000 70%, #0000 100%);
 }
 
 .image-trail-panel-root .image-trail-panel__history-item > .image-trail-panel__record-thumbnail,
@@ -2716,7 +2716,7 @@
   max-inline-size: none;
   object-fit: cover;
   object-position: left center;
-  mask-image: linear-gradient(to right, black 0%, black 25%, rgb(0 0 0 / 50%) 50%, rgb(0 0 0 / 0%) 95%) !important;
+  mask-image: var(--image-trail-history-thumbnail-mask, linear-gradient(to right, #000 0 25%, #0008 50%, #0000 95%)) !important;
 }
 
 .image-trail-panel-root .image-trail-panel__record-thumbnail {

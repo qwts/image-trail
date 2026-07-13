@@ -42,6 +42,8 @@ export const PinnedAndCaptured: Story = {
     if (!row || !thumbnail) throw new Error('expected a two-row Recent background to render');
     await expect(getComputedStyle(label).alignSelf).toBe('start');
     await expect(thumbnail.getBoundingClientRect().width).toBeGreaterThan(row.getBoundingClientRect().width * 0.95);
+    await expect(getComputedStyle(thumbnail).maskImage).toContain('30%');
+    await expect(getComputedStyle(thumbnail).maskImage).toContain('70%');
   },
 };
 
