@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/html-vite';
 import { expect } from 'storybook/test';
 
-import { panelStory } from '../stories/story-host.js';
+import { settingsGroupStory } from '../stories/settings-story-host.js';
 import { createShortcutSettingsView } from './shortcut-settings-view.js';
 
 const meta = {
   title: 'Extension UI/Shortcut settings',
-  render: () => panelStory(shortcutSettingsStory()),
+  render: () => shortcutSettingsStory(),
 } satisfies Meta;
 
 export default meta;
@@ -20,34 +20,14 @@ export const Standard: Story = {
 };
 
 export const Narrow: Story = {
-  render: () => panelStory(shortcutSettingsStory(), { width: 300 }),
+  render: () => shortcutSettingsStory({ width: 300 }),
   play: async ({ canvasElement }) => {
     await expectShortcutRowsFit(canvasElement);
   },
 };
 
-function shortcutSettingsStory(): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'image-trail-panel__section image-trail-panel__settings-section';
-
-  const heading = document.createElement('h3');
-  heading.textContent = 'Settings';
-
-  const group = document.createElement('details');
-  group.className = 'image-trail-panel__settings-templates image-trail-panel__settings-utility-section';
-  group.open = true;
-
-  const summary = document.createElement('summary');
-  summary.className = 'image-trail-panel__settings-utility-summary';
-  summary.textContent = 'Shortcuts';
-
-  const body = document.createElement('div');
-  body.className = 'image-trail-panel__settings-utility-body';
-  body.append(createShortcutSettingsView());
-
-  group.append(summary, body);
-  section.append(heading, group);
-  return section;
+function shortcutSettingsStory(storyOptions: { readonly width?: number } = {}): HTMLElement {
+  return settingsGroupStory('Shortcuts', [createShortcutSettingsView()], storyOptions);
 }
 
 async function expectShortcutRowsFit(canvasElement: HTMLElement): Promise<void> {

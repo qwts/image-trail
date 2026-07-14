@@ -111,6 +111,53 @@
       ]
     },
     {
+      "id": "design-system-settings-help",
+      "acceptance": "Shared design-system Settings, integrations, shortcuts, and Help surfaces",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom/settings-primitive-contracts.test.ts",
+            "tests/dom/settings-view.test.ts",
+            "tests/dom/settings-section.test.ts",
+            "tests/dom/help-view.test.ts",
+            "tests/dom/maintenance-settings-view.test.ts",
+            "tests/primitives-css.test.ts"
+          ],
+          "notes": "Covers grouped Settings composition, native control preservation, primitive variants, input/select/toggle treatment, encryption badges, provider status, file pickers, danger actions, Help keycaps, privacy-inert copy, narrow reflow, focus, disabled, waiting, error, and reduced-motion contracts."
+        },
+        {
+          "type": "storybook",
+          "paths": [
+            "extension/src/ui/components/help-view.stories.ts",
+            "extension/src/ui/components/shortcut-settings-view.stories.ts",
+            "extension/src/ui/components/encryption-view.stories.ts",
+            "extension/src/ui/components/import-export-view.stories.ts",
+            "extension/src/ui/components/display-settings-view.stories.ts",
+            "extension/src/ui/components/privacy-settings-view.stories.ts",
+            "extension/src/ui/components/automation-settings-view.stories.ts",
+            "extension/src/ui/components/maintenance-settings-view.stories.ts"
+          ],
+          "notes": "Covers standard and narrow Settings groups plus locked, unlocked, waiting, error, connected-provider, restore-preview, destructive, shortcut, and Help states using production view factories."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": [
+            "tests/e2e/extension-smoke.spec.ts",
+            "tests/e2e/detachable-sections.spec.ts",
+            "tests/e2e/import-export-settings.spec.ts"
+          ],
+          "notes": "Covers packaged Settings open and interaction behavior, privacy and build-overlay settings, import/export and encrypted backup states, detach/restore, detached scrolling, focus preservation, and state changes routed through existing controllers."
+        },
+        {
+          "type": "manual",
+          "reason": "The handoff specifies dense visual hierarchy and state contrast across browser-controlled form elements and detached extension windows.",
+          "notes": "Load the packaged extension at standard and narrow widths; inspect attached and detached Settings plus Help. Verify grouped hierarchy, sticky headings, native input/select/file controls, focus, locked and privacy states, connected/waiting/error statuses, destructive separation, reduced motion, preserved scroll, and no stylesheet request failures."
+        }
+      ]
+    },
+    {
       "id": "automation-keybindings-and-request-governance",
       "acceptance": "M08 automation, keybindings, and request governance",
       "wiki": "https://github.com/qwts/image-trail/wiki/User-Story-M08-Automation-Keybindings-And-Request-Governance",

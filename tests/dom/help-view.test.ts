@@ -18,11 +18,15 @@ test('help/toggle flips helpOpen on and off', () => {
 
 test('the Help view renders the shared shortcut reference with panel and browser groups', () => {
   const view = createHelpView();
+  assert.ok(view.classList.contains('image-trail-ds__help'));
+  assert.ok(view.classList.contains('image-trail-ds__settings-surface'));
+  assert.ok(view.querySelector('.image-trail-ds__section-header'));
   const headings = [...view.querySelectorAll('h5')].map((heading) => heading.textContent);
   assert.ok(headings.includes('Browser shortcuts'), 'browser commands are distinguished');
   assert.ok(headings.includes('Panel shortcuts'), 'panel/page shortcuts are distinguished');
   // The rows come from the same registry the keyboard router uses — kbd chips must render.
   assert.ok(view.querySelectorAll('kbd').length > 0, 'shortcut key chips render');
+  assert.equal(view.querySelectorAll('kbd').length, view.querySelectorAll('.image-trail-ds__kbd').length);
   const text = view.textContent ?? '';
   assert.ok(text.includes('Next trail step'), 'shortcut labels come from the shared registry');
 });

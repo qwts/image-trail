@@ -1,6 +1,7 @@
 import type { PanelAction } from '../../core/types.js';
 import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
+import { createBadge } from './primitives.js';
 
 let encryptedOriginalsOpen = false;
 
@@ -23,7 +24,7 @@ export function createEncryptionView(
   dispatch: (action: EncryptionAction) => void,
 ): HTMLElement {
   const section = document.createElement('details');
-  section.className = 'image-trail-panel__settings-templates image-trail-panel__encryption';
+  section.className = 'image-trail-panel__settings-templates image-trail-panel__encryption image-trail-ds__settings-integration';
   section.classList.toggle('is-waiting', state.busy);
   section.open = encryptedOriginalsOpen;
   section.addEventListener('toggle', () => {
@@ -36,9 +37,12 @@ export function createEncryptionView(
   const heading = document.createElement('h4');
   heading.textContent = 'Encrypted originals';
 
-  const badge = document.createElement('span');
-  badge.className = `image-trail-panel__encryption-badge${state.unlocked ? ' is-unlocked' : ''}${state.busy ? ' is-waiting' : ''}`;
-  badge.textContent = state.busy ? 'Working' : state.unlocked ? 'Unlocked' : 'AES-GCM';
+  const badge = createBadge({
+    label: state.busy ? 'Working' : state.unlocked ? 'Unlocked' : 'AES-GCM',
+    tone: state.busy ? 'warning' : state.unlocked ? 'success' : 'encryption',
+    uppercase: true,
+    className: `image-trail-panel__encryption-badge${state.unlocked ? ' is-unlocked' : ''}${state.busy ? ' is-waiting' : ''}`,
+  });
 
   header.append(heading, badge);
 
@@ -47,7 +51,8 @@ export function createEncryptionView(
   summary.append(header);
 
   const body = document.createElement('div');
-  body.className = 'image-trail-panel__encryption-body';
+  body.className = 'image-trail-panel__encryption-body image-trail-ds__card';
+  body.dataset['tone'] = 'encryption';
 
   const description = document.createElement('p');
   description.className = 'image-trail-panel__meta';

@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/html-vite';
 import { createCloudBackupView, createImageTransferView, createImportExportView } from './import-export-view.js';
 import { mockDispatch, panelStory } from '../stories/story-host.js';
 import { VERIFIED_BACKUP_HISTORY } from '../stories/cloud-backup-fixtures.js';
+import { applySettingsPrimitiveContracts } from './settings-primitive-contracts.js';
 
 type ImportExportStoryState = Parameters<typeof createImportExportView>[0];
 type CloudBackupStoryState = Parameters<typeof createCloudBackupView>[0];
@@ -337,11 +338,14 @@ export const CloudBackupNarrow: Story = {
 function importExportStory(overrides: Partial<ImportExportStoryState> = {}, storyOptions: { readonly width?: number } = {}): HTMLElement {
   const view = createImportExportView(importExportState(overrides), mockDispatch('import export story action'));
   view.open = true;
+  applySettingsPrimitiveContracts(view);
   return panelStory(view, storyOptions);
 }
 
 function imageTransferStory(overrides: Partial<ImportExportStoryState> = {}, storyOptions: { readonly width?: number } = {}): HTMLElement {
-  return panelStory(createImageTransferView(importExportState(overrides), mockDispatch('image transfer story action')), storyOptions);
+  const view = createImageTransferView(importExportState(overrides), mockDispatch('image transfer story action'));
+  applySettingsPrimitiveContracts(view);
+  return panelStory(view, storyOptions);
 }
 
 function cloudBackupStory(
@@ -350,6 +354,7 @@ function cloudBackupStory(
 ): HTMLElement {
   const view = createCloudBackupView(cloudBackupState(overrides), mockDispatch('cloud backup story action'));
   setUtilityDetailsOpen(view, !storyOptions.collapsed);
+  applySettingsPrimitiveContracts(view);
   return panelStory(view, storyOptions);
 }
 

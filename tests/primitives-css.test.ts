@@ -10,8 +10,10 @@ const panelShellCss = read('extension/src/ui/styles/panel-shell.css');
 const primaryWorkflowCss = read('extension/src/ui/styles/primary-workflow.css');
 const recordRowCss = read('extension/src/ui/styles/record-row.css');
 const fieldsCss = read('extension/src/ui/styles/fields.css');
+const settingsSurfaceCss = read('extension/src/ui/styles/settings-surface.css');
+const settingsIntegrationsCss = read('extension/src/ui/styles/settings-integrations.css');
 const designSystemCss = read('extension/src/ui/styles/design-system.css');
-const css = `${primitiveCss}\n${feedbackCss}\n${panelShellCss}\n${primaryWorkflowCss}\n${recordRowCss}\n${fieldsCss}`;
+const css = `${primitiveCss}\n${feedbackCss}\n${panelShellCss}\n${primaryWorkflowCss}\n${recordRowCss}\n${fieldsCss}\n${settingsSurfaceCss}\n${settingsIntegrationsCss}`;
 const panel = read('extension/src/ui/styles/panel.css');
 const manifest = JSON.parse(read('extension/manifest.json')) as {
   web_accessible_resources: Array<{ resources: string[] }>;
@@ -66,11 +68,22 @@ test('FieldRow styles expose semantic states, privacy masking, and narrow reflow
   assert.match(fieldsCss, /prefers-reduced-motion: reduce[\s\S]*field-row[\s\S]*transition:\s*none/u);
 });
 
+test('Settings and Help styles expose grouped, integration, narrow, danger, and motion contracts', () => {
+  assert.match(settingsSurfaceCss, /settings-group\[open\][\s\S]*rotate\(90deg\)/u);
+  assert.match(settingsSurfaceCss, /settings-group-body[\s\S]*22px/u);
+  assert.match(settingsSurfaceCss, /button\.image-trail-ds__button\.is-danger/u);
+  assert.match(settingsSurfaceCss, /@container \(max-width: 360px\)/u);
+  assert.match(settingsSurfaceCss, /prefers-reduced-motion: reduce/u);
+  assert.match(settingsIntegrationsCss, /settings-danger/u);
+  assert.match(settingsIntegrationsCss, /settings-integration:has\(button\.is-waiting\)/u);
+  assert.match(settingsIntegrationsCss, /image-trail-ds__help/u);
+});
+
 test('panel packaging loads design-system stylesheets after tokens', () => {
   assert.match(panel, /^@import '\.\/design-system\.css';/u);
   assert.equal(
     designSystemCss,
-    "@import './tokens.css';\n@import './primitives.css';\n@import './feedback-primitives.css';\n@import './panel-shell.css';\n@import './primary-workflow.css';\n@import './record-row.css';\n@import './fields.css';\n",
+    "@import './tokens.css';\n@import './primitives.css';\n@import './feedback-primitives.css';\n@import './panel-shell.css';\n@import './primary-workflow.css';\n@import './record-row.css';\n@import './fields.css';\n@import './settings-surface.css';\n@import './settings-integrations.css';\n",
   );
   const resources = manifest.web_accessible_resources.flatMap((entry) => entry.resources);
   assert.ok(resources.includes('src/ui/styles/design-system.css'));
@@ -80,4 +93,6 @@ test('panel packaging loads design-system stylesheets after tokens', () => {
   assert.ok(resources.includes('src/ui/styles/primary-workflow.css'));
   assert.ok(resources.includes('src/ui/styles/record-row.css'));
   assert.ok(resources.includes('src/ui/styles/fields.css'));
+  assert.ok(resources.includes('src/ui/styles/settings-surface.css'));
+  assert.ok(resources.includes('src/ui/styles/settings-integrations.css'));
 });

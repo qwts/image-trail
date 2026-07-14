@@ -31,7 +31,7 @@
     "test:dom": "npm run test:compile && npm run test:dom:run",
     "test:dom:run": "node --import ./.test-dist/tests/dom/register.js --test .test-dist/tests/dom/*.test.js",
     "test:run": "npm run test:unit:run && npm run test:dom:run",
-    "test:cov": "npm run typecheck && npm run test:compile && c8 npm run test:run",
+    "test:cov": "npm run typecheck && npm run test:compile && c8 --clean=true --check-coverage=false --reporter=none npm run test:unit:run && c8 --clean=false npm run test:dom:run",
     "coverage:summary": "node scripts/report-coverage-summary.mjs",
     "test:stories": "test-storybook",
     "test:stories:ci": "npm run build:storybook && concurrently -k -s first -n SB,TEST \"http-server storybook-static --port 6006 --silent\" \"wait-on tcp:127.0.0.1:6006 && test-storybook --url http://127.0.0.1:6006\"",

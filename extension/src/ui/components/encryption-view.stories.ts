@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/html-vite';
 
 import { createEncryptionView } from './encryption-view.js';
-import { mockDispatch, panelStory } from '../stories/story-host.js';
+import { mockDispatch } from '../stories/story-host.js';
+import { settingsGroupStory } from '../stories/settings-story-host.js';
 
 type EncryptionStoryState = Parameters<typeof createEncryptionView>[0];
 
@@ -57,7 +58,11 @@ export const Narrow: Story = {
 };
 
 function encryptionStory(overrides: Partial<EncryptionStoryState> = {}, storyOptions: { readonly width?: number } = {}): HTMLElement {
-  return panelStory(createEncryptionView(encryptionState(overrides), mockDispatch('encryption story action')), storyOptions);
+  return settingsGroupStory(
+    'Privacy',
+    [createEncryptionView(encryptionState(overrides), mockDispatch('encryption story action'))],
+    storyOptions,
+  );
 }
 
 function encryptionState(overrides: Partial<EncryptionStoryState> = {}): EncryptionStoryState {
