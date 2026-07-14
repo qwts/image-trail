@@ -1,0 +1,132 @@
+# Version-cut automation (#501), mirroring qwts/photos:
+#
+#  1. version-pr — while changesets are pending, keep one rolling version PR
+#     open and current. Merging that PR is the human "cut a release" action.
+#  2. tag — after the version PR merges (package version changed, no pending
+#     changesets), tag v<version> and hand off to the release workflow.
+#
+# GITHUB_TOKEN events cannot trigger other workflows, so this workflow also:
+#  - dispatches CI onto the bot-refreshed version branch;
+#  - explicitly dispatches release.yml after pushing the version tag.
+name: Version cut
+
+on:
+  push:
+    branches:
+      - main
+  # Manual refresh / recovery for a cut whose tag or release dispatch failed.
+  workflow_dispatch:
+
+concurrency:
+  group: version-cut
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version-pr:
+    name: Version packages PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create or refresh the ready version PR
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: npm run changeset:version
+          title: 'chore: version Image Trail'
+          commit: 'chore: version Image Trail'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run required checks on the version branch
+        if: steps.changesets.outputs.hasChangesets == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref changeset-release/main
+
+  tag:
+    name: Tag version merges
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Tag when the current version is a fresh cut
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          # A normal main push is a release cut only when package.json changed.
+          # Manual dispatch is recovery-only and still must pass the pending,
+          # synchronized-version, and existing-tag checks below.
+          if [ "$EVENT_NAME" = "push" ]; then
+            prev=$(git show 'HEAD~1:package.json' 2>/dev/null | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).version' 2>/dev/null || echo '')
+            cur=$(node -p 'require("./package.json").version')
+            if [ "$prev" = "$cur" ]; then
+              echo "Version unchanged ($cur) — not a version-cut merge."
+              exit 0
+            fi
+          fi
+
+          pending=$(find .changeset -name '*.md' ! -name 'README.md' | head -1)
+          if [ -n "$pending" ]; then
+            echo "Changesets pending — nothing to tag."
+            exit 0
+          fi
+
+          version=$(node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const manifest = JSON.parse(fs.readFileSync("extension/manifest.json", "utf8"));
+            const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+            const version = String(pkg.version);
+            if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version)) {
+              throw new Error(`package version is not stable three-component semver: ${version}`);
+            }
+            if (manifest.version !== version || lock.version !== version || lock.packages?.[""]?.version !== version) {
+              throw new Error("package, manifest, and lockfile versions are not synchronized");
+            }
+            process.stdout.write(`v${version}`);
+          ')
+
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            echo "$version already tagged."
+            if ! gh release view "$version" >/dev/null 2>&1; then
+              echo "$version has no release — dispatching recovery."
+              gh workflow run release.yml --ref main -f tag="$version"
+            fi
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a "$version" -m "Image Trail $version"
+          git push origin "$version"
+          echo "Tagged $version."
+
+          # A tag pushed with GITHUB_TOKEN does not emit a new workflow run.
+          # Dispatch from main (which contains release.yml) while pinning the
+          # source built and published to the immutable tag.
+          gh workflow run release.yml --ref main -f tag="$version"

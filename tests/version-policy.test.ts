@@ -171,19 +171,27 @@ test('ignores tests, Storybook-only files, and repository tooling', () => {
       'extension/src/ui/stories/harness.ts',
       'tests/version-policy.test.ts',
       'scripts/check-version-policy.mjs',
-      '.github/workflows/version-pr.yml',
+      '.github/workflows/version-cut.yml',
     ],
   });
   assert.equal(result.ok, true);
   assert.deepEqual(result.productFiles, []);
 });
 
-test('version workflow creates a ready Changesets PR without publishing or merging', () => {
-  const workflow = readFileSync('.github/workflows/version-pr.yml', 'utf8');
+test('version-cut workflow refreshes a checked Changesets PR and tags only fresh version merges', () => {
+  const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
 
   assert.match(workflow, /uses: changesets\/action@v1/u);
   assert.match(workflow, /version: npm run changeset:version/u);
   assert.match(workflow, /pull-requests: write/u);
+  assert.match(workflow, /actions: write/u);
+  assert.match(workflow, /gh workflow run ci\.yml --ref changeset-release\/main/u);
+  assert.match(workflow, /Version unchanged \(\$cur\) — not a version-cut merge/u);
+  assert.match(workflow, /Changesets pending — nothing to tag/u);
+  assert.match(workflow, /package, manifest, and lockfile versions are not synchronized/u);
+  assert.match(workflow, /git tag -a "\$version"/u);
+  assert.match(workflow, /git push origin "\$version"/u);
+  assert.match(workflow, /gh workflow run release\.yml --ref main -f tag="\$version"/u);
   assert.doesNotMatch(workflow, /^\s+publish:/mu);
   assert.doesNotMatch(workflow, /^\s+prDraft:/mu);
   assert.doesNotMatch(workflow, /gh pr merge|auto-merge/u);
@@ -193,6 +201,8 @@ test('required CI runs the version-policy gate', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 
   assert.match(workflow, /run: npm run check:version-policy/u);
+  assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch'.*'true'/u);
 });
 
 test('required CI retains PR base history for consumed-changeset validation', () => {
@@ -220,19 +230,22 @@ test('release packaging enforces a Chrome Web Store-compatible archive root', ()
   assert.match(releasePackage.validateArchiveEntries(['manifest.json', '../secret', '.DS_Store']).join(' '), /safe relative.*forbidden/u);
 });
 
-test('release workflow validates, tags, and publishes assets without store publication', () => {
+test('release workflow checks out a supplied tag and publishes assets without store publication', () => {
   const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
 
   assert.match(workflow, /workflow_dispatch:/u);
   assert.match(workflow, /tags:\s*\n\s*- 'v\*\.\*\.\*'/u);
+  assert.match(workflow, /tag:\s*\n\s+description: 'Existing exact v<package-version> tag/u);
+  assert.match(workflow, /ref: \$\{\{ steps\.release\.outputs\.tag \}\}/u);
   assert.match(workflow, /run: npm run ci/u);
   assert.match(workflow, /npm run package:release -- --tag/u);
   assert.match(workflow, /Release tag must be stable three-component semver/u);
-  assert.match(workflow, /git merge-base --is-ancestor "\$GITHUB_SHA" origin\/main/u);
+  assert.match(workflow, /git merge-base --is-ancestor "\$\(git rev-list -n 1 "\$TAG_NAME"\)" origin\/main/u);
   assert.match(workflow, /gh release create/u);
   assert.match(workflow, /--prerelease/u);
   assert.match(workflow, /gh release edit.*--prerelease/u);
   assert.match(workflow, /gh release upload.*--clobber/u);
+  assert.doesNotMatch(workflow, /git tag -a|git push origin/u);
   assert.doesNotMatch(workflow, /chrome-webstore-upload|webstore.*publish/iu);
 });
 
