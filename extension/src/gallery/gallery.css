@@ -1,14 +1,17 @@
+@import '../ui/styles/tokens.css';
+
 :root {
   color-scheme: dark;
   --image-trail-gallery-bg: #050706;
-  --image-trail-gallery-panel: rgb(0 0 0 / 88%);
-  --image-trail-gallery-surface: rgb(255 255 255 / 4%);
-  --image-trail-gallery-surface-hover: rgb(255 255 255 / 7%);
-  --image-trail-gallery-border: rgb(255 255 255 / 14%);
-  --image-trail-gallery-border-strong: rgb(255 255 255 / 28%);
-  --image-trail-gallery-accent: rgb(124 255 168);
+  /* Compatibility aliases keep Gallery migrations incremental. */
+  --image-trail-gallery-panel: var(--it-panel-bg);
+  --image-trail-gallery-surface: var(--it-fill-4);
+  --image-trail-gallery-surface-hover: var(--it-fill-7);
+  --image-trail-gallery-border: var(--it-fill-14);
+  --image-trail-gallery-border-strong: var(--it-border-row-hover);
+  --image-trail-gallery-accent: var(--it-accent-row);
   --image-trail-gallery-accent-soft: rgb(124 255 168 / 12%);
-  --image-trail-gallery-text: #fff;
+  --image-trail-gallery-text: var(--it-text);
   --image-trail-gallery-muted: #aeb6c2;
   --image-trail-gallery-danger: #fb7185;
   background: var(--image-trail-gallery-bg);

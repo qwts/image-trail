@@ -50,7 +50,7 @@
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "web_accessible_resources": [
     {
-      "resources": ["src/ui/styles/panel.css", "src/ui/styles/fields.css"],
+      "resources": ["src/ui/styles/panel.css", "src/ui/styles/fields.css", "src/ui/styles/tokens.css"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ]

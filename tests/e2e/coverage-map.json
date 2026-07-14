@@ -4,6 +4,23 @@
   "description": "Manual acceptance coverage map for the maintained Playwright E2E gate. Each entry links a canonical acceptance flow to automated coverage, intentional manual coverage, or a deferred issue.",
   "entries": [
     {
+      "id": "design-system-token-foundation",
+      "acceptance": "Shared design-system token contract",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/design-tokens.test.ts", "tests/panel-css.test.ts"],
+          "notes": "Covers the canonical token inventory, document and Shadow DOM scopes, panel and Gallery imports, Gallery compatibility aliases, web-accessible token loading, and preservation of existing panel layout contracts."
+        },
+        {
+          "type": "manual",
+          "reason": "Token indirection preserves exact values and requires a packaged-extension visual smoke check across the injected Shadow DOM and extension-owned Gallery page.",
+          "notes": "Load the built extension, open the panel over the single-image fixture, then open Gallery. Verify the panel, Recall drawer, detached section, and Gallery retain their prior colors, spacing, typography, geometry, focus treatment, and motion behavior with no unstyled flash or missing stylesheet request."
+        }
+      ]
+    },
+    {
       "id": "automation-keybindings-and-request-governance",
       "acceptance": "M08 automation, keybindings, and request governance",
       "wiki": "https://github.com/qwts/image-trail/wiki/User-Story-M08-Automation-Keybindings-And-Request-Governance",

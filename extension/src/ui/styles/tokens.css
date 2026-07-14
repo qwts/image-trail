@@ -1,0 +1,141 @@
+/* Canonical Image Trail design tokens.
+ * :host scopes the injected Shadow DOM; :root scopes extension-owned pages and Storybook.
+ */
+:root,
+:host {
+  /* Surfaces and depth */
+  --it-panel-bg: rgb(0 0 0 / 88%);
+  --it-drawer-bg: rgb(0 0 0 / 91%);
+  --it-header-bg: rgb(9 9 9 / 98%);
+  --it-menu-bg: #171717;
+  --it-input-bg: #111;
+  --it-input-bg-privacy: #080808;
+  --it-control-bg: #222;
+  --it-control-bg-hover: #2b2b2b;
+  --it-control-bg-alt: #242424;
+  --it-thumb-bg: #111;
+  --it-fill-3: rgb(255 255 255 / 3%);
+  --it-fill-4: rgb(255 255 255 / 4%);
+  --it-fill-5: rgb(255 255 255 / 5%);
+  --it-fill-6: rgb(255 255 255 / 6%);
+  --it-fill-7: rgb(255 255 255 / 7%);
+  --it-fill-8: rgb(255 255 255 / 8%);
+  --it-fill-14: rgb(255 255 255 / 14%);
+
+  /* Text */
+  --it-text: #fff;
+  --it-text-2: #eee;
+  --it-text-3: #ddd;
+  --it-text-4: #ccc;
+  --it-text-muted: #aaa;
+  --it-text-dim: #999;
+
+  /* Borders */
+  --it-border-panel: #666;
+  --it-border-control: #555;
+  --it-divider: rgb(255 255 255 / 12%);
+  --it-divider-soft: rgb(255 255 255 / 8%);
+  --it-border-row: rgb(255 255 255 / 13%);
+  --it-border-row-hover: rgb(255 255 255 / 28%);
+
+  /* Accent and semantic states */
+  --it-accent: rgb(89 255 178);
+  --it-accent-row: rgb(124 255 168);
+  --it-accent-wait: rgb(139 246 220);
+  --it-accent-check: #10b981;
+  --it-accent-btn-border: rgb(67 211 139);
+  --it-accent-btn-bg: rgb(39 120 78 / 44%);
+  --it-focus: #8fd;
+  --it-field-active: #9ee;
+  --it-field-active-bg: rgb(90 180 200 / 18%);
+  --it-error: rgb(255 112 112);
+  --it-error-soft: #f88;
+  --it-error-locked: rgb(255 96 112);
+  --it-danger-border: rgb(255 112 112 / 70%);
+  --it-danger-bg: rgb(110 24 28 / 72%);
+  --it-warn: rgb(226 188 103);
+  --it-warn-strong: #d6aa26;
+  --it-ok: rgb(123 190 138);
+  --it-ok-strong: #2ca66a;
+  --it-status-current: #58a6ff;
+  --it-status-end: #686868;
+
+  /* Typography */
+  --it-font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --it-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --it-fs-title: 14px;
+  --it-fs-heading: 12px;
+  --it-fs-base: 12px;
+  --it-fs-sm: 11px;
+  --it-fs-xs: 10px;
+  --it-fs-2xs: 9px;
+  --it-lh-base: 1.4;
+  --it-lh-tight: 1.25;
+  --it-lh-snug: 1.2;
+  --it-fw-normal: 400;
+  --it-fw-medium: 600;
+  --it-fw-bold: 700;
+  --it-fw-heavy: 800;
+  --it-type-title: var(--it-fw-bold) var(--it-fs-title) var(--it-font-ui);
+  --it-type-heading: var(--it-fw-bold) var(--it-fs-heading) var(--it-font-ui);
+  --it-type-body: var(--it-fs-base) / var(--it-lh-base) var(--it-font-ui);
+  --it-type-label: var(--it-fw-medium) var(--it-fs-sm) var(--it-font-ui);
+  --it-type-meta: var(--it-fs-sm) / var(--it-lh-base) var(--it-font-ui);
+  --it-type-micro: var(--it-fw-medium) var(--it-fs-xs) / var(--it-lh-tight) var(--it-font-ui);
+  --it-type-mono: var(--it-fs-base) / var(--it-lh-base) var(--it-font-mono);
+  --it-type-mono-sm: var(--it-fs-sm) var(--it-font-mono);
+  --it-uppercase-tracking: 0.03em;
+
+  /* Spacing and geometry */
+  --it-space-1: 2px;
+  --it-space-2: 4px;
+  --it-space-3: 5px;
+  --it-space-4: 6px;
+  --it-space-5: 7px;
+  --it-space-6: 8px;
+  --it-space-7: 9px;
+  --it-space-8: 10px;
+  --it-space-9: 11px;
+  --it-space-10: 12px;
+  --it-space-12: 14px;
+  --it-radius-panel: 8px;
+  --it-radius-card: 7px;
+  --it-radius-row: 6px;
+  --it-radius-badge: 5px;
+  --it-radius-control: 4px;
+  --it-radius-pill: 999px;
+  --it-panel-width: 420px;
+  --it-drawer-width: 340px;
+  --it-window-width: 340px;
+  --it-panel-pad: 10px;
+  --it-control-min-h: 26px;
+  --it-icon-btn: 26px;
+  --it-hit-min: 44px;
+  --it-thumb: 44px;
+  --it-thumb-sm: 34px;
+  --it-row-min-h: 120px;
+
+  /* Elevation, focus, privacy, and motion */
+  --it-shadow-panel: 0 8px 24px rgb(0 0 0 / 45%);
+  --it-shadow-menu: 0 10px 26px rgb(0 0 0 / 42%);
+  --it-shadow-toast: 0 10px 28px rgb(0 0 0 / 42%);
+  --it-highlight-top: inset 0 1px 0 rgb(255 255 255 / 8%);
+  --it-highlight-top-strong: inset 0 1px 0 rgb(255 255 255 / 10%);
+  --it-glow-target: 0 0 0 1px rgb(89 255 178 / 22%), 0 0 16px rgb(89 255 178 / 34%);
+  --it-glow-row: 0 0 0 1px rgb(124 255 168 / 14%), 0 0 12px rgb(124 255 168 / 16%);
+  --it-glow-wait: 0 0 10px rgb(139 246 220 / 72%);
+  --it-glow-error: 0 0 18px rgb(255 36 36 / 22%);
+  --it-focus-ring: 1px solid #8fd;
+  --it-focus-offset: 2px;
+  --it-opacity-locked: 0.72;
+  --it-opacity-key-gone: 0.34;
+  --it-blur-privacy: blur(0.5px);
+  --it-surface-selected: linear-gradient(135deg, rgb(124 255 168 / 8%), transparent 50%), rgb(10 35 20 / 28%);
+  --it-surface-locked: linear-gradient(135deg, rgb(255 96 112 / 7%), transparent 45%), rgb(38 10 16 / 34%);
+  --it-ease: ease;
+  --it-ease-out: ease-out;
+  --it-dur-fast: 160ms;
+  --it-dur-fade: 170ms;
+  --it-dur-sweep: 1200ms;
+  --it-dur-dot: 900ms;
+}
