@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.2.5
+
+### Patch Changes
+
+- ab59acc: Treat thumbnail and malformed blob rows as missing during original repair verification without reading encrypted payloads.
+
 ## 0.2.4
 
 ### Patch Changes
