@@ -51,6 +51,7 @@ function createHarness(): Harness {
     },
     dispatch: () => {},
     root: () => root,
+    contextRoot: () => null,
     recallRoot: () => recallRoot,
     detachedRoot: () => detachedRoot,
     toastRoot: () => toastRoot,

@@ -1,0 +1,118 @@
+.image-trail-page-context-root {
+  all: initial;
+  position: fixed;
+  inset-block-start: 14px;
+  inset-inline-start: calc(100vw - 14px);
+  inline-size: max-content;
+  max-inline-size: calc(100vw - 28px);
+  transform: translateX(-100%);
+  z-index: 2147483647;
+  color: var(--it-text);
+  font-family: var(--it-font-ui);
+  pointer-events: none;
+}
+
+.image-trail-page-context,
+.image-trail-page-context * {
+  box-sizing: border-box;
+}
+
+.image-trail-page-context {
+  display: grid;
+  justify-items: end;
+  gap: var(--it-space-2);
+  pointer-events: auto;
+}
+
+.image-trail-page-context__options {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: var(--it-radius-row);
+  background: rgb(9 9 9 / 82%);
+  box-shadow:
+    var(--it-highlight-top),
+    0 8px 24px rgb(0 0 0 / 34%);
+  backdrop-filter: blur(4px);
+}
+
+.image-trail-page-context__option,
+.image-trail-page-context__reset {
+  appearance: none;
+  border: 0;
+  color: var(--it-text-muted);
+  font: var(--it-fw-bold) var(--it-fs-sm) / 1 var(--it-font-ui);
+  cursor: pointer;
+  transition:
+    color var(--it-dur-fast) var(--it-ease),
+    background var(--it-dur-fast) var(--it-ease);
+}
+
+.image-trail-panel-root .image-trail-panel__feed-hint.is-active {
+  color: #daffe9;
+}
+
+.image-trail-page-context__option {
+  min-block-size: 32px;
+  padding: 6px 11px;
+  background: transparent;
+}
+
+.image-trail-page-context__option + .image-trail-page-context__option {
+  border-inline-start: 1px solid var(--it-divider-soft);
+}
+
+.image-trail-page-context__option:hover:not(:disabled),
+.image-trail-page-context__reset:hover {
+  color: var(--it-text);
+  background: var(--it-fill-8);
+}
+
+.image-trail-page-context__option[aria-pressed='true'] {
+  color: #daffe9;
+  background: rgb(124 255 168 / 18%);
+  box-shadow: inset 0 -1px 0 rgb(124 255 168 / 55%);
+}
+
+.image-trail-page-context__option:disabled {
+  color: rgb(255 255 255 / 28%);
+  cursor: not-allowed;
+}
+
+.image-trail-page-context__option:focus-visible,
+.image-trail-page-context__reset:focus-visible {
+  outline: var(--it-focus-ring);
+  outline-offset: -2px;
+}
+
+.image-trail-page-context__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--it-space-4);
+  min-block-size: 21px;
+  padding: 3px 4px 3px 8px;
+  border: 1px solid var(--it-divider-soft);
+  border-radius: var(--it-radius-row);
+  background: rgb(9 9 9 / 78%);
+  color: var(--it-text-dim);
+  font: var(--it-type-micro);
+  box-shadow: var(--it-highlight-top);
+  backdrop-filter: blur(4px);
+}
+
+.image-trail-page-context__reset {
+  min-block-size: 20px;
+  padding: 3px 6px;
+  border: 1px solid rgb(124 255 168 / 32%);
+  border-radius: var(--it-radius-control);
+  background: rgb(124 255 168 / 10%);
+  color: #daffe9;
+  font-size: var(--it-fs-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-trail-page-context__option,
+  .image-trail-page-context__reset {
+    transition: none;
+  }
+}

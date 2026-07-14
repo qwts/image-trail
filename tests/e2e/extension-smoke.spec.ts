@@ -261,7 +261,7 @@ test('single-image page auto-selects the host target on panel open', async ({ pa
   await expectSelectedImage(page, primaryImage);
   await expectPanelStatusMessage(page, /Auto-selected .*asset-one\.svg/u);
   await expect(page.locator('.image-trail-panel__target-badge')).toHaveText('Selected');
-  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('single image');
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Single image');
   await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl(fixtureAssetPaths.assetOne));
 });
 

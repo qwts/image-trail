@@ -21,6 +21,7 @@ export const PANEL_ACTION_DOMAINS = {
   'target/fill-screen': 'panel-session',
   'target/set-object-fit': 'panel-session',
   'target/release': 'panel-session',
+  'page-context/set': 'panel-session',
   'history/add-loaded': 'queue-recents',
   'history/remove': 'queue-recents',
   'history/pin': 'queue-recents',

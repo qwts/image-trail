@@ -1,6 +1,7 @@
 import type { ChangeEvent } from 'react';
 
 import { OBJECT_FIT_MODES, isObjectFitMode } from '../../core/preview-style.js';
+import { pageContextLabel, type PageContextState } from '../../core/page-context.js';
 import type { PanelAction, TargetState } from '../../core/types.js';
 import { PRIVACY_URL_TEXT } from '../components/record-metadata.js';
 import { renderReactSubtree } from './react-subtree.js';
@@ -10,6 +11,7 @@ let targetControlsOpen = false;
 
 interface TargetPickerProps {
   readonly target: TargetState;
+  readonly pageContext: PageContextState;
   readonly dispatch: (action: PanelAction) => void;
   readonly privacyMode: boolean;
 }
@@ -30,9 +32,14 @@ function TargetThumbnail({ target, privacyMode }: Pick<TargetPickerProps, 'targe
   );
 }
 
-function TargetIdentity({ target, privacyMode }: Pick<TargetPickerProps, 'target' | 'privacyMode'>) {
+function contextCountLabel(pageContext: PageContextState): string {
+  if (pageContext.effective === 'single') return pageContextLabel(pageContext.effective);
+  const suffix = pageContext.imageCount === 1 ? 'image' : 'images';
+  return `${pageContextLabel(pageContext.effective)} · ${pageContext.imageCount} ${suffix}`;
+}
+
+function TargetIdentity({ target, pageContext, privacyMode }: Pick<TargetPickerProps, 'target' | 'pageContext' | 'privacyMode'>) {
   const url = targetUrl(target, privacyMode);
-  const countLabel = `${target.candidateCount} on page`;
   return (
     <span className="image-trail-panel__target-identity">
       <span className={`image-trail-panel__target-url${privacyMode && target.selectedUrl ? ' is-privacy-masked' : ''}`} title={url}>
@@ -45,14 +52,14 @@ function TargetIdentity({ target, privacyMode }: Pick<TargetPickerProps, 'target
           </span>
         ) : null}
         <span className="image-trail-ds__badge image-trail-panel__target-count" data-tone="count">
-          {target.candidateCount === 1 ? 'single image' : countLabel}
+          {contextCountLabel(pageContext)}
         </span>
       </span>
     </span>
   );
 }
 
-function TargetButton({ target, dispatch }: Omit<TargetPickerProps, 'privacyMode'>) {
+function TargetButton({ target, dispatch }: Pick<TargetPickerProps, 'target' | 'dispatch'>) {
   const action = target.picking
     ? { name: 'stop-target-picker' as const }
     : target.selectedUrl
@@ -71,7 +78,7 @@ function TargetButton({ target, dispatch }: Omit<TargetPickerProps, 'privacyMode
   );
 }
 
-function TargetControls({ target, dispatch }: Omit<TargetPickerProps, 'privacyMode'>) {
+function TargetControls({ target, dispatch }: Pick<TargetPickerProps, 'target' | 'dispatch'>) {
   const onFitChange = (event: ChangeEvent<HTMLSelectElement>) => {
     if (isObjectFitMode(event.target.value)) dispatch({ name: 'target/set-object-fit', mode: event.target.value });
   };
@@ -120,7 +127,7 @@ function TargetControls({ target, dispatch }: Omit<TargetPickerProps, 'privacyMo
   );
 }
 
-function TargetPickerContent({ target, dispatch, privacyMode }: TargetPickerProps) {
+function TargetPickerContent({ target, pageContext, dispatch, privacyMode }: TargetPickerProps) {
   return (
     <>
       <summary className="image-trail-panel__target-summary image-trail-ds__section-header">
@@ -128,7 +135,7 @@ function TargetPickerContent({ target, dispatch, privacyMode }: TargetPickerProp
       </summary>
       <div className="image-trail-panel__target-card image-trail-ds__card">
         <TargetThumbnail target={target} privacyMode={privacyMode} />
-        <TargetIdentity target={target} privacyMode={privacyMode} />
+        <TargetIdentity target={target} pageContext={pageContext} privacyMode={privacyMode} />
         <TargetControls target={target} dispatch={dispatch} />
       </div>
     </>
@@ -138,7 +145,7 @@ function TargetPickerContent({ target, dispatch, privacyMode }: TargetPickerProp
 export function createTargetPickerView(
   target: TargetState,
   dispatch: (action: PanelAction) => void,
-  options: { readonly privacyMode?: boolean } = {},
+  options: { readonly pageContext?: PageContextState; readonly privacyMode?: boolean } = {},
 ): HTMLElement {
   const targetNeedsAttention = target.picking || target.grabModeActive || target.mode !== 'auto' || target.candidateCount !== 1;
   const wrapper = document.createElement('details');
@@ -150,6 +157,19 @@ export function createTargetPickerView(
   });
   return renderReactSubtree(
     wrapper,
-    <TargetPickerContent target={target} dispatch={dispatch} privacyMode={options.privacyMode === true} />,
+    <TargetPickerContent
+      target={target}
+      pageContext={
+        options.pageContext ?? {
+          detected: target.candidateCount > 1 ? 'gallery' : 'single',
+          effective: target.candidateCount > 1 ? 'gallery' : 'single',
+          override: null,
+          available: target.candidateCount > 1 ? ['single', 'gallery', 'feed'] : ['single'],
+          imageCount: target.candidateCount,
+        }
+      }
+      dispatch={dispatch}
+      privacyMode={options.privacyMode === true}
+    />,
   );
 }

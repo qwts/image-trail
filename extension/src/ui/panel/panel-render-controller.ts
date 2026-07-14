@@ -12,6 +12,7 @@ export interface PanelRenderControllerDeps {
   setState(state: PanelState): void;
   dispatch(action: PanelAction): void;
   root(): HTMLElement | null;
+  contextRoot(): HTMLElement | null;
   recallRoot(): HTMLElement | null;
   detachedRoot(): HTMLElement | null;
   toastRoot(): HTMLElement | null;
@@ -111,6 +112,7 @@ export class PanelRenderController {
       renderPanel(
         {
           root,
+          contextRoot: this.deps.contextRoot(),
           recallRoot: this.deps.recallRoot(),
           detachedRoot: this.deps.detachedRoot(),
           toastRoot: this.deps.toastRoot(),

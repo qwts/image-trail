@@ -108,7 +108,7 @@ function createHarness(overrides: Partial<PanelMountDeps> = {}): Harness {
   return harness;
 }
 
-test('mount() creates the four roots inside a scoped host appended to document.body', () => {
+test('mount() creates the five roots inside a scoped host appended to document.body', () => {
   const { mount, doc } = createHarness();
   mount.mount();
 
@@ -118,11 +118,12 @@ test('mount() creates the four roots inside a scoped host appended to document.b
   assert.equal(doc.documentElement.children.length, 0, 'host is not appended to documentElement');
 
   assert.ok(mount.root, 'root getter exposes the mounted aside');
+  assert.ok(mount.contextRoot, 'contextRoot getter exposes the page-context root');
   assert.ok(mount.recallRoot, 'recallRoot getter exposes the recall root');
   assert.ok(mount.detachedRoot, 'detachedRoot getter exposes the detached-sections root');
   assert.ok(mount.toastRoot, 'toastRoot getter exposes the toast root');
   assert.equal(mount.root!.tagName, 'aside');
-  assert.equal(host!.shadowRoot?.children.length, 5, 'shadow root holds link + four roots');
+  assert.equal(host!.shadowRoot?.children.length, 6, 'shadow root holds link + five roots');
   assert.equal(mount.root!.style.visibility, 'hidden', 'root starts hidden until styles are ready');
 });
 
@@ -209,6 +210,7 @@ test('teardown() removes the host and clears root/styles-ready state', async () 
 
   assert.equal(host!.removed, true, 'host is removed from the page');
   assert.equal(harness.mount.root, null, 'root is cleared');
+  assert.equal(harness.mount.contextRoot, null, 'contextRoot is cleared');
   assert.equal(harness.mount.recallRoot, null, 'recallRoot is cleared');
   assert.equal(harness.mount.detachedRoot, null, 'detachedRoot is cleared');
   assert.equal(harness.mount.toastRoot, null, 'toastRoot is cleared');

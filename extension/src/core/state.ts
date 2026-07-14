@@ -9,6 +9,7 @@ import { DEFAULT_GOVERNOR_CONFIG } from './automation/types.js';
 import { DEFAULT_SEARCHABLE_METADATA_POLICY } from './metadata-policy.js';
 import { DEFAULT_QUEUE_DISPLAY_ORDER, DEFAULT_RECENT_DISPLAY_ORDER } from './display-order.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT } from './preview-style.js';
+import { EMPTY_PAGE_CONTEXT_STATE } from './page-context.js';
 
 export const EMPTY_TARGET_STATE: TargetState = {
   mode: 'none',
@@ -55,6 +56,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     message: 'Image Trail is ready.',
     lastUpdatedAt: now,
     target: EMPTY_TARGET_STATE,
+    pageContext: EMPTY_PAGE_CONTEXT_STATE,
     draftUrl: null,
     history: [],
     recentHistoryLimit: 30,

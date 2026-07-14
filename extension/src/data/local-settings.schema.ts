@@ -42,6 +42,7 @@ const plaintextLocalSettingsEntries = {
   loadFailureFeedback: v.picklist(['alert', 'display', 'mute']),
   secondaryControlsOpen: v.boolean(),
   restoreWorkspaceLayout: v.boolean(),
+  pageContextOverrides: v.record(v.string(), v.object({ context: v.picklist(['single', 'gallery', 'feed']), updatedAt: v.number() })),
 };
 
 export const plaintextLocalSettingsSchema = v.object(plaintextLocalSettingsEntries);

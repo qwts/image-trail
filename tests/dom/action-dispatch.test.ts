@@ -71,6 +71,7 @@ function createHarness(): Harness {
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
     saveLocalSettings: noop,
     applyBuildInfoOverlayVisibility: noop,
+    updatePageContextOverride: noop,
     pageAdapter: () => ({ enableBookmarkShortcut: () => record('pageAdapter.enableBookmarkShortcut') }) as unknown as PageAdapter,
     panelMount: () => panelMount,
     keyboard: () => ({ enable: () => record('keyboard.enable') }) as unknown as KeyboardRouter,

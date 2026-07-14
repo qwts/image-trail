@@ -3,6 +3,7 @@ import { expect } from 'storybook/test';
 
 import type { PanelState } from '../core/types.js';
 import { DEFAULT_SEARCHABLE_METADATA_POLICY } from '../core/metadata-policy.js';
+import { EMPTY_PAGE_CONTEXT_STATE } from '../core/page-context.js';
 import { renderPanel, type PanelLayoutState } from './render.js';
 import {
   bookmarkFixtures,
@@ -21,6 +22,17 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+const STORY_BUILD_IDENTITY = {
+  schemaVersion: 1,
+  version: '0.1.0',
+  builtAt: '2026-06-28T03:30:00.000Z',
+  commit: 'abc123def456',
+  branch: 'codex/dev',
+  worktree: '7bc4/image-bookmarklet',
+  timezone: 'America/Chicago',
+  mode: 'local',
+} as const;
 
 export const SettingsSectionOrder: Story = {
   render: () =>
@@ -205,6 +217,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     status: 'ready',
     message: 'Image Trail is ready.',
     lastUpdatedAt: Date.parse('2026-06-25T15:30:00.000Z'),
+    pageContext: EMPTY_PAGE_CONTEXT_STATE,
     target: {
       mode: 'auto',
       picking: false,
@@ -247,16 +260,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     captureInProgress: false,
     captureResult: null,
     storageUsage: null,
-    buildIdentity: {
-      schemaVersion: 1,
-      version: '0.1.0',
-      builtAt: '2026-06-28T03:30:00.000Z',
-      commit: 'abc123def456',
-      branch: 'codex/dev',
-      worktree: '7bc4/image-bookmarklet',
-      timezone: 'America/Chicago',
-      mode: 'local',
-    },
+    buildIdentity: STORY_BUILD_IDENTITY,
     blobKeyUnlocked: true,
     blobKeyAvailable: true,
     blobKeyReference: 'session key',

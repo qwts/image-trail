@@ -13,6 +13,8 @@ import type { ObjectFitMode } from './preview-style.js';
 import type { QueueDisplayOrder, RecentDisplayOrder } from './display-order.js';
 import type { DetachableSectionId } from './workspace-layout.js';
 import type { PCloudBackupState } from './cloud/pcloud-provider.js';
+import type { PageContext, PageContextState } from './page-context.js';
+import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePreviewState } from './import-types.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
@@ -29,16 +31,6 @@ export interface TargetState {
   readonly fillScreen: boolean;
   readonly objectFit: ObjectFitMode;
   readonly message: string;
-}
-
-export interface ImportedImageFile {
-  readonly name: string;
-  readonly dataUrl: string;
-}
-
-export interface ImportedEncryptedImageFile {
-  readonly name: string;
-  readonly fileContent: string;
 }
 
 export interface AutomationState {
@@ -66,6 +58,14 @@ export type {
   WorkspaceLayoutStore,
   WorkspaceSectionLayout,
 } from './workspace-layout.js';
+export type {
+  ImportedEncryptedImageFile,
+  ImportedImageFile,
+  ImportRestorePreviewSample,
+  ImportRestorePreviewState,
+  ImportRestorePreviewUnsupportedSection,
+  ImportRestorePreviewValidationIssue,
+} from './import-types.js';
 
 export interface UrlTemplateStore {
   load(hostname: string): Promise<readonly UrlTemplateRecord[]>;
@@ -168,6 +168,7 @@ export interface PanelState {
   readonly message: string;
   readonly lastUpdatedAt: number;
   readonly target: TargetState;
+  readonly pageContext: PageContextState;
   readonly draftUrl: string | null;
   readonly history: readonly ImageDisplayRecord[];
   readonly recentHistoryLimit: number;
@@ -236,38 +237,6 @@ export interface PanelState {
   readonly currentImageFingerprint: string | null;
 }
 
-export interface ImportRestorePreviewState {
-  readonly fileName: string;
-  readonly payloadLabel: string;
-  readonly recordCount: number;
-  readonly capturedOriginalCount?: number | undefined;
-  readonly duplicateCount?: number | undefined;
-  readonly skippedCount?: number | undefined;
-  readonly unsupportedCount?: number | undefined;
-  readonly plaintext?: boolean | undefined;
-  readonly message?: string | undefined;
-  readonly messageIsError?: boolean | undefined;
-  readonly samples: readonly ImportRestorePreviewSample[];
-  readonly validationIssues?: readonly ImportRestorePreviewValidationIssue[] | undefined;
-  readonly unsupportedSections?: readonly ImportRestorePreviewUnsupportedSection[] | undefined;
-}
-
-export interface ImportRestorePreviewSample {
-  readonly label: string;
-  readonly url?: string | undefined;
-  readonly detail?: string | undefined;
-}
-
-export interface ImportRestorePreviewUnsupportedSection {
-  readonly label: string;
-  readonly detail: string;
-}
-
-export interface ImportRestorePreviewValidationIssue {
-  readonly reason: string;
-  readonly count: number;
-}
-
 export type PanelActionName =
   | 'toggle-panel'
   | 'close-panel'
@@ -283,6 +252,7 @@ export type PanelActionName =
   | 'target/fill-screen'
   | 'target/set-object-fit'
   | 'target/release'
+  | 'page-context/set'
   | 'history/add-loaded'
   | 'history/remove'
   | 'history/pin'
@@ -452,6 +422,7 @@ export type PanelAction =
         | 'selected-url/apply'
         | 'target/fill-screen'
         | 'target/set-object-fit'
+        | 'page-context/set'
         | 'panel/secondary-controls-open'
         | 'section/detach'
         | 'section/restore'
@@ -605,6 +576,7 @@ export type PanelAction =
   | { readonly name: 'active-field/set'; readonly id: string | null }
   | { readonly name: 'target/fill-screen'; readonly enabled: boolean }
   | { readonly name: 'target/set-object-fit'; readonly mode: ObjectFitMode }
+  | { readonly name: 'page-context/set'; readonly context: PageContext | null }
   | { readonly name: 'field-unlock/toggle'; readonly id: string }
   | FieldTransformPanelAction
   | { readonly name: 'selected-url/apply'; readonly url: string }

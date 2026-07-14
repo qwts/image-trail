@@ -140,6 +140,7 @@ function createHarness(
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
     saveLocalSettings: () => record('saveLocalSettings'),
     applyBuildInfoOverlayVisibility: () => record('applyBuildInfoOverlayVisibility'),
+    updatePageContextOverride: () => record('updatePageContextOverride'),
     pageAdapter: () => pageAdapter,
     panelMount: () => ({ mount: () => record('panelMount.mount') }) as unknown as PanelMount,
     keyboard: () => ({ enable: () => record('keyboard.enable') }) as unknown as KeyboardRouter,
@@ -219,8 +220,6 @@ function createHarness(
   };
 }
 
-// One valid action per registered name. The mapped type makes this a second compile-time totality
-// check: adding a registry entry without a fixture (or vice versa) fails to build.
 const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> } = {
   'start-target-picker': { name: 'start-target-picker' },
   'stop-target-picker': { name: 'stop-target-picker' },
@@ -229,6 +228,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'target/release': { name: 'target/release' },
   'target/fill-screen': { name: 'target/fill-screen', enabled: true },
   'target/set-object-fit': { name: 'target/set-object-fit', mode: 'contain' },
+  'page-context/set': { name: 'page-context/set', context: 'gallery' },
   'panel/secondary-controls-open': { name: 'panel/secondary-controls-open', open: true },
   'panel/history-section-open': { name: 'panel/history-section-open', open: true },
   'panel/bookmarks-section-open': { name: 'panel/bookmarks-section-open', open: true },

@@ -2,6 +2,7 @@ import { closePanel, EMPTY_AUTOMATION_STATE, showPanel } from '../state.js';
 import type { PanelState } from '../types.js';
 import { assertNeverAction } from './routing.js';
 import type { PanelActionForDomain } from './routing.js';
+import { resolvePageContextState } from '../page-context.js';
 
 type PanelSessionAction = PanelActionForDomain<'panel-session'>;
 
@@ -40,6 +41,12 @@ export function reducePanelSessionAction(state: PanelState, action: PanelSession
         ...state,
         helpOpen: !state.helpOpen,
         settingsOpen: state.helpOpen ? state.settingsOpen : false,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'page-context/set':
+      return {
+        ...state,
+        pageContext: resolvePageContextState(state.pageContext, action.context),
         lastUpdatedAt: Date.now(),
       };
     case 'section/detach':

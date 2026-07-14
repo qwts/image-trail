@@ -24,6 +24,7 @@ function createHarness(): Harness {
       log.push('dispatch');
     },
     root: () => null,
+    contextRoot: () => null,
     recallRoot: () => null,
     detachedRoot: () => null,
     toastRoot: () => null,

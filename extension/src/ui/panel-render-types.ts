@@ -4,6 +4,7 @@ import type { NumericFieldDisplayMode } from './parsed-fields-section.js';
 
 export interface PanelRenderTarget {
   readonly root: HTMLElement;
+  readonly contextRoot?: HTMLElement | null;
   readonly recallRoot?: HTMLElement | null;
   readonly detachedRoot?: HTMLElement | null;
   readonly toastRoot?: HTMLElement | null;

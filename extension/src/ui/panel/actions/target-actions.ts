@@ -8,7 +8,8 @@ export type TargetActionName =
   | 'grab-mode/stop'
   | 'target/release'
   | 'target/fill-screen'
-  | 'target/set-object-fit';
+  | 'target/set-object-fit'
+  | 'page-context/set';
 
 /** Target picking, grab mode, and selected-target presentation. Bodies moved verbatim from the panel dispatch chain. */
 export function buildTargetActionEntries(deps: PanelActionDeps): ActionEntries<TargetActionName> {
@@ -60,6 +61,11 @@ export function buildTargetActionEntries(deps: PanelActionDeps): ActionEntries<T
         deps.syncTargetState(snapshot);
         deps.saveLocalSettings({ ...deps.getLocalSettings(), previewObjectFit: snapshot.objectFit });
         deps.render();
+      },
+    },
+    'page-context/set': {
+      handle(action) {
+        deps.updatePageContextOverride(action.context);
       },
     },
   };

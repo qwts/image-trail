@@ -6,18 +6,25 @@ const roots = new WeakMap<HTMLElement, Root>();
 const REACT_SUBTREE_SELECTOR = '[data-image-trail-react-root]';
 
 export function renderReactSubtree(container: HTMLElement, content: ReactNode): HTMLElement {
-  const root = createRoot(container);
-  roots.set(container, root);
-  container.dataset['imageTrailReactRoot'] = 'true';
+  const root = roots.get(container) ?? createRoot(container);
+  if (!roots.has(container)) {
+    roots.set(container, root);
+    container.dataset['imageTrailReactRoot'] = 'true';
+  }
   flushSync(() => root.render(content));
   return container;
 }
 
+export function unmountReactSubtree(container: HTMLElement): void {
+  const root = roots.get(container);
+  if (!root) return;
+  root.unmount();
+  roots.delete(container);
+  delete container.dataset['imageTrailReactRoot'];
+}
+
 export function unmountReactSubtrees(container: HTMLElement): void {
   for (const subtree of Array.from(container.querySelectorAll<HTMLElement>(REACT_SUBTREE_SELECTOR))) {
-    const root = roots.get(subtree);
-    if (!root) continue;
-    root.unmount();
-    roots.delete(subtree);
+    unmountReactSubtree(subtree);
   }
 }

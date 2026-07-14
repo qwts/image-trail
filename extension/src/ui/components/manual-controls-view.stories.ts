@@ -60,6 +60,13 @@ function controlsStory(overrides: Partial<PanelState> = {}, width = 420): HTMLEl
     createManualControlsView({
       state: {
         ...initial,
+        pageContext: {
+          detected: 'gallery',
+          effective: 'gallery',
+          override: null,
+          available: ['single', 'gallery', 'feed'],
+          imageCount: 4,
+        },
         target: { ...initial.target, selectedUrl },
         ...overrides,
       },

@@ -7,6 +7,7 @@ import type { ImageProbeMethod } from '../../../core/image/request-policy.js';
 import type { CaptureRetryRequest, CaptureSourceType } from '../../../core/image/capture-result.js';
 import type { LoadFailureFeedback } from '../../../core/settings.js';
 import type { FieldTransformPanelAction, PanelAction, PanelState } from '../../../core/types.js';
+import type { PageContext } from '../../../core/page-context.js';
 import type { BufferedNavigationController } from '../buffered-navigation-controller.js';
 import type { PanelMount } from '../panel-mount.js';
 import type { ParsedFieldStateSync } from '../parsed-field-state-sync.js';
@@ -43,6 +44,7 @@ export interface PanelActionDeps {
   getLocalSettings(): PlaintextLocalSettings;
   saveLocalSettings(settings: PlaintextLocalSettings): void;
   applyBuildInfoOverlayVisibility(visible: boolean): void;
+  updatePageContextOverride(context: PageContext | null): void;
 
   // Collaborators, as lazy whole-object getters.
   pageAdapter(): PageAdapter;

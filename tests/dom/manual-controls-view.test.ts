@@ -22,7 +22,16 @@ function createView(overrides: Partial<ReturnType<typeof createInitialPanelState
 }
 
 test('primary workflow exposes navigation, capture, slideshow, and Grab Mode without expanding details', () => {
-  const { view, actions } = createView();
+  const initial = createInitialPanelState(0);
+  const { view, actions } = createView({
+    pageContext: {
+      ...initial.pageContext,
+      detected: 'gallery',
+      effective: 'gallery',
+      available: ['single', 'gallery', 'feed'],
+      imageCount: 4,
+    },
+  });
   const primary = view.querySelector('.image-trail-panel__primary-workflow');
   assert.ok(primary);
   assert.deepEqual(
@@ -38,6 +47,20 @@ test('primary workflow exposes navigation, capture, slideshow, and Grab Mode wit
     { name: 'slideshow-start' },
     { name: 'grab-mode/start' },
   ]);
+});
+
+test('single-image context hides Grab while feed context explains its state', () => {
+  const single = createView().view;
+  assert.equal(single.querySelector('[aria-label="Grab Mode"]'), null);
+  assert.equal(single.querySelector('.image-trail-panel__feed-hint'), null);
+
+  const initial = createInitialPanelState(0);
+  const feed = createView({
+    pageContext: { ...initial.pageContext, detected: 'feed', effective: 'feed', available: ['single', 'gallery', 'feed'], imageCount: 6 },
+    target: { ...initial.target, selectedUrl: 'https://images.example.test/photo.jpg', grabModeActive: true },
+  }).view;
+  assert.equal(feed.querySelector('.image-trail-panel__feed-hint')?.textContent, 'Click images in the feed to pin them.');
+  assert.equal(feed.querySelector('.image-trail-panel__feed-hint')?.classList.contains('is-active'), true);
 });
 
 test('running workflow exposes pause and stop actions while keeping More controls state-owned', () => {

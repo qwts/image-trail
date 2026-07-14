@@ -184,6 +184,18 @@ test('record schemas accept canonical fixtures and reject corrupted mutants with
     v.is(saveLocalSettingsRequestSchema, { settings: { ...DEFAULT_LOCAL_SETTINGS, recentSparseRowDisplayMode: 'stretchy' } }),
     false,
   );
+  assert.equal(
+    v.is(saveLocalSettingsRequestSchema, {
+      settings: { ...DEFAULT_LOCAL_SETTINGS, pageContextOverrides: { 'example.test': { context: 'feed', updatedAt: 1 } } },
+    }),
+    true,
+  );
+  assert.equal(
+    v.is(saveLocalSettingsRequestSchema, {
+      settings: { ...DEFAULT_LOCAL_SETTINGS, pageContextOverrides: { 'example.test': { context: 'invalid', updatedAt: 1 } } },
+    }),
+    false,
+  );
 
   assert.equal(v.is(urlReviewStatusClearFilterSchema, { scope: 'all' }), true);
   assert.equal(v.is(urlReviewStatusClearFilterSchema, { scope: 'page', hostname: 'h', pageUrl: 'p' }), true);

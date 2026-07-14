@@ -36,8 +36,22 @@
       "scenario": "settings",
       "test": "tests/e2e/design-baseline.spec.ts"
     },
-    { "id": "08-context-gallery", "file": "08-context-gallery.png", "status": "deferred", "issues": [506] },
-    { "id": "09-context-feed", "file": "09-context-feed.png", "status": "deferred", "issues": [506] },
+    {
+      "id": "08-context-gallery",
+      "file": "08-context-gallery.png",
+      "status": "automated",
+      "issues": [517],
+      "scenario": "gallery-context",
+      "test": "tests/e2e/page-context.spec.ts"
+    },
+    {
+      "id": "09-context-feed",
+      "file": "09-context-feed.png",
+      "status": "automated",
+      "issues": [517],
+      "scenario": "feed-context",
+      "test": "tests/e2e/page-context.spec.ts"
+    },
     {
       "id": "10-help",
       "file": "10-help.png",

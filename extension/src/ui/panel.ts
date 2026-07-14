@@ -46,6 +46,8 @@ import { NeighborPreloadController } from './panel/neighbor-preload-controller.j
 import { ParsedFieldNavigationController } from './panel/parsed-field-navigation-controller.js';
 import { ParsedFieldStateSync } from './panel/parsed-field-state-sync.js';
 import { PanelMount } from './panel/panel-mount.js';
+import { PageContextController } from './panel/page-context-controller.js';
+import { subscribeToPageAdapter } from './panel/panel-subscriptions.js';
 import { PanelPositionController } from './panel/panel-position-controller.js';
 import { WorkspaceLayoutController } from './panel/workspace-layout-controller.js';
 import { handlePanelShortcutAction } from './panel/shortcut-actions.js';
@@ -94,18 +96,6 @@ export class ImageTrailPanel {
       this.panelPosition.applyRestoredPanelPosition();
     },
   });
-  private get root(): HTMLElement | null {
-    return this.panelMount.root;
-  }
-  private get recallRoot(): HTMLElement | null {
-    return this.panelMount.recallRoot;
-  }
-  private get detachedRoot(): HTMLElement | null {
-    return this.panelMount.detachedRoot;
-  }
-  private get toastRoot(): HTMLElement | null {
-    return this.panelMount.toastRoot;
-  }
   private state: PanelState = createInitialPanelState();
   private readonly replaceState = (state: PanelState): void => {
     this.state = state;
@@ -292,7 +282,7 @@ export class ImageTrailPanel {
     render: () => this.render(),
     renderRecallOnly: () => this.renderRecallOnly(),
     whenStylesReady: () => this.panelMount.whenStylesReady(),
-    root: () => this.root,
+    root: () => this.panelMount.root,
     panelPositionStore: () => this.panelPositionStore,
   });
   private readonly workspaceLayout: WorkspaceLayoutController = new WorkspaceLayoutController({
@@ -314,7 +304,7 @@ export class ImageTrailPanel {
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     ensurePanelPositionRestored: () => this.panelPosition.ensurePanelPositionRestored(),
     refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
-    root: () => this.root,
+    root: () => this.panelMount.root,
     recallStore: () => this.recallStore,
   });
   private readonly panelSettings: PanelSettingsController = new PanelSettingsController({
@@ -334,7 +324,17 @@ export class ImageTrailPanel {
     governor: () => this.governor,
     neighborPreload: () => this.neighborPreload,
     pageAdapter: () => this.pageAdapter,
-    onLocalSettingsLoaded: () => this.workspaceLayout.queueWorkspaceRestore(),
+    onLocalSettingsLoaded: () => {
+      this.pageContext.applyStoredOverride();
+      this.workspaceLayout.queueWorkspaceRestore();
+    },
+  });
+  private readonly pageContext = new PageContextController({
+    getState: () => this.state,
+    setState: this.replaceState,
+    getLocalSettings: () => this.localSettings,
+    saveLocalSettings: (settings) => this.panelSettings.saveLocalSettings(settings),
+    render: () => this.render(),
   });
   private readonly parsedFieldNavigation: ParsedFieldNavigationController = new ParsedFieldNavigationController({
     getState: () => this.state,
@@ -376,10 +376,11 @@ export class ImageTrailPanel {
     getState: () => this.state,
     setState: this.replaceState,
     dispatch: (action) => this.dispatch(action),
-    root: () => this.root,
-    recallRoot: () => this.recallRoot,
-    detachedRoot: () => this.detachedRoot,
-    toastRoot: () => this.toastRoot,
+    root: () => this.panelMount.root,
+    contextRoot: () => this.panelMount.contextRoot,
+    recallRoot: () => this.panelMount.recallRoot,
+    detachedRoot: () => this.panelMount.detachedRoot,
+    toastRoot: () => this.panelMount.toastRoot,
     panelStylesReady: () => this.panelMount.panelStylesReady,
     previewScrollAnchorId: () => this.projectionApplication.previewScrollAnchorId,
     handlePanelDragStart: (event) => this.panelPosition.handlePanelDragStart(event),
@@ -439,35 +440,21 @@ export class ImageTrailPanel {
     private readonly workspaceLayoutStore: WorkspaceLayoutStore | null = null,
     private readonly options: ImageTrailPanelOptions = {},
   ) {
-    this.panelMount.registerSubscriptions([
-      this.pageAdapter.subscribe((snapshot) => {
-        this.state = setTargetState(this.state, toTargetState(snapshot));
-        this.render();
-        void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore());
+    this.panelMount.registerSubscriptions(
+      subscribeToPageAdapter({
+        pageAdapter: this.pageAdapter,
+        projections: this.projections,
+        recordLibrary: this.recordLibrary,
+        urlTemplateSettings: this.urlTemplateSettings,
+        onTargetSelection: (snapshot) => {
+          this.state = setTargetState(this.state, toTargetState(snapshot));
+          this.render();
+        },
+        restoreFieldState: () => {
+          void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore());
+        },
       }),
-      this.pageAdapter.subscribeToSuccessfulLoads((target) => {
-        if (target.projectionId && !this.projections.isActive(target.projectionId)) return;
-        if (target.projectionId) this.projections.update(target.projectionId, { status: 'loaded' });
-        void this.recordLibrary.addRecentHistory(target.url, target.thumbnail, {
-          trustLoadedImage: target.trustedLoadedImage,
-          width: target.width,
-          height: target.height,
-          projectionId: target.projectionId,
-        });
-      }),
-      this.pageAdapter.subscribeToBookmarkRequests((target) => {
-        this.recordLibrary.enqueueBookmarkMutation(async () => {
-          const options = { trustLoadedImage: target.trustedLoadedImage, width: target.width, height: target.height };
-          const bookmarked = await this.recordLibrary.bookmarkUrl(target.url, target.thumbnail, options);
-          if (bookmarked) {
-            await this.recordLibrary.addRecentHistory(target.url, target.thumbnail, options);
-          }
-        });
-      }),
-      this.pageAdapter.subscribeToGrabSourcePatternRequests((url) => {
-        void this.urlTemplateSettings.learnGrabSourcePattern(url);
-      }),
-    ]);
+    );
     void this.panelDataLoad.loadSettingsBookmarksAndRecents();
     void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore());
     void this.panelDataLoad.refreshStorageUsage();
@@ -528,6 +515,7 @@ export class ImageTrailPanel {
   }
 
   private cleanupMountedElements(options: { readonly releaseTarget?: boolean } = {}): void {
+    this.pageContext.stop();
     if (options.releaseTarget) {
       this.pageAdapter.cleanup();
     } else {
@@ -566,6 +554,7 @@ export class ImageTrailPanel {
       getLocalSettings: () => this.localSettings,
       saveLocalSettings: (settings) => this.panelSettings.saveLocalSettings(settings),
       applyBuildInfoOverlayVisibility: (visible) => this.options.applyBuildInfoOverlayVisibility?.(visible),
+      updatePageContextOverride: (context) => this.pageContext.setOverride(context),
       pageAdapter: () => this.pageAdapter,
       panelMount: () => this.panelMount,
       keyboard: () => this.keyboard,
@@ -642,6 +631,7 @@ export class ImageTrailPanel {
       return;
     }
     this.pageAdapter.prepareStandaloneImageBackdrop();
+    this.pageContext.start();
     this.panelMount.mount();
     this.keyboard.enable();
     this.pageAdapter.enableBookmarkShortcut();

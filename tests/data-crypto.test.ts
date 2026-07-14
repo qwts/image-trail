@@ -140,6 +140,23 @@ test('migrates secondary controls disclosure local setting safely', () => {
   assert.equal(invalid.load().secondaryControlsOpen, false);
 });
 
+test('migrates page-context overrides as bounded normalized extension-owned settings', () => {
+  const repository = new LocalSettingsRepository({
+    getItem: () =>
+      JSON.stringify({
+        pageContextOverrides: {
+          'Example.TEST': { context: 'feed', updatedAt: 2 },
+          'example.test': { context: 'gallery', updatedAt: 3 },
+          invalid: { context: 'unsupported', updatedAt: 4 },
+        },
+      }),
+    setItem: () => {},
+  });
+  assert.deepEqual(repository.load().pageContextOverrides, {
+    'example.test': { context: 'gallery', updatedAt: 3 },
+  });
+});
+
 test('migrates display-order settings safely', () => {
   const valid = new LocalSettingsRepository({
     getItem: () => JSON.stringify({ recentDisplayOrder: 'oldest-first', queueDisplayOrder: 'back-first' }),

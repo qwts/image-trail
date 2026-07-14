@@ -1,3 +1,5 @@
+import { unmountReactSubtree } from '../react/react-subtree.js';
+
 const ROOT_ID = 'image-trail-panel-root';
 const STYLE_PATH = 'src/ui/styles/panel-entry.css';
 const STYLES_READY_FALLBACK_MS = 300;
@@ -45,6 +47,7 @@ function defaultEnvironment(): PanelMountEnvironment {
  */
 export class PanelMount {
   private rootEl: HTMLElement | null = null;
+  private contextRootEl: HTMLElement | null = null;
   private recallRootEl: HTMLElement | null = null;
   private detachedRootEl: HTMLElement | null = null;
   private toastRootEl: HTMLElement | null = null;
@@ -63,6 +66,10 @@ export class PanelMount {
 
   get recallRoot(): HTMLElement | null {
     return this.recallRootEl;
+  }
+
+  get contextRoot(): HTMLElement | null {
+    return this.contextRootEl;
   }
 
   get detachedRoot(): HTMLElement | null {
@@ -106,6 +113,9 @@ export class PanelMount {
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-label', 'Image Trail panel');
     this.rootEl = root;
+    const contextRoot = doc.createElement('div');
+    contextRoot.className = 'image-trail-page-context-root';
+    this.contextRootEl = contextRoot;
     const recallRoot = doc.createElement('div');
     recallRoot.className = 'image-trail-panel-recall-root';
     this.recallRootEl = recallRoot;
@@ -136,7 +146,7 @@ export class PanelMount {
       link.addEventListener('error', reveal, { once: true });
       this.environment.scheduleStylesReadyFallback(reveal);
     });
-    shadow.replaceChildren(link, root, recallRoot, detachedRoot, toastRoot);
+    shadow.replaceChildren(link, root, contextRoot, recallRoot, detachedRoot, toastRoot);
     // Prefer document.body; fall back to documentElement only when body is absent. The logical
     // expression keeps this clear of the no-document-element-append lint rule.
     (doc.body ?? doc.documentElement).append(host);
@@ -144,8 +154,10 @@ export class PanelMount {
 
   /** Removes the mounted host and clears root/styles-ready state. Subscriptions are left intact. */
   teardown(): void {
+    if (this.contextRootEl) unmountReactSubtree(this.contextRootEl);
     this.environment.document.getElementById(ROOT_ID)?.remove();
     this.rootEl = null;
+    this.contextRootEl = null;
     this.recallRootEl = null;
     this.detachedRootEl = null;
     this.toastRootEl = null;
