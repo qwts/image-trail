@@ -6,6 +6,7 @@ import { PRIVACY_URL_TEXT } from '../components/record-metadata.js';
 import { renderReactSubtree } from './react-subtree.js';
 
 let targetUtilityOpen: boolean | null = null;
+let targetControlsOpen = false;
 
 interface TargetPickerProps {
   readonly target: TargetState;
@@ -75,7 +76,13 @@ function TargetControls({ target, dispatch }: Omit<TargetPickerProps, 'privacyMo
     if (isObjectFitMode(event.target.value)) dispatch({ name: 'target/set-object-fit', mode: event.target.value });
   };
   return (
-    <details className="image-trail-panel__target-controls">
+    <details
+      className="image-trail-panel__target-controls"
+      open={targetControlsOpen}
+      onToggle={(event) => {
+        targetControlsOpen = event.currentTarget.open;
+      }}
+    >
       <summary className="image-trail-panel__target-controls-summary" aria-label="Show target controls">
         <span aria-hidden="true">•••</span>
       </summary>

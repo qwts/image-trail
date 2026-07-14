@@ -227,6 +227,29 @@ export async function openTargetControls(page: Page): Promise<void> {
   await expect(details).toHaveAttribute('open', '');
 }
 
+export async function openSettingsGroup(page: Page, name: string): Promise<void> {
+  const showSettings = page.getByRole('button', { name: 'Show settings' });
+  if ((await showSettings.count()) > 0) await showSettings.click();
+  // Role locators intentionally exclude headings inside closed disclosures. Find the semantic
+  // heading by text first so the owning top-level group can be opened before role visibility exists.
+  const exactName = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}$`, 'u');
+  const heading = page.locator('h3, h4, h5').filter({ hasText: exactName }).first();
+  const topLevel = heading.locator(
+    'xpath=ancestor::details[contains(concat(" ", normalize-space(@class), " "), " image-trail-ds__settings-group ")][1]',
+  );
+  if ((await topLevel.count()) > 0 && (await topLevel.getAttribute('open')) === null) {
+    await topLevel.locator(':scope > summary').click();
+  }
+  const group = heading.locator('xpath=ancestor::details[1]');
+  if ((await group.getAttribute('open')) === null) await group.locator(':scope > summary').click();
+  await expect(group).toHaveAttribute('open', '');
+}
+
+export async function closeSettings(page: Page): Promise<void> {
+  const hideSettings = page.getByRole('button', { name: 'Hide settings' });
+  if ((await hideSettings.count()) > 0) await hideSettings.click();
+}
+
 // Sets the parsed-field load-failure feedback mode (#450). The control lives in Settings → Automation
 // → Preload; the default is Mute, so tests that assert a red field ring or an HTTP-error status must
 // opt into Display/Alert. Self-contained: opens Settings, selects the mode, then closes Settings so

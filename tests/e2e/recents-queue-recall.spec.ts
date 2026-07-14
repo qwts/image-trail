@@ -3,6 +3,7 @@ import type { Page, Worker } from '@playwright/test';
 import {
   applyUrlInEditor,
   clearDownloadRequestLog,
+  closeSettings,
   expect,
   expectPanelClosed,
   expectPanelOpen,
@@ -12,6 +13,7 @@ import {
   fixtureUrl,
   installDownloadRequestLog,
   openFixturePage,
+  openSettingsGroup,
   readDownloadRequestLog,
   setLoadFailureFeedback,
   test,
@@ -26,27 +28,20 @@ async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await expectPanelOpen(page);
 }
 
-async function showSettings(page: Page): Promise<void> {
-  const showSettingsButton = page.getByRole('button', { name: 'Show settings' });
-  if ((await showSettingsButton.count()) > 0) await showSettingsButton.click();
-}
-
-async function openSettingsGroup(page: Page, name: string): Promise<void> {
-  await showSettings(page);
-  const group = page.getByRole('heading', { name }).locator('xpath=ancestor::details[1]');
-  if (!(await group.evaluate((element) => element.hasAttribute('open')))) await page.getByRole('heading', { name }).click();
-}
-
 async function openImageUtilities(page: Page): Promise<void> {
   await openSettingsGroup(page, 'Image utilities');
 }
 
 async function setupEncryptedOriginals(page: Page): Promise<void> {
   await openSettingsGroup(page, 'Encrypted originals');
-  if ((await page.getByText(/Encrypted capture is unlocked with blob:/u).count()) > 0) return;
+  if ((await page.getByText(/Encrypted capture is unlocked with blob:/u).count()) > 0) {
+    await closeSettings(page);
+    return;
+  }
   await page.getByLabel('New encrypted originals password').fill(encryptedOriginalsPassword);
   await page.getByRole('button', { name: 'Create first key' }).click();
   await expectPanelStatusMessage(page, /Encrypted blob storage unlocked with blob:[a-f0-9-]+\./u);
+  await closeSettings(page);
 }
 
 async function openQueueMenu(page: Page): Promise<void> {
@@ -61,6 +56,7 @@ async function setVisiblePins(page: Page, value: string, expectedVisibleCount?: 
     .locator('xpath=ancestor::div[contains(@class, "image-trail-panel__settings-templates")][1]');
   await pins.locator('input[type="number"]').fill(value);
   await pins.locator('button', { hasText: 'Apply' }).click();
+  await closeSettings(page);
   if (expectedVisibleCount !== undefined) {
     await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(expectedVisibleCount);
   }
@@ -90,6 +86,7 @@ async function setVisibleRecents(
     .locator('select')
     .selectOption({ label: input.overflow });
   await recents.locator('button', { hasText: 'Apply' }).click();
+  await closeSettings(page);
   if (input.expectedVisibleCount !== undefined) {
     await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(input.expectedVisibleCount);
   }
@@ -98,6 +95,7 @@ async function setVisibleRecents(
 async function showHiddenRecents(page: Page, expectedVisibleCount: number): Promise<void> {
   await openSettingsGroup(page, 'Display');
   await page.getByRole('button', { name: 'Show hidden recents' }).click();
+  await closeSettings(page);
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(expectedVisibleCount);
 }
 
@@ -119,6 +117,7 @@ async function deleteAllDurableQueueRows(page: Page): Promise<void> {
     await deleteRecall.click();
     await page.getByRole('button', { name: /^Confirm Delete Recall items \(\d+\)$/u }).click();
   }
+  await closeSettings(page);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
 }
 
@@ -132,6 +131,7 @@ async function exportImages(page: Page, serviceWorker: Worker): Promise<void> {
   await clearDownloadRequestLog(serviceWorker);
   await page.getByRole('button', { name: /Export images/u }).click();
   await expectPanelStatusMessage(page, /Image export started\.|Started \d+ image downloads\./u);
+  await closeSettings(page);
 }
 
 async function waitForDownloadCount(serviceWorker: Worker, count: number): Promise<readonly string[]> {

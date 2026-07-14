@@ -7,6 +7,7 @@ import type { Download, Page, Worker } from '@playwright/test';
 import {
   applyUrlInEditor,
   clearDownloadRequestLog,
+  closeSettings,
   expect,
   expectPanelClosed,
   expectPanelOpen,
@@ -17,6 +18,7 @@ import {
   imageNavigationSnapshot,
   installDownloadRequestLog,
   openFixturePage,
+  openSettingsGroup,
   readDownloadRequestLog,
   test,
   togglePanelFromExtensionAction,
@@ -47,17 +49,6 @@ async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await expectPanelOpen(page);
 }
 
-async function showSettings(page: Page): Promise<void> {
-  const showSettingsButton = page.getByRole('button', { name: 'Show settings' });
-  if ((await showSettingsButton.count()) > 0) await showSettingsButton.click();
-}
-
-async function openSettingsGroup(page: Page, name: string): Promise<void> {
-  await showSettings(page);
-  const group = page.getByRole('heading', { name }).locator('xpath=ancestor::details[1]');
-  if (!(await group.evaluate((element) => element.hasAttribute('open')))) await page.getByRole('heading', { name }).click();
-}
-
 async function openImageUtilities(page: Page): Promise<void> {
   await openSettingsGroup(page, 'Image utilities');
 }
@@ -69,6 +60,7 @@ async function setVisiblePins(page: Page, value: string, expectedVisibleCount: n
     .locator('xpath=ancestor::div[contains(@class, "image-trail-panel__settings-templates")][1]');
   await pins.locator('input[type="number"]').fill(value);
   await pins.locator('button', { hasText: 'Apply' }).click();
+  await closeSettings(page);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(expectedVisibleCount);
 }
 
@@ -102,6 +94,7 @@ async function setupEncryptedOriginals(page: Page, value = password): Promise<vo
   await page.getByRole('button', { name: 'Create first key' }).click();
   await expectPanelStatusMessage(page, /Encrypted blob storage unlocked with blob:[a-f0-9-]+\./u);
   await expect(page.locator('.image-trail-panel__encryption-badge')).toHaveText('Unlocked');
+  await closeSettings(page);
 }
 
 async function clearEncryptedOriginalsKey(page: Page): Promise<void> {
@@ -109,6 +102,7 @@ async function clearEncryptedOriginalsKey(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Clear key' }).click();
   await page.getByRole('button', { name: 'Confirm clear key' }).click();
   await expectPanelStatusMessage(page, /Encrypted blob key cleared\. Import a key backup to recover encrypted originals\./u);
+  await closeSettings(page);
 }
 
 // Removes every stored blob key directly from the extension database. Used to reset
@@ -163,6 +157,7 @@ async function exportImages(page: Page, serviceWorker: Worker, options: { readon
   await clearDownloadRequestLog(serviceWorker);
   await page.getByRole('button', { name: /Export images/u }).click({ modifiers: options.saveAs ? ['Shift'] : [] });
   await expectPanelStatusMessage(page, /Image export started\.|Started \d+ image downloads\./u);
+  await closeSettings(page);
 }
 
 async function exportEncryptedImage(page: Page): Promise<{ readonly download: Download; readonly fileContent: string }> {
@@ -171,7 +166,9 @@ async function exportEncryptedImage(page: Page): Promise<{ readonly download: Do
   const path = await download.path();
   expect(path).not.toBeNull();
   await expectPanelStatusMessage(page, /Encrypted image export started\./u);
-  return { download, fileContent: await readFile(path!, 'utf8') };
+  const fileContent = await readFile(path!, 'utf8');
+  await closeSettings(page);
+  return { download, fileContent };
 }
 
 async function importEncryptedImage(page: Page, fileContent: string, fileName = 'asset-one.image-trail-encrypted.json'): Promise<void> {
@@ -181,6 +178,7 @@ async function importEncryptedImage(page: Page, fileContent: string, fileName = 
     .locator('input[type="file"][accept=".json,.image-trail-encrypted.json"]')
     .setInputFiles({ name: fileName, mimeType: 'application/json', buffer: Buffer.from(fileContent) });
   await imageUtilities.getByRole('button', { name: 'Import encrypted' }).click();
+  await closeSettings(page);
 }
 
 async function waitForDownloadRequests(serviceWorker: Worker, count: number) {
@@ -199,7 +197,9 @@ async function encryptedOriginalsStorageText(page: Page): Promise<string> {
   const usage = page
     .locator('.image-trail-panel__storage-health dt', { hasText: 'Encrypted originals' })
     .locator('xpath=following-sibling::dd[1]');
-  return (await usage.textContent()) ?? '';
+  const text = (await usage.textContent()) ?? '';
+  await closeSettings(page);
+  return text;
 }
 
 async function clearSelectedQueueRows(page: Page) {

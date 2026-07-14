@@ -7,6 +7,7 @@ import { chromium, type BrowserContext, type Download, type Page, type Worker } 
 
 import {
   applyUrlInEditor,
+  closeSettings,
   expect,
   expectPanelOpen,
   expectPanelStatusMessage,
@@ -15,6 +16,7 @@ import {
   fixtureUrl,
   imageNavigationSnapshot,
   openFixturePage,
+  openSettingsGroup,
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
@@ -83,14 +85,8 @@ async function hideSettings(page: Page): Promise<void> {
   if ((await hideSettingsButton.count()) > 0) await hideSettingsButton.click();
 }
 
-async function openSettingsGroup(page: Page, name: string): Promise<void> {
-  await showSettings(page);
-  const group = page.getByRole('heading', { name }).locator('xpath=ancestor::details[1]');
-  if (!(await group.evaluate((element) => element.hasAttribute('open')))) await page.getByRole('heading', { name }).click();
-}
-
 async function closeSettingsGroup(page: Page, name: string): Promise<void> {
-  await showSettings(page);
+  await openSettingsGroup(page, name);
   const group = page.getByRole('heading', { name }).locator('xpath=ancestor::details[1]');
   if (await group.evaluate((element) => element.hasAttribute('open'))) await page.getByRole('heading', { name }).click();
 }
@@ -124,6 +120,7 @@ async function deleteVisibleQueueRows(page: Page): Promise<void> {
     await deleteRecall.click();
     await page.getByRole('button', { name: /^Confirm Delete Recall items \(\d+\)$/u }).click();
   }
+  await closeSettings(page);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
 }
 
@@ -137,7 +134,9 @@ async function exportRecordJson(
   const [download] = await Promise.all([page.waitForEvent('download'), importExport.getByRole('button', { name: buttonName }).click()]);
   const filePath = await download.path();
   expect(filePath).not.toBeNull();
-  return { download, fileContent: await readFile(filePath!, 'utf8') };
+  const fileContent = await readFile(filePath!, 'utf8');
+  await closeSettings(page);
+  return { download, fileContent };
 }
 
 async function importRecordJson(page: Page, buttonName: string, fileContent: string, fileName: string): Promise<void> {
@@ -149,6 +148,7 @@ async function importRecordJson(page: Page, buttonName: string, fileContent: str
   await importExport.getByRole('button', { name: buttonName }).click();
   await expect(importExport.locator('.image-trail-panel__restore-preview')).toBeVisible();
   await importExport.getByRole('button', { name: 'Confirm import' }).click();
+  await closeSettings(page);
 }
 
 async function setupEncryptedOriginals(page: Page): Promise<void> {
@@ -168,6 +168,7 @@ async function setupEncryptedOriginals(page: Page): Promise<void> {
     await section.getByRole('button', { name: 'Unlock' }).click();
   }
   await expect(section.locator('.image-trail-panel__encryption-badge')).toHaveText('Unlocked');
+  await closeSettings(page);
 }
 
 async function exportKeyBackup(page: Page): Promise<{ readonly download: Download; readonly fileContent: string }> {
@@ -182,7 +183,9 @@ async function exportKeyBackup(page: Page): Promise<{ readonly download: Downloa
   ]);
   const filePath = await download.path();
   expect(filePath).not.toBeNull();
-  return { download, fileContent: await readFile(filePath!, 'utf8') };
+  const fileContent = await readFile(filePath!, 'utf8');
+  await closeSettings(page);
+  return { download, fileContent };
 }
 
 async function clearEncryptedOriginalsKey(page: Page): Promise<void> {
@@ -190,6 +193,7 @@ async function clearEncryptedOriginalsKey(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Clear key' }).click();
   await page.getByRole('button', { name: 'Confirm clear key' }).click();
   await expectPanelStatusMessage(page, /Encrypted blob key cleared\. Import a key backup to recover encrypted originals\./u);
+  await closeSettings(page);
 }
 
 async function importKeyBackup(page: Page, fileContent: string, password: string): Promise<void> {
@@ -209,6 +213,7 @@ async function unlockEncryptedOriginals(page: Page): Promise<void> {
   await page.getByLabel('Encrypted originals password').fill(encryptionPassword);
   await page.getByRole('button', { name: 'Unlock' }).click();
   await expectPanelStatusMessage(page, /Encrypted blob storage unlocked with blob:[a-f0-9-]+\./u);
+  await closeSettings(page);
 }
 
 async function installPCloudMock(serviceWorker: Worker): Promise<void> {

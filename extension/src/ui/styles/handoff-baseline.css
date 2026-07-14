@@ -258,6 +258,8 @@
 .image-trail-panel-root.image-trail-panel[data-surface='settings'] > .image-trail-panel__settings-section,
 .image-trail-panel-root.image-trail-panel[data-surface='help'] > .image-trail-panel__help-section {
   block-size: min(420px, calc(100vh - 136px));
+  grid-auto-rows: max-content;
+  overflow-anchor: none;
   padding-block-end: 0;
 }
 

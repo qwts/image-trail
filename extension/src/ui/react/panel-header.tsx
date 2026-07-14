@@ -74,7 +74,9 @@ function PanelHeaderContent({ state, callbacks }: { readonly state: PanelState; 
         </h2>
         <HeaderActions state={state} dispatch={callbacks.dispatch} />
         <span
-          className="image-trail-panel__header-state image-trail-panel__header-status image-trail-panel__status-announcer"
+          className={`image-trail-panel__header-state image-trail-panel__header-status image-trail-panel__status-announcer ${
+            status.tone === 'error' ? 'is-error' : status.tone === 'busy' ? 'is-waiting' : 'is-ready'
+          }`}
           role="status"
           data-tone={status.tone}
           title={state.privacyModeEnabled ? 'Image Trail status updated.' : state.message}

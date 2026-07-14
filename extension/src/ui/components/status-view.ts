@@ -10,6 +10,55 @@ function formatBytes(bytes: number): string {
 
 type StatusAction = { readonly name: 'capture/clear' | 'capture/permission-retry' };
 
+function automationStatusPills(state: PanelState): HTMLElement[] {
+  const pills: HTMLElement[] = [];
+  const auto = state.automation;
+
+  if (auto.slideshowPhase !== 'idle') {
+    pills.push(
+      createStatusPill({
+        label: `Slideshow: ${auto.slideshowPhase} (${auto.slideshowCount} shown)`,
+        tone: auto.slideshowPhase === 'running' ? 'busy' : 'neutral',
+        waiting: auto.slideshowPhase === 'running',
+        className: 'image-trail-panel__automation-status',
+      }),
+    );
+  }
+
+  if (auto.retryPhase !== 'idle') {
+    pills.push(
+      createStatusPill({
+        label: `Retry: ${auto.retryPhase} (${auto.retriesUsed}/${auto.retriesMax})`,
+        tone: auto.retryPhase === 'running' ? 'busy' : 'neutral',
+        waiting: auto.retryPhase === 'running',
+        className: 'image-trail-panel__automation-status',
+      }),
+    );
+  }
+
+  if (auto.governorStatus !== 'ready') {
+    pills.push(
+      createStatusPill({
+        label: `Rate limit: ${auto.governorStatus} (${auto.requestsInWindow} in window)`,
+        tone: 'busy',
+        waiting: true,
+        className: 'image-trail-panel__automation-status',
+      }),
+    );
+  }
+  return pills;
+}
+
+export function createAutomationStatusElements(state: PanelState): HTMLElement[] {
+  const pills = automationStatusPills(state);
+  if (pills.length === 0) return [];
+  const wrapper = document.createElement('section');
+  wrapper.className = 'image-trail-panel__section image-trail-panel__status-section';
+  wrapper.setAttribute('aria-label', 'Automation status');
+  wrapper.append(...pills);
+  return [wrapper];
+}
+
 export function createStatusView(state: PanelState, dispatch: (action: StatusAction) => void, existing?: HTMLElement | null): HTMLElement {
   const wrapper = existing ?? document.createElement('section');
   wrapper.className = 'image-trail-panel__section image-trail-panel__status-section';
@@ -64,36 +113,7 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
     children.push(usage);
   }
 
-  const auto = state.automation;
-  if (auto.slideshowPhase !== 'idle') {
-    const slideshow = createStatusPill({
-      label: `Slideshow: ${auto.slideshowPhase} (${auto.slideshowCount} shown)`,
-      tone: auto.slideshowPhase === 'running' ? 'busy' : 'neutral',
-      waiting: auto.slideshowPhase === 'running',
-      className: 'image-trail-panel__automation-status',
-    });
-    children.push(slideshow);
-  }
-
-  if (auto.retryPhase !== 'idle') {
-    const retry = createStatusPill({
-      label: `Retry: ${auto.retryPhase} (${auto.retriesUsed}/${auto.retriesMax})`,
-      tone: auto.retryPhase === 'running' ? 'busy' : 'neutral',
-      waiting: auto.retryPhase === 'running',
-      className: 'image-trail-panel__automation-status',
-    });
-    children.push(retry);
-  }
-
-  if (auto.governorStatus !== 'ready') {
-    const governor = createStatusPill({
-      label: `Rate limit: ${auto.governorStatus} (${auto.requestsInWindow} in window)`,
-      tone: 'busy',
-      waiting: true,
-      className: 'image-trail-panel__automation-status',
-    });
-    children.push(governor);
-  }
+  children.push(...automationStatusPills(state));
 
   wrapper.replaceChildren(...children);
   return wrapper;

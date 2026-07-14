@@ -19,7 +19,16 @@ async function openPanelWithSettings(page: Page, serviceWorker: Worker): Promise
 }
 
 function groupSummary(panel: Locator, title: string): Locator {
-  return panel.locator('summary.image-trail-panel__settings-utility-summary', { hasText: title });
+  return panel
+    .locator('.image-trail-panel__settings-section > details.image-trail-ds__settings-group', { hasText: title })
+    .first()
+    .locator(':scope > summary');
+}
+
+async function openGroup(panel: Locator, title: string): Promise<void> {
+  const summary = groupSummary(panel, title);
+  const group = summary.locator('xpath=..');
+  if ((await group.getAttribute('open')) === null) await summary.click();
 }
 
 async function boxOf(locator: Locator): Promise<{ x: number; y: number }> {
@@ -29,7 +38,8 @@ async function boxOf(locator: Locator): Promise<{ x: number; y: number }> {
 }
 
 // Click a group summary and assert the clicked control and reserved Settings surface hold their
-// positions through the toggle.
+// positions through the toggle. The covered top-level groups are already visible in the reserved
+// surface, so the assertion does not introduce a synthetic scroll before the click.
 async function toggleGroupExpectingStability(panel: Locator, title: string): Promise<void> {
   const summary = groupSummary(panel, title);
   const settings = panel.locator('.image-trail-panel__settings-section');
@@ -57,9 +67,9 @@ test('expanding and collapsing Settings groups keeps the clicked summary and the
 
   // The settings region reserves its block size up front, so its overlay geometry stays fixed
   // across every group expand/collapse.
-  await toggleGroupExpectingStability(panel, 'Display'); // open
+  await toggleGroupExpectingStability(panel, 'Display'); // close the default-open group
   await toggleGroupExpectingStability(panel, 'Automation'); // open (second group, region already partly full)
-  await toggleGroupExpectingStability(panel, 'Display'); // close again
+  await toggleGroupExpectingStability(panel, 'Display'); // open again
 });
 
 test('the Settings scroll position survives the rerender caused by applying a setting', async ({ page, serviceWorker }) => {
@@ -67,9 +77,9 @@ test('the Settings scroll position survives the rerender caused by applying a se
   const settingsSection = panel.locator('.image-trail-panel__settings-section');
 
   // Open a few groups so the region has enough content to scroll, then scroll partway down.
-  await groupSummary(panel, 'Display').click();
-  await groupSummary(panel, 'Automation').click();
-  await groupSummary(panel, 'System').click();
+  await openGroup(panel, 'Display');
+  await openGroup(panel, 'Automation');
+  await openGroup(panel, 'System');
   await settingsSection.evaluate((element) => {
     element.scrollTop = 60;
   });

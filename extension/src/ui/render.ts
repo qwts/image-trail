@@ -16,6 +16,7 @@ import { createPanelHeader } from './react/panel-header.js';
 import { unmountReactSubtrees } from './react/react-subtree.js';
 import type { PanelLayoutState, PanelRenderOptions, PanelRenderTarget } from './panel-render-types.js';
 import { createParsedFieldsSection } from './parsed-fields-section.js';
+import { createAutomationStatusElements } from './components/status-view.js';
 
 export type { PanelLayoutState, PanelRenderOptions, PanelRenderTarget } from './panel-render-types.js';
 
@@ -221,12 +222,12 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
   const focusedTextControl = focusedTextControlSnapshot(target.root);
   const scrollPositions = scrollSnapshots(target.root, target.layoutState, target.scrollAnchorId);
   target.root.replaceChildren();
-
   target.root.append(
     createPanelHeader(state, {
       dispatch: target.dispatch,
       ...(target.onPanelDragStart ? { onPanelDragStart: target.onPanelDragStart } : {}),
     }),
+    ...createAutomationStatusElements(state),
     ...attachedSectionElements(SECTIONS, target, state),
   );
   restoreScrollSnapshots(target.root, scrollPositions, target.layoutState);

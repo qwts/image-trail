@@ -6,6 +6,7 @@ import {
   fixturePaths,
   fixtureUrl,
   openFixturePage,
+  openSettingsGroup,
   panelStatus,
   test,
   togglePanelFromExtensionAction,
@@ -36,8 +37,7 @@ async function setRequestThrottle(
   page: Parameters<typeof openFixturePage>[0],
   values: { readonly minimumIntervalMs: string; readonly maxRequests: string; readonly windowMs: string },
 ): Promise<void> {
-  await page.getByRole('button', { name: 'Show settings' }).click();
-  await page.getByRole('heading', { name: 'Automation' }).click();
+  await openSettingsGroup(page, 'Automation');
   const throttle = page
     .getByRole('heading', { name: 'Request throttle' })
     .locator('xpath=ancestor::div[contains(@class, "image-trail-panel__settings-templates")][1]');
@@ -143,4 +143,7 @@ test('request-governor status surfaces bounded automation recovery', async ({ pa
   await expect(page.locator('.image-trail-panel__automation-status', { hasText: 'Rate limit: capped' })).toBeVisible({
     timeout: 6_000,
   });
+  // This worker-scoped browser profile is reused by later specs; restore the production defaults
+  // so the deliberate one-request cap cannot leak into unrelated navigation checks.
+  await setRequestThrottle(page, { minimumIntervalMs: '250', maxRequests: '60', windowMs: '60000' });
 });

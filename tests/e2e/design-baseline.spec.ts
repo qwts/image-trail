@@ -68,6 +68,16 @@ async function setupEncryptedOriginals(page: Page, panel: Locator): Promise<void
   await page.getByRole('button', { name: 'Hide settings' }).click();
 }
 
+async function clearEncryptedOriginals(page: Page, panel: Locator): Promise<void> {
+  await page.getByRole('button', { name: 'Show settings' }).click();
+  const privacy = settingsGroup(panel, 'Privacy');
+  if ((await privacy.getAttribute('open')) === null) await privacy.locator(':scope > summary').click();
+  const encryption = privacy.locator('details.image-trail-panel__encryption');
+  if ((await encryption.getAttribute('open')) === null) await encryption.locator(':scope > summary').click();
+  await encryption.getByRole('button', { name: 'Clear key' }).click();
+  await encryption.getByRole('button', { name: 'Confirm clear key' }).click();
+}
+
 test('panel shell matches the approved standard and narrow geometry', async ({ page, serviceWorker }, testInfo) => {
   const panel = await openPanel(page, serviceWorker);
   const box = await panel.boundingBox();
@@ -95,6 +105,10 @@ test('successful original capture uses the approved bottom-center feedback', asy
   expect(box).not.toBeNull();
   expect(Math.abs(box!.x + box!.width / 2 - referenceViewport.width / 2)).toBeLessThan(2);
   await captureArtifact(page, testInfo, '03-capture-flash');
+  const capturedRow = panel.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
+  await capturedRow.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(capturedRow).toHaveCount(0);
+  await clearEncryptedOriginals(page, panel);
 });
 
 test('Settings presents the five approved groups as one reserved surface', async ({ page, serviceWorker }, testInfo) => {

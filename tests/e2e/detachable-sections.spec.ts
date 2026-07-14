@@ -181,9 +181,11 @@ test('the per-site workspace layout persists across a reload when opted in, and 
   await openSystemGroup();
   await page.getByRole('button', { name: 'Reset workspace layout' }).click();
   await expect(restoredWindow).toHaveCount(0);
+  await page.getByRole('button', { name: 'Hide settings' }).click();
   await expect(page.getByRole('button', { name: detachHistoryName })).toBeVisible();
 
   // Leave the shared profile the way we found it: opt back out.
+  await openSystemGroup();
   await page.getByLabel('Restore workspace layout per site').uncheck();
 });
 
