@@ -9,5 +9,8 @@ await build({
   format: 'iife',
   platform: 'browser',
   target: 'es2022',
+  define: {
+    'process.env.NODE_ENV': '"production"',
+  },
   logLevel: 'info',
 });

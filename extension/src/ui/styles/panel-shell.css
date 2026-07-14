@@ -50,6 +50,85 @@
   gap: var(--it-space-3);
 }
 
+.image-trail-panel-root .image-trail-ds__panel-header:has(.image-trail-panel__destination-dock) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--it-space-5);
+  padding-block: 9px 8px;
+}
+
+.image-trail-panel-root .image-trail-panel__header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  align-items: center;
+  gap: var(--it-space-5);
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__header-state {
+  overflow: hidden;
+  color: var(--it-text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--it-type-micro);
+}
+
+.image-trail-panel-root .image-trail-panel__header-state[data-tone='ready'] {
+  color: var(--it-ok);
+}
+
+.image-trail-panel-root .image-trail-panel__header-state[data-tone='busy'] {
+  color: var(--it-warn);
+}
+
+.image-trail-panel-root .image-trail-panel__header-state[data-tone='error'] {
+  color: var(--it-error);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-dock {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--it-space-4);
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__dock-button {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  min-width: 0;
+  min-block-size: 40px;
+  padding: 5px 3px;
+  border: 1px solid var(--it-border-control);
+  border-radius: var(--it-radius-control);
+  background: var(--it-control-bg);
+  color: var(--it-text-3);
+  cursor: pointer;
+  font: var(--it-type-micro);
+}
+
+.image-trail-panel-root .image-trail-panel__dock-button:hover,
+.image-trail-panel-root .image-trail-panel__dock-button:focus-visible {
+  border-color: rgb(89 255 178 / 42%);
+  background: var(--it-control-bg-hover);
+}
+
+.image-trail-panel-root .image-trail-panel__dock-button:focus-visible {
+  outline: var(--it-focus-ring);
+  outline-offset: var(--it-focus-offset);
+}
+
+.image-trail-panel-root .image-trail-panel__dock-button[aria-pressed='true'] {
+  border-color: rgb(67 211 139 / 76%);
+  background: var(--it-accent-btn-bg);
+  color: var(--it-text);
+  box-shadow: 0 0 10px rgb(89 255 178 / 14%);
+}
+
+.image-trail-panel-root .image-trail-panel__dock-glyph {
+  font: var(--it-fw-bold) 13px/1 var(--it-font-ui);
+}
+
 .image-trail-panel-root .image-trail-ds__status-pill.image-trail-panel__header-status {
   max-inline-size: 130px;
   margin: 0;

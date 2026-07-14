@@ -1,7 +1,7 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
-const sourceFiles = ['extension/src/**/*.ts', 'tests/**/*.ts'];
+const sourceFiles = ['extension/src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}'];
 const sourceAndScripts = [...sourceFiles, 'scripts/**/*.mjs', 'eslint.config.js'];
 
 const noDocumentElementAppend = {
@@ -51,7 +51,7 @@ const layerImportBoundaries = [
 ];
 
 const layerBoundaryConfigs = layerImportBoundaries.map(({ layer, forbids, message }) => ({
-  files: [`extension/src/${layer}/**/*.ts`],
+  files: [`extension/src/${layer}/**/*.{ts,tsx}`],
   rules: {
     'no-restricted-imports': [
       'error',

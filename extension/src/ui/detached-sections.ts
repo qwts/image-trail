@@ -1,6 +1,7 @@
 import type { PanelState } from '../core/types.js';
 import { createDetachedSectionWindow, type DetachedWindowGeometry, type DetachedWindowPosition } from './components/detachable-section.js';
 import { sectionVisible, sectionWindowInlineSize, type DetachableSectionDefinition } from './section-registry.js';
+import { unmountReactSubtrees } from './react/react-subtree.js';
 import type { PanelRenderTarget } from './render.js';
 
 const DETACHED_WINDOW_GAP = 8;
@@ -21,6 +22,7 @@ export function renderDetachedSections(
 ): void {
   const detachedRoot = target.detachedRoot;
   if (!detachedRoot) return;
+  unmountReactSubtrees(detachedRoot);
   // A restored section must not reopen collapsed on its next detach: prune minimized flags for
   // sections that are no longer detached. Window positions are intentionally kept — reopening at
   // the last dragged spot is desired within a session.

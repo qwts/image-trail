@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/html-vite';
 
 import type { TargetState } from '../../core/types.js';
-import { createTargetPickerView } from './target-picker-view.js';
+import { createTargetPickerView } from '../react/target-picker-view.js';
 import { mockDispatch, panelStory } from '../stories/story-host.js';
 
 const meta = {

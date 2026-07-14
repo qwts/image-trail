@@ -39,6 +39,8 @@
           "type": "unit-dom",
           "paths": [
             "tests/dom/panel-shell-view.test.ts",
+            "tests/react-renderer-architecture.test.ts",
+            "tests/function-size-ratchet.test.ts",
             "tests/dom/manual-controls-view.test.ts",
             "tests/dom/url-editor-view.test.ts",
             "tests/dom/status-view.test.ts",
@@ -52,6 +54,7 @@
           "type": "storybook",
           "paths": [
             "extension/src/ui/render.stories.ts",
+            "extension/src/ui/react/renderer-comparison.stories.ts",
             "extension/src/ui/components/manual-controls-view.stories.ts",
             "extension/src/ui/components/status-view.stories.ts",
             "extension/src/ui/components/target-picker-view.stories.ts",
@@ -65,7 +68,8 @@
             "tests/e2e/extension-smoke.spec.ts",
             "tests/e2e/automation-governance.spec.ts",
             "tests/e2e/url-editor-parsed-fields.spec.ts",
-            "tests/e2e/detachable-sections.spec.ts"
+            "tests/e2e/detachable-sections.spec.ts",
+            "tests/e2e/react-renderer-boundary.spec.ts"
           ],
           "notes": "Covers packaged-extension open/minimize/expand/close, Host selection, URL application, visible navigation and automation actions, More controls, detached windows, status refresh, and focus/scroll-preserving rerenders."
         },

@@ -392,7 +392,11 @@ test('previewing a recent after a failed load updates the URL editor and parsed 
 
   // Double-click projecting a recent must supersede the failed draft: the URL editor and the
   // parsed-field derivation follow the projected record, not the dead address.
-  await page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' }).dblclick();
+  const failedDraftRecent = page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' });
+  // The first click selects and rerenders the row. Resolve the locator again for the second click
+  // so this exercises the product's cross-render double-click tracker instead of a stale node.
+  await failedDraftRecent.click();
+  await failedDraftRecent.click();
   await expectPanelStatusMessage(page, /(Loaded|Applied) .*asset-one\.svg|Projected image into selected host element\./u);
   await expect(page.locator('.image-trail-panel__full-url-input')).toHaveValue(fixtureUrl(fixtureAssetPaths.assetOne));
 });

@@ -339,7 +339,10 @@ test('previewing a recent clears the red failed-field marker left by a failed st
     .locator('.image-trail-panel__history-item')
     .filter({ has: page.locator('[title*="frame=97"]') })
     .first();
-  await frame97Recent.dblclick();
+  // The first click may select and rerender the row; resolve it again for the
+  // second click so the preview gesture survives the targeted list refresh.
+  await frame97Recent.click();
+  await frame97Recent.click();
   await expect(page.locator('.image-trail-panel__full-url-input')).toHaveValue(fixtureUrl('/dynamic-image.svg?set=50&frame=97'));
   await expect(page.locator('.image-trail-panel__field-row.is-error')).toHaveCount(0);
 });
