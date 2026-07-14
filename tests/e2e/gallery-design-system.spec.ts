@@ -39,6 +39,50 @@ const seedRecords: readonly SeedRecord[] = [
   },
 ];
 
+const galleryAlbumName = 'References';
+
+test.afterEach(async ({ extensionId, page }) => {
+  if (!page.url().startsWith(`chrome-extension://${extensionId}/`)) await openGallery(page, extensionId);
+  const cleanup = await page.evaluate(
+    async ({ albumName, recordUrls }) => {
+      const albumSnapshot = await chrome.runtime.sendMessage({
+        type: 'imageTrail.loadAlbums',
+        version: 1,
+        payload: {},
+      });
+      const albums = (albumSnapshot?.payload?.albums ?? []) as Array<{ id: string; name: string }>;
+      const albumResults = await Promise.all(
+        albums
+          .filter((album) => album.name === albumName)
+          .map((album) =>
+            chrome.runtime.sendMessage({
+              type: 'imageTrail.deleteAlbum',
+              version: 1,
+              payload: { albumId: album.id },
+            }),
+          ),
+      );
+      const bookmarkSnapshot = await chrome.runtime.sendMessage({
+        type: 'imageTrail.loadBookmarks',
+        version: 1,
+        payload: { offset: 0, limit: 500, scope: 'global' },
+      });
+      const bookmarks = (bookmarkSnapshot?.payload?.items ?? []) as Array<{ id: string; url: string }>;
+      const recordIds = bookmarks.filter((record) => recordUrls.includes(record.url)).map((record) => record.id);
+      const bookmarkResult = await chrome.runtime.sendMessage({
+        type: 'imageTrail.removeBookmarks',
+        version: 1,
+        payload: { ids: recordIds },
+      });
+      return { albumResults, bookmarkResult, recordIds };
+    },
+    { albumName: galleryAlbumName, recordUrls: seedRecords.map((record) => record.url) },
+  );
+  expect(cleanup.albumResults.every((result) => result?.payload?.ok === true)).toBe(true);
+  expect(cleanup.bookmarkResult?.payload?.ok).toBe(true);
+  expect(cleanup.bookmarkResult?.payload?.removedCount).toBe(cleanup.recordIds.length);
+});
+
 test('Gallery uses the shared design system without mutating durable queue order', async ({ extensionId, page }) => {
   await openGallery(page, extensionId);
   await seedGallery(page, seedRecords);
@@ -60,7 +104,7 @@ test('Gallery uses the shared design system without mutating durable queue order
   await page.getByRole('button', { name: 'Clear' }).click();
   await expect(page.locator('.image-trail-gallery__card')).toHaveCount(3);
 
-  await page.getByRole('textbox', { name: 'New album' }).fill('References');
+  await page.getByRole('textbox', { name: 'New album' }).fill(galleryAlbumName);
   await page.getByRole('button', { name: 'Create album' }).click();
   await expect(page.getByRole('button', { name: 'References (0)' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'All Images' }).click();
