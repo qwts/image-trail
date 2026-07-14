@@ -1,0 +1,143 @@
+import { Buffer } from 'node:buffer';
+import { webcrypto } from 'node:crypto';
+
+export const HANDOFF_RAIL_GEOMETRY = {
+  side: 344,
+  block: 240,
+  minimumHostWidth: 640,
+  minimumHostHeight: 480,
+} as const;
+
+export type RailEdge = 'left' | 'right' | 'top' | 'bottom';
+export type HostRisk =
+  | 'viewport-media-query'
+  | 'fixed-or-sticky'
+  | 'infinite-feed'
+  | 'nested-scroll'
+  | 'iframe'
+  | 'transformed-root'
+  | 'fullscreen'
+  | 'rtl-physical-edge'
+  | 'spa-root-replacement'
+  | 'shadow-root';
+
+export interface RailSpace {
+  readonly remainingWidth: number;
+  readonly remainingHeight: number;
+  readonly geometryFits: boolean;
+}
+
+export interface RailModeDecision {
+  readonly mode: 'overlay' | 'adapter-reflow';
+  readonly reasons: readonly string[];
+}
+
+export const REFLOW_STRATEGY_EVIDENCE = [
+  {
+    strategy: 'overlay',
+    result: 'default',
+    evidence: 'Does not mutate host layout; removable extension surfaces preserve host geometry, scroll, and focus.',
+  },
+  {
+    strategy: 'root-inset-or-margin',
+    result: 'reject-general',
+    evidence: 'Shrinks normal flow without changing viewport media queries and leaves fixed/sticky chrome in the reserved edge.',
+  },
+  {
+    strategy: 'wrapper-insertion',
+    result: 'reject',
+    evidence: 'Changes direct-child selectors, framework root ancestry, observer records, and fixed-position containing blocks.',
+  },
+  {
+    strategy: 'css-transform',
+    result: 'reject',
+    evidence: 'Changes paint geometry while layout metrics, media queries, scroll bounds, and fixed/sticky behavior remain unchanged.',
+  },
+  {
+    strategy: 'site-adapter',
+    result: 'conditional',
+    evidence: 'Can reflow an explicitly known container and its chrome, but only after adapter-specific tests and exact rollback proof.',
+  },
+] as const;
+
+export function measureRailSpace(viewport: { readonly width: number; readonly height: number }, edges: readonly RailEdge[]): RailSpace {
+  const unique = new Set(edges);
+  const sideCount = Number(unique.has('left')) + Number(unique.has('right'));
+  const blockCount = Number(unique.has('top')) + Number(unique.has('bottom'));
+  const remainingWidth = viewport.width - sideCount * HANDOFF_RAIL_GEOMETRY.side;
+  const remainingHeight = viewport.height - blockCount * HANDOFF_RAIL_GEOMETRY.block;
+  return {
+    remainingWidth,
+    remainingHeight,
+    geometryFits: remainingWidth >= HANDOFF_RAIL_GEOMETRY.minimumHostWidth && remainingHeight >= HANDOFF_RAIL_GEOMETRY.minimumHostHeight,
+  };
+}
+
+export function interactionThresholds(pointer: 'fine' | 'coarse' | 'keyboard'): {
+  readonly detach: number | null;
+  readonly snap: number | null;
+} {
+  if (pointer === 'keyboard') return { detach: null, snap: null };
+  return pointer === 'coarse' ? { detach: 16, snap: 56 } : { detach: 8, snap: 40 };
+}
+
+export function recommendRailMode(input: {
+  readonly viewport: { readonly width: number; readonly height: number };
+  readonly edges: readonly RailEdge[];
+  readonly risks: readonly HostRisk[];
+  readonly adapterApproved: boolean;
+}): RailModeDecision {
+  const space = measureRailSpace(input.viewport, input.edges);
+  if (!space.geometryFits) return { mode: 'overlay', reasons: ['insufficient-host-viewport'] };
+  if (!input.adapterApproved) return { mode: 'overlay', reasons: ['no-explicit-site-adapter'] };
+  if (input.risks.length > 0) return { mode: 'overlay', reasons: input.risks.map((risk) => `host-risk:${risk}`) };
+  return { mode: 'adapter-reflow', reasons: ['adapter-and-geometry-approved'] };
+}
+
+export function canonicalWorkspaceUrlStructure(rawUrl: string): string {
+  const url = new URL(rawUrl);
+  const path = url.pathname
+    .split('/')
+    .map((segment) => normalizePathSegment(segment))
+    .join('/');
+  const query = [...new Set(url.searchParams.keys())]
+    .sort()
+    .map((key) => {
+      const shapes = [...new Set(url.searchParams.getAll(key).map((value) => queryValueShape(value)))].sort();
+      return `${key}=${shapes.join(',')}`;
+    })
+    .join('&');
+  return `${url.origin}${path}${query ? `?${query}` : ''}`;
+}
+
+export async function deriveWorkspaceLayoutKey(rawUrl: string, installSecret: Uint8Array): Promise<string> {
+  const keyBytes = Uint8Array.from(installSecret);
+  const key = await webcrypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await webcrypto.subtle.sign('HMAC', key, new TextEncoder().encode(canonicalWorkspaceUrlStructure(rawUrl)));
+  return `workspace-layout:v2:${Buffer.from(signature).toString('base64url')}`;
+}
+
+function normalizePathSegment(segment: string): string {
+  const decoded = safeDecode(segment);
+  if (/^[0-9a-f]{8}-[0-9a-f-]{27}$/iu.test(decoded)) return '{uuid}';
+  if (/^[0-9a-f]{16,}$/iu.test(decoded)) return '{hex}';
+  if (/^[A-Za-z0-9_-]{24,}$/u.test(decoded)) return '{opaque}';
+  return decoded.replace(/\d+/gu, '{n}');
+}
+
+function queryValueShape(value: string): string {
+  if (value === '') return 'empty';
+  if (/^-?\d+(?:\.\d+)?$/u.test(value)) return 'number';
+  if (/^(?:true|false)$/iu.test(value)) return 'boolean';
+  if (/^[0-9a-f]{8}-[0-9a-f-]{27}$/iu.test(value)) return 'uuid';
+  if (/^https?:\/\//iu.test(value)) return 'url';
+  return 'text';
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
