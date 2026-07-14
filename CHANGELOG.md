@@ -1,5 +1,19 @@
 # image-trail
 
+## 0.3.0
+
+### Minor Changes
+
+- 88c0533: Complete the design-system migration by aligning Gallery header, search, paging, albums, status, cards, locked and empty states on canonical tokens and shared primitives with focused accessibility and packaged-extension acceptance coverage.
+- 6a29c88: Migrate the panel shell, status surfaces, Host target, URL editor, detached chrome, and primary navigation, capture, slideshow, and Grab Mode workflow to the shared design system.
+- 70bd2fd: Migrate the Field Editor to the shared design-system FieldRow, active-field hierarchy, responsive states, and critique-ready Storybook coverage while preserving existing editing and navigation behavior.
+- c183676: Unify Queue, Recents, Recall, and Gallery records on the shared design-system RecordRow with consistent selection, stored-original, encrypted, unavailable-key, privacy, and thumbnail states.
+- 1088f9a: Migrate Settings, encrypted and cloud integrations, maintenance controls, shortcuts, and Help to the shared design system while preserving existing behavior and native control state.
+
+### Patch Changes
+
+- 6b5c96d: Add accessible plain-DOM design-system primitives with shared interaction states and Storybook coverage.
+
 ## 0.2.6
 
 ### Patch Changes
