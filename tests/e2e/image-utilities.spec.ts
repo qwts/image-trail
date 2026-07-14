@@ -364,14 +364,22 @@ test('refuses to store oversized originals and keeps stored-original usage bound
   const baselineUsage = await encryptedOriginalsStorageText(page);
   expect(baselineUsage).toMatch(/^1 record ·/u);
 
-  // The acceptance flow captures the host page's own oversized image: the panel's
-  // URL editor already refuses oversized loads, so navigate to a fixture whose
-  // single image is the oversized asset and let panel open auto-select it.
+  // The fixture displays a normal thumbnail whose richer source URL points to the
+  // oversized asset. The host image is therefore pinnable while capture still sees
+  // and refuses the oversized response body.
   await openFixturePage(page, fixturePaths.oversizedImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
-  const oversizedRecent = page.locator('.image-trail-panel__history-item', { hasText: 'generated-oversized.svg' });
-  await expect(oversizedRecent).toBeVisible();
+  await expectPanelStatusMessage(page, 'Auto-selected the only qualifying image.');
+  await page.locator(primaryImage).evaluate((image: HTMLImageElement, thumbnailUrl) => {
+    image.removeAttribute('srcset');
+    image.src = thumbnailUrl;
+  }, fixtureUrl(fixtureAssetPaths.assetOne));
+  await expect
+    .poll(() => page.locator(primaryImage).evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0), {
+      timeout: 20_000,
+    })
+    .toBe(true);
 
   // Pin the oversized image into a durable queue row and attempt the capture from
   // there, so the refusal is exercised against a pinned queue record (matching the
