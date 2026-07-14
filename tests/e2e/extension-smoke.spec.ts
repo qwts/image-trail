@@ -142,10 +142,10 @@ test('the panel header Help toggle shows the grouped handoff shortcut reference 
   await expect(helpSection.getByRole('heading', { name: 'Trail navigation' })).toBeVisible();
   await expect(helpSection.getByRole('heading', { name: 'Capture' })).toBeVisible();
   await expect(helpSection.getByRole('heading', { name: 'Panel' })).toBeVisible();
-  await expect(helpSection.getByText(/Browser commands are modifier-based and user-rebindable/u)).toBeVisible();
+  await expect(helpSection.getByText(/are browser commands you rebind/u)).toBeVisible();
   await helpSection.getByRole('heading', { name: 'Workspace' }).click();
   await expect(helpSection.getByText(/Every workspace section can detach into a floating window/u)).toBeVisible();
-  await expect(helpSection.locator('strong').filter({ hasText: 'Next trail step' })).toBeVisible();
+  await expect(helpSection.locator('strong').filter({ hasText: 'Step to the previous / next image in the trail' })).toBeVisible();
 
   // Keyboard access without a focus trap: the toggle is a plain button and focus stays usable.
   await page.getByRole('button', { name: 'Hide help' }).click();

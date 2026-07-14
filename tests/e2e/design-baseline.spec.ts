@@ -57,28 +57,6 @@ async function showOnlySettingsGroup(panel: Locator, targetName: string): Promis
   await settingsGroup(panel, targetName).scrollIntoViewIfNeeded();
 }
 
-async function setupEncryptedOriginals(page: Page, panel: Locator): Promise<void> {
-  await page.getByRole('button', { name: 'Show settings' }).click();
-  const privacy = settingsGroup(panel, 'Privacy');
-  if ((await privacy.getAttribute('open')) === null) await privacy.locator(':scope > summary').click();
-  const encryption = privacy.locator('details.image-trail-panel__encryption');
-  if ((await encryption.getAttribute('open')) === null) await encryption.locator(':scope > summary').click();
-  await page.getByLabel('New encrypted originals password').fill('visual acceptance password');
-  await page.getByRole('button', { name: 'Create first key' }).click();
-  await expect(encryption).toContainText('Unlocked');
-  await page.getByRole('button', { name: 'Hide settings' }).click();
-}
-
-async function clearEncryptedOriginals(page: Page, panel: Locator): Promise<void> {
-  await page.getByRole('button', { name: 'Show settings' }).click();
-  const privacy = settingsGroup(panel, 'Privacy');
-  if ((await privacy.getAttribute('open')) === null) await privacy.locator(':scope > summary').click();
-  const encryption = privacy.locator('details.image-trail-panel__encryption');
-  if ((await encryption.getAttribute('open')) === null) await encryption.locator(':scope > summary').click();
-  await encryption.getByRole('button', { name: 'Clear key' }).click();
-  await encryption.getByRole('button', { name: 'Confirm clear key' }).click();
-}
-
 test('panel shell matches the approved standard and narrow geometry', async ({ page, serviceWorker }, testInfo) => {
   const panel = await openPanel(page, serviceWorker);
   const box = await panel.boundingBox();
@@ -96,20 +74,15 @@ test('panel shell matches the approved standard and narrow geometry', async ({ p
   await captureArtifact(page, testInfo, '01-panel-narrow');
 });
 
-test('successful original capture uses the approved bottom-center feedback', async ({ page, serviceWorker }, testInfo) => {
-  const panel = await openPanel(page, serviceWorker);
-  await setupEncryptedOriginals(page, panel);
+test('locked capture uses the approved bottom-center pin feedback', async ({ page, serviceWorker }, testInfo) => {
+  await openPanel(page, serviceWorker);
   await page.keyboard.press('c');
   const toast = page.locator('.image-trail-panel__shortcut-feedback');
-  await expect(toast).toHaveText('Captured original ✓');
+  await expect(toast).toHaveText('Pinned — unlock encryption to store the original');
   const box = await toast.boundingBox();
   expect(box).not.toBeNull();
   expect(Math.abs(box!.x + box!.width / 2 - referenceViewport.width / 2)).toBeLessThan(2);
   await captureArtifact(page, testInfo, '03-capture-flash');
-  const capturedRow = panel.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
-  await capturedRow.getByRole('button', { name: 'Delete', exact: true }).click();
-  await expect(capturedRow).toHaveCount(0);
-  await clearEncryptedOriginals(page, panel);
 });
 
 test('Settings presents the five approved groups as one reserved surface', async ({ page, serviceWorker }, testInfo) => {

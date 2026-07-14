@@ -14,11 +14,7 @@ export function createShortcutSettingsView(): HTMLElement {
   for (const group of SHORTCUT_GROUPS) {
     const heading = document.createElement('h5');
     heading.textContent = group.label;
-    const shortcuts = PAGE_SHORTCUTS.filter((shortcut) => shortcut.group === group.id).map((shortcut) => ({
-      keys: [shortcut.display],
-      label: shortcut.label,
-      description: shortcut.description,
-    }));
+    const shortcuts = group.id === 'trail' ? trailShortcutReference() : shortcutReferencesForGroup(group.id);
     wrapper.append(heading, createShortcutList(shortcuts));
     if (group.id === 'trail') wrapper.append(createTrailNote());
   }
@@ -26,17 +22,39 @@ export function createShortcutSettingsView(): HTMLElement {
   return wrapper;
 }
 
+function trailShortcutReference(): readonly ShortcutReference[] {
+  const previous = PAGE_SHORTCUTS.find((shortcut) => shortcut.action === 'previous');
+  const next = PAGE_SHORTCUTS.find((shortcut) => shortcut.action === 'next');
+  if (!previous || !next) return [];
+  return [
+    {
+      keys: [previous.display, next.display],
+      label: 'Step to the previous / next image in the trail',
+      description: `${previous.description} ${next.description}`,
+    },
+  ];
+}
+
+function shortcutReferencesForGroup(group: 'capture' | 'panel'): readonly ShortcutReference[] {
+  return PAGE_SHORTCUTS.filter((shortcut) => shortcut.group === group).map((shortcut) => ({
+    keys: [shortcut.display],
+    label: shortcut.label,
+    description: shortcut.description,
+  }));
+}
+
 function createTrailNote(): HTMLElement {
   const note = document.createElement('p');
   note.className = 'image-trail-panel__meta';
-  note.textContent = 'Arrow keys step every parsed field included in the Trail together.';
+  note.textContent =
+    'Arrow keys decrement / increment every parsed field included in the Trail together — usually one field, but multiple fields advance in lockstep.';
   return note;
 }
 
 function createBrowserCommandNote(): HTMLElement {
   const note = document.createElement('p');
   note.className = 'image-trail-panel__meta image-trail-panel__browser-command-note';
-  note.textContent = `Browser commands are modifier-based and user-rebindable: ${BROWSER_COMMAND_SHORTCUTS.map((shortcut) => shortcut.label).join(', ')}. The single-key shortcuts above are handled in-page.`;
+  note.textContent = `Modifier shortcuts — ${BROWSER_COMMAND_SHORTCUTS.map((shortcut) => shortcut.label).join(', ')} — are browser commands you rebind in your browser's extension keyboard shortcuts page. The single-key shortcuts above are handled in-page by Image Trail.`;
   return note;
 }
 

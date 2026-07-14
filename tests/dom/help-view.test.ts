@@ -35,8 +35,9 @@ test('the Help view renders the grouped handoff shortcut reference and browser-c
   assert.ok(view.querySelectorAll('kbd').length > 0, 'shortcut key chips render');
   assert.equal(view.querySelectorAll('kbd').length, view.querySelectorAll('.image-trail-ds__kbd').length);
   const text = view.textContent ?? '';
-  assert.ok(text.includes('Capture original'), 'shortcut labels come from the shared registry');
-  assert.ok(text.includes('modifier-based and user-rebindable'), 'browser commands are distinguished');
+  assert.ok(text.includes("Capture the current image's original"), 'shortcut labels come from the shared registry');
+  assert.ok(text.includes('Step to the previous / next image in the trail'), 'paired arrows use the handoff presentation');
+  assert.ok(text.includes('are browser commands you rebind'), 'browser commands are distinguished');
   assert.ok(text.includes('Settings › Automation'), 'Down assignment location is accurate');
 });
 
