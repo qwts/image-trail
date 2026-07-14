@@ -3,6 +3,7 @@ import './write-extension-build-info.mjs';
 
 await mkdir('extension/dist', { recursive: true });
 await cp('extension/manifest.json', 'extension/dist/manifest.json');
+await cp('extension/icons', 'extension/dist/icons', { recursive: true });
 await mkdir('extension/dist/src/ui', { recursive: true });
 await cp('extension/src/ui/styles', 'extension/dist/src/ui/styles', { recursive: true });
 await mkdir('extension/dist/src/preview', { recursive: true });

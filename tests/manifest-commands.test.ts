@@ -1,8 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 interface ExtensionCommandManifest {
+  readonly icons?: Record<string, string>;
+  readonly action?: {
+    readonly default_icon?: Record<string, string>;
+  };
   readonly permissions?: readonly string[];
   readonly host_permissions?: readonly string[];
   readonly optional_host_permissions?: readonly string[];
@@ -35,6 +40,28 @@ test('manifest uses activeTab injection and optional per-origin host grants', ()
 function loadManifest(): ExtensionCommandManifest {
   return JSON.parse(readFileSync('extension/manifest.json', 'utf8')) as ExtensionCommandManifest;
 }
+
+test('manifest registers correctly sized PNG icons for the extension and browser action', () => {
+  const manifest = loadManifest();
+  const expectedIcons = {
+    '16': 'icons/icon16.png',
+    '32': 'icons/icon32.png',
+    '48': 'icons/icon48.png',
+    '128': 'icons/icon128.png',
+  };
+
+  assert.deepEqual(manifest.icons, expectedIcons);
+  assert.deepEqual(manifest.action?.default_icon, expectedIcons);
+
+  for (const [declaredSize, iconPath] of Object.entries(expectedIcons)) {
+    const expectedSize = Number(declaredSize);
+    const icon = readFileSync(join('extension', iconPath));
+
+    assert.deepEqual([...icon.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], `${iconPath} should be a PNG`);
+    assert.equal(icon.readUInt32BE(16), expectedSize, `${iconPath} should have the declared width`);
+    assert.equal(icon.readUInt32BE(20), expectedSize, `${iconPath} should have the declared height`);
+  }
+});
 
 test('manifest exposes the build-info overlay toggle in Chromium keyboard shortcuts', () => {
   const command = loadManifest().commands?.['toggle-build-info-overlay'];
