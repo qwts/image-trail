@@ -52,7 +52,7 @@ test('panel and Gallery consume the same token source', () => {
   assert.match(galleryTokens, /^@import '\.\.\/ui\/styles\/tokens\.css';/u);
   assert.match(galleryTokens, /--image-trail-gallery-panel:\s*var\(--it-panel-bg\);/u);
   assert.match(galleryTokens, /--image-trail-gallery-accent:\s*var\(--it-accent-row\);/u);
-  assert.ok(galleryHtml.indexOf('gallery-tokens.css') < galleryHtml.indexOf('gallery.css'));
+  assert.ok(galleryHtml.indexOf('gallery.css') < galleryHtml.indexOf('gallery-tokens.css'));
 });
 
 test('the injected stylesheet can load its token dependency', () => {
