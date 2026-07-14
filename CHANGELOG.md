@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.7.0
+
+### Minor Changes
+
+- b356e31: Add accessible Dashboard, Gallery, Recall, and Settings dock routes with compact in-panel views, focus and scroll restoration, and a real Gallery-tab action.
+
 ## 0.6.0
 
 ### Minor Changes
