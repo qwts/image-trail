@@ -180,6 +180,35 @@ test('loadLocalSettings honors { render: false } and falls back to defaults with
   assert.equal(harness.getState().bookmarkLimit, DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax);
 });
 
+test('external queue-view settings reload page zero before refreshing the panel and Recall', async () => {
+  const harness = createHarness({
+    storeSettings: {
+      ...DEFAULT_LOCAL_SETTINGS,
+      visibleBookmarkSoftMax: 50,
+      bookmarkVisibilityScope: 'site',
+      queueDisplayOrder: 'back-first',
+    },
+  });
+
+  await harness.controller.loadLocalSettings({ reloadQueue: true });
+
+  assert.equal(harness.getState().bookmarkLimit, 50);
+  assert.equal(harness.getState().bookmarkVisibilityScope, 'site');
+  assert.equal(harness.getState().queueDisplayOrder, 'back-first');
+  assert.deepEqual(harness.log, ['loadBookmarkPage:0', 'renderPanelAndRefreshRecall']);
+});
+
+test('external non-queue settings render without repaging bookmarks', async () => {
+  const harness = createHarness({
+    storeSettings: { ...DEFAULT_LOCAL_SETTINGS, privacyModeEnabled: true },
+  });
+
+  await harness.controller.loadLocalSettings({ reloadQueue: true });
+
+  assert.equal(harness.getState().privacyModeEnabled, true);
+  assert.deepEqual(harness.log, ['render']);
+});
+
 test('saveLocalSettingsAsync writes to the store and updates the owned localSettings', async () => {
   const harness = createHarness();
   const next: PlaintextLocalSettings = { ...DEFAULT_LOCAL_SETTINGS, privacyModeEnabled: true };

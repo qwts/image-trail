@@ -204,7 +204,7 @@
         {
           "type": "playwright-e2e",
           "paths": ["tests/e2e/keyboard-feedback.spec.ts", "tests/e2e/automation-governance.spec.ts", "tests/e2e/design-baseline.spec.ts"],
-          "notes": "Covers the canonical bare-key table, typing/modifier/native-row exclusions, Trail and Grab routing, capture/pin semantics, 1400ms repeated-key reset, Controls hint reset, privacy-safe feedback, Help/Settings/Escape transitions, Down-arrow assignment and existing download path, cross-tab setting reload, source-page reload, extension process restart, duplicate-listener prevention, fixed-viewport capture/Help artifacts, slideshow controls, opposite-direction manual interruption, retry reachability, and request-governor capping."
+          "notes": "Covers the canonical bare-key table, typing/modifier/native-row exclusions, Trail and Grab routing, capture/pin semantics, 1400ms repeated-key reset, Controls hint reset, privacy-safe feedback, Help/Settings/Escape transitions, Down-arrow assignment and existing download path including imported data images, cross-tab setting reload, source-page reload, extension process restart, duplicate-listener prevention, fixed-viewport capture/Help artifacts, slideshow controls, opposite-direction manual interruption, retry reachability, and request-governor capping."
         },
         {
           "type": "playwright-e2e",
@@ -228,9 +228,11 @@
             "tests/data-crypto.test.ts",
             "tests/schema-validation.test.ts",
             "tests/local-settings-handlers.test.ts",
-            "tests/settings-change-message.test.ts"
+            "tests/settings-change-message.test.ts",
+            "tests/panel-settings-controller.test.ts",
+            "tests/dom/current-image-download-controller.test.ts"
           ],
-          "notes": "Covers the exact canonical registry, case-insensitive bare letters, handler-declined Down behavior, all excluded targets/modifiers, capture/pin/download routing and locked fallback, privacy-safe copy, Help grouping, Settings assignment, schema migration, typed cross-tab notification with no-listener resilience, 1400ms repeated-key reset, render survival, and teardown cleanup."
+          "notes": "Covers the exact canonical registry, case-insensitive bare letters, handler-declined Down behavior, all excluded targets/modifiers, capture/pin/download routing and locked fallback, real data-image URL resolution, privacy-safe copy, Help grouping, Settings assignment, schema migration, queue repaging after external queue-view settings, typed cross-tab notification with no-listener resilience, 1400ms repeated-key reset, render survival, and teardown cleanup."
         },
         {
           "type": "storybook",

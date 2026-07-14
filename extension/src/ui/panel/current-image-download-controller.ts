@@ -6,6 +6,15 @@ export interface CurrentImageDownloadControllerDeps {
   getState(): PanelState;
   setState(state: PanelState): void;
   render(): void;
+  findSelectedImage(handleId: string): HTMLImageElement | null;
+}
+
+function resolveCurrentImageUrl(state: PanelState, findSelectedImage: (handleId: string) => HTMLImageElement | null): string | null {
+  const selectedUrl = state.target.selectedUrl;
+  if (!selectedUrl || selectedUrl !== 'data:') return selectedUrl;
+  const handleId = state.target.selectedHandleId;
+  const image = handleId ? findSelectedImage(handleId) : null;
+  return image?.currentSrc || image?.src || null;
 }
 
 export class CurrentImageDownloadController {
@@ -13,7 +22,7 @@ export class CurrentImageDownloadController {
 
   async download(saveAs: boolean): Promise<boolean> {
     const state = this.deps.getState();
-    const url = state.target.selectedUrl;
+    const url = resolveCurrentImageUrl(state, this.deps.findSelectedImage);
     if (state.importExportBusy || !url) return false;
     this.deps.setState(reducePanelAction(state, { name: 'import-export/start' }));
     this.deps.render();

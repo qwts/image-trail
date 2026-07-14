@@ -44,6 +44,19 @@ export interface PanelSettingsControllerDeps {
   onLocalSettingsLoaded?(): void;
 }
 
+interface LoadLocalSettingsOptions {
+  readonly render?: boolean;
+  readonly reloadQueue?: boolean;
+}
+
+function queueViewSettingsChanged(state: PanelState, settings: PlaintextLocalSettings): boolean {
+  return (
+    state.bookmarkLimit !== settings.visibleBookmarkSoftMax ||
+    state.bookmarkVisibilityScope !== settings.bookmarkVisibilityScope ||
+    state.queueDisplayOrder !== settings.queueDisplayOrder
+  );
+}
+
 /**
  * Local-settings load/save plus the per-setting update handlers, moved verbatim off `ImageTrailPanel`.
  * Each `update*` handler validates the incoming value against its `*_LIMITS`, no-ops when the value is
@@ -55,11 +68,12 @@ export interface PanelSettingsControllerDeps {
 export class PanelSettingsController {
   constructor(private readonly deps: PanelSettingsControllerDeps) {}
 
-  async loadLocalSettings(options: { readonly render?: boolean } = {}): Promise<void> {
+  async loadLocalSettings(options: LoadLocalSettingsOptions = {}): Promise<void> {
     const store = this.deps.localSettingsStore();
     const settings = store ? await store.load() : DEFAULT_LOCAL_SETTINGS;
     this.deps.setLocalSettings(settings);
     const state = this.deps.getState();
+    const reloadQueue = options.reloadQueue === true && queueViewSettingsChanged(state, settings);
     const history = state.history.slice(0, settings.recentHistoryLimit);
     this.deps.setState({
       ...state,
@@ -104,7 +118,13 @@ export class PanelSettingsController {
     this.deps.setState(setTargetState(this.deps.getState(), toTargetState(snapshot)));
     // The workspace-layout restore is gated on the opt-in flag that just landed in state.
     this.deps.onLocalSettingsLoaded?.();
-    if (options.render !== false) this.deps.render();
+    if (reloadQueue) await this.deps.loadBookmarkPage(0, { render: false });
+    if (options.render === false) return;
+    if (reloadQueue) {
+      this.deps.renderPanelAndRefreshRecall();
+      return;
+    }
+    this.deps.render();
   }
 
   saveLocalSettings(settings: PlaintextLocalSettings): void {

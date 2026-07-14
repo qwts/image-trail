@@ -246,6 +246,7 @@ export class ImageTrailPanel {
     getState: () => this.state,
     setState: this.replaceState,
     render: () => this.render(),
+    findSelectedImage: (handleId) => this.findSelectedImage(handleId),
   });
   private readonly projectionApplication: ProjectionApplicationController = new ProjectionApplicationController({
     getState: () => this.state,
@@ -494,7 +495,7 @@ export class ImageTrailPanel {
   }
 
   reloadLocalSettings(): Promise<void> {
-    return this.panelSettings.loadLocalSettings({ render: this.state.visible });
+    return this.panelSettings.loadLocalSettings({ render: this.state.visible, reloadQueue: true });
   }
 
   toggle(): PanelState {

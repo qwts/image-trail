@@ -217,6 +217,40 @@ test('Down assignment persists, uses the existing download path, and reloads acr
   }
 });
 
+test('Down download resolves an imported data image without exposing it in feedback', async ({ page, serviceWorker }) => {
+  const dataImageUrl = `data:image/svg+xml,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#7cf3c5"/></svg>',
+  )}`;
+  await installDownloadRequestLog(serviceWorker);
+  await clearDownloadRequestLog(serviceWorker);
+  await openFixturePage(page, fixturePaths.singleImage);
+  await page
+    .locator('img')
+    .first()
+    .evaluate((image, url) => {
+      const target = image as HTMLImageElement;
+      target.removeAttribute('srcset');
+      target.src = url;
+    }, dataImageUrl);
+  await expect
+    .poll(() =>
+      page
+        .locator('img')
+        .first()
+        .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+  await setDownArrowAction(page, 'download');
+
+  await page.keyboard.press('ArrowDown');
+
+  await expectFeedback(page, 'Downloading current image…');
+  await waitForDownloads(serviceWorker, 1);
+  expect((await readDownloadRequestLog(serviceWorker))[0]).toMatchObject({ url: dataImageUrl, saveAs: false });
+});
+
 test('Down assignment survives an extension process restart without duplicate listeners', async ({ headless }) => {
   const userDataDir = await mkdtemp(path.join(tmpdir(), 'image-trail-keyboard-reload-'));
   try {
