@@ -52,3 +52,17 @@ test('running workflow exposes pause and stop actions while keeping More control
   view.querySelector<HTMLButtonElement>('.image-trail-panel__automation-actions [data-variant="danger"]')?.click();
   assert.deepEqual(actions, [{ name: 'slideshow-pause' }, { name: 'retry-stop' }]);
 });
+
+test('stopped slideshow is inactive and cannot restart without a target', () => {
+  const initial = createInitialPanelState(0);
+  const { view, actions } = createView({
+    target: { ...initial.target, selectedUrl: null },
+    automation: { ...initial.automation, slideshowPhase: 'stopped' },
+  });
+  const slideshow = view.querySelector<HTMLButtonElement>('[aria-label="Start slideshow"]');
+  assert.ok(slideshow);
+  assert.equal(slideshow.disabled, true);
+  assert.equal(slideshow.getAttribute('aria-pressed'), 'false');
+  slideshow.click();
+  assert.deepEqual(actions, []);
+});

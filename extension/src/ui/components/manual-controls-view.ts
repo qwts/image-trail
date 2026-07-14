@@ -72,13 +72,14 @@ export function createManualControlsView(options: ManualControlsViewOptions): HT
         : { name: 'slideshow-start' };
   const slideshowLabel =
     slideshowPhase === 'running' ? 'Pause slideshow' : slideshowPhase === 'paused' ? 'Resume slideshow' : 'Start slideshow';
+  const slideshowActive = slideshowPhase === 'running' || slideshowPhase === 'paused';
   primary.append(
     actionButton(slideshowPhase === 'running' ? '⏸ Slideshow' : '⏵ Slideshow', slideshowAction, dispatch, {
       ariaLabel: slideshowLabel,
       title: slideshowLabel,
-      active: slideshowPhase !== 'idle',
-      pressed: slideshowPhase !== 'idle',
-      disabled: noTarget && slideshowPhase === 'idle',
+      active: slideshowActive,
+      pressed: slideshowActive,
+      disabled: noTarget && !slideshowActive,
     }),
     actionButton('⌖ Grab', { name: state.target.grabModeActive ? 'grab-mode/stop' : 'grab-mode/start' }, dispatch, {
       ariaLabel: state.target.grabModeActive ? 'Stop Grab Mode' : 'Grab Mode',
