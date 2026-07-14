@@ -1,6 +1,6 @@
 import { PAGE_SHORTCUTS } from '../core/keyboard-shortcuts.js';
 
-export type KeyTarget = 'typing' | 'button' | 'record-row' | 'panel' | 'page';
+export type KeyTarget = 'typing' | 'button' | 'record-row' | 'detached-window' | 'panel' | 'page';
 
 export interface KeyBinding {
   readonly key: string;
@@ -42,6 +42,10 @@ export function classifyTarget(event: KeyboardEvent): KeyTarget {
   if (el['isContentEditable'] === true) return 'typing';
   if (composedPath.some(isRecordRow)) return 'record-row';
   if (typeof el['closest'] === 'function' && (el as unknown as HTMLElement).closest('[data-image-trail-row-id]')) return 'record-row';
+  if (composedPath.some(isDetachedWindow)) return 'detached-window';
+  if (typeof el['closest'] === 'function' && (el as unknown as HTMLElement).closest('[data-image-trail-detached-window]')) {
+    return 'detached-window';
+  }
   if (tag === 'BUTTON') return 'button';
   if (composedPath.some(isPanelHost)) return 'panel';
   if (typeof el['closest'] === 'function' && (el as unknown as HTMLElement).closest('#image-trail-panel-root')) return 'panel';
@@ -62,9 +66,19 @@ function isPanelHost(node: unknown): boolean {
   return (node as { id?: unknown }).id === 'image-trail-panel-root';
 }
 
-export function shouldRouteKeyboardShortcut(target: KeyTarget, _action: string, _key?: string): boolean {
+function isDetachedWindow(node: unknown): boolean {
+  if (!node || typeof node !== 'object') return false;
+  const candidate = node as { dataset?: { imageTrailDetachedWindow?: unknown }; getAttribute?: (name: string) => string | null };
+  return (
+    typeof candidate.dataset?.imageTrailDetachedWindow === 'string' ||
+    (typeof candidate.getAttribute === 'function' && candidate.getAttribute('data-image-trail-detached-window') !== null)
+  );
+}
+
+export function shouldRouteKeyboardShortcut(target: KeyTarget, action: string, _key?: string): boolean {
   if (target === 'typing') return false;
   if (target === 'record-row') return false;
+  if (target === 'detached-window' && action === 'close-surface') return false;
   return true;
 }
 

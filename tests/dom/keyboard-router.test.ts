@@ -67,3 +67,26 @@ test('an unassigned Down action remains native because the handler declines it',
     router.disable();
   }
 });
+
+test('Escape inside a detached window remains owned by its local restore handler', () => {
+  const actions: string[] = [];
+  const router = new KeyboardRouter((action) => {
+    actions.push(action);
+    return true;
+  });
+  const detachedWindow = document.createElement('aside');
+  detachedWindow.dataset['imageTrailDetachedWindow'] = 'history';
+  const restore = document.createElement('button');
+  detachedWindow.append(restore);
+  document.body.append(detachedWindow);
+  router.enable();
+  try {
+    assert.equal(dispatchKey(restore, 'Escape').defaultPrevented, false);
+    assert.deepEqual(actions, []);
+    assert.equal(dispatchKey(restore, 'g').defaultPrevented, true);
+    assert.deepEqual(actions, ['grab-mode-toggle']);
+  } finally {
+    router.disable();
+    detachedWindow.remove();
+  }
+});

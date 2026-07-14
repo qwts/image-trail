@@ -129,7 +129,7 @@ test('ignores browser shortcut action messages while the panel is closed', async
   await expectPanelClosed(page);
 });
 
-test('the panel header Help toggle shows the shortcut reference and feature guide (#352)', async ({ page, serviceWorker }) => {
+test('the panel header Help toggle shows the grouped handoff shortcut reference (#352, #519)', async ({ page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
@@ -139,15 +139,13 @@ test('the panel header Help toggle shows the shortcut reference and feature guid
 
   const helpSection = page.locator('.image-trail-panel__help-section');
   await expect(helpSection).toBeVisible();
-  // Role-based locators: shortcut ROW text can contain the heading strings as substrings
-  // (e.g. a row starting 'Browser shortcut…'), which trips strict mode with getByText.
-  await expect(helpSection.getByRole('heading', { name: 'Panel shortcuts' })).toBeVisible();
-  await expect(helpSection.getByRole('heading', { name: 'Browser shortcuts' })).toBeVisible();
+  await expect(helpSection.getByRole('heading', { name: 'Trail navigation' })).toBeVisible();
+  await expect(helpSection.getByRole('heading', { name: 'Capture' })).toBeVisible();
+  await expect(helpSection.getByRole('heading', { name: 'Panel' })).toBeVisible();
+  await expect(helpSection.getByText(/Browser commands are modifier-based and user-rebindable/u)).toBeVisible();
   await helpSection.getByRole('heading', { name: 'Workspace' }).click();
-  await expect(helpSection.getByText('Host target', { exact: true })).toBeVisible();
-  // The label can render in both the panel list and the legacy-keys list; any one instance proves
-  // the shared registry feeds Help.
-  await expect(helpSection.locator('strong').filter({ hasText: 'Next trail step' }).first()).toBeVisible();
+  await expect(helpSection.getByText(/Every workspace section can detach into a floating window/u)).toBeVisible();
+  await expect(helpSection.locator('strong').filter({ hasText: 'Next trail step' })).toBeVisible();
 
   // Keyboard access without a focus trap: the toggle is a plain button and focus stays usable.
   await page.getByRole('button', { name: 'Hide help' }).click();

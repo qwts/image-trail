@@ -68,6 +68,12 @@ test('classifyTarget returns record-row for row shortcuts inside the panel', () 
   assert.equal(classifyTarget(fakeEvent({ target: host, composedPath: () => [row, host] })), 'record-row');
 });
 
+test('classifyTarget identifies controls inside detached windows before generic buttons', () => {
+  const button = { tagName: 'BUTTON' };
+  const detachedWindow = { tagName: 'ASIDE', dataset: { imageTrailDetachedWindow: 'history' } };
+  assert.equal(classifyTarget(fakeEvent({ target: button, composedPath: () => [button, detachedWindow] })), 'detached-window');
+});
+
 test('default keyboard bindings are the exact approved bare-key registry', () => {
   assert.deepEqual(
     DEFAULT_BINDINGS.map(({ key, shift, action }) => ({ key, shift, action })),
@@ -119,6 +125,8 @@ test('keyboard shortcuts route from panel controls but not typing targets', () =
   assert.equal(shouldRouteKeyboardShortcut('button', 'grab-mode-toggle'), true);
   assert.equal(shouldRouteKeyboardShortcut('record-row', 'down-arrow', 'ArrowDown'), false);
   assert.equal(shouldRouteKeyboardShortcut('record-row', 'capture-current', 'c'), false);
+  assert.equal(shouldRouteKeyboardShortcut('detached-window', 'close-surface', 'Escape'), false);
+  assert.equal(shouldRouteKeyboardShortcut('detached-window', 'grab-mode-toggle', 'g'), true);
   assert.equal(shouldRouteKeyboardShortcut('panel', 'help-toggle'), true);
   assert.equal(shouldRouteKeyboardShortcut('page', 'capture-current'), true);
 });
