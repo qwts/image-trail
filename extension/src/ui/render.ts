@@ -1,9 +1,7 @@
 import type { DetachableSectionId, PanelAction, PanelState } from '../core/types.js';
-import { captureFailureMessage } from '../core/image/capture-result.js';
 import { renderDetachedSections } from './detached-sections.js';
 import { attachedSectionElements, type DetachableSectionDefinition } from './section-registry.js';
 import { createBookmarksView } from './components/bookmarks-view.js';
-import { createControlsView } from './components/controls-view.js';
 import type { DetachedWindowPosition } from './components/detachable-section.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHelpView } from './components/help-view.js';
@@ -14,6 +12,8 @@ import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './components/target-picker-view.js';
 import { activeUrlFieldsForState } from './active-url-fields.js';
 import { createFieldEditorViewModel } from './field-editor-view-model.js';
+import { createManualControlsView } from './components/manual-controls-view.js';
+import { createMinimizedPanel, createPanelHeader, panelHasError, panelIsWaiting, renderPanelToast } from './components/panel-shell-view.js';
 
 import { createParsedFieldsSection, type NumericFieldDisplayMode } from './parsed-fields-section.js';
 
@@ -117,105 +117,6 @@ const COLLAPSIBLE_LIST_SELECTORS = [
 const DRAWER_GAP = 8;
 const DRAWER_EDGE_PADDING = 12;
 const DRAWER_INLINE_SIZE = 340;
-
-function makeButton(label: string, action: PanelAction, dispatch: (action: PanelAction) => void, disabled = false): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = label;
-  button.disabled = disabled;
-  button.addEventListener('click', () => dispatch(action));
-  return button;
-}
-
-function createSecondaryControlsGroup(
-  state: Pick<PanelState, 'secondaryControlsOpen'>,
-  target: PanelRenderTarget,
-  controls: readonly HTMLElement[],
-): HTMLElement {
-  const group = document.createElement('details');
-  group.className = 'image-trail-panel__section image-trail-panel__secondary-controls';
-  group.open = state.secondaryControlsOpen;
-
-  const summary = document.createElement('summary');
-  summary.className = 'image-trail-panel__secondary-controls-summary';
-  const heading = document.createElement('h3');
-  heading.textContent = 'Manual controls';
-  summary.append(heading);
-  group.addEventListener('toggle', () => {
-    if (group.open === state.secondaryControlsOpen) return;
-    target.dispatch({ name: 'panel/secondary-controls-open', open: group.open });
-  });
-
-  const body = document.createElement('div');
-  body.className = 'image-trail-panel__secondary-controls-body';
-  body.append(...controls);
-
-  group.append(summary, body);
-  return group;
-}
-
-function createPanelHeader(state: PanelState, target: PanelRenderTarget): HTMLElement {
-  const header = document.createElement('header');
-  header.className = 'image-trail-panel__header';
-
-  const heading = document.createElement('h2');
-  heading.className = 'image-trail-panel__title';
-  heading.textContent = 'Image Trail';
-  if (target.onPanelDragStart) {
-    heading.addEventListener('pointerdown', target.onPanelDragStart);
-  }
-
-  const actions = document.createElement('div');
-  actions.className = 'image-trail-panel__header-actions';
-
-  const settings = makeButton('⚙', { name: 'settings/toggle' }, target.dispatch);
-  settings.className = 'image-trail-panel__icon-button';
-  settings.setAttribute('aria-label', state.settingsOpen ? 'Hide settings' : 'Show settings');
-  settings.title = state.settingsOpen ? 'Hide settings' : 'Show settings';
-  settings.setAttribute('aria-pressed', state.settingsOpen ? 'true' : 'false');
-
-  const help = makeButton('?', { name: 'help/toggle' }, target.dispatch);
-  help.className = 'image-trail-panel__icon-button';
-  help.setAttribute('aria-label', state.helpOpen ? 'Hide help' : 'Show help');
-  help.title = state.helpOpen ? 'Hide help' : 'Show help';
-  help.setAttribute('aria-pressed', state.helpOpen ? 'true' : 'false');
-
-  const minimize = makeButton('-', { name: 'panel/minimize' }, target.dispatch);
-  minimize.className = 'image-trail-panel__icon-button';
-  minimize.setAttribute('aria-label', 'Minimize panel');
-  minimize.title = 'Minimize panel';
-
-  const close = makeButton('X', { name: 'close-panel' }, target.dispatch);
-  close.className = 'image-trail-panel__icon-button';
-  close.setAttribute('aria-label', 'Close panel');
-  close.title = 'Close panel';
-
-  const status = document.createElement('p');
-  status.className = `image-trail-panel__header-status ${statusToneClass(state)}`;
-  status.textContent = statusSummaryText(state);
-  status.title = state.message.trim() || status.textContent;
-  if (isPanelWaiting(state)) status.classList.add('is-waiting');
-
-  actions.append(help, settings, minimize, close);
-  header.append(heading, status, actions);
-  return header;
-}
-
-function createMinimizedPanel(state: PanelState, target: PanelRenderTarget): HTMLElement {
-  const container = document.createElement('div');
-  container.className = 'image-trail-panel__minimized';
-
-  const button = makeButton('Image Trail', { name: 'panel/expand' }, target.dispatch);
-  button.className = 'image-trail-panel__minimized-button';
-  button.setAttribute(
-    'aria-label',
-    state.target.grabModeActive ? 'Expand Image Trail panel. Grab Mode is active.' : 'Expand Image Trail panel',
-  );
-  button.title = state.target.grabModeActive ? 'Expand Image Trail panel. Grab Mode is active.' : 'Expand Image Trail panel';
-  button.dataset['grabMode'] = state.target.grabModeActive ? 'active' : 'inactive';
-  container.append(button);
-  return container;
-}
 
 function focusedTextControlSnapshot(root: HTMLElement): FocusedTextControlSnapshot | null {
   const rootNode = root.getRootNode();
@@ -336,11 +237,11 @@ function restoreScrollAnchor(container: HTMLElement, anchor: ScrollSnapshot['anc
 
 export function renderPanel(target: PanelRenderTarget, state: PanelState, options: PanelRenderOptions = {}): void {
   target.root.classList.toggle('is-minimized', state.minimized);
-  target.root.classList.toggle('is-waiting', isPanelWaiting(state));
-  target.root.classList.toggle('has-status-error', hasPanelError(state));
-  renderStatusToast(target.toastRoot, state);
+  target.root.classList.toggle('is-waiting', panelIsWaiting(state));
+  target.root.classList.toggle('has-status-error', panelHasError(state));
+  renderPanelToast(target.toastRoot, state);
   if (state.minimized) {
-    target.root.replaceChildren(createMinimizedPanel(state, target));
+    target.root.replaceChildren(createMinimizedPanel(state, target.dispatch));
     if (target.recallRoot && options.renderRecall !== false) target.recallRoot.replaceChildren();
     target.detachedRoot?.replaceChildren();
     return;
@@ -353,7 +254,10 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
   target.root.replaceChildren();
 
   target.root.append(
-    createPanelHeader(state, target),
+    createPanelHeader(state, {
+      dispatch: target.dispatch,
+      ...(target.onPanelDragStart ? { onPanelDragStart: target.onPanelDragStart } : {}),
+    }),
     createStatusView(state, target.dispatch, statusView),
     ...attachedSectionElements(SECTIONS, target, state),
   );
@@ -388,6 +292,11 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [
     create: () => createHelpView(),
   },
   {
+    id: 'target',
+    title: 'Host target',
+    create: (target, state) => createTargetPickerView(state.target, target.dispatch, { privacyMode: state.privacyModeEnabled }),
+  },
+  {
     id: 'url-editor',
     title: 'URL editor',
     create: (target, state) =>
@@ -404,11 +313,6 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [
       ),
   },
   {
-    id: 'target',
-    title: 'Host target',
-    create: (target, state) => createTargetPickerView(state.target, target.dispatch, { privacyMode: state.privacyModeEnabled }),
-  },
-  {
     id: 'fields',
     title: 'Field Editor',
     windowInlineSize: 380,
@@ -421,70 +325,12 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [
 
 function createManualControlsSection(target: PanelRenderTarget, state: PanelState): HTMLElement {
   const fieldEditor = cachedFieldEditorViewModel(state);
-  const dispatchActiveField = (delta: -1 | 1): void => {
-    const fieldId = delta < 0 ? fieldEditor.previousFieldId : fieldEditor.nextFieldId;
-    if (fieldId) target.dispatch({ name: 'active-field/set', id: fieldId });
-  };
-
-  const isNoTarget = !state.target.selectedUrl;
-
-  const captureSection = document.createElement('div');
-  captureSection.className = 'image-trail-panel__capture-actions';
-  const selectedUrl = state.target.selectedUrl;
-  if (selectedUrl) {
-    const captureBtn = makeButton(
-      'Capture original',
-      { name: 'capture/request', url: selectedUrl, sourceType: 'target' },
-      target.dispatch,
-      state.captureInProgress,
-    );
-    captureBtn.className = 'image-trail-panel__capture-btn';
-    captureSection.append(captureBtn);
-  }
-
-  const navSection = document.createElement('div');
-  navSection.className = 'image-trail-panel__nav-actions';
-  navSection.append(
-    makeButton('◀ Prev', { name: 'navigate-previous' }, target.dispatch, isNoTarget),
-    makeButton('Next ▶', { name: 'navigate-next' }, target.dispatch, isNoTarget),
-  );
-
-  const autoSection = document.createElement('div');
-  autoSection.className = 'image-trail-panel__automation-actions';
-  const auto = state.automation;
-  if (auto.slideshowPhase === 'running') {
-    autoSection.append(
-      makeButton('Pause slideshow', { name: 'slideshow-pause' }, target.dispatch),
-      makeButton('Stop slideshow', { name: 'slideshow-stop' }, target.dispatch),
-    );
-  } else if (auto.slideshowPhase === 'paused') {
-    autoSection.append(
-      makeButton('Resume slideshow', { name: 'slideshow-resume' }, target.dispatch),
-      makeButton('Stop slideshow', { name: 'slideshow-stop' }, target.dispatch),
-    );
-  } else {
-    autoSection.append(makeButton('Start slideshow', { name: 'slideshow-start' }, target.dispatch, isNoTarget));
-  }
-
-  if (auto.retryPhase === 'running') {
-    autoSection.append(makeButton('Stop retry', { name: 'retry-stop' }, target.dispatch));
-  } else {
-    autoSection.append(makeButton('Retry 404', { name: 'retry-start' }, target.dispatch, isNoTarget));
-  }
-
-  if (auto.slideshowPhase !== 'idle' || auto.retryPhase !== 'idle') {
-    autoSection.append(makeButton('Stop all', { name: 'stop-all' }, target.dispatch));
-  }
-
-  return createSecondaryControlsGroup(state, target, [
-    createControlsView({
-      onPrevious: () => dispatchActiveField(-1),
-      onNext: () => dispatchActiveField(1),
-    }),
-    captureSection,
-    navSection,
-    autoSection,
-  ]);
+  return createManualControlsView({
+    state,
+    previousFieldId: fieldEditor.previousFieldId,
+    nextFieldId: fieldEditor.nextFieldId,
+    dispatch: target.dispatch,
+  });
 }
 
 function createHistorySection(target: PanelRenderTarget, state: PanelState): HTMLElement {
@@ -528,112 +374,6 @@ function createBookmarksSection(target: PanelRenderTarget, state: PanelState): H
       collapsible: !state.detachedSections.includes('bookmarks'),
     },
     target.dispatch,
-  );
-}
-
-function renderStatusToast(toastRoot: HTMLElement | null | undefined, state: PanelState): void {
-  if (!toastRoot) return;
-  const message = toastMessageText(state);
-  const showToast = state.visible && state.status !== 'closed' && !!message;
-  const label = hasPanelError(state) ? 'Error' : isPanelWaiting(state) ? 'Working' : statusSummaryText(state);
-  // Targeted refresh (#373): rebuilding the toast on every render replays its enter animation, so
-  // an unchanged (often stale) status message "pops up" again on each navigation render. Skip the
-  // rebuild unless something the toast shows actually changed. The key holds every input that
-  // affects the DOM below; out-of-band writers (the buffered-skip toast) clear it to force a rebuild.
-  const toastKey = showToast
-    ? [statusToneClass(state), String(isPanelWaiting(state)), String(hasPanelError(state)), label, message].join(' ')
-    : '';
-  if (toastRoot.dataset['imageTrailToastKey'] === toastKey) return;
-  toastRoot.dataset['imageTrailToastKey'] = toastKey;
-  toastRoot.replaceChildren();
-  toastRoot.className = `image-trail-panel-root image-trail-panel__toast-root ${statusToneClass(state)}`;
-  toastRoot.classList.toggle('is-waiting', isPanelWaiting(state));
-  toastRoot.classList.toggle('has-status-error', hasPanelError(state));
-  if (!showToast) return;
-
-  const toast = document.createElement('aside');
-  toast.className = 'image-trail-panel__toast';
-  toast.setAttribute('role', hasPanelError(state) ? 'alert' : 'status');
-  toast.setAttribute('aria-live', hasPanelError(state) ? 'assertive' : 'polite');
-
-  const labelElement = document.createElement('span');
-  labelElement.className = 'image-trail-panel__toast-label';
-  labelElement.textContent = label;
-
-  const copy = document.createElement('span');
-  copy.className = 'image-trail-panel__toast-message';
-  copy.textContent = message;
-  copy.title = message;
-
-  toast.append(labelElement, copy);
-  toastRoot.append(toast);
-}
-
-function statusSummaryText(state: PanelState): string {
-  if (hasPanelError(state)) return 'Needs attention';
-  if (state.captureInProgress) return 'Capturing';
-  if (state.importExportBusy) return 'Import/export';
-  if (state.pcloudBackup.connectionState === 'busy') return 'pCloud';
-  if (state.recall.busy) return 'Recall loading';
-  if (state.automation.retryPhase === 'running') return 'Retrying';
-  if (state.automation.slideshowPhase === 'running') return 'Slideshow';
-  if (state.automation.governorStatus !== 'ready') return 'Rate limited';
-  if (state.automation.navigationBusy) return 'Loading';
-  if (state.status === 'picking') return 'Picking';
-  return 'Ready';
-}
-
-function toastMessageText(state: PanelState): string {
-  const waitingMessage = waitingToastMessageText(state);
-  if (waitingMessage) return waitingMessage;
-  if (!hasPanelError(state)) return '';
-  if (state.privacyModeEnabled) return 'Image Trail needs attention. Open the panel for details.';
-  if (state.captureResult?.status === 'failed' || state.captureResult?.status === 'remote-only') {
-    return state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
-  }
-  if (state.importExportMessage) return state.importExportMessage;
-  if (state.recall.message) return state.recall.message;
-  if (state.message.trim()) return state.message.trim();
-  return '';
-}
-
-function waitingToastMessageText(state: PanelState): string {
-  if (state.captureInProgress) return 'Capturing selected image original.';
-  if (state.importExportBusy) return 'Import or export is running.';
-  if (state.pcloudBackup.connectionState === 'busy') return state.pcloudBackup.message ?? 'pCloud is working.';
-  if (state.recall.busy) return 'Loading Recall records.';
-  if (state.automation.retryPhase === 'running') return 'Retrying failed image loads.';
-  if (state.automation.slideshowPhase === 'running') return 'Slideshow is advancing images.';
-  if (state.automation.governorStatus !== 'ready') return 'Waiting for the request limit window.';
-  if (state.automation.navigationBusy) return 'Loading the next image.';
-  return '';
-}
-
-function statusToneClass(state: PanelState): string {
-  if (hasPanelError(state)) return 'is-error';
-  if (isPanelWaiting(state)) return 'is-waiting';
-  return 'is-ready';
-}
-
-function isPanelWaiting(state: PanelState): boolean {
-  return (
-    state.captureInProgress ||
-    state.importExportBusy ||
-    state.pcloudBackup.connectionState === 'busy' ||
-    state.recall.busy ||
-    state.automation.slideshowPhase === 'running' ||
-    state.automation.retryPhase === 'running' ||
-    state.automation.governorStatus !== 'ready' ||
-    state.automation.navigationBusy
-  );
-}
-
-function hasPanelError(state: PanelState): boolean {
-  return (
-    state.status === 'error' ||
-    state.importExportMessageIsError === true ||
-    state.recall.messageIsError === true ||
-    (state.captureResult !== null && state.captureResult.status !== 'captured')
   );
 }
 

@@ -56,6 +56,8 @@
         "src/ui/styles/design-system.css",
         "src/ui/styles/primitives.css",
         "src/ui/styles/feedback-primitives.css",
+        "src/ui/styles/panel-shell.css",
+        "src/ui/styles/primary-workflow.css",
         "src/ui/styles/tokens.css"
       ],
       "matches": ["http://*/*", "https://*/*"]

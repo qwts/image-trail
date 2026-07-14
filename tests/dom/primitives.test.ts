@@ -67,10 +67,21 @@ test('Input supports native text and textarea controls without leaking private v
   assert.ok(privateInput.classList.contains('is-private'));
   assert.doesNotMatch(privateInput.outerHTML, /images\.example\.test/u);
 
-  const textarea = createInput({ ariaLabelledBy: 'notes-label', multiline: true, value: 'Notes', rows: 5 });
+  const textarea = createInput({
+    ariaLabelledBy: 'notes-label',
+    multiline: true,
+    value: 'Notes',
+    rows: 5,
+    readOnly: true,
+    spellcheck: false,
+    wrap: 'soft',
+  });
   assert.equal(textarea.tagName, 'TEXTAREA');
   assert.equal(textarea.getAttribute('rows'), '5');
   assert.equal(textarea.getAttribute('aria-labelledby'), 'notes-label');
+  assert.equal(textarea.readOnly, true);
+  assert.equal(textarea.spellcheck, false);
+  assert.equal(textarea.wrap, 'soft');
 });
 
 test('Select and Toggle use native form state and change events', () => {

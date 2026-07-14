@@ -236,60 +236,6 @@
   }
 }
 
-.image-trail-panel-root .image-trail-panel__minimized {
-  display: block;
-  width: 112px;
-  height: 34px;
-  inline-size: 112px;
-  block-size: 34px;
-  min-width: 112px;
-  min-height: 34px;
-  min-inline-size: 112px;
-}
-
-.image-trail-panel-root .image-trail-panel__minimized-button {
-  appearance: none;
-  width: 112px;
-  height: 34px;
-  inline-size: 100%;
-  block-size: 34px;
-  min-width: 112px;
-  min-height: 34px;
-  min-inline-size: 112px;
-  min-block-size: 34px;
-  display: inline-grid;
-  place-items: center;
-  padding: 8px 12px;
-  border: 1px solid rgb(255 255 255 / 24%);
-  border-radius: 7px;
-  background: rgb(9 9 9 / 92%);
-  color: #fff;
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 9%),
-    0 8px 20px rgb(0 0 0 / 32%);
-  cursor: pointer;
-  font:
-    700 12px/1 system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__minimized-button:hover,
-.image-trail-panel-root .image-trail-panel__minimized-button:focus-visible {
-  border-color: rgb(255 255 255 / 45%);
-  background: rgb(22 22 22 / 96%);
-}
-
-.image-trail-panel-root .image-trail-panel__minimized-button[data-grab-mode='active'] {
-  border-color: rgb(77 214 121 / 65%);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 10%),
-    0 0 0 1px rgb(77 214 121 / 24%),
-    0 8px 20px rgb(0 0 0 / 32%);
-}
-
 .image-trail-panel-root,
 .image-trail-panel-root * {
   box-sizing: border-box;
@@ -300,224 +246,6 @@
   min-width: 0;
   max-width: 100%;
   max-inline-size: 100%;
-}
-
-.image-trail-panel-root h2 {
-  margin: 0;
-  color: #fff;
-  font:
-    700 14px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__header {
-  position: sticky;
-  top: -10px;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(86px, max-content) max-content;
-  align-items: center;
-  gap: 8px;
-  justify-self: start;
-  inline-size: calc(100% + 20px);
-  max-inline-size: none;
-  min-width: 0;
-  margin: -10px -10px 0;
-  padding: 11px 10px 9px;
-  border-bottom: 1px solid rgb(255 255 255 / 16%);
-  border-radius: 7px 7px 0 0;
-  background: rgb(9 9 9 / 98%);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 8%),
-    0 6px 12px rgb(0 0 0 / 20%);
-}
-
-.image-trail-panel-root .image-trail-panel__title {
-  min-block-size: 26px;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  overflow: hidden;
-  cursor: grab;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  touch-action: none;
-  user-select: none;
-}
-
-.image-trail-panel-root .image-trail-panel__title:active {
-  cursor: grabbing;
-}
-
-.image-trail-panel-root .image-trail-panel__header-actions {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.image-trail-panel-root .image-trail-panel__header-status {
-  min-width: 0;
-  max-inline-size: 130px;
-  overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 15%);
-  border-radius: 5px;
-  margin: 0;
-  background: rgb(255 255 255 / 5%);
-  color: #bbb;
-  padding: 3px 7px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font:
-    700 10px/1.25 system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__header-status.is-ready {
-  border-color: rgb(139 246 220 / 28%);
-  color: rgb(208 255 244 / 90%);
-}
-
-.image-trail-panel-root .image-trail-panel__header-status.is-waiting {
-  border-color: rgb(139 246 220 / 58%);
-  background: linear-gradient(110deg, transparent 0 32%, rgb(139 246 220 / 18%) 38% 50%, transparent 58% 100%), rgb(15 36 33 / 86%);
-  background-size:
-    220% 100%,
-    auto;
-  color: rgb(232 255 249);
-  animation: image-trail-wait-sweep 1200ms linear infinite;
-}
-
-.image-trail-panel-root .image-trail-panel__header-status.is-error {
-  border-color: rgb(255 112 112 / 80%);
-  background: rgb(92 20 24 / 82%);
-  color: rgb(255 226 226);
-  box-shadow: 0 0 12px rgb(255 64 64 / 28%);
-}
-
-.image-trail-panel-root.image-trail-panel__toast-root {
-  all: initial;
-  position: fixed;
-  z-index: 2147483647;
-  inset-block-start: 12px;
-  inset-inline-end: 12px;
-  display: grid;
-  justify-items: end;
-  inline-size: min(360px, calc(100vw - 24px));
-  pointer-events: none;
-  font:
-    12px/1.35 system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__toast {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  inline-size: fit-content;
-  max-inline-size: 100%;
-  min-block-size: 36px;
-  overflow: hidden;
-  border: 1px solid rgb(139 246 220 / 42%);
-  border-radius: 7px;
-  background: rgb(9 16 16 / 94%);
-  color: #fff;
-  padding: 8px 10px;
-  box-shadow:
-    0 10px 28px rgb(0 0 0 / 42%),
-    inset 0 1px 0 rgb(255 255 255 / 9%);
-  animation: image-trail-toast-enter 170ms ease-out;
-}
-
-.image-trail-panel-root.image-trail-panel__toast-root.is-waiting .image-trail-panel__toast {
-  border-color: rgb(139 246 220 / 64%);
-  background: linear-gradient(110deg, transparent 0 34%, rgb(139 246 220 / 12%) 40% 52%, transparent 60% 100%), rgb(8 30 28 / 95%);
-  background-size:
-    240% 100%,
-    auto;
-
-  /* Waiting toasts enter on a short delay (fill-mode backwards holds them invisible) so busy
-     phases that resolve near-instantly — e.g. a buffered navigation step (#373) — never flash. */
-  animation:
-    image-trail-toast-enter 170ms ease-out 150ms backwards,
-    image-trail-wait-sweep 1200ms linear infinite;
-}
-
-.image-trail-panel-root.image-trail-panel__toast-root.has-status-error .image-trail-panel__toast {
-  border-color: rgb(255 112 112 / 52%);
-  background: rgb(42 14 16 / 96%);
-  box-shadow:
-    0 10px 28px rgb(0 0 0 / 46%),
-    inset 0 1px 0 rgb(255 255 255 / 10%);
-  animation:
-    image-trail-toast-enter 170ms ease-out,
-    image-trail-error-toast-pulse 600ms ease-out 3;
-}
-
-.image-trail-panel-root.image-trail-panel__toast-root.has-buffered-skip-pulse .image-trail-panel__toast {
-  border-color: rgb(255 112 112 / 84%);
-  background: rgb(48 14 16 / 96%);
-  box-shadow:
-    0 10px 28px rgb(0 0 0 / 46%),
-    0 0 18px rgb(255 36 36 / 34%),
-    inset 0 1px 0 rgb(255 255 255 / 10%);
-  animation:
-    image-trail-toast-enter 170ms ease-out,
-    image-trail-error-frame-pulse 540ms ease-out 1;
-}
-
-.image-trail-panel-root .image-trail-panel__toast-label {
-  display: inline-grid;
-  place-items: center;
-  min-block-size: 22px;
-  max-inline-size: 86px;
-  overflow: hidden;
-  border-radius: 5px;
-  background: rgb(139 246 220 / 14%);
-  color: rgb(218 255 246);
-  padding: 3px 7px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font:
-    800 10px/1.2 system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  text-transform: uppercase;
-}
-
-.image-trail-panel-root.image-trail-panel__toast-root.has-status-error .image-trail-panel__toast-label {
-  background: rgb(255 98 98 / 20%);
-  color: rgb(255 226 226);
-}
-
-.image-trail-panel-root .image-trail-panel__toast-message {
-  min-width: 0;
-  overflow: hidden;
-  color: rgb(241 241 241);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.image-trail-panel-root h3 {
-  margin: 0;
-  color: #ddd;
-  font:
-    700 12px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
 }
 
 .image-trail-panel-root .image-trail-panel__recall-header {
@@ -532,134 +260,6 @@
   display: grid;
   gap: 2px;
   min-width: 0;
-}
-
-.image-trail-panel-root .image-trail-panel__detached-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.image-trail-panel-root .image-trail-panel__detached-title {
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
-}
-
-.image-trail-panel-root .image-trail-panel__detached-actions {
-  display: inline-flex;
-  gap: 4px;
-}
-
-.image-trail-panel__detach-ghost {
-  position: fixed;
-  z-index: 2147483647;
-  box-sizing: border-box;
-  border: 2px dashed rgb(255 255 255 / 55%);
-  border-radius: 8px;
-  background: rgb(0 0 0 / 35%);
-  pointer-events: none;
-}
-
-.image-trail-panel-root.image-trail-panel__detached-window.is-minimized {
-  grid-template-rows: auto;
-}
-
-.image-trail-panel-root.image-trail-panel__detached-window.is-minimized .image-trail-panel__detached-body {
-  display: none;
-}
-
-.image-trail-panel-root .image-trail-panel__detached-body {
-  display: grid;
-  min-width: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.image-trail-panel-root .image-trail-panel__detached-body > .image-trail-panel__section {
-  padding: 0;
-  border-top: none;
-}
-
-/* The window chrome header already carries the section title — don't repeat it in the body. A
-   header that carries the section's action toolbar (#430) stays visible so the detached window
-   keeps its actions; only its redundant heading is hidden. */
-.image-trail-panel-root .image-trail-panel__detached-body > .image-trail-panel__section > h3,
-.image-trail-panel-root
-  .image-trail-panel__detached-body
-  > .image-trail-panel__section
-  > .image-trail-panel__section-header:not(.image-trail-panel__section-header--with-actions) {
-  display: none;
-}
-
-.image-trail-panel-root
-  .image-trail-panel__detached-body
-  > .image-trail-panel__section
-  > .image-trail-panel__section-header--with-actions
-  > h3 {
-  display: none;
-}
-
-.image-trail-panel-root .image-trail-panel__section-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* Sections are drag-out sources (#408): hint on the natural grab area. */
-.image-trail-panel-root .image-trail-panel__section-header > h3 {
-  cursor: grab;
-}
-
-/* The detach control and the Show/Hide hint form two fixed right-hand columns across every
-   section header: the control carries the single auto margin (two auto margins would split the
-   free space and strand it mid-bar), and the hint has a fixed inline size so 'Show' vs 'Hide'
-   never shifts the control's column. */
-.image-trail-panel-root summary .image-trail-panel__section-detach {
-  margin-inline-start: auto;
-}
-
-.image-trail-panel-root .image-trail-panel__target-summary::after,
-.image-trail-panel-root .image-trail-panel__secondary-controls-summary::after,
-.image-trail-panel-root .image-trail-panel__fields-summary::after {
-  content: 'Show';
-  flex: none;
-  inline-size: 30px;
-  text-align: end;
-  color: #999;
-  font:
-    11px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-/* Inside a detached window the section renders without an injected control; the hint takes the
-   auto margin itself so it stays on the far edge. */
-.image-trail-panel-root summary:not(:has(.image-trail-panel__section-detach))::after {
-  margin-inline-start: auto;
-}
-
-/* Plain header rows have no Show/Hide hint; reserve its column so every ⧉ lines up. */
-.image-trail-panel-root .image-trail-panel__section-header .image-trail-panel__section-detach {
-  margin-inline-end: 38px;
-}
-
-.image-trail-panel-root .image-trail-panel__detached-placeholder {
-  color: #999;
-}
-
-.image-trail-panel-root .image-trail-panel__detached-placeholder button {
-  justify-self: start;
-}
-
-.image-trail-panel-root summary {
-  cursor: pointer;
 }
 
 .image-trail-panel-root p {
@@ -689,18 +289,12 @@
   white-space: nowrap;
 }
 
-.image-trail-panel-root .image-trail-panel__full-url-input,
 .image-trail-panel-root .image-trail-panel__target-url {
   min-width: 0;
   max-width: 100%;
   max-inline-size: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.image-trail-panel-root .image-trail-panel__full-url-input {
-  resize: none;
-  white-space: nowrap;
 }
 
 .image-trail-panel-root .image-trail-panel__target-url {
@@ -809,164 +403,6 @@
 .image-trail-panel-root .image-trail-panel__settings-section > h3,
 .image-trail-panel-root .image-trail-panel__settings-section > .image-trail-panel__section-header > h3 {
   color: #fff;
-}
-
-.image-trail-panel-root .image-trail-panel__target-summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  list-style: none;
-}
-
-.image-trail-panel-root .image-trail-panel__target-utility {
-  gap: 10px;
-}
-
-.image-trail-panel-root .image-trail-panel__target-utility:not([open]) {
-  padding-bottom: 1px;
-}
-
-.image-trail-panel-root .image-trail-panel__target-utility > :not(summary) {
-  transition:
-    opacity 160ms ease,
-    transform 160ms ease;
-}
-
-@supports selector(::details-content) {
-  .image-trail-panel-root .image-trail-panel__target-utility {
-    interpolate-size: allow-keywords;
-  }
-
-  .image-trail-panel-root .image-trail-panel__target-utility::details-content {
-    block-size: 0;
-    overflow: hidden;
-    opacity: 0;
-    transform: translateY(-4px);
-    transition:
-      block-size 190ms ease,
-      opacity 160ms ease,
-      transform 190ms ease,
-      content-visibility 190ms ease allow-discrete;
-  }
-
-  .image-trail-panel-root .image-trail-panel__target-utility[open]::details-content {
-    block-size: auto;
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.image-trail-panel-root .image-trail-panel__target-body {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  margin-block-start: 2px;
-  padding: 9px;
-  border: 1px solid rgb(255 255 255 / 10%);
-  border-radius: 7px;
-  background: rgb(255 255 255 / 3%);
-}
-
-.image-trail-panel-root .image-trail-panel__target-body .image-trail-panel__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.image-trail-panel-root .image-trail-panel__target-utility:not([open]) > :not(summary) {
-  opacity: 0;
-  transform: translateY(-3px);
-}
-
-.image-trail-panel-root .image-trail-panel__target-count,
-.image-trail-panel-root .image-trail-panel__target-badge {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  max-inline-size: 120px;
-  min-block-size: 24px;
-  overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 14%);
-  border-radius: 5px;
-  background: rgb(255 255 255 / 6%);
-  color: #aaa;
-  padding: 3px 8px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font:
-    700 10px/1.2 system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__target-fit {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  color: #aaa;
-  font:
-    700 10px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  text-transform: uppercase;
-}
-
-.image-trail-panel-root .image-trail-panel__target-fit-select {
-  box-sizing: border-box;
-  min-block-size: 28px;
-  max-inline-size: 112px;
-  border: 1px solid #555;
-  border-radius: 4px;
-  background: #242424;
-  color: #fff;
-  padding: 4px 6px;
-  font:
-    11px ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Consolas,
-    monospace;
-}
-
-.image-trail-panel-root .image-trail-panel__target-count {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  color: #999;
-  padding-inline: 0;
-}
-
-.image-trail-panel-root .image-trail-panel__target-badge {
-  justify-self: center;
-  transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.image-trail-panel-root .image-trail-panel__target-badge.is-selected {
-  border-color: rgb(89 255 178 / 76%);
-  background: rgb(89 255 178 / 20%);
-  color: rgb(232 255 244);
-  box-shadow:
-    0 0 0 1px rgb(89 255 178 / 22%),
-    0 0 16px rgb(89 255 178 / 34%);
-}
-
-.image-trail-panel-root .image-trail-panel__target-summary::-webkit-details-marker {
-  display: none;
-}
-
-.image-trail-panel-root .image-trail-panel__target-utility[open] .image-trail-panel__target-summary::after {
-  content: 'Hide';
 }
 
 .image-trail-panel-root .image-trail-panel__encryption {
@@ -1155,10 +591,6 @@
   color: #ccc;
 }
 
-.image-trail-panel-root .image-trail-panel__url-editor {
-  min-width: 0;
-}
-
 .image-trail-panel-root .image-trail-panel__section:first-of-type {
   border-top: 0;
   padding-top: 0;
@@ -1171,37 +603,6 @@
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-}
-
-.image-trail-panel-root .image-trail-panel__secondary-controls {
-  color: #fff;
-}
-
-.image-trail-panel-root .image-trail-panel__secondary-controls[open] {
-  display: grid;
-}
-
-.image-trail-panel-root .image-trail-panel__secondary-controls-summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  list-style: none;
-  cursor: pointer;
-}
-
-.image-trail-panel-root .image-trail-panel__secondary-controls-summary::-webkit-details-marker {
-  display: none;
-}
-
-.image-trail-panel-root .image-trail-panel__secondary-controls[open] .image-trail-panel__secondary-controls-summary::after {
-  content: 'Hide';
-}
-
-.image-trail-panel-root .image-trail-panel__secondary-controls-body {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
 }
 
 /* Collapsible section headers (#438/#441): the WHOLE row is the toggle (summary ergonomics — the
@@ -2275,7 +1676,6 @@
 }
 
 .image-trail-panel-root .image-trail-panel__target-url,
-.image-trail-panel-root .image-trail-panel__full-url-input,
 .image-trail-panel-root .image-trail-panel__password-input,
 .image-trail-panel-root .image-trail-panel__field-input,
 .image-trail-panel-root .image-trail-panel__field-width-input,
@@ -2302,7 +1702,6 @@
     monospace;
 }
 
-.image-trail-panel-root .image-trail-panel__full-url-input:focus,
 .image-trail-panel-root .image-trail-panel__password-input:focus,
 .image-trail-panel-root .image-trail-panel__field-input:focus,
 .image-trail-panel-root .image-trail-panel__field-width-input:focus,
@@ -2318,7 +1717,6 @@
   border-color: #8fd;
 }
 
-.image-trail-panel-root .image-trail-panel__full-url-input:disabled,
 .image-trail-panel-root .image-trail-panel__password-input:disabled,
 .image-trail-panel-root .image-trail-panel__field-input:disabled,
 .image-trail-panel-root .image-trail-panel__field-width-input:disabled,
@@ -2885,7 +2283,6 @@
   text-shadow: none;
 }
 
-.image-trail-panel-root .image-trail-panel__full-url-input.is-privacy-masked,
 .image-trail-panel-root .image-trail-panel__field-input.is-privacy-masked,
 .image-trail-panel-root .image-trail-panel__target-url.is-privacy-masked {
   color: rgb(255 255 255 / 62%);

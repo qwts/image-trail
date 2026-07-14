@@ -40,8 +40,10 @@ export interface IconButtonOptions extends PrimitiveOptions {
 
 interface InputSharedOptions extends PrimitiveOptions {
   readonly disabled?: boolean;
+  readonly readOnly?: boolean;
   readonly required?: boolean;
   readonly invalid?: boolean;
+  readonly spellcheck?: boolean;
   readonly describedBy?: string;
   readonly onInput?: (event: Event) => void;
   readonly onChange?: (event: Event) => void;
@@ -74,6 +76,7 @@ export type TextareaInputOptions = InputSharedOptions &
   (VisibleInputValue | PrivateInputValue) & {
     readonly multiline: true;
     readonly rows?: number;
+    readonly wrap?: HTMLTextAreaElement['wrap'];
   };
 
 export type InputOptions = SingleLineInputOptions | TextareaInputOptions;
@@ -203,6 +206,7 @@ export function createInput(options: InputOptions): HTMLInputElement | HTMLTextA
   if (options.multiline) {
     const textarea = document.createElement('textarea');
     textarea.rows = options.rows ?? 3;
+    if (options.wrap) textarea.wrap = options.wrap;
     input = textarea;
   } else {
     const singleLine = document.createElement('input');
@@ -212,7 +216,9 @@ export function createInput(options: InputOptions): HTMLInputElement | HTMLTextA
   }
   input.className = 'image-trail-ds__input';
   input.disabled = options.disabled === true;
+  input.readOnly = options.readOnly === true;
   input.required = options.required === true;
+  if (options.spellcheck !== undefined) input.spellcheck = options.spellcheck;
   input.setAttribute('aria-invalid', String(options.invalid === true));
   input.classList.toggle('is-private', options.privacyMasked === true);
   if (options.describedBy) input.setAttribute('aria-describedby', options.describedBy);

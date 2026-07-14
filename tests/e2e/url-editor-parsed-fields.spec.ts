@@ -63,7 +63,7 @@ async function openParsedFields(page: Page): Promise<void> {
 }
 
 async function openManualControls(page: Page): Promise<void> {
-  const controls = page.locator('.image-trail-panel__secondary-controls');
+  const controls = page.locator('.image-trail-panel__secondary-controls-details');
   if (!(await controls.evaluate((element) => element.hasAttribute('open')))) {
     await page.locator('.image-trail-panel__secondary-controls-summary').click();
   }

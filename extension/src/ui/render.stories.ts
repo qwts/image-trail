@@ -77,6 +77,31 @@ export const SecondaryControlsExpanded: Story = {
   render: () => panelLayoutStory({ secondaryControlsOpen: true }),
 };
 
+export const Minimized: Story = {
+  render: () => panelLayoutStory({ minimized: true }),
+};
+
+export const Waiting: Story = {
+  render: () => panelLayoutStory({ captureInProgress: true, message: 'Capturing selected image original.' }),
+};
+
+export const Error: Story = {
+  render: () => panelLayoutStory({ status: 'error', message: 'Image Trail needs attention.' }),
+};
+
+export const Narrow: Story = {
+  render: () => panelLayoutStory({}, { width: 300 }),
+  play: async ({ canvasElement }) => {
+    const panel = canvasElement.querySelector<HTMLElement>('.image-trail-panel');
+    await expect(panel).not.toBeNull();
+    await expect(panel?.scrollWidth).toBeLessThanOrEqual(panel?.clientWidth ?? 0);
+  },
+};
+
+export const ReducedMotion: Story = {
+  render: () => panelLayoutStory({ captureInProgress: true }, { reducedMotion: true }),
+};
+
 export const SettingsDetached: Story = {
   render: () => detachedPanelStory({ settingsOpen: true, detachedSections: ['settings'] }),
   play: async ({ canvasElement }) => {
@@ -96,7 +121,7 @@ export const SettingsDetachedPrivacyMasked: Story = {
 function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.style.position = 'relative';
-  wrapper.style.minInlineSize = '880px';
+  wrapper.style.minInlineSize = '940px';
   wrapper.style.minBlockSize = '700px';
 
   const host = document.createElement('div');
@@ -105,8 +130,8 @@ function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
   host.style.inset = 'auto';
   host.style.left = '16px';
   host.style.top = '16px';
-  host.style.width = '380px';
-  host.style.inlineSize = '380px';
+  host.style.width = '420px';
+  host.style.inlineSize = '420px';
 
   const detachedRoot = document.createElement('div');
   const layoutState: PanelLayoutState = {
@@ -114,7 +139,7 @@ function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
-    detachedWindowPositions: new Map([['settings', { left: 420, top: 16 }]]),
+    detachedWindowPositions: new Map([['settings', { left: 460, top: 16 }]]),
     detachedWindowMinimized: new Set(),
     collapsibleListScrollTops: new Map(),
   };
@@ -137,14 +162,18 @@ function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
   return wrapper;
 }
 
-function panelLayoutStory(overrides: Partial<PanelState> = {}): HTMLElement {
+function panelLayoutStory(
+  overrides: Partial<PanelState> = {},
+  options: { readonly width?: number; readonly reducedMotion?: boolean } = {},
+): HTMLElement {
   const host = document.createElement('div');
   host.className = 'image-trail-panel-root image-trail-panel';
   host.style.position = 'relative';
   host.style.inset = 'auto';
   host.style.margin = '16px';
-  host.style.width = '380px';
-  host.style.inlineSize = '380px';
+  host.style.width = `${options.width ?? 420}px`;
+  host.style.inlineSize = `${options.width ?? 420}px`;
+  if (options.reducedMotion) host.dataset['reducedMotionPreview'] = 'true';
 
   const layoutState: PanelLayoutState = {
     fieldsPanelOpen: true,
@@ -236,6 +265,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
       connectionState: 'disconnected',
     },
     settingsOpen: false,
+    helpOpen: false,
     automation: {
       slideshowPhase: 'idle',
       slideshowCount: 0,

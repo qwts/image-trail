@@ -60,3 +60,16 @@ test('non-permission capture failures do not expose the permission action', () =
     ['Dismiss'],
   );
 });
+
+test('privacy mode replaces URL-bearing status and failure copy', () => {
+  const state = {
+    ...permissionState(),
+    privacyModeEnabled: true,
+    message: 'Could not load https://private.example.test/photo.jpg',
+  };
+  const view = createStatusView(state, () => {});
+
+  assert.doesNotMatch(view.textContent ?? '', /private\.example|cdn\.example/u);
+  assert.doesNotMatch(view.innerHTML, /https?:/u);
+  assert.match(view.textContent ?? '', /Image Trail needs attention/u);
+});

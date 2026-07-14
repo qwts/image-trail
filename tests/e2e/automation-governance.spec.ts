@@ -60,7 +60,7 @@ async function openParsedFields(page: Parameters<typeof openFixturePage>[0]): Pr
 }
 
 async function openManualControls(page: Parameters<typeof openFixturePage>[0]): Promise<void> {
-  const controls = page.locator('.image-trail-panel__secondary-controls');
+  const controls = page.locator('.image-trail-panel__secondary-controls-details');
   const isOpen = await controls.evaluate((element) => element.hasAttribute('open'));
   if (!isOpen) await page.locator('.image-trail-panel__secondary-controls-summary').click();
 }

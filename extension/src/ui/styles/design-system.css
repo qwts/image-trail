@@ -1,3 +1,5 @@
 @import './tokens.css';
 @import './primitives.css';
 @import './feedback-primitives.css';
+@import './panel-shell.css';
+@import './primary-workflow.css';

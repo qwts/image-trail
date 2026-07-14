@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/html-vite';
 
-import { captureFailureMessage } from '../../core/image/capture-result.js';
-import type { PanelState } from '../../core/types.js';
+import type { PanelAction, PanelState } from '../../core/types.js';
+import { createInitialPanelState } from '../../core/state.js';
 import { DEFAULT_SEARCHABLE_METADATA_POLICY } from '../../core/metadata-policy.js';
 import { createStatusView } from './status-view.js';
+import { createPanelHeader, panelHasError, panelIsWaiting, renderPanelToast } from './panel-shell-view.js';
 import { bookmarkFixtures, recallState, recentFixtures } from '../stories/fixtures.js';
 import { mockDispatch, panelStory } from '../stories/story-host.js';
 
@@ -97,137 +98,23 @@ function statusStory(overrides: Partial<PanelState> = {}): HTMLElement {
   const state = panelState(overrides);
   const wrapper = document.createElement('div');
   const story = panelStory(statusStoryContent(state));
-  const toast = statusToastStory(state);
-  story.classList.toggle('is-waiting', isPanelWaiting(state));
-  story.classList.toggle('has-status-error', hasPanelError(state));
+  const toast = document.createElement('div');
+  renderPanelToast(toast, state);
+  story.classList.toggle('is-waiting', panelIsWaiting(state));
+  story.classList.toggle('has-status-error', panelHasError(state));
   wrapper.append(story, toast);
   return wrapper;
 }
 
 function statusStoryContent(state: PanelState): HTMLElement {
   const fragment = document.createElement('div');
-  fragment.append(statusHeaderStory(state), createStatusView(state, mockDispatch('status story action')));
+  const dispatch = mockDispatch<PanelAction>('status story action');
+  fragment.append(createPanelHeader(state, { dispatch }), createStatusView(state, dispatch));
   return fragment;
 }
 
-function statusHeaderStory(state: PanelState): HTMLElement {
-  const header = document.createElement('header');
-  header.className = 'image-trail-panel__header';
-
-  const heading = document.createElement('h2');
-  heading.className = 'image-trail-panel__title';
-  heading.textContent = 'Image Trail';
-
-  const status = document.createElement('p');
-  status.className = `image-trail-panel__header-status ${statusToneClass(state)}`;
-  status.textContent = statusSummaryText(state);
-  status.title = state.message.trim() || status.textContent;
-  if (isPanelWaiting(state)) status.classList.add('is-waiting');
-
-  const actions = document.createElement('div');
-  actions.className = 'image-trail-panel__header-actions';
-  for (const label of ['⚙', '-', 'X']) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'image-trail-panel__icon-button';
-    button.textContent = label;
-    actions.append(button);
-  }
-
-  header.append(heading, status, actions);
-  return header;
-}
-
-function statusToastStory(state: PanelState): HTMLElement {
-  const toastRoot = document.createElement('div');
-  toastRoot.className = `image-trail-panel-root image-trail-panel__toast-root ${statusToneClass(state)}`;
-  toastRoot.classList.toggle('is-waiting', isPanelWaiting(state));
-  toastRoot.classList.toggle('has-status-error', hasPanelError(state));
-  const toastMessage = toastMessageText(state);
-  if (!toastMessage) return toastRoot;
-
-  const toast = document.createElement('aside');
-  toast.className = 'image-trail-panel__toast';
-  toast.setAttribute('role', hasPanelError(state) ? 'alert' : 'status');
-  toast.setAttribute('aria-live', hasPanelError(state) ? 'assertive' : 'polite');
-
-  const label = document.createElement('span');
-  label.className = 'image-trail-panel__toast-label';
-  label.textContent = hasPanelError(state) ? 'Error' : isPanelWaiting(state) ? 'Working' : statusSummaryText(state);
-
-  const message = document.createElement('span');
-  message.className = 'image-trail-panel__toast-message';
-  message.textContent = toastMessage;
-  message.title = message.textContent;
-
-  toast.append(label, message);
-  toastRoot.append(toast);
-  return toastRoot;
-}
-
-function isPanelWaiting(state: PanelState): boolean {
-  return (
-    state.captureInProgress ||
-    state.importExportBusy ||
-    state.recall.busy ||
-    state.automation.slideshowPhase === 'running' ||
-    state.automation.retryPhase === 'running' ||
-    state.automation.governorStatus !== 'ready'
-  );
-}
-
-function hasPanelError(state: PanelState): boolean {
-  return (
-    state.status === 'error' ||
-    state.importExportMessageIsError === true ||
-    state.recall.messageIsError === true ||
-    (state.captureResult !== null && state.captureResult.status !== 'captured')
-  );
-}
-
-function statusSummaryText(state: PanelState): string {
-  if (hasPanelError(state)) return 'Needs attention';
-  if (state.captureInProgress) return 'Capturing';
-  if (state.importExportBusy) return 'Import/export';
-  if (state.recall.busy) return 'Recall loading';
-  if (state.automation.retryPhase === 'running') return 'Retrying';
-  if (state.automation.slideshowPhase === 'running') return 'Slideshow';
-  if (state.automation.governorStatus !== 'ready') return 'Rate limited';
-  if (state.status === 'picking') return 'Picking';
-  return 'Ready';
-}
-
-function toastMessageText(state: PanelState): string {
-  const waitingMessage = waitingToastMessageText(state);
-  if (waitingMessage) return waitingMessage;
-  if (!hasPanelError(state)) return '';
-  if (state.privacyModeEnabled) return 'Image Trail needs attention. Open the panel for details.';
-  if (state.captureResult?.status === 'failed' || state.captureResult?.status === 'remote-only') {
-    return state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
-  }
-  if (state.importExportMessage) return state.importExportMessage;
-  if (state.recall.message) return state.recall.message;
-  if (state.message.trim()) return state.message.trim();
-  return '';
-}
-
-function waitingToastMessageText(state: PanelState): string {
-  if (state.captureInProgress) return 'Capturing selected image original.';
-  if (state.importExportBusy) return 'Import or export is running.';
-  if (state.recall.busy) return 'Loading Recall records.';
-  if (state.automation.retryPhase === 'running') return 'Retrying failed image loads.';
-  if (state.automation.slideshowPhase === 'running') return 'Slideshow is advancing images.';
-  if (state.automation.governorStatus !== 'ready') return 'Waiting for the request limit window.';
-  return '';
-}
-
-function statusToneClass(state: PanelState): string {
-  if (hasPanelError(state)) return 'is-error';
-  if (isPanelWaiting(state)) return 'is-waiting';
-  return 'is-ready';
-}
-
 function panelState(overrides: Partial<PanelState> = {}): PanelState {
+  const initial = createInitialPanelState(0);
   return {
     visible: true,
     minimized: false,
@@ -279,6 +166,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     blobKeyAvailable: true,
     blobKeyReference: 'session key',
     importExportBusy: false,
+    pcloudBackup: initial.pcloudBackup,
     settingsOpen: false,
     automation: {
       slideshowPhase: 'idle',

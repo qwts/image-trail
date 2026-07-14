@@ -1,6 +1,7 @@
 import { reducePanelAction } from '../../core/actions.js';
 import type { PanelAction, PanelState } from '../../core/types.js';
 import { renderPanel, renderRecallDrawer, type PanelLayoutState } from '../render.js';
+import { createToast } from '../components/primitives.js';
 import { isFocusablePanelControl } from './export-download.js';
 import type { BufferedNavigationDebugSnapshot } from './buffered-navigation-controller.js';
 
@@ -175,21 +176,12 @@ export class PanelRenderController {
     // Out-of-band toast write: clear the status-toast refresh key so the next render rebuilds.
     delete toastRoot.dataset['imageTrailToastKey'];
 
-    const toast = document.createElement('aside');
-    toast.className = 'image-trail-panel__toast image-trail-panel__buffered-skip-toast';
-    toast.setAttribute('role', 'status');
-    toast.setAttribute('aria-live', 'polite');
-
-    const label = document.createElement('span');
-    label.className = 'image-trail-panel__toast-label';
-    label.textContent = 'Skipped';
-
-    const copy = document.createElement('span');
-    copy.className = 'image-trail-panel__toast-message';
-    copy.textContent = message;
-    copy.title = message;
-
-    toast.append(label, copy);
+    const toast = createToast({ label: 'Skipped', message, tone: 'error' });
+    toast.classList.add('image-trail-panel__toast', 'image-trail-panel__buffered-skip-toast');
+    toast.querySelector('.image-trail-ds__toast-label')?.classList.add('image-trail-panel__toast-label');
+    const copy = toast.querySelector<HTMLElement>('.image-trail-ds__toast-message');
+    copy?.classList.add('image-trail-panel__toast-message');
+    if (copy) copy.title = message;
     toastRoot.append(toast);
     this.bufferedNavigationToastTimer = window.setTimeout(() => {
       this.deps.root()?.classList.remove('has-buffered-skip-pulse');

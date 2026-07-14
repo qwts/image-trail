@@ -31,6 +31,18 @@ test('Enter applies the edited URL and prevents the default newline', () => {
   assert.equal(enter.defaultPrevented, true);
 });
 
+test('Apply URL button dispatches the current edited value', () => {
+  const applied: string[] = [];
+  const view = createUrlEditorView({ url: CURRENT_URL }, { onApply: (url) => applied.push(url) });
+  const textarea = textareaOf(view);
+  textarea.value = 'https://images.example.test/albums/1024/photo_0044.jpg';
+
+  view.querySelector<HTMLButtonElement>('button')?.click();
+
+  assert.deepEqual(applied, ['https://images.example.test/albums/1024/photo_0044.jpg']);
+  assert.match(view.textContent ?? '', /Enter apply URL/u);
+});
+
 test('pasting a data: URL is rejected before it reaches the textarea', () => {
   const applied: string[] = [];
   let rejected = 0;

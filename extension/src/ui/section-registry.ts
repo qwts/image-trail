@@ -80,6 +80,8 @@ function detachableSectionElement(definition: DetachableSectionDefinition, targe
 function injectDetachControl(sectionEl: HTMLElement, control: HTMLElement): void {
   const headerRow = sectionEl.querySelector<HTMLElement>(':scope > .image-trail-panel__section-header');
   if (headerRow) {
+    headerRow.classList.add('image-trail-ds__section-header');
+    headerRow.querySelector<HTMLElement>('h2, h3, h4')?.classList.add('image-trail-ds__section-title');
     headerRow.append(control);
     return;
   }
@@ -89,11 +91,14 @@ function injectDetachControl(sectionEl: HTMLElement, control: HTMLElement): void
     return;
   }
   if (heading.parentElement.tagName === 'SUMMARY') {
+    heading.classList.add('image-trail-ds__section-title');
+    heading.parentElement.classList.add('image-trail-ds__section-header');
     heading.parentElement.append(control);
     return;
   }
   const wrapper = document.createElement('div');
-  wrapper.className = 'image-trail-panel__section-header';
+  wrapper.className = 'image-trail-panel__section-header image-trail-ds__section-header';
+  heading.classList.add('image-trail-ds__section-title');
   heading.replaceWith(wrapper);
   wrapper.append(heading, control);
 }

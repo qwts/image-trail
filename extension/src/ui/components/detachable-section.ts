@@ -1,5 +1,6 @@
 import type { DetachableSectionId, PanelAction } from '../../core/types.js';
 import { clampPanelPosition } from '../panel-position.js';
+import { createButton, createIconButton, createSectionHeader } from './primitives.js';
 
 export interface DetachedWindowPosition {
   readonly left: number;
@@ -169,13 +170,12 @@ export function createSectionDetachControl(
     readonly onDragOutPosition?: (sectionId: DetachableSectionId, position: DetachedWindowPosition) => void;
   } = {},
 ): HTMLElement {
-  const detach = document.createElement('button');
-  detach.type = 'button';
-  detach.className = 'image-trail-panel__icon-button image-trail-panel__section-detach';
-  detach.textContent = '⧉';
+  const detach = createIconButton({
+    glyph: '⧉',
+    label: `Detach ${sectionTitle} into a floating window (drag to place)`,
+    className: 'image-trail-panel__icon-button image-trail-panel__section-detach',
+  });
   detach.dataset['imageTrailDetach'] = sectionId;
-  detach.setAttribute('aria-label', `Detach ${sectionTitle} into a floating window (drag to place)`);
-  detach.title = `Detach ${sectionTitle} into a floating window (drag to place)`;
   let suppressClick = false;
   detach.addEventListener('click', (event) => {
     // The control may live inside a <details> summary (Host target, Field Editor, Manual
@@ -218,18 +218,21 @@ export function createDetachedSectionPlaceholder(
   section.className = 'image-trail-panel__section image-trail-panel__detached-placeholder';
   section.dataset['imageTrailDetachedPlaceholder'] = sectionId;
 
-  const heading = document.createElement('h3');
-  heading.textContent = sectionTitle;
+  const heading = createSectionHeader({
+    title: sectionTitle,
+    className: 'image-trail-panel__section-header',
+    divider: false,
+  });
 
   const meta = document.createElement('p');
   meta.className = 'image-trail-panel__meta';
   meta.textContent = `${sectionTitle} is open in a floating window.`;
 
-  const restore = document.createElement('button');
-  restore.type = 'button';
-  restore.textContent = 'Restore to panel';
-  restore.setAttribute('aria-label', `Restore ${sectionTitle} into the panel`);
-  restore.addEventListener('click', () => dispatch({ name: 'section/restore', sectionId }));
+  const restore = createButton({
+    label: 'Restore to panel',
+    ariaLabel: `Restore ${sectionTitle} into the panel`,
+    onClick: () => dispatch({ name: 'section/restore', sectionId }),
+  });
 
   section.append(heading, meta, restore);
   return section;
@@ -296,10 +299,7 @@ export function createDetachedSectionWindow(
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__detached-actions';
 
-  const minimize = document.createElement('button');
-  minimize.type = 'button';
-  minimize.className = 'image-trail-panel__icon-button';
-  minimize.textContent = '-';
+  const minimize = createIconButton({ glyph: '−', label: `Minimize ${sectionTitle} window`, className: 'image-trail-panel__icon-button' });
   minimize.dataset['imageTrailMinimize'] = sectionId;
   const applyMinimized = (minimized: boolean): void => {
     windowEl.classList.toggle('is-minimized', minimized);
@@ -316,13 +316,12 @@ export function createDetachedSectionWindow(
   });
 
   // Close semantics: the X restores the section into the panel — the window has no other exit.
-  const restore = document.createElement('button');
-  restore.type = 'button';
-  restore.className = 'image-trail-panel__icon-button';
-  restore.textContent = 'X';
+  const restore = createIconButton({
+    glyph: '×',
+    label: `Restore ${sectionTitle} into the panel`,
+    className: 'image-trail-panel__icon-button',
+  });
   restore.dataset['imageTrailRestore'] = sectionId;
-  restore.setAttribute('aria-label', `Restore ${sectionTitle} into the panel`);
-  restore.title = `Restore ${sectionTitle} into the panel`;
   restore.addEventListener('click', () => dispatch({ name: 'section/restore', sectionId }));
 
   actions.append(minimize, restore);

@@ -1,5 +1,6 @@
 import { captureFailureMessage, isFailedResult } from '../../core/image/capture-result.js';
 import type { PanelState } from '../../core/types.js';
+import { createButton, createStatusPill } from './primitives.js';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -15,7 +16,11 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
 
   const status = wrapper.querySelector<HTMLParagraphElement>('.image-trail-panel__status') ?? document.createElement('p');
   status.className = 'image-trail-panel__status';
-  const statusText = state.message.trim() || 'Image Trail is ready.';
+  const statusText = state.privacyModeEnabled
+    ? state.status === 'error' || (state.captureResult !== null && state.captureResult.status !== 'captured')
+      ? 'Image Trail needs attention.'
+      : 'Image Trail is ready.'
+    : state.message.trim() || 'Image Trail is ready.';
   status.textContent = statusText;
   status.title = statusText;
 
@@ -26,10 +31,8 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
   const children: HTMLElement[] = [status, meta];
 
   if (state.captureInProgress) {
-    const progress = document.createElement('p');
-    progress.className = 'image-trail-panel__capture-status';
-    progress.textContent = 'Capturing image…';
-    progress.setAttribute('aria-live', 'polite');
+    const progress = createStatusPill({ label: 'Capturing image…', tone: 'busy', waiting: true });
+    progress.classList.add('image-trail-panel__capture-status');
     children.push(progress);
   }
 
@@ -37,19 +40,19 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
     const error = document.createElement('p');
     error.className = 'image-trail-panel__capture-error';
     error.setAttribute('role', 'alert');
-    error.textContent = state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
+    error.textContent = state.privacyModeEnabled
+      ? 'Image Trail could not capture the selected image.'
+      : state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
     if (state.captureResult.reason === 'permission-needed' && state.captureRetryRequest) {
-      const retry = document.createElement('button');
-      retry.type = 'button';
-      retry.className = 'image-trail-panel__primary-action';
-      retry.textContent = 'Grant permission and retry';
-      retry.addEventListener('click', () => dispatch({ name: 'capture/permission-retry' }));
+      const retry = createButton({
+        label: 'Grant permission and retry',
+        variant: 'primary',
+        className: 'image-trail-panel__primary-action',
+        onClick: () => dispatch({ name: 'capture/permission-retry' }),
+      });
       error.append(document.createTextNode(' '), retry);
     }
-    const dismiss = document.createElement('button');
-    dismiss.type = 'button';
-    dismiss.textContent = 'Dismiss';
-    dismiss.addEventListener('click', () => dispatch({ name: 'capture/clear' }));
+    const dismiss = createButton({ label: 'Dismiss', variant: 'ghost', onClick: () => dispatch({ name: 'capture/clear' }) });
     error.append(document.createTextNode(' '), dismiss);
     children.push(error);
   }
@@ -63,25 +66,32 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
 
   const auto = state.automation;
   if (auto.slideshowPhase !== 'idle') {
-    const slideshow = document.createElement('p');
-    slideshow.className = 'image-trail-panel__automation-status';
-    if (auto.slideshowPhase === 'running') slideshow.classList.add('is-waiting');
-    slideshow.textContent = `Slideshow: ${auto.slideshowPhase} (${auto.slideshowCount} shown)`;
+    const slideshow = createStatusPill({
+      label: `Slideshow: ${auto.slideshowPhase} (${auto.slideshowCount} shown)`,
+      tone: auto.slideshowPhase === 'running' ? 'busy' : 'neutral',
+      waiting: auto.slideshowPhase === 'running',
+      className: 'image-trail-panel__automation-status',
+    });
     children.push(slideshow);
   }
 
   if (auto.retryPhase !== 'idle') {
-    const retry = document.createElement('p');
-    retry.className = 'image-trail-panel__automation-status';
-    if (auto.retryPhase === 'running') retry.classList.add('is-waiting');
-    retry.textContent = `Retry: ${auto.retryPhase} (${auto.retriesUsed}/${auto.retriesMax})`;
+    const retry = createStatusPill({
+      label: `Retry: ${auto.retryPhase} (${auto.retriesUsed}/${auto.retriesMax})`,
+      tone: auto.retryPhase === 'running' ? 'busy' : 'neutral',
+      waiting: auto.retryPhase === 'running',
+      className: 'image-trail-panel__automation-status',
+    });
     children.push(retry);
   }
 
   if (auto.governorStatus !== 'ready') {
-    const governor = document.createElement('p');
-    governor.className = 'image-trail-panel__automation-status is-waiting';
-    governor.textContent = `Rate limit: ${auto.governorStatus} (${auto.requestsInWindow} in window)`;
+    const governor = createStatusPill({
+      label: `Rate limit: ${auto.governorStatus} (${auto.requestsInWindow} in window)`,
+      tone: 'busy',
+      waiting: true,
+      className: 'image-trail-panel__automation-status',
+    });
     children.push(governor);
   }
 

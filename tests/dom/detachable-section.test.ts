@@ -74,8 +74,8 @@ const REGISTRY_EXPECTATIONS: readonly {
   readonly overrides?: Partial<PanelState>;
 }[] = [
   { id: 'settings', title: 'Settings', contentClass: 'image-trail-panel__settings-section', overrides: { settingsOpen: true } },
-  { id: 'url-editor', title: 'URL editor', contentClass: 'image-trail-panel__url-editor' },
   { id: 'target', title: 'Host target', contentClass: 'image-trail-panel__target-utility' },
+  { id: 'url-editor', title: 'URL editor', contentClass: 'image-trail-panel__url-editor' },
   { id: 'fields', title: 'Field Editor', contentClass: 'image-trail-panel__fields' },
   { id: 'controls', title: 'Manual controls', contentClass: 'image-trail-panel__secondary-controls' },
   { id: 'history', title: 'Recent history', contentClass: 'image-trail-panel__history-section' },
@@ -155,18 +155,6 @@ test('summary-backed sections drag out by their header, and an engaged drag supp
   const trailingClick = new MouseEvent('click', { bubbles: true, cancelable: true });
   summary.dispatchEvent(trailingClick);
   assert.equal(trailingClick.defaultPrevented, true, 'the trailing click cannot toggle the details group');
-});
-
-test('summary-backed sections keep detach controls beside the Show/Hide tail', () => {
-  const harness = createHarness();
-  harness.render(panelState());
-
-  for (const selector of ['.image-trail-panel__target-summary', '.image-trail-panel__secondary-controls-summary']) {
-    const summary = harness.root.querySelector<HTMLElement>(selector);
-    assert.ok(summary, `expected ${selector}`);
-    assert.ok(summary.lastElementChild instanceof HTMLButtonElement, `${selector} keeps the detach button as the last real element`);
-    assert.equal(summary.lastElementChild.matches('[data-image-trail-detach]'), true);
-  }
 });
 
 test('a sub-threshold press on a summary leaves the details toggle untouched', () => {

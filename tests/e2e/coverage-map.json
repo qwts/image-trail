@@ -31,6 +31,52 @@
       ]
     },
     {
+      "id": "design-system-panel-shell-primary-workflow",
+      "acceptance": "Shared design-system panel shell and primary workflow",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom/panel-shell-view.test.ts",
+            "tests/dom/manual-controls-view.test.ts",
+            "tests/dom/url-editor-view.test.ts",
+            "tests/dom/status-view.test.ts",
+            "tests/dom/detachable-section.test.ts",
+            "tests/dom/primitives.test.ts",
+            "tests/primitives-css.test.ts"
+          ],
+          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; always-visible navigation, capture, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
+        },
+        {
+          "type": "storybook",
+          "paths": [
+            "extension/src/ui/render.stories.ts",
+            "extension/src/ui/components/manual-controls-view.stories.ts",
+            "extension/src/ui/components/status-view.stories.ts",
+            "extension/src/ui/components/target-picker-view.stories.ts",
+            "extension/src/ui/components/url-editor-view.stories.ts"
+          ],
+          "notes": "Covers the 420px attached shell plus minimized, detached, waiting, error, privacy, expanded workflow, Grab Mode, narrow, and reduced-motion presentation states."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": [
+            "tests/e2e/extension-smoke.spec.ts",
+            "tests/e2e/automation-governance.spec.ts",
+            "tests/e2e/url-editor-parsed-fields.spec.ts",
+            "tests/e2e/detachable-sections.spec.ts"
+          ],
+          "notes": "Covers packaged-extension open/minimize/expand/close, Host selection, URL application, visible navigation and automation actions, More controls, detached windows, status refresh, and focus/scroll-preserving rerenders."
+        },
+        {
+          "type": "manual",
+          "reason": "The handoff calls for visual fidelity over an arbitrary host page and browser-level reduced-motion behavior.",
+          "notes": "Load the packaged extension over the single-image fixture at 420px and a narrow viewport. Compare against the handoff panel and capture-flash references; verify hierarchy, density, glows, typography, status/toast motion, header drag, minimize, detach/restore, keyboard focus, privacy masking, and no failed stylesheet requests."
+        }
+      ]
+    },
+    {
       "id": "automation-keybindings-and-request-governance",
       "acceptance": "M08 automation, keybindings, and request governance",
       "wiki": "https://github.com/qwts/image-trail/wiki/User-Story-M08-Automation-Keybindings-And-Request-Governance",
