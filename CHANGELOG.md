@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.4.0
+
+### Minor Changes
+
+- f3c22ba: Adopt a locally bundled React UI boundary for the panel header, destination dock, and Host target while preserving the existing extension state, action, controller, detach, focus, and storage architecture.
+
 ## 0.3.1
 
 ### Patch Changes
