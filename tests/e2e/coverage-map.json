@@ -92,7 +92,7 @@
             "tests/dom/record-row.test.ts",
             "tests/dom/bookmarks-view.test.ts",
             "tests/dom/history-view.test.ts",
-            "tests/dom/recall-drawer-view.test.ts",
+            "tests/dom/recall-destination-view.test.ts",
             "tests/dom/gallery-view.test.ts",
             "tests/primitives-css.test.ts"
           ],
@@ -352,7 +352,7 @@
             "tests/parsed-field-state-sync.test.ts",
             "tests/dom/history-view.test.ts",
             "tests/dom/bookmarks-view.test.ts",
-            "tests/dom/recall-drawer-view.test.ts"
+            "tests/dom/recall-destination-view.test.ts"
           ],
           "notes": "Covers projection ownership plus row interaction dispatch: plain click selects once, selected-row click or focused-row Enter projects through capture/preview, Space keeps selection-first activation, arrows move single selection/focus across History/Queue/Recall shadow roots, locked rows stay disabled, and private placeholder preview is blocked before preload/fetch."
         },
@@ -431,7 +431,7 @@
         {
           "type": "unit-dom",
           "notes": "Covers the Recall drawer's inline width staying clamped inside the viewport's edge padding on a narrow viewport, mirroring the CSS max-width so the Close control can't be pushed off-screen (regression: a stale 240px width floor). Header follow-up to #408: the detach control and Show/Hide hint form fixed right-hand columns (single auto margin; fixed-width hint), and Reset all availability compares resolved image URLs so a restored baseline no longer shows it when nothing changed.",
-          "paths": ["tests/dom/recall-drawer-view.test.ts", "tests/parsed-field-reset-baseline.test.ts"]
+          "paths": ["tests/dom/recall-destination-view.test.ts", "tests/parsed-field-reset-baseline.test.ts"]
         }
       ]
     },
@@ -592,7 +592,7 @@
             "tests/panel-state-queue-recents.test.ts",
             "tests/dom/history-view.test.ts",
             "tests/dom/bookmarks-view.test.ts",
-            "tests/dom/recall-drawer-view.test.ts"
+            "tests/dom/recall-destination-view.test.ts"
           ],
           "notes": "Covers selection state plus row-level Cmd/Ctrl toggle and Shift range behavior for Recents, Queue, and Recall without triggering projection."
         },
@@ -926,7 +926,7 @@
             "tests/dom/history-view.test.ts",
             "tests/dom/detachable-section.test.ts",
             "tests/dom/bookmarks-view.test.ts",
-            "tests/dom/recall-drawer-view.test.ts"
+            "tests/dom/recall-destination-view.test.ts"
           ],
           "notes": "Covers #426: previewing/projecting a Recents, queue, or Recall row requires a real double-click \u2014 a second click within the 500ms window on the same row previews, while a stale later click re-selects; window semantics unit-tested in the shared registerPreviewRowClick helper. Covers #446 Recents sparse-row sizing by locking the attached list to stable 120px auto rows, start-aligned grid tracks, a one-to-three-row viewport cap, viewport-only user resize, and panel scroll anchoring when sparse Recents grow above visible Queue rows."
         },
@@ -985,7 +985,7 @@
             "tests/workspace-layout-controller.test.ts",
             "tests/dom/panel-layout-settings-view.test.ts"
           ],
-          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X). #217 Settings detach: detach control, window/placeholder conditional on settingsOpen, wider window default, settings-action routing from the window, and the Escape-in-editable-control guard. #215 completion: Queue (bookmarks) detach, drag-out gesture (threshold, ghost cleanup, drop-position seeding, click suppression), and settings-section state branches. #408: registry-driven eligibility asserted across every section id (URL editor, Host target, Field Editor, Manual controls, Recents, Queue, Settings), summary-backed detach control placement beside the Show/Hide tail, section-surface drag-out with interactive-origin filtering, and Escape cancelling both surface drags and window drags. #398 per-site workspace persistence: layout sanitize/capture/equality helpers, restore gating on the opt-in flag, hydration of detached sections + positions + minimized state, debounced change-only saves, immediate capture on opt-in, reset clearing storage and reattaching, teardown-invalidated restores, and the settings-view toggle/reset dispatch contract. #248 verifies the renamed Field Editor title in detached window accessibility labels."
+          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X). #217 Settings detach: detach control, window/placeholder conditional on the active Settings destination, wider window default, settings-action routing from the window, and the Escape-in-editable-control guard. #215 completion: Queue (bookmarks) detach, drag-out gesture (threshold, ghost cleanup, drop-position seeding, click suppression), and settings-section state branches. #408: registry-driven eligibility asserted across every section id (URL editor, Host target, Field Editor, Manual controls, Recents, Queue, Settings), summary-backed detach control placement beside the Show/Hide tail, section-surface drag-out with interactive-origin filtering, and Escape cancelling both surface drags and window drags. #398 per-site workspace persistence: layout sanitize/capture/equality helpers, restore gating on the opt-in flag, hydration of detached sections + positions + minimized state, debounced change-only saves, immediate capture on opt-in, reset clearing storage and reattaching, teardown-invalidated restores, and the settings-view toggle/reset dispatch contract. #248 verifies the renamed Field Editor title in detached window accessibility labels."
         },
         {
           "type": "storybook",
@@ -1096,6 +1096,46 @@
           "notes": "Open the built extension on one standalone image, one multi-image gallery, and one infinite feed. Verify the automatic label, enabled overrides, target badge, Grab availability and hint, reset-to-automatic behavior, reload persistence, SPA transitions, keyboard focus, and pixel fidelity against handoff screenshots 08 and 09 without exposing URL evidence in the switcher."
         }
       ]
+    },
+    {
+      "id": "context-destination-dock-and-routing",
+      "acceptance": "Accessible Dashboard, Gallery, Recall, and Settings dock with one in-panel route source of truth (issue #516)",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/destination-registry.test.ts",
+            "tests/action-dispatch.test.ts",
+            "tests/panel-state-queue-recents.test.ts",
+            "tests/panel-state-settings.test.ts",
+            "tests/recall-destination-controller.test.ts",
+            "tests/dom/destination-routing.test.ts",
+            "tests/dom/recall-destination-controller.test.ts",
+            "tests/dom/recall-destination-view.test.ts"
+          ],
+          "notes": "Covers the typed four-route registry, Gallery-only open-in-tab eligibility before #518, single activeDestination state, reselect/close/help/settings/minimize/panel-close transitions, preserved primary state, Recall selection continuity across routes plus cleanup on close, producer paging, plain/modifier dock actions, detached Settings single-mount behavior, focus/scroll restoration, and targeted Recall body refresh without replacing destination chrome."
+        },
+        {
+          "type": "storybook",
+          "paths": ["extension/src/ui/render.stories.ts", "extension/src/ui/components/recall-destination-view.stories.ts"],
+          "notes": "Covers Dashboard, Gallery, Recall, and Settings destination compositions, active-tile and close chrome assertions, populated/empty/loading/error/selected Recall states, and narrow destination geometry."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": [
+            "tests/e2e/destination-routing.spec.ts",
+            "tests/e2e/react-renderer-boundary.spec.ts",
+            "tests/e2e/recents-queue-recall.spec.ts"
+          ],
+          "notes": "Covers packaged plain-click routing, keyboard activation and return focus, per-route scroll, minimize/expand, panel close/reopen, detached controller compatibility, durable Gallery loading without queue reorder, Recall paging and selection, explicit and modifier-key real Gallery tabs, narrow layout, and deterministic artifacts for handoff screenshots 04 through 07."
+        },
+        {
+          "type": "manual",
+          "reason": "Pixel fidelity and slide-down motion over arbitrary host pages require a packaged browser comparison.",
+          "notes": "At 924x540 and 360x740, compare all four populated routes against screenshots 04 through 07. Verify the active indicator, header and close chrome, 420px overlay geometry, primary workflow behind the surface, selected/stored-original hierarchy, generic privacy copy, visible keyboard focus, scroll restoration, reduced motion, and no full-panel flicker during Recall refresh."
+        }
+      ],
+      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System"
     },
     {
       "id": "image-preview-backdrop-no-flash",

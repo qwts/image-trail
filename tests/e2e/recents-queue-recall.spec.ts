@@ -243,7 +243,7 @@ test('pins persist across panel reopen and Recall recalls offscreen durable rows
 
   await setVisiblePins(page, '1', 1);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Recall', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Recall' }).click();
   const recall = page.getByRole('dialog', { name: 'Recall' });
   await expect(recall).toBeVisible();
   await expect(recall.locator('.image-trail-panel__recall-list > li')).toHaveCount(2);
@@ -258,9 +258,9 @@ test('pins persist across panel reopen and Recall recalls offscreen durable rows
   await recall.getByRole('button', { name: 'Clear results' }).click();
   await expect(recall.locator('.image-trail-panel__recall-list > li')).toHaveCount(0);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(1);
-  await recall.getByRole('button', { name: 'Close' }).click();
+  await recall.getByRole('button', { name: 'Close Recall' }).click();
   await expect(recall).toHaveCount(0);
-  await page.getByRole('button', { name: 'Recall', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Recall' }).click();
   await expect(page.getByRole('dialog', { name: 'Recall' }).locator('.image-trail-panel__recall-list > li')).toHaveCount(2);
 });
 
@@ -295,7 +295,7 @@ test('Recents reflect captured queue state even when the saved row is in Recall'
   await expect(recent.getByRole('button', { name: 'Capture' })).toHaveCount(0);
   await expect(recent.getByRole('button', { name: 'Delete original' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Recall', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Recall' }).click();
   const recall = page.getByRole('dialog', { name: 'Recall' });
   await expect(recall.locator('.image-trail-panel__recall-list > li', { hasText: 'asset-one.svg' })).toBeVisible();
 });
@@ -338,14 +338,16 @@ test('select-all scopes export to visible Recents, visible queue rows, and loade
   await expect(await waitForDownloadCount(serviceWorker, 1)).toEqual(['asset-one.svg']);
   await clearSelectedQueueRows(page);
 
-  await page.getByRole('button', { name: 'Recall', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Recall' }).click();
   const recall = page.getByRole('dialog', { name: 'Recall' });
   await expect(recall.locator('.image-trail-panel__recall-list > li')).toHaveCount(2);
+  await expect(recall.locator('.image-trail-panel__recall-list > li', { hasText: 'asset-two.svg' })).toBeVisible();
+  await expect(recall.locator('.image-trail-panel__recall-list > li', { hasText: 'asset-three.svg' })).toBeVisible();
   await recall.getByRole('button', { name: 'Select all Recall' }).click();
   await exportImages(page, serviceWorker);
   await expect(await waitForDownloadCount(serviceWorker, 2)).toEqual(['asset-two.svg', 'asset-three.svg']);
 
-  await recall.getByRole('button', { name: 'Close' }).click();
+  await expect(recall).toHaveCount(0);
   await setVisiblePins(page, '30', 3);
   await deleteAllDurableQueueRows(page);
 });

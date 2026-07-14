@@ -1,6 +1,6 @@
 import { reducePanelAction } from '../../core/actions.js';
 import type { PanelAction, PanelState } from '../../core/types.js';
-import { renderPanel, renderRecallDrawer, type PanelLayoutState } from '../render.js';
+import { renderPanel, renderRecallDestination, type PanelLayoutState } from '../render.js';
 import { createToast } from '../components/primitives.js';
 import { isFocusablePanelControl } from './export-download.js';
 import type { BufferedNavigationDebugSnapshot } from './buffered-navigation-controller.js';
@@ -13,19 +13,18 @@ export interface PanelRenderControllerDeps {
   dispatch(action: PanelAction): void;
   root(): HTMLElement | null;
   contextRoot(): HTMLElement | null;
-  recallRoot(): HTMLElement | null;
   detachedRoot(): HTMLElement | null;
   toastRoot(): HTMLElement | null;
   panelStylesReady(): boolean;
   // The active preview scroll anchor + drag handler live on their own controllers; the render path
-  // only threads them into `renderPanel`/`renderRecallDrawer`.
+  // only threads them into the main and targeted destination render paths.
   previewScrollAnchorId(): string | null;
   handlePanelDragStart(event: PointerEvent): void;
   queuePanelPositionRestore(): void;
   applyRestoredPanelPosition(): void;
   // The buffered-navigation debug overlay reads a snapshot of the skip-buffer window.
   bufferedNavDebugSnapshot(): BufferedNavigationDebugSnapshot | null;
-  // Queue refresh after a panel-only render so the recall drawer never triggers a full rerender.
+  // Queue refresh after a panel-only render so Recall can use its targeted body refresh.
   refreshRecallIfOpen(): void;
   onWorkspaceLayoutChanged(): void;
 }
@@ -45,8 +44,8 @@ type FocusedPanelControlSnapshot = {
 
 /**
  * The panel's rendering plumbing, moved verbatim off `ImageTrailPanel`: the main `render` (with its
- * focus capture/restore contract across DOM swaps), the recall-only render (the `renderRecallDrawer`
- * vs `renderPanel` split that avoids full rerenders), the buffered-skip toast and buffered-debug
+ * focus capture/restore contract across DOM swaps), the targeted Recall destination refresh that
+ * avoids full rerenders, the buffered-skip toast and buffered-debug
  * overlay, and the finite capture-error reset timer.
  *
  * Order-sensitive spots preserved: `captureFocusedPanelControl` → render → `restoreFocusedPanelControl`
@@ -64,6 +63,8 @@ export class PanelRenderController {
     detachedWindowPositions: new Map(),
     detachedWindowMinimized: new Set(),
     collapsibleListScrollTops: new Map(),
+    primaryPanelScrollTop: null,
+    destinationScrollTops: new Map(),
   };
 
   constructor(private readonly deps: PanelRenderControllerDeps) {}
@@ -101,11 +102,11 @@ export class PanelRenderController {
   }
 
   renderPanelAndRefreshRecall(): void {
-    this.render({ includeRecall: false });
+    this.render();
     this.deps.refreshRecallIfOpen();
   }
 
-  render(options: { readonly includeRecall?: boolean } = {}): void {
+  render(): void {
     const root = this.deps.root();
     if (root) {
       const focusedControl = this.captureFocusedPanelControl();
@@ -113,7 +114,6 @@ export class PanelRenderController {
         {
           root,
           contextRoot: this.deps.contextRoot(),
-          recallRoot: this.deps.recallRoot(),
           detachedRoot: this.deps.detachedRoot(),
           toastRoot: this.deps.toastRoot(),
           dispatch: this.deps.dispatch,
@@ -123,7 +123,6 @@ export class PanelRenderController {
           onPanelDragStart: this.deps.handlePanelDragStart,
         },
         this.deps.getState(),
-        { renderRecall: options.includeRecall !== false },
       );
       this.restoreFocusedPanelControl(focusedControl);
       if (!this.deps.getState().minimized && this.deps.panelStylesReady()) {
@@ -270,12 +269,10 @@ export class PanelRenderController {
 
   renderRecallOnly(): void {
     const root = this.deps.root();
-    const recallRoot = this.deps.recallRoot();
-    if (!root || !recallRoot) return;
-    renderRecallDrawer(
+    if (!root) return;
+    renderRecallDestination(
       {
         root,
-        recallRoot,
         toastRoot: this.deps.toastRoot(),
         dispatch: this.deps.dispatch,
         layoutState: this.layoutState,

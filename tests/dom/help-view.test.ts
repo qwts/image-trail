@@ -17,11 +17,11 @@ test('help/toggle flips helpOpen on and off', () => {
 });
 
 test('opening Help closes Settings so destinations replace each other', () => {
-  const state = { ...createInitialPanelState(0), settingsOpen: true };
+  const state = { ...createInitialPanelState(0), activeDestination: 'settings' as const };
   const opened = reducePanelAction(state, { name: 'help/toggle' });
 
   assert.equal(opened.helpOpen, true);
-  assert.equal(opened.settingsOpen, false);
+  assert.equal(opened.activeDestination, null);
 });
 
 test('the Help view renders the shared shortcut reference with panel and browser groups', () => {

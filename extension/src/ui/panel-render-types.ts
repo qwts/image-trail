@@ -1,11 +1,10 @@
-import type { DetachableSectionId, PanelAction } from '../core/types.js';
+import type { DetachableSectionId, PanelAction, PanelDestinationId } from '../core/types.js';
 import type { DetachedWindowPosition } from './components/detachable-section.js';
 import type { NumericFieldDisplayMode } from './parsed-fields-section.js';
 
 export interface PanelRenderTarget {
   readonly root: HTMLElement;
   readonly contextRoot?: HTMLElement | null;
-  readonly recallRoot?: HTMLElement | null;
   readonly detachedRoot?: HTMLElement | null;
   readonly toastRoot?: HTMLElement | null;
   readonly dispatch: (action: PanelAction) => void;
@@ -14,10 +13,6 @@ export interface PanelRenderTarget {
   readonly onPanelDragStart?: (event: PointerEvent) => void;
   /** Fired after detached-window geometry or minimized state changes. */
   readonly onWorkspaceLayoutChanged?: () => void;
-}
-
-export interface PanelRenderOptions {
-  readonly renderRecall?: boolean;
 }
 
 export interface PanelLayoutState {
@@ -29,4 +24,8 @@ export interface PanelLayoutState {
   detachedWindowMinimized: Set<DetachableSectionId>;
   /** Scroll offsets parked while collapsible record lists are absent from the DOM. */
   collapsibleListScrollTops: Map<string, number>;
+  /** Primary workflow offset parked while a destination owns the panel scrollport. */
+  primaryPanelScrollTop: number | null;
+  /** Per-destination offsets survive route switches without becoming durable product state. */
+  destinationScrollTops: Map<PanelDestinationId, number>;
 }

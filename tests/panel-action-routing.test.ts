@@ -23,7 +23,7 @@ test('panel action dispatcher reaches each reducer domain', () => {
   assert.deepEqual(queueRecents.selectedHistoryIds, []);
 
   const settings = reducePanelAction(initial, { name: 'settings/toggle' });
-  assert.equal(settings.settingsOpen, !initial.settingsOpen);
+  assert.equal(settings.activeDestination, 'settings');
 
   const panelSession = reducePanelAction(initial, { name: 'panel/minimize' });
   assert.equal(panelSession.minimized, true);

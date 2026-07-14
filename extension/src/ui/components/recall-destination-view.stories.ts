@@ -1,21 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/html-vite';
 import { expect, fireEvent, fn, userEvent } from 'storybook/test';
 
-import { createRecallDrawerView } from './recall-drawer-view.js';
+import { createRecallDestinationBody } from './recall-destination-view.js';
 import { resetPreviewRowClickTracking } from './record-row-preview-click.js';
 import { recallState } from '../stories/fixtures.js';
-import { drawerStory, mockDispatch } from '../stories/story-host.js';
-
-const geometry = {
-  side: 'right' as const,
-  inlineStart: 16,
-  inlineSize: 340,
-  blockStart: 16,
-  blockSize: 480,
-};
+import { mockDispatch, panelStory } from '../stories/story-host.js';
 
 const meta = {
-  title: 'Extension UI/Recall drawer',
+  title: 'Extension UI/Recall destination',
   render: () => recallStory(),
 } satisfies Meta;
 
@@ -49,20 +41,13 @@ export const HasMore: Story = {
 };
 
 export const Narrow: Story = {
-  render: () =>
-    recallStory(
-      {},
-      {
-        ...geometry,
-        inlineSize: 280,
-      },
-    ),
+  render: () => recallStory({}, undefined, 280),
 };
 
 const dispatchSpy = fn();
 
 export const SelectsRow: Story = {
-  render: () => recallStory({}, geometry, dispatchSpy),
+  render: () => recallStory({}, dispatchSpy),
   play: async ({ canvasElement }) => {
     dispatchSpy.mockClear();
     const row = canvasElement.querySelector('[data-image-trail-row-id="recall-queue-captured"]');
@@ -78,7 +63,7 @@ export const SelectsRow: Story = {
 };
 
 export const PreviewsSelectedRow: Story = {
-  render: () => recallStory({ selectedIds: ['recall-queue-captured'] }, geometry, dispatchSpy),
+  render: () => recallStory({ selectedIds: ['recall-queue-captured'] }, dispatchSpy),
   play: async ({ canvasElement }) => {
     dispatchSpy.mockClear();
     resetPreviewRowClickTracking();
@@ -92,10 +77,8 @@ export const PreviewsSelectedRow: Story = {
   },
 };
 
-function recallStory(
-  stateOverrides = {},
-  geometryOverrides = geometry,
-  dispatch: Parameters<typeof createRecallDrawerView>[2] = mockDispatch(),
-) {
-  return drawerStory(createRecallDrawerView(recallState(stateOverrides), geometryOverrides, dispatch));
+function recallStory(stateOverrides = {}, dispatch: Parameters<typeof createRecallDestinationBody>[1] = mockDispatch(), width = 420) {
+  const body = createRecallDestinationBody(recallState(stateOverrides), dispatch);
+  body.classList.add('image-trail-panel__destination-body');
+  return panelStory(body, { width });
 }

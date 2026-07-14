@@ -15,7 +15,6 @@ interface Harness {
   readonly controller: PanelRenderController;
   readonly root: HTMLElement;
   readonly toastRoot: HTMLElement;
-  readonly recallRoot: HTMLElement;
   readonly detachedRoot: HTMLElement;
   readonly log: string[];
   getState(): PanelState;
@@ -28,14 +27,12 @@ function createHarness(): Harness {
   const log: string[] = [];
   const root = document.createElement('div');
   const toastRoot = document.createElement('div');
-  const recallRoot = document.createElement('div');
   const detachedRoot = document.createElement('div');
-  document.body.append(root, toastRoot, recallRoot, detachedRoot);
+  document.body.append(root, toastRoot, detachedRoot);
   const harness: Harness = {
     controller: undefined as unknown as PanelRenderController,
     root,
     toastRoot,
-    recallRoot,
     detachedRoot,
     log,
     getState: () => state,
@@ -52,7 +49,6 @@ function createHarness(): Harness {
     dispatch: () => {},
     root: () => root,
     contextRoot: () => null,
-    recallRoot: () => recallRoot,
     detachedRoot: () => detachedRoot,
     toastRoot: () => toastRoot,
     panelStylesReady: () => true,

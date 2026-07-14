@@ -76,8 +76,8 @@ export function createDomPanelHeader(state: PanelState, callbacks: PanelShellCal
     }),
     createIconButton({
       glyph: '⚙',
-      label: state.settingsOpen ? 'Hide settings' : 'Show settings',
-      pressed: state.settingsOpen,
+      label: state.activeDestination === 'settings' ? 'Hide settings' : 'Show settings',
+      pressed: state.activeDestination === 'settings',
       className: 'image-trail-panel__icon-button',
       onClick: () => callbacks.dispatch({ name: 'settings/toggle' }),
     }),

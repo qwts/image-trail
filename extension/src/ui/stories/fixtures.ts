@@ -132,9 +132,7 @@ export function recallState(overrides: Partial<RecallState> = {}): RecallState {
   }));
 
   return {
-    open: true,
     busy: false,
-    side: 'right',
     candidates,
     selectedIds: [],
     offset: 0,

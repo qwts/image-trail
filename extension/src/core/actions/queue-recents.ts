@@ -87,7 +87,10 @@ export function reduceQueueRecentsAction(state: PanelState, action: QueueRecents
         ...state,
         selectedHistoryIds: state.history.map((item) => item.id),
         selectedBookmarkIds: state.bookmarks.map((item) => item.id),
-        recall: { ...state.recall, selectedIds: state.recall.open ? state.recall.candidates.map((candidate) => candidate.id) : [] },
+        recall: {
+          ...state.recall,
+          selectedIds: state.activeDestination === 'recall' ? state.recall.candidates.map((candidate) => candidate.id) : [],
+        },
         lastUpdatedAt: Date.now(),
       };
     case 'history-selection/toggle':
@@ -103,11 +106,18 @@ export function reduceQueueRecentsAction(state: PanelState, action: QueueRecents
     case 'recall/open':
       return {
         ...state,
-        recall: { ...state.recall, open: true, side: action.side, message: undefined, messageIsError: false },
+        activeDestination: 'recall',
+        helpOpen: false,
+        recall: { ...state.recall, message: undefined, messageIsError: false },
         lastUpdatedAt: Date.now(),
       };
     case 'recall/close':
-      return { ...state, recall: { ...state.recall, open: false, selectedIds: [] }, lastUpdatedAt: Date.now() };
+      return {
+        ...state,
+        activeDestination: state.activeDestination === 'recall' ? null : state.activeDestination,
+        recall: { ...state.recall, selectedIds: [] },
+        lastUpdatedAt: Date.now(),
+      };
     case 'recall/load-start':
       return {
         ...state,
@@ -345,6 +355,7 @@ export function reduceQueueRecentsAction(state: PanelState, action: QueueRecents
     case 'capture/cleanup-orphans':
     case 'capture/preview':
     case 'recall/load-more':
+    case 'recall/reload':
     case 'recall/selected':
     case 'recall/delete-all':
       return state;

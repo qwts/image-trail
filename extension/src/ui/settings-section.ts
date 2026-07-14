@@ -167,5 +167,5 @@ function selectedRecordCount(state: PanelState): number {
 }
 
 function visibleImageSelectionCount(state: PanelState): number {
-  return state.history.length + state.bookmarks.length + (state.recall.open ? state.recall.candidates.length : 0);
+  return state.history.length + state.bookmarks.length + (state.activeDestination === 'recall' ? state.recall.candidates.length : 0);
 }

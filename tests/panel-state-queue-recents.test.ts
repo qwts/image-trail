@@ -79,6 +79,7 @@ test('select-all and range actions update only their own selection surface', () 
 test('select visible selects recents, visible queue rows, and loaded Recall rows', () => {
   const state = {
     ...createInitialPanelState(),
+    activeDestination: 'recall' as const,
     history: [
       createPanelRecordFixture({ id: 'history-1', source: 'history' }),
       createPanelRecordFixture({ id: 'history-2', source: 'history', timestamp: '2026-06-20T00:00:01.000Z' }),
@@ -86,7 +87,6 @@ test('select visible selects recents, visible queue rows, and loaded Recall rows
     bookmarks: [createPanelRecordFixture({ id: 'bookmark-1', source: 'bookmark' })],
     recall: {
       ...createInitialPanelState().recall,
-      open: true,
       candidates: [
         {
           id: 'recall-1',
@@ -106,14 +106,13 @@ test('select visible selects recents, visible queue rows, and loaded Recall rows
   assert.deepEqual(selected.recall.selectedIds, ['recall-1']);
 });
 
-test('select visible ignores cached Recall rows while the drawer is closed', () => {
+test('select visible ignores cached Recall rows while Recall is not active', () => {
   const state = {
     ...createInitialPanelState(),
     history: [createPanelRecordFixture({ id: 'history-1', source: 'history' })],
     bookmarks: [createPanelRecordFixture({ id: 'bookmark-1', source: 'bookmark' })],
     recall: {
       ...createInitialPanelState().recall,
-      open: false,
       candidates: [
         {
           id: 'hidden-recall-1',
@@ -232,9 +231,9 @@ test('record selection prunes removed and unloaded rows', () => {
   assert.deepEqual(reloadedBookmarks.selectedBookmarkIds, ['bookmark-2']);
 });
 
-test('recall drawer loads candidates and toggles selection', () => {
+test('Recall destination loads candidates and toggles selection', () => {
   const state = createInitialPanelState();
-  const opened = reducePanelAction(state, { name: 'recall/open', side: 'left' });
+  const opened = reducePanelAction(state, { name: 'recall/open' });
   const loading = reducePanelAction(opened, { name: 'recall/load-start' });
   const loaded = reducePanelAction(loading, {
     name: 'recall/load-complete',
@@ -258,15 +257,14 @@ test('recall drawer loads candidates and toggles selection', () => {
   const selected = reducePanelAction(loaded, { name: 'recall-selection/toggle', id: 'recall-1' });
   const closed = reducePanelAction(selected, { name: 'recall/close' });
 
-  assert.equal(opened.recall.open, true);
-  assert.equal(opened.recall.side, 'left');
+  assert.equal(opened.activeDestination, 'recall');
   assert.equal(loading.recall.busy, true);
   assert.equal(loaded.recall.busy, false);
   assert.equal(loaded.recall.candidates.length, 1);
   assert.equal(loaded.recall.nextOffset, 31);
   assert.equal(loaded.recall.hasMore, false);
   assert.deepEqual(selected.recall.selectedIds, ['recall-1']);
-  assert.equal(closed.recall.open, false);
+  assert.equal(closed.activeDestination, null);
   assert.deepEqual(closed.recall.selectedIds, []);
 });
 

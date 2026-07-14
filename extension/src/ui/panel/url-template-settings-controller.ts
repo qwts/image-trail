@@ -86,7 +86,7 @@ export class UrlTemplateSettingsController {
         await store.remove(existing.hostname, existing.id);
         await this.deps.loadGrabSettings({ render: false });
       }
-      if (this.deps.getState().settingsOpen) this.deps.render();
+      if (this.deps.getState().activeDestination === 'settings') this.deps.render();
       return;
     }
     const template = createUrlTemplateRecord({
@@ -98,7 +98,7 @@ export class UrlTemplateSettingsController {
     if (!template) return;
     await store.save(template);
     await this.deps.loadGrabSettings({ render: false });
-    if (this.deps.getState().settingsOpen) this.deps.render();
+    if (this.deps.getState().activeDestination === 'settings') this.deps.render();
   }
 
   async removeUrlTemplate(id: string): Promise<void> {

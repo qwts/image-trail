@@ -14,7 +14,7 @@ test('panel header uses shared status and icon primitives with existing actions'
   assert.equal(header.querySelectorAll('.image-trail-ds__icon-button').length, 3);
   header.querySelector<HTMLButtonElement>('[aria-label="Show settings"]')?.click();
   header.querySelector<HTMLButtonElement>('[aria-label="Minimize panel"]')?.click();
-  assert.deepEqual(actions, [{ name: 'settings/toggle' }, { name: 'panel/minimize' }]);
+  assert.deepEqual(actions, [{ name: 'destination/select', destination: 'settings' }, { name: 'panel/minimize' }]);
 });
 
 test('privacy mode keeps private URLs out of header and toast text, titles, and accessibility copy', () => {

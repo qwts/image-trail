@@ -66,6 +66,7 @@
         "src/ui/styles/panel.css",
         "src/ui/styles/panel-entry.css",
         "src/ui/styles/handoff-baseline.css",
+        "src/ui/styles/destinations.css",
         "src/ui/styles/page-context.css",
         "src/ui/styles/panel-legacy-foundation.css",
         "src/ui/styles/panel-legacy-sections.css",
@@ -82,6 +83,7 @@
         "src/ui/styles/record-row.css",
         "src/ui/styles/settings-surface.css",
         "src/ui/styles/settings-integrations.css",
+        "src/ui/styles/backup-history.css",
         "src/ui/styles/tokens.css"
       ],
       "matches": ["http://*/*", "https://*/*"]

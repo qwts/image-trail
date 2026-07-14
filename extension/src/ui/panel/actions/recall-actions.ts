@@ -5,6 +5,7 @@ export type RecallActionName =
   | 'recall/delete-all'
   | 'recall/open'
   | 'recall/close'
+  | 'recall/reload'
   | 'recall-selection/toggle'
   | 'recall-selection/select'
   | 'recall-selection/clear'
@@ -28,15 +29,13 @@ export function buildRecallActionEntries(deps: PanelActionDeps): ActionEntries<R
     },
     'recall/open': {
       handle() {
-        if (deps.getState().recall.open) {
-          // Re-opening an open drawer toggles it shut: reduce a synthesized close, NOT the
-          // dispatched open action (which carries the drawer side).
+        if (deps.getState().activeDestination === 'recall') {
           deps.clearRecallMessageTimer();
           deps.reduce({ name: 'recall/close' });
           deps.render();
           return;
         }
-        void deps.openRecallDrawer();
+        void deps.openRecallDestination();
       },
     },
     'recall/close': {
@@ -44,6 +43,11 @@ export function buildRecallActionEntries(deps: PanelActionDeps): ActionEntries<R
         deps.clearRecallMessageTimer();
         deps.reduce(action);
         deps.render();
+      },
+    },
+    'recall/reload': {
+      handle() {
+        deps.reloadRecallCandidates();
       },
     },
     'recall-selection/toggle': reduceAndRender,

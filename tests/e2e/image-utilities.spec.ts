@@ -236,6 +236,7 @@ test('exports selected recents, queue rows, and Recall rows in UI order', async 
   await installDownloadRequestLog(serviceWorker);
   await openPanel(page, serviceWorker);
   await deleteVisibleRecents(page);
+  await deleteVisibleQueueRows(page);
 
   await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetOne));
   await expectPanelStatusMessage(page, /Loaded .*asset-one\.svg|Image loaded but did not change\./u);
@@ -265,14 +266,14 @@ test('exports selected recents, queue rows, and Recall rows in UI order', async 
   await expect(page.locator('.image-trail-panel__bookmark-item.is-selected')).toHaveCount(0);
 
   await setVisiblePins(page, '1', 1);
-  await page.getByRole('button', { name: 'Recall', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Recall' })).toBeVisible();
-  await page.getByRole('button', { name: 'Select all Recall' }).click();
+  await page.getByRole('button', { name: 'Open Recall' }).click();
+  const recall = page.getByRole('dialog', { name: 'Recall' });
+  await expect(recall.locator('.image-trail-panel__recall-list > li', { hasText: 'asset-three.svg' })).toBeVisible();
+  await recall.getByRole('button', { name: 'Select all Recall' }).click();
   await exportImages(page, serviceWorker);
   downloads = await waitForDownloadRequests(serviceWorker, 1);
   expect(downloads.map((download) => download.filename)).toEqual(['asset-three.svg']);
 
-  await page.getByRole('dialog', { name: 'Recall' }).getByRole('button', { name: 'Close' }).click();
   await expect(page.getByRole('dialog', { name: 'Recall' })).toHaveCount(0);
   await setVisiblePins(page, '30', 2);
 });

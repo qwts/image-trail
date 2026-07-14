@@ -69,8 +69,8 @@ function createHarness(options: HarnessOptions = {}): Harness {
     setState: (next) => {
       state = next;
     },
-    render: (opts) => {
-      log.push(`render:${String(opts?.includeRecall ?? true)}`);
+    render: () => {
+      log.push('render:true');
     },
     renderPanelAndRefreshRecall: () => {
       log.push('renderPanelAndRefreshRecall');
@@ -443,7 +443,7 @@ test('cleanupOrphanedBlobs applies the usage, invalidates in-flight refreshes, a
   await harness.controller.cleanupOrphanedBlobs();
   assert.equal(harness.getState().message, 'Cleaned up 2 unused originals.');
   assert.equal(harness.getState().storageUsage?.blobCount, 2);
-  assert.deepEqual(harness.log, ['requestCleanupOrphanedBlobs', 'invalidateStorageUsageRequests', 'render:false']);
+  assert.deepEqual(harness.log, ['requestCleanupOrphanedBlobs', 'invalidateStorageUsageRequests', 'render:true']);
 });
 
 test('removeCapturedBlobReference applies the returned usage and only renders when asked', async () => {

@@ -19,6 +19,25 @@ export function reducePanelSessionAction(state: PanelState, action: PanelSession
     case 'panel/secondary-controls-open':
       if (state.secondaryControlsOpen === action.open) return state;
       return { ...state, secondaryControlsOpen: action.open, lastUpdatedAt: Date.now() };
+    case 'destination/select': {
+      const activeDestination = state.activeDestination === action.destination ? null : action.destination;
+      const routeClosed = activeDestination === null;
+      return {
+        ...state,
+        activeDestination,
+        helpOpen: false,
+        recall: routeClosed ? { ...state.recall, selectedIds: [] } : state.recall,
+        lastUpdatedAt: Date.now(),
+      };
+    }
+    case 'destination/close':
+      if (state.activeDestination === null) return state;
+      return {
+        ...state,
+        activeDestination: null,
+        recall: { ...state.recall, selectedIds: [] },
+        lastUpdatedAt: Date.now(),
+      };
     case 'panel/history-section-open':
       return { ...state, historySectionOpen: action.open, lastUpdatedAt: Date.now() };
     case 'panel/bookmarks-section-open':
@@ -40,7 +59,8 @@ export function reducePanelSessionAction(state: PanelState, action: PanelSession
       return {
         ...state,
         helpOpen: !state.helpOpen,
-        settingsOpen: state.helpOpen ? state.settingsOpen : false,
+        activeDestination: state.helpOpen ? state.activeDestination : null,
+        recall: !state.helpOpen && state.activeDestination === 'recall' ? { ...state.recall, selectedIds: [] } : state.recall,
         lastUpdatedAt: Date.now(),
       };
     case 'page-context/set':

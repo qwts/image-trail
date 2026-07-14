@@ -60,7 +60,7 @@ test('mount() creates the scoped host under document.body with the shadow-rooted
 
     const shadow = host.shadowRoot;
     assert.ok(shadow, 'the host must carry an open shadow root');
-    assert.equal(shadow.children.length, 6, 'stylesheet link + root + contextRoot + recallRoot + detachedRoot + toastRoot');
+    assert.equal(shadow.children.length, 5, 'stylesheet link + root + contextRoot + detachedRoot + toastRoot');
     stylesheetLink(host);
 
     assert.ok(mount.root instanceof HTMLElement);
@@ -69,7 +69,6 @@ test('mount() creates the scoped host under document.body with the shadow-rooted
     assert.equal(mount.root.style.visibility, 'hidden', 'the panel stays hidden until styles are ready');
     assert.equal(mount.panelStylesReady, false);
     assert.ok(mount.contextRoot instanceof HTMLElement);
-    assert.ok(mount.recallRoot instanceof HTMLElement);
     assert.ok(mount.detachedRoot instanceof HTMLElement);
     assert.ok(mount.toastRoot instanceof HTMLElement);
 
@@ -129,7 +128,6 @@ test('teardown() removes the host from the document and clears the mount state',
   assert.equal(document.getElementById(ROOT_ID), null, 'the host must leave the document');
   assert.equal(mount.root, null);
   assert.equal(mount.contextRoot, null);
-  assert.equal(mount.recallRoot, null);
   assert.equal(mount.detachedRoot, null);
   assert.equal(mount.toastRoot, null);
   assert.equal(mount.panelStylesReady, false);
@@ -147,7 +145,7 @@ test('repeated mount/teardown cycles leak no hosts or shadow children', () => {
 
     mount.mount();
     assert.equal(document.querySelectorAll(`#${ROOT_ID}`).length, 1);
-    assert.equal(mountedHost().shadowRoot?.children.length, 6, 'remounting must rebuild exactly one set of roots');
+    assert.equal(mountedHost().shadowRoot?.children.length, 5, 'remounting must rebuild exactly one set of roots');
   } finally {
     mount.teardown();
   }

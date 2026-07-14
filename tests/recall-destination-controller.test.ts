@@ -5,12 +5,14 @@ import { createInitialPanelState } from '../extension/src/core/state.js';
 import { createDisplayRecord } from '../extension/src/core/display-records.js';
 import type { PanelState, RecallCandidate } from '../extension/src/core/types.js';
 import type { RecallStore, RecallCandidatesResult, RecallRecordsResult } from '../extension/src/content/recall-store.js';
-import { RecallDrawerController, type RecallDrawerControllerDeps } from '../extension/src/ui/panel/recall-drawer-controller.js';
+import {
+  RecallDestinationController,
+  type RecallDestinationControllerDeps,
+} from '../extension/src/ui/panel/recall-destination-controller.js';
 
-// This flat suite stubs window with a manual timer registry so the drawer-open animation window
+// This flat suite stubs window with a manual timer registry so the destination-open animation window
 // (waitForRecallOpening) and the success-message clear timer fire deterministically instead of on
-// the real clock. Drawer-side geometry against a real element lives in
-// tests/dom/recall-drawer-controller.test.ts.
+// the real clock. Browser timer behavior lives in tests/dom/recall-destination-controller.test.ts.
 interface StubTimer {
   readonly id: number;
   readonly callback: () => void;
@@ -33,7 +35,7 @@ globalThis.window = {
   },
 } as unknown as Window & typeof globalThis;
 
-// Fires the drawer-open animation timers (waitForRecallOpening and the deferred busy check, both
+// Fires the destination-open animation timers (waitForRecallOpening and the deferred busy check, both
 // <= 200ms) round by round, draining real micro/macrotasks in between so awaited timer promises
 // resume before the next batch fires. The 1800ms message-clear timer is deliberately left pending —
 // tests fire it explicitly.
@@ -71,7 +73,7 @@ function okCandidates(candidates: readonly RecallCandidate[], overrides: Partial
 }
 
 interface Harness {
-  readonly controller: RecallDrawerController;
+  readonly controller: RecallDestinationController;
   readonly log: string[];
   getState(): PanelState;
   patchState(patch: Partial<PanelState>): void;
@@ -100,7 +102,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
       return { ok: true, records: [], failedCount: 0, message: 'Recalled 1 record.' } as RecallRecordsResult;
     },
   } as unknown as RecallStore;
-  const deps: RecallDrawerControllerDeps = {
+  const deps: RecallDestinationControllerDeps = {
     getState: () => state,
     setState: (next) => {
       state = next;
@@ -123,11 +125,10 @@ function createHarness(options: HarnessOptions = {}): Harness {
     refreshBlobKeyStatus: async () => {
       log.push('refreshBlobKeyStatus');
     },
-    root: () => null,
     recallStore: () => (options.hasStore === false ? null : store),
   };
   return {
-    controller: new RecallDrawerController(deps),
+    controller: new RecallDestinationController(deps),
     log,
     getState: () => state,
     patchState: (patch) => {
@@ -136,48 +137,56 @@ function createHarness(options: HarnessOptions = {}): Harness {
   };
 }
 
-test('openRecallDrawer restores the panel position first, opens the drawer, and pages from the visible-queue limit', async () => {
+test('openRecallDestination restores panel position, activates Recall, and pages from the visible-queue limit', async () => {
   const harness = createHarness();
-  await harness.controller.openRecallDrawer();
+  await harness.controller.openRecallDestination();
   assert.equal(harness.log[0], 'ensurePanelPositionRestored');
-  assert.equal(harness.getState().recall.open, true);
-  assert.equal(harness.getState().recall.side, 'right', 'no root falls back to the right side');
+  assert.equal(harness.getState().activeDestination, 'recall');
+  assert.equal(harness.getState().recall.busy, true, 'stale candidates stay non-interactive while the route reloads');
   assert.ok(harness.log.includes('loadCandidates:30'), 'the initial page starts past the visible queue (bookmarkLimit)');
   await flushAnimationTimers();
   assert.equal(harness.getState().recall.candidates.length, 1);
 });
 
-test('openRecallDrawer without a recall store still opens the drawer and skips loading', async () => {
+test('openRecallDestination without a recall store still activates Recall and skips loading', async () => {
   const harness = createHarness({ hasStore: false });
-  await harness.controller.openRecallDrawer();
-  assert.equal(harness.getState().recall.open, true);
+  await harness.controller.openRecallDestination();
+  assert.equal(harness.getState().activeDestination, 'recall');
   assert.deepEqual(harness.log, ['ensurePanelPositionRestored', 'render']);
 });
 
-test('the busy render is deferred during the open animation and fires only if the load is still pending', async () => {
+test('the initial route render exposes busy state without a redundant targeted render', async () => {
   let releaseLoad = (): void => {};
   const gate = new Promise<void>((resolve) => {
     releaseLoad = resolve;
   });
   const harness = createHarness({ loadCandidates: () => gate.then(() => okCandidates([candidate('candidate-1')])) });
-  await harness.controller.openRecallDrawer();
-  assert.ok(!harness.log.includes('renderRecallOnly'), 'the busy render must wait for the open animation');
+  await harness.controller.openRecallDestination();
+  assert.equal(harness.getState().recall.busy, true);
+  assert.deepEqual(
+    harness.log.filter((entry) => entry === 'render' || entry === 'renderRecallOnly'),
+    ['render'],
+    'the first full route render owns the visible busy state',
+  );
   await flushAnimationTimers();
   assert.deepEqual(
     harness.log.filter((entry) => entry === 'renderRecallOnly'),
-    ['renderRecallOnly'],
-    'once the animation settles the still-pending load shows its busy state',
+    [],
+    'the still-pending load does not rebuild a busy state that is already visible',
   );
-  assert.equal(harness.getState().recall.busy, true);
   releaseLoad();
   await flushAnimationTimers();
   assert.equal(harness.getState().recall.busy, false);
   assert.equal(harness.getState().recall.candidates.length, 1);
+  assert.deepEqual(
+    harness.log.filter((entry) => entry === 'renderRecallOnly'),
+    ['renderRecallOnly'],
+  );
 });
 
 test('the deferred busy render is dropped when the load completes within the animation window', async () => {
   const harness = createHarness();
-  await harness.controller.openRecallDrawer();
+  await harness.controller.openRecallDestination();
   await flushAnimationTimers();
   // One render for the completed load; the deferred busy check found pending=false and skipped.
   assert.deepEqual(
@@ -237,7 +246,7 @@ test('an encryption-locked load refreshes the blob-key status before surfacing t
   assert.equal(harness.getState().recall.messageIsError, true);
 });
 
-test('a successful load schedules the message clear; firing it clears the message and rerenders the drawer', async () => {
+test('a successful load schedules the message clear; firing it clears the message and rerenders Recall', async () => {
   const harness = createHarness();
   await harness.controller.loadRecallCandidates({ offset: 0, append: false });
   const messageTimer = timers.find((timer) => timer.delayMs === 1800);
@@ -259,13 +268,13 @@ test('clearRecallMessageTimer cancels a scheduled message clear', async () => {
   assert.equal(clearedTimerIds.length, 1, 'a second clear must be a no-op');
 });
 
-test('refreshRecallIfOpen refreshes only an open drawer, without the busy state', async () => {
+test('refreshRecallIfOpen refreshes only the active Recall destination, without the busy state', async () => {
   const closed = createHarness();
   closed.controller.refreshRecallIfOpen();
   assert.deepEqual(closed.log, []);
 
   const open = createHarness();
-  open.patchState({ recall: { ...open.getState().recall, open: true } });
+  open.patchState({ activeDestination: 'recall' });
   open.controller.refreshRecallIfOpen();
   await flushAnimationTimers();
   assert.ok(open.log.includes('loadCandidates:30'));
@@ -298,7 +307,7 @@ test('recallSelectedRecords reloads the first queue page before completing and r
   assert.equal(harness.getState().recall.message, 'Recalled 1 record.');
 });
 
-test('an encryption-locked recall refreshes the blob-key status and surfaces the error in the drawer', async () => {
+test('an encryption-locked recall refreshes the blob-key status and surfaces the error in Recall', async () => {
   const harness = createHarness({
     recall: async () =>
       ({

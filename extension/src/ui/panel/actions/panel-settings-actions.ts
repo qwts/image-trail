@@ -72,7 +72,7 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
       handle(action) {
         deps.reduce(action);
         deps.render();
-        if (deps.getState().settingsOpen) void deps.refreshStorageUsage({ render: true });
+        if (deps.getState().activeDestination === 'settings') void deps.refreshStorageUsage({ render: true });
       },
     },
     'help/toggle': {

@@ -407,7 +407,6 @@ test('capture/delete clears paired bookmark, recent, and recall original state b
     bookmarks: [capturedRecord],
     recall: {
       ...createInitialPanelState(0).recall,
-      open: true,
       candidates: [{ ...capturedRecord, id: 'recall-paired', envelopeCreatedAt: '2026-06-28T00:58:00.000Z' }],
       selectedIds: ['recall-paired'],
       total: 1,
@@ -465,7 +464,6 @@ test('bookmark/remove unlinks pinned recent rows and clears stale original state
     selectedBookmarkIds: ['bookmark-linked'],
     recall: {
       ...createInitialPanelState(0).recall,
-      open: true,
       candidates: [
         {
           id: 'bookmark-linked',
@@ -536,7 +534,6 @@ test('bookmark/clear hides the visible queue row without unlinking durable paire
     selectedBookmarkIds: ['bookmark-clear-linked'],
     recall: {
       ...createInitialPanelState(0).recall,
-      open: true,
       candidates: [
         {
           id: 'bookmark-clear-linked',

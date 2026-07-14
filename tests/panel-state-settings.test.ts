@@ -159,17 +159,17 @@ test('updating request throttle settings only changes throttle policy state', ()
 
 test('settings toggle opens and closes the panel settings section', () => {
   const opened = reducePanelAction(createInitialPanelState(), { name: 'settings/toggle' });
-  assert.equal(opened.settingsOpen, true);
+  assert.equal(opened.activeDestination, 'settings');
 
   const closed = reducePanelAction(opened, { name: 'settings/toggle' });
-  assert.equal(closed.settingsOpen, false);
+  assert.equal(closed.activeDestination, null);
 });
 
 test('opening settings closes Help so destinations replace each other', () => {
   const state = { ...createInitialPanelState(), helpOpen: true };
   const opened = reducePanelAction(state, { name: 'settings/toggle' });
 
-  assert.equal(opened.settingsOpen, true);
+  assert.equal(opened.activeDestination, 'settings');
   assert.equal(opened.helpOpen, false);
 });
 

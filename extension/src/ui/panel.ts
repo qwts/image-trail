@@ -56,7 +56,7 @@ import { ParsedFieldStateRecordController } from './panel/parsed-field-state-rec
 import { UrlReviewStatusController } from './panel/url-review-status-controller.js';
 import { PanelDataLoadController } from './panel/panel-data-load-controller.js';
 import { PanelSettingsController } from './panel/panel-settings-controller.js';
-import { RecallDrawerController } from './panel/recall-drawer-controller.js';
+import { RecallDestinationController } from './panel/recall-destination-controller.js';
 import { RecallExportController } from './panel/recall-export-controller.js';
 import { RecallRestoreController } from './panel/recall-restore-controller.js';
 import { RecordLibraryController } from './panel/record-library-controller.js';
@@ -92,6 +92,7 @@ export class ImageTrailPanel {
     isPanelVisible: () => this.state.visible,
     isPanelMinimized: () => this.state.minimized,
     onStylesReady: () => {
+      this.render();
       this.panelPosition.queuePanelPositionRestore();
       this.panelPosition.applyRestoredPanelPosition();
     },
@@ -235,7 +236,7 @@ export class ImageTrailPanel {
   private readonly capturedOriginals: CapturedOriginalsController = new CapturedOriginalsController({
     getState: () => this.state,
     setState: this.replaceState,
-    render: (options) => this.render(options),
+    render: () => this.render(),
     renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
@@ -295,7 +296,7 @@ export class ImageTrailPanel {
     detachedWindowPositions: () => this.panelRender.workspaceGeometry().detachedWindowPositions,
     detachedWindowMinimized: () => this.panelRender.workspaceGeometry().detachedWindowMinimized,
   });
-  private readonly recallDrawer: RecallDrawerController = new RecallDrawerController({
+  private readonly recallDestination: RecallDestinationController = new RecallDestinationController({
     getState: () => this.state,
     setState: this.replaceState,
     render: () => this.render(),
@@ -304,7 +305,6 @@ export class ImageTrailPanel {
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     ensurePanelPositionRestored: () => this.panelPosition.ensurePanelPositionRestored(),
     refreshBlobKeyStatus: () => this.recallExport.refreshBlobKeyStatus(),
-    root: () => this.panelMount.root,
     recallStore: () => this.recallStore,
   });
   private readonly panelSettings: PanelSettingsController = new PanelSettingsController({
@@ -378,7 +378,6 @@ export class ImageTrailPanel {
     dispatch: (action) => this.dispatch(action),
     root: () => this.panelMount.root,
     contextRoot: () => this.panelMount.contextRoot,
-    recallRoot: () => this.panelMount.recallRoot,
     detachedRoot: () => this.panelMount.detachedRoot,
     toastRoot: () => this.panelMount.toastRoot,
     panelStylesReady: () => this.panelMount.panelStylesReady,
@@ -387,7 +386,7 @@ export class ImageTrailPanel {
     queuePanelPositionRestore: () => this.panelPosition.queuePanelPositionRestore(),
     applyRestoredPanelPosition: () => this.panelPosition.applyRestoredPanelPosition(),
     bufferedNavDebugSnapshot: () => this.bufferedNav.getDebugSnapshot(),
-    refreshRecallIfOpen: () => this.recallDrawer.refreshRecallIfOpen(),
+    refreshRecallIfOpen: () => this.recallDestination.refreshRecallIfOpen(),
     onWorkspaceLayoutChanged: () => this.workspaceLayout.handleWorkspaceLayoutChanged(),
   });
   private readonly parsedFieldStateRecord: ParsedFieldStateRecordController = new ParsedFieldStateRecordController({
@@ -490,7 +489,7 @@ export class ImageTrailPanel {
 
   setBuildIdentity(buildIdentity: BuildIdentity | null): void {
     this.state = { ...this.state, buildIdentity };
-    if (this.state.visible && this.state.settingsOpen) this.render();
+    if (this.state.visible && this.state.activeDestination === 'settings') this.render();
   }
 
   setBuildInfoOverlayVisible(visible: boolean): void {
@@ -524,7 +523,7 @@ export class ImageTrailPanel {
     this.panelMount.teardown();
     this.panelPosition.invalidateRestore();
     this.workspaceLayout.invalidateRestore();
-    this.recallDrawer.clearRecallMessageTimer();
+    this.recallDestination.clearRecallMessageTimer();
     this.panelRender.clearFiniteCaptureErrorTimer();
   }
 
@@ -547,10 +546,10 @@ export class ImageTrailPanel {
       syncTargetState: (snapshot) => {
         this.state = setTargetState(this.state, toTargetState(snapshot));
       },
-      render: (options) => this.render(options),
+      render: () => this.render(),
       renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
-      refreshRecallIfOpen: () => this.recallDrawer.refreshRecallIfOpen(),
-      clearRecallMessageTimer: () => this.recallDrawer.clearRecallMessageTimer(),
+      refreshRecallIfOpen: () => this.recallDestination.refreshRecallIfOpen(),
+      clearRecallMessageTimer: () => this.recallDestination.clearRecallMessageTimer(),
       getLocalSettings: () => this.localSettings,
       saveLocalSettings: (settings) => this.panelSettings.saveLocalSettings(settings),
       applyBuildInfoOverlayVisibility: (visible) => this.options.applyBuildInfoOverlayVisibility?.(visible),
@@ -598,9 +597,10 @@ export class ImageTrailPanel {
       notifyWorkspaceLayoutChanged: () => this.workspaceLayout.handleWorkspaceLayoutChanged(),
       refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
       restoreParsedFieldStateForCurrentPanel: () => this.parsedFieldStateRecord.restoreParsedFieldStateForCurrentPanel(),
-      openRecallDrawer: () => this.recallDrawer.openRecallDrawer(),
-      loadRecallCandidates: (input) => this.recallDrawer.loadRecallCandidates(input),
-      recallSelectedRecords: () => this.recallDrawer.recallSelectedRecords(),
+      openRecallDestination: () => this.recallDestination.openRecallDestination(),
+      reloadRecallCandidates: () => this.recallDestination.reloadRecallCandidates(),
+      loadRecallCandidates: (input) => this.recallDestination.loadRecallCandidates(input),
+      recallSelectedRecords: () => this.recallDestination.recallSelectedRecords(),
       enqueueFieldTransform: (action) => this.fieldEditor.enqueueFieldTransform(action),
       enqueueRejectedFieldCommit: () => this.fieldEditor.enqueueRejectedFieldCommit(),
       enqueueSelectedUrlApply: (url) => this.fieldEditor.enqueueSelectedUrlApply(url),
@@ -774,8 +774,8 @@ export class ImageTrailPanel {
     return document.querySelector<HTMLImageElement>(`[data-image-trail-handle="${handleId}"]`);
   }
 
-  private render(options: { readonly includeRecall?: boolean } = {}): void {
-    this.panelRender.render(options);
+  private render(): void {
+    this.panelRender.render();
   }
 
   private renderRecallOnly(): void {

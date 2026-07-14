@@ -1,0 +1,360 @@
+.image-trail-panel-root.image-trail-panel[data-destination] {
+  block-size: calc(100vh - 24px);
+  overflow: hidden;
+}
+
+.image-trail-panel-root .image-trail-panel__sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-root {
+  position: absolute;
+  z-index: 4;
+  inset-block-start: var(--it-destination-top, 104px);
+  inset-block-end: 0;
+  inset-inline: 0;
+  overflow: hidden;
+  border-radius: 0 0 var(--it-radius-panel) var(--it-radius-panel);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-surface {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  overflow: hidden;
+  border: 1px solid var(--it-border-panel);
+  border-block-start: 0;
+  border-radius: 0 0 var(--it-radius-panel) var(--it-radius-panel);
+  background: #05070a;
+  box-shadow:
+    var(--it-shadow-panel),
+    0 20px 40px rgb(0 0 0 / 45%);
+  animation: image-trail-destination-enter 180ms var(--it-ease-out);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px 10px;
+  border-block-end: 1px solid var(--it-divider);
+  background: var(--it-header-bg);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-header > span {
+  flex: none;
+  color: var(--it-text-dim);
+  font: 13px/1 var(--it-font-ui);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-header h3 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--it-text-3);
+  font: var(--it-type-heading);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-header button,
+.image-trail-panel-root .image-trail-panel__destination-actions button,
+.image-trail-panel-root .image-trail-panel__recall-destination button {
+  appearance: none;
+  min-block-size: 26px;
+  padding: 5px 8px;
+  border: 1px solid var(--it-border-control);
+  border-radius: var(--it-radius-control);
+  background: var(--it-control-bg);
+  color: var(--it-text-3);
+  cursor: pointer;
+  font: var(--it-fw-medium) var(--it-fs-sm) / 1 var(--it-font-ui);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-header button:hover,
+.image-trail-panel-root .image-trail-panel__destination-actions button:hover,
+.image-trail-panel-root .image-trail-panel__recall-destination button:hover {
+  background: var(--it-control-bg-hover);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-header button:focus-visible,
+.image-trail-panel-root .image-trail-panel__destination-actions button:focus-visible,
+.image-trail-panel-root .image-trail-panel__recall-destination button:focus-visible,
+.image-trail-panel-root .image-trail-panel__gallery-tile:focus-visible {
+  outline: var(--it-focus-ring);
+  outline-offset: var(--it-focus-offset);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-header button:disabled,
+.image-trail-panel-root .image-trail-panel__destination-actions button:disabled,
+.image-trail-panel-root .image-trail-panel__recall-destination button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-open-tab {
+  inline-size: 26px;
+  margin-inline-start: auto;
+  padding: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-close {
+  inline-size: 26px;
+  padding: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-body {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 12px;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-body[data-destination='settings'] {
+  overflow: hidden;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-dom-host[data-destination='settings'] {
+  display: block;
+  block-size: 100%;
+  min-block-size: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-dom-host[data-destination='settings'] > .image-trail-panel__settings-section {
+  block-size: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  grid-auto-rows: max-content;
+  overflow-anchor: none;
+  padding-block-end: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-dom-host,
+.image-trail-panel-root .image-trail-panel__dashboard-destination,
+.image-trail-panel-root .image-trail-panel__gallery-destination,
+.image-trail-panel-root .image-trail-panel__recall-destination {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__dashboard-target {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+}
+
+.image-trail-panel-root .image-trail-panel__dashboard-target > img,
+.image-trail-panel-root .image-trail-panel__destination-image-placeholder {
+  display: grid;
+  place-items: center;
+  inline-size: 52px;
+  block-size: 52px;
+  object-fit: cover;
+  overflow: hidden;
+  border: 1px solid var(--it-fill-14);
+  border-radius: var(--it-radius-badge);
+  background: var(--it-input-bg);
+  color: var(--it-accent-wait);
+  font: var(--it-type-tiny);
+}
+
+.image-trail-panel-root .image-trail-panel__dashboard-target > div {
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__dashboard-target p {
+  overflow: hidden;
+  margin: 0 0 5px;
+  color: var(--it-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--it-type-mono-sm);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-applied {
+  margin-inline-start: 6px;
+  color: var(--it-text-dim);
+  font: var(--it-type-micro);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-stat {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--it-border-control);
+  border-radius: var(--it-radius-card);
+  background: var(--it-control-bg);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-stat strong {
+  color: var(--it-text-2);
+  font: var(--it-fw-heavy) 18px/1 var(--it-font-ui);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-stat[data-tone='accent'] strong {
+  color: #9fe;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-stat span {
+  overflow: hidden;
+  color: var(--it-text-dim);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  font: var(--it-fw-semi) 9px/1 var(--it-font-ui);
+  letter-spacing: 0.06em;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-note,
+.image-trail-panel-root .image-trail-panel__destination-empty {
+  margin: 0;
+  color: var(--it-text-dim);
+  font: var(--it-type-meta);
+}
+
+.image-trail-panel-root .image-trail-panel__destination-note strong {
+  color: #cfe;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.image-trail-panel-root .image-trail-panel__destination-actions .is-primary {
+  border-color: rgb(89 255 178 / 48%);
+  box-shadow: 0 0 10px rgb(89 255 178 / 12%);
+}
+
+.image-trail-panel-root .image-trail-panel__gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.image-trail-panel-root .image-trail-panel__gallery-tile {
+  appearance: none;
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-block-size: 104px;
+  place-items: stretch;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--it-fill-14);
+  border-radius: var(--it-radius-card);
+  background: #0c0f12;
+  color: var(--it-text-2);
+  cursor: pointer;
+}
+
+.image-trail-panel-root .image-trail-panel__gallery-tile[data-stored-original='true'] {
+  border-color: rgb(124 255 168 / 45%);
+  box-shadow: var(--it-glow-row);
+}
+
+.image-trail-panel-root .image-trail-panel__gallery-tile > img,
+.image-trail-panel-root .image-trail-panel__gallery-tile > .image-trail-panel__destination-image-placeholder {
+  inline-size: 100%;
+  block-size: 104px;
+  border: 0;
+  border-radius: 0;
+  object-fit: cover;
+}
+
+.image-trail-panel-root .image-trail-panel__gallery-tile > span:last-child {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  overflow: hidden;
+  padding: 14px 5px 4px;
+  background: linear-gradient(transparent, rgb(0 0 0 / 88%));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--it-fw-semi) 9px/1.2 var(--it-font-mono);
+}
+
+.image-trail-panel-root .image-trail-panel__gallery-original {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 6px;
+  inset-inline-end: 6px;
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: var(--it-radius-pill);
+  background: var(--it-text);
+  box-shadow: 0 0 7px rgb(255 255 255 / 55%);
+}
+
+.image-trail-panel-root .image-trail-panel__recall-destination-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-trail-panel-root .image-trail-panel__recall-destination-toolbar > p {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__recall-destination .image-trail-panel__recall-list {
+  max-block-size: min(330px, calc(100vh - 275px));
+  overflow-y: auto;
+}
+
+.image-trail-panel-root .image-trail-panel__recall-destination .image-trail-panel__recall-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+@keyframes image-trail-destination-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 380px) {
+  .image-trail-panel-root .image-trail-panel__destination-header {
+    flex-wrap: wrap;
+  }
+
+  .image-trail-panel-root .image-trail-panel__destination-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .image-trail-panel-root .image-trail-panel__gallery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-trail-panel-root .image-trail-panel__destination-surface {
+    animation: none;
+  }
+}

@@ -35,7 +35,7 @@ export interface PanelActionDeps {
 
   // Render variants — these are distinct on purpose (see ui/CLAUDE.md: no full panel rerenders for
   // recall-only updates); each handler must keep calling exactly the variant the if-chain used.
-  render(options?: { readonly includeRecall?: boolean }): void;
+  render(): void;
   renderPanelAndRefreshRecall(): void;
   refreshRecallIfOpen(): void;
   clearRecallMessageTimer(): void;
@@ -94,7 +94,8 @@ export interface PanelActionDeps {
   notifyWorkspaceLayoutChanged(): void;
   refreshStorageUsage(options?: { readonly render?: boolean }): Promise<void>;
   restoreParsedFieldStateForCurrentPanel(): void;
-  openRecallDrawer(): Promise<void>;
+  openRecallDestination(): Promise<void>;
+  reloadRecallCandidates(): void;
   loadRecallCandidates(input: { readonly offset: number; readonly append: boolean }): Promise<void>;
   recallSelectedRecords(): Promise<void>;
   enqueueFieldTransform(action: FieldTransformPanelAction): void;

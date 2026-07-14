@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/html-vite';
 import { expect } from 'storybook/test';
 
 import type { PanelState } from '../core/types.js';
+import { createInitialPanelState } from '../core/state.js';
 import { DEFAULT_SEARCHABLE_METADATA_POLICY } from '../core/metadata-policy.js';
 import { EMPTY_PAGE_CONTEXT_STATE } from '../core/page-context.js';
 import { renderPanel, type PanelLayoutState } from './render.js';
@@ -37,7 +38,7 @@ const STORY_BUILD_IDENTITY = {
 export const SettingsSectionOrder: Story = {
   render: () =>
     panelLayoutStory({
-      settingsOpen: true,
+      activeDestination: 'settings',
       storageUsage: {
         blobCount: 14,
         totalBytes: 867_328,
@@ -47,6 +48,22 @@ export const SettingsSectionOrder: Story = {
         thumbnails: { count: 4, totalBytes: 38_912 },
       },
     }),
+  play: async ({ canvasElement }) => expectDestination(canvasElement, 'settings'),
+};
+
+export const DashboardDestination: Story = {
+  render: () => panelLayoutStory({ activeDestination: 'dashboard' }),
+  play: async ({ canvasElement }) => expectDestination(canvasElement, 'dashboard'),
+};
+
+export const GalleryDestination: Story = {
+  render: () => panelLayoutStory({ activeDestination: 'gallery' }),
+  play: async ({ canvasElement }) => expectDestination(canvasElement, 'gallery'),
+};
+
+export const RecallDestination: Story = {
+  render: () => panelLayoutStory({ activeDestination: 'recall' }),
+  play: async ({ canvasElement }) => expectDestination(canvasElement, 'recall'),
 };
 
 export const ParsedFieldFailedLoad: Story = {
@@ -102,7 +119,7 @@ export const Error: Story = {
 };
 
 export const Narrow: Story = {
-  render: () => panelLayoutStory({}, { width: 300 }),
+  render: () => panelLayoutStory({ activeDestination: 'gallery' }, { width: 300 }),
   play: async ({ canvasElement }) => {
     const panel = canvasElement.querySelector<HTMLElement>('.image-trail-panel');
     await expect(panel).not.toBeNull();
@@ -110,12 +127,20 @@ export const Narrow: Story = {
   },
 };
 
+async function expectDestination(canvasElement: HTMLElement, destination: 'dashboard' | 'gallery' | 'recall' | 'settings'): Promise<void> {
+  const surface = canvasElement.querySelector<HTMLElement>(`.image-trail-panel__destination-surface[data-destination="${destination}"]`);
+  const active = canvasElement.querySelector<HTMLElement>(`[data-image-trail-destination="${destination}"]`);
+  await expect(surface).not.toBeNull();
+  await expect(active).toHaveAttribute('aria-pressed', 'true');
+  await expect(surface?.querySelector('.image-trail-panel__destination-close')).not.toBeNull();
+}
+
 export const ReducedMotion: Story = {
   render: () => panelLayoutStory({ captureInProgress: true }, { reducedMotion: true }),
 };
 
 export const SettingsDetached: Story = {
-  render: () => detachedPanelStory({ settingsOpen: true, detachedSections: ['settings'] }),
+  render: () => detachedPanelStory({ activeDestination: 'settings', detachedSections: ['settings'] }),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('.image-trail-panel')?.querySelector('.image-trail-panel__settings-section')).toBeNull();
     await expect(canvasElement.querySelector('[data-image-trail-detached-placeholder="settings"]')).not.toBeNull();
@@ -126,7 +151,7 @@ export const SettingsDetached: Story = {
 };
 
 export const SettingsDetachedPrivacyMasked: Story = {
-  render: () => detachedPanelStory({ settingsOpen: true, detachedSections: ['settings'], privacyModeEnabled: true }),
+  render: () => detachedPanelStory({ activeDestination: 'settings', detachedSections: ['settings'], privacyModeEnabled: true }),
 };
 
 /** Panel plus a detached-window root in one canvas; fixed windows become absolute for the story. */
@@ -154,6 +179,8 @@ function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
     detachedWindowPositions: new Map([['settings', { left: 460, top: 16 }]]),
     detachedWindowMinimized: new Set(),
     collapsibleListScrollTops: new Map(),
+    primaryPanelScrollTop: null,
+    destinationScrollTops: new Map(),
   };
   wrapper.append(host, detachedRoot);
 
@@ -165,7 +192,6 @@ function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
       layoutState,
     },
     panelState(overrides),
-    { renderRecall: false },
   );
 
   for (const windowEl of Array.from(detachedRoot.querySelectorAll<HTMLElement>('.image-trail-panel__detached-window'))) {
@@ -195,6 +221,8 @@ function panelLayoutStory(
     detachedWindowPositions: new Map(),
     detachedWindowMinimized: new Set(),
     collapsibleListScrollTops: new Map(),
+    primaryPanelScrollTop: null,
+    destinationScrollTops: new Map(),
   };
 
   renderPanel(
@@ -204,7 +232,6 @@ function panelLayoutStory(
       layoutState,
     },
     panelState(overrides),
-    { renderRecall: false },
   );
 
   return host;
@@ -212,6 +239,7 @@ function panelLayoutStory(
 
 function panelState(overrides: Partial<PanelState> = {}): PanelState {
   return {
+    ...createInitialPanelState(Date.parse('2026-06-25T15:30:00.000Z')),
     visible: true,
     minimized: false,
     status: 'ready',
@@ -268,7 +296,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     pcloudBackup: {
       connectionState: 'disconnected',
     },
-    settingsOpen: false,
+    activeDestination: null,
     helpOpen: false,
     automation: {
       slideshowPhase: 'idle',

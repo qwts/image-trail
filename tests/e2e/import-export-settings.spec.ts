@@ -109,19 +109,21 @@ async function deleteVisibleRecents(page: Page): Promise<void> {
 }
 
 async function deleteVisibleQueueRows(page: Page): Promise<void> {
-  await openSettingsGroup(page, 'System');
-  const deleteCurrent = page.getByRole('button', { name: /^Delete current queue \(\d+\)$/u });
-  if ((await deleteCurrent.count()) > 0 && !(await deleteCurrent.isDisabled())) {
-    await deleteCurrent.click();
-    await page.getByRole('button', { name: /^Confirm Delete current queue \(\d+\)$/u }).click();
+  for (let pass = 0; pass < 3; pass += 1) {
+    await openSettingsGroup(page, 'System');
+    await confirmQueueDeletion(page, /^Delete current queue \(\d+\)$/u, /^Confirm Delete current queue \(\d+\)$/u);
+    await confirmQueueDeletion(page, /^Delete Recall items \(\d+\)$/u, /^Confirm Delete Recall items \(\d+\)$/u);
+    await closeSettings(page);
+    if ((await page.locator('.image-trail-panel__bookmark-item').count()) === 0) return;
   }
-  const deleteRecall = page.getByRole('button', { name: /^Delete Recall items \(\d+\)$/u });
-  if ((await deleteRecall.count()) > 0 && !(await deleteRecall.isDisabled())) {
-    await deleteRecall.click();
-    await page.getByRole('button', { name: /^Confirm Delete Recall items \(\d+\)$/u }).click();
-  }
-  await closeSettings(page);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
+}
+
+async function confirmQueueDeletion(page: Page, actionName: RegExp, confirmName: RegExp): Promise<void> {
+  const action = page.getByRole('button', { name: actionName });
+  if ((await action.count()) === 0 || (await action.isDisabled())) return;
+  await action.click();
+  await page.getByRole('button', { name: confirmName }).click();
 }
 
 async function exportRecordJson(
@@ -323,6 +325,7 @@ async function uninstallPCloudMock(serviceWorker: Worker): Promise<void> {
 test('history and bookmark exports restore through preview without durable side effects', async ({ page, serviceWorker }) => {
   await openPanel(page, serviceWorker);
   await deleteVisibleRecents(page);
+  await deleteVisibleQueueRows(page);
 
   await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetTwo));
   await expectPanelStatusMessage(page, /Loaded .*asset-two\.svg/u);

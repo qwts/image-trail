@@ -10,16 +10,12 @@ import type { Retry404 } from '../extension/src/core/automation/retry-404.js';
 import type { Slideshow } from '../extension/src/core/automation/slideshow.js';
 import type { PanelAction, PanelState } from '../extension/src/core/types.js';
 import { defineAction, dispatchPanelAction, type ActionDef, type PanelActionFor } from '../extension/src/ui/panel/action-dispatch.js';
-import { buildAutomationActionEntries } from '../extension/src/ui/panel/actions/automation-actions.js';
 import type { PanelActionDeps } from '../extension/src/ui/panel/actions/deps.js';
-import { buildDetachableSectionActionEntries } from '../extension/src/ui/panel/actions/detach-actions.js';
-import { buildFieldActionEntries } from '../extension/src/ui/panel/actions/field-actions.js';
-import { buildLibraryActionEntries } from '../extension/src/ui/panel/actions/library-actions.js';
-import { buildPanelSettingsActionEntries } from '../extension/src/ui/panel/actions/panel-settings-actions.js';
-import { buildRecallActionEntries } from '../extension/src/ui/panel/actions/recall-actions.js';
-import { buildTargetActionEntries } from '../extension/src/ui/panel/actions/target-actions.js';
-import { buildTransferActionEntries } from '../extension/src/ui/panel/actions/transfer-actions.js';
-import { buildPanelActionRegistry, type RegisteredPanelActionName } from '../extension/src/ui/panel/actions/registry.js';
+import {
+  buildPanelActionRegistry,
+  PANEL_ACTION_ENTRY_BUILDERS,
+  type RegisteredPanelActionName,
+} from '../extension/src/ui/panel/actions/registry.js';
 import type { PanelMount } from '../extension/src/ui/panel/panel-mount.js';
 import type { ParsedFieldStateSync } from '../extension/src/ui/panel/parsed-field-state-sync.js';
 import type { BufferedNavigationController } from '../extension/src/ui/panel/buffered-navigation-controller.js';
@@ -192,7 +188,8 @@ function createHarness(
     notifyWorkspaceLayoutChanged: () => record('notifyWorkspaceLayoutChanged'),
     refreshStorageUsage: () => recordAsync('refreshStorageUsage'),
     restoreParsedFieldStateForCurrentPanel: () => record('restoreParsedFieldStateForCurrentPanel'),
-    openRecallDrawer: () => recordAsync('openRecallDrawer'),
+    openRecallDestination: () => recordAsync('openRecallDestination'),
+    reloadRecallCandidates: () => record('reloadRecallCandidates'),
     loadRecallCandidates: (input) => recordAsync(`loadRecallCandidates:${input.offset}:${String(input.append)}`),
     recallSelectedRecords: () => recordAsync('recallSelectedRecords'),
     enqueueFieldTransform: () => record('enqueueFieldTransform'),
@@ -230,6 +227,8 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'target/set-object-fit': { name: 'target/set-object-fit', mode: 'contain' },
   'page-context/set': { name: 'page-context/set', context: 'gallery' },
   'panel/secondary-controls-open': { name: 'panel/secondary-controls-open', open: true },
+  'destination/select': { name: 'destination/select', destination: 'dashboard' },
+  'destination/close': { name: 'destination/close' },
   'panel/history-section-open': { name: 'panel/history-section-open', open: true },
   'panel/bookmarks-section-open': { name: 'panel/bookmarks-section-open', open: true },
   'section/detach': { name: 'section/detach', sectionId: 'history' },
@@ -303,8 +302,9 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'bookmark-selection/select': { name: 'bookmark-selection/select', ids: ['bookmark-1'] },
   'bookmark-selection/clear': { name: 'bookmark-selection/clear' },
   'recall/delete-all': { name: 'recall/delete-all' },
-  'recall/open': { name: 'recall/open', side: 'left' },
+  'recall/open': { name: 'recall/open' },
   'recall/close': { name: 'recall/close' },
+  'recall/reload': { name: 'recall/reload' },
   'recall-selection/toggle': { name: 'recall-selection/toggle', id: 'recall-1' },
   'recall-selection/select': { name: 'recall-selection/select', ids: ['recall-1'] },
   'recall-selection/clear': { name: 'recall-selection/clear' },
@@ -419,16 +419,7 @@ test('registry keys match the fixture domain with one entry per name and no tail
   const keys = Object.keys(registry);
   assert.equal(keys.length, Object.keys(fixtures).length);
   // Spreading group maps would silently drop duplicates across groups; the per-group sum catches that.
-  const groupKeySum = [
-    buildTargetActionEntries,
-    buildPanelSettingsActionEntries,
-    buildLibraryActionEntries,
-    buildRecallActionEntries,
-    buildFieldActionEntries,
-    buildTransferActionEntries,
-    buildAutomationActionEntries,
-    buildDetachableSectionActionEntries,
-  ].reduce((sum, build) => sum + Object.keys(build(harness.deps)).length, 0);
+  const groupKeySum = PANEL_ACTION_ENTRY_BUILDERS.reduce((sum, build) => sum + Object.keys(build(harness.deps)).length, 0);
   assert.equal(groupKeySum, keys.length);
   assert.ok(!keys.includes('toggle-panel'), 'toggle-panel must stay on the fallback tail');
   assert.ok(!keys.includes('close-panel'), 'close-panel must stay on the fallback tail');
@@ -529,16 +520,16 @@ test('Queue pager actions preserve front/back semantics across display orders', 
   assert.deepEqual(harness.log, ['loadBookmarkPage:0', 'loadBookmarkPage:20', 'loadBookmarkPage:20', 'loadBookmarkPage:0']);
 });
 
-test('recall/open toggles an already-open drawer shut instead of reopening it', () => {
+test('recall/open toggles an already-open destination shut instead of reopening it', () => {
   const harness = createHarness();
   const registry = buildPanelActionRegistry(harness.deps);
-  harness.patchState({ recall: { ...harness.getState().recall, open: true } });
-  dispatchPanelAction(registry, { name: 'recall/open', side: 'left' }, () => assert.fail('unexpected fallback'));
+  harness.patchState({ activeDestination: 'recall' });
+  dispatchPanelAction(registry, { name: 'recall/open' }, () => assert.fail('unexpected fallback'));
   assert.deepEqual(harness.log, ['clearRecallMessageTimer', 'reduce', 'render']);
-  assert.equal(harness.getState().recall.open, false, 'the synthesized recall/close must reduce the drawer shut');
+  assert.equal(harness.getState().activeDestination, null, 'the synthesized recall/close must close the destination');
   harness.log.length = 0;
-  dispatchPanelAction(registry, { name: 'recall/open', side: 'left' }, () => assert.fail('unexpected fallback'));
-  assert.deepEqual(harness.log, ['openRecallDrawer']);
+  dispatchPanelAction(registry, { name: 'recall/open' }, () => assert.fail('unexpected fallback'));
+  assert.deepEqual(harness.log, ['openRecallDestination']);
 });
 
 test('recall/load-more only pages when the drawer is idle and has more candidates', () => {

@@ -7,7 +7,7 @@ route through `content/` controllers (ESLint-enforced).
 
 - **Avoid full panel rerenders.** The recall drawer has its own DOM root and
   render path. Use `renderRecallOnly()`, `render({ includeRecall: false })`, or
-  `renderPanelAndRefreshRecall()` (`panel.ts`) — i.e. `renderRecallDrawer` vs
+  `renderPanelAndRefreshRecall()` (`panel.ts`) — i.e. `renderRecallDestination` vs
   `renderPanel` (`render.ts`) — so queue/recall updates never rebuild the whole
   panel. Focus and scroll are captured/restored across renders; preserve that.
 - **Selected vs stored-original must stay visually distinct.** Selection is a

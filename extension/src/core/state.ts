@@ -36,9 +36,7 @@ export const EMPTY_AUTOMATION_STATE: AutomationState = {
 };
 
 export const EMPTY_RECALL_STATE: RecallState = {
-  open: false,
   busy: false,
-  side: 'right',
   candidates: [],
   selectedIds: [],
   offset: 0,
@@ -103,7 +101,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     pcloudBackup: {
       connectionState: 'disconnected',
     },
-    settingsOpen: false,
+    activeDestination: null,
     helpOpen: false,
     automation: EMPTY_AUTOMATION_STATE,
     recall: EMPTY_RECALL_STATE,
@@ -134,10 +132,13 @@ export function closePanel(state: PanelState, now = Date.now()): PanelState {
     ...state,
     visible: false,
     minimized: false,
+    activeDestination: null,
+    helpOpen: false,
     status: 'closed',
     message: 'Panel closed.',
     lastUpdatedAt: now,
     target: { ...state.target, picking: false },
+    recall: { ...state.recall, selectedIds: [] },
   };
 }
 

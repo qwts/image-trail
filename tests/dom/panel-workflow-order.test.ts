@@ -14,12 +14,10 @@ test('attached workflow follows the handoff order from Host target through Contr
     detachedWindowPositions: new Map(),
     detachedWindowMinimized: new Set(),
     collapsibleListScrollTops: new Map(),
+    primaryPanelScrollTop: null,
+    destinationScrollTops: new Map(),
   };
-  renderPanel(
-    { root, dispatch: () => {}, layoutState },
-    { ...createInitialPanelState(0), visible: true, status: 'ready' },
-    { renderRecall: false },
-  );
+  renderPanel({ root, dispatch: () => {}, layoutState }, { ...createInitialPanelState(0), visible: true, status: 'ready' });
   const classes = Array.from(root.querySelectorAll<HTMLElement>(':scope > .image-trail-panel__section')).map(
     (section) => section.className,
   );

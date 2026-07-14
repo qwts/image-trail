@@ -26,7 +26,7 @@ function parseDimensionText(value: string | null): { readonly width?: number; re
 export interface CapturedOriginalsControllerDeps {
   getState(): PanelState;
   setState(state: PanelState): void;
-  render(options?: { readonly includeRecall?: boolean }): void;
+  render(): void;
   renderPanelAndRefreshRecall(): void;
   loadBookmarkPage(offset: number, options?: { readonly render?: boolean }): Promise<void>;
   refreshStorageUsage(options?: { readonly render?: boolean | undefined }): Promise<void>;
@@ -95,7 +95,7 @@ export class CapturedOriginalsController {
       ),
     );
     this.deps.invalidateStorageUsageRequests();
-    this.deps.render({ includeRecall: false });
+    this.deps.render();
   }
 
   async captureImage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<void> {

@@ -1,6 +1,7 @@
 import type { PanelAction } from '../../../core/types.js';
 import type { AnyActionDef } from '../action-dispatch.js';
 import { buildAutomationActionEntries, type AutomationActionName } from './automation-actions.js';
+import { buildDestinationActionEntries, type DestinationActionName } from './destination-actions.js';
 import type { PanelActionDeps } from './deps.js';
 import { buildDetachableSectionActionEntries, type DetachableSectionActionName } from './detach-actions.js';
 import { buildFieldActionEntries, type FieldActionName } from './field-actions.js';
@@ -61,6 +62,18 @@ type FallbackPanelActionName =
  */
 export type RegisteredPanelActionName = Exclude<PanelAction['name'], FallbackPanelActionName>;
 
+export const PANEL_ACTION_ENTRY_BUILDERS = [
+  buildTargetActionEntries,
+  buildPanelSettingsActionEntries,
+  buildLibraryActionEntries,
+  buildRecallActionEntries,
+  buildFieldActionEntries,
+  buildTransferActionEntries,
+  buildAutomationActionEntries,
+  buildDetachableSectionActionEntries,
+  buildDestinationActionEntries,
+] as const;
+
 /**
  * Panel action registry: the single source of truth for `ImageTrailPanel.dispatch`. The
  * `satisfies Record<RegisteredPanelActionName, …>` check enforces completeness at compile time —
@@ -77,6 +90,7 @@ export function buildPanelActionRegistry(deps: PanelActionDeps) {
     ...buildTransferActionEntries(deps),
     ...buildAutomationActionEntries(deps),
     ...buildDetachableSectionActionEntries(deps),
+    ...buildDestinationActionEntries(deps),
   } satisfies Record<RegisteredPanelActionName, AnyActionDef>;
 }
 
@@ -91,6 +105,7 @@ type GroupActionName =
   | FieldActionName
   | TransferActionName
   | AutomationActionName
-  | DetachableSectionActionName;
+  | DetachableSectionActionName
+  | DestinationActionName;
 type _AssertNever<T extends never> = T;
 type _NoGroupNameOutsideRegistry = _AssertNever<Exclude<GroupActionName, RegisteredPanelActionName>>;

@@ -25,8 +25,11 @@ export const ReactProductionSlice: Story = {
   play: async ({ canvasElement }) => {
     reactDispatch.mockClear();
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole('button', { name: 'Gallery' }));
-    await expect(reactDispatch).toHaveBeenCalledWith({ name: 'gallery/open' });
+    const gallery = canvasElement.querySelector<HTMLButtonElement>('[data-image-trail-destination="gallery"]');
+    await expect(gallery).not.toBeNull();
+    await expect(gallery).toHaveTextContent('Gallery');
+    await userEvent.click(gallery!);
+    await expect(reactDispatch).toHaveBeenCalledWith({ name: 'destination/select', destination: 'gallery' });
 
     const targetControls = canvasElement.querySelector<HTMLElement>('.image-trail-panel__target-controls-summary');
     await expect(targetControls).not.toBeNull();

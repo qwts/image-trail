@@ -41,12 +41,11 @@ export interface AutomationState {
   readonly retriesMax: number;
   readonly governorStatus: 'ready' | 'throttled' | 'capped';
   readonly requestsInWindow: number;
-  // True while the parsed-field navigation drain is working (loading, skipping, or waiting on the
-  // governor) — the panel's visible "navigation is busy" signal (#373).
+  // True while the parsed-field navigation drain is working; the panel's busy signal (#373).
   readonly navigationBusy: boolean;
 }
 
-export type RecallDrawerSide = 'left' | 'right';
+export type PanelDestinationId = 'dashboard' | 'gallery' | 'recall' | 'settings';
 
 export type {
   DetachableSectionId,
@@ -145,9 +144,7 @@ export interface RecallCandidate extends ImageDisplayRecord {
 }
 
 export interface RecallState {
-  readonly open: boolean;
   readonly busy: boolean;
-  readonly side: RecallDrawerSide;
   readonly candidates: readonly RecallCandidate[];
   readonly selectedIds: readonly string[];
   readonly offset: number;
@@ -216,7 +213,7 @@ export interface PanelState {
   readonly importExportMessageIsError?: boolean | undefined;
   readonly importRestorePreview?: ImportRestorePreviewState | undefined;
   readonly pcloudBackup: PCloudBackupState;
-  readonly settingsOpen: boolean;
+  readonly activeDestination: PanelDestinationId | null;
   readonly helpOpen: boolean;
   readonly automation: AutomationState;
   readonly recall: RecallState;
@@ -243,6 +240,8 @@ export type PanelActionName =
   | 'panel/minimize'
   | 'panel/expand'
   | 'panel/secondary-controls-open'
+  | 'destination/select'
+  | 'destination/close'
   | 'section/detach'
   | 'section/restore'
   | 'start-target-picker'
@@ -353,6 +352,7 @@ export type PanelActionName =
   | 'recall/open'
   | 'recall/close'
   | 'recall/load-start'
+  | 'recall/reload'
   | 'recall/load-more'
   | 'recall/load-complete'
   | 'recall/error'
@@ -424,6 +424,7 @@ export type PanelAction =
         | 'target/set-object-fit'
         | 'page-context/set'
         | 'panel/secondary-controls-open'
+        | 'destination/select'
         | 'section/detach'
         | 'section/restore'
         | 'active-field/set'
@@ -490,7 +491,6 @@ export type PanelAction =
         | 'import/bookmarks'
         | 'import/image'
         | 'import/encrypted-image'
-        | 'recall/open'
         | 'recall/load-complete'
         | 'recall/error'
         | 'recall-selection/toggle'
@@ -535,6 +535,7 @@ export type PanelAction =
   | { readonly name: 'bookmarks/update-display-order'; readonly order: QueueDisplayOrder }
   | { readonly name: 'history/load' | 'history/download' }
   | { readonly name: 'panel/secondary-controls-open'; readonly open: boolean }
+  | { readonly name: 'destination/select'; readonly destination: PanelDestinationId }
   | { readonly name: 'panel/history-section-open'; readonly open: boolean }
   | { readonly name: 'panel/bookmarks-section-open'; readonly open: boolean }
   | { readonly name: 'section/detach' | 'section/restore'; readonly sectionId: DetachableSectionId }
@@ -672,7 +673,6 @@ export type PanelAction =
   | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
   | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] }
   | { readonly name: 'import/confirm-restore-preview' | 'import/cancel-restore-preview' }
-  | { readonly name: 'recall/open'; readonly side: RecallDrawerSide }
   | {
       readonly name: 'recall/load-complete';
       readonly candidates: readonly RecallCandidate[];

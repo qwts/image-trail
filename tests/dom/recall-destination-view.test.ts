@@ -2,9 +2,7 @@ import test from 'node:test';
 import { resetPreviewRowClickTracking } from '../../extension/src/ui/components/record-row-preview-click.js';
 import assert from 'node:assert/strict';
 
-import { createRecallDrawerView } from '../../extension/src/ui/components/recall-drawer-view.js';
-import { renderRecallDrawer, type PanelRenderTarget } from '../../extension/src/ui/render.js';
-import { createInitialPanelState, EMPTY_RECALL_STATE } from '../../extension/src/core/state.js';
+import { createRecallDestinationBody } from '../../extension/src/ui/components/recall-destination-view.js';
 import type { RecallCandidate } from '../../extension/src/core/types.js';
 
 const record: RecallCandidate = {
@@ -15,24 +13,14 @@ const record: RecallCandidate = {
   envelopeCreatedAt: '2026-06-25T15:30:00.000Z',
 };
 
-const geometry = {
-  side: 'right' as const,
-  inlineStart: 0,
-  inlineSize: 320,
-  blockStart: 0,
-  blockSize: 480,
-};
-
 function buildRecallView(
   actions: unknown[],
   selectedIds: readonly string[] = [],
   candidates: readonly RecallCandidate[] = [record],
 ): HTMLElement {
-  return createRecallDrawerView(
+  return createRecallDestinationBody(
     {
-      open: true,
       busy: false,
-      side: 'right',
       candidates,
       selectedIds,
       offset: 0,
@@ -41,7 +29,6 @@ function buildRecallView(
       total: candidates.length,
       failedCount: 0,
     },
-    geometry,
     (action) => actions.push(action),
   );
 }
@@ -157,54 +144,15 @@ test('ArrowDown restores Recall row focus inside a shadow root', async () => {
   assert.equal(root.activeElement, nextRow);
 });
 
-test('a viewport narrower than the drawer clamps the inline width inside the edge padding', () => {
-  // Regression: the geometry had a 240px width floor, so on viewports narrower than ~264px the
-  // inline width overrode the CSS `width: min(340px, calc(100vw - 24px))` and pushed the Close
-  // control off-screen. The width must mirror the CSS and never exceed viewport - 2 * 12px padding.
-  const happyDOM = (window as unknown as { happyDOM: { setViewport(viewport: { width?: number; height?: number }): void } }).happyDOM;
-  const root = document.createElement('div');
-  const recallRoot = document.createElement('div');
-  document.body.append(root, recallRoot);
-  // happy-dom elements report a zero rect; pin a realistic panel rect so the drawer takes the
-  // clamped-inside-the-viewport path rather than the beside-the-panel path.
-  Object.defineProperty(root, 'getBoundingClientRect', {
-    value: () => ({ left: 12, right: 100, top: 40, bottom: 400, width: 88, height: 360 }),
-  });
-  happyDOM.setViewport({ width: 200, height: 480 });
-  try {
-    const target: PanelRenderTarget = {
-      root,
-      recallRoot,
-      dispatch: () => {},
-      layoutState: {
-        fieldsPanelOpen: false,
-        fieldsPanelBlockSize: null,
-        historyListBlockSize: null,
-        fieldDisplayModes: new Map(),
-        detachedWindowPositions: new Map(),
-        detachedWindowMinimized: new Set(),
-        collapsibleListScrollTops: new Map(),
-      },
-    };
-    const state = {
-      ...createInitialPanelState(0),
-      recall: { ...EMPTY_RECALL_STATE, open: true, candidates: [record], total: 1, nextOffset: 1 },
-    };
+test('Recall destination reload dispatches through the typed route action', () => {
+  const actions: unknown[] = [];
+  const view = buildRecallView(actions);
+  const reload = Array.from(view.querySelectorAll('button')).find((button) => button.textContent === 'Reload');
+  assert.ok(reload);
 
-    renderRecallDrawer(target, state);
+  reload.click();
 
-    const drawer = recallRoot.querySelector<HTMLElement>('.image-trail-panel__recall-drawer');
-    assert.ok(drawer, 'the recall drawer renders');
-    const width = Number.parseFloat(drawer.style.width);
-    const left = Number.parseFloat(drawer.style.left);
-    assert.equal(width, 200 - 24, 'the inline width mirrors the CSS min(340px, 100vw - 24px)');
-    assert.ok(left >= 12, `the drawer starts inside the left edge padding (left=${left})`);
-    assert.ok(left + width <= 200 - 12, `the drawer ends inside the right edge padding (left=${left}, width=${width})`);
-  } finally {
-    happyDOM.setViewport({ width: 1024, height: 768 });
-    root.remove();
-    recallRoot.remove();
-  }
+  assert.deepEqual(actions, [{ name: 'recall/reload' }]);
 });
 
 test('Recall rows render thumbnail images when available', () => {

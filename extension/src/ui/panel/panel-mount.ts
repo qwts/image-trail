@@ -40,7 +40,7 @@ function defaultEnvironment(): PanelMountEnvironment {
 }
 
 /**
- * Owns the panel's DOM mount lifecycle: the shadow-root host, the `root`/`recallRoot`/`toastRoot`
+ * Owns the panel's DOM mount lifecycle: the shadow-root host, panel/context/detached/toast roots,
  * elements, the styles-ready gating promise, and the page-adapter subscription unsubscribe handles.
  * Extracted from `ImageTrailPanel` so mounting/teardown is isolated from panel business logic and
  * independently testable.
@@ -48,7 +48,6 @@ function defaultEnvironment(): PanelMountEnvironment {
 export class PanelMount {
   private rootEl: HTMLElement | null = null;
   private contextRootEl: HTMLElement | null = null;
-  private recallRootEl: HTMLElement | null = null;
   private detachedRootEl: HTMLElement | null = null;
   private toastRootEl: HTMLElement | null = null;
   private stylesReady = false;
@@ -62,10 +61,6 @@ export class PanelMount {
 
   get root(): HTMLElement | null {
     return this.rootEl;
-  }
-
-  get recallRoot(): HTMLElement | null {
-    return this.recallRootEl;
   }
 
   get contextRoot(): HTMLElement | null {
@@ -116,9 +111,6 @@ export class PanelMount {
     const contextRoot = doc.createElement('div');
     contextRoot.className = 'image-trail-page-context-root';
     this.contextRootEl = contextRoot;
-    const recallRoot = doc.createElement('div');
-    recallRoot.className = 'image-trail-panel-recall-root';
-    this.recallRootEl = recallRoot;
     const detachedRoot = doc.createElement('div');
     detachedRoot.className = 'image-trail-panel-detached-root';
     this.detachedRootEl = detachedRoot;
@@ -146,7 +138,7 @@ export class PanelMount {
       link.addEventListener('error', reveal, { once: true });
       this.environment.scheduleStylesReadyFallback(reveal);
     });
-    shadow.replaceChildren(link, root, contextRoot, recallRoot, detachedRoot, toastRoot);
+    shadow.replaceChildren(link, root, contextRoot, detachedRoot, toastRoot);
     // Prefer document.body; fall back to documentElement only when body is absent. The logical
     // expression keeps this clear of the no-document-element-append lint rule.
     (doc.body ?? doc.documentElement).append(host);
@@ -158,7 +150,6 @@ export class PanelMount {
     this.environment.document.getElementById(ROOT_ID)?.remove();
     this.rootEl = null;
     this.contextRootEl = null;
-    this.recallRootEl = null;
     this.detachedRootEl = null;
     this.toastRootEl = null;
     this.stylesReady = false;

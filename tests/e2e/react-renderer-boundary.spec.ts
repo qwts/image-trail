@@ -21,7 +21,7 @@ test('React destination dock routes existing actions and preserves focus across 
 
   const dock = page.getByRole('navigation', { name: 'Image Trail destinations' });
   await expect(dock.getByRole('button')).toHaveCount(4);
-  await expect(dock.getByRole('button', { name: 'Dashboard' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(dock.getByRole('button', { name: 'Dashboard' })).toHaveAttribute('aria-pressed', 'false');
 
   const settings = dock.getByRole('button', { name: 'Show settings' });
   await settings.focus();
@@ -37,7 +37,7 @@ test('React destination dock routes existing actions and preserves focus across 
   await openRecall.press('Enter');
   const closeRecall = dock.getByRole('button', { name: 'Close Recall' });
   await expect(closeRecall).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.image-trail-panel__recall-drawer')).toBeVisible();
+  await expect(page.locator('.image-trail-panel__destination-surface[data-destination="recall"]')).toBeVisible();
   await expect(closeRecall).toBeFocused();
 });
 

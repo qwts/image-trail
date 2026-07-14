@@ -27,7 +27,8 @@ test('createSettingsSection reflects populated backup, restore, and selection st
     importExportMessageIsError: false,
     selectedHistoryIds: ['recent-1'],
     selectedBookmarkIds: ['queue-1'],
-    recall: { ...createInitialPanelState(0).recall, open: true, selectedIds: ['recall-1'], candidates: [] },
+    activeDestination: 'recall',
+    recall: { ...createInitialPanelState(0).recall, selectedIds: ['recall-1'], candidates: [] },
     target: { ...createInitialPanelState(0).target, selectedUrl: 'https://images.example.test/a/1.jpg' },
     pcloudBackup: {
       connectionState: 'connected',

@@ -46,8 +46,9 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
     case 'settings/toggle':
       return {
         ...state,
-        settingsOpen: !state.settingsOpen,
-        helpOpen: state.settingsOpen ? state.helpOpen : false,
+        activeDestination: state.activeDestination === 'settings' ? null : 'settings',
+        helpOpen: false,
+        recall: state.activeDestination === 'recall' ? { ...state.recall, selectedIds: [] } : state.recall,
         lastUpdatedAt: Date.now(),
       };
     case 'settings/update-visible-bookmark-soft-max':

@@ -111,7 +111,7 @@ export class PanelDataLoadController {
       const usage = await captureStore.requestStorageUsage();
       if (requestId !== this.storageUsageRequestId) return;
       this.applyStorageUsage(usage, { preserveRequestId: true });
-      if (options.render || this.deps.getState().settingsOpen) this.deps.render();
+      if (options.render || this.deps.getState().activeDestination === 'settings') this.deps.render();
     } catch {
       // Storage health is informational; it must not break row actions.
     }

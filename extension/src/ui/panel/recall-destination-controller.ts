@@ -3,10 +3,10 @@ import type { RecallStore } from '../../content/recall-store.js';
 import { reducePanelAction } from '../../core/actions.js';
 import type { PanelState } from '../../core/types.js';
 
-const RECALL_DRAWER_OPEN_ANIMATION_MS = 190;
+const RECALL_DESTINATION_OPEN_ANIMATION_MS = 190;
 const RECALL_SUCCESS_MESSAGE_MS = 1800;
 
-export interface RecallDrawerControllerDeps {
+export interface RecallDestinationControllerDeps {
   getState(): PanelState;
   setState(state: PanelState): void;
   render(): void;
@@ -15,12 +15,11 @@ export interface RecallDrawerControllerDeps {
   loadBookmarkPage(offset: number, options?: { readonly render?: boolean }): Promise<void>;
   ensurePanelPositionRestored(): Promise<void>;
   refreshBlobKeyStatus(): Promise<void>;
-  root(): HTMLElement | null;
   recallStore(): RecallStore | null;
 }
 
 /**
- * Recall-drawer open/load/select lifecycle, moved verbatim off `ImageTrailPanel`: the drawer-open
+ * Recall destination open/load/select lifecycle. The destination route lives in PanelState while
  * animation window (`recallOpeningUntil` defers the busy render until the open animation settles),
  * candidate paging, the success-message clear timer, and the recall-selected flow. Export/restore
  * live in `RecallExportController`/`RecallRestoreController`; this controller reaches them only
@@ -28,33 +27,32 @@ export interface RecallDrawerControllerDeps {
  * `renderRecallOnly` vs `render` per the ui/ "avoid full panel rerenders" rule — preserve which
  * variant each one calls.
  */
-export class RecallDrawerController {
+export class RecallDestinationController {
   private recallOpeningUntil = 0;
   private recallMessageClearTimer: number | null = null;
 
-  constructor(private readonly deps: RecallDrawerControllerDeps) {}
+  constructor(private readonly deps: RecallDestinationControllerDeps) {}
 
-  async openRecallDrawer(): Promise<void> {
+  async openRecallDestination(): Promise<void> {
     await this.deps.ensurePanelPositionRestored();
-    this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'recall/open', side: this.recallDrawerSide() }));
-    this.recallOpeningUntil = Date.now() + RECALL_DRAWER_OPEN_ANIMATION_MS;
+    const recallStore = this.deps.recallStore();
+    const openState = reducePanelAction(this.deps.getState(), { name: 'recall/open' });
+    this.deps.setState(recallStore ? reducePanelAction(openState, { name: 'recall/load-start' }) : openState);
+    this.recallOpeningUntil = Date.now() + RECALL_DESTINATION_OPEN_ANIMATION_MS;
     this.deps.render();
-    if (!this.deps.recallStore()) {
-      return;
-    }
+    if (!recallStore) return;
+    void this.loadRecallCandidates({
+      offset: this.deps.getState().bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
+      append: false,
+      showBusy: false,
+    });
+  }
+
+  reloadRecallCandidates(): void {
     void this.loadRecallCandidates({
       offset: this.deps.getState().bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
       append: false,
     });
-  }
-
-  private recallDrawerSide(): 'left' | 'right' {
-    const root = this.deps.root();
-    if (!root) return 'right';
-    const rect = root.getBoundingClientRect();
-    const leftSpace = rect.left;
-    const rightSpace = window.innerWidth - rect.right;
-    return rightSpace >= 360 || rightSpace >= leftSpace ? 'right' : 'left';
   }
 
   async loadRecallCandidates(input: {
@@ -121,7 +119,7 @@ export class RecallDrawerController {
   }
 
   refreshRecallIfOpen(): void {
-    if (!this.deps.getState().recall.open) return;
+    if (this.deps.getState().activeDestination !== 'recall') return;
     void this.loadRecallCandidates({
       offset: this.deps.getState().bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
       append: false,

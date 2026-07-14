@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 
 interface ExtensionCommandManifest {
   readonly icons?: Record<string, string>;
@@ -39,6 +39,22 @@ test('manifest uses activeTab injection and optional per-origin host grants', ()
 
 function loadManifest(): ExtensionCommandManifest {
   return JSON.parse(readFileSync('extension/manifest.json', 'utf8')) as ExtensionCommandManifest;
+}
+
+function stylesheetDependencyClosure(entry: string): readonly string[] {
+  const pending = [entry];
+  const seen = new Set<string>();
+  while (pending.length > 0) {
+    const resource = pending.pop();
+    if (!resource || seen.has(resource)) continue;
+    seen.add(resource);
+    const css = readFileSync(join('extension', resource), 'utf8');
+    for (const match of css.matchAll(/@import ['"](?<path>[^'"]+)['"];/gu)) {
+      const importPath = match.groups?.['path'];
+      if (importPath) pending.push(posix.join(posix.dirname(resource), importPath));
+    }
+  }
+  return [...seen];
 }
 
 test('manifest registers correctly sized PNG icons for the extension and browser action', () => {
@@ -104,11 +120,7 @@ test('manifest exposes assignable Image Trail action commands in Chromium keyboa
 test('manifest exposes panel stylesheet imports to content pages', () => {
   const resources = loadManifest().web_accessible_resources?.flatMap((entry) => entry.resources ?? []) ?? [];
 
-  assert.ok(resources.includes('src/ui/styles/panel.css'), 'panel stylesheet should be web-accessible');
-  assert.ok(resources.includes('src/ui/styles/panel-entry.css'), 'panel entry stylesheet should be web-accessible');
-  assert.ok(resources.includes('src/ui/styles/handoff-baseline.css'), 'handoff stylesheet should be web-accessible');
-  for (const name of ['foundation', 'sections', 'controls', 'cloud', 'settings', 'records']) {
-    assert.ok(resources.includes(`src/ui/styles/panel-legacy-${name}.css`), `${name} panel module should be web-accessible`);
+  for (const stylesheet of stylesheetDependencyClosure('src/ui/styles/panel-entry.css')) {
+    assert.ok(resources.includes(stylesheet), `${stylesheet} should be web-accessible`);
   }
-  assert.ok(resources.includes('src/ui/styles/fields.css'), 'imported parsed-fields stylesheet should be web-accessible');
 });

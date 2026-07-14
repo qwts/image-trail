@@ -168,7 +168,7 @@ function panelState(overrides: Partial<PanelState> = {}): PanelState {
     blobKeyReference: 'session key',
     importExportBusy: false,
     pcloudBackup: initial.pcloudBackup,
-    settingsOpen: false,
+    activeDestination: null,
     automation: {
       slideshowPhase: 'idle',
       slideshowCount: 0,

@@ -25,7 +25,6 @@ function createHarness(): Harness {
     },
     root: () => null,
     contextRoot: () => null,
-    recallRoot: () => null,
     detachedRoot: () => null,
     toastRoot: () => null,
     panelStylesReady: () => {
@@ -75,7 +74,7 @@ test('showBufferedNavigationToast with no root/toastRoot is a no-op', () => {
   assert.doesNotThrow(() => controller.showBufferedNavigationToast('Skipped 3 URLs'));
 });
 
-test('renderPanelAndRefreshRecall refreshes the recall drawer after the (no-op) panel render', () => {
+test('renderPanelAndRefreshRecall refreshes the Recall destination after the (no-op) panel render', () => {
   const { controller, log } = createHarness();
   controller.renderPanelAndRefreshRecall();
   assert.deepEqual(log, ['refreshRecallIfOpen']);
