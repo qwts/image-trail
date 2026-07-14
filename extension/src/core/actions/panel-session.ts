@@ -36,7 +36,12 @@ export function reducePanelSessionAction(state: PanelState, action: PanelSession
     case 'grab-mode/stop':
       return { ...state, status: 'ready', message: 'Grab Mode stopped.', lastUpdatedAt: Date.now() };
     case 'help/toggle':
-      return { ...state, helpOpen: !state.helpOpen, lastUpdatedAt: Date.now() };
+      return {
+        ...state,
+        helpOpen: !state.helpOpen,
+        settingsOpen: state.helpOpen ? state.settingsOpen : false,
+        lastUpdatedAt: Date.now(),
+      };
     case 'section/detach':
       if (state.detachedSections.includes(action.sectionId)) return state;
       return { ...state, detachedSections: [...state.detachedSections, action.sectionId], lastUpdatedAt: Date.now() };

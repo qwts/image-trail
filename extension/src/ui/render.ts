@@ -16,7 +16,7 @@ import { createPanelHeader } from './react/panel-header.js';
 import { unmountReactSubtrees } from './react/react-subtree.js';
 import type { PanelLayoutState, PanelRenderOptions, PanelRenderTarget } from './panel-render-types.js';
 import { createParsedFieldsSection } from './parsed-fields-section.js';
-import { createAutomationStatusElements } from './components/status-view.js';
+import { createCompactStatusElements } from './components/status-view.js';
 
 export type { PanelLayoutState, PanelRenderOptions, PanelRenderTarget } from './panel-render-types.js';
 
@@ -227,7 +227,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
       dispatch: target.dispatch,
       ...(target.onPanelDragStart ? { onPanelDragStart: target.onPanelDragStart } : {}),
     }),
-    ...createAutomationStatusElements(state),
+    ...createCompactStatusElements(state, target.dispatch),
     ...attachedSectionElements(SECTIONS, target, state),
   );
   restoreScrollSnapshots(target.root, scrollPositions, target.layoutState);
@@ -243,7 +243,7 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [
     id: 'settings',
     title: 'Settings',
     windowInlineSize: 420,
-    visible: (state) => state.settingsOpen && !state.helpOpen,
+    visible: (state) => state.settingsOpen,
     create: (target, state) => {
       const { fields, activeTemplate } = cachedActiveUrlFields(state);
       return createSettingsSection(state, { fields, activeTemplateId: activeTemplate?.id ?? state.activeUrlTemplateId }, target.dispatch);

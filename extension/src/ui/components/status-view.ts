@@ -49,13 +49,43 @@ function automationStatusPills(state: PanelState): HTMLElement[] {
   return pills;
 }
 
-export function createAutomationStatusElements(state: PanelState): HTMLElement[] {
-  const pills = automationStatusPills(state);
-  if (pills.length === 0) return [];
+function captureStatusElements(state: PanelState, dispatch: (action: StatusAction) => void): HTMLElement[] {
+  const elements: HTMLElement[] = [];
+  if (state.captureInProgress) {
+    const progress = createStatusPill({ label: 'Capturing image…', tone: 'busy', waiting: true });
+    progress.classList.add('image-trail-panel__capture-status');
+    elements.push(progress);
+  }
+
+  if (!state.captureResult || !isFailedResult(state.captureResult)) return elements;
+  const error = document.createElement('p');
+  error.className = 'image-trail-panel__capture-error';
+  error.setAttribute('role', 'alert');
+  error.textContent = state.privacyModeEnabled
+    ? 'Image Trail could not capture the selected image.'
+    : state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
+  if (state.captureResult.reason === 'permission-needed' && state.captureRetryRequest) {
+    const retry = createButton({
+      label: 'Grant permission and retry',
+      variant: 'primary',
+      className: 'image-trail-panel__primary-action',
+      onClick: () => dispatch({ name: 'capture/permission-retry' }),
+    });
+    error.append(document.createTextNode(' '), retry);
+  }
+  const dismiss = createButton({ label: 'Dismiss', variant: 'ghost', onClick: () => dispatch({ name: 'capture/clear' }) });
+  error.append(document.createTextNode(' '), dismiss);
+  elements.push(error);
+  return elements;
+}
+
+export function createCompactStatusElements(state: PanelState, dispatch: (action: StatusAction) => void): HTMLElement[] {
+  const elements = [...captureStatusElements(state, dispatch), ...automationStatusPills(state)];
+  if (elements.length === 0) return [];
   const wrapper = document.createElement('section');
   wrapper.className = 'image-trail-panel__section image-trail-panel__status-section';
-  wrapper.setAttribute('aria-label', 'Automation status');
-  wrapper.append(...pills);
+  wrapper.setAttribute('aria-label', 'Panel status');
+  wrapper.append(...elements);
   return [wrapper];
 }
 
@@ -79,32 +109,7 @@ export function createStatusView(state: PanelState, dispatch: (action: StatusAct
 
   const children: HTMLElement[] = [status, meta];
 
-  if (state.captureInProgress) {
-    const progress = createStatusPill({ label: 'Capturing image…', tone: 'busy', waiting: true });
-    progress.classList.add('image-trail-panel__capture-status');
-    children.push(progress);
-  }
-
-  if (state.captureResult && isFailedResult(state.captureResult)) {
-    const error = document.createElement('p');
-    error.className = 'image-trail-panel__capture-error';
-    error.setAttribute('role', 'alert');
-    error.textContent = state.privacyModeEnabled
-      ? 'Image Trail could not capture the selected image.'
-      : state.captureResult.message || captureFailureMessage(state.captureResult.reason, state.captureResult.origin);
-    if (state.captureResult.reason === 'permission-needed' && state.captureRetryRequest) {
-      const retry = createButton({
-        label: 'Grant permission and retry',
-        variant: 'primary',
-        className: 'image-trail-panel__primary-action',
-        onClick: () => dispatch({ name: 'capture/permission-retry' }),
-      });
-      error.append(document.createTextNode(' '), retry);
-    }
-    const dismiss = createButton({ label: 'Dismiss', variant: 'ghost', onClick: () => dispatch({ name: 'capture/clear' }) });
-    error.append(document.createTextNode(' '), dismiss);
-    children.push(error);
-  }
+  children.push(...captureStatusElements(state, dispatch));
 
   if (state.storageUsage) {
     const usage = document.createElement('p');

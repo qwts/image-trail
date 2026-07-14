@@ -132,6 +132,15 @@ test('Help replaces dashboard content with the approved grouped surface', async 
   await expect(panel.locator('.image-trail-panel__help-section')).toBeVisible();
   await expect(panel).toHaveAttribute('data-surface', 'help');
   await captureArtifact(page, testInfo, '10-help');
+
+  await page.getByRole('button', { name: 'Show settings' }).click();
+  await expect(panel.locator('.image-trail-panel__settings-section')).toBeVisible();
+  await expect(panel.locator('.image-trail-panel__help-section')).toHaveCount(0);
+  await expect(panel).toHaveAttribute('data-surface', 'settings');
+
+  await page.getByRole('button', { name: 'Show help' }).click();
+  await expect(panel.locator('.image-trail-panel__help-section')).toBeVisible();
+  await expect(panel.locator('.image-trail-panel__settings-section')).toHaveCount(0);
 });
 
 test('detached Settings preserves the approved floating-window chrome', async ({ page, serviceWorker }, testInfo) => {

@@ -16,6 +16,14 @@ test('help/toggle flips helpOpen on and off', () => {
   assert.equal(closed.helpOpen, false);
 });
 
+test('opening Help closes Settings so destinations replace each other', () => {
+  const state = { ...createInitialPanelState(0), settingsOpen: true };
+  const opened = reducePanelAction(state, { name: 'help/toggle' });
+
+  assert.equal(opened.helpOpen, true);
+  assert.equal(opened.settingsOpen, false);
+});
+
 test('the Help view renders the shared shortcut reference with panel and browser groups', () => {
   const view = createHelpView();
   assert.ok(view.classList.contains('image-trail-ds__help'));

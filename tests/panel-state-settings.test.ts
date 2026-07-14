@@ -165,6 +165,14 @@ test('settings toggle opens and closes the panel settings section', () => {
   assert.equal(closed.settingsOpen, false);
 });
 
+test('opening settings closes Help so destinations replace each other', () => {
+  const state = { ...createInitialPanelState(), helpOpen: true };
+  const opened = reducePanelAction(state, { name: 'settings/toggle' });
+
+  assert.equal(opened.settingsOpen, true);
+  assert.equal(opened.helpOpen, false);
+});
+
 test('updating pin save storage preference only changes future save preference state', () => {
   const state = createInitialPanelState();
   const updated = reducePanelAction(state, { name: 'settings/update-pin-save-storage-preference', value: 'plaintext' });
