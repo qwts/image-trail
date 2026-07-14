@@ -54,6 +54,7 @@ async function showOnlySettingsGroup(panel: Locator, targetName: string): Promis
     const isOpen = (await group.getAttribute('open')) !== null;
     if (isOpen !== (name === targetName)) await group.locator(':scope > summary').click();
   }
+  await settingsGroup(panel, targetName).scrollIntoViewIfNeeded();
 }
 
 async function setupEncryptedOriginals(page: Page, panel: Locator): Promise<void> {
@@ -98,9 +99,9 @@ test('panel shell matches the approved standard and narrow geometry', async ({ p
 test('successful original capture uses the approved bottom-center feedback', async ({ page, serviceWorker }, testInfo) => {
   const panel = await openPanel(page, serviceWorker);
   await setupEncryptedOriginals(page, panel);
-  await page.getByRole('button', { name: 'Capture original' }).click();
-  const toast = page.locator('.image-trail-panel__toast');
-  await expect(toast).toContainText(/Captured/u);
+  await page.keyboard.press('c');
+  const toast = page.locator('.image-trail-panel__shortcut-feedback');
+  await expect(toast).toHaveText('Captured original ✓');
   const box = await toast.boundingBox();
   expect(box).not.toBeNull();
   expect(Math.abs(box!.x + box!.width / 2 - referenceViewport.width / 2)).toBeLessThan(2);

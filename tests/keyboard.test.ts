@@ -68,23 +68,32 @@ test('classifyTarget returns record-row for row shortcuts inside the panel', () 
   assert.equal(classifyTarget(fakeEvent({ target: host, composedPath: () => [row, host] })), 'record-row');
 });
 
-test('default keyboard bindings map d to download and shifted shortcuts to save-as download', () => {
-  assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'd' && binding.action === 'download'));
-  assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'ArrowDown' && binding.action === 'download'));
-  assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'D' && binding.shift === true && binding.action === 'download-save-as'));
-  assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'G' && binding.shift === true && binding.action === 'grab-mode-toggle'));
-  assert.ok(DEFAULT_BINDINGS.some((binding) => binding.key === 'Enter' && binding.shift === true && binding.action === 'download-save-as'));
+test('default keyboard bindings are the exact approved bare-key registry', () => {
+  assert.deepEqual(
+    DEFAULT_BINDINGS.map(({ key, shift, action }) => ({ key, shift, action })),
+    [
+      { key: 'ArrowRight', shift: false, action: 'next' },
+      { key: 'ArrowLeft', shift: false, action: 'previous' },
+      { key: 'c', shift: undefined, action: 'capture-current' },
+      { key: 'p', shift: undefined, action: 'pin-current' },
+      { key: 'b', shift: undefined, action: 'capture-and-bookmark' },
+      { key: 'g', shift: undefined, action: 'grab-mode-toggle' },
+      { key: 'ArrowDown', shift: false, action: 'down-arrow' },
+      { key: '?', shift: true, action: 'help-toggle' },
+      { key: ',', shift: false, action: 'settings-toggle' },
+      { key: 'Escape', shift: false, action: 'close-surface' },
+    ],
+  );
 });
 
-test('default keyboard bindings keep legacy h and a-z field jumps unassigned', () => {
-  assert.equal(
-    DEFAULT_BINDINGS.some((binding) => binding.key === 'h'),
-    false,
-  );
-  assert.equal(
-    DEFAULT_BINDINGS.some((binding) => binding.action === 'field-jump'),
-    false,
-  );
+test('legacy page-only automation and download keys are no longer intercepted', () => {
+  for (const action of ['slideshow-toggle', 'download', 'download-save-as', 'retry', 'buffer-debug-toggle', 'panel-toggle']) {
+    assert.equal(
+      DEFAULT_BINDINGS.some((binding) => binding.action === action),
+      false,
+      `${action} remains browser-command-only`,
+    );
+  }
 });
 
 test('key code shortcuts survive Option-modified Mac key values', () => {
@@ -104,15 +113,12 @@ test('key code shortcuts survive Option-modified Mac key values', () => {
 
 test('keyboard shortcuts route from panel controls but not typing targets', () => {
   assert.equal(shouldRouteKeyboardShortcut('typing', 'download'), false);
-  assert.equal(shouldRouteKeyboardShortcut('button', 'slideshow-toggle'), false);
+  assert.equal(shouldRouteKeyboardShortcut('button', 'capture-current'), true);
   assert.equal(shouldRouteKeyboardShortcut('button', 'next'), true);
   assert.equal(shouldRouteKeyboardShortcut('button', 'previous'), true);
-  assert.equal(shouldRouteKeyboardShortcut('button', 'download'), true);
-  assert.equal(shouldRouteKeyboardShortcut('button', 'download-save-as'), true);
   assert.equal(shouldRouteKeyboardShortcut('button', 'grab-mode-toggle'), true);
-  assert.equal(shouldRouteKeyboardShortcut('record-row', 'download', 'ArrowDown'), false);
-  assert.equal(shouldRouteKeyboardShortcut('record-row', 'download', 'd'), true);
-  assert.equal(shouldRouteKeyboardShortcut('record-row', 'download-save-as', 'Enter'), true);
-  assert.equal(shouldRouteKeyboardShortcut('panel', 'slideshow-toggle'), true);
-  assert.equal(shouldRouteKeyboardShortcut('page', 'download'), true);
+  assert.equal(shouldRouteKeyboardShortcut('record-row', 'down-arrow', 'ArrowDown'), false);
+  assert.equal(shouldRouteKeyboardShortcut('record-row', 'capture-current', 'c'), false);
+  assert.equal(shouldRouteKeyboardShortcut('panel', 'help-toggle'), true);
+  assert.equal(shouldRouteKeyboardShortcut('page', 'capture-current'), true);
 });

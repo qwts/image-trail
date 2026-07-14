@@ -7,7 +7,6 @@ import {
   fixtureUrl,
   openFixturePage,
   openSettingsGroup,
-  panelStatus,
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
@@ -47,12 +46,6 @@ async function setRequestThrottle(
   await throttle.getByRole('button', { name: 'Apply' }).click();
 }
 
-async function blurFocusedElement(page: Parameters<typeof openFixturePage>[0]): Promise<void> {
-  await page.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-  });
-}
-
 async function openParsedFields(page: Parameters<typeof openFixturePage>[0]): Promise<void> {
   const fields = page.locator('.image-trail-panel__fields');
   const isOpen = await fields.evaluate((element) => element.hasAttribute('open'));
@@ -71,35 +64,7 @@ async function ensureQueryFrameIncluded(page: Parameters<typeof openFixturePage>
   await expect(page.getByRole('button', { name: /Exclude query frame/u })).toBeVisible();
 }
 
-test('keyboard automation shortcuts preserve typing targets and route image downloads globally', async ({ page, serviceWorker }) => {
-  await openPanel(page, serviceWorker);
-  await page.evaluate(() => {
-    const win = window as typeof window & { imageTrailUnhandledKeys?: string[] };
-    win.imageTrailUnhandledKeys = [];
-    document.addEventListener('keydown', (event) => {
-      if (event.key !== 'd' && event.key !== 'D') return;
-      win.imageTrailUnhandledKeys?.push(event.key);
-    });
-  });
-
-  const editor = page.locator('.image-trail-panel__full-url-input');
-  await editor.focus();
-  await page.keyboard.press('End');
-  await page.keyboard.press('d');
-  await page.keyboard.press('Shift+D');
-  await expect(editor).toHaveValue(/dD$/u);
-  await expect(panelStatus(page)).not.toHaveAttribute('title', /export|download/u);
-  await page.evaluate(() => {
-    (window as typeof window & { imageTrailUnhandledKeys?: string[] }).imageTrailUnhandledKeys = [];
-  });
-
-  await blurFocusedElement(page);
-  await page.keyboard.press('d');
-  await page.keyboard.press('Shift+D');
-  expect(await page.evaluate(() => (window as typeof window & { imageTrailUnhandledKeys?: string[] }).imageTrailUnhandledKeys)).toEqual([]);
-});
-
-test('slideshow keyboard controls pause, resume, and stop on opposite manual navigation', async ({ page, serviceWorker }) => {
+test('slideshow controls pause, resume, and stop on opposite manual navigation', async ({ page, serviceWorker }) => {
   await installDynamicImageRoute(page);
   await openPanel(page, serviceWorker);
   await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=1'));
@@ -109,14 +74,13 @@ test('slideshow keyboard controls pause, resume, and stop on opposite manual nav
   await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?frame=2/u);
   await ensureQueryFrameIncluded(page);
 
-  await blurFocusedElement(page);
-  await page.keyboard.press('Space');
+  await page.getByRole('button', { name: 'Start slideshow' }).click();
   await expect(page.locator('.image-trail-panel__automation-status', { hasText: 'Slideshow: running' })).toBeVisible();
 
-  await page.keyboard.press('Space');
+  await page.getByRole('button', { name: 'Pause slideshow' }).click();
   await expect(page.locator('.image-trail-panel__automation-status', { hasText: 'Slideshow: paused' })).toBeVisible();
 
-  await page.keyboard.press('Space');
+  await page.getByRole('button', { name: 'Resume slideshow' }).click();
   await expect(page.locator('.image-trail-panel__automation-status', { hasText: 'Slideshow: running' })).toBeVisible();
 
   await openManualControls(page);
@@ -138,8 +102,7 @@ test('request-governor status surfaces bounded automation recovery', async ({ pa
   await expect(page.getByRole('button', { name: 'Retry 404' })).toBeVisible();
   await setRequestThrottle(page, { minimumIntervalMs: '0', maxRequests: '1', windowMs: '60000' });
 
-  await blurFocusedElement(page);
-  await page.keyboard.press('Space');
+  await page.getByRole('button', { name: 'Start slideshow' }).click();
   await expect(page.locator('.image-trail-panel__automation-status', { hasText: 'Rate limit: capped' })).toBeVisible({
     timeout: 6_000,
   });

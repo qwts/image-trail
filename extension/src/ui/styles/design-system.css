@@ -1,6 +1,7 @@
 @import './tokens.css';
 @import './primitives.css';
 @import './feedback-primitives.css';
+@import './shortcut-feedback.css';
 @import './panel-shell.css';
 @import './primary-workflow.css';
 @import './record-row.css';

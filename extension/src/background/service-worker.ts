@@ -8,7 +8,6 @@ import { IndexedDbParsedFieldStateStore } from '../data/parsed-field-state-contr
 import { IndexedDbUrlTemplateStore } from '../data/url-template-controller.js';
 import { IndexedDbUrlReviewStatusStore } from '../data/url-review-status-controller.js';
 import { RecentHistoryCache } from './recent-history-cache.js';
-import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, migrateLocalSettings } from '../data/local-settings.js';
 import { getActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
 import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFileHeader } from '../data/import-export/encrypted-image.js';
@@ -101,6 +100,7 @@ import { createOriginalBlobMessageRegistry } from './handlers/original-blob-hand
 import { createDestinationMessageRegistry } from './handlers/destination-page-handler.js';
 import { createPCloudMessageRegistry } from './handlers/pcloud-handlers.js';
 import { createUrlTemplateMessageRegistry } from './handlers/url-template-handlers.js';
+import { handleLoadLocalSettings, handleSaveLocalSettings, loadLocalSettings } from './handlers/local-settings-handlers.js';
 import { normalizeHostname } from './handlers/hostname.js';
 import { createRuntimeLibraryChangeNotifier } from './library-change-notifier.js';
 import type { ServiceWorkerContext } from './service-worker-context.js';
@@ -616,32 +616,6 @@ function normalizeUrlReviewStatusClearFilter(filter: UrlReviewStatusClearFilter)
   return typeof filter.sourceUrl === 'string' ? { scope: 'source', hostname, sourceUrl: filter.sourceUrl } : null;
 }
 
-async function handleLoadLocalSettings(): Promise<import('./messages.js').LoadLocalSettingsResultMessage['payload']> {
-  return { ok: true, settings: await loadLocalSettings() };
-}
-
-async function loadLocalSettings(): Promise<typeof DEFAULT_LOCAL_SETTINGS> {
-  const stored = await chrome.storage.local.get(LOCAL_SETTINGS_KEY);
-  const raw = stored[LOCAL_SETTINGS_KEY];
-  if (typeof raw === 'string') {
-    try {
-      return migrateLocalSettings(JSON.parse(raw) as Partial<typeof DEFAULT_LOCAL_SETTINGS>);
-    } catch {
-      return DEFAULT_LOCAL_SETTINGS;
-    }
-  }
-  return migrateLocalSettings(typeof raw === 'object' && raw !== null ? raw : DEFAULT_LOCAL_SETTINGS);
-}
-
-async function handleSaveLocalSettings(
-  message: SaveLocalSettingsMessage,
-): Promise<import('./messages.js').SaveLocalSettingsResultMessage['payload']> {
-  const settings = migrateLocalSettings(message.payload.settings);
-  await chrome.storage.local.set({ [LOCAL_SETTINGS_KEY]: settings });
-  recentHistoryCache.pruneForSettings(settings);
-  return { ok: true };
-}
-
 async function handleGrantPermissionAndCapture(
   message: GrantPermissionAndCaptureMessage,
 ): Promise<import('../core/image/capture-result.js').CaptureResult> {
@@ -925,7 +899,11 @@ const messageRegistry = {
   }),
   [MessageType.SaveLocalSettings]: defineMessage({
     requestSchema: requestSchemas.saveLocalSettingsRequestSchema,
-    handle: (message: SaveLocalSettingsMessage) => handleSaveLocalSettings(message),
+    handle: async (message: SaveLocalSettingsMessage) => {
+      return handleSaveLocalSettings(message, chrome.storage.local, chrome.tabs, (settings) =>
+        recentHistoryCache.pruneForSettings(settings),
+      );
+    },
     respond: (result) => createSaveLocalSettingsResultMessage(result),
     fallback: () => createSaveLocalSettingsResultMessage({ ok: false }),
   }),

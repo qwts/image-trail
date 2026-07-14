@@ -1,4 +1,5 @@
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
+import type { DownArrowAction } from '../../core/keyboard-shortcuts.js';
 import type { SearchableMetadataPolicy } from '../../core/metadata-policy.js';
 import type { PanelAction } from '../../core/types.js';
 import type { GrabSourcePattern, UrlTemplateRecord } from '../../core/url/templates.js';
@@ -27,7 +28,7 @@ import {
   type PrivatePinSettingsState,
 } from './privacy-settings-view.js';
 import { createRecentsSettingsView, type RecentHistorySettingsState } from './recents-settings-view.js';
-import { createShortcutSettingsView } from './shortcut-settings-view.js';
+import { createKeybindingSettingsView } from './keybinding-settings-view.js';
 import { createGrabSourcePatternSettingsView, createTemplateSettingsView } from './url-learning-settings-view.js';
 import { createUrlSteppingPresetView } from './url-stepping-preset-view.js';
 import { applySettingsPrimitiveContracts } from './settings-primitive-contracts.js';
@@ -61,6 +62,7 @@ export function createSettingsView(
   urlReviewStatusState: UrlReviewStatusSettingsState,
   requestThrottleState: RequestThrottleSettingsState,
   neighborPreloadState: NeighborPreloadSettingsState,
+  downArrowAction: DownArrowAction,
   restoreWorkspaceLayoutEnabled: boolean,
   utilityGroups: SettingsUtilityGroups,
   dispatch: (action: PanelAction) => void,
@@ -89,7 +91,7 @@ export function createSettingsView(
       ...utilityGroups.privacy,
     ]),
     createSettingsDisclosure('Automation', 'automation', [
-      createShortcutSettingsView(),
+      createKeybindingSettingsView(downArrowAction, dispatch),
       createRequestThrottleSettingsView(requestThrottleState, dispatch),
       createNeighborPreloadSettingsView(neighborPreloadState, dispatch),
       createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),

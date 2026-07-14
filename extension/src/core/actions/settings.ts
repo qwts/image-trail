@@ -103,6 +103,8 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
         loadFailureFeedback: action.loadFailureFeedback,
         lastUpdatedAt: Date.now(),
       };
+    case 'settings/update-down-arrow-action':
+      return { ...state, downArrowAction: action.value, lastUpdatedAt: Date.now() };
     case 'blob-key/status':
       return {
         ...state,

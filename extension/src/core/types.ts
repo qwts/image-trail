@@ -6,7 +6,7 @@ import type { ImageProbeMethod } from './image/request-policy.js';
 import type { LoadFailureFeedback } from './settings.js';
 import type { SearchableMetadataPolicy } from './metadata-policy.js';
 import type { GrabSourcePattern, UrlTemplateRecord } from './url/templates.js';
-import type { FieldTransformId } from './url/field-transforms.js';
+import type { FieldTransformPanelAction } from './field-transform-panel-action.js';
 import type { UrlTemplatePanelAction } from './url/panel-actions.js';
 import type { UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from './url/types.js';
 import type { ObjectFitMode } from './preview-style.js';
@@ -65,6 +65,7 @@ export type {
   ImportRestorePreviewUnsupportedSection,
   ImportRestorePreviewValidationIssue,
 } from './import-types.js';
+export type { FieldTransformPanelAction } from './field-transform-panel-action.js';
 
 export interface UrlTemplateStore {
   load(hostname: string): Promise<readonly UrlTemplateRecord[]>;
@@ -193,6 +194,7 @@ export interface PanelState {
   readonly neighborPreloadCacheLimit: number;
   readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly loadFailureFeedback: LoadFailureFeedback;
+  readonly downArrowAction: import('./keyboard-shortcuts.js').DownArrowAction;
   readonly secondaryControlsOpen: boolean;
   readonly historySectionOpen: boolean;
   readonly bookmarksSectionOpen: boolean;
@@ -299,6 +301,7 @@ export type PanelActionName =
   | 'settings/update-url-review-status-retention'
   | 'settings/update-request-throttle'
   | 'settings/update-neighbor-preload'
+  | 'settings/update-down-arrow-action'
   | 'neighbor-preload/manual'
   | 'settings/reset-panel-position'
   | 'settings/update-workspace-layout-restore'
@@ -373,36 +376,6 @@ export type PanelActionName =
   | 'navigate-previous'
   | 'stop-all';
 
-export type FieldTransformPanelAction =
-  | {
-      readonly name: 'field/transform';
-      readonly fieldId: string;
-      readonly transformId: Extract<FieldTransformId, 'set-value'>;
-      readonly value: string;
-    }
-  | {
-      readonly name: 'field/transform';
-      readonly fieldId: string;
-      readonly transformId: Extract<FieldTransformId, 'step'>;
-      readonly delta: 1 | -1;
-    }
-  | {
-      readonly name: 'field/transform';
-      readonly fieldId: string;
-      readonly transformId: Extract<FieldTransformId, 'digit-width'>;
-      readonly value: string;
-    }
-  | {
-      readonly name: 'field/transform';
-      readonly fieldId: string;
-      readonly transformId: Extract<FieldTransformId, 'split-apply'>;
-      readonly pattern: string;
-    }
-  | { readonly name: 'field/transform'; readonly fieldId: string; readonly transformId: Extract<FieldTransformId, 'split-clear'> }
-  | { readonly name: 'field/transform'; readonly fieldId: string; readonly transformId: Extract<FieldTransformId, 'reset-field'> }
-  | { readonly name: 'field/transform'; readonly transformId: Extract<FieldTransformId, 'reset-structure'> }
-  | { readonly name: 'field/transform'; readonly transformId: Extract<FieldTransformId, 'reset-all'> };
-
 export type PanelAction =
   | {
       readonly name: Exclude<
@@ -447,6 +420,7 @@ export type PanelAction =
         | 'settings/update-url-review-status-retention'
         | 'settings/update-request-throttle'
         | 'settings/update-neighbor-preload'
+        | 'settings/update-down-arrow-action'
         | 'settings/update-workspace-layout-restore'
         | 'neighbor-preload/manual'
         | 'url-templates/load'
@@ -570,6 +544,10 @@ export type PanelAction =
       readonly cacheLimit: number;
       readonly probeMethod: ImageProbeMethod;
       readonly loadFailureFeedback: LoadFailureFeedback;
+    }
+  | {
+      readonly name: 'settings/update-down-arrow-action';
+      readonly value: import('./keyboard-shortcuts.js').DownArrowAction;
     }
   | { readonly name: 'neighbor-preload/manual'; readonly radius: number; readonly cacheLimit: number }
   | UrlTemplatePanelAction

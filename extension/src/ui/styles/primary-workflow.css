@@ -31,6 +31,11 @@
   gap: var(--it-space-3);
 }
 
+.image-trail-panel-root .image-trail-panel__capture-hint[data-tone='success'] {
+  color: var(--it-accent-selected);
+  font-weight: var(--it-fw-bold);
+}
+
 .image-trail-panel-root .image-trail-panel__secondary-controls-details {
   display: grid;
   gap: var(--it-space-4);

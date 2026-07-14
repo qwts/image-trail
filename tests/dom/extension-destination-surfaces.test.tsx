@@ -166,10 +166,10 @@ test('Recall masks private metadata and moves only selected durable records', as
 });
 
 test('Settings renders all groups and persists through the extension-owned service', async () => {
-  const saved: boolean[] = [];
+  const saved: Array<{ readonly privacy: boolean; readonly down: string }> = [];
   const api = services({
     saveSettings: async (settings) => {
-      saved.push(settings.privacyModeEnabled);
+      saved.push({ privacy: settings.privacyModeEnabled, down: settings.downArrowAction });
     },
   });
   const root = await mount(<SettingsDestination services={api} />);
@@ -187,9 +187,41 @@ test('Settings renders all groups and persists through the extension-owned servi
     );
     await act(async () => privacyToggle?.click());
     await flush();
-    assert.deepEqual(saved, [true]);
+    assert.deepEqual(saved, [{ privacy: true, down: 'capture' }]);
     assert.match(root.textContent ?? '', /Settings saved/u);
     assert.match(root.textContent ?? '', /session-only active CryptoKey/u);
+  } finally {
+    await cleanup(root);
+  }
+});
+
+test('React Settings uses the handoff keybinding control and persists the Down assignment', async () => {
+  const saved: string[] = [];
+  const root = await mount(
+    <SettingsDestination
+      services={services({
+        saveSettings: async (settings) => {
+          saved.push(settings.downArrowAction);
+        },
+      })}
+    />,
+  );
+  try {
+    await flush();
+    const select = root.querySelector<HTMLSelectElement>('[aria-label="Down arrow action"]');
+    assert.equal(select?.value, 'capture');
+    await act(async () => {
+      if (select) {
+        select.value = 'off';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+    await flush();
+    assert.deepEqual(saved, ['off']);
+    assert.match(
+      root.textContent ?? '',
+      /Modifier shortcuts like Grab Mode and Slideshow are set in your browser's extension keyboard shortcuts page/u,
+    );
   } finally {
     await cleanup(root);
   }

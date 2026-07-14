@@ -30,9 +30,7 @@ interface Harness {
   patchState(patch: Partial<PanelState>): void;
 }
 
-// Every dependency logs its name; `reduce` runs the real reducer so guard branches (secondary-controls no-op,
-// recall/open toggle, recall/load-more gating) behave as they do in the panel. Collaborator stubs
-// implement only the methods the handlers touch and are cast, matching the controller-test style.
+// Every dependency logs; the real reducer preserves handler guards while collaborator stubs expose only touched methods.
 function createHarness(
   options: {
     readonly applyPanelStateResult?: boolean;
@@ -133,6 +131,7 @@ function createHarness(
     renderPanelAndRefreshRecall: () => record('renderPanelAndRefreshRecall'),
     refreshRecallIfOpen: () => record('refreshRecallIfOpen'),
     clearRecallMessageTimer: () => record('clearRecallMessageTimer'),
+    showFeedback: (message, tone) => record(`showFeedback:${message}:${tone ?? 'default'}`),
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
     saveLocalSettings: () => record('saveLocalSettings'),
     applyBuildInfoOverlayVisibility: () => record('applyBuildInfoOverlayVisibility'),
@@ -163,7 +162,7 @@ function createHarness(
     urlTemplateSettings: () => urlTemplateSettings,
     recallExport: () => recallExport,
     recallRestore: () => recallRestore,
-    bookmarkCurrentImage: () => recordAsync('bookmarkCurrentImage'),
+    bookmarkCurrentImage: async () => (record('bookmarkCurrentImage'), true),
     removeRecentHistory: () => recordAsync('removeRecentHistory'),
     deleteRecentHistory: () => recordAsync('deleteRecentHistory'),
     pinRecentHistory: () => recordAsync('pinRecentHistory'),
@@ -177,6 +176,7 @@ function createHarness(
     updateVisibleBookmarkSoftMax: () => recordAsync('updateVisibleBookmarkSoftMax'),
     updateRecentHistoryRetention: () => recordAsync('updateRecentHistoryRetention'),
     updateRecentSparseRowDisplayMode: () => record('updateRecentSparseRowDisplayMode'),
+    updateDownArrowAction: (value) => record(`updateDownArrowAction:${value}`),
     updatePinSaveStoragePreference: () => record('updatePinSaveStoragePreference'),
     updateUrlReviewStatusRetention: () => recordAsync('updateUrlReviewStatusRetention'),
     updateRequestThrottle: () => record('updateRequestThrottle'),
@@ -196,7 +196,7 @@ function createHarness(
     enqueueRejectedFieldCommit: () => record('enqueueRejectedFieldCommit'),
     enqueueSelectedUrlApply: () => record('enqueueSelectedUrlApply'),
     rejectUrlEditorInput: () => record('rejectUrlEditorInput'),
-    captureImage: () => recordAsync('captureImage'),
+    captureImage: async () => (record('captureImage'), null),
     repairMissingOriginals: () => recordAsync('repairMissingOriginals'),
     retryCaptureWithPermission: () => recordAsync('retryCaptureWithPermission'),
     deleteCapturedBlob: () => recordAsync('deleteCapturedBlob'),
@@ -274,6 +274,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
     probeMethod: 'get',
     loadFailureFeedback: 'mute',
   },
+  'settings/update-down-arrow-action': { name: 'settings/update-down-arrow-action', value: 'download' },
   'neighbor-preload/manual': { name: 'neighbor-preload/manual', radius: 2, cacheLimit: 10 },
   'settings/reset-panel-position': { name: 'settings/reset-panel-position' },
   'settings/update-workspace-layout-restore': { name: 'settings/update-workspace-layout-restore', enabled: true },

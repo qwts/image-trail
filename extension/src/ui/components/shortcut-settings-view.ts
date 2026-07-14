@@ -1,30 +1,43 @@
-import { BROWSER_SHORTCUTS, LEGACY_SHORTCUT_DECISIONS, PAGE_SHORTCUTS, type ShortcutReference } from '../../core/keyboard-shortcuts.js';
+import { BROWSER_COMMAND_SHORTCUTS, PAGE_SHORTCUTS, type ShortcutReference } from '../../core/keyboard-shortcuts.js';
 import { createKbd } from './primitives.js';
+
+const SHORTCUT_GROUPS = [
+  { id: 'trail', label: 'Trail navigation' },
+  { id: 'capture', label: 'Capture' },
+  { id: 'panel', label: 'Panel' },
+] as const;
 
 export function createShortcutSettingsView(): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'image-trail-panel__settings-templates image-trail-ds__shortcut-reference';
 
-  const browserHeading = document.createElement('h5');
-  browserHeading.textContent = 'Browser shortcuts';
-  const browserList = createShortcutList(BROWSER_SHORTCUTS);
-
-  const panelHeading = document.createElement('h5');
-  panelHeading.textContent = 'Panel shortcuts';
-  const panelList = createShortcutList(
-    PAGE_SHORTCUTS.map((shortcut) => ({
+  for (const group of SHORTCUT_GROUPS) {
+    const heading = document.createElement('h5');
+    heading.textContent = group.label;
+    const shortcuts = PAGE_SHORTCUTS.filter((shortcut) => shortcut.group === group.id).map((shortcut) => ({
       keys: [shortcut.display],
       label: shortcut.label,
       description: shortcut.description,
-    })),
-  );
-
-  const legacyHeading = document.createElement('h5');
-  legacyHeading.textContent = 'Legacy keys';
-  const legacyList = createShortcutList(LEGACY_SHORTCUT_DECISIONS);
-
-  wrapper.append(browserHeading, browserList, panelHeading, panelList, legacyHeading, legacyList);
+    }));
+    wrapper.append(heading, createShortcutList(shortcuts));
+    if (group.id === 'trail') wrapper.append(createTrailNote());
+  }
+  wrapper.append(createBrowserCommandNote());
   return wrapper;
+}
+
+function createTrailNote(): HTMLElement {
+  const note = document.createElement('p');
+  note.className = 'image-trail-panel__meta';
+  note.textContent = 'Arrow keys step every parsed field included in the Trail together.';
+  return note;
+}
+
+function createBrowserCommandNote(): HTMLElement {
+  const note = document.createElement('p');
+  note.className = 'image-trail-panel__meta image-trail-panel__browser-command-note';
+  note.textContent = `Browser commands are modifier-based and user-rebindable: ${BROWSER_COMMAND_SHORTCUTS.map((shortcut) => shortcut.label).join(', ')}. The single-key shortcuts above are handled in-page.`;
+  return note;
 }
 
 function createShortcutList(shortcuts: readonly ShortcutReference[]): HTMLElement {

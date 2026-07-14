@@ -5,10 +5,11 @@ import { resolve } from 'node:path';
 
 const PANEL_CSS = readFileSync(resolve(process.cwd(), 'extension/src/ui/styles/panel.css'), 'utf8');
 const RECORD_ROW_CSS = readFileSync(resolve(process.cwd(), 'extension/src/ui/styles/record-row.css'), 'utf8');
+const SHORTCUT_FEEDBACK_CSS = readFileSync(resolve(process.cwd(), 'extension/src/ui/styles/shortcut-feedback.css'), 'utf8');
 const LEGACY_PANEL_CSS = ['foundation', 'sections', 'controls', 'cloud', 'settings', 'records']
   .map((name) => readFileSync(resolve(process.cwd(), `extension/src/ui/styles/panel-legacy-${name}.css`), 'utf8'))
   .join('\n');
-const PANEL_STYLES = `${PANEL_CSS}\n${LEGACY_PANEL_CSS}\n${RECORD_ROW_CSS}`;
+const PANEL_STYLES = `${PANEL_CSS}\n${LEGACY_PANEL_CSS}\n${RECORD_ROW_CSS}\n${SHORTCUT_FEEDBACK_CSS}`;
 
 function cssRule(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -79,4 +80,13 @@ test('Adaptive two-row Recents keep the full-width, center-visible thumbnail bac
   );
   assert.match(thumbnail, /inline-size:\s*var\(--image-trail-history-thumbnail-inline-size,\s*auto\);/u);
   assert.match(thumbnail, /mask-image:\s*var\(--image-trail-history-thumbnail-mask,/u);
+});
+
+test('shortcut feedback resets the inherited toast transform and spans the viewport', () => {
+  const body = cssRule('.image-trail-panel-root.image-trail-panel__toast-root.has-shortcut-feedback');
+
+  assert.match(body, /inset-inline-start:\s*0;/u);
+  assert.match(body, /inset-inline-end:\s*auto;/u);
+  assert.match(body, /inline-size:\s*100vw;/u);
+  assert.match(body, /transform:\s*none;/u);
 });

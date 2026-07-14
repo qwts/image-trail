@@ -69,16 +69,8 @@ import type { PanelActionDeps } from './panel/actions/deps.js';
 import { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../content/panel-services.js';
 import { hostnameFromLocation } from './panel-position.js';
 import { destinationOpenErrorState, openDestinationErrorMessage } from './panel/gallery-action.js';
-
-function addItems(items: readonly string[], nextItems: readonly string[]): readonly string[] {
-  return [...items, ...nextItems.filter((item) => !items.includes(item))];
-}
-
-function removeItems(items: readonly string[], removedItems: readonly string[]): readonly string[] {
-  if (removedItems.length === 0) return items;
-  const removed = new Set(removedItems);
-  return items.filter((item) => !removed.has(item));
-}
+import { fieldLoadResultState } from './panel/field-load-result-state.js';
+import { CurrentImageDownloadController } from './panel/current-image-download-controller.js';
 
 export { nextParsedFieldStatePageKey, shouldRestoreParsedFieldState } from './panel/parsed-field-state-sync.js';
 export { projectionSessionOwnsSelectedTarget, urlReviewStatusForLoadResult } from './panel/projection-application-controller.js';
@@ -249,6 +241,11 @@ export class ImageTrailPanel {
     captureStore: () => this.captureStore,
     bookmarkStore: () => this.bookmarkStore,
     recentHistoryStore: () => this.recentHistoryStore,
+  });
+  private readonly currentImageDownload = new CurrentImageDownloadController({
+    getState: () => this.state,
+    setState: this.replaceState,
+    render: () => this.render(),
   });
   private readonly projectionApplication: ProjectionApplicationController = new ProjectionApplicationController({
     getState: () => this.state,
@@ -496,6 +493,10 @@ export class ImageTrailPanel {
     this.dispatch({ name: 'settings/update-build-info-overlay-visibility', visible });
   }
 
+  reloadLocalSettings(): Promise<void> {
+    return this.panelSettings.loadLocalSettings({ render: this.state.visible });
+  }
+
   toggle(): PanelState {
     const wasVisible = this.state.visible;
     this.dispatch({ name: 'toggle-panel' });
@@ -525,6 +526,7 @@ export class ImageTrailPanel {
     this.workspaceLayout.invalidateRestore();
     this.recallDestination.clearRecallMessageTimer();
     this.panelRender.clearFiniteCaptureErrorTimer();
+    this.panelRender.clearShortcutFeedback();
   }
 
   disconnect(): void {
@@ -550,6 +552,7 @@ export class ImageTrailPanel {
       renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
       refreshRecallIfOpen: () => this.recallDestination.refreshRecallIfOpen(),
       clearRecallMessageTimer: () => this.recallDestination.clearRecallMessageTimer(),
+      showFeedback: (message, tone) => this.panelRender.showShortcutFeedback(message, tone),
       getLocalSettings: () => this.localSettings,
       saveLocalSettings: (settings) => this.panelSettings.saveLocalSettings(settings),
       applyBuildInfoOverlayVisibility: (visible) => this.options.applyBuildInfoOverlayVisibility?.(visible),
@@ -583,6 +586,7 @@ export class ImageTrailPanel {
       updateVisibleBookmarkSoftMax: (value) => this.panelSettings.updateVisibleBookmarkSoftMax(value),
       updateRecentHistoryRetention: (input) => this.panelSettings.updateRecentHistoryRetention(input),
       updateRecentSparseRowDisplayMode: (mode) => this.panelSettings.updateRecentSparseRowDisplayMode(mode),
+      updateDownArrowAction: (value) => this.panelSettings.updateDownArrowAction(value),
       updatePinSaveStoragePreference: (value) => this.panelSettings.updatePinSaveStoragePreference(value),
       updateUrlReviewStatusRetention: (limit, clearAfterExport) =>
         this.panelSettings.updateUrlReviewStatusRetention(limit, clearAfterExport),
@@ -647,12 +651,16 @@ export class ImageTrailPanel {
     dispatchPanelAction(this.actionRegistry, action, this.handleDefaultAction);
   };
 
-  handleShortcutAction(action: string): void {
-    handlePanelShortcutAction(action, {
+  handleShortcutAction(action: string): boolean {
+    return handlePanelShortcutAction(action, {
       getState: () => this.state,
       dispatch: this.dispatch,
       slideshow: () => this.slideshow,
       toggleBufferedNavDebug: () => this.bufferedNav.toggleDebugVisible(),
+      bookmarkCurrentImage: () => this.recordLibrary.bookmarkCurrentImage(),
+      captureImage: (url) => this.capturedOriginals.captureImage(url, 'target'),
+      downloadCurrentImage: (saveAs) => this.currentImageDownload.download(saveAs),
+      showFeedback: (message, tone) => this.panelRender.showShortcutFeedback(message, tone),
     });
   }
 
@@ -715,24 +723,9 @@ export class ImageTrailPanel {
     nextFingerprint: string | null,
     previousFingerprint: string | null,
   ): PanelState {
-    const changed = Boolean(nextFingerprint && previousFingerprint && nextFingerprint !== previousFingerprint);
-    const unchanged = Boolean(nextFingerprint && previousFingerprint && nextFingerprint === previousFingerprint);
-    const autoUnlocked = changed
-      ? attemptedFieldIds.filter((fieldId) => this.isAutoUnlockableField(fieldId) && !state.manuallyExcludedFieldIds.includes(fieldId))
-      : [];
-
-    return {
-      ...state,
-      failedFieldId: null,
-      successfulFieldIds: changed
-        ? addItems(removeItems(state.successfulFieldIds, attemptedFieldIds), attemptedFieldIds)
-        : removeItems(state.successfulFieldIds, attemptedFieldIds),
-      unchangedFieldIds: unchanged
-        ? addItems(removeItems(state.unchangedFieldIds, attemptedFieldIds), attemptedFieldIds)
-        : removeItems(state.unchangedFieldIds, attemptedFieldIds),
-      unlockedFieldIds: changed ? addItems(removeItems(state.unlockedFieldIds, attemptedFieldIds), autoUnlocked) : state.unlockedFieldIds,
-      currentImageFingerprint: nextFingerprint ?? state.currentImageFingerprint,
-    };
+    return fieldLoadResultState(state, attemptedFieldIds, nextFingerprint, previousFingerprint, (fieldId) =>
+      this.isAutoUnlockableField(fieldId),
+    );
   }
 
   private isAutoUnlockableField(fieldId: string): boolean {

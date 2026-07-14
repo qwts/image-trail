@@ -136,6 +136,7 @@
           "type": "storybook",
           "paths": [
             "extension/src/ui/components/help-view.stories.ts",
+            "extension/src/ui/components/keybinding-settings-view.stories.ts",
             "extension/src/ui/components/shortcut-settings-view.stories.ts",
             "extension/src/ui/components/encryption-view.stories.ts",
             "extension/src/ui/components/import-export-view.stories.ts",
@@ -202,8 +203,8 @@
       "coverage": [
         {
           "type": "playwright-e2e",
-          "path": "tests/e2e/automation-governance.spec.ts",
-          "notes": "Covers typing-target keyboard preservation, global image export shortcut interception, slideshow start/pause/resume/stop, opposite-direction manual interruption, retry control reachability, and visible request-governor capping under automated navigation."
+          "paths": ["tests/e2e/keyboard-feedback.spec.ts", "tests/e2e/automation-governance.spec.ts", "tests/e2e/design-baseline.spec.ts"],
+          "notes": "Covers the canonical bare-key table, typing/modifier/native-row exclusions, Trail and Grab routing, capture/pin semantics, 1400ms repeated-key reset, Controls hint reset, privacy-safe feedback, Help/Settings/Escape transitions, Down-arrow assignment and existing download path, cross-tab setting reload, source-page reload, extension process restart, duplicate-listener prevention, fixed-viewport capture/Help artifacts, slideshow controls, opposite-direction manual interruption, retry reachability, and request-governor capping."
         },
         {
           "type": "playwright-e2e",
@@ -217,13 +218,34 @@
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/keyboard.test.ts", "tests/dom/settings-view.test.ts"],
-          "notes": "Covers the page-level shortcut binding table, record-row ArrowDown routing that lets focused rows handle local navigation instead of the global download shortcut, the Settings shortcut reference row layout, and the intentional legacy a-z/h parity gaps."
+          "paths": [
+            "tests/keyboard.test.ts",
+            "tests/dom/keyboard-router.test.ts",
+            "tests/panel-shortcut-actions.test.ts",
+            "tests/dom/settings-view.test.ts",
+            "tests/dom/help-view.test.ts",
+            "tests/dom/panel-render-controller.test.ts",
+            "tests/data-crypto.test.ts",
+            "tests/schema-validation.test.ts",
+            "tests/local-settings-handlers.test.ts",
+            "tests/settings-change-message.test.ts"
+          ],
+          "notes": "Covers the exact canonical registry, case-insensitive bare letters, handler-declined Down behavior, all excluded targets/modifiers, capture/pin/download routing and locked fallback, privacy-safe copy, Help grouping, Settings assignment, schema migration, typed cross-tab notification with no-listener resilience, 1400ms repeated-key reset, render survival, and teardown cleanup."
         },
         {
           "type": "storybook",
-          "path": "extension/src/ui/components/shortcut-settings-view.stories.ts",
-          "notes": "Covers the shortcut reference at standard and narrow panel widths with row overflow assertions."
+          "paths": [
+            "extension/src/ui/components/shortcut-settings-view.stories.ts",
+            "extension/src/ui/components/keybinding-settings-view.stories.ts",
+            "extension/src/ui/components/help-view.stories.ts",
+            "extension/src/ui/stories/extension-destinations.stories.tsx"
+          ],
+          "notes": "Covers grouped Help, the assignable Down control at standard and narrow widths, interaction dispatch, row overflow, and persistence through the production React Settings destination."
+        },
+        {
+          "type": "manual",
+          "reason": "Final handoff fidelity and browser-owned shortcut assignment require a packaged-extension inspection.",
+          "notes": "Compare the capture feedback, Help, and Settings Automation surfaces with handoff screenshots 03, 10, and 13. Exercise every canonical bare key using keyboard-only navigation, repeat a shortcut before 1400ms, switch the Down assignment across two source tabs, reload a source tab, restart the extension process, inspect browser extension shortcuts, verify reduced motion, and confirm capture/download feedback contains no image metadata or URL and opens no unintended tab."
         },
         {
           "type": "unit-dom",

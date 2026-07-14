@@ -2,6 +2,7 @@ import type { BuildIdentity } from '../core/build-info.js';
 import type { ImageProbeMethod } from '../core/image/request-policy.js';
 import type { LoadFailureFeedback } from '../core/settings.js';
 import type { ObjectFitMode } from '../core/preview-style.js';
+import { DOWN_ARROW_ACTION_OPTIONS, isDownArrowAction } from '../core/keyboard-shortcuts.js';
 import {
   ApplyButton,
   formValues,
@@ -30,11 +31,37 @@ export function AutomationSettingsGroup({ settings, disabled, save }: SettingsGr
         disabled={disabled}
         onChange={(checked) => save({ ...settings, clearUrlReviewStatusAfterExport: checked })}
       />
-      <div className="image-trail-destination-page__unavailable">
-        <strong>Keybindings</strong>
-        <p>The canonical bare-key registry and assignable Down arrow are owned by #519.</p>
-      </div>
+      <KeybindingSettings settings={settings} disabled={disabled} save={save} />
     </SettingsGroup>
+  );
+}
+
+function KeybindingSettings({ settings, disabled, save }: SettingsGroupProps) {
+  return (
+    <div className="image-trail-destination-settings__subsection">
+      <strong>Keybindings</strong>
+      <SettingNote>
+        The <b>C</b> key captures the current image. The Down arrow is yours to assign — pick what it fires below. Modifier shortcuts like
+        Grab Mode and Slideshow are set in your browser&apos;s extension keyboard shortcuts page.
+      </SettingNote>
+      <SettingField label="Down arrow ( ↓ )">
+        <select
+          aria-label="Down arrow action"
+          value={settings.downArrowAction}
+          disabled={disabled}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            if (isDownArrowAction(value)) save({ ...settings, downArrowAction: value });
+          }}
+        >
+          {DOWN_ARROW_ACTION_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </SettingField>
+    </div>
   );
 }
 

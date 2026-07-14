@@ -72,13 +72,15 @@ function createHarness(): Harness {
 
 // Replaces window.setTimeout/clearTimeout with a manual queue so the finite-error reset callback can
 // be fired deterministically. Returns a restore function.
-function stubTimers(): { fire(): void; cleared(): boolean; restore(): void } {
+function stubTimers(): { fire(): void; cleared(): boolean; delay(): number | undefined; restore(): void } {
   const realSet = window.setTimeout;
   const realClear = window.clearTimeout;
   let pending: (() => void) | null = null;
+  let pendingDelay: number | undefined;
   let clearedFlag = false;
-  (window as unknown as { setTimeout: typeof setTimeout }).setTimeout = ((cb: () => void) => {
+  (window as unknown as { setTimeout: typeof setTimeout }).setTimeout = ((cb: () => void, delay?: number) => {
     pending = cb;
+    pendingDelay = delay;
     return 1 as unknown as ReturnType<typeof setTimeout>;
   }) as typeof setTimeout;
   (window as unknown as { clearTimeout: typeof clearTimeout }).clearTimeout = (() => {
@@ -88,6 +90,7 @@ function stubTimers(): { fire(): void; cleared(): boolean; restore(): void } {
   return {
     fire: () => pending?.(),
     cleared: () => clearedFlag,
+    delay: () => pendingDelay,
     restore: () => {
       window.setTimeout = realSet;
       window.clearTimeout = realClear;
@@ -203,6 +206,43 @@ test('showBufferedNavigationToast writes a toast, pulses the root, and dismisses
     timers.fire();
     assert.ok(!harness.root.classList.contains('has-buffered-skip-pulse'), 'pulse class removed on dismiss');
     assert.equal(harness.toastRoot.querySelector('.image-trail-panel__buffered-skip-toast'), null);
+  } finally {
+    timers.restore();
+  }
+});
+
+test('shortcut feedback matches the bottom-center contract and repeated calls reset its 1400ms timer', () => {
+  const harness = createHarness();
+  const timers = stubTimers();
+  try {
+    harness.controller.showShortcutFeedback('Captured original ✓');
+    assert.equal(timers.delay(), 1_400);
+    assert.ok(harness.toastRoot.classList.contains('has-shortcut-feedback'));
+    assert.equal(harness.toastRoot.querySelector('.image-trail-panel__shortcut-feedback')?.textContent, 'Captured original ✓');
+
+    harness.controller.showShortcutFeedback('Downloading current image…');
+    assert.equal(timers.cleared(), true, 'the first dismissal timer is cleared');
+    assert.equal(harness.toastRoot.querySelectorAll('.image-trail-panel__shortcut-feedback').length, 1);
+    assert.equal(harness.toastRoot.textContent, 'Downloading current image…');
+    timers.fire();
+    assert.equal(harness.toastRoot.querySelector('.image-trail-panel__shortcut-feedback'), null);
+  } finally {
+    timers.restore();
+  }
+});
+
+test('shortcut feedback survives panel renders and teardown clears its timer and DOM', () => {
+  const harness = createHarness();
+  const timers = stubTimers();
+  try {
+    harness.patchState({ visible: true });
+    harness.controller.showShortcutFeedback('Pinned current image ✓');
+    harness.controller.render();
+    assert.equal(harness.toastRoot.textContent, 'Pinned current image ✓');
+    harness.controller.clearShortcutFeedback();
+    assert.equal(timers.cleared(), true);
+    assert.equal(harness.toastRoot.childElementCount, 0);
+    assert.ok(!harness.toastRoot.classList.contains('has-shortcut-feedback'));
   } finally {
     timers.restore();
   }

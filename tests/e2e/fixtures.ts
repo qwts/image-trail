@@ -21,6 +21,11 @@ interface ExtensionWorkerFixtures {
   extensionContext: BrowserContext;
 }
 
+export interface PersistentExtensionSession {
+  readonly context: BrowserContext;
+  readonly serviceWorker: Worker;
+}
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const extensionPath = path.join(repoRoot, 'extension/dist');
 const fixtureBaseUrl = 'http://127.0.0.1:4173';
@@ -49,6 +54,15 @@ async function waitForServiceWorker(context: BrowserContext): Promise<Worker> {
     const candidate = await context.waitForEvent('serviceworker');
     if (candidate.url().startsWith('chrome-extension://')) return candidate;
   }
+}
+
+export async function launchPersistentExtensionSession(userDataDir: string, headless: boolean): Promise<PersistentExtensionSession> {
+  const context = await chromium.launchPersistentContext(userDataDir, {
+    channel: 'chromium',
+    headless,
+    args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
+  });
+  return { context, serviceWorker: await waitForServiceWorker(context) };
 }
 
 function extensionIdFromWorker(worker: Worker): string {

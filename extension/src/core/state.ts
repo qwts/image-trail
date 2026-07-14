@@ -82,6 +82,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     neighborPreloadCacheLimit: DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
     neighborPreloadProbeMethod: 'get',
     loadFailureFeedback: DEFAULT_LOAD_FAILURE_FEEDBACK,
+    downArrowAction: 'capture',
     secondaryControlsOpen: false,
     historySectionOpen: true,
     bookmarksSectionOpen: true,

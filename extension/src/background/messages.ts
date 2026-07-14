@@ -706,7 +706,7 @@ export interface LoadLocalSettingsResultMessage {
 
 type LocalSettings = import('../data/local-settings.js').PlaintextLocalSettings;
 type BackwardCompatibleLocalSettingsKey =
-  'recentSparseRowDisplayMode' | 'recentDisplayOrder' | 'queueDisplayOrder' | 'pageContextOverrides';
+  'recentSparseRowDisplayMode' | 'recentDisplayOrder' | 'queueDisplayOrder' | 'downArrowAction' | 'pageContextOverrides';
 type BackwardCompatibleLocalSettings = {
   readonly [Key in BackwardCompatibleLocalSettingsKey]?: LocalSettings[Key] | undefined;
 };

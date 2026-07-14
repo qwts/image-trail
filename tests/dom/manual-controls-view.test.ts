@@ -42,6 +42,13 @@ test('primary workflow exposes navigation, capture, slideshow, and Grab Mode wit
   primary.querySelector<HTMLButtonElement>('[aria-label="Capture original"]')?.click();
   primary.querySelector<HTMLButtonElement>('[aria-label="Start slideshow"]')?.click();
   primary.querySelector<HTMLButtonElement>('[aria-label="Grab Mode"]')?.click();
+  assert.equal(
+    primary.querySelector<HTMLButtonElement>('[aria-label="Capture original"]')?.title,
+    'Capture original (C) — store the full-resolution original bytes as a Bookmark',
+  );
+  assert.match(primary.querySelector<HTMLButtonElement>('[aria-label="Start slideshow"]')?.title ?? '', /step Trail fields/u);
+  assert.match(primary.querySelector<HTMLButtonElement>('[aria-label="Grab Mode"]')?.title ?? '', /click host-page images to pin/u);
+  assert.equal(view.querySelector('.image-trail-panel__capture-hint')?.textContent, 'Press C to capture the current image.');
   assert.deepEqual(actions, [
     { name: 'capture/request', url: 'https://images.example.test/photo.jpg', sourceType: 'target' },
     { name: 'slideshow-start' },

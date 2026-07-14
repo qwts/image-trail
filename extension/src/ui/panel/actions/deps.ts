@@ -9,6 +9,7 @@ import type { LoadFailureFeedback } from '../../../core/settings.js';
 import type { FieldTransformPanelAction, PanelAction, PanelDestinationId, PanelState } from '../../../core/types.js';
 import type { PageContext } from '../../../core/page-context.js';
 import type { BufferedNavigationController } from '../buffered-navigation-controller.js';
+import type { CurrentImageFeedbackTone } from '../current-image-workflows.js';
 import type { PanelMount } from '../panel-mount.js';
 import type { ParsedFieldStateSync } from '../parsed-field-state-sync.js';
 import type { RecallExportController } from '../recall-export-controller.js';
@@ -39,6 +40,7 @@ export interface PanelActionDeps {
   renderPanelAndRefreshRecall(): void;
   refreshRecallIfOpen(): void;
   clearRecallMessageTimer(): void;
+  showFeedback(message: string, tone?: CurrentImageFeedbackTone): void;
 
   // Local settings.
   getLocalSettings(): PlaintextLocalSettings;
@@ -59,7 +61,7 @@ export interface PanelActionDeps {
   recallRestore(): RecallRestoreController;
 
   // Panel-private workflows, signatures copied from `panel.ts`.
-  bookmarkCurrentImage(): Promise<void>;
+  bookmarkCurrentImage(): Promise<boolean>;
   removeRecentHistory(id: string): Promise<void>;
   deleteRecentHistory(): Promise<void>;
   pinRecentHistory(id: string): Promise<void>;
@@ -77,6 +79,7 @@ export interface PanelActionDeps {
     readonly overflowBehavior: PlaintextLocalSettings['recentHistoryOverflowBehavior'];
   }): Promise<void>;
   updateRecentSparseRowDisplayMode(mode: PlaintextLocalSettings['recentSparseRowDisplayMode']): void;
+  updateDownArrowAction(value: PlaintextLocalSettings['downArrowAction']): void;
   updatePinSaveStoragePreference(value: PlaintextLocalSettings['pinSaveStoragePreference']): void;
   updateUrlReviewStatusRetention(limit: number, clearAfterExport: boolean): Promise<void>;
   updateRequestThrottle(minimumIntervalMs: number, maxRequests: number, windowMs: number): void;
@@ -102,7 +105,11 @@ export interface PanelActionDeps {
   enqueueRejectedFieldCommit(): void;
   enqueueSelectedUrlApply(url: string): void;
   rejectUrlEditorInput(): void;
-  captureImage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<void>;
+  captureImage(
+    url: string,
+    sourceType: CaptureSourceType,
+    sourceRecordId?: string,
+  ): Promise<import('../../../core/image/capture-result.js').CaptureResult | null>;
   repairMissingOriginals(ids: readonly string[]): Promise<void>;
   retryCaptureWithPermission(request: CaptureRetryRequest): Promise<void>;
   deleteCapturedBlob(recordId: string, blobId: string): Promise<void>;

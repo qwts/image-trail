@@ -98,8 +98,8 @@ export class CapturedOriginalsController {
     this.deps.render();
   }
 
-  async captureImage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<void> {
-    await this.captureImageWithOptions(url, sourceType, sourceRecordId);
+  async captureImage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<CaptureResult | null> {
+    return this.captureImageWithOptions(url, sourceType, sourceRecordId);
   }
 
   async repairBookmarkOriginal(record: ImageDisplayRecord): Promise<CaptureResult | null> {

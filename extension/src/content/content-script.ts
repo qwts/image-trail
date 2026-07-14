@@ -7,6 +7,7 @@ import {
   MessageType,
 } from '../background/messages.js';
 import { isShortcutActionMessage } from '../background/shortcut-action-message.js';
+import { isSettingsChangeMessage } from '../background/settings-change-message.js';
 import { isNonProductionBuildIdentity, type BuildIdentity } from '../core/build-info.js';
 import { PageAdapter } from './page-adapter.js';
 import { BuildIdentityOverlay } from './build-identity-overlay.js';
@@ -23,6 +24,7 @@ import { ExtensionUrlReviewStatusStore } from './url-review-status-store.js';
 import { ImageTrailPanel } from '../ui/panel.js';
 import { sendRuntimeMessage } from './runtime-message.js';
 import { classifyTarget, matchesKeyCodeShortcut, shouldRouteKeyboardShortcut } from './keyboard.js';
+import { LOCAL_SETTINGS_KEY } from '../data/local-settings.js';
 
 interface ImageTrailContentController {
   readonly panel: ImageTrailPanel;
@@ -131,6 +133,10 @@ function createController(): ImageTrailContentController {
   }
 
   const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
+    if (isSettingsChangeMessage(message)) {
+      void panel.reloadLocalSettings();
+      return false;
+    }
     if (isShortcutActionMessage(message)) {
       if (!panel.visible) {
         sendResponse(createStatusMessage(false, 'Panel is closed.'));
@@ -173,24 +179,33 @@ function createController(): ImageTrailContentController {
     event.stopPropagation();
   };
 
-  const destroy = (): void => {
-    if (hasRuntimeMessaging()) chrome.runtime.onMessage.removeListener(handleMessage);
-    document.removeEventListener('keydown', handleKeyDown, true);
-    buildOverlay.hide();
-    panel.disconnect();
-    delete window.__imageTrailContentController;
+  const handleStorageChanged = (changes: Record<string, chrome.storage.StorageChange>, areaName: string): void => {
+    if (areaName === 'local' && LOCAL_SETTINGS_KEY in changes) void panel.reloadLocalSettings();
   };
 
-  chrome.runtime.onMessage.addListener(handleMessage);
-  document.addEventListener('keydown', handleKeyDown, true);
-  window.addEventListener('pagehide', (event) => {
+  const handlePageHide = (event: PageTransitionEvent): void => {
     buildOverlay.hide();
     if (event.persisted) {
       panel.destroy();
       return;
     }
     destroy();
-  });
+  };
+
+  const destroy = (): void => {
+    if (hasRuntimeMessaging()) chrome.runtime.onMessage.removeListener(handleMessage);
+    chrome.storage?.onChanged.removeListener(handleStorageChanged);
+    document.removeEventListener('keydown', handleKeyDown, true);
+    window.removeEventListener('pagehide', handlePageHide);
+    buildOverlay.hide();
+    panel.disconnect();
+    delete window.__imageTrailContentController;
+  };
+
+  chrome.runtime.onMessage.addListener(handleMessage);
+  chrome.storage?.onChanged.addListener(handleStorageChanged);
+  document.addEventListener('keydown', handleKeyDown, true);
+  window.addEventListener('pagehide', handlePageHide);
 
   return { panel, destroy };
 }

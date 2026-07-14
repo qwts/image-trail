@@ -44,6 +44,7 @@ const plaintextLocalSettingsEntries = {
   neighborPreloadCacheLimit: v.number(),
   neighborPreloadProbeMethod: v.picklist(['get', 'head']),
   loadFailureFeedback: v.picklist(['alert', 'display', 'mute']),
+  downArrowAction: v.picklist(['capture', 'download', 'off']),
   secondaryControlsOpen: v.boolean(),
   restoreWorkspaceLayout: v.boolean(),
   pageContextOverrides: pageContextOverridesSchema,
@@ -56,6 +57,7 @@ export const saveLocalSettingsPayloadSchema = v.object({
   recentSparseRowDisplayMode: v.optional(recentSparseRowDisplayModeSchema),
   recentDisplayOrder: v.optional(v.picklist(['newest-first', 'oldest-first'])),
   queueDisplayOrder: v.optional(v.picklist(['front-first', 'back-first'])),
+  downArrowAction: v.optional(v.picklist(['capture', 'download', 'off'])),
   pageContextOverrides: v.optional(pageContextOverridesSchema),
 });
 
