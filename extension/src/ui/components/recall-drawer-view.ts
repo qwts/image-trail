@@ -1,8 +1,9 @@
 import { encryptedBlobIdForRecord, imageExtensionFromUrl, type ImageDisplayRecord } from '../../core/display-records.js';
 import type { PanelAction, RecallDrawerSide, RecallState } from '../../core/types.js';
-import { createExtensionIndicator, isCapturedOriginalRecord } from './bookmarks-view.js';
-import { createPrivacyThumbnail, recordDisplayName, recordMetadataText, recordTitle } from './record-metadata.js';
+import { isCapturedOriginalRecord } from './bookmarks-view.js';
+import { recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitle } from './record-metadata.js';
 import { registerPreviewRowClick } from './record-row-preview-click.js';
+import { createRecordRow } from './record-row.js';
 import { selectedRangeIds } from './selection-ranges.js';
 
 export interface RecallDrawerGeometry {
@@ -151,9 +152,27 @@ function createRecallRow(
   dispatch: (action: PanelAction) => void,
   options: { readonly privacyMode?: boolean } = {},
 ): HTMLElement {
-  const item = document.createElement('li');
-  item.className = selected ? 'is-selected' : '';
-  if (options.privacyMode && record.privacyStatus !== 'locked') item.classList.add('is-privacy-masked');
+  const privacyMasked = options.privacyMode === true && record.privacyStatus !== 'locked';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = selected;
+  const row = createRecordRow({
+    layout: 'recall',
+    thumbnail: record.thumbnail,
+    thumbnailFallback: privacyMasked ? 'PRIVATE' : (imageExtensionFromUrl(record.url) ?? 'IMG'),
+    source: privacyMasked ? 'PRIVATE' : recordExtensionLabel(record),
+    name: recordDisplayName(record, options),
+    nameTitle: recordTitle(record, options),
+    meta: recordMetadataText(record, options),
+    storedOriginal: isCapturedOriginalRecord(record),
+    state: record.privacyStatus === 'locked' ? 'locked-encrypted' : selected ? 'selected' : 'default',
+    privacyMasked,
+    bodyClassName: 'image-trail-panel__recall-label',
+    nameClassName: 'image-trail-panel__recall-name',
+    metaClassName: 'image-trail-panel__recall-row-meta image-trail-panel__record-row-meta',
+    leading: checkbox,
+  });
+  const item = row.root;
   item.tabIndex = 0;
   item.setAttribute('role', 'button');
   item.setAttribute('aria-pressed', selected ? 'true' : 'false');
@@ -162,9 +181,6 @@ function createRecallRow(
   item.title =
     'Click to select this row. Double-click or press Enter to preview it. Cmd/Ctrl-click selects for export. Shift-click selects a range.';
 
-  const checkbox = document.createElement('input');
-  checkbox.type = 'checkbox';
-  checkbox.checked = selected;
   checkbox.addEventListener('click', (event) => {
     event.stopPropagation();
     if (event.shiftKey) {
@@ -174,7 +190,6 @@ function createRecallRow(
     dispatch({ name: 'recall-selection/toggle', id: record.id });
   });
 
-  item.append(checkbox, createRecallThumbnail(record, options), createRecallLabel(record, options));
   item.addEventListener('click', (event) => {
     if (event.metaKey || event.ctrlKey) {
       dispatch({ name: 'recall-selection/toggle', id: record.id });
@@ -245,41 +260,6 @@ function findRecordRow(root: ParentNode, id: string): HTMLElement | null {
   return null;
 }
 /* c8 ignore stop */
-
-function createRecallThumbnail(record: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
-  if (options.privacyMode && record.privacyStatus !== 'locked') return createPrivacyThumbnail();
-  if (record.thumbnail) {
-    const image = document.createElement('img');
-    image.className = 'image-trail-panel__record-thumbnail';
-    image.src = record.thumbnail;
-    image.alt = '';
-    image.loading = 'lazy';
-    return image;
-  }
-
-  const fallback = document.createElement('span');
-  fallback.className = 'image-trail-panel__record-thumbnail image-trail-panel__record-thumbnail--empty';
-  fallback.textContent = imageExtensionFromUrl(record.url) ?? 'IMG';
-  return fallback;
-}
-
-function createRecallLabel(record: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'image-trail-panel__recall-label';
-
-  const name = document.createElement('span');
-  name.className = 'image-trail-panel__recall-name';
-  name.textContent = recordDisplayName(record, options);
-  name.title = recordTitle(record, options);
-
-  const meta = document.createElement('span');
-  meta.className = 'image-trail-panel__recall-row-meta';
-  meta.textContent = recordMetadataText(record, options);
-  meta.title = meta.textContent;
-
-  wrapper.append(createExtensionIndicator(record), name, meta);
-  return wrapper;
-}
 
 function recallMetaText(state: RecallState): string {
   if (state.busy) return 'Loading queue rows.';

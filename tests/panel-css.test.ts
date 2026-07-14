@@ -4,10 +4,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const PANEL_CSS = readFileSync(resolve(process.cwd(), 'extension/src/ui/styles/panel.css'), 'utf8');
+const RECORD_ROW_CSS = readFileSync(resolve(process.cwd(), 'extension/src/ui/styles/record-row.css'), 'utf8');
+const PANEL_STYLES = `${PANEL_CSS}\n${RECORD_ROW_CSS}`;
 
 function cssRule(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = new RegExp(`${escaped}\\s*\\{(?<body>[^}]*)\\}`, 'u').exec(PANEL_CSS);
+  const match = new RegExp(`${escaped}\\s*\\{(?<body>[^}]*)\\}`, 'u').exec(PANEL_STYLES);
   assert.ok(match?.groups?.['body'], `missing CSS rule for ${selector}`);
   return match.groups['body'];
 }
@@ -65,9 +67,7 @@ test('Adaptive two-row Recents keep the full-width, center-visible thumbnail bac
   const item = cssRule(
     '.image-trail-panel-root .image-trail-panel__record-list.is-sparse-adaptive.has-sparse-count-2 .image-trail-panel__history-item',
   );
-  const thumbnail = cssRule(
-    '.image-trail-panel-root .image-trail-panel__history-item > .image-trail-panel__record-thumbnail,\n.image-trail-panel-root .image-trail-panel__bookmark-item > .image-trail-panel__record-thumbnail',
-  );
+  const thumbnail = cssRule('.image-trail-panel-root .image-trail-ds__record-thumbnail');
 
   assert.match(item, /--image-trail-history-thumbnail-inline-size:\s*100%;/u);
   assert.match(

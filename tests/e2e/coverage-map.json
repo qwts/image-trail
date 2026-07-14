@@ -77,6 +77,40 @@
       ]
     },
     {
+      "id": "design-system-record-row",
+      "acceptance": "Shared RecordRow across Queue, Recents, Recall, and Gallery",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom/record-row.test.ts",
+            "tests/dom/bookmarks-view.test.ts",
+            "tests/dom/history-view.test.ts",
+            "tests/dom/recall-drawer-view.test.ts",
+            "tests/dom/gallery-view.test.ts",
+            "tests/primitives-css.test.ts"
+          ],
+          "notes": "Covers the canonical thumbnail, source/name/meta hierarchy, selected/locked/key-unavailable/privacy states, stored-original indicator, native Gallery button semantics, shared adoption across all four record surfaces, existing row interactions, and stylesheet packaging."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/record-row.stories.ts",
+          "notes": "Covers default, selected and captured, locked, key-unavailable, privacy-masked, missing-thumbnail, narrow, keyboard, and action states."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": ["tests/e2e/recents-queue-recall.spec.ts", "tests/e2e/extension-smoke.spec.ts"],
+          "notes": "Covers packaged Queue, Recents, and Recall row selection, preview, paging, capture, durable state, and lifecycle behavior after migration to the shared primitive."
+        },
+        {
+          "type": "manual",
+          "reason": "The handoff defines a signature thumbnail bleed, fade, glow, and state hierarchy that requires visual comparison in the injected panel and extension Gallery.",
+          "notes": "Load the packaged extension and compare Queue, Recents, Recall, and Gallery against the handoff. Verify full-height faded thumbnails, source/name/meta hierarchy, selected dominance over the stored-original dot, locked and key-unavailable dimming, privacy masking, missing thumbnails, keyboard focus, narrow widths, and no layout flicker."
+        }
+      ]
+    },
+    {
       "id": "automation-keybindings-and-request-governance",
       "acceptance": "M08 automation, keybindings, and request governance",
       "wiki": "https://github.com/qwts/image-trail/wiki/User-Story-M08-Automation-Keybindings-And-Request-Governance",

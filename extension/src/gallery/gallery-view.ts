@@ -1,5 +1,6 @@
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitle } from '../ui/components/record-metadata.js';
+import { createRecordRow } from '../ui/components/record-row.js';
 import type { GalleryAlbumSummary } from './gallery-albums.js';
 import { galleryRecordKind, openActionForGalleryRecord } from './gallery-model.js';
 
@@ -248,16 +249,34 @@ function createGrid(state: GalleryViewState, handlers: GalleryViewHandlers): HTM
 }
 
 function createCard(record: ImageDisplayRecord, state: GalleryViewState, handlers: GalleryViewHandlers): HTMLLIElement {
-  const item = document.createElement('li');
-  item.className = 'image-trail-gallery__card';
-  if (state.openAlbumMenuRecordIds.includes(record.id)) item.classList.add('has-album-popover');
-  item.draggable = true;
-
   const action = openActionForGalleryRecord(record, { blobKeyUnlocked: state.blobKeyUnlocked });
   const disabledReason = action.kind === 'locked' || action.kind === 'unsupported' ? action.message : null;
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'image-trail-gallery__card-button';
+  const privacyMasked = state.privacyMode && record.privacyStatus !== 'locked';
+  const row = createRecordRow({
+    className: 'image-trail-gallery__card',
+    layout: 'gallery',
+    interactionTarget: 'button',
+    thumbnail: record.thumbnail,
+    thumbnailAlt: recordDisplayName(record, state),
+    thumbnailFallback: privacyMasked ? 'PRIVATE' : recordExtensionLabel(record),
+    source: privacyMasked ? 'PRIVATE' : recordExtensionLabel(record),
+    name: recordDisplayName(record, state),
+    nameTitle: recordTitle(record, state),
+    meta: [galleryRecordKind(record), recordMetadataText(record, state)].filter(Boolean).join(' | '),
+    warning: disabledReason ?? undefined,
+    storedOriginal: !!record.storedOriginal || record.captureStatus === 'captured',
+    state: record.privacyStatus === 'locked' ? 'locked-encrypted' : 'default',
+    privacyMasked,
+    bodyClassName: 'image-trail-gallery__card-body',
+    nameClassName: 'image-trail-gallery__card-title',
+    metaClassName: 'image-trail-gallery__card-meta',
+    warningClassName: 'image-trail-gallery__card-warning',
+  });
+  const item = row.root;
+  const button = row.interactionTarget as HTMLButtonElement;
+  button.classList.add('image-trail-gallery__card-button');
+  if (state.openAlbumMenuRecordIds.includes(record.id)) item.classList.add('has-album-popover');
+  item.draggable = true;
   button.disabled = disabledReason !== null;
   button.title = disabledReason ?? recordTitle(record, state);
   let suppressOpenClick = false;
@@ -286,9 +305,6 @@ function createCard(record: ImageDisplayRecord, state: GalleryViewState, handler
       suppressOpenClick = false;
     }, 0);
   });
-
-  button.append(createVisual(record, state), createBody(record, state, disabledReason));
-  item.append(button);
   const albumActions = createCardAlbumControl(record, state, handlers);
   if (albumActions) item.append(albumActions);
   return item;
@@ -363,44 +379,6 @@ function createAlbumChoiceButton(
   choice.className = 'image-trail-gallery__album-choice';
   choice.setAttribute('aria-pressed', String(summary.album.id === selectedAlbumId));
   return choice;
-}
-
-function createVisual(record: ImageDisplayRecord, state: GalleryViewState): HTMLElement {
-  if (record.thumbnail && record.privacyStatus !== 'locked' && !state.privacyMode) {
-    const image = document.createElement('img');
-    image.className = 'image-trail-gallery__thumbnail';
-    image.src = record.thumbnail;
-    image.alt = recordDisplayName(record, state);
-    image.loading = 'lazy';
-    return image;
-  }
-
-  const fallback = document.createElement('span');
-  fallback.className = 'image-trail-gallery__thumbnail image-trail-gallery__thumbnail--fallback';
-  fallback.textContent = state.privacyMode && record.privacyStatus !== 'locked' ? 'PRIVATE' : recordExtensionLabel(record);
-  return fallback;
-}
-
-function createBody(record: ImageDisplayRecord, state: GalleryViewState, disabledReason: string | null): HTMLElement {
-  const body = document.createElement('span');
-  body.className = 'image-trail-gallery__card-body';
-
-  const name = document.createElement('span');
-  name.className = 'image-trail-gallery__card-title';
-  name.textContent = recordDisplayName(record, state);
-
-  const meta = document.createElement('span');
-  meta.className = 'image-trail-gallery__card-meta';
-  meta.textContent = [galleryRecordKind(record), recordMetadataText(record, state)].filter(Boolean).join(' | ');
-
-  body.append(name, meta);
-  if (disabledReason) {
-    const reason = document.createElement('span');
-    reason.className = 'image-trail-gallery__card-warning';
-    reason.textContent = disabledReason;
-    body.append(reason);
-  }
-  return body;
 }
 
 function createPageButton(label: string, enabled: boolean, onClick: () => void): HTMLButtonElement {

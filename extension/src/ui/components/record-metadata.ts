@@ -40,13 +40,6 @@ export function recordMetadataText(record: ImageDisplayRecord, options: RecordPr
   return parts.join(' · ');
 }
 
-export function createPrivacyThumbnail(label = 'PRIVATE'): HTMLElement {
-  const fallback = document.createElement('span');
-  fallback.className = 'image-trail-panel__record-thumbnail image-trail-panel__record-thumbnail--privacy';
-  fallback.textContent = label;
-  return fallback;
-}
-
 export function recordResolutionText(record: ImageDisplayRecord): string | null {
   return isPositiveDimension(record.width) && isPositiveDimension(record.height) ? `${record.width} x ${record.height}` : null;
 }

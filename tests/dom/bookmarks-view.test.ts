@@ -57,6 +57,7 @@ test('a plain click selects an unselected queue row without previewing it', () =
   const view = buildBookmarksView(actions);
   const row = rowFor(view, 'row-1');
 
+  assert.ok(row.classList.contains('image-trail-ds__record-row'));
   assert.equal(row.getAttribute('role'), 'button');
   assert.equal(row.tabIndex, 0);
 

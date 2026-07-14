@@ -47,6 +47,7 @@ test('a plain click selects an unselected recent row without previewing it', () 
   const view = buildHistoryView(actions);
   const row = rowFor(view, 'recent-1');
 
+  assert.ok(row.classList.contains('image-trail-ds__record-row'));
   row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 
   assert.deepEqual(actions, [{ name: 'history-selection/select', ids: ['recent-1'] }]);

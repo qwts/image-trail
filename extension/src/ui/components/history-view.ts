@@ -1,8 +1,9 @@
 import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import { DEFAULT_RECENT_DISPLAY_ORDER, sortRecentRecords, type RecentDisplayOrder } from '../../core/display-order.js';
 import type { RecentSparseRowDisplayMode } from '../../core/types.js';
-import { createPrivacyThumbnail, PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordExtensionLabel, recordTitle } from './record-metadata.js';
+import { PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordExtensionLabel, recordTitle } from './record-metadata.js';
 import { registerPreviewRowClick } from './record-row-preview-click.js';
+import { createRecordRow, type RecordRowState } from './record-row.js';
 import { selectedRangeIds } from './selection-ranges.js';
 
 type HistoryAction =
@@ -126,12 +127,29 @@ export function createHistoryView(
     const pinned = isPinnedRecord(item);
     const statusText = recentStatusText(item);
     const selected = selectedIds.includes(item.id);
-    const entry = document.createElement('li');
-    entry.className = 'image-trail-panel__history-item';
+    const privacyMasked = options?.privacyMode === true && item.privacyStatus !== 'locked';
+    const actions = document.createElement('span');
+    actions.className = 'image-trail-panel__item-actions';
+    actions.addEventListener('keydown', (event) => event.stopPropagation());
+    const row = createRecordRow({
+      className: 'image-trail-panel__history-item',
+      thumbnail: item.thumbnail,
+      thumbnailFallback: privacyMasked ? 'PRIVATE' : recordExtensionLabel(item).slice(0, 4),
+      source: privacyMasked ? 'PRIVATE' : recordExtensionLabel(item),
+      name: privacyMasked ? PRIVACY_RECORD_NAME : (item.label ?? item.url),
+      nameTitle: privacyMasked ? recordTitle(item, options) : displayTitleForRecord(item),
+      meta: privacyMasked ? (statusText ? `${PRIVACY_RECORD_META} / ${statusText}` : PRIVACY_RECORD_META) : (statusText ?? undefined),
+      storedOriginal: !!item.storedOriginal || item.captureStatus === 'captured',
+      state: historyRecordRowState({ selected, keyUnavailable, lockedEncrypted }),
+      privacyMasked,
+      bodyClassName: 'image-trail-panel__history-label',
+      nameClassName: 'image-trail-panel__bookmark-name',
+      metaClassName: 'image-trail-panel__record-row-meta',
+      actions,
+    });
+    const entry = row.root;
     entry.dataset['imageTrailRowId'] = item.id;
-    if (options?.privacyMode && item.privacyStatus !== 'locked') entry.classList.add('is-privacy-masked');
     if (previewableEncrypted) entry.classList.add('is-captured');
-    if (selected) entry.classList.add('is-selected');
     entry.setAttribute('aria-selected', String(selected));
     entry.addEventListener('click', (event) => {
       if (!isSelectionClick(event)) return;
@@ -206,33 +224,6 @@ export function createHistoryView(
         focusRecordRow(root, item.id);
       });
     }
-    const visual = createRecordVisual(item, options);
-    const label = document.createElement('div');
-    label.className = 'image-trail-panel__history-label';
-    const source = createHistoryExtensionIndicator(item, options);
-    const name = document.createElement('span');
-    name.className = 'image-trail-panel__bookmark-name';
-    name.textContent = options?.privacyMode && item.privacyStatus !== 'locked' ? PRIVACY_RECORD_NAME : (item.label ?? item.url);
-    name.title = options?.privacyMode && item.privacyStatus !== 'locked' ? recordTitle(item, options) : displayTitleForRecord(item);
-    label.append(source, name);
-    if (options?.privacyMode && item.privacyStatus !== 'locked') {
-      const meta = document.createElement('span');
-      meta.className = 'image-trail-panel__record-row-meta';
-      meta.textContent = statusText ? `${PRIVACY_RECORD_META} / ${statusText}` : PRIVACY_RECORD_META;
-      meta.title = meta.textContent;
-      label.append(meta);
-    } else if (statusText) {
-      const meta = document.createElement('span');
-      meta.className = 'image-trail-panel__record-row-meta';
-      meta.textContent = statusText;
-      meta.title = meta.textContent;
-      label.append(meta);
-    }
-
-    const actions = document.createElement('span');
-    actions.className = 'image-trail-panel__item-actions';
-    actions.addEventListener('keydown', (event) => event.stopPropagation());
-
     if (!keyUnavailable && !lockedEncrypted && !pinned) {
       const pin = document.createElement('button');
       pin.type = 'button';
@@ -284,7 +275,6 @@ export function createHistoryView(
       });
       actions.append(remove);
     }
-    entry.append(visual, label, actions);
     list.append(entry);
   }
 
@@ -361,41 +351,14 @@ function recentStatusText(item: ImageDisplayRecord): string | null {
   return status.length > 0 ? status.join(' / ') : null;
 }
 
-function createRecordVisual(item: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
-  if (options.privacyMode && item.privacyStatus !== 'locked') return createPrivacyThumbnail();
-  if (item.thumbnail) {
-    const image = document.createElement('img');
-    image.className = 'image-trail-panel__record-thumbnail';
-    image.src = item.thumbnail;
-    image.alt = '';
-    image.loading = 'lazy';
-    return image;
-  }
-
-  const fallback = document.createElement('span');
-  fallback.className = 'image-trail-panel__record-thumbnail image-trail-panel__record-thumbnail--empty';
-  fallback.textContent = recordExtensionLabel(item).slice(0, 4);
-  return fallback;
-}
-
-function createHistoryExtensionIndicator(item: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
-  const wrapper = document.createElement('span');
-  wrapper.className = 'image-trail-panel__record-extension-wrap';
-
-  const source = document.createElement('span');
-  source.className = 'image-trail-panel__bookmark-source';
-  source.textContent = options.privacyMode && item.privacyStatus !== 'locked' ? 'PRIVATE' : recordExtensionLabel(item);
-  source.title = source.textContent;
-  wrapper.append(source);
-
-  if (item.storedOriginal || item.captureStatus === 'captured') {
-    const dot = document.createElement('span');
-    dot.className = 'image-trail-panel__stored-original-dot';
-    dot.title = 'Original stored';
-    wrapper.append(dot);
-  }
-
-  return wrapper;
+function historyRecordRowState(input: {
+  readonly selected: boolean;
+  readonly keyUnavailable: boolean;
+  readonly lockedEncrypted: boolean;
+}): RecordRowState {
+  if (input.keyUnavailable) return 'key-unavailable';
+  if (input.lockedEncrypted) return 'locked-encrypted';
+  return input.selected ? 'selected' : 'default';
 }
 
 function isSelectionClick(event: MouseEvent): boolean {

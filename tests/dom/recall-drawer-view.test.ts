@@ -60,6 +60,7 @@ test('a plain click selects an unselected Recall row without previewing it', () 
   const view = buildRecallView(actions);
   const row = rowFor(view, 'recall-1');
 
+  assert.ok(row.classList.contains('image-trail-ds__record-row'));
   row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 
   assert.deepEqual(actions, [{ name: 'recall-selection/select', ids: ['recall-1'] }]);

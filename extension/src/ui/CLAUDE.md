@@ -11,11 +11,11 @@ route through `content/` controllers (ESLint-enforced).
   `renderPanel` (`render.ts`) — so queue/recall updates never rebuild the whole
   panel. Focus and scroll are captured/restored across renders; preserve that.
 - **Selected vs stored-original must stay visually distinct.** Selection is a
-  row-level highlight (`.is-selected`, `styles/panel.css`); a stored original is
-  a separate indicator dot (`.image-trail-panel__stored-original-dot`, set by
-  `createExtensionIndicator` in `components/bookmarks-view.ts` and
-  `components/history-view.ts`). Keep them on separate visual channels — the dot
-  is an indicator, not a competing selected-row background.
+  row-level highlight (`RecordRow` `selected` state in
+  `components/record-row.ts` / `styles/record-row.css`); a stored original is a
+  separate indicator dot from the same visual contract. Keep them on separate
+  visual channels — the dot is an indicator, not a competing selected-row
+  background.
 - **Pointer capture kills native clicks.** `setPointerCapture` on pointerdown retargets the
   pointerup and suppresses click synthesis — it silently breaks `<details>` summary toggles and
   any click-driven control under the pointer. For drag gestures on large surfaces, observe

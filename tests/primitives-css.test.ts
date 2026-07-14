@@ -8,8 +8,9 @@ const primitiveCss = read('extension/src/ui/styles/primitives.css');
 const feedbackCss = read('extension/src/ui/styles/feedback-primitives.css');
 const panelShellCss = read('extension/src/ui/styles/panel-shell.css');
 const primaryWorkflowCss = read('extension/src/ui/styles/primary-workflow.css');
+const recordRowCss = read('extension/src/ui/styles/record-row.css');
 const designSystemCss = read('extension/src/ui/styles/design-system.css');
-const css = `${primitiveCss}\n${feedbackCss}\n${panelShellCss}\n${primaryWorkflowCss}`;
+const css = `${primitiveCss}\n${feedbackCss}\n${panelShellCss}\n${primaryWorkflowCss}\n${recordRowCss}`;
 const panel = read('extension/src/ui/styles/panel.css');
 const manifest = JSON.parse(read('extension/manifest.json')) as {
   web_accessible_resources: Array<{ resources: string[] }>;
@@ -46,11 +47,19 @@ test('SectionHeader title track can shrink without pushing actions outside narro
   assert.match(css, /\.image-trail-ds__section-title[\s\S]*min-width:\s*0;[\s\S]*text-overflow:\s*ellipsis;/u);
 });
 
+test('RecordRow styles keep selection stronger than stored-original and cover private lock states', () => {
+  assert.match(recordRowCss, /data-state='selected'[\s\S]*--it-record-border:[\s\S]*box-shadow:\s*var\(--it-glow-row\)/u);
+  assert.match(recordRowCss, /data-state='locked-encrypted'[\s\S]*var\(--it-opacity-locked\)/u);
+  assert.match(recordRowCss, /data-state='key-unavailable'[\s\S]*var\(--it-opacity-key-gone\)/u);
+  assert.match(recordRowCss, /record-stored-original[\s\S]*inline-size:\s*6px/u);
+  assert.match(recordRowCss, /record-privacy-veil[\s\S]*backdrop-filter:\s*var\(--it-blur-privacy\)/u);
+});
+
 test('panel packaging loads design-system stylesheets after tokens', () => {
   assert.match(panel, /^@import '\.\/design-system\.css';/u);
   assert.equal(
     designSystemCss,
-    "@import './tokens.css';\n@import './primitives.css';\n@import './feedback-primitives.css';\n@import './panel-shell.css';\n@import './primary-workflow.css';\n",
+    "@import './tokens.css';\n@import './primitives.css';\n@import './feedback-primitives.css';\n@import './panel-shell.css';\n@import './primary-workflow.css';\n@import './record-row.css';\n",
   );
   const resources = manifest.web_accessible_resources.flatMap((entry) => entry.resources);
   assert.ok(resources.includes('src/ui/styles/design-system.css'));
@@ -58,4 +67,5 @@ test('panel packaging loads design-system stylesheets after tokens', () => {
   assert.ok(resources.includes('src/ui/styles/feedback-primitives.css'));
   assert.ok(resources.includes('src/ui/styles/panel-shell.css'));
   assert.ok(resources.includes('src/ui/styles/primary-workflow.css'));
+  assert.ok(resources.includes('src/ui/styles/record-row.css'));
 });

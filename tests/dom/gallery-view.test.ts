@@ -100,6 +100,7 @@ test('gallery view renders durable records in a bounded page grid', () => {
   );
 
   assert.equal(view.querySelectorAll('.image-trail-gallery__card').length, 1);
+  assert.equal(view.querySelectorAll('.image-trail-ds__record-row').length, 1);
   assert.match(view.textContent ?? '', /1-1 of 1 durable records/u);
   const recordButton = view.querySelector('.image-trail-gallery__card-button');
   assert.ok(recordButton instanceof HTMLButtonElement);

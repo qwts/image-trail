@@ -1,7 +1,8 @@
 import { encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import { DEFAULT_QUEUE_DISPLAY_ORDER, type QueueDisplayOrder } from '../../core/display-order.js';
 import type { BookmarkAction } from './bookmarks-view-actions.js';
-import { createPrivacyThumbnail, recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitle } from './record-metadata.js';
+import { recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitle } from './record-metadata.js';
+import { createRecordRow, type RecordRowState } from './record-row.js';
 import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { createQueueRepairButton, createQueueSelectionButton } from './queue-repair-button.js';
 import { createQueueSortControl } from './queue-sort-control.js';
@@ -236,13 +237,30 @@ export function createBookmarksView(
     const lockedEncrypted = isLockedEncryptedRecord(item, blobKeyUnlocked);
     const previewableEncrypted = isPreviewableEncryptedRecord(item, blobKeyUnlocked);
     const selected = selectedIds.includes(item.id);
-    const entry = document.createElement('li');
-    entry.className = 'image-trail-panel__bookmark-item';
+    const actions = document.createElement('span');
+    actions.className = 'image-trail-panel__item-actions';
+    actions.addEventListener('click', (event) => event.stopPropagation());
+    actions.addEventListener('keydown', (event) => event.stopPropagation());
+    const row = createRecordRow({
+      className: 'image-trail-panel__bookmark-item',
+      thumbnail: item.thumbnail,
+      thumbnailFallback: extensionLabelFor(item).slice(0, 4),
+      source: extensionLabelFor(item),
+      name: recordDisplayName(item, options),
+      nameTitle: recordTitle(item, options),
+      meta: recordMetadataText(item, options),
+      storedOriginal: isCapturedOriginalRecord(item),
+      state: recordRowState({ selected, privatePlaceholder, keyUnavailable, lockedEncrypted }),
+      privacyMasked: options.privacyMode === true && !privatePlaceholder,
+      bodyClassName: 'image-trail-panel__bookmark-label',
+      nameClassName: 'image-trail-panel__bookmark-name',
+      metaClassName: 'image-trail-panel__record-row-meta',
+      actions,
+    });
+    const entry = row.root;
     entry.dataset['imageTrailScrollAnchor'] = `bookmark:${item.id}`;
     entry.dataset['imageTrailRowId'] = item.id;
-    if (options.privacyMode && !privatePlaceholder) entry.classList.add('is-privacy-masked');
     if (previewableEncrypted) entry.classList.add('is-captured');
-    if (selected) entry.classList.add('is-selected');
     entry.setAttribute('aria-selected', String(selected));
     entry.addEventListener('click', (event) => {
       if (!isSelectionClick(event)) return;
@@ -307,25 +325,6 @@ export function createBookmarksView(
         dispatch({ name: 'capture/preview', url: item.url, blobId: capturedBlobId, scrollAnchorId: `bookmark:${item.id}` });
       });
     }
-    const visual = createRecordVisual(item, options);
-    const bookmarkLabel = document.createElement('div');
-    bookmarkLabel.className = 'image-trail-panel__bookmark-label';
-    const source = createExtensionIndicator(item);
-    const label = document.createElement('span');
-    label.className = 'image-trail-panel__bookmark-name';
-    label.textContent = recordDisplayName(item, options);
-    label.title = recordTitle(item, options);
-    const meta = document.createElement('span');
-    meta.className = 'image-trail-panel__record-row-meta';
-    meta.textContent = recordMetadataText(item, options);
-    meta.title = meta.textContent;
-    bookmarkLabel.append(source, label, meta);
-
-    const actions = document.createElement('span');
-    actions.className = 'image-trail-panel__item-actions';
-    actions.addEventListener('click', (event) => event.stopPropagation());
-    actions.addEventListener('keydown', (event) => event.stopPropagation());
-
     if (item.captureStatus !== 'captured' && blobKeyUnlocked) {
       const capture = document.createElement('button');
       capture.type = 'button';
@@ -371,7 +370,6 @@ export function createBookmarksView(
       bindBookmarkClearButton(clear, item.id, dispatch);
       actions.append(clear);
     }
-    entry.append(visual, bookmarkLabel, actions);
     list.append(entry);
   }
 
@@ -399,45 +397,19 @@ export function createBookmarksView(
   return section;
 }
 
-function createRecordVisual(item: ImageDisplayRecord, options: { readonly privacyMode?: boolean } = {}): HTMLElement {
-  if (options.privacyMode && item.privacyStatus !== 'locked') return createPrivacyThumbnail();
-  if (item.thumbnail) {
-    const image = document.createElement('img');
-    image.className = 'image-trail-panel__record-thumbnail';
-    image.src = item.thumbnail;
-    image.alt = '';
-    image.loading = 'lazy';
-    return image;
-  }
-
-  const fallback = document.createElement('span');
-  fallback.className = 'image-trail-panel__record-thumbnail image-trail-panel__record-thumbnail--empty';
-  fallback.textContent = extensionLabelFor(item).slice(0, 4);
-  return fallback;
-}
-
 export function extensionLabelFor(item: ImageDisplayRecord): string {
   return recordExtensionLabel(item);
 }
 
-export function createExtensionIndicator(item: ImageDisplayRecord): HTMLElement {
-  const wrapper = document.createElement('span');
-  wrapper.className = 'image-trail-panel__record-extension-wrap';
-
-  const source = document.createElement('span');
-  source.className = 'image-trail-panel__bookmark-source';
-  source.textContent = extensionLabelFor(item);
-  source.title = source.textContent;
-  wrapper.append(source);
-
-  if (item.storedOriginal || item.captureStatus === 'captured') {
-    const dot = document.createElement('span');
-    dot.className = 'image-trail-panel__stored-original-dot';
-    dot.title = 'Original stored';
-    wrapper.append(dot);
-  }
-
-  return wrapper;
+function recordRowState(input: {
+  readonly selected: boolean;
+  readonly privatePlaceholder: boolean;
+  readonly keyUnavailable: boolean;
+  readonly lockedEncrypted: boolean;
+}): RecordRowState {
+  if (input.keyUnavailable) return 'key-unavailable';
+  if (input.privatePlaceholder || input.lockedEncrypted) return 'locked-encrypted';
+  return input.selected ? 'selected' : 'default';
 }
 
 function isLockedEncryptedRecord(item: ImageDisplayRecord, blobKeyUnlocked: boolean): boolean {
