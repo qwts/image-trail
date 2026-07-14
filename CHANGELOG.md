@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.8.0
+
+### Minor Changes
+
+- 9781b17: Add self-contained React Dashboard, Gallery, Recall, and Settings extension pages with durable shared state and source-tab return handling.
+
 ## 0.7.0
 
 ### Minor Changes
