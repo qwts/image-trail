@@ -10,7 +10,7 @@ export interface KeyBinding {
   readonly action: string;
 }
 
-export type KeyActionHandler = (action: string) => void;
+export type KeyActionHandler = (action: string) => boolean;
 
 export interface KeyCodeShortcut {
   readonly code: string;
@@ -40,9 +40,9 @@ export function classifyTarget(event: KeyboardEvent): KeyTarget {
   const tag = el['tagName'] as string;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return 'typing';
   if (el['isContentEditable'] === true) return 'typing';
-  if (tag === 'BUTTON') return 'button';
   if (composedPath.some(isRecordRow)) return 'record-row';
   if (typeof el['closest'] === 'function' && (el as unknown as HTMLElement).closest('[data-image-trail-row-id]')) return 'record-row';
+  if (tag === 'BUTTON') return 'button';
   if (composedPath.some(isPanelHost)) return 'panel';
   if (typeof el['closest'] === 'function' && (el as unknown as HTMLElement).closest('#image-trail-panel-root')) return 'panel';
   return 'page';
@@ -62,15 +62,9 @@ function isPanelHost(node: unknown): boolean {
   return (node as { id?: unknown }).id === 'image-trail-panel-root';
 }
 
-export function shouldRouteKeyboardShortcut(target: KeyTarget, action: string, key?: string): boolean {
+export function shouldRouteKeyboardShortcut(target: KeyTarget, _action: string, _key?: string): boolean {
   if (target === 'typing') return false;
-  if (target === 'record-row' && action === 'download' && (key === 'ArrowDown' || key === 'ArrowUp')) return false;
-  // Keep native button activation intact; only explicit global shortcuts route from focused panel controls.
-  if (target === 'button') {
-    return (
-      action === 'next' || action === 'previous' || action === 'download' || action === 'download-save-as' || action === 'grab-mode-toggle'
-    );
-  }
+  if (target === 'record-row') return false;
   return true;
 }
 
@@ -84,10 +78,12 @@ export function matchesKeyCodeShortcut(event: KeyboardEvent, shortcut: KeyCodeSh
 }
 
 function matchesBinding(event: KeyboardEvent, binding: KeyBinding): boolean {
-  if (event.key !== binding.key) return false;
-  if ((binding.shift ?? false) !== event.shiftKey) return false;
+  const key = /^[a-z]$/u.test(binding.key) ? event.key.toLowerCase() : event.key;
+  if (key !== binding.key) return false;
+  if (binding.shift !== undefined && binding.shift !== event.shiftKey) return false;
   if ((binding.ctrl ?? false) !== event.ctrlKey) return false;
   if ((binding.alt ?? false) !== event.altKey) return false;
+  if (event.metaKey) return false;
   return true;
 }
 
@@ -119,14 +115,15 @@ export class KeyboardRouter {
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
     const target = classifyTarget(event);
 
     for (const binding of this.bindings) {
       if (matchesBinding(event, binding)) {
         if (!shouldRouteKeyboardShortcut(target, binding.action, binding.key)) return;
+        if (!this.handler(binding.action)) return;
         event.preventDefault();
         event.stopPropagation();
-        this.handler(binding.action);
         return;
       }
     }

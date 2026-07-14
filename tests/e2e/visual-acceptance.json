@@ -28,7 +28,7 @@
       "id": "03-capture-flash",
       "file": "03-capture-flash.png",
       "status": "automated",
-      "issues": [540],
+      "issues": [519, 540],
       "scenario": "capture-feedback",
       "test": "tests/e2e/design-baseline.spec.ts"
     },
@@ -84,7 +84,7 @@
       "id": "10-help",
       "file": "10-help.png",
       "status": "automated",
-      "issues": [540],
+      "issues": [519, 540],
       "scenario": "help",
       "test": "tests/e2e/design-baseline.spec.ts"
     },
@@ -116,7 +116,7 @@
       "id": "13-settings-automation",
       "file": "13-settings-automation.png",
       "status": "automated",
-      "issues": [540],
+      "issues": [519, 540],
       "scenario": "settings-automation",
       "test": "tests/e2e/design-baseline.spec.ts"
     },

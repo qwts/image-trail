@@ -64,13 +64,13 @@ export class RecordLibraryController {
 
   constructor(private readonly deps: RecordLibraryControllerDeps) {}
 
-  async bookmarkCurrentImage(): Promise<void> {
+  async bookmarkCurrentImage(): Promise<boolean> {
     const state = this.deps.getState();
     const url = state.target.selectedUrl;
-    if (!url) return;
+    if (!url) return false;
     const image = state.target.selectedHandleId ? this.deps.findSelectedImage(state.target.selectedHandleId) : null;
     const trustLoadedImage = image ? image.complete && image.naturalWidth > 0 && image.naturalHeight > 0 : false;
-    await this.bookmarkUrl(url, image ? ((await this.deps.createThumbnailDataUrlFromImage(image)) ?? undefined) : undefined, {
+    return this.bookmarkUrl(url, image ? ((await this.deps.createThumbnailDataUrlFromImage(image)) ?? undefined) : undefined, {
       trustLoadedImage,
       width: image?.naturalWidth || undefined,
       height: image?.naturalHeight || undefined,

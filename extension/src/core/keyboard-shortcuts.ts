@@ -7,6 +7,19 @@ export interface ShortcutKeyBinding {
   readonly display: string;
   readonly label: string;
   readonly description: string;
+  readonly group: 'trail' | 'capture' | 'panel';
+}
+
+export type DownArrowAction = 'capture' | 'download' | 'off';
+
+export const DOWN_ARROW_ACTION_OPTIONS: readonly { readonly value: DownArrowAction; readonly label: string }[] = [
+  { value: 'capture', label: 'Capture original' },
+  { value: 'download', label: 'Download image' },
+  { value: 'off', label: 'Unassigned' },
+];
+
+export function isDownArrowAction(value: unknown): value is DownArrowAction {
+  return value === 'capture' || value === 'download' || value === 'off';
 }
 
 export interface ShortcutReference {
@@ -20,95 +33,95 @@ export interface BrowserCommandShortcut {
   readonly action: string;
   readonly label: string;
   readonly description: string;
+  readonly manifestDescription: string;
 }
 
 export const PAGE_SHORTCUTS: readonly ShortcutKeyBinding[] = [
   {
     key: 'ArrowRight',
+    shift: false,
     action: 'next',
-    display: 'ArrowRight',
+    display: '→',
     label: 'Next trail step',
     description: 'Step included parsed fields forward.',
+    group: 'trail',
   },
   {
     key: 'ArrowLeft',
+    shift: false,
     action: 'previous',
-    display: 'ArrowLeft',
+    display: '←',
     label: 'Previous trail step',
     description: 'Step included parsed fields backward.',
+    group: 'trail',
   },
   {
-    key: 'ArrowDown',
-    action: 'download',
-    display: 'ArrowDown',
-    label: 'Download image',
-    description: 'Download the current image without a Save As prompt.',
-  },
-  {
-    key: ' ',
-    action: 'slideshow-toggle',
-    display: 'Space',
-    label: 'Slideshow',
-    description: 'Start, pause, or resume slideshow navigation.',
-  },
-  {
-    key: 'Escape',
-    action: 'stop',
-    display: 'Escape',
-    label: 'Stop automation',
-    description: 'Stop active slideshow and retry automation.',
-  },
-  {
-    key: 's',
-    action: 'buffer-debug-toggle',
-    display: 'S',
-    label: 'Buffer debug',
-    description: 'Toggle the buffered navigation debug display.',
+    key: 'c',
+    action: 'capture-current',
+    display: 'C',
+    label: 'Capture original',
+    description: "Capture the current image's encrypted original.",
+    group: 'capture',
   },
   {
     key: 'p',
-    action: 'panel-toggle',
+    action: 'pin-current',
     display: 'P',
-    label: 'Hide panel',
-    description: 'Close the in-page panel. Reopen it from the extension button or assigned browser shortcut.',
+    label: 'Pin current image',
+    description: 'Save the current image link to the durable queue.',
+    group: 'capture',
   },
   {
-    key: 'd',
-    action: 'download',
-    display: 'D',
-    label: 'Download image',
-    description: 'Download the current image without a Save As prompt.',
+    key: 'b',
+    action: 'capture-and-bookmark',
+    display: 'B',
+    label: 'Capture and bookmark',
+    description: 'Capture the original and save it as a durable bookmark.',
+    group: 'capture',
   },
   {
-    key: 'D',
-    shift: true,
-    action: 'download-save-as',
-    display: 'Shift+D',
-    label: 'Download with Save As',
-    description: 'Download the current image with a Save As prompt.',
-  },
-  {
-    key: 'G',
-    shift: true,
+    key: 'g',
     action: 'grab-mode-toggle',
-    display: 'Shift+G',
+    display: 'G',
     label: 'Grab mode',
     description: 'Start or stop target-image grab mode.',
+    group: 'capture',
   },
   {
-    key: 'Enter',
+    key: 'ArrowDown',
+    shift: false,
+    action: 'down-arrow',
+    display: '↓',
+    label: 'Assignable action',
+    description: 'Run Capture original or Download image, as assigned in Settings › Automation.',
+    group: 'capture',
+  },
+  {
+    key: '?',
     shift: true,
-    action: 'download-save-as',
-    display: 'Shift+Enter',
-    label: 'Download with Save As',
-    description: 'Download the current image with a Save As prompt.',
+    action: 'help-toggle',
+    display: '?',
+    label: 'Toggle Help',
+    description: 'Open or close the in-panel Help surface.',
+    group: 'panel',
   },
   {
-    key: 'r',
-    action: 'retry',
-    display: 'R',
-    label: 'Retry navigation',
-    description: 'Start retry automation for the current image.',
+    key: ',',
+    shift: false,
+    action: 'settings-toggle',
+    display: ',',
+    label: 'Open Settings',
+    description: 'Open or close the Settings destination.',
+    group: 'panel',
+  },
+  {
+    key: 'Escape',
+    shift: false,
+    action: 'close-surface',
+    display: 'Esc',
+    label: 'Close active surface',
+    description: 'Leave Help or a destination, then close the panel.',
+    group: 'panel',
   },
 ];
 
@@ -118,78 +131,55 @@ export const BROWSER_COMMAND_SHORTCUTS: readonly BrowserCommandShortcut[] = [
     action: 'next',
     label: 'Next trail step',
     description: 'Run the same action as ArrowRight on the active Image Trail panel.',
+    manifestDescription: 'Next Image Trail step (assign in browser shortcuts)',
   },
   {
     command: 'shortcut-previous',
     action: 'previous',
     label: 'Previous trail step',
     description: 'Run the same action as ArrowLeft on the active Image Trail panel.',
+    manifestDescription: 'Previous Image Trail step (assign in browser shortcuts)',
   },
   {
     command: 'shortcut-download',
     action: 'download',
     label: 'Download image',
     description: 'Download the current image without a Save As prompt.',
+    manifestDescription: 'Download current image (assign in browser shortcuts)',
   },
   {
     command: 'shortcut-download-save-as',
     action: 'download-save-as',
     label: 'Download with Save As',
     description: 'Download the current image with a Save As prompt.',
+    manifestDescription: 'Download current image with Save As (assign in browser shortcuts)',
   },
   {
     command: 'shortcut-slideshow-toggle',
     action: 'slideshow-toggle',
     label: 'Slideshow',
     description: 'Start, pause, or resume slideshow navigation.',
+    manifestDescription: 'Toggle Image Trail slideshow (assign in browser shortcuts)',
   },
   {
     command: 'shortcut-stop',
     action: 'stop',
     label: 'Stop automation',
     description: 'Stop active slideshow and retry automation.',
+    manifestDescription: 'Stop Image Trail automation (assign in browser shortcuts)',
   },
   {
     command: 'shortcut-grab-mode-toggle',
     action: 'grab-mode-toggle',
     label: 'Grab mode',
     description: 'Start or stop target-image grab mode.',
+    manifestDescription: 'Toggle Image Trail Grab Mode (assign in browser shortcuts)',
   },
   {
     command: 'shortcut-retry',
     action: 'retry',
     label: 'Retry navigation',
     description: 'Start retry automation for the current image.',
-  },
-];
-
-export const BROWSER_SHORTCUTS: readonly ShortcutReference[] = [
-  {
-    keys: ['Extension button', 'Browser shortcut'],
-    label: 'Open or hide panel',
-    description: 'Use the toolbar button or assign the Image Trail action in browser extension shortcuts.',
-  },
-  ...BROWSER_COMMAND_SHORTCUTS.map((shortcut) => ({
-    keys: ['Browser shortcut'],
-    label: shortcut.label,
-    description: shortcut.description,
-  })),
-  {
-    keys: ['Alt+Shift+B'],
-    label: 'Build identity overlay',
-    description: 'Toggle the local build identity overlay when build identity is available.',
-  },
-];
-
-export const LEGACY_SHORTCUT_DECISIONS: readonly ShortcutReference[] = [
-  {
-    keys: ['A-Z'],
-    label: 'Legacy field jumps not assigned',
-    description: 'Use field rows directly; Prev/Next and arrows step included navigable fields together.',
-  },
-  {
-    keys: ['H'],
-    label: 'Legacy grayscale hide not assigned',
-    description: 'Use P to hide the panel; selected-image styling remains controlled by target display settings.',
+    manifestDescription: 'Retry Image Trail navigation (assign in browser shortcuts)',
   },
 ];

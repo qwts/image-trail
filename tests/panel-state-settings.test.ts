@@ -157,6 +157,16 @@ test('updating request throttle settings only changes throttle policy state', ()
   assert.equal(updated.bookmarks, state.bookmarks);
 });
 
+test('updating the Down arrow assignment changes only the canonical shortcut setting', () => {
+  const state = createInitialPanelState(0);
+  const updated = reducePanelAction(state, { name: 'settings/update-down-arrow-action', value: 'download' });
+
+  assert.equal(updated.downArrowAction, 'download');
+  assert.equal(updated.target, state.target);
+  assert.equal(updated.history, state.history);
+  assert.equal(updated.bookmarks, state.bookmarks);
+});
+
 test('settings toggle opens and closes the panel settings section', () => {
   const opened = reducePanelAction(createInitialPanelState(), { name: 'settings/toggle' });
   assert.equal(opened.activeDestination, 'settings');

@@ -1,7 +1,8 @@
 import type { ActionEntries, AnyActionDef } from '../action-dispatch.js';
 import type { PanelActionDeps } from './deps.js';
+import { captureCurrentImageWithFeedback } from '../current-image-workflows.js';
 
-export type TransferActionName =
+type CaptureActionName =
   | 'capture/request'
   | 'capture/repair-selected'
   | 'capture/permission-retry'
@@ -12,7 +13,9 @@ export type TransferActionName =
   | 'blob-key/unlock'
   | 'blob-key/clear'
   | 'blob-key/export'
-  | 'blob-key/import'
+  | 'blob-key/import';
+
+type CloudExportActionName =
   | 'cloud-backup/connect'
   | 'cloud-backup/retry'
   | 'cloud-backup/disconnect'
@@ -24,7 +27,9 @@ export type TransferActionName =
   | 'export/image'
   | 'export/encrypted-image'
   | 'export/url-review-status'
-  | 'clear/url-review-status'
+  | 'clear/url-review-status';
+
+type ImportActionName =
   | 'import/history'
   | 'import/bookmarks'
   | 'import/url-review-status'
@@ -33,19 +38,36 @@ export type TransferActionName =
   | 'import/image'
   | 'import/encrypted-image';
 
+export type TransferActionName = CaptureActionName | CloudExportActionName | ImportActionName;
+
 /**
  * Capture, blob-key, cloud backup, and export/import flows — thin delegation to the
  * RecallExport/RecallRestore controllers extracted by #297, moved verbatim from the panel dispatch chain.
  */
 export function buildTransferActionEntries(deps: PanelActionDeps): ActionEntries<TransferActionName> {
-  const connectPCloud: AnyActionDef = {
-    handle() {
-      void deps.recallExport().connectPCloudBackup();
-    },
+  return {
+    ...buildCaptureActionEntries(deps),
+    ...buildCloudExportActionEntries(deps),
+    ...buildImportActionEntries(deps),
   };
+}
+
+function buildCaptureActionEntries(deps: PanelActionDeps): ActionEntries<CaptureActionName> {
   return {
     'capture/request': {
       handle(action) {
+        if (action.sourceType === 'target') {
+          void captureCurrentImageWithFeedback(
+            {
+              getState: deps.getState,
+              bookmarkCurrentImage: deps.bookmarkCurrentImage,
+              captureImage: (url) => deps.captureImage(url, 'target'),
+              showFeedback: deps.showFeedback,
+            },
+            action.url,
+          );
+          return;
+        }
         void deps.captureImage(action.url, action.sourceType, action.sourceRecordId);
       },
     },
@@ -100,6 +122,16 @@ export function buildTransferActionEntries(deps: PanelActionDeps): ActionEntries
         void deps.recallExport().importBlobKeyBackup(action.fileContent, action.password);
       },
     },
+  };
+}
+
+function buildCloudExportActionEntries(deps: PanelActionDeps): ActionEntries<CloudExportActionName> {
+  const connectPCloud: AnyActionDef = {
+    handle() {
+      void deps.recallExport().connectPCloudBackup();
+    },
+  };
+  return {
     'cloud-backup/connect': connectPCloud,
     'cloud-backup/retry': connectPCloud,
     'cloud-backup/disconnect': {
@@ -152,6 +184,11 @@ export function buildTransferActionEntries(deps: PanelActionDeps): ActionEntries
         void deps.clearUrlReviewStatus(action.scope ?? 'hostname');
       },
     },
+  };
+}
+
+function buildImportActionEntries(deps: PanelActionDeps): ActionEntries<ImportActionName> {
+  return {
     'import/history': {
       handle(action) {
         void deps.recallRestore().previewHistoryImport(action.fileContent, action.password, action.fileName);

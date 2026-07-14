@@ -21,6 +21,7 @@ function build(utilityChildren: readonly HTMLElement[] = [], actions: PanelActio
     { limit: 5_000, clearAfterExport: false },
     { minimumIntervalMs: 0, maxRequests: 3, windowMs: 10_000 },
     { enabled: false, radius: 3, cacheLimit: 24, probeMethod: 'get', feedback: 'mute' },
+    'capture',
     false,
     { privacy: [], utilities: utilityChildren },
     (action) => actions.push(action),
@@ -47,15 +48,22 @@ test('settings orchestrator preserves group and section order', () => {
     [
       ['Pins', 'Recents'],
       ['Private pins', 'Privacy', 'Searchable metadata'],
-      ['Request throttle', 'Preload', 'URL review status', 'Stepping presets', 'URL templates', 'Grab patterns'],
+      ['Keybindings', 'Request throttle', 'Preload', 'URL review status', 'Stepping presets', 'URL templates', 'Grab patterns'],
       [],
       ['Panel layout', 'Build identity', 'Storage health', 'Delete pins'],
     ],
   );
-  assert.deepEqual(
-    Array.from(view.querySelectorAll('h5')).map((heading) => heading.textContent),
-    ['Browser shortcuts', 'Panel shortcuts', 'Legacy keys'],
-  );
+  assert.equal(view.querySelector<HTMLSelectElement>('[aria-label="Down arrow action"]')?.value, 'capture');
+});
+
+test('Automation persists the assignable Down arrow through the named settings action', () => {
+  const actions: PanelAction[] = [];
+  const view = build([], actions);
+  const select = view.querySelector<HTMLSelectElement>('[aria-label="Down arrow action"]');
+  assert.ok(select);
+  select.value = 'download';
+  select.dispatchEvent(new Event('change'));
+  assert.deepEqual(actions, [{ name: 'settings/update-down-arrow-action', value: 'download' }]);
 });
 
 test('settings group open state survives a reconstructed view', () => {

@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8');
 const primitiveCss = read('extension/src/ui/styles/primitives.css');
 const feedbackCss = read('extension/src/ui/styles/feedback-primitives.css');
+const shortcutFeedbackCss = read('extension/src/ui/styles/shortcut-feedback.css');
 const panelShellCss = read('extension/src/ui/styles/panel-shell.css');
 const primaryWorkflowCss = read('extension/src/ui/styles/primary-workflow.css');
 const recordRowCss = read('extension/src/ui/styles/record-row.css');
@@ -13,7 +14,7 @@ const fieldsCss = read('extension/src/ui/styles/fields.css');
 const settingsSurfaceCss = read('extension/src/ui/styles/settings-surface.css');
 const settingsIntegrationsCss = read('extension/src/ui/styles/settings-integrations.css');
 const designSystemCss = read('extension/src/ui/styles/design-system.css');
-const css = `${primitiveCss}\n${feedbackCss}\n${panelShellCss}\n${primaryWorkflowCss}\n${recordRowCss}\n${fieldsCss}\n${settingsSurfaceCss}\n${settingsIntegrationsCss}`;
+const css = `${primitiveCss}\n${feedbackCss}\n${shortcutFeedbackCss}\n${panelShellCss}\n${primaryWorkflowCss}\n${recordRowCss}\n${fieldsCss}\n${settingsSurfaceCss}\n${settingsIntegrationsCss}`;
 const panel = read('extension/src/ui/styles/panel.css');
 const manifest = JSON.parse(read('extension/manifest.json')) as {
   web_accessible_resources: Array<{ resources: string[] }>;
@@ -86,12 +87,13 @@ test('panel packaging loads design-system stylesheets after tokens', () => {
   }
   assert.equal(
     designSystemCss,
-    "@import './tokens.css';\n@import './primitives.css';\n@import './feedback-primitives.css';\n@import './panel-shell.css';\n@import './primary-workflow.css';\n@import './record-row.css';\n@import './fields.css';\n@import './settings-surface.css';\n@import './settings-integrations.css';\n",
+    "@import './tokens.css';\n@import './primitives.css';\n@import './feedback-primitives.css';\n@import './shortcut-feedback.css';\n@import './panel-shell.css';\n@import './primary-workflow.css';\n@import './record-row.css';\n@import './fields.css';\n@import './settings-surface.css';\n@import './settings-integrations.css';\n",
   );
   const resources = manifest.web_accessible_resources.flatMap((entry) => entry.resources);
   assert.ok(resources.includes('src/ui/styles/design-system.css'));
   assert.ok(resources.includes('src/ui/styles/primitives.css'));
   assert.ok(resources.includes('src/ui/styles/feedback-primitives.css'));
+  assert.ok(resources.includes('src/ui/styles/shortcut-feedback.css'));
   assert.ok(resources.includes('src/ui/styles/panel-shell.css'));
   assert.ok(resources.includes('src/ui/styles/primary-workflow.css'));
   assert.ok(resources.includes('src/ui/styles/record-row.css'));

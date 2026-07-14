@@ -1,11 +1,15 @@
 import { reducePanelAction } from '../../core/actions.js';
 import type { PanelAction, PanelState } from '../../core/types.js';
 import { renderPanel, renderRecallDestination, type PanelLayoutState } from '../render.js';
-import { createToast } from '../components/primitives.js';
+import { createKbd, createToast } from '../components/primitives.js';
+import { renderPanelToast } from '../components/panel-shell-view.js';
 import { isFocusablePanelControl } from './export-download.js';
 import type { BufferedNavigationDebugSnapshot } from './buffered-navigation-controller.js';
 
 const FINITE_CAPTURE_ERROR_MS = 2400;
+const SHORTCUT_FEEDBACK_MS = 1400;
+
+type ShortcutFeedbackTone = 'success' | 'warning' | 'error';
 
 export interface PanelRenderControllerDeps {
   getState(): PanelState;
@@ -55,6 +59,8 @@ type FocusedPanelControlSnapshot = {
 export class PanelRenderController {
   private finiteCaptureErrorTimer: number | null = null;
   private bufferedNavigationToastTimer: number | null = null;
+  private shortcutFeedbackTimer: number | null = null;
+  private shortcutFeedback: { readonly message: string; readonly tone: ShortcutFeedbackTone } | null = null;
   private readonly layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
     fieldsPanelBlockSize: null,
@@ -124,6 +130,7 @@ export class PanelRenderController {
         },
         this.deps.getState(),
       );
+      this.renderShortcutFeedback();
       this.restoreFocusedPanelControl(focusedControl);
       if (!this.deps.getState().minimized && this.deps.panelStylesReady()) {
         this.deps.queuePanelPositionRestore();
@@ -194,6 +201,67 @@ export class PanelRenderController {
       }
       this.bufferedNavigationToastTimer = null;
     }, 1800);
+  }
+
+  showShortcutFeedback(message: string, tone: ShortcutFeedbackTone = 'success'): void {
+    if (!this.deps.root() || !this.deps.toastRoot()) return;
+    this.clearShortcutFeedbackTimer();
+    this.shortcutFeedback = { message, tone };
+    this.renderShortcutFeedback();
+    this.shortcutFeedbackTimer = window.setTimeout(() => {
+      this.shortcutFeedbackTimer = null;
+      this.shortcutFeedback = null;
+      this.restoreCaptureHint();
+      renderPanelToast(this.deps.toastRoot(), this.deps.getState());
+    }, SHORTCUT_FEEDBACK_MS);
+  }
+
+  clearShortcutFeedback(): void {
+    this.clearShortcutFeedbackTimer();
+    this.shortcutFeedback = null;
+    this.restoreCaptureHint();
+    const toastRoot = this.deps.toastRoot();
+    if (!toastRoot) return;
+    toastRoot.replaceChildren();
+    toastRoot.className = 'image-trail-panel-root image-trail-panel__toast-root';
+    delete toastRoot.dataset['imageTrailToastKey'];
+  }
+
+  private clearShortcutFeedbackTimer(): void {
+    if (this.shortcutFeedbackTimer === null) return;
+    window.clearTimeout(this.shortcutFeedbackTimer);
+    this.shortcutFeedbackTimer = null;
+  }
+
+  private renderShortcutFeedback(): void {
+    const toastRoot = this.deps.toastRoot();
+    if (!toastRoot || !this.shortcutFeedback) return;
+    const { message, tone } = this.shortcutFeedback;
+    const feedback = document.createElement('aside');
+    feedback.className = 'image-trail-panel__shortcut-feedback';
+    feedback.dataset['tone'] = tone;
+    feedback.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+    feedback.setAttribute('aria-live', tone === 'error' ? 'assertive' : 'polite');
+    feedback.textContent = message;
+    toastRoot.replaceChildren(feedback);
+    toastRoot.className = 'image-trail-panel-root image-trail-panel__toast-root has-shortcut-feedback';
+    delete toastRoot.dataset['imageTrailToastKey'];
+    this.renderCaptureHintFeedback(message, tone);
+  }
+
+  private renderCaptureHintFeedback(message: string, tone: ShortcutFeedbackTone): void {
+    if (!/^(Captured original|Pinned — unlock encryption)/u.test(message)) return;
+    const hint = this.deps.root()?.querySelector<HTMLElement>('.image-trail-panel__capture-hint');
+    if (!hint) return;
+    hint.replaceChildren(document.createTextNode(message));
+    hint.dataset['tone'] = tone;
+  }
+
+  private restoreCaptureHint(): void {
+    const hint = this.deps.root()?.querySelector<HTMLElement>('.image-trail-panel__capture-hint');
+    if (!hint || hint.dataset['tone'] === undefined) return;
+    hint.replaceChildren(document.createTextNode('Press '), createKbd('C'), document.createTextNode(' to capture the current image.'));
+    delete hint.dataset['tone'];
   }
 
   private captureFocusedPanelControl(): FocusedPanelControlSnapshot | null {

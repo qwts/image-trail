@@ -23,28 +23,28 @@
       "description": "Open or hide Image Trail panel"
     },
     "shortcut-next": {
-      "description": "Next trail step"
+      "description": "Next Image Trail step (assign in browser shortcuts)"
     },
     "shortcut-previous": {
-      "description": "Previous trail step"
+      "description": "Previous Image Trail step (assign in browser shortcuts)"
     },
     "shortcut-download": {
-      "description": "Download image"
+      "description": "Download current image (assign in browser shortcuts)"
     },
     "shortcut-download-save-as": {
-      "description": "Download with Save As"
+      "description": "Download current image with Save As (assign in browser shortcuts)"
     },
     "shortcut-slideshow-toggle": {
-      "description": "Slideshow"
+      "description": "Toggle Image Trail slideshow (assign in browser shortcuts)"
     },
     "shortcut-stop": {
-      "description": "Stop automation"
+      "description": "Stop Image Trail automation (assign in browser shortcuts)"
     },
     "shortcut-grab-mode-toggle": {
-      "description": "Grab mode"
+      "description": "Toggle Image Trail Grab Mode (assign in browser shortcuts)"
     },
     "shortcut-retry": {
-      "description": "Retry navigation"
+      "description": "Retry Image Trail navigation (assign in browser shortcuts)"
     },
     "toggle-build-info-overlay": {
       "suggested_key": {
@@ -78,6 +78,7 @@
         "src/ui/styles/design-system.css",
         "src/ui/styles/primitives.css",
         "src/ui/styles/feedback-primitives.css",
+        "src/ui/styles/shortcut-feedback.css",
         "src/ui/styles/panel-shell.css",
         "src/ui/styles/primary-workflow.css",
         "src/ui/styles/record-row.css",

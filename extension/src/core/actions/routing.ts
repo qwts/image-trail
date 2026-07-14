@@ -75,6 +75,7 @@ export const PANEL_ACTION_DOMAINS = {
   'settings/update-url-review-status-retention': 'settings',
   'settings/update-request-throttle': 'settings',
   'settings/update-neighbor-preload': 'settings',
+  'settings/update-down-arrow-action': 'settings',
   'neighbor-preload/manual': 'settings',
   'settings/reset-panel-position': 'settings',
   'settings/update-workspace-layout-restore': 'settings',

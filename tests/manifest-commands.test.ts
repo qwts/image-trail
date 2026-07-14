@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
+import { BROWSER_COMMAND_SHORTCUTS } from '../extension/src/core/keyboard-shortcuts.js';
+
 interface ExtensionCommandManifest {
   readonly icons?: Record<string, string>;
   readonly action?: {
@@ -100,20 +102,9 @@ test('manifest exposes the browser action in Chromium keyboard shortcuts', () =>
 
 test('manifest exposes assignable Image Trail action commands in Chromium keyboard shortcuts', () => {
   const commands = loadManifest().commands ?? {};
-  const expected = {
-    'shortcut-next': 'Next trail step',
-    'shortcut-previous': 'Previous trail step',
-    'shortcut-download': 'Download image',
-    'shortcut-download-save-as': 'Download with Save As',
-    'shortcut-slideshow-toggle': 'Slideshow',
-    'shortcut-stop': 'Stop automation',
-    'shortcut-grab-mode-toggle': 'Grab mode',
-    'shortcut-retry': 'Retry navigation',
-  };
-
-  for (const [name, description] of Object.entries(expected)) {
-    assert.equal(commands[name]?.description, description);
-    assert.equal(commands[name]?.suggested_key, undefined);
+  for (const shortcut of BROWSER_COMMAND_SHORTCUTS) {
+    assert.equal(commands[shortcut.command]?.description, shortcut.manifestDescription);
+    assert.equal(commands[shortcut.command]?.suggested_key, undefined);
   }
 });
 

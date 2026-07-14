@@ -121,9 +121,25 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().neighborPreloadRadius, 3);
   assert.equal(repository.load().neighborPreloadCacheLimit, 24);
   assert.equal(repository.load().neighborPreloadProbeMethod, 'get');
+  assert.equal(repository.load().downArrowAction, 'capture');
   assert.equal(repository.load().secondaryControlsOpen, false);
   repository.save({ ...DEFAULT_LOCAL_SETTINGS, pinSaveStoragePreference: 'plaintext' });
   assert.equal(repository.load().pinSaveStoragePreference, 'plaintext');
+});
+
+test('migrates the extension-owned Down arrow assignment safely', () => {
+  for (const value of ['capture', 'download', 'off'] as const) {
+    const repository = new LocalSettingsRepository({
+      getItem: () => JSON.stringify({ downArrowAction: value }),
+      setItem: () => {},
+    });
+    assert.equal(repository.load().downArrowAction, value);
+  }
+  const invalid = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ downArrowAction: 'open-tab' }),
+    setItem: () => {},
+  });
+  assert.equal(invalid.load().downArrowAction, DEFAULT_LOCAL_SETTINGS.downArrowAction);
 });
 
 test('migrates secondary controls disclosure local setting safely', () => {

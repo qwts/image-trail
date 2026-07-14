@@ -87,6 +87,7 @@ export class PanelSettingsController {
       neighborPreloadCacheLimit: settings.neighborPreloadCacheLimit,
       neighborPreloadProbeMethod: settings.neighborPreloadProbeMethod,
       loadFailureFeedback: settings.loadFailureFeedback,
+      downArrowAction: settings.downArrowAction,
       secondaryControlsOpen: settings.secondaryControlsOpen,
       restoreWorkspaceLayoutEnabled: settings.restoreWorkspaceLayout,
       lastUpdatedAt: Date.now(),
@@ -175,6 +176,13 @@ export class PanelSettingsController {
     if (mode === this.deps.getState().recentSparseRowDisplayMode) return;
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'settings/update-recent-sparse-row-display-mode', mode }));
     this.saveLocalSettings({ ...this.deps.getLocalSettings(), recentSparseRowDisplayMode: mode });
+    this.deps.render();
+  }
+
+  updateDownArrowAction(value: PlaintextLocalSettings['downArrowAction']): void {
+    if (value === this.deps.getState().downArrowAction) return;
+    this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'settings/update-down-arrow-action', value }));
+    this.saveLocalSettings({ ...this.deps.getLocalSettings(), downArrowAction: value });
     this.deps.render();
   }
 

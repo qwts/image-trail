@@ -138,6 +138,7 @@ test('loadLocalSettings syncs state, governor, and preview prefs from the store,
       requestThrottleWindowMs: 9_000,
       neighborPreloadEnabled: true,
       neighborPreloadRadius: 4,
+      downArrowAction: 'download',
       previewFillScreen: false,
       previewObjectFit: 'contain',
     },
@@ -163,6 +164,7 @@ test('loadLocalSettings syncs state, governor, and preview prefs from the store,
   assert.equal(state.recentHistoryRetainedLimit, 4);
   assert.equal(state.neighborPreloadEnabled, true);
   assert.equal(state.neighborPreloadRadius, 4);
+  assert.equal(state.downArrowAction, 'download');
   assert.equal(state.history.length, 2, 'history is trimmed to the new recentHistoryLimit');
   assert.deepEqual(state.selectedHistoryIds, ['a'], 'selected ids that fall outside the trimmed history are dropped');
   assert.deepEqual(harness.governorConfigs, [{ minimumIntervalMs: 250, maxRequests: 7, windowMs: 9_000 }]);
@@ -254,6 +256,19 @@ test('updateRecentSparseRowDisplayMode persists and renders only on a change', (
   changed.controller.updateRecentSparseRowDisplayMode('compact');
   assert.equal(changed.getState().recentSparseRowDisplayMode, 'compact');
   assert.equal(changed.getLocalSettings().recentSparseRowDisplayMode, 'compact');
+  assert.deepEqual(changed.log, ['render']);
+  assert.equal(changed.saved.length, 1);
+});
+
+test('updateDownArrowAction persists and renders only on a change', () => {
+  const unchanged = createHarness();
+  unchanged.controller.updateDownArrowAction('capture');
+  assert.deepEqual(unchanged.log, []);
+
+  const changed = createHarness();
+  changed.controller.updateDownArrowAction('download');
+  assert.equal(changed.getState().downArrowAction, 'download');
+  assert.equal(changed.getLocalSettings().downArrowAction, 'download');
   assert.deepEqual(changed.log, ['render']);
   assert.equal(changed.saved.length, 1);
 });

@@ -1,0 +1,49 @@
+.image-trail-panel-root.image-trail-panel__toast-root.has-shortcut-feedback {
+  inset-block-start: auto;
+  inset-inline-start: 0;
+  inset-inline-end: auto;
+  inset-block-end: 22px;
+  display: flex;
+  justify-content: center;
+  inline-size: 100vw;
+  transform: none;
+}
+
+.image-trail-panel-root .image-trail-panel__shortcut-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-inline-size: calc(100vw - 24px);
+  padding: 9px 15px;
+  border: 1px solid rgb(124 255 168 / 55%);
+  border-radius: 999px;
+  background: rgb(10 35 20 / 94%);
+  box-shadow:
+    0 10px 34px rgb(0 0 0 / 55%),
+    0 0 16px rgb(124 255 168 / 22%);
+  color: #daffe9;
+  font: 700 12px/1 var(--it-font-ui);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: image-trail-toast-enter var(--it-dur-fade) var(--it-ease-out);
+}
+
+.image-trail-panel-root .image-trail-panel__shortcut-feedback[data-tone='warning'] {
+  border-color: rgb(226 188 103 / 60%);
+  background: rgb(38 29 10 / 94%);
+  color: rgb(255 239 199);
+}
+
+.image-trail-panel-root .image-trail-panel__shortcut-feedback[data-tone='error'] {
+  border-color: rgb(255 112 112 / 60%);
+  background: rgb(42 14 16 / 96%);
+  color: rgb(255 226 226);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-trail-panel-root .image-trail-panel__shortcut-feedback {
+    animation: none;
+  }
+}

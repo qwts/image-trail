@@ -295,6 +295,32 @@
   overflow-wrap: anywhere;
 }
 
+.image-trail-panel-root .image-trail-ds__help .image-trail-panel__shortcut-list {
+  gap: var(--it-space-2);
+}
+
+.image-trail-panel-root .image-trail-ds__help .image-trail-ds__shortcut-row {
+  grid-template-columns: minmax(54px, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--it-space-6);
+  padding: var(--it-space-2);
+  border: 0;
+  background: transparent;
+}
+
+.image-trail-panel-root .image-trail-ds__help .image-trail-ds__shortcut-row .image-trail-panel__shortcut-body {
+  display: block;
+}
+
+.image-trail-panel-root .image-trail-ds__help .image-trail-ds__shortcut-row .image-trail-panel__shortcut-body span {
+  display: none;
+}
+
+.image-trail-panel-root .image-trail-ds__help .image-trail-ds__shortcut-row .image-trail-panel__shortcut-body strong {
+  font-size: var(--it-fs-base);
+  line-height: 1.35;
+}
+
 .image-trail-panel-root .image-trail-ds__help > h4 {
   margin-block: var(--it-space-8) var(--it-space-4);
 }

@@ -70,6 +70,7 @@ export function createSettingsSection(
       probeMethod: state.neighborPreloadProbeMethod,
       feedback: state.loadFailureFeedback,
     },
+    state.downArrowAction,
     state.restoreWorkspaceLayoutEnabled,
     {
       privacy: [

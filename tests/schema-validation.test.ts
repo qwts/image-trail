@@ -181,10 +181,12 @@ test('record schemas accept canonical fixtures and reject corrupted mutants with
   );
   assert.equal(v.is(saveLocalSettingsRequestSchema, { settings: omitKey(DEFAULT_LOCAL_SETTINGS, 'recentSparseRowDisplayMode') }), true);
   assert.equal(v.is(saveLocalSettingsRequestSchema, { settings: omitKey(DEFAULT_LOCAL_SETTINGS, 'pageContextOverrides') }), true);
+  assert.equal(v.is(saveLocalSettingsRequestSchema, { settings: omitKey(DEFAULT_LOCAL_SETTINGS, 'downArrowAction') }), true);
   assert.equal(
     v.is(saveLocalSettingsRequestSchema, { settings: { ...DEFAULT_LOCAL_SETTINGS, recentSparseRowDisplayMode: 'stretchy' } }),
     false,
   );
+  assert.equal(v.is(saveLocalSettingsRequestSchema, { settings: { ...DEFAULT_LOCAL_SETTINGS, downArrowAction: 'open-tab' } }), false);
   assert.equal(
     v.is(saveLocalSettingsRequestSchema, {
       settings: { ...DEFAULT_LOCAL_SETTINGS, pageContextOverrides: { 'example.test': { context: 'feed', updatedAt: 1 } } },

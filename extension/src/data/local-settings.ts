@@ -26,6 +26,7 @@ import {
 } from '../core/metadata-policy.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT, isObjectFitMode, type ObjectFitMode } from '../core/preview-style.js';
 import type { PinSaveStoragePreference, RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from '../core/types.js';
+import { isDownArrowAction, type DownArrowAction } from '../core/keyboard-shortcuts.js';
 import { sanitizePageContextOverrides, type PageContextOverrides } from '../core/page-context.js';
 import {
   DEFAULT_QUEUE_DISPLAY_ORDER,
@@ -63,6 +64,7 @@ export interface PlaintextLocalSettings {
   readonly neighborPreloadCacheLimit: number;
   readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly loadFailureFeedback: LoadFailureFeedback;
+  readonly downArrowAction: DownArrowAction;
   readonly secondaryControlsOpen: boolean;
   readonly restoreWorkspaceLayout: boolean;
   readonly pageContextOverrides: PageContextOverrides;
@@ -95,6 +97,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   neighborPreloadCacheLimit: DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
   neighborPreloadProbeMethod: 'get',
   loadFailureFeedback: DEFAULT_LOAD_FAILURE_FEEDBACK,
+  downArrowAction: 'capture',
   secondaryControlsOpen: false,
   restoreWorkspaceLayout: false,
   pageContextOverrides: {},
@@ -195,6 +198,7 @@ export function migrateLocalSettings(input: LocalSettingsMigrationInput): Plaint
     loadFailureFeedback: isLoadFailureFeedback(input.loadFailureFeedback)
       ? input.loadFailureFeedback
       : DEFAULT_LOCAL_SETTINGS.loadFailureFeedback,
+    downArrowAction: isDownArrowAction(input.downArrowAction) ? input.downArrowAction : DEFAULT_LOCAL_SETTINGS.downArrowAction,
     secondaryControlsOpen: input.secondaryControlsOpen === true,
     restoreWorkspaceLayout: input.restoreWorkspaceLayout === true,
     pageContextOverrides: sanitizePageContextOverrides(input.pageContextOverrides),

@@ -26,6 +26,15 @@ function actionButton(
   return createButton({ label, ...options, ...(action ? { onClick: () => dispatch(action) } : {}) });
 }
 
+function slideshowPresentation(phase: ManualControlsViewOptions['state']['automation']['slideshowPhase']): {
+  readonly label: string;
+  readonly title: string;
+} {
+  if (phase === 'running') return { label: 'Pause slideshow', title: 'Pause slideshow — keep the current Trail position' };
+  if (phase === 'paused') return { label: 'Resume slideshow', title: 'Resume slideshow — continue stepping Trail fields' };
+  return { label: 'Start slideshow', title: 'Start slideshow — step Trail fields automatically' };
+}
+
 function createPrimaryWorkflow(state: ManualControlsViewOptions['state'], dispatch: ManualControlsViewOptions['dispatch']): HTMLElement {
   const noTarget = state.target.selectedUrl === null;
   const primary = document.createElement('div');
@@ -39,7 +48,7 @@ function createPrimaryWorkflow(state: ManualControlsViewOptions['state'], dispat
       dispatch,
       {
         ariaLabel: 'Capture original',
-        title: 'Capture original',
+        title: 'Capture original (C) — store the full-resolution original bytes as a Bookmark',
         variant: 'primary',
         waiting: state.captureInProgress,
         disabled: noTarget || state.captureInProgress,
@@ -51,12 +60,12 @@ function createPrimaryWorkflow(state: ManualControlsViewOptions['state'], dispat
   const phase = state.automation.slideshowPhase;
   const slideshowAction: PanelAction =
     phase === 'running' ? { name: 'slideshow-pause' } : phase === 'paused' ? { name: 'slideshow-resume' } : { name: 'slideshow-start' };
-  const slideshowLabel = phase === 'running' ? 'Pause slideshow' : phase === 'paused' ? 'Resume slideshow' : 'Start slideshow';
+  const slideshow = slideshowPresentation(phase);
   const slideshowActive = phase === 'running' || phase === 'paused';
   primary.append(
     actionButton(phase === 'running' ? '⏸ Slideshow' : '⏵ Slideshow', slideshowAction, dispatch, {
-      ariaLabel: slideshowLabel,
-      title: slideshowLabel,
+      ariaLabel: slideshow.label,
+      title: slideshow.title,
       active: slideshowActive,
       pressed: slideshowActive,
       disabled: noTarget && !slideshowActive,
@@ -66,7 +75,9 @@ function createPrimaryWorkflow(state: ManualControlsViewOptions['state'], dispat
     primary.append(
       actionButton('⌖ Grab', { name: state.target.grabModeActive ? 'grab-mode/stop' : 'grab-mode/start' }, dispatch, {
         ariaLabel: state.target.grabModeActive ? 'Stop Grab Mode' : 'Grab Mode',
-        title: state.target.grabModeActive ? 'Stop Grab Mode' : 'Start Grab Mode',
+        title: state.target.grabModeActive
+          ? 'Grab mode: ON — click host-page images to pin them'
+          : 'Grab mode — click host-page images to pin them',
         active: state.target.grabModeActive,
         pressed: state.target.grabModeActive,
       }),

@@ -1,14 +1,16 @@
 import type { ActionEntries, AnyActionDef } from '../action-dispatch.js';
 import type { PanelActionDeps } from './deps.js';
 
-export type PanelSettingsActionName =
+type PanelChromeActionName =
   | 'panel/secondary-controls-open'
   | 'panel/history-section-open'
   | 'panel/bookmarks-section-open'
   | 'panel/minimize'
   | 'panel/expand'
   | 'settings/toggle'
-  | 'help/toggle'
+  | 'help/toggle';
+
+type DisplaySettingsActionName =
   | 'settings/update-visible-bookmark-soft-max'
   | 'settings/update-recent-history-retention'
   | 'settings/update-recent-sparse-row-display-mode'
@@ -17,17 +19,30 @@ export type PanelSettingsActionName =
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
   | 'settings/update-metadata-policy'
-  | 'settings/update-build-info-overlay-visibility'
+  | 'settings/update-build-info-overlay-visibility';
+
+type AutomationSettingsActionName =
   | 'settings/update-url-review-status-retention'
   | 'settings/update-request-throttle'
   | 'settings/update-neighbor-preload'
+  | 'settings/update-down-arrow-action'
   | 'neighbor-preload/manual'
   | 'settings/reset-panel-position'
   | 'settings/update-workspace-layout-restore'
   | 'settings/reset-workspace-layout';
 
+export type PanelSettingsActionName = PanelChromeActionName | DisplaySettingsActionName | AutomationSettingsActionName;
+
 /** Panel chrome (minimize/expand, secondary controls) and the settings drawer. Bodies moved verbatim from the panel dispatch chain. */
 export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEntries<PanelSettingsActionName> {
+  return {
+    ...buildPanelChromeEntries(deps),
+    ...buildDisplaySettingsEntries(deps),
+    ...buildAutomationSettingsEntries(deps),
+  };
+}
+
+function buildPanelChromeEntries(deps: PanelActionDeps): ActionEntries<PanelChromeActionName> {
   // Shared by minimize/expand; the per-name conditionals around the common remount sequence are
   // preserved from the chain (minimize saves field state first, expand restores it last).
   const minimizeOrExpand: AnyActionDef = {
@@ -81,6 +96,11 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
         deps.render();
       },
     },
+  };
+}
+
+function buildDisplaySettingsEntries(deps: PanelActionDeps): ActionEntries<DisplaySettingsActionName> {
+  return {
     'settings/update-visible-bookmark-soft-max': {
       handle(action) {
         void deps.updateVisibleBookmarkSoftMax(action.value);
@@ -147,6 +167,11 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
         deps.render();
       },
     },
+  };
+}
+
+function buildAutomationSettingsEntries(deps: PanelActionDeps): ActionEntries<AutomationSettingsActionName> {
+  return {
     'settings/update-url-review-status-retention': {
       handle(action) {
         void deps.updateUrlReviewStatusRetention(action.limit, action.clearAfterExport);
@@ -160,6 +185,11 @@ export function buildPanelSettingsActionEntries(deps: PanelActionDeps): ActionEn
     'settings/update-neighbor-preload': {
       handle(action) {
         deps.updateNeighborPreload(action.enabled, action.radius, action.cacheLimit, action.probeMethod, action.loadFailureFeedback);
+      },
+    },
+    'settings/update-down-arrow-action': {
+      handle(action) {
+        deps.updateDownArrowAction(action.value);
       },
     },
     'neighbor-preload/manual': {

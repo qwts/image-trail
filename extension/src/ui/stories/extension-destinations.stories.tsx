@@ -17,6 +17,7 @@ import { renderReactSubtree } from '../react/react-subtree.js';
 
 const recalled = fn<(ids: readonly string[]) => void>();
 const saved = fn<(privacyModeEnabled: boolean) => void>();
+const savedDownArrowAction = fn<(value: string) => void>();
 const routes: readonly DestinationRouteLink[] = [
   { id: 'dashboard', href: '#dashboard' },
   { id: 'gallery', href: '#gallery' },
@@ -89,10 +90,14 @@ export const Settings: Story = {
   render: () => page('settings', <SettingsDestination services={services()} />),
   play: async ({ canvasElement }) => {
     saved.mockClear();
+    savedDownArrowAction.mockClear();
     const canvas = within(canvasElement);
     const privacy = await canvas.findByRole('checkbox', { name: 'Privacy mode' });
     await userEvent.click(privacy);
     await expect(saved).toHaveBeenCalledWith(true);
+    const downArrow = canvas.getByRole('combobox', { name: 'Down arrow action' });
+    await userEvent.selectOptions(downArrow, 'download');
+    await expect(savedDownArrowAction).toHaveBeenCalledWith('download');
   },
 };
 
@@ -178,7 +183,10 @@ function services(options: ServiceOptions = {}): DestinationServices {
       return { ok: true, records: [], failedCount: 0, message: 'Selected records moved to the front.' };
     },
     loadSettings: options.settingsFailure ? fail : async () => DEFAULT_LOCAL_SETTINGS,
-    saveSettings: async (settings) => saved(settings.privacyModeEnabled),
+    saveSettings: async (settings) => {
+      saved(settings.privacyModeEnabled);
+      savedDownArrowAction(settings.downArrowAction);
+    },
     loadBuildIdentity: async () => ({
       schemaVersion: 1,
       version: '0.6.0',
