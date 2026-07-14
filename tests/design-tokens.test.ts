@@ -6,7 +6,8 @@ import { resolve } from 'node:path';
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8');
 const tokens = read('extension/src/ui/styles/tokens.css');
 const panel = read('extension/src/ui/styles/panel.css');
-const gallery = read('extension/src/gallery/gallery.css');
+const galleryTokens = read('extension/src/gallery/gallery-tokens.css');
+const galleryHtml = read('extension/src/gallery/gallery.html');
 const manifest = JSON.parse(read('extension/manifest.json')) as {
   web_accessible_resources: Array<{ resources: string[] }>;
 };
@@ -48,9 +49,10 @@ test('panel and Gallery consume the same token source', () => {
   assert.match(panel, /^@import '\.\/tokens\.css';/u);
   assert.match(panel, /width:\s*min\(var\(--it-panel-width\),/u);
   assert.match(panel, /background:\s*var\(--it-panel-bg\);/u);
-  assert.match(gallery, /^@import '\.\.\/ui\/styles\/tokens\.css';/u);
-  assert.match(gallery, /--image-trail-gallery-panel:\s*var\(--it-panel-bg\);/u);
-  assert.match(gallery, /--image-trail-gallery-accent:\s*var\(--it-accent-row\);/u);
+  assert.match(galleryTokens, /^@import '\.\.\/ui\/styles\/tokens\.css';/u);
+  assert.match(galleryTokens, /--image-trail-gallery-panel:\s*var\(--it-panel-bg\);/u);
+  assert.match(galleryTokens, /--image-trail-gallery-accent:\s*var\(--it-accent-row\);/u);
+  assert.ok(galleryHtml.indexOf('gallery-tokens.css') < galleryHtml.indexOf('gallery.css'));
 });
 
 test('the injected stylesheet can load its token dependency', () => {
