@@ -11,7 +11,7 @@
         {
           "type": "unit-dom",
           "paths": ["tests/design-tokens.test.ts", "tests/panel-css.test.ts"],
-          "notes": "Covers the canonical token inventory, document and Shadow DOM scopes, panel and Gallery imports, Gallery compatibility aliases, web-accessible token loading, and preservation of existing panel layout contracts."
+          "notes": "Covers the canonical token inventory, document and Shadow DOM scopes, direct panel and Gallery imports, removal of Gallery-only aliases and global legacy controls, web-accessible token loading, and preservation of existing panel layout contracts."
         },
         {
           "type": "unit-dom",
@@ -158,6 +158,39 @@
       ]
     },
     {
+      "id": "design-system-gallery-acceptance",
+      "acceptance": "Shared design-system Gallery and final high-fidelity acceptance",
+      "repoPath": "docs/acceptance-tests/gallery-design-system.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Gallery-Design-System",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom/gallery-view.test.ts",
+            "tests/dom/gallery-focus.test.ts",
+            "tests/design-tokens.test.ts",
+            "tests/primitives-css.test.ts"
+          ],
+          "notes": "Covers Gallery composition with shared Button, IconButton, Input, Card, SectionHeader, StatusPill, and RecordRow primitives; canonical tokens without compatibility aliases; native form semantics; paging, search, album, locked/privacy, empty, loading, error, and independent per-card album states."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/stories/gallery-view.stories.ts",
+          "notes": "Covers populated, interactive, locked/private, empty, loading, error, narrow, and reduced-motion Gallery states using the production view factory."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/gallery-design-system.spec.ts",
+          "notes": "Covers the packaged extension Gallery with real durable IndexedDB records, shared primitive adoption, canonical queue order, debounced search, album creation and membership, native keyboard order with focus preserved through background refresh renders, narrow overflow, and reduced-motion behavior; verifies browsing, search, and album membership do not reorder the durable queue."
+        },
+        {
+          "type": "manual",
+          "reason": "Browser zoom, drag-and-drop affordances, and final visual comparison against the supplied mocked-tab reference require a packaged-extension inspection.",
+          "notes": "Open Gallery from the packaged panel and compare its dark extension-page shell, hierarchy, density, type, borders, glows, status, cards, and controls with the mocked-tab handoff. Exercise 200% zoom, keyboard-only navigation, album drag/drop, locked/private records, captured-original indicators, no-results and load-error states, reduced motion, and confirm no context rail, destination navigation, Recents, or failed stylesheet requests appear."
+        }
+      ]
+    },
+    {
       "id": "automation-keybindings-and-request-governance",
       "acceptance": "M08 automation, keybindings, and request governance",
       "wiki": "https://github.com/qwts/image-trail/wiki/User-Story-M08-Automation-Keybindings-And-Request-Governance",
@@ -234,8 +267,13 @@
           "notes": "Covers the panel open-gallery action, runtime message classification, bounded gallery paging controls, URL/data/blob activation decisions, and locked private-record disabling without implementing search, filters, or albums."
         },
         {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/gallery-design-system.spec.ts",
+          "notes": "Covers the packaged extension Gallery with durable records, shared design-system controls, canonical ordering, search, album membership, narrow layout, keyboard order, and reduced motion."
+        },
+        {
           "type": "manual",
-          "reason": "Cross-extension-tab activation and browser tab focus are covered manually until this flow is promoted to a focused Playwright extension-page spec.",
+          "reason": "The production toolbar gesture, cross-extension-tab focus, encrypted-original preview tab, and final visual comparison remain browser-level checks.",
           "notes": "Load the built extension, open the Queue menu, choose Open gallery, verify a dedicated extension tab lists only durable pins/bookmarks, URL-only rows open their saved URL, unlocked captured originals use encrypted preview, locked originals stay disabled, and Queue/Recents/Recall/pCloud/import-export state does not change while browsing."
         }
       ]
@@ -252,8 +290,13 @@
           "notes": "Covers gallery metadata matching, privacy-mode search masking, matched-result queue order, single-pass durable search loading, zero-as-unlimited gallery limit migration, draft search input handling, and the gallery search/page-limit controls."
         },
         {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/gallery-design-system.spec.ts",
+          "notes": "Covers debounced search and clear behavior over real durable IndexedDB records while preserving the canonical queue order."
+        },
+        {
           "type": "manual",
-          "reason": "Extension-page search over real durable IndexedDB records remains manual until the gallery page gets a focused Playwright extension-page spec.",
+          "reason": "The complete metadata matrix, privacy-mode term masking, and unlimited-result visual review remain manual browser checks.",
           "notes": "Load the built extension, open the gallery, save a finite gallery page limit and then 0, type host/filename/label/extension queries, verify search waits for a typing pause, results stay in queue order, no-match and cleared states are explicit, privacy mode hides URL/label matches, thumbnails crop from the top, and queue/Recents/Recall/pCloud/import-export state does not change."
         }
       ]
@@ -280,8 +323,13 @@
           "notes": "Covers durable album and membership stores, v8 IndexedDB migration/indexes, idempotent ordered membership add/remove without queueUpdatedAt changes, album and bookmark mutation notifications, gallery debounced refresh hooks, privacy-safe notification payloads, album message registry fallbacks, gallery album create/select/rename/delete controls, custom add-to-album popovers with independent per-card choices, add/remove membership actions, selected-album missing-record status, v2 full-backup album metadata export/import including album-only backups, duplicate UUID remapping, and explicit skipped membership reporting."
         },
         {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/gallery-design-system.spec.ts",
+          "notes": "Covers album creation, selection, per-card membership, selected-album filtering, and explicit verification that membership changes do not mutate durable queue order."
+        },
+        {
           "type": "manual",
-          "reason": "Extension-page album CRUD over real durable records remains manual until the gallery page gets a focused Playwright extension-page spec.",
+          "reason": "Rename/delete, drag-and-drop, concurrent external refresh, missing-membership recovery, and full-backup restore remain manual browser checks.",
           "notes": "Load the built extension, create captured and uncaptured durable records, open Gallery, pin/capture from another tab and verify the Gallery updates without browser refresh, create/rename/delete an album, add/remove records through the card popover, choose albums for several cards and apply one to verify other pending choices remain, drag a card onto an album chip, search from the header inside the selected album, verify missing/deleted referenced records are omitted with status text, confirm the gallery uses the dark panel palette and privacy mode still masks URL-derived record metadata, verify queue/Recall/Recents order is unchanged, then run pCloud/full-backup restore and verify albums restore without duplicating encrypted originals."
         }
       ]

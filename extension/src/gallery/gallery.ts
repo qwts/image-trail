@@ -15,6 +15,7 @@ import { galleryAlbumSummaries, galleryListStore, missingAlbumRecordCount, selec
 import { openActionForGalleryRecord } from './gallery-model.js';
 import { installGalleryLibraryRefreshHook } from './gallery-refresh.js';
 import { type GallerySearchPage, loadGallerySearchPage } from './gallery-search-loader.js';
+import { captureFocusedGalleryInput, restoreFocusedGalleryInput } from './gallery-focus.js';
 import { createGalleryView, type GalleryViewState } from './gallery-view.js';
 
 const bookmarkStore = new ExtensionBookmarkStore();
@@ -53,7 +54,9 @@ function root(): HTMLElement {
 }
 
 function render(options: { readonly focusSearch?: boolean } = {}): void {
-  root().replaceChildren(
+  const container = root();
+  const focusedInput = options.focusSearch ? null : captureFocusedGalleryInput(container);
+  container.replaceChildren(
     createGalleryView(state, {
       openRecord,
       createAlbum: (name) => {
@@ -90,6 +93,7 @@ function render(options: { readonly focusSearch?: boolean } = {}): void {
     }),
   );
   if (options.focusSearch) focusSearchInput();
+  else if (focusedInput) restoreFocusedGalleryInput(container, focusedInput);
 }
 
 async function loadPage(
