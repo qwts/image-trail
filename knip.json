@@ -4,13 +4,13 @@
     "extension/src/background/service-worker.ts",
     "extension/src/content/content-script.ts",
     "extension/src/gallery/gallery.ts",
-    "extension/src/ui/**/*.stories.ts",
+    "extension/src/ui/**/*.stories.{ts,tsx}",
     "tests/**/*.test.ts",
     "tests/dom/register.ts",
     "tests/e2e/**/*.spec.ts",
     "scripts/*.mjs"
   ],
-  "project": ["extension/src/**/*.ts", "scripts/**/*.mjs"],
+  "project": ["extension/src/**/*.{ts,tsx}", "scripts/**/*.mjs"],
   "ignore": [
     "extension/src/core/automation/navigation-queue.ts",
     "extension/src/data/import-export/key-import.ts",

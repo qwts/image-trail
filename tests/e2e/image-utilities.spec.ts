@@ -265,7 +265,7 @@ test('exports selected recents, queue rows, and Recall rows in UI order', async 
   await expect(page.locator('.image-trail-panel__bookmark-item.is-selected')).toHaveCount(0);
 
   await setVisiblePins(page, '1', 1);
-  await page.getByRole('button', { name: 'Recall' }).click();
+  await page.getByRole('button', { name: 'Recall', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Recall' })).toBeVisible();
   await page.getByRole('button', { name: 'Select all Recall' }).click();
   await exportImages(page, serviceWorker);

@@ -1,21 +1,25 @@
-import type { DetachableSectionId, PanelAction, PanelState } from '../core/types.js';
+import type { PanelState } from '../core/types.js';
 import { renderDetachedSections } from './detached-sections.js';
 import { attachedSectionElements, type DetachableSectionDefinition } from './section-registry.js';
 import { createBookmarksView } from './components/bookmarks-view.js';
-import type { DetachedWindowPosition } from './components/detachable-section.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHelpView } from './components/help-view.js';
 import { createHistoryView } from './components/history-view.js';
 import { createRecallDrawerView, type RecallDrawerGeometry } from './components/recall-drawer-view.js';
 import { createSettingsSection } from './settings-section.js';
 import { createStatusView } from './components/status-view.js';
-import { createTargetPickerView } from './components/target-picker-view.js';
+import { createTargetPickerView } from './react/target-picker-view.js';
 import { activeUrlFieldsForState } from './active-url-fields.js';
 import { createFieldEditorViewModel } from './field-editor-view-model.js';
 import { createManualControlsView } from './components/manual-controls-view.js';
-import { createMinimizedPanel, createPanelHeader, panelHasError, panelIsWaiting, renderPanelToast } from './components/panel-shell-view.js';
+import { createMinimizedPanel, panelHasError, panelIsWaiting, renderPanelToast } from './components/panel-shell-view.js';
+import { createPanelHeader } from './react/panel-header.js';
+import { unmountReactSubtrees } from './react/react-subtree.js';
+import type { PanelLayoutState, PanelRenderOptions, PanelRenderTarget } from './panel-render-types.js';
 
-import { createParsedFieldsSection, type NumericFieldDisplayMode } from './parsed-fields-section.js';
+import { createParsedFieldsSection } from './parsed-fields-section.js';
+
+export type { PanelLayoutState, PanelRenderOptions, PanelRenderTarget } from './panel-render-types.js';
 
 // PanelState is immutable per render, so the URL parse/tokenization is shared between the main
 // panel pass and the detached Settings renderer instead of running twice per render. Keyed by
@@ -39,39 +43,6 @@ function cachedFieldEditorViewModel(state: PanelState): ReturnType<typeof create
   const value = createFieldEditorViewModel(state, cachedActiveUrlFields(state));
   fieldEditorViewModelCache.set(state, { href, value });
   return value;
-}
-
-export interface PanelRenderTarget {
-  readonly root: HTMLElement;
-  readonly recallRoot?: HTMLElement | null;
-  readonly detachedRoot?: HTMLElement | null;
-  readonly toastRoot?: HTMLElement | null;
-  readonly dispatch: (action: PanelAction) => void;
-  readonly layoutState: PanelLayoutState;
-  readonly scrollAnchorId?: string | null;
-  readonly onPanelDragStart?: (event: PointerEvent) => void;
-  /** Fired when detached-window geometry or minimized state mutates, so per-site workspace persistence (issue #398) can save. */
-  readonly onWorkspaceLayoutChanged?: () => void;
-}
-
-export interface PanelRenderOptions {
-  readonly renderRecall?: boolean;
-}
-
-export interface PanelLayoutState {
-  fieldsPanelOpen: boolean;
-  fieldsPanelBlockSize: number | null;
-  historyListBlockSize: number | null;
-  fieldDisplayModes: Map<string, NumericFieldDisplayMode>;
-  detachedWindowPositions: Map<DetachableSectionId, DetachedWindowPosition>;
-  detachedWindowMinimized: Set<DetachableSectionId>;
-  /**
-   * Last-seen scrollTop of each collapsible record-list, keyed by its snapshot selector. The DOM
-   * scroll snapshot only bridges renders where the list exists before and after; collapse destroys
-   * the list, so its offset is parked here to survive the collapsed intermediate renders and is
-   * restored when the list reappears (#443). Session-transient, like the detached-window scroll.
-   */
-  collapsibleListScrollTops: Map<string, number>;
 }
 
 interface FocusedTextControlSnapshot {
@@ -240,6 +211,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
   target.root.classList.toggle('is-waiting', panelIsWaiting(state));
   target.root.classList.toggle('has-status-error', panelHasError(state));
   renderPanelToast(target.toastRoot, state);
+  unmountReactSubtrees(target.root);
   if (state.minimized) {
     target.root.replaceChildren(createMinimizedPanel(state, target.dispatch));
     if (target.recallRoot && options.renderRecall !== false) target.recallRoot.replaceChildren();
@@ -403,7 +375,6 @@ export function renderRecallDrawer(target: PanelRenderTarget, state: PanelState)
     });
   }
 }
-
 function recallDrawerGeometry(panelRoot: HTMLElement, side: 'left' | 'right'): RecallDrawerGeometry {
   const rect = panelRoot.getBoundingClientRect();
   const viewportWidth = window.innerWidth;

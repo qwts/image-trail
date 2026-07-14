@@ -5,7 +5,7 @@ import { createBadge, createButton, createSelect } from './primitives.js';
 
 let targetUtilityOpen: boolean | null = null;
 
-export function createTargetPickerView(
+export function createDomTargetPickerView(
   target: TargetState,
   dispatch: (action: PanelAction) => void,
   options: { readonly privacyMode?: boolean } = {},
@@ -22,6 +22,11 @@ export function createTargetPickerView(
     targetUtilityOpen = wrapper.open;
   });
 
+  wrapper.append(createTargetHeading(target), createTargetBody(target, dispatch, options.privacyMode === true));
+  return wrapper;
+}
+
+function createTargetHeading(target: TargetState): HTMLElement {
   const heading = document.createElement('summary');
   heading.className = 'image-trail-panel__target-summary image-trail-ds__section-header';
   const title = document.createElement('h3');
@@ -33,7 +38,10 @@ export function createTargetPickerView(
     className: 'image-trail-panel__target-count',
   });
   heading.append(title, summaryMeta);
+  return heading;
+}
 
+function createTargetBody(target: TargetState, dispatch: (action: PanelAction) => void, privacyMode: boolean): HTMLElement {
   const description = document.createElement('p');
   description.className = 'image-trail-panel__meta';
   description.textContent = target.grabModeActive
@@ -44,18 +52,23 @@ export function createTargetPickerView(
 
   const current = document.createElement('p');
   current.className = 'image-trail-panel__target-url';
-  if (options.privacyMode && target.selectedUrl) current.classList.add('is-privacy-masked');
+  if (privacyMode && target.selectedUrl) current.classList.add('is-privacy-masked');
   current.textContent =
-    options.privacyMode && target.selectedUrl
+    privacyMode && target.selectedUrl
       ? PRIVACY_URL_TEXT
       : target.selectedUrl?.startsWith('data:')
         ? 'data URL'
         : (target.selectedUrl ?? 'No host image selected yet.');
   current.title =
-    options.privacyMode && target.selectedUrl
-      ? 'Privacy mode is hiding this URL for screen sharing.'
-      : (target.selectedUrl ?? current.textContent);
+    privacyMode && target.selectedUrl ? 'Privacy mode is hiding this URL for screen sharing.' : (target.selectedUrl ?? current.textContent);
 
+  const body = document.createElement('div');
+  body.className = 'image-trail-panel__target-body';
+  body.append(description, current, createTargetActions(target, dispatch));
+  return body;
+}
+
+function createTargetActions(target: TargetState, dispatch: (action: PanelAction) => void): HTMLElement {
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__actions image-trail-ds__target-actions';
   let targetButton: HTMLButtonElement;
@@ -107,11 +120,5 @@ export function createTargetPickerView(
     });
     actions.append(dimensions);
   }
-
-  const body = document.createElement('div');
-  body.className = 'image-trail-panel__target-body';
-  body.append(description, current, actions);
-
-  wrapper.append(heading, body);
-  return wrapper;
+  return actions;
 }

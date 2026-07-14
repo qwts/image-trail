@@ -10,12 +10,19 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,
+    "jsx": "react-jsx",
     "noEmitOnError": true,
     "rootDir": "extension/src",
     "outDir": "extension/dist/src",
     "types": ["chrome"],
     "skipLibCheck": true
   },
-  "include": ["extension/src/**/*.ts"],
-  "exclude": ["extension/src/test-fixtures/**/*.ts", "extension/src/**/*.stories.ts", "extension/src/ui/stories/**/*.ts"]
+  "include": ["extension/src/**/*.ts", "extension/src/**/*.tsx"],
+  "exclude": [
+    "extension/src/test-fixtures/**/*.ts",
+    "extension/src/**/*.stories.ts",
+    "extension/src/**/*.stories.tsx",
+    "extension/src/ui/stories/**/*.ts",
+    "extension/src/ui/stories/**/*.tsx"
+  ]
 }

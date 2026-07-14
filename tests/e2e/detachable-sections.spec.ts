@@ -42,6 +42,7 @@ test('dragging the detach control places the window at the drop point and Escape
   await openPanel(page, serviceWorker);
 
   const detachControl = page.getByRole('button', { name: detachHistoryName });
+  await detachControl.scrollIntoViewIfNeeded();
   const box = await detachControl.boundingBox();
   expect(box).not.toBeNull();
   const startX = box!.x + box!.width / 2;
@@ -71,6 +72,7 @@ test('dragging a section by its heading detaches at the drop point, and Escape c
   await openPanel(page, serviceWorker);
 
   const heading = page.locator('.image-trail-panel__history-section .image-trail-panel__section-header h3');
+  await heading.scrollIntoViewIfNeeded();
   const box = await heading.boundingBox();
   expect(box).not.toBeNull();
   const startX = box!.x + box!.width / 2;

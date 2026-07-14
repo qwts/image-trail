@@ -4,7 +4,8 @@ import type { PanelAction, PanelState } from '../../core/types.js';
 import { createInitialPanelState } from '../../core/state.js';
 import { DEFAULT_SEARCHABLE_METADATA_POLICY } from '../../core/metadata-policy.js';
 import { createStatusView } from './status-view.js';
-import { createPanelHeader, panelHasError, panelIsWaiting, renderPanelToast } from './panel-shell-view.js';
+import { panelHasError, panelIsWaiting, renderPanelToast } from './panel-shell-view.js';
+import { createPanelHeader } from '../react/panel-header.js';
 import { bookmarkFixtures, recallState, recentFixtures } from '../stories/fixtures.js';
 import { mockDispatch, panelStory } from '../stories/story-host.js';
 

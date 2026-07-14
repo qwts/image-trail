@@ -49,7 +49,7 @@ function statusTone(state: PanelState): StatusTone {
   return 'ready';
 }
 
-export function createPanelHeader(state: PanelState, callbacks: PanelShellCallbacks): HTMLElement {
+export function createDomPanelHeader(state: PanelState, callbacks: PanelShellCallbacks): HTMLElement {
   const header = document.createElement('header');
   header.className = 'image-trail-panel__header image-trail-ds__panel-header';
 
