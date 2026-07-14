@@ -4,6 +4,7 @@ import type { Download, Page, Worker } from '@playwright/test';
 
 import {
   applyUrlInEditor,
+  closeSettings,
   expect,
   expectPanelClosed,
   expectPanelOpen,
@@ -12,6 +13,7 @@ import {
   fixtureUrl,
   imageNavigationSnapshot,
   openFixturePage,
+  openSettingsGroup,
   panelStatus,
   setLoadFailureFeedback,
   test,
@@ -69,21 +71,12 @@ async function openManualControls(page: Page): Promise<void> {
   }
 }
 
-async function openSettingsGroup(page: Page, name: string): Promise<void> {
-  const showSettings = page.getByRole('button', { name: 'Show settings' });
-  if ((await showSettings.count()) > 0) await showSettings.click();
-  const group = page.getByRole('heading', { name }).locator('xpath=ancestor::details[1]');
-  if (!(await group.evaluate((element) => element.hasAttribute('open')))) {
-    await page.getByRole('heading', { name }).click();
-  }
-}
-
 async function openImportExport(page: Page): Promise<void> {
   await openSettingsGroup(page, 'Import / Export');
 }
 
 async function openUrlLearning(page: Page): Promise<void> {
-  await openSettingsGroup(page, 'URL learning');
+  await openSettingsGroup(page, 'Automation');
 }
 
 async function setRequestThrottle(
@@ -100,11 +93,6 @@ async function setRequestThrottle(
   await throttle.getByRole('button', { name: 'Apply' }).click();
 }
 
-async function closeSettingsIfOpen(page: Page): Promise<void> {
-  const hideSettings = page.getByRole('button', { name: 'Hide settings' });
-  if ((await hideSettings.count()) > 0) await hideSettings.click();
-}
-
 async function deleteVisibleRecents(page: Page): Promise<void> {
   // An image load already in flight can re-add a recent right after the delete (worker
   // contention makes this reliable on CI runners); re-delete until the list stays empty.
@@ -119,6 +107,7 @@ async function clearAllUrlReviewStatus(page: Page): Promise<void> {
   await openImportExport(page);
   await page.getByRole('button', { name: 'Clear all review status' }).click();
   await expectPanelStatusMessage(page, /Cleared \d+ URL review status records? for all sites\./u);
+  await closeSettings(page);
 }
 
 async function ensureQueryFieldIncluded(page: Page, fieldName: string): Promise<void> {
@@ -180,6 +169,7 @@ async function exportUrlReviewStatus(
   const fileContent = await readFile(filePath!, 'utf8');
   await expectPanelStatusMessage(page, /Exported \d+ URL review status record\(s\)\./u);
   const exported = JSON.parse(fileContent) as { readonly records: readonly UrlReviewStatusRecord[] };
+  await closeSettings(page);
   return { download, fileContent, records: normalizeUrlReviewRecords(exported.records) };
 }
 
@@ -193,6 +183,7 @@ async function importUrlReviewStatus(page: Page, fileContent: string): Promise<v
   await expect(importExport.locator('.image-trail-panel__restore-preview')).toContainText('URL review status');
   await importExport.getByRole('button', { name: 'Confirm import' }).click();
   await expectPanelStatusMessage(page, /Imported \d+ URL review status record\(s\).* saved to extension state\./u);
+  await closeSettings(page);
 }
 
 async function expectFrame(page: Page, frame: string): Promise<void> {
@@ -227,7 +218,7 @@ test('URL editor and parsed fields load, fail closed, navigate, learn templates,
   await setRequestThrottle(page, { minimumIntervalMs: '0', maxRequests: '100', windowMs: '1000' });
   // Alert mode so the direct fail-closed apply below still surfaces the red status + HTTP error (#450).
   await setLoadFailureFeedback(page, 'alert');
-  await closeSettingsIfOpen(page);
+  await closeSettings(page);
 
   await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=1'));
   await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?frame=1/u);
@@ -270,9 +261,9 @@ test('URL editor and parsed fields load, fail closed, navigate, learn templates,
   await expectPanelOpen(page);
   await openUrlLearning(page);
   await expect(savedTemplate).toHaveCount(1);
+  await closeSettings(page);
   await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=2'));
   await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?frame=2/u);
-  await closeSettingsIfOpen(page);
   await openParsedFields(page);
   await expect(page.getByLabel(/Edit .*frame/u)).toHaveValue('2');
 });
@@ -281,7 +272,7 @@ test('Reset all stays available across successful steps instead of flickering aw
   await installMultiParamImageRoute(page);
   await openPanel(page, serviceWorker);
   await setRequestThrottle(page, { minimumIntervalMs: '0', maxRequests: '100', windowMs: '1000' });
-  await closeSettingsIfOpen(page);
+  await closeSettings(page);
 
   // Distinct values from this serial spec's other tests, so the load is a real state change.
   await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?set=30&frame=70'));
@@ -319,7 +310,7 @@ test('previewing a recent clears the red failed-field marker left by a failed st
   await setRequestThrottle(page, { minimumIntervalMs: '0', maxRequests: '100', windowMs: '1000' });
   // Display mode so the failed step paints the red field ring this test then clears (#450).
   await setLoadFailureFeedback(page, 'display');
-  await closeSettingsIfOpen(page);
+  await closeSettings(page);
 
   await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?set=50&frame=97'));
   await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?set=50&frame=97/u);
@@ -367,7 +358,7 @@ test('a Next step that skips a dead run leaves no stray red field outline on the
   // Display mode: the red ring CAN appear while skipping, so this test meaningfully proves it is
   // reconciled away at rest rather than trivially absent (Mute would hide it either way) (#450).
   await setLoadFailureFeedback(page, 'display');
-  await closeSettingsIfOpen(page);
+  await closeSettings(page);
 
   await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=500'));
   await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?frame=500/u);
@@ -393,7 +384,7 @@ test('Mute (default) hides the red ring and error status a failed apply would sh
   await installDynamicImageRoute(page, ['404', '405']);
   await openPanel(page, serviceWorker);
   await setRequestThrottle(page, { minimumIntervalMs: '0', maxRequests: '100', windowMs: '1000' });
-  await closeSettingsIfOpen(page);
+  await closeSettings(page);
 
   await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=1'));
   await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?frame=1/u);
@@ -418,7 +409,7 @@ test('Prev/Next steps every included field together into one combined URL', asyn
   await installMultiParamImageRoute(page);
   await openPanel(page, serviceWorker);
   await setRequestThrottle(page, { minimumIntervalMs: '0', maxRequests: '100', windowMs: '1000' });
-  await closeSettingsIfOpen(page);
+  await closeSettings(page);
 
   await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?set=3&frame=7'));
   await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?set=3&frame=7/u);
@@ -453,7 +444,7 @@ test('URL review status export/import round trips without image-record side effe
   // Alert mode so the fail-closed apply surfaces the HTTP-error status this test waits on (#450).
   await setLoadFailureFeedback(page, 'alert');
   await clearAllUrlReviewStatus(page);
-  await closeSettingsIfOpen(page);
+  await closeSettings(page);
 
   await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=1'));
   await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?frame=1/u);

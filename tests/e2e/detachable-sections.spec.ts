@@ -131,16 +131,16 @@ test('the per-site workspace layout persists across a reload when opted in, and 
 }) => {
   await openPanel(page, serviceWorker);
 
-  const openMaintenanceGroup = async (): Promise<void> => {
+  const openSystemGroup = async (): Promise<void> => {
     const showSettingsButton = page.getByRole('button', { name: 'Show settings' });
     if ((await showSettingsButton.count()) > 0) await showSettingsButton.click();
-    const heading = page.getByRole('heading', { name: 'Maintenance' });
+    const heading = page.getByRole('heading', { name: 'System' });
     const group = heading.locator('xpath=ancestor::details[1]');
     if (!(await group.evaluate((element) => element.hasAttribute('open')))) await heading.click();
   };
 
-  // Opt in (Maintenance → Panel layout), then close settings to leave a clean panel.
-  await openMaintenanceGroup();
+  // Opt in (System → Panel layout), then close settings to leave a clean panel.
+  await openSystemGroup();
   const restoreToggle = page.getByLabel('Restore workspace layout per site');
   await restoreToggle.check();
   await page.getByRole('button', { name: 'Hide settings' }).click();
@@ -178,12 +178,14 @@ test('the per-site workspace layout persists across a reload when opted in, and 
   await expect(restoredWindow.locator('.image-trail-panel__detached-body')).toBeHidden();
 
   // Reset clears the saved layout for the site and reattaches the section.
-  await openMaintenanceGroup();
+  await openSystemGroup();
   await page.getByRole('button', { name: 'Reset workspace layout' }).click();
   await expect(restoredWindow).toHaveCount(0);
+  await page.getByRole('button', { name: 'Hide settings' }).click();
   await expect(page.getByRole('button', { name: detachHistoryName })).toBeVisible();
 
   // Leave the shared profile the way we found it: opt back out.
+  await openSystemGroup();
   await page.getByLabel('Restore workspace layout per site').uncheck();
 });
 

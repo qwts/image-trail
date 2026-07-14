@@ -1,5 +1,4 @@
 import type { PanelAction, PanelState } from '../../core/types.js';
-import { panelHasError, panelIsWaiting } from '../components/panel-shell-view.js';
 import { renderReactSubtree } from './react-subtree.js';
 
 interface PanelHeaderCallbacks {
@@ -28,18 +27,9 @@ function DockButton({ label, ariaLabel, glyph, active, onClick }: DockButtonProp
         {glyph}
       </span>
       <span>{label}</span>
+      <i className="image-trail-panel__dock-indicator" aria-hidden="true" />
     </button>
   );
-}
-
-function statusSummary(state: PanelState): string {
-  if (panelHasError(state)) return 'Needs attention';
-  if (state.captureInProgress) return 'Capturing';
-  if (state.importExportBusy) return 'Import/export';
-  if (state.recall.busy) return 'Recall loading';
-  if (panelIsWaiting(state)) return 'Working';
-  if (state.status === 'picking') return 'Picking';
-  return 'Ready';
 }
 
 function HeaderActions({ state, dispatch }: { readonly state: PanelState; readonly dispatch: (action: PanelAction) => void }) {
@@ -64,10 +54,15 @@ function HeaderActions({ state, dispatch }: { readonly state: PanelState; readon
   );
 }
 
+function statusLabel(state: PanelState): { readonly label: string; readonly tone: 'ready' | 'busy' | 'error' } {
+  if (state.status === 'error') return { label: 'Needs attention', tone: 'error' };
+  if (state.status === 'picking') return { label: 'Working', tone: 'busy' };
+  return { label: 'Ready', tone: 'ready' };
+}
+
 function PanelHeaderContent({ state, callbacks }: { readonly state: PanelState; readonly callbacks: PanelHeaderCallbacks }) {
-  const dashboardActive = !state.settingsOpen && !state.recall.open;
-  const status = statusSummary(state);
-  const statusClass = panelHasError(state) ? 'is-error' : panelIsWaiting(state) ? 'is-waiting' : 'is-ready';
+  const dashboardActive = !state.settingsOpen && !state.helpOpen && !state.recall.open;
+  const status = statusLabel(state);
   return (
     <>
       <div className="image-trail-panel__header-row">
@@ -77,22 +72,25 @@ function PanelHeaderContent({ state, callbacks }: { readonly state: PanelState; 
         >
           Image Trail
         </h2>
-        <span
-          className={`image-trail-panel__header-state image-trail-panel__header-status ${statusClass}`}
-          data-tone={panelHasError(state) ? 'error' : panelIsWaiting(state) ? 'busy' : 'ready'}
-          title={state.privacyModeEnabled ? status : state.message.trim() || status}
-        >
-          {status}
-        </span>
         <HeaderActions state={state} dispatch={callbacks.dispatch} />
+        <span
+          className={`image-trail-panel__header-state image-trail-panel__header-status image-trail-panel__status-announcer ${
+            status.tone === 'error' ? 'is-error' : status.tone === 'busy' ? 'is-waiting' : 'is-ready'
+          }`}
+          role="status"
+          data-tone={status.tone}
+          title={state.privacyModeEnabled ? 'Image Trail status updated.' : state.message}
+        >
+          {status.label}
+        </span>
       </div>
       <nav className="image-trail-panel__destination-dock" aria-label="Image Trail destinations">
-        <DockButton label="Dashboard" glyph="▦" active={dashboardActive} />
-        <DockButton label="Gallery" glyph="▧" active={false} onClick={() => callbacks.dispatch({ name: 'gallery/open' })} />
+        <DockButton label="Dashboard" glyph="◱" active={dashboardActive} />
+        <DockButton label="Gallery" glyph="▦" active={false} onClick={() => callbacks.dispatch({ name: 'gallery/open' })} />
         <DockButton
           label="Recall"
           ariaLabel={state.recall.open ? 'Close Recall' : 'Open Recall'}
-          glyph="⌕"
+          glyph="⟲"
           active={state.recall.open}
           onClick={() =>
             callbacks.dispatch(state.recall.open ? { name: 'recall/close' } : { name: 'recall/open', side: state.recall.side })
@@ -101,7 +99,7 @@ function PanelHeaderContent({ state, callbacks }: { readonly state: PanelState; 
         <DockButton
           label="Settings"
           ariaLabel={state.settingsOpen ? 'Hide settings' : 'Show settings'}
-          glyph="⌘"
+          glyph="⚙"
           active={state.settingsOpen}
           onClick={() => callbacks.dispatch({ name: 'settings/toggle' })}
         />

@@ -67,11 +67,12 @@
           "paths": [
             "tests/e2e/extension-smoke.spec.ts",
             "tests/e2e/automation-governance.spec.ts",
+            "tests/e2e/design-baseline.spec.ts",
             "tests/e2e/url-editor-parsed-fields.spec.ts",
             "tests/e2e/detachable-sections.spec.ts",
             "tests/e2e/react-renderer-boundary.spec.ts"
           ],
-          "notes": "Covers packaged-extension open/minimize/expand/close, Host selection, URL application, visible navigation and automation actions, More controls, detached windows, status refresh, and focus/scroll-preserving rerenders."
+          "notes": "Covers packaged-extension open/minimize/expand/close, approved standard and narrow panel geometry, deterministic handoff artifacts, capture feedback, grouped Settings and Help surfaces, Host selection, URL application, visible navigation and automation actions, More controls, detached windows, status refresh, and focus/scroll-preserving rerenders."
         },
         {
           "type": "manual",
@@ -716,7 +717,7 @@
             "tests/dom/automation-settings-view.test.ts",
             "tests/dom/maintenance-settings-view.test.ts"
           ],
-          "notes": "Covers #470 group ordering/open-state orchestration plus focused Display, Privacy, Automation, and Maintenance DOM/event contracts, including bounded single dispatch, metadata preservation, preload command ordering, storage rendering, and confirmed deletion."
+          "notes": "Covers #470 group ordering/open-state orchestration plus focused Display, Privacy, Automation, Utilities, and System DOM/event contracts, including bounded single dispatch, metadata preservation, preload command ordering, storage rendering, and confirmed deletion."
         }
       ]
     },

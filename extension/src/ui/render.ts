@@ -7,7 +7,6 @@ import { createHelpView } from './components/help-view.js';
 import { createHistoryView } from './components/history-view.js';
 import { createRecallDrawerView, type RecallDrawerGeometry } from './components/recall-drawer-view.js';
 import { createSettingsSection } from './settings-section.js';
-import { createStatusView } from './components/status-view.js';
 import { createTargetPickerView } from './react/target-picker-view.js';
 import { activeUrlFieldsForState } from './active-url-fields.js';
 import { createFieldEditorViewModel } from './field-editor-view-model.js';
@@ -16,8 +15,8 @@ import { createMinimizedPanel, panelHasError, panelIsWaiting, renderPanelToast }
 import { createPanelHeader } from './react/panel-header.js';
 import { unmountReactSubtrees } from './react/react-subtree.js';
 import type { PanelLayoutState, PanelRenderOptions, PanelRenderTarget } from './panel-render-types.js';
-
 import { createParsedFieldsSection } from './parsed-fields-section.js';
+import { createCompactStatusElements } from './components/status-view.js';
 
 export type { PanelLayoutState, PanelRenderOptions, PanelRenderTarget } from './panel-render-types.js';
 
@@ -207,6 +206,7 @@ function restoreScrollAnchor(container: HTMLElement, anchor: ScrollSnapshot['anc
 }
 
 export function renderPanel(target: PanelRenderTarget, state: PanelState, options: PanelRenderOptions = {}): void {
+  target.root.dataset['surface'] = state.helpOpen ? 'help' : state.settingsOpen ? 'settings' : 'dashboard';
   target.root.classList.toggle('is-minimized', state.minimized);
   target.root.classList.toggle('is-waiting', panelIsWaiting(state));
   target.root.classList.toggle('has-status-error', panelHasError(state));
@@ -221,16 +221,13 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
 
   const focusedTextControl = focusedTextControlSnapshot(target.root);
   const scrollPositions = scrollSnapshots(target.root, target.layoutState, target.scrollAnchorId);
-  const statusView = target.root.querySelector<HTMLElement>('.image-trail-panel__status-section');
-
   target.root.replaceChildren();
-
   target.root.append(
     createPanelHeader(state, {
       dispatch: target.dispatch,
       ...(target.onPanelDragStart ? { onPanelDragStart: target.onPanelDragStart } : {}),
     }),
-    createStatusView(state, target.dispatch, statusView),
+    ...createCompactStatusElements(state, target.dispatch),
     ...attachedSectionElements(SECTIONS, target, state),
   );
   restoreScrollSnapshots(target.root, scrollPositions, target.layoutState);
@@ -240,11 +237,7 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState, option
   if (options.renderRecall !== false) renderRecallDrawer(target, state);
 }
 
-/**
- * The section registry (issue #408): the single declaration of every detachable panel section, in
- * panel order. The attached composition, detach controls, surface drag-out, placeholders, and
- * floating windows all derive from these entries — adding a section here is all it takes.
- */
+// Single declaration for attached composition, detach controls, placeholders, and windows (#408).
 const SECTIONS: readonly DetachableSectionDefinition[] = [
   {
     id: 'settings',
@@ -266,11 +259,13 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [
   {
     id: 'target',
     title: 'Host target',
+    attachedVisible: dashboardSectionVisible,
     create: (target, state) => createTargetPickerView(state.target, target.dispatch, { privacyMode: state.privacyModeEnabled }),
   },
   {
     id: 'url-editor',
     title: 'URL editor',
+    attachedVisible: dashboardSectionVisible,
     create: (target, state) =>
       createUrlEditorView(
         { url: cachedActiveUrlFields(state).activeUrl, privacyMode: state.privacyModeEnabled },
@@ -288,12 +283,17 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [
     id: 'fields',
     title: 'Field Editor',
     windowInlineSize: 380,
+    attachedVisible: dashboardSectionVisible,
     create: (target, state) => createParsedFieldsSection(cachedFieldEditorViewModel(state), target),
   },
-  { id: 'controls', title: 'Manual controls', create: createManualControlsSection },
-  { id: 'history', title: 'Recent history', create: createHistorySection },
-  { id: 'bookmarks', title: 'Queue', create: createBookmarksSection },
+  { id: 'controls', title: 'Manual controls', attachedVisible: dashboardSectionVisible, create: createManualControlsSection },
+  { id: 'history', title: 'Recent history', attachedVisible: dashboardSectionVisible, create: createHistorySection },
+  { id: 'bookmarks', title: 'Queue', attachedVisible: dashboardSectionVisible, create: createBookmarksSection },
 ];
+
+function dashboardSectionVisible(state: PanelState): boolean {
+  return !state.settingsOpen && !state.helpOpen;
+}
 
 function createManualControlsSection(target: PanelRenderTarget, state: PanelState): HTMLElement {
   const fieldEditor = cachedFieldEditorViewModel(state);

@@ -1,0 +1,320 @@
+.image-trail-panel-root .image-trail-panel__settings-section > h3,
+.image-trail-panel-root .image-trail-panel__settings-section > .image-trail-panel__section-header > h3 {
+  color: #fff;
+}
+
+.image-trail-panel-root .image-trail-panel__encryption {
+  gap: 8px;
+}
+
+/* The attached Settings section is a layout-reserved scroll region (#367): it always occupies the
+   same block size while open, so expanding/collapsing a settings group reflows inside this box and
+   can never push the sections below it up or down (the click-target-under-pointer jump). Scoped to
+   the panel's direct child so a detached Settings window keeps its natural window-sized layout. */
+.image-trail-panel-root.image-trail-panel > .image-trail-panel__settings-section {
+  block-size: min(420px, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+/* Help shares the Settings reserved scroll-region pattern (#352): a bounded box that scrolls
+   internally, so opening it never makes controls jump and its content cannot fight the queue for
+   space. Scoped to the attached panel; a detached Help window keeps its natural layout. */
+.image-trail-panel-root.image-trail-panel > .image-trail-panel__help-section {
+  block-size: min(420px, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.image-trail-panel-root .image-trail-panel__help-features {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__help-features dt {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.image-trail-panel-root .image-trail-panel__help-features dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-summary::-webkit-details-marker {
+  display: none;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-header h4 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-header::after {
+  content: 'Show';
+  margin-left: auto;
+  color: #999;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-section[open] .image-trail-panel__settings-utility-header::after {
+  content: 'Hide';
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-section:not([open]) > :not(summary) {
+  display: none;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-block-start: 7px;
+}
+
+.image-trail-panel-root .image-trail-panel__settings-utility-body > .image-trail-panel__settings-templates {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.image-trail-panel-root
+  .image-trail-panel__settings-utility-body
+  > .image-trail-panel__settings-templates
+  + .image-trail-panel__settings-templates {
+  padding-top: 7px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.image-trail-panel-root .image-trail-panel__section.is-waiting,
+.image-trail-panel-root .image-trail-panel__image-transfer:has(button.is-waiting),
+.image-trail-panel-root .image-trail-panel__import-export:has(button.is-waiting) {
+  border-color: rgb(139 246 220 / 24%);
+}
+
+.image-trail-panel-root .image-trail-panel__encryption-summary {
+  list-style: none;
+}
+
+.image-trail-panel-root .image-trail-panel__encryption-summary::-webkit-details-marker {
+  display: none;
+}
+
+.image-trail-panel-root .image-trail-panel__encryption-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__encryption-badge {
+  display: inline-grid;
+  place-items: center;
+  min-block-size: 22px;
+  margin-left: auto;
+  border: 1px solid rgb(89 255 178 / 34%);
+  border-radius: 5px;
+  background: rgb(89 255 178 / 10%);
+  color: rgb(216 255 236 / 90%);
+  padding: 3px 7px;
+  box-shadow: 0 0 10px rgb(89 255 178 / 12%);
+  font:
+    700 9px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  letter-spacing: 0.03em;
+}
+
+.image-trail-panel-root .image-trail-panel__encryption-badge.is-unlocked {
+  border-color: rgb(89 255 178 / 48%);
+  background: rgb(89 255 178 / 14%);
+  box-shadow: 0 0 12px rgb(89 255 178 / 18%);
+}
+
+.image-trail-panel-root .image-trail-panel__encryption-badge.is-waiting {
+  border-color: rgb(139 246 220 / 62%);
+  background: rgb(139 246 220 / 14%);
+  color: rgb(230 255 249);
+  animation: image-trail-wait-badge 1050ms ease-in-out infinite;
+}
+
+.image-trail-panel-root .image-trail-panel__encryption-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgb(89 255 178 / 7%), transparent 48%), rgb(255 255 255 / 3%);
+}
+
+.image-trail-panel-root .image-trail-panel__encryption-body .image-trail-panel__actions {
+  justify-content: space-between;
+}
+
+.image-trail-panel-root .image-trail-panel__primary-action {
+  border-color: rgb(89 255 178 / 42%);
+  background: rgb(18 49 34 / 72%);
+  box-shadow: 0 0 10px rgb(89 255 178 / 14%);
+}
+
+.image-trail-panel-root .image-trail-panel__primary-action:hover:not(:disabled) {
+  background: rgb(24 64 45 / 84%);
+}
+
+.image-trail-panel-root .image-trail-panel__secondary-action {
+  color: #ccc;
+}
+
+.image-trail-panel-root .image-trail-panel__section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__actions,
+.image-trail-panel-root .image-trail-panel__item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Collapsible section headers (#438/#441): the WHOLE row is the toggle (summary ergonomics — the
+   hint area included), interactive children pass through, and the row stays the drag-out handle.
+   The doubled class selector outranks the --with-actions template regardless of rule order, so the
+   hint gets a real fourth column instead of auto-placing onto a stray row. */
+.image-trail-panel-root .image-trail-panel__section-header--with-actions.image-trail-panel__section-header--collapsible {
+  grid-template-columns: minmax(min-content, 1fr) minmax(0, max-content) max-content max-content;
+  cursor: pointer;
+}
+
+.image-trail-panel-root .image-trail-panel__section-header--collapsible::after {
+  content: 'Show';
+  inline-size: 30px;
+  text-align: end;
+  color: #999;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__section-header--collapsible[data-open='true']::after {
+  content: 'Hide';
+}
+
+/* The hint occupies the reserved hint column, so the detach control drops its stand-in margin. */
+.image-trail-panel-root .image-trail-panel__section-header--collapsible .image-trail-panel__section-detach {
+  margin-inline-end: 0;
+}
+
+/* Detached windows are their own container: no collapse there, so no hint either. */
+.image-trail-panel-root .image-trail-panel__detached-body .image-trail-panel__section-header--collapsible::after {
+  content: none;
+}
+
+/* Section headers that carry their action toolbar (#430): heading | toolbar | detach columns.
+   The toolbar column can compress, so on narrow panels its buttons wrap right-aligned INSIDE the
+   column while the detach control stays pinned to the top-right column (never orphan-wraps left). */
+.image-trail-panel-root .image-trail-panel__section-header--with-actions {
+  display: grid;
+  grid-template-columns: minmax(min-content, 1fr) minmax(0, max-content) max-content;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-toolbar,
+.image-trail-panel-root .image-trail-panel__history-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Keep bulk controls out of the collapsible heading grid: sorting remains in the header while
+   existing Queue/Recents actions stay available in a predictable row when the list is collapsed. */
+.image-trail-panel-root .image-trail-panel__section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-toolbar .image-trail-panel__primary-action {
+  text-align: center;
+}
+
+.image-trail-panel-root .image-trail-panel__record-sort-select {
+  box-sizing: border-box;
+  min-block-size: 28px;
+  max-inline-size: 124px;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 6px;
+  background: rgb(16 22 34 / 92%);
+  color: inherit;
+  font: inherit;
+}
+
+.image-trail-panel-root .image-trail-panel__record-sort-select:focus-visible {
+  outline: 2px solid rgb(114 207 255 / 88%);
+  outline-offset: 2px;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  min-width: 0;
+  max-width: 100%;
+  padding-block-start: 14px;
+  border-top: 1px solid rgb(255 255 255 / 10%);
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-status-row .image-trail-panel__meta {
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-pager {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__bookmark-pager button {
+  padding: 2px 7px;
+  border-color: rgb(255 255 255 / 18%);
+  background: rgb(255 255 255 / 5%);
+  color: #ddd;
+  font-size: 11px;
+}

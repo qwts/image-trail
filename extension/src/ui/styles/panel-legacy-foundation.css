@@ -1,0 +1,397 @@
+.image-trail-panel-root.image-trail-panel {
+  all: initial;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--it-space-6);
+  width: min(var(--it-panel-width), calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  inline-size: min(var(--it-panel-width), calc(100vw - 24px));
+  max-inline-size: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  contain: layout inline-size style paint;
+  isolation: isolate;
+  padding: var(--it-panel-pad);
+  border: 1px solid var(--it-border-panel);
+  border-radius: var(--it-radius-panel);
+  background: var(--it-panel-bg);
+  color: var(--it-text);
+  box-shadow: var(--it-shadow-panel);
+  font: var(--it-type-body);
+}
+
+.image-trail-panel-root.image-trail-panel__recall-drawer {
+  all: initial;
+  position: fixed;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: var(--it-space-6);
+  width: min(var(--it-drawer-width), calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  padding: var(--it-panel-pad);
+  border: 1px solid var(--it-border-panel);
+  border-radius: var(--it-radius-panel);
+  background: var(--it-drawer-bg);
+  color: var(--it-text);
+  box-shadow: var(--it-shadow-panel);
+  isolation: isolate;
+  font: var(--it-type-body);
+}
+
+.image-trail-panel-root.image-trail-panel__recall-drawer.is-left.is-opening {
+  animation: image-trail-recall-fade-in 160ms ease-out;
+}
+
+.image-trail-panel-root.image-trail-panel__recall-drawer.is-right.is-opening {
+  animation: image-trail-recall-fade-in 160ms ease-out;
+}
+
+@keyframes image-trail-recall-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.image-trail-panel-root.image-trail-panel__detached-window {
+  all: initial;
+  position: fixed;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--it-space-6);
+  width: min(var(--it-window-width), calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: min(70vh, calc(100vh - 24px));
+  overflow: hidden;
+  overscroll-behavior: contain;
+  padding: var(--it-panel-pad);
+  border: 1px solid var(--it-border-panel);
+  border-radius: var(--it-radius-panel);
+  background: var(--it-drawer-bg);
+  color: var(--it-text);
+  box-shadow: var(--it-shadow-panel);
+  isolation: isolate;
+  font: var(--it-type-body);
+}
+
+.image-trail-panel-root.image-trail-panel__detached-window.is-opening {
+  animation: image-trail-recall-fade-in 160ms ease-out;
+}
+
+.image-trail-panel-root.image-trail-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.image-trail-panel-root.image-trail-panel.has-status-error {
+  border-color: rgb(255 112 112 / 46%);
+  box-shadow:
+    0 8px 24px rgb(0 0 0 / 45%),
+    0 0 18px rgb(255 36 36 / 22%);
+  animation: image-trail-error-frame-glow 600ms ease-out 3;
+}
+
+.image-trail-panel-root.image-trail-panel.has-status-error::before {
+  content: none;
+}
+
+/* The frame rings live on the aside's own box-shadow, not a ::before overlay: the aside is the
+   scroll container, and an absolutely-positioned `inset: 0` ::before anchors to the scroll origin, so
+   its ring scrolls up and its bottom edge cuts across the middle of a scrolled panel. An inset
+   box-shadow is painted on the scrollport frame and stays pinned to the visible panel. */
+.image-trail-panel-root.image-trail-panel.has-buffered-skip-pulse {
+  box-shadow:
+    0 8px 24px rgb(0 0 0 / 45%),
+    inset 0 0 0 1px rgb(255 88 88 / 70%),
+    0 0 18px rgb(255 36 36 / 38%);
+  animation: image-trail-error-frame-glow 540ms ease-out 1;
+}
+
+.image-trail-panel-root.image-trail-panel.has-buffered-skip-pulse::before {
+  content: none;
+}
+
+.image-trail-panel-root.image-trail-panel.is-waiting:not(.has-status-error) {
+  border-color: rgb(139 246 220 / 44%);
+  box-shadow:
+    0 8px 24px rgb(0 0 0 / 45%),
+    inset 0 0 0 1px rgb(139 246 220 / 20%);
+}
+
+.image-trail-panel-root.image-trail-panel.is-waiting:not(.has-status-error)::before {
+  content: none;
+}
+
+.image-trail-panel-root.image-trail-panel.is-minimized {
+  top: 50% !important;
+  right: 12px !important;
+  left: auto !important;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: stretch;
+  width: 112px !important;
+  height: 34px !important;
+  min-width: 112px !important;
+  min-height: 34px !important;
+  max-width: 112px !important;
+  max-height: 34px !important;
+  width: 112px;
+  inline-size: 112px;
+  max-inline-size: 112px;
+  min-inline-size: 112px;
+  block-size: 34px;
+  min-block-size: 34px;
+  max-height: none;
+  overflow: visible;
+  contain: layout style paint;
+  padding: 0;
+  border-color: rgb(255 255 255 / 22%);
+  background: transparent;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 32%);
+}
+
+.image-trail-panel-root.image-trail-panel.is-minimized::before {
+  content: none;
+}
+
+@keyframes image-trail-error-frame-glow {
+  0%,
+  100% {
+    border-color: rgb(255 78 78 / 62%);
+  }
+
+  35% {
+    border-color: rgb(255 126 126 / 96%);
+  }
+}
+
+@keyframes image-trail-error-frame-pulse {
+  0% {
+    opacity: 0;
+  }
+
+  35% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes image-trail-error-toast-pulse {
+  0% {
+    box-shadow:
+      0 10px 28px rgb(0 0 0 / 46%),
+      0 0 0 rgb(255 36 36 / 0%),
+      inset 0 1px 0 rgb(255 255 255 / 10%);
+  }
+
+  35% {
+    box-shadow:
+      0 10px 28px rgb(0 0 0 / 46%),
+      0 0 24px rgb(255 36 36 / 42%),
+      inset 0 1px 0 rgb(255 255 255 / 10%);
+  }
+
+  100% {
+    box-shadow:
+      0 10px 28px rgb(0 0 0 / 46%),
+      0 0 0 rgb(255 36 36 / 0%),
+      inset 0 1px 0 rgb(255 255 255 / 10%);
+  }
+}
+
+@keyframes image-trail-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.image-trail-panel-root,
+.image-trail-panel-root * {
+  box-sizing: border-box;
+  max-inline-size: 100%;
+}
+
+.image-trail-panel-root > * {
+  min-width: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
+}
+
+.image-trail-panel-root .image-trail-panel__recall-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__recall-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.image-trail-panel-root p {
+  margin: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__meta,
+.image-trail-panel-root .image-trail-panel__storage-usage,
+.image-trail-panel-root .image-trail-panel__automation-status,
+.image-trail-panel-root .image-trail-panel__capture-status {
+  color: #999;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__status {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__target-url {
+  min-width: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.image-trail-panel-root .image-trail-panel__target-url {
+  color: #aaa;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.image-trail-panel-root .image-trail-panel__capture-error {
+  color: #f88;
+  font:
+    11px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__capture-status,
+.image-trail-panel-root .image-trail-panel__automation-status.is-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgb(193 255 240 / 92%);
+}
+
+.image-trail-panel-root .image-trail-panel__capture-status::before,
+.image-trail-panel-root .image-trail-panel__automation-status.is-waiting::before {
+  content: '';
+  flex: none;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 999px;
+  background: rgb(139 246 220);
+  box-shadow: 0 0 10px rgb(139 246 220 / 72%);
+  animation: image-trail-wait-dot 900ms ease-in-out infinite;
+}
+
+.image-trail-panel-root .image-trail-panel__section {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+  padding: 6px 0;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+}
+
+.image-trail-panel-root .image-trail-panel__status-section {
+  min-block-size: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__buffer-debug {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 6px 0 0;
+  background: linear-gradient(to top, rgb(31 31 31 / 96%), rgb(31 31 31 / 72%));
+}
+
+.image-trail-panel-root .image-trail-panel__buffer-debug-cell {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 18px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 999px;
+  color: #eee;
+  font:
+    600 9px/1 system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.image-trail-panel-root .image-trail-panel__buffer-debug-cell[data-status*='UNKNOWN'] {
+  background: #f5f5f5;
+  color: #1f1f1f;
+}
+
+.image-trail-panel-root .image-trail-panel__buffer-debug-cell[data-status*='PENDING'] {
+  background: #d6aa26;
+  color: #1f1f1f;
+}
+
+.image-trail-panel-root .image-trail-panel__buffer-debug-cell[data-status*='OK'] {
+  background: #2ca66a;
+}
+
+.image-trail-panel-root .image-trail-panel__buffer-debug-cell[data-status*='FAILED'] {
+  background: #c54949;
+}
+
+.image-trail-panel-root .image-trail-panel__buffer-debug-cell[data-status*='END'] {
+  background: #686868;
+}
+
+.image-trail-panel-root .image-trail-panel__buffer-debug-cell.is-current {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 1px rgb(88 166 255 / 70%);
+}

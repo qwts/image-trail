@@ -130,6 +130,9 @@ function waitingMessage(state: PanelState): string {
 function toastMessage(state: PanelState): string {
   const waiting = waitingMessage(state);
   if (waiting) return waiting;
+  if (state.captureResult?.status === 'captured') {
+    return state.privacyModeEnabled ? 'Captured original.' : state.message.trim() || 'Captured original.';
+  }
   if (!panelHasError(state)) return '';
   if (state.privacyModeEnabled) return 'Image Trail needs attention. Open the panel for details.';
   if (state.captureResult?.status === 'failed' || state.captureResult?.status === 'remote-only') {

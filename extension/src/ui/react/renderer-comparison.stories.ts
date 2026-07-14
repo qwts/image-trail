@@ -28,6 +28,9 @@ export const ReactProductionSlice: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Gallery' }));
     await expect(reactDispatch).toHaveBeenCalledWith({ name: 'gallery/open' });
 
+    const targetControls = canvasElement.querySelector<HTMLElement>('.image-trail-panel__target-controls-summary');
+    await expect(targetControls).not.toBeNull();
+    await userEvent.click(targetControls!);
     const release = canvas.getByRole('button', { name: 'Release host image' });
     release.focus();
     await expect(release).toHaveFocus();

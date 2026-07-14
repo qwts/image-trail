@@ -1,0 +1,151 @@
+import type { Locator, Page, TestInfo, Worker } from '@playwright/test';
+
+import { expect, expectPanelOpen, fixturePaths, openFixturePage, test, togglePanelFromExtensionAction } from './fixtures.js';
+
+const referenceViewport = { width: 924, height: 540 };
+const narrowViewport = { width: 360, height: 740 };
+const settingsGroups = [
+  ['Display', '11a-settings-display'],
+  ['Privacy', '12-settings-privacy'],
+  ['Automation', '13-settings-automation'],
+  ['Utilities', '14-settings-utilities'],
+  ['System', '15-settings-system'],
+] as const;
+
+async function openPanel(page: Page, serviceWorker: Worker, viewport = referenceViewport): Promise<Locator> {
+  await page.setViewportSize(viewport);
+  await openFixturePage(page, fixturePaths.singleImage);
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+  const panel = page.getByRole('dialog', { name: 'Image Trail panel' });
+  await hideBuildOverlay(page);
+  return panel;
+}
+
+async function captureArtifact(page: Page, testInfo: TestInfo, name: string): Promise<void> {
+  const path = testInfo.outputPath(`${name}.png`);
+  await page.screenshot({ path, animations: 'disabled' });
+  await testInfo.attach(name, { path, contentType: 'image/png' });
+}
+
+function settingsGroup(panel: Locator, name: string): Locator {
+  return panel
+    .locator('.image-trail-panel__settings-section > details.image-trail-panel__settings-utility-section', { hasText: name })
+    .first();
+}
+
+async function hideBuildOverlay(page: Page): Promise<void> {
+  const overlay = page.locator('#image-trail-build-identity-overlay');
+  if ((await overlay.count()) === 0) return;
+  await overlay.evaluate((element) => element.remove());
+  await expect(overlay).toHaveCount(0);
+}
+
+async function openSettings(page: Page, serviceWorker: Worker): Promise<Locator> {
+  const panel = await openPanel(page, serviceWorker);
+  await page.getByRole('button', { name: 'Show settings' }).click();
+  await expect(panel.locator('.image-trail-panel__settings-section')).toBeVisible();
+  return panel;
+}
+
+async function showOnlySettingsGroup(panel: Locator, targetName: string): Promise<void> {
+  for (const [name] of settingsGroups) {
+    const group = settingsGroup(panel, name);
+    const isOpen = (await group.getAttribute('open')) !== null;
+    if (isOpen !== (name === targetName)) await group.locator(':scope > summary').click();
+  }
+}
+
+async function setupEncryptedOriginals(page: Page, panel: Locator): Promise<void> {
+  await page.getByRole('button', { name: 'Show settings' }).click();
+  const privacy = settingsGroup(panel, 'Privacy');
+  if ((await privacy.getAttribute('open')) === null) await privacy.locator(':scope > summary').click();
+  const encryption = privacy.locator('details.image-trail-panel__encryption');
+  if ((await encryption.getAttribute('open')) === null) await encryption.locator(':scope > summary').click();
+  await page.getByLabel('New encrypted originals password').fill('visual acceptance password');
+  await page.getByRole('button', { name: 'Create first key' }).click();
+  await expect(encryption).toContainText('Unlocked');
+  await page.getByRole('button', { name: 'Hide settings' }).click();
+}
+
+async function clearEncryptedOriginals(page: Page, panel: Locator): Promise<void> {
+  await page.getByRole('button', { name: 'Show settings' }).click();
+  const privacy = settingsGroup(panel, 'Privacy');
+  if ((await privacy.getAttribute('open')) === null) await privacy.locator(':scope > summary').click();
+  const encryption = privacy.locator('details.image-trail-panel__encryption');
+  if ((await encryption.getAttribute('open')) === null) await encryption.locator(':scope > summary').click();
+  await encryption.getByRole('button', { name: 'Clear key' }).click();
+  await encryption.getByRole('button', { name: 'Confirm clear key' }).click();
+}
+
+test('panel shell matches the approved standard and narrow geometry', async ({ page, serviceWorker }, testInfo) => {
+  const panel = await openPanel(page, serviceWorker);
+  const box = await panel.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeCloseTo(12, 0);
+  expect(box!.y).toBeCloseTo(12, 0);
+  expect(box!.width).toBeCloseTo(420, 0);
+  await expect(panel.locator('.image-trail-panel__target-utility')).toContainText('Selected');
+  await expect(panel.locator('.image-trail-panel__dock-button')).toHaveCount(4);
+  await captureArtifact(page, testInfo, '01-panel');
+
+  await page.setViewportSize(narrowViewport);
+  await expect.poll(async () => (await panel.boundingBox())?.width ?? 0).toBeLessThanOrEqual(336);
+  expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await captureArtifact(page, testInfo, '01-panel-narrow');
+});
+
+test('successful original capture uses the approved bottom-center feedback', async ({ page, serviceWorker }, testInfo) => {
+  const panel = await openPanel(page, serviceWorker);
+  await setupEncryptedOriginals(page, panel);
+  await page.getByRole('button', { name: 'Capture original' }).click();
+  const toast = page.locator('.image-trail-panel__toast');
+  await expect(toast).toContainText(/Captured/u);
+  const box = await toast.boundingBox();
+  expect(box).not.toBeNull();
+  expect(Math.abs(box!.x + box!.width / 2 - referenceViewport.width / 2)).toBeLessThan(2);
+  await captureArtifact(page, testInfo, '03-capture-flash');
+  const capturedRow = panel.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
+  await capturedRow.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(capturedRow).toHaveCount(0);
+  await clearEncryptedOriginals(page, panel);
+});
+
+test('Settings presents the five approved groups as one reserved surface', async ({ page, serviceWorker }, testInfo) => {
+  const panel = await openSettings(page, serviceWorker);
+  await expect(panel.locator('.image-trail-panel__settings-section > details > summary')).toHaveText(settingsGroups.map(([name]) => name));
+  await captureArtifact(page, testInfo, '07-settings');
+});
+
+for (const [groupName, artifactName] of settingsGroups) {
+  test(`Settings ${groupName} group has a deterministic visual artifact`, async ({ page, serviceWorker }, testInfo) => {
+    const panel = await openSettings(page, serviceWorker);
+    await showOnlySettingsGroup(panel, groupName);
+    await expect(settingsGroup(panel, groupName)).toHaveAttribute('open', '');
+    await captureArtifact(page, testInfo, artifactName);
+  });
+}
+
+test('Help replaces dashboard content with the approved grouped surface', async ({ page, serviceWorker }, testInfo) => {
+  const panel = await openPanel(page, serviceWorker);
+  await page.getByRole('button', { name: 'Show help' }).click();
+  await expect(panel.locator('.image-trail-panel__help-section')).toBeVisible();
+  await expect(panel).toHaveAttribute('data-surface', 'help');
+  await captureArtifact(page, testInfo, '10-help');
+
+  await page.getByRole('button', { name: 'Show settings' }).click();
+  await expect(panel.locator('.image-trail-panel__settings-section')).toBeVisible();
+  await expect(panel.locator('.image-trail-panel__help-section')).toHaveCount(0);
+  await expect(panel).toHaveAttribute('data-surface', 'settings');
+
+  await page.getByRole('button', { name: 'Show help' }).click();
+  await expect(panel.locator('.image-trail-panel__help-section')).toBeVisible();
+  await expect(panel.locator('.image-trail-panel__settings-section')).toHaveCount(0);
+});
+
+test('detached Settings preserves the approved floating-window chrome', async ({ page, serviceWorker }, testInfo) => {
+  await openSettings(page, serviceWorker);
+  await page.getByRole('button', { name: 'Detach Settings into a floating window (drag to place)' }).click();
+  await expect(page.getByRole('dialog', { name: 'Settings (detached)' })).toBeVisible();
+  await captureArtifact(page, testInfo, '11-detached-windows');
+});

@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "handoff": {
+    "archive": "Image Trail Design System.zip",
+    "sha256": "5696d46897fcf6ca9ee50064c83d36b95c35a7c8448576df402eccefb6741e3d",
+    "received": "2026-07-14",
+    "referenceViewport": { "width": 924, "height": 540 },
+    "narrowViewport": { "width": 360, "height": 740 }
+  },
+  "entries": [
+    {
+      "id": "01-panel",
+      "file": "01-panel.png",
+      "status": "automated",
+      "issues": [540],
+      "scenario": "dashboard",
+      "test": "tests/e2e/design-baseline.spec.ts"
+    },
+    { "id": "02-mocked-tab", "file": "02-mocked-tab.png", "status": "deferred", "issues": [508] },
+    {
+      "id": "03-capture-flash",
+      "file": "03-capture-flash.png",
+      "status": "automated",
+      "issues": [540],
+      "scenario": "capture-feedback",
+      "test": "tests/e2e/design-baseline.spec.ts"
+    },
+    { "id": "04-dashboard", "file": "04-dashboard.png", "status": "deferred", "issues": [508] },
+    { "id": "05-gallery", "file": "05-gallery.png", "status": "deferred", "issues": [508] },
+    { "id": "06-recall", "file": "06-recall.png", "status": "deferred", "issues": [506, 508] },
+    {
+      "id": "07-settings",
+      "file": "07-settings.png",
+      "status": "automated",
+      "issues": [540],
+      "scenario": "settings",
+      "test": "tests/e2e/design-baseline.spec.ts"
+    },
+    { "id": "08-context-gallery", "file": "08-context-gallery.png", "status": "deferred", "issues": [506] },
+    { "id": "09-context-feed", "file": "09-context-feed.png", "status": "deferred", "issues": [506] },
+    {
+      "id": "10-help",
+      "file": "10-help.png",
+      "status": "automated",
+      "issues": [540],
+      "scenario": "help",
+      "test": "tests/e2e/design-baseline.spec.ts"
+    },
+    {
+      "id": "11-detached-windows",
+      "file": "11-detached-windows.png",
+      "status": "automated",
+      "issues": [540],
+      "scenario": "detached-settings",
+      "test": "tests/e2e/design-baseline.spec.ts"
+    },
+    {
+      "id": "11a-settings-display",
+      "file": "11a-settings-display.png",
+      "status": "automated",
+      "issues": [540],
+      "scenario": "settings-display",
+      "test": "tests/e2e/design-baseline.spec.ts"
+    },
+    {
+      "id": "12-settings-privacy",
+      "file": "12-settings-privacy.png",
+      "status": "automated",
+      "issues": [540],
+      "scenario": "settings-privacy",
+      "test": "tests/e2e/design-baseline.spec.ts"
+    },
+    {
+      "id": "13-settings-automation",
+      "file": "13-settings-automation.png",
+      "status": "automated",
+      "issues": [540],
+      "scenario": "settings-automation",
+      "test": "tests/e2e/design-baseline.spec.ts"
+    },
+    {
+      "id": "14-settings-utilities",
+      "file": "14-settings-utilities.png",
+      "status": "automated",
+      "issues": [540],
+      "scenario": "settings-utilities",
+      "test": "tests/e2e/design-baseline.spec.ts"
+    },
+    {
+      "id": "15-settings-system",
+      "file": "15-settings-system.png",
+      "status": "automated",
+      "issues": [540],
+      "scenario": "settings-system",
+      "test": "tests/e2e/design-baseline.spec.ts"
+    }
+  ]
+}

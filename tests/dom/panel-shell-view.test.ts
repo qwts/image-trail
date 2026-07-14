@@ -35,6 +35,21 @@ test('privacy mode keeps private URLs out of header and toast text, titles, and 
   assert.match(toastRoot.textContent ?? '', /Image Trail needs attention/u);
 });
 
+test('a successful capture renders the bottom-center success toast copy', () => {
+  const initial = createInitialPanelState(0);
+  const root = document.createElement('div');
+  renderPanelToast(root, {
+    ...initial,
+    visible: true,
+    status: 'ready',
+    message: 'Captured original and saved bookmark.',
+    captureResult: { status: 'captured', blobId: 'blob-1', mimeType: 'image/jpeg', byteLength: 2048 },
+  });
+
+  assert.match(root.textContent ?? '', /Captured original and saved bookmark/u);
+  assert.ok(root.querySelector('.image-trail-panel__toast'));
+});
+
 test('minimized panel preserves the expand action and active Grab Mode state', () => {
   const actions: PanelAction[] = [];
   const initial = createInitialPanelState(0);

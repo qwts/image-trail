@@ -9,6 +9,7 @@ import {
   fixtureUrl,
   imageNavigationSnapshot,
   openFixturePage,
+  openTargetControls,
   panelStatus,
   setLoadFailureFeedback,
   test,
@@ -26,7 +27,9 @@ async function expectSelectedImage(page: Parameters<typeof imageNavigationSnapsh
 async function openHostTargetDetails(page: Parameters<typeof imageNavigationSnapshot>[0]): Promise<void> {
   const release = page.getByRole('button', { name: 'Release host image' });
   if (await release.isVisible()) return;
-  await page.locator('.image-trail-panel__target-summary').click();
+  const target = page.locator('.image-trail-panel__target-utility');
+  if ((await target.getAttribute('open')) === null) await page.locator('.image-trail-panel__target-summary').click();
+  await openTargetControls(page);
   await expect(release).toBeVisible();
 }
 
@@ -136,7 +139,8 @@ test('the panel header Help toggle shows the shortcut reference and feature guid
   // (e.g. a row starting 'Browser shortcut…'), which trips strict mode with getByText.
   await expect(helpSection.getByRole('heading', { name: 'Panel shortcuts' })).toBeVisible();
   await expect(helpSection.getByRole('heading', { name: 'Browser shortcuts' })).toBeVisible();
-  await expect(helpSection.getByRole('heading', { name: 'Feature guide' })).toBeVisible();
+  await helpSection.getByRole('heading', { name: 'Workspace' }).click();
+  await expect(helpSection.getByText('Host target', { exact: true })).toBeVisible();
   // The label can render in both the panel list and the legacy-keys list; any one instance proves
   // the shared registry feeds Help.
   await expect(helpSection.locator('strong').filter({ hasText: 'Next trail step' }).first()).toBeVisible();
@@ -152,7 +156,7 @@ test('surfaces the build-info overlay toggle in Settings', async ({ page, servic
   await expectPanelOpen(page);
 
   await page.getByRole('button', { name: 'Show settings' }).click();
-  await page.getByText('Maintenance', { exact: true }).click();
+  await page.getByText('System', { exact: true }).click();
 
   const toggle = page.getByLabel('Show build info overlay');
   await expect(toggle).toBeVisible();
@@ -256,7 +260,8 @@ test('single-image page auto-selects the host target on panel open', async ({ pa
 
   await expectSelectedImage(page, primaryImage);
   await expectPanelStatusMessage(page, /Auto-selected .*asset-one\.svg/u);
-  await expect(page.locator('.image-trail-panel__target-badge')).toHaveText('180×120');
+  await expect(page.locator('.image-trail-panel__target-badge')).toHaveText('Selected');
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('single image');
   await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl(fixtureAssetPaths.assetOne));
 });
 
@@ -267,6 +272,7 @@ test('multi-image page requires picking and marks only the selected target', asy
   await expectPanelOpen(page);
 
   await expectPanelStatusMessage(page, '3 qualifying images found. Pick one target image.');
+  await openTargetControls(page);
   await page.getByRole('button', { name: 'Set host image' }).click();
   await expectPanelStatusMessage(page, 'Pick mode is active. 3 image candidates available.');
   await page.locator('#fixture-image-two').click();
@@ -275,6 +281,7 @@ test('multi-image page requires picking and marks only the selected target', asy
   await expect(page.locator('#fixture-image-one')).not.toHaveAttribute('data-image-trail-selected', 'true');
   await expect(page.locator('#fixture-image-three')).not.toHaveAttribute('data-image-trail-selected', 'true');
   await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl(fixtureAssetPaths.assetTwo));
+  await openTargetControls(page);
   await expect(page.getByRole('button', { name: 'Release host image' })).toBeVisible();
 });
 
@@ -348,7 +355,9 @@ test('recent preview projects into selected host image and guards repeated curre
   expect(projectedOne.src).toMatch(/^data:image\/svg\+xml;base64,/u);
   expect(projectedOne.src).not.toBe(projectedTwo.src);
 
-  await page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' }).dblclick();
+  // Enter exercises the repeated-preview guard with one activation. A synthetic second dblclick
+  // can lose its final event when the first click rerenders the row under Playwright.
+  await page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' }).press('Enter');
   await expectPanelStatusMessage(page, 'Recent image is already projected into the selected host element.');
   expect(await imageNavigationSnapshot(page, primaryImage)).toEqual(projectedOne);
 });

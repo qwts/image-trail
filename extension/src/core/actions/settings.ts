@@ -44,7 +44,12 @@ function pCloudBackupHistoryUpdate(backupHistory: PanelState['pcloudBackup']['ba
 export function reduceSettingsAction(state: PanelState, action: SettingsAction): PanelState {
   switch (action.name) {
     case 'settings/toggle':
-      return { ...state, settingsOpen: !state.settingsOpen, lastUpdatedAt: Date.now() };
+      return {
+        ...state,
+        settingsOpen: !state.settingsOpen,
+        helpOpen: state.settingsOpen ? state.helpOpen : false,
+        lastUpdatedAt: Date.now(),
+      };
     case 'settings/update-visible-bookmark-soft-max':
       return { ...state, bookmarkLimit: action.value, bookmarkOffset: 0, lastUpdatedAt: Date.now() };
     case 'settings/update-recent-history-retention': {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { createInitialPanelState } from '../../extension/src/core/state.js';
 import type { PanelAction } from '../../extension/src/core/types.js';
-import { createStatusView } from '../../extension/src/ui/components/status-view.js';
+import { createCompactStatusElements, createStatusView } from '../../extension/src/ui/components/status-view.js';
 
 function permissionState() {
   return {
@@ -35,6 +35,19 @@ test('permission-needed capture renders retry and dismiss actions', () => {
 
   buttons[0]?.click();
   buttons[1]?.click();
+  assert.deepEqual(actions, [{ name: 'capture/permission-retry' }, { name: 'capture/clear' }]);
+});
+
+test('compact panel status keeps permission retry and dismiss actions mounted', () => {
+  const actions: PanelAction[] = [];
+  const [view] = createCompactStatusElements(permissionState(), (action) => actions.push(action));
+  const buttons = Array.from(view?.querySelectorAll('button') ?? []);
+
+  assert.deepEqual(
+    buttons.map((button) => button.textContent),
+    ['Grant permission and retry', 'Dismiss'],
+  );
+  buttons.forEach((button) => button.click());
   assert.deepEqual(actions, [{ name: 'capture/permission-retry' }, { name: 'capture/clear' }]);
 });
 

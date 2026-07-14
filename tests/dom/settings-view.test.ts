@@ -22,7 +22,7 @@ function build(utilityChildren: readonly HTMLElement[] = [], actions: PanelActio
     { minimumIntervalMs: 0, maxRequests: 3, windowMs: 10_000 },
     { enabled: false, radius: 3, cacheLimit: 24, probeMethod: 'get', feedback: 'mute' },
     false,
-    utilityChildren,
+    { privacy: [], utilities: utilityChildren },
     (action) => actions.push(action),
   );
 }
@@ -31,12 +31,12 @@ test('settings orchestrator preserves group and section order', () => {
   const view = build();
   assert.ok(view.classList.contains('image-trail-ds__settings'));
   assert.ok(view.classList.contains('image-trail-ds__settings-surface'));
-  assert.equal(view.querySelectorAll(':scope > .image-trail-ds__settings-group').length, 6);
-  assert.equal(view.querySelectorAll(':scope > details .image-trail-ds__settings-group-header').length, 6);
+  assert.equal(view.querySelectorAll(':scope > .image-trail-ds__settings-group').length, 5);
+  assert.equal(view.querySelectorAll(':scope > details .image-trail-ds__settings-group-header').length, 5);
   assert.ok(view.querySelectorAll('.image-trail-ds__input, .image-trail-ds__select, .image-trail-ds__toggle').length > 0);
   assert.deepEqual(
     Array.from(view.querySelectorAll(':scope > details > summary h4')).map((heading) => heading.textContent),
-    ['Display', 'Privacy', 'Automation', 'Shortcuts', 'Maintenance', 'URL learning'],
+    ['Display', 'Privacy', 'Automation', 'Utilities', 'System'],
   );
   assert.deepEqual(
     Array.from(view.querySelectorAll(':scope > details')).map((group) =>
@@ -47,10 +47,9 @@ test('settings orchestrator preserves group and section order', () => {
     [
       ['Pins', 'Recents'],
       ['Private pins', 'Privacy', 'Searchable metadata'],
-      ['Request throttle', 'Preload', 'URL review status'],
+      ['Request throttle', 'Preload', 'URL review status', 'Stepping presets', 'URL templates', 'Grab patterns'],
       [],
       ['Panel layout', 'Build identity', 'Storage health', 'Delete pins'],
-      ['Stepping presets', 'URL templates', 'Grab patterns'],
     ],
   );
   assert.deepEqual(
@@ -76,12 +75,15 @@ test('settings group open state survives a reconstructed view', () => {
   automation.dispatchEvent(new Event('toggle'));
 });
 
-test('utility children remain after the six built-in groups and use the shared dispatch', () => {
+test('utility children remain inside the Utilities group and use the shared dispatch', () => {
   const utility = document.createElement('details');
   utility.dataset['testUtility'] = 'true';
   const actions: PanelAction[] = [];
   const view = build([utility], actions);
-  assert.equal(view.lastElementChild, utility);
+  const utilities = Array.from(view.querySelectorAll<HTMLDetailsElement>(':scope > details')).find((group) =>
+    group.querySelector('summary')?.textContent?.includes('Utilities'),
+  );
+  assert.equal(utilities?.querySelector(':scope > .image-trail-panel__settings-utility-body')?.lastElementChild, utility);
   const privacy = Array.from(view.querySelectorAll('label')).find((label) => label.textContent?.includes('Privacy mode'));
   const input = privacy?.querySelector('input');
   assert.ok(input);

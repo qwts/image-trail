@@ -1,6 +1,14 @@
 import type { Page, Worker } from '@playwright/test';
 
-import { expect, expectPanelOpen, fixturePaths, openFixturePage, test, togglePanelFromExtensionAction } from './fixtures.js';
+import {
+  expect,
+  expectPanelOpen,
+  fixturePaths,
+  openFixturePage,
+  openTargetControls,
+  test,
+  togglePanelFromExtensionAction,
+} from './fixtures.js';
 
 async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await openFixturePage(page, fixturePaths.singleImage);
@@ -41,6 +49,7 @@ test('React Host target keeps detached focus, actions, and subtree lifecycle sta
   await expect(targetWindow).toBeVisible();
   await expect(targetWindow.locator('[data-image-trail-react-root]')).toHaveCount(1);
 
+  await openTargetControls(page);
   const fit = targetWindow.getByRole('combobox', { name: 'Preview object fit' });
   await fit.focus();
   await fit.selectOption('cover');
