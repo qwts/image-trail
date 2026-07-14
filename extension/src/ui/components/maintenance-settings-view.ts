@@ -66,7 +66,7 @@ export function createStorageHealthSettingsView(storageUsage: StorageUsageSummar
 
 export function createDestructiveSettingsView(state: DestructiveSettingsState, dispatch: (action: PanelAction) => void): HTMLElement {
   const wrapper = document.createElement('div');
-  wrapper.className = 'image-trail-panel__settings-templates';
+  wrapper.className = 'image-trail-panel__settings-templates image-trail-ds__settings-danger';
   const heading = document.createElement('h4');
   heading.textContent = 'Delete pins';
   const meta = document.createElement('p');

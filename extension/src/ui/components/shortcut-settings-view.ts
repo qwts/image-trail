@@ -1,8 +1,9 @@
 import { BROWSER_SHORTCUTS, LEGACY_SHORTCUT_DECISIONS, PAGE_SHORTCUTS, type ShortcutReference } from '../../core/keyboard-shortcuts.js';
+import { createKbd } from './primitives.js';
 
 export function createShortcutSettingsView(): HTMLElement {
   const wrapper = document.createElement('div');
-  wrapper.className = 'image-trail-panel__settings-templates';
+  wrapper.className = 'image-trail-panel__settings-templates image-trail-ds__shortcut-reference';
 
   const browserHeading = document.createElement('h5');
   browserHeading.textContent = 'Browser shortcuts';
@@ -37,14 +38,12 @@ function createShortcutList(shortcuts: readonly ShortcutReference[]): HTMLElemen
 
 function createShortcutRow(shortcut: ShortcutReference): HTMLElement {
   const row = document.createElement('div');
-  row.className = 'image-trail-panel__shortcut-row';
+  row.className = 'image-trail-panel__shortcut-row image-trail-ds__shortcut-row';
 
   const keys = document.createElement('div');
   keys.className = 'image-trail-panel__shortcut-keys';
   for (const key of shortcut.keys) {
-    const keyChip = document.createElement('kbd');
-    keyChip.textContent = key;
-    keys.append(keyChip);
+    keys.append(createKbd(key));
   }
 
   const body = document.createElement('div');

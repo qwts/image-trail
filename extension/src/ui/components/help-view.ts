@@ -1,4 +1,6 @@
 import { createShortcutSettingsView } from './shortcut-settings-view.js';
+import { applySettingsPrimitiveContracts } from './settings-primitive-contracts.js';
+import { createSectionHeader } from './primitives.js';
 
 interface HelpFeatureEntry {
   readonly label: string;
@@ -58,13 +60,9 @@ const HELP_FEATURES: readonly HelpFeatureEntry[] = [
  */
 export function createHelpView(): HTMLElement {
   const section = document.createElement('section');
-  section.className = 'image-trail-panel__section image-trail-panel__help-section';
+  section.className = 'image-trail-panel__section image-trail-panel__help-section image-trail-ds__help';
 
-  const heading = document.createElement('h3');
-  heading.textContent = 'Help';
-  const header = document.createElement('div');
-  header.className = 'image-trail-panel__section-header';
-  header.append(heading);
+  const header = createSectionHeader({ title: 'Help', className: 'image-trail-panel__section-header' });
 
   const shortcutsHeading = document.createElement('h4');
   shortcutsHeading.textContent = 'Keyboard shortcuts';
@@ -83,5 +81,6 @@ export function createHelpView(): HTMLElement {
   }
 
   section.append(header, shortcutsHeading, createShortcutSettingsView(), featuresHeading, features);
+  applySettingsPrimitiveContracts(section);
   return section;
 }

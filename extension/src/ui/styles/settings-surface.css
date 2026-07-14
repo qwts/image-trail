@@ -1,0 +1,356 @@
+.image-trail-panel-root .image-trail-ds__settings-surface {
+  container-type: inline-size;
+  display: grid;
+  min-width: 0;
+  color: var(--it-text-3);
+}
+
+.image-trail-panel-root.image-trail-panel > .image-trail-ds__settings,
+.image-trail-panel-root.image-trail-panel > .image-trail-ds__help {
+  block-size: min(420px, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.image-trail-panel-root .image-trail-ds__settings > .image-trail-panel__section-header,
+.image-trail-panel-root .image-trail-ds__help > .image-trail-panel__section-header {
+  position: sticky;
+  z-index: 1;
+  inset-block-start: 0;
+  padding-block: var(--it-space-2) var(--it-space-6);
+  background: linear-gradient(var(--it-panel-bg), var(--it-panel-bg) 75%, transparent);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group,
+.image-trail-panel-root .image-trail-ds__settings-integration {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  padding-block-start: 0;
+  border-block-start: 1px solid var(--it-divider);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group > summary,
+.image-trail-panel-root .image-trail-ds__settings-integration > summary {
+  padding: var(--it-space-8) var(--it-space-1);
+  list-style: none;
+  cursor: pointer;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group > summary::-webkit-details-marker,
+.image-trail-panel-root .image-trail-ds__settings-integration > summary::-webkit-details-marker {
+  display: none;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group-header,
+.image-trail-panel-root .image-trail-ds__settings-integration .image-trail-panel__settings-utility-header {
+  display: flex;
+  align-items: center;
+  gap: var(--it-space-6);
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group-header h4,
+.image-trail-panel-root .image-trail-ds__settings-integration .image-trail-panel__settings-utility-header h4 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--it-text-3);
+  font: var(--it-type-heading);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group-header::before,
+.image-trail-panel-root .image-trail-ds__settings-integration .image-trail-panel__settings-utility-header::before {
+  content: '›';
+  flex: none;
+  inline-size: 12px;
+  color: var(--it-text-dim);
+  font-size: 13px;
+  text-align: center;
+  transition: transform var(--it-dur-fast) var(--it-ease);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group-header::after,
+.image-trail-panel-root .image-trail-ds__settings-integration .image-trail-panel__settings-utility-header::after {
+  content: none;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group[open] .image-trail-ds__settings-group-header::before,
+.image-trail-panel-root .image-trail-ds__settings-integration[open] .image-trail-panel__settings-utility-header::before {
+  transform: rotate(90deg);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group-body,
+.image-trail-panel-root .image-trail-ds__settings-integration > .image-trail-panel__settings-utility-body {
+  display: grid;
+  gap: var(--it-space-8);
+  min-width: 0;
+  padding: 0 var(--it-space-1) var(--it-space-12) 22px;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group:not([open]) > :not(summary),
+.image-trail-panel-root .image-trail-ds__settings-integration:not([open]) > :not(summary) {
+  display: none;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group-body > .image-trail-panel__settings-templates,
+.image-trail-panel-root .image-trail-ds__settings-integration .image-trail-panel__subsection {
+  display: grid;
+  gap: var(--it-space-5);
+  min-width: 0;
+  padding-block-start: var(--it-space-5);
+  border-block-start: 1px solid var(--it-divider-soft);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-group-body > .image-trail-panel__settings-templates:first-child,
+.image-trail-panel-root .image-trail-ds__settings-integration .image-trail-panel__subsection:first-child {
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+
+.image-trail-panel-root .image-trail-ds__settings h4,
+.image-trail-panel-root .image-trail-ds__help h4 {
+  margin: 0;
+  color: var(--it-text-3);
+  font: var(--it-type-heading);
+}
+
+.image-trail-panel-root .image-trail-ds__settings h5 {
+  margin: var(--it-space-6) 0 0;
+  color: var(--it-text-3);
+  font: var(--it-fw-bold) var(--it-fs-sm) / var(--it-lh-tight) var(--it-font-ui);
+  text-transform: uppercase;
+}
+
+.image-trail-panel-root .image-trail-ds__settings h5:first-child {
+  margin-block-start: 0;
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__settings-empty,
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__settings-template-meta,
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__meta,
+.image-trail-panel-root .image-trail-ds__help .image-trail-panel__meta {
+  margin: 0;
+  color: var(--it-text-dim);
+  font: var(--it-fs-xs) / 1.45 var(--it-font-ui);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-field,
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__settings-field {
+  display: grid;
+  gap: var(--it-space-2);
+  min-width: 0;
+  color: var(--it-text-3);
+  font: var(--it-type-label);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-label {
+  color: var(--it-text-dim);
+  font: var(--it-type-label);
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__form-field-help {
+  margin: 0;
+  color: var(--it-text-dim);
+  font: var(--it-fs-xs) / 1.45 var(--it-font-ui);
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__settings-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: var(--it-space-6);
+  align-items: end;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__settings-field--wide {
+  min-width: min(144px, 100%);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-ds__input,
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-ds__select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border-color: var(--it-border-control);
+  background: var(--it-input-bg);
+  color: var(--it-text);
+  font: var(--it-type-mono);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface textarea.image-trail-ds__input {
+  min-inline-size: 0;
+  resize: vertical;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface button.image-trail-ds__button {
+  min-height: var(--it-control-min-h);
+  border-color: var(--it-divider);
+  background: var(--it-control-bg-alt);
+  color: var(--it-text-3);
+  font: var(--it-type-micro);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface button.image-trail-ds__button:hover:not(:disabled) {
+  border-color: var(--it-focus);
+  background: var(--it-control-bg-hover);
+  color: var(--it-text);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface button.image-trail-ds__button[data-variant='primary'] {
+  border-color: var(--it-accent-btn-border);
+  background: var(--it-accent-btn-bg);
+  color: var(--it-text);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface button.image-trail-ds__button[data-variant='danger'],
+.image-trail-panel-root .image-trail-ds__settings-surface button.image-trail-ds__button.is-danger {
+  border-color: var(--it-danger-border);
+  background: var(--it-danger-bg);
+  color: var(--it-text);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface button.image-trail-ds__button:focus-visible,
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-ds__input:focus-visible,
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-ds__select:focus-visible,
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-ds__toggle input:focus-visible,
+.image-trail-panel-root .image-trail-ds__settings-file-button:focus-within {
+  border-color: var(--it-focus);
+  outline: var(--it-focus-ring);
+  outline-offset: var(--it-focus-offset);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface button.image-trail-ds__button:disabled,
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-ds__input:disabled,
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-ds__select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-ds__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--it-space-3);
+  width: fit-content;
+  max-width: 100%;
+  color: var(--it-text-3);
+  font: var(--it-type-label);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-ds__toggle input {
+  flex: none;
+  margin: 0;
+  accent-color: var(--it-accent-check);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-action-group {
+  display: grid;
+  gap: var(--it-space-3);
+  min-width: 0;
+  padding-block-start: var(--it-space-5);
+  border-block-start: 1px solid var(--it-divider-soft);
+}
+
+.image-trail-panel-root .image-trail-ds__settings-action-group:first-child {
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-caption {
+  margin: 0;
+  color: var(--it-text-muted);
+  font: var(--it-fw-medium) var(--it-fs-xs) / var(--it-lh-tight) var(--it-font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-panel__actions,
+.image-trail-panel-root .image-trail-ds__settings-surface .image-trail-panel__settings-template-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--it-space-4);
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__file-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--it-space-4);
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-ds__settings-file-button {
+  min-height: var(--it-control-min-h);
+  padding: var(--it-space-2) var(--it-space-5);
+  border: 1px solid var(--it-divider);
+  border-radius: var(--it-radius-control);
+  background: var(--it-control-bg-alt);
+  color: var(--it-text-3);
+  cursor: pointer;
+  font: var(--it-type-micro);
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__file-picker-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--it-text-muted);
+  font: var(--it-type-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__storage-health,
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__build-identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--it-space-3) var(--it-space-8);
+  min-width: 0;
+  margin: 0;
+  padding: var(--it-space-6) var(--it-space-8);
+  border: 1px solid var(--it-border-row);
+  border-radius: var(--it-radius-row);
+  background: var(--it-fill-3);
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__storage-health dt,
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__storage-health dd,
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__build-identity dt,
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__build-identity dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--it-text-dim);
+  font: var(--it-type-meta);
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__storage-health dt,
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__build-identity dt {
+  color: var(--it-text-3);
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__storage-health dd,
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__build-identity dd {
+  overflow-wrap: anywhere;
+  text-align: end;
+}
+
+@container (max-width: 360px) {
+  .image-trail-panel-root .image-trail-ds__settings-group-body,
+  .image-trail-panel-root .image-trail-ds__settings-integration > .image-trail-panel__settings-utility-body {
+    padding-inline-start: var(--it-space-8);
+  }
+
+  .image-trail-panel-root .image-trail-ds__settings .image-trail-panel__settings-template-extractors {
+    min-inline-size: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-trail-panel-root .image-trail-ds__settings-surface *,
+  .image-trail-panel-root .image-trail-ds__settings-surface *::before,
+  .image-trail-panel-root .image-trail-ds__settings-surface *::after {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}

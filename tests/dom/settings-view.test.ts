@@ -29,6 +29,11 @@ function build(utilityChildren: readonly HTMLElement[] = [], actions: PanelActio
 
 test('settings orchestrator preserves group and section order', () => {
   const view = build();
+  assert.ok(view.classList.contains('image-trail-ds__settings'));
+  assert.ok(view.classList.contains('image-trail-ds__settings-surface'));
+  assert.equal(view.querySelectorAll(':scope > .image-trail-ds__settings-group').length, 6);
+  assert.equal(view.querySelectorAll(':scope > details .image-trail-ds__settings-group-header').length, 6);
+  assert.ok(view.querySelectorAll('.image-trail-ds__input, .image-trail-ds__select, .image-trail-ds__toggle').length > 0);
   assert.deepEqual(
     Array.from(view.querySelectorAll(':scope > details > summary h4')).map((heading) => heading.textContent),
     ['Display', 'Privacy', 'Automation', 'Shortcuts', 'Maintenance', 'URL learning'],

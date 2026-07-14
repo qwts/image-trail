@@ -39,10 +39,10 @@ export function createPasswordField(options: PasswordControlOptions): {
   const descriptionId = `${id}-description`;
 
   const field = document.createElement('div');
-  field.className = 'image-trail-panel__form-field';
+  field.className = 'image-trail-panel__form-field image-trail-ds__settings-field';
 
   const label = document.createElement('label');
-  label.className = 'image-trail-panel__form-field-label';
+  label.className = 'image-trail-panel__form-field-label image-trail-ds__settings-label';
   label.htmlFor = id;
   label.textContent = options.label;
 
@@ -51,7 +51,7 @@ export function createPasswordField(options: PasswordControlOptions): {
   input.type = 'password';
   input.placeholder = options.placeholder;
   input.autocomplete = options.autocomplete;
-  input.className = 'image-trail-panel__password-input';
+  input.className = 'image-trail-panel__password-input image-trail-ds__input';
   input.disabled = options.disabled === true;
   input.setAttribute('aria-describedby', descriptionId);
 
@@ -70,11 +70,11 @@ export function createFilePickerField(options: FilePickerOptions): {
   const selectedId = `${id}-selected`;
 
   const field = document.createElement('div');
-  field.className = 'image-trail-panel__form-field';
+  field.className = 'image-trail-panel__form-field image-trail-ds__settings-field';
 
   const fieldLabel = document.createElement('span');
   fieldLabel.id = labelId;
-  fieldLabel.className = 'image-trail-panel__form-field-label';
+  fieldLabel.className = 'image-trail-panel__form-field-label image-trail-ds__settings-label';
   fieldLabel.textContent = options.label;
 
   const wrapper = document.createElement('div');
@@ -92,7 +92,7 @@ export function createFilePickerField(options: FilePickerOptions): {
 
   const buttonLabel = document.createElement('label');
   buttonLabel.id = buttonId;
-  buttonLabel.className = 'image-trail-panel__file-picker-button';
+  buttonLabel.className = 'image-trail-panel__file-picker-button image-trail-ds__settings-file-button';
   buttonLabel.htmlFor = id;
   buttonLabel.textContent = options.buttonText;
 

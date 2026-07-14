@@ -30,6 +30,7 @@ import { createRecentsSettingsView, type RecentHistorySettingsState } from './re
 import { createShortcutSettingsView } from './shortcut-settings-view.js';
 import { createGrabSourcePatternSettingsView, createTemplateSettingsView } from './url-learning-settings-view.js';
 import { createUrlSteppingPresetView } from './url-stepping-preset-view.js';
+import { applySettingsPrimitiveContracts } from './settings-primitive-contracts.js';
 
 export {
   createBuildIdentitySettingsView,
@@ -61,7 +62,7 @@ export function createSettingsView(
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
-  section.className = 'image-trail-panel__section image-trail-panel__settings-section';
+  section.className = 'image-trail-panel__section image-trail-panel__settings-section image-trail-ds__settings';
 
   const heading = document.createElement('h3');
   heading.textContent = 'Settings';
@@ -99,12 +100,13 @@ export function createSettingsView(
     ]),
     ...utilityChildren,
   );
+  applySettingsPrimitiveContracts(section);
   return section;
 }
 
 function createSettingsGroup(title: string, id: string, children: readonly HTMLElement[]): HTMLElement {
   const group = document.createElement('details');
-  group.className = 'image-trail-panel__settings-templates image-trail-panel__settings-utility-section';
+  group.className = 'image-trail-panel__settings-templates image-trail-panel__settings-utility-section image-trail-ds__settings-group';
   group.open = settingsGroupsOpen.get(id) ?? false;
   group.addEventListener('toggle', () => {
     settingsGroupsOpen.set(id, group.open);
@@ -113,13 +115,13 @@ function createSettingsGroup(title: string, id: string, children: readonly HTMLE
   const heading = document.createElement('h4');
   heading.textContent = title;
   const header = document.createElement('div');
-  header.className = 'image-trail-panel__settings-utility-header';
+  header.className = 'image-trail-panel__settings-utility-header image-trail-ds__settings-group-header';
   header.append(heading);
   const summary = document.createElement('summary');
   summary.className = 'image-trail-panel__settings-utility-summary';
   summary.append(header);
   const body = document.createElement('div');
-  body.className = 'image-trail-panel__settings-utility-body';
+  body.className = 'image-trail-panel__settings-utility-body image-trail-ds__settings-group-body';
   body.append(...children);
   group.append(summary, body);
   return group;
