@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.6.0
+
+### Minor Changes
+
+- e364853: Detect single-image, gallery, and feed page contexts, expose a capability-aware React context switcher, and persist explicit per-host overrides in extension-owned settings.
+
 ## 0.5.0
 
 ### Minor Changes
