@@ -29,13 +29,17 @@ export const ActiveField: Story = {
   render: () => fieldsStory({ activeFieldId: 'query-page' }),
 };
 
-export const IncludedAndExcluded: Story = {
+export const ActiveNonNavigableField: Story = {
+  render: () => fieldsStory({ activeFieldId: 'query-slug', successfulFieldIds: ['query-slug'] }),
+};
+
+export const IncludedNavigableAndNonNavigable: Story = {
   render: () =>
     fieldsStory({
       activeFieldId: 'query-color',
-      successfulFieldIds: ['query-page', 'query-color'],
+      successfulFieldIds: ['query-page', 'query-color', 'query-slug'],
       unchangedFieldIds: ['path-frame'],
-      unlockedFieldIds: ['query-page'],
+      unlockedFieldIds: ['query-page', 'query-slug'],
     }),
 };
 
@@ -70,7 +74,7 @@ export const PrivacyMasked: Story = {
 };
 
 export const Collapsed: Story = {
-  render: () => fieldsStory({ options: { open: false } }),
+  render: () => fieldsStory({ activeFieldId: 'query-page', options: { open: false } }),
 };
 
 export const Narrow: Story = {

@@ -1,28 +1,5 @@
-.image-trail-panel-root .image-trail-panel__field-input {
-  inline-size: 100%;
-  max-inline-size: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.image-trail-panel-root .image-trail-panel__field-width-input {
-  inline-size: 64px;
-  max-inline-size: 64px;
-  padding-inline: 4px;
-  text-align: center;
-}
-
-.image-trail-panel-root .image-trail-panel__field-list {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
-  list-style: none;
-}
-
 .image-trail-panel-root .image-trail-panel__fields {
+  container-type: inline-size;
   min-block-size: 0;
   overflow: visible;
 }
@@ -42,18 +19,40 @@
 .image-trail-panel-root .image-trail-panel__fields-summary {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--it-space-6);
   min-width: 0;
   list-style: none;
 }
 
-/* Reset controls sit against the fixed right-hand detach/hint columns (#430): they take over the
-   summary's SINGLE auto margin (two autos would split the free space and strand controls
-   mid-bar), so the detach control's auto is zeroed only when Reset all is present, and in a
-   detached window (no control) the hint's auto is zeroed the same way. */
+.image-trail-panel-root .image-trail-panel__fields-summary::-webkit-details-marker {
+  display: none;
+}
+
+.image-trail-panel-root .image-trail-panel__fields[open] .image-trail-panel__fields-summary::after {
+  content: 'Hide';
+}
+
+.image-trail-panel-root .image-trail-ds__field-summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--it-text-muted);
+  font: var(--it-type-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-ds__field-summary[data-state='active'] {
+  color: var(--it-field-active);
+}
+
+.image-trail-panel-root .image-trail-ds__field-summary[data-state='error'] {
+  color: var(--it-error-soft);
+}
+
+/* Reset controls own the summary's single auto margin so the fixed detach/hint track stays aligned. */
 .image-trail-panel-root .image-trail-panel__fields-summary .image-trail-panel__fields-reset-controls {
   display: flex;
-  gap: 6px;
+  gap: var(--it-space-4);
   margin-inline-start: auto;
 }
 
@@ -68,34 +67,17 @@
   margin-inline-start: 0;
 }
 
-.image-trail-panel-root .image-trail-panel__fields-reset-all {
-  min-height: 24px;
-  padding: 0 7px;
-  border: 1px solid rgb(255 255 255 / 22%);
-  border-radius: 4px;
-  background: #242424;
-  color: #ddd;
-  cursor: pointer;
-  font:
-    700 10px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__fields-summary::-webkit-details-marker {
-  display: none;
-}
-
-.image-trail-panel-root .image-trail-panel__fields[open] .image-trail-panel__fields-summary::after {
-  content: 'Hide';
-}
-
-.image-trail-panel-root .image-trail-panel__fields-body {
+.image-trail-panel-root .image-trail-panel__fields-body,
+.image-trail-panel-root .image-trail-panel__field-list {
   display: grid;
-  gap: 6px;
+  gap: var(--it-space-4);
   min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__field-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .image-trail-panel-root .image-trail-panel__field-item {
@@ -104,47 +86,82 @@
   list-style: none;
 }
 
-.image-trail-panel-root .image-trail-panel__field-row {
+.image-trail-panel-root .image-trail-ds__field-row {
   display: grid;
-  gap: 4px;
+  gap: var(--it-space-2);
   min-width: 0;
   max-width: 100%;
-  padding: 6px;
-  border: 1px solid rgb(255 255 255 / 16%);
-  border-radius: 5px;
-  background: rgb(255 255 255 / 4%);
+  padding: var(--it-space-4);
+  border: 1px solid var(--it-border-row);
+  border-radius: var(--it-radius-row);
+  background: var(--it-fill-4);
+  box-shadow: var(--it-highlight-top);
+  transition:
+    border-color var(--it-dur-fast) var(--it-ease),
+    background var(--it-dur-fast) var(--it-ease),
+    box-shadow var(--it-dur-fast) var(--it-ease);
 }
 
-.image-trail-panel-root .image-trail-panel__field-row.is-active {
-  border-color: #9ee;
-  background: rgb(90 180 200 / 18%);
+.image-trail-panel-root .image-trail-ds__field-row[data-state='unchanged'] {
+  border-color: var(--it-divider);
+  background: var(--it-fill-7);
 }
 
-.image-trail-panel-root .image-trail-panel__field-row.is-success {
+.image-trail-panel-root .image-trail-ds__field-row[data-state='success'] {
   border-color: rgb(116 214 158 / 76%);
   background: rgb(42 126 76 / 18%);
+  box-shadow: var(--it-glow-row);
+}
+
+.image-trail-panel-root .image-trail-ds__field-row[data-state='active'] {
+  border-color: var(--it-field-active);
+  background: var(--it-field-active-bg);
   box-shadow:
-    0 0 0 1px rgb(116 214 158 / 15%),
-    0 0 14px rgb(80 210 130 / 18%);
+    0 0 0 1px rgb(158 238 238 / 20%),
+    0 0 16px rgb(90 180 200 / 22%);
 }
 
-.image-trail-panel-root .image-trail-panel__field-row.is-unchanged {
-  border-color: rgb(255 255 255 / 24%);
-  background: rgb(255 255 255 / 7%);
-}
-
-.image-trail-panel-root .image-trail-panel__field-row.is-error {
+.image-trail-panel-root .image-trail-ds__field-row[data-state='error'] {
   border-color: rgb(255 126 126 / 78%);
   background: rgb(170 38 38 / 20%);
   box-shadow:
     inset 0 0 0 1px rgb(255 126 126 / 16%),
-    inset 0 0 12px rgb(255 80 80 / 18%);
+    var(--it-glow-error);
+}
+
+.image-trail-panel-root .image-trail-ds__field-identity {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: var(--it-space-4);
+  align-items: baseline;
+  min-width: 0;
+}
+
+.image-trail-panel-root .image-trail-panel__field-label,
+.image-trail-panel-root .image-trail-panel__field-meta {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.image-trail-panel-root .image-trail-panel__field-label {
+  color: var(--it-text-4);
+  font: var(--it-type-label);
+}
+
+.image-trail-panel-root .image-trail-panel__field-meta {
+  overflow: hidden;
+  color: var(--it-text-muted);
+  font: var(--it-type-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .image-trail-panel-root .image-trail-panel__field-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 48px;
-  gap: 4px;
+  gap: var(--it-space-2);
   min-width: 0;
   max-width: 100%;
 }
@@ -157,9 +174,144 @@
   grid-template-columns: minmax(0, 1fr) minmax(54px, max-content) 64px 26px 26px 48px minmax(58px, max-content);
 }
 
+.image-trail-panel-root .image-trail-panel__field-input,
+.image-trail-panel-root .image-trail-panel__field-width-input,
+.image-trail-panel-root .image-trail-panel__field-split-input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
+  padding: var(--it-space-3) var(--it-space-4);
+  border: 1px solid var(--it-border-control);
+  border-radius: var(--it-radius-control);
+  background: var(--it-input-bg);
+  color: var(--it-text);
+  font: var(--it-type-mono);
+}
+
+.image-trail-panel-root .image-trail-panel__field-input {
+  inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-trail-panel-root .image-trail-panel__field-width-input {
+  inline-size: 64px;
+  max-inline-size: 64px;
+  padding-inline: var(--it-space-2);
+  text-align: center;
+}
+
+.image-trail-panel-root .image-trail-panel__field-input:focus-visible,
+.image-trail-panel-root .image-trail-panel__field-width-input:focus-visible,
+.image-trail-panel-root .image-trail-panel__field-split-input:focus-visible,
+.image-trail-panel-root .image-trail-panel__field-step-button:focus-visible,
+.image-trail-panel-root .image-trail-panel__field-radix-button:focus-visible,
+.image-trail-panel-root .image-trail-panel__field-trail-button:focus-visible,
+.image-trail-panel-root .image-trail-panel__field-split-button:focus-visible,
+.image-trail-panel-root .image-trail-panel__field-reset-button:focus-visible,
+.image-trail-panel-root .image-trail-panel__fields-reset-all:focus-visible {
+  border-color: var(--it-focus);
+  outline: var(--it-focus-ring);
+  outline-offset: var(--it-focus-offset);
+}
+
+.image-trail-panel-root .image-trail-panel__field-input.is-privacy-masked {
+  border-color: var(--it-divider);
+  background: linear-gradient(90deg, var(--it-fill-8), var(--it-fill-4)), var(--it-input-bg-privacy);
+  color: rgb(255 255 255 / 62%);
+  text-shadow: none;
+}
+
+.image-trail-panel-root .image-trail-panel__fields.is-privacy-masked .image-trail-panel__field-label,
+.image-trail-panel-root .image-trail-panel__fields.is-privacy-masked .image-trail-panel__field-meta {
+  border-radius: var(--it-radius-control);
+  background: linear-gradient(90deg, var(--it-fill-14), var(--it-fill-5));
+  color: rgb(255 255 255 / 62%);
+  text-shadow: none;
+}
+
+.image-trail-panel-root .image-trail-panel__field-radix-toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 54px;
+  min-height: var(--it-control-min-h);
+  overflow: hidden;
+  border: 1px solid var(--it-divider);
+  border-radius: var(--it-radius-control);
+  background: var(--it-control-bg);
+}
+
+.image-trail-panel-root .image-trail-panel__field-radix-button,
+.image-trail-panel-root .image-trail-panel__field-step-button,
+.image-trail-panel-root .image-trail-panel__field-trail-button,
+.image-trail-panel-root .image-trail-panel__field-split-button,
+.image-trail-panel-root .image-trail-panel__field-reset-button,
+.image-trail-panel-root .image-trail-panel__fields-reset-all {
+  min-height: var(--it-control-min-h);
+  padding: 0 var(--it-space-5);
+  border: 1px solid var(--it-divider);
+  border-radius: var(--it-radius-control);
+  background: var(--it-control-bg-alt);
+  color: var(--it-text-3);
+  cursor: pointer;
+  font: var(--it-type-micro);
+}
+
+.image-trail-panel-root .image-trail-panel__field-radix-button {
+  min-width: 0;
+  min-height: 24px;
+  padding: 0 var(--it-space-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--it-text-muted);
+  font-size: var(--it-fs-2xs);
+}
+
+.image-trail-panel-root .image-trail-panel__field-radix-button.is-active {
+  background: rgb(143 255 221 / 18%);
+  color: var(--it-text);
+}
+
+.image-trail-panel-root .image-trail-panel__field-step-button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--it-icon-btn);
+  height: var(--it-icon-btn);
+  padding: 0;
+  font: var(--it-fw-bold) 15px / 1 var(--it-font-mono);
+}
+
+.image-trail-panel-root .image-trail-panel__field-radix-button:hover,
+.image-trail-panel-root .image-trail-panel__field-step-button:hover,
+.image-trail-panel-root .image-trail-panel__field-trail-button:hover,
+.image-trail-panel-root .image-trail-panel__field-split-button:hover,
+.image-trail-panel-root .image-trail-panel__field-reset-button:hover,
+.image-trail-panel-root .image-trail-panel__fields-reset-all:hover {
+  border-color: var(--it-focus);
+  background: var(--it-control-bg-hover);
+  color: var(--it-text);
+}
+
+.image-trail-panel-root .image-trail-panel__field-trail-button.is-included {
+  border-color: var(--it-accent-btn-border);
+  background: var(--it-accent-btn-bg);
+  color: var(--it-text);
+}
+
+.image-trail-panel-root .image-trail-panel__field-reset-placeholder {
+  display: block;
+  min-width: 48px;
+  min-height: var(--it-control-min-h);
+}
+
 .image-trail-panel-root .image-trail-panel__field-split-control {
   display: grid;
-  gap: 4px;
+  gap: var(--it-space-2);
   min-width: 0;
 }
 
@@ -170,175 +322,64 @@
 .image-trail-panel-root .image-trail-panel__field-split-length {
   display: inline-grid;
   align-items: center;
-  min-height: 26px;
-  color: #aaa;
+  min-height: var(--it-control-min-h);
+  color: var(--it-text-muted);
+  font: var(--it-type-micro);
   white-space: nowrap;
-  font:
-    10px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__field-radix-toggle {
-  display: inline-grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  min-width: 54px;
-  min-height: 26px;
-  overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 22%);
-  border-radius: 4px;
-  background: #202020;
-}
-
-.image-trail-panel-root .image-trail-panel__field-radix-button {
-  min-width: 0;
-  min-height: 24px;
-  padding: 0 4px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #aaa;
-  cursor: pointer;
-  font:
-    700 9px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__field-radix-button.is-active {
-  background: rgb(143 255 221 / 18%);
-  color: #eff;
-}
-
-.image-trail-panel-root .image-trail-panel__field-step-button {
-  display: inline-grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 1px solid rgb(255 255 255 / 22%);
-  border-radius: 4px;
-  background: #2a2a2a;
-  color: #f2f2f2;
-  cursor: pointer;
-  font:
-    700 15px ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Consolas,
-    monospace;
-  line-height: 1;
-}
-
-.image-trail-panel-root .image-trail-panel__field-step-button:hover {
-  border-color: #8fd;
-  background: #333;
-}
-
-.image-trail-panel-root .image-trail-panel__field-radix-button:hover {
-  background: rgb(255 255 255 / 10%);
-  color: #fff;
-}
-
-.image-trail-panel-root .image-trail-panel__field-trail-button {
-  min-height: 26px;
-  padding: 0 7px;
-  border: 1px solid rgb(255 255 255 / 22%);
-  border-radius: 4px;
-  background: #2a2a2a;
-  color: #ddd;
-  cursor: pointer;
-  font:
-    700 10px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__field-split-button,
-.image-trail-panel-root .image-trail-panel__field-reset-button {
-  min-height: 26px;
-  padding: 0 7px;
-  border: 1px solid rgb(255 255 255 / 22%);
-  border-radius: 4px;
-  background: #242424;
-  color: #ddd;
-  cursor: pointer;
-  font:
-    700 10px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__field-reset-placeholder {
-  display: block;
-  min-width: 48px;
-  min-height: 26px;
-}
-
-.image-trail-panel-root .image-trail-panel__field-split-button:hover,
-.image-trail-panel-root .image-trail-panel__field-reset-button:hover,
-.image-trail-panel-root .image-trail-panel__fields-reset-all:hover {
-  border-color: #8fd;
-  background: #303030;
-}
-
-.image-trail-panel-root .image-trail-panel__field-trail-button.is-included {
-  border-color: rgb(116 214 158 / 62%);
-  background: rgb(42 126 76 / 28%);
-  color: rgb(230 255 240);
-}
-
-.image-trail-panel-root .image-trail-panel__field-step-button:focus,
-.image-trail-panel-root .image-trail-panel__field-radix-button:focus,
-.image-trail-panel-root .image-trail-panel__field-reset-button:focus,
-.image-trail-panel-root .image-trail-panel__fields-reset-all:focus {
-  outline: 1px solid #8fd;
-  outline-offset: 1px;
-}
-
-.image-trail-panel-root .image-trail-panel__field-label {
-  min-width: 0;
-  max-width: 100%;
-  color: #ccc;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  font:
-    11px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__field-meta {
-  min-width: 0;
-  max-width: 100%;
-  color: #aaa;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  white-space: normal;
-  font:
-    11px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
 }
 
 .image-trail-panel-root .image-trail-panel__field-empty {
-  color: #999;
-  font:
-    11px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  color: var(--it-text-dim);
+  font: var(--it-type-meta);
+}
+
+@container (max-width: 360px) {
+  .image-trail-panel-root .image-trail-panel__field-control.has-step-controls,
+  .image-trail-panel-root .image-trail-panel__field-control.has-step-controls.has-trail-control-slot {
+    grid-template-columns: 54px minmax(64px, 1fr) 30px 30px;
+  }
+
+  .image-trail-panel-root .image-trail-panel__field-control.has-step-controls .image-trail-panel__field-input {
+    grid-column: 1 / -1;
+  }
+
+  .image-trail-panel-root .image-trail-panel__field-radix-toggle {
+    grid-column: 1;
+  }
+
+  .image-trail-panel-root .image-trail-panel__field-width-input {
+    grid-column: 2;
+  }
+
+  .image-trail-panel-root .image-trail-panel__field-reset-button,
+  .image-trail-panel-root .image-trail-panel__field-reset-placeholder {
+    grid-column: 1 / 3;
+  }
+
+  .image-trail-panel-root .image-trail-panel__field-trail-button {
+    grid-column: 3 / -1;
+  }
+
+  .image-trail-panel-root .image-trail-panel__field-reset-button,
+  .image-trail-panel-root .image-trail-panel__field-reset-placeholder {
+    justify-self: start;
+  }
+
+  .image-trail-panel-root .image-trail-panel__field-control.has-step-controls .image-trail-panel__field-reset-placeholder {
+    display: none;
+  }
+
+  .image-trail-panel-root .image-trail-panel__field-split-control.has-split-input {
+    grid-template-columns: minmax(0, 1fr) minmax(48px, max-content);
+  }
+
+  .image-trail-panel-root .image-trail-panel__field-split-length {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-trail-panel-root .image-trail-ds__field-row {
+    transition: none;
+  }
 }

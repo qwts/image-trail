@@ -363,6 +363,7 @@
             "tests/field-editor-view-model.test.ts",
             "tests/panel-state-parsed-fields.test.ts",
             "tests/dom/controls-view.test.ts",
+            "tests/dom/field-row.test.ts",
             "tests/dom/fields-view.test.ts",
             "tests/dom/parsed-field-navigation-controller.test.ts",
             "tests/dom/field-value-commit-controller.test.ts",
@@ -373,11 +374,12 @@
             "tests/url-stepping-presets.test.ts",
             "tests/url-template-settings-controller.test.ts"
           ],
-          "notes": "Covers parsed-field state sync plus the serializable Field Editor view model and Field Editor UI controls: active position/count, previous/next field selection, status flags/chips, navigation eligibility, transform/reset availability, template-filtered and invalid-URL empty states, muted failure visibility, JSON serialization, corrected field-selection labels, the extracted single-fire commit controller and reset-control renderer, split-child routing, commit-before-command ordering, numeric display modes, baseline restoration, privacy masking, the user-facing Field Editor section name (#248), and bounded saved stepping presets whose exact unsplit numeric fields are reviewable before persistence through the existing URL template store (#207)."
+          "notes": "Covers parsed-field state sync plus the serializable Field Editor view model and typed design-system FieldRow: active position/count and collapsed hierarchy, native control semantics and keyboard order, state priority, previous/next field selection, status flags/chips, navigation eligibility, transform/reset availability, template-filtered and invalid-URL empty states, muted failure visibility, JSON serialization, split-child routing, commit-before-command ordering, numeric display modes, baseline restoration, privacy masking without label/value/title leakage, the user-facing Field Editor section name (#248), critique coverage (#249), and bounded saved stepping presets whose exact unsplit numeric fields are reviewable before persistence through the existing URL template store (#207)."
         },
         {
           "type": "storybook",
           "paths": [
+            "extension/src/ui/components/field-row.stories.ts",
             "extension/src/ui/components/fields-view.stories.ts",
             "extension/src/ui/components/url-learning-settings-view.stories.ts"
           ]

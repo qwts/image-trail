@@ -114,6 +114,37 @@ test('the section uses the Field Editor feature name', () => {
   const view = buildFieldsView([]);
 
   assert.equal(view.querySelector('h3')?.textContent, 'Field Editor');
+  assert.equal(view.querySelector('.image-trail-ds__field-summary')?.textContent, '1 field');
+});
+
+test('the summary and FieldRow expose active hierarchy without replacing native controls', () => {
+  const view = buildFieldsView([], { activeFieldId: 'query-page', successfulFieldIds: ['query-page'] });
+  const summary = view.querySelector('.image-trail-ds__field-summary');
+  const row = view.querySelector('.image-trail-ds__field-row');
+
+  assert.equal(summary?.textContent, 'page · 1/1');
+  assert.equal(summary?.getAttribute('data-state'), 'active');
+  assert.equal(row?.getAttribute('data-state'), 'active');
+  assert.equal(row?.getAttribute('data-field-id'), 'query-page');
+  assert.ok(row?.querySelector('input') instanceof HTMLInputElement);
+  assert.ok(row?.querySelector('button') instanceof HTMLButtonElement);
+});
+
+test('privacy-safe active hierarchy exposes no field label or value', () => {
+  const view = buildFieldsView([], {
+    activeFieldId: 'query-page',
+    options: { open: false, blockSize: null, privacyMode: true },
+  });
+  const summary = view.querySelector('.image-trail-ds__field-summary');
+
+  assert.equal(summary?.textContent, 'Private field · 1/1');
+  assert.doesNotMatch(view.textContent ?? '', /page|17/u);
+  assert.doesNotMatch(
+    Array.from(view.querySelectorAll('[title]'))
+      .map((node) => node.getAttribute('title'))
+      .join(' '),
+    /page|17/u,
+  );
 });
 
 test('a change event on the value input commits the new value', () => {
@@ -442,6 +473,8 @@ test('the failed-field ring renders unless showFieldFailure is false (Mute) (#45
     options: { open: true, blockSize: null, showFieldFailure: false },
   });
   assert.equal(errorRows(muted), 0, 'Mute hides the ring even though failedFieldId is set');
+  assert.equal(shown.querySelector('.image-trail-ds__field-row')?.getAttribute('data-state'), 'error');
+  assert.equal(muted.querySelector('.image-trail-ds__field-row')?.getAttribute('data-state'), 'default');
 });
 
 test('privacy mode masks the field and blocks value commits', () => {
