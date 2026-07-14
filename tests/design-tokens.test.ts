@@ -8,6 +8,7 @@ const tokens = read('extension/src/ui/styles/tokens.css');
 const panel = read('extension/src/ui/styles/panel.css');
 const designSystem = read('extension/src/ui/styles/design-system.css');
 const galleryTokens = read('extension/src/gallery/gallery-tokens.css');
+const gallery = read('extension/src/gallery/gallery.css');
 const galleryHtml = read('extension/src/gallery/gallery.html');
 const manifest = JSON.parse(read('extension/manifest.json')) as {
   web_accessible_resources: Array<{ resources: string[] }>;
@@ -46,15 +47,20 @@ test('canonical tokens cover both document and Shadow DOM scopes', () => {
   }
 });
 
-test('panel and Gallery consume the same token source', () => {
+test('panel and Gallery consume canonical tokens and shared primitives', () => {
   assert.match(panel, /^@import '\.\/design-system\.css';/u);
   assert.match(designSystem, /^@import '\.\/tokens\.css';/u);
   assert.match(panel, /width:\s*min\(var\(--it-panel-width\),/u);
   assert.match(panel, /background:\s*var\(--it-panel-bg\);/u);
   assert.match(galleryTokens, /^@import '\.\.\/ui\/styles\/tokens\.css';/u);
-  assert.match(galleryTokens, /--image-trail-gallery-panel:\s*var\(--it-panel-bg\);/u);
-  assert.match(galleryTokens, /--image-trail-gallery-accent:\s*var\(--it-accent-row\);/u);
-  assert.ok(galleryHtml.indexOf('gallery.css') < galleryHtml.indexOf('gallery-tokens.css'));
+  assert.match(galleryTokens, /@import '\.\.\/ui\/styles\/primitives\.css';/u);
+  assert.match(galleryTokens, /@import '\.\.\/ui\/styles\/feedback-primitives\.css';/u);
+  assert.match(galleryTokens, /@import '\.\.\/ui\/styles\/record-row\.css';/u);
+  assert.doesNotMatch(galleryTokens, /--image-trail-gallery-/u);
+  assert.doesNotMatch(gallery, /--image-trail-gallery-/u);
+  assert.doesNotMatch(gallery, /(?:^|\n)button(?:,|\s*\{)/u);
+  assert.match(gallery, /var\(--it-header-bg\)/u);
+  assert.ok(galleryHtml.indexOf('gallery-tokens.css') < galleryHtml.indexOf('gallery.css'));
 });
 
 test('the injected stylesheet can load its token dependency', () => {

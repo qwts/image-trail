@@ -101,11 +101,31 @@ test('gallery view renders durable records in a bounded page grid', () => {
 
   assert.equal(view.querySelectorAll('.image-trail-gallery__card').length, 1);
   assert.equal(view.querySelectorAll('.image-trail-ds__record-row').length, 1);
+  assert.equal(view.classList.contains('image-trail-panel-root'), true);
+  assert.equal(view.querySelectorAll('.image-trail-ds__button').length > 0, true);
+  assert.ok(view.querySelector('.image-trail-ds__input'));
+  assert.ok(view.querySelector('.image-trail-ds__card'));
+  assert.ok(view.querySelector('.image-trail-ds__status-pill'));
   assert.match(view.textContent ?? '', /1-1 of 1 durable records/u);
   const recordButton = view.querySelector('.image-trail-gallery__card-button');
   assert.ok(recordButton instanceof HTMLButtonElement);
   recordButton.click();
   assert.deepEqual(opened, [record]);
+});
+
+test('gallery view exposes semantic loading error and empty states', () => {
+  const loading = createGalleryView(galleryState({ loading: true }), galleryHandlers());
+  const loadingStatus = loading.querySelector<HTMLElement>('.image-trail-gallery__status');
+  assert.ok(loadingStatus);
+  assert.equal(loadingStatus.dataset['tone'], 'busy');
+  assert.equal(loadingStatus.getAttribute('aria-busy'), 'true');
+
+  const error = createGalleryView(galleryState({ message: 'Gallery could not load durable records.' }), galleryHandlers());
+  const errorStatus = error.querySelector<HTMLElement>('.image-trail-gallery__status');
+  assert.ok(errorStatus);
+  assert.equal(errorStatus.dataset['tone'], 'error');
+  assert.match(error.textContent ?? '', /Gallery unavailable/u);
+  assert.ok(error.querySelector('[aria-label="Gallery empty state"]'));
 });
 
 test('gallery view disables locked private records without exposing metadata', () => {

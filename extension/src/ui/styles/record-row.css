@@ -289,20 +289,27 @@
 }
 
 .image-trail-gallery .image-trail-ds__record-body {
+  grid-column: auto;
+  align-self: stretch;
   display: grid;
   align-content: start;
   gap: var(--it-space-6);
   min-width: 0;
+  max-width: 100%;
   padding: 10px;
 }
 
 .image-trail-gallery .image-trail-ds__record-thumbnail {
+  position: static;
+  inset: auto;
   display: block;
   width: 100%;
+  max-width: 100%;
   height: 148px;
   object-fit: cover;
   object-position: top;
   background: var(--it-thumb-bg);
+  mask-image: none;
 }
 
 .image-trail-gallery .image-trail-ds__record-thumbnail--fallback {
