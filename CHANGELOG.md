@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.2.6
+
+### Patch Changes
+
+- 77e03b9: Add the shared production design-token foundation used by the injected panel and Gallery.
+
 ## 0.2.5
 
 ### Patch Changes
