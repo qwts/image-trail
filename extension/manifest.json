@@ -50,7 +50,14 @@
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "web_accessible_resources": [
     {
-      "resources": ["src/ui/styles/panel.css", "src/ui/styles/fields.css", "src/ui/styles/tokens.css"],
+      "resources": [
+        "src/ui/styles/panel.css",
+        "src/ui/styles/fields.css",
+        "src/ui/styles/design-system.css",
+        "src/ui/styles/primitives.css",
+        "src/ui/styles/feedback-primitives.css",
+        "src/ui/styles/tokens.css"
+      ],
       "matches": ["http://*/*", "https://*/*"]
     }
   ]

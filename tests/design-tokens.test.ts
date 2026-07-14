@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8');
 const tokens = read('extension/src/ui/styles/tokens.css');
 const panel = read('extension/src/ui/styles/panel.css');
+const designSystem = read('extension/src/ui/styles/design-system.css');
 const galleryTokens = read('extension/src/gallery/gallery-tokens.css');
 const galleryHtml = read('extension/src/gallery/gallery.html');
 const manifest = JSON.parse(read('extension/manifest.json')) as {
@@ -46,7 +47,8 @@ test('canonical tokens cover both document and Shadow DOM scopes', () => {
 });
 
 test('panel and Gallery consume the same token source', () => {
-  assert.match(panel, /^@import '\.\/tokens\.css';/u);
+  assert.match(panel, /^@import '\.\/design-system\.css';/u);
+  assert.match(designSystem, /^@import '\.\/tokens\.css';/u);
   assert.match(panel, /width:\s*min\(var\(--it-panel-width\),/u);
   assert.match(panel, /background:\s*var\(--it-panel-bg\);/u);
   assert.match(galleryTokens, /^@import '\.\.\/ui\/styles\/tokens\.css';/u);

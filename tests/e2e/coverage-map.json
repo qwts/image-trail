@@ -4,8 +4,8 @@
   "description": "Manual acceptance coverage map for the maintained Playwright E2E gate. Each entry links a canonical acceptance flow to automated coverage, intentional manual coverage, or a deferred issue.",
   "entries": [
     {
-      "id": "design-system-token-foundation",
-      "acceptance": "Shared design-system token contract",
+      "id": "design-system-foundation",
+      "acceptance": "Shared design-system tokens and core primitive contracts",
       "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
       "coverage": [
         {
@@ -14,9 +14,19 @@
           "notes": "Covers the canonical token inventory, document and Shadow DOM scopes, panel and Gallery imports, Gallery compatibility aliases, web-accessible token loading, and preservation of existing panel layout contracts."
         },
         {
+          "type": "unit-dom",
+          "paths": ["tests/dom/primitives.test.ts", "tests/primitives-css.test.ts"],
+          "notes": "Covers typed plain-DOM Button, IconButton, Input, Select, Toggle, Badge, StatusPill, Kbd, Toast, Card, and SectionHeader output; native semantics and callbacks; pressed, waiting, disabled, invalid, semantic, privacy-safe, focus, packaging, and reduced-motion contracts."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/primitives.stories.ts",
+          "notes": "Covers critique-ready overview, interactive, disabled, waiting, semantic feedback, narrow, and reduced-motion previews with keyboard-native control interactions and action assertions."
+        },
+        {
           "type": "manual",
-          "reason": "Token indirection preserves exact values and requires a packaged-extension visual smoke check across the injected Shadow DOM and extension-owned Gallery page.",
-          "notes": "Load the built extension, open the panel over the single-image fixture, then open Gallery. Verify the panel, Recall drawer, detached section, and Gallery retain their prior colors, spacing, typography, geometry, focus treatment, and motion behavior with no unstyled flash or missing stylesheet request."
+          "reason": "Token and primitive styling requires a packaged-extension visual and keyboard smoke check across the injected Shadow DOM.",
+          "notes": "Load the built extension, open the panel over the single-image fixture, and inspect the core-primitives Storybook stories. Verify the panel and Gallery retain their prior rendering, every primitive matches the canonical hierarchy, keyboard focus is visible, disabled and waiting states remain distinct, narrow content wraps without overflow, reduced motion removes animation without hiding state, and no stylesheet request fails."
         }
       ]
     },
