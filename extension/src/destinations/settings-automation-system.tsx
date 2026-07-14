@@ -41,6 +41,7 @@ export function AutomationSettingsGroup({ settings, disabled, save }: SettingsGr
 function AutomationRequestForm({ settings, disabled, save }: SettingsGroupProps) {
   return (
     <form
+      key={automationFormKey(settings)}
       className="image-trail-destination-settings__form"
       onSubmit={(event) => {
         const data = formValues(event);
@@ -61,6 +62,19 @@ function AutomationRequestForm({ settings, disabled, save }: SettingsGroupProps)
       <ApplyButton disabled={disabled} />
     </form>
   );
+}
+
+function automationFormKey(settings: SettingsGroupProps['settings']): string {
+  return [
+    settings.requestThrottleMs,
+    settings.requestThrottleMaxRequests,
+    settings.requestThrottleWindowMs,
+    settings.neighborPreloadRadius,
+    settings.neighborPreloadCacheLimit,
+    settings.neighborPreloadProbeMethod,
+    settings.loadFailureFeedback,
+    settings.urlReviewStatusLimit,
+  ].join(':');
 }
 
 function AutomationRequestFields({ settings }: Pick<SettingsGroupProps, 'settings'>) {

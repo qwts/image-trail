@@ -16,6 +16,7 @@ export function DisplaySettingsGroup({ settings, disabled, save }: SettingsGroup
   return (
     <SettingsGroup title="Display" open>
       <form
+        key={displayFormKey(settings)}
         className="image-trail-destination-settings__form"
         onSubmit={(event) => {
           const data = formValues(event);
@@ -70,6 +71,17 @@ export function DisplaySettingsGroup({ settings, disabled, save }: SettingsGroup
       <SettingNote>Recents stay transient. Gallery page limit 0 means an unlimited durable page; other reads remain bounded.</SettingNote>
     </SettingsGroup>
   );
+}
+
+function displayFormKey(settings: SettingsGroupProps['settings']): string {
+  return [
+    settings.visibleBookmarkSoftMax,
+    settings.galleryPageLimit,
+    settings.recentHistoryLimit,
+    settings.recentHistoryRetainedLimit,
+    settings.recentSparseRowDisplayMode,
+    settings.recentHistoryOverflowBehavior,
+  ].join(':');
 }
 
 export function PrivacySettingsGroup({ settings, disabled, save }: SettingsGroupProps) {

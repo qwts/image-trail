@@ -86,6 +86,14 @@ test('real destination pages share navigation and real durable state', async ({ 
     await duplicate.goto(page.url());
     await duplicate.getByText('Privacy', { exact: true }).click();
     await expect(duplicate.getByRole('checkbox', { name: 'Privacy mode' })).toBeChecked();
+    await duplicate.getByRole('spinbutton', { name: 'Visible pins' }).fill('45');
+    await duplicate.locator('form').first().getByRole('button', { name: 'Apply' }).click();
+    await expect(page.getByRole('spinbutton', { name: 'Visible pins' })).toHaveValue('45');
+
+    await page.getByRole('spinbutton', { name: 'Gallery page limit' }).fill('99');
+    await page.locator('form').first().getByRole('button', { name: 'Apply' }).click();
+    await expect(duplicate.getByRole('spinbutton', { name: 'Visible pins' })).toHaveValue('45');
+    await expect(duplicate.getByRole('spinbutton', { name: 'Gallery page limit' })).toHaveValue('99');
   } finally {
     await duplicate.close();
   }

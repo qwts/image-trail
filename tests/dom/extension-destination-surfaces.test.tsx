@@ -195,6 +195,51 @@ test('Settings renders all groups and persists through the extension-owned servi
   }
 });
 
+test('Settings reloads uncontrolled form drafts before a duplicate tab can overwrite newer values', async () => {
+  let current = DEFAULT_LOCAL_SETTINGS;
+  let refresh: () => void = () => undefined;
+  const saved: Array<typeof DEFAULT_LOCAL_SETTINGS> = [];
+  const api = services({
+    loadSettings: async () => current,
+    saveSettings: async (settings) => {
+      saved.push(settings);
+    },
+    subscribeSettings: (listener) => {
+      refresh = listener;
+      return () => undefined;
+    },
+  });
+  const root = await mount(<SettingsDestination services={api} />);
+  try {
+    await flush();
+    const visiblePins = root.querySelector<HTMLInputElement>('input[name="visibleBookmarkSoftMax"]');
+    const requestInterval = root.querySelector<HTMLInputElement>('input[name="requestThrottleMs"]');
+    assert.equal(visiblePins?.value, String(DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax));
+    assert.equal(requestInterval?.value, String(DEFAULT_LOCAL_SETTINGS.requestThrottleMs));
+
+    current = { ...current, visibleBookmarkSoftMax: 45, requestThrottleMs: 1_234 };
+    await act(async () => refresh());
+    await flush();
+
+    assert.equal(root.querySelector<HTMLInputElement>('input[name="visibleBookmarkSoftMax"]')?.value, '45');
+    assert.equal(root.querySelector<HTMLInputElement>('input[name="requestThrottleMs"]')?.value, '1234');
+    const applyButtons = Array.from(root.querySelectorAll<HTMLButtonElement>('button[type="submit"]'));
+    await act(async () => applyButtons[0]?.click());
+    await flush();
+    await act(async () => applyButtons[1]?.click());
+    await flush();
+    assert.deepEqual(
+      saved.map((settings) => [settings.visibleBookmarkSoftMax, settings.requestThrottleMs]),
+      [
+        [45, 1_234],
+        [45, 1_234],
+      ],
+    );
+  } finally {
+    await cleanup(root);
+  }
+});
+
 test('Settings exposes a retry path after a repository load failure', async () => {
   let attempts = 0;
   const api = services({
