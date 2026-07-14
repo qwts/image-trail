@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.9.0
+
+### Minor Changes
+
+- 9027223: Align bare-key navigation, capture, pinning, Help, and Settings with the updated workspace handoff; add a persisted Down-arrow assignment and privacy-safe capture/download feedback.
+
 ## 0.8.0
 
 ### Minor Changes
