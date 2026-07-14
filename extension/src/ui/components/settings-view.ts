@@ -31,6 +31,7 @@ import { createShortcutSettingsView } from './shortcut-settings-view.js';
 import { createGrabSourcePatternSettingsView, createTemplateSettingsView } from './url-learning-settings-view.js';
 import { createUrlSteppingPresetView } from './url-stepping-preset-view.js';
 import { applySettingsPrimitiveContracts } from './settings-primitive-contracts.js';
+import { createSettingsDisclosure } from './settings-disclosure.js';
 
 export {
   createBuildIdentitySettingsView,
@@ -39,7 +40,10 @@ export {
   storageHealthRows,
 } from './maintenance-settings-view.js';
 
-const settingsGroupsOpen = new Map<string, boolean>();
+export interface SettingsUtilityGroups {
+  readonly privacy: readonly HTMLElement[];
+  readonly utilities: readonly HTMLElement[];
+}
 
 export function createSettingsView(
   visibleBookmarkSoftMax: number,
@@ -58,7 +62,7 @@ export function createSettingsView(
   requestThrottleState: RequestThrottleSettingsState,
   neighborPreloadState: NeighborPreloadSettingsState,
   restoreWorkspaceLayoutEnabled: boolean,
-  utilityChildren: readonly HTMLElement[],
+  utilityGroups: SettingsUtilityGroups,
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
   const section = document.createElement('section');
@@ -72,57 +76,35 @@ export function createSettingsView(
 
   section.append(
     header,
-    createSettingsGroup('Display', 'display', [
-      createVisiblePinsSettingsView(visibleBookmarkSoftMax, dispatch),
-      createRecentsSettingsView(recentHistoryState, dispatch),
-    ]),
-    createSettingsGroup('Privacy', 'privacy', [
+    createSettingsDisclosure(
+      'Display',
+      'display',
+      [createVisiblePinsSettingsView(visibleBookmarkSoftMax, dispatch), createRecentsSettingsView(recentHistoryState, dispatch)],
+      { defaultOpen: true },
+    ),
+    createSettingsDisclosure('Privacy', 'privacy', [
       createPrivatePinSettingsView(privatePinState, dispatch),
       createPrivacyModeSettingsView(privacyModeEnabled, dispatch),
       createSearchableMetadataSettingsView(searchableMetadataPolicy, dispatch),
+      ...utilityGroups.privacy,
     ]),
-    createSettingsGroup('Automation', 'automation', [
+    createSettingsDisclosure('Automation', 'automation', [
+      createShortcutSettingsView(),
       createRequestThrottleSettingsView(requestThrottleState, dispatch),
       createNeighborPreloadSettingsView(neighborPreloadState, dispatch),
       createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),
+      createUrlSteppingPresetView(currentFields, dispatch),
+      createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
+      createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),
     ]),
-    createSettingsGroup('Shortcuts', 'shortcuts', [createShortcutSettingsView()]),
-    createSettingsGroup('Maintenance', 'maintenance', [
+    createSettingsDisclosure('Utilities', 'utilities', utilityGroups.utilities),
+    createSettingsDisclosure('System', 'system', [
       createPanelLayoutSettingsView(restoreWorkspaceLayoutEnabled, dispatch),
       createBuildIdentitySettingsView(buildIdentityState, dispatch),
       createStorageHealthSettingsView(storageUsage),
       createDestructiveSettingsView(destructiveState, dispatch),
     ]),
-    createSettingsGroup('URL learning', 'url-learning', [
-      createUrlSteppingPresetView(currentFields, dispatch),
-      createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
-      createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),
-    ]),
-    ...utilityChildren,
   );
   applySettingsPrimitiveContracts(section);
   return section;
-}
-
-function createSettingsGroup(title: string, id: string, children: readonly HTMLElement[]): HTMLElement {
-  const group = document.createElement('details');
-  group.className = 'image-trail-panel__settings-templates image-trail-panel__settings-utility-section image-trail-ds__settings-group';
-  group.open = settingsGroupsOpen.get(id) ?? false;
-  group.addEventListener('toggle', () => {
-    settingsGroupsOpen.set(id, group.open);
-  });
-
-  const heading = document.createElement('h4');
-  heading.textContent = title;
-  const header = document.createElement('div');
-  header.className = 'image-trail-panel__settings-utility-header image-trail-ds__settings-group-header';
-  header.append(heading);
-  const summary = document.createElement('summary');
-  summary.className = 'image-trail-panel__settings-utility-summary';
-  summary.append(header);
-  const body = document.createElement('div');
-  body.className = 'image-trail-panel__settings-utility-body image-trail-ds__settings-group-body';
-  body.append(...children);
-  group.append(summary, body);
-  return group;
 }

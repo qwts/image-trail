@@ -5,7 +5,10 @@ import { resolve } from 'node:path';
 
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8');
 const tokens = read('extension/src/ui/styles/tokens.css');
-const panel = read('extension/src/ui/styles/panel.css');
+const panelEntry = read('extension/src/ui/styles/panel.css');
+const panel = `${panelEntry}\n${['foundation', 'sections', 'controls', 'cloud', 'settings', 'records']
+  .map((name) => read(`extension/src/ui/styles/panel-legacy-${name}.css`))
+  .join('\n')}`;
 const designSystem = read('extension/src/ui/styles/design-system.css');
 const galleryTokens = read('extension/src/gallery/gallery-tokens.css');
 const gallery = read('extension/src/gallery/gallery.css');

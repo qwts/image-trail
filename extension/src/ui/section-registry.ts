@@ -20,6 +20,10 @@ export interface DetachableSectionDefinition {
   readonly windowInlineSize?: number;
   /** When false, neither the section, its placeholder, nor its window renders this pass. */
   readonly visible?: (state: PanelState) => boolean;
+  /** Optional attached-panel filter; detached windows continue to use `visible`. */
+  readonly attachedVisible?: (state: PanelState) => boolean;
+  /** A section may keep drag-out without showing a dedicated detach icon. */
+  readonly showDetachControl?: boolean;
   readonly create: (target: PanelRenderTarget, state: PanelState) => HTMLElement;
 }
 
@@ -42,7 +46,7 @@ export function attachedSectionElements(
   state: PanelState,
 ): HTMLElement[] {
   return definitions
-    .filter((definition) => sectionVisible(definition, state))
+    .filter((definition) => sectionVisible(definition, state) && (definition.attachedVisible?.(state) ?? true))
     .map((definition) =>
       state.detachedSections.includes(definition.id)
         ? createDetachedSectionPlaceholder(definition.id, definition.title, target.dispatch)
@@ -61,13 +65,15 @@ function detachableSectionElement(definition: DetachableSectionDefinition, targe
     dispatch: target.dispatch,
     onDragOutPosition,
   };
-  injectDetachControl(
-    element,
-    createSectionDetachControl(definition.id, definition.title, target.dispatch, {
-      windowInlineSize: dragOptions.windowInlineSize,
-      onDragOutPosition,
-    }),
-  );
+  if (definition.showDetachControl !== false) {
+    injectDetachControl(
+      element,
+      createSectionDetachControl(definition.id, definition.title, target.dispatch, {
+        windowInlineSize: dragOptions.windowInlineSize,
+        onDragOutPosition,
+      }),
+    );
+  }
   attachSectionDragOut(element, dragOptions);
   return element;
 }

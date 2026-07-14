@@ -36,8 +36,11 @@ test('Apply URL button dispatches the current edited value', () => {
   const view = createUrlEditorView({ url: CURRENT_URL }, { onApply: (url) => applied.push(url) });
   const textarea = textareaOf(view);
   textarea.value = 'https://images.example.test/albums/1024/photo_0044.jpg';
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
 
-  view.querySelector<HTMLButtonElement>('button')?.click();
+  Array.from(view.querySelectorAll<HTMLButtonElement>('button'))
+    .find((button) => button.textContent === 'Apply to Host')
+    ?.click();
 
   assert.deepEqual(applied, ['https://images.example.test/albums/1024/photo_0044.jpg']);
   assert.match(view.textContent ?? '', /Enter apply URL/u);

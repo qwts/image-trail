@@ -7,6 +7,7 @@ import {
   fixtureUrl,
   imageNavigationSnapshot,
   openFixturePage,
+  openTargetControls,
   test,
   togglePanelFromExtensionAction,
   expect,
@@ -29,7 +30,9 @@ interface ReplacementFrame {
 async function openHostTargetDetails(page: Parameters<typeof imageNavigationSnapshot>[0]): Promise<void> {
   const release = page.getByRole('button', { name: 'Release host image' });
   if (await release.isVisible()) return;
-  await page.locator('.image-trail-panel__target-summary').click();
+  const target = page.locator('.image-trail-panel__target-utility');
+  if ((await target.getAttribute('open')) === null) await page.locator('.image-trail-panel__target-summary').click();
+  await openTargetControls(page);
   await expect(release).toBeVisible();
 }
 

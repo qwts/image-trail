@@ -5,7 +5,10 @@ import { resolve } from 'node:path';
 
 const PANEL_CSS = readFileSync(resolve(process.cwd(), 'extension/src/ui/styles/panel.css'), 'utf8');
 const RECORD_ROW_CSS = readFileSync(resolve(process.cwd(), 'extension/src/ui/styles/record-row.css'), 'utf8');
-const PANEL_STYLES = `${PANEL_CSS}\n${RECORD_ROW_CSS}`;
+const LEGACY_PANEL_CSS = ['foundation', 'sections', 'controls', 'cloud', 'settings', 'records']
+  .map((name) => readFileSync(resolve(process.cwd(), `extension/src/ui/styles/panel-legacy-${name}.css`), 'utf8'))
+  .join('\n');
+const PANEL_STYLES = `${PANEL_CSS}\n${LEGACY_PANEL_CSS}\n${RECORD_ROW_CSS}`;
 
 function cssRule(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

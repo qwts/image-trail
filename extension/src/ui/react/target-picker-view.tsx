@@ -19,105 +19,110 @@ function targetUrl(target: TargetState, privacyMode: boolean): string {
   return target.selectedUrl ?? 'No host image selected yet.';
 }
 
+function TargetThumbnail({ target, privacyMode }: Pick<TargetPickerProps, 'target' | 'privacyMode'>) {
+  const imageUrl = privacyMode || target.selectedUrl?.startsWith('data:') ? null : target.selectedUrl;
+  return (
+    <span className={`image-trail-panel__target-thumbnail${privacyMode ? ' is-privacy-masked' : ''}`} aria-hidden="true">
+      {imageUrl ? <img src={imageUrl} alt="" onError={(event) => (event.currentTarget.hidden = true)} /> : null}
+      <span>▧</span>
+    </span>
+  );
+}
+
+function TargetIdentity({ target, privacyMode }: Pick<TargetPickerProps, 'target' | 'privacyMode'>) {
+  const url = targetUrl(target, privacyMode);
+  const countLabel = `${target.candidateCount} on page`;
+  return (
+    <span className="image-trail-panel__target-identity">
+      <span className={`image-trail-panel__target-url${privacyMode && target.selectedUrl ? ' is-privacy-masked' : ''}`} title={url}>
+        {url}
+      </span>
+      <span className="image-trail-panel__target-badges">
+        {target.selectedUrl ? (
+          <span className="image-trail-ds__badge image-trail-panel__target-badge is-selected" data-tone="selected">
+            Selected
+          </span>
+        ) : null}
+        <span className="image-trail-ds__badge image-trail-panel__target-count" data-tone="count">
+          {target.candidateCount === 1 ? 'single image' : countLabel}
+        </span>
+      </span>
+    </span>
+  );
+}
+
 function TargetButton({ target, dispatch }: Omit<TargetPickerProps, 'privacyMode'>) {
-  if (target.picking) {
-    return (
-      <button
-        type="button"
-        className="image-trail-ds__button is-active"
-        data-variant="danger"
-        onClick={() => dispatch({ name: 'stop-target-picker' })}
-      >
-        Cancel host pick
-      </button>
-    );
-  }
-  if (target.selectedUrl) {
-    return (
-      <button type="button" className="image-trail-ds__button" data-variant="default" onClick={() => dispatch({ name: 'target/release' })}>
-        Release host image
-      </button>
-    );
-  }
+  const action = target.picking
+    ? { name: 'stop-target-picker' as const }
+    : target.selectedUrl
+      ? { name: 'target/release' as const }
+      : { name: 'start-target-picker' as const };
+  const label = target.picking ? 'Cancel host pick' : target.selectedUrl ? 'Release host image' : 'Set host image';
   return (
     <button
       type="button"
       className="image-trail-ds__button"
-      data-variant="primary"
-      onClick={() => dispatch({ name: 'start-target-picker' })}
+      data-variant={target.picking ? 'danger' : target.selectedUrl ? 'default' : 'primary'}
+      onClick={() => dispatch(action)}
     >
-      Set host image
+      {label}
     </button>
   );
 }
 
-function SelectedTargetActions({ target, dispatch }: Omit<TargetPickerProps, 'privacyMode'>) {
-  if (!target.selectedUrl) return null;
+function TargetControls({ target, dispatch }: Omit<TargetPickerProps, 'privacyMode'>) {
   const onFitChange = (event: ChangeEvent<HTMLSelectElement>) => {
     if (isObjectFitMode(event.target.value)) dispatch({ name: 'target/set-object-fit', mode: event.target.value });
   };
   return (
-    <>
-      <button
-        type="button"
-        className="image-trail-ds__button"
-        data-variant="default"
-        aria-pressed={target.fillScreen}
-        onClick={() => dispatch({ name: 'target/fill-screen', enabled: !target.fillScreen })}
-      >
-        {target.fillScreen ? 'Fit in page' : 'Fill screen'}
-      </button>
-      <label className="image-trail-panel__target-fit">
-        <span>Fit</span>
-        <select
-          className="image-trail-ds__select image-trail-panel__target-fit-select"
-          aria-label="Preview object fit"
-          value={target.objectFit}
-          onChange={onFitChange}
-        >
-          {OBJECT_FIT_MODES.map((mode) => (
-            <option key={mode} value={mode}>
-              {mode}
-            </option>
-          ))}
-        </select>
-      </label>
-      {target.selectedDimensions ? (
-        <span className="image-trail-ds__badge image-trail-panel__target-badge is-selected" data-tone="selected">
-          {target.selectedDimensions}
-        </span>
-      ) : null}
-    </>
+    <details className="image-trail-panel__target-controls">
+      <summary className="image-trail-panel__target-controls-summary" aria-label="Show target controls">
+        <span aria-hidden="true">•••</span>
+      </summary>
+      <span className="image-trail-panel__actions image-trail-ds__target-actions">
+        <TargetButton target={target} dispatch={dispatch} />
+        {target.selectedUrl ? (
+          <>
+            <button
+              type="button"
+              className="image-trail-ds__button"
+              aria-pressed={target.fillScreen}
+              onClick={() => dispatch({ name: 'target/fill-screen', enabled: !target.fillScreen })}
+            >
+              {target.fillScreen ? 'Fit in page' : 'Fill screen'}
+            </button>
+            <label className="image-trail-panel__target-fit">
+              <span>Fit</span>
+              <select
+                className="image-trail-ds__select image-trail-panel__target-fit-select"
+                aria-label="Preview object fit"
+                value={target.objectFit}
+                onChange={onFitChange}
+              >
+                {OBJECT_FIT_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : null}
+      </span>
+    </details>
   );
 }
 
 function TargetPickerContent({ target, dispatch, privacyMode }: TargetPickerProps) {
-  const description = target.grabModeActive
-    ? 'Grab Mode is active. Click page images to add them to the queue.'
-    : target.selectedUrl
-      ? 'Rows and URL edits project into this host image.'
-      : `Choose which page image receives the current edited URL. ${target.candidateCount} candidate${target.candidateCount === 1 ? '' : 's'} detected.`;
-  const url = targetUrl(target, privacyMode);
   return (
     <>
       <summary className="image-trail-panel__target-summary image-trail-ds__section-header">
         <h3 className="image-trail-ds__section-title">Host target</h3>
-        <span className="image-trail-ds__badge image-trail-panel__target-count" data-tone="count">
-          {target.candidateCount} candidate{target.candidateCount === 1 ? '' : 's'}
-        </span>
       </summary>
-      <div className="image-trail-panel__target-body">
-        <p className="image-trail-panel__meta">{description}</p>
-        <p
-          className={`image-trail-panel__target-url${privacyMode && target.selectedUrl ? ' is-privacy-masked' : ''}`}
-          title={privacyMode && target.selectedUrl ? 'Privacy mode is hiding this URL for screen sharing.' : (target.selectedUrl ?? url)}
-        >
-          {url}
-        </p>
-        <div className="image-trail-panel__actions image-trail-ds__target-actions">
-          <TargetButton target={target} dispatch={dispatch} />
-          <SelectedTargetActions target={target} dispatch={dispatch} />
-        </div>
+      <div className="image-trail-panel__target-card image-trail-ds__card">
+        <TargetThumbnail target={target} privacyMode={privacyMode} />
+        <TargetIdentity target={target} privacyMode={privacyMode} />
+        <TargetControls target={target} dispatch={dispatch} />
       </div>
     </>
   );

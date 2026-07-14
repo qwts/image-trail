@@ -9,6 +9,7 @@ import {
   fixtureUrl,
   imageNavigationSnapshot,
   openFixturePage,
+  openTargetControls,
   panelStatus,
   setLoadFailureFeedback,
   test,
@@ -26,7 +27,9 @@ async function expectSelectedImage(page: Parameters<typeof imageNavigationSnapsh
 async function openHostTargetDetails(page: Parameters<typeof imageNavigationSnapshot>[0]): Promise<void> {
   const release = page.getByRole('button', { name: 'Release host image' });
   if (await release.isVisible()) return;
-  await page.locator('.image-trail-panel__target-summary').click();
+  const target = page.locator('.image-trail-panel__target-utility');
+  if ((await target.getAttribute('open')) === null) await page.locator('.image-trail-panel__target-summary').click();
+  await openTargetControls(page);
   await expect(release).toBeVisible();
 }
 
@@ -152,7 +155,7 @@ test('surfaces the build-info overlay toggle in Settings', async ({ page, servic
   await expectPanelOpen(page);
 
   await page.getByRole('button', { name: 'Show settings' }).click();
-  await page.getByText('Maintenance', { exact: true }).click();
+  await page.getByText('System', { exact: true }).click();
 
   const toggle = page.getByLabel('Show build info overlay');
   await expect(toggle).toBeVisible();
@@ -256,7 +259,8 @@ test('single-image page auto-selects the host target on panel open', async ({ pa
 
   await expectSelectedImage(page, primaryImage);
   await expectPanelStatusMessage(page, /Auto-selected .*asset-one\.svg/u);
-  await expect(page.locator('.image-trail-panel__target-badge')).toHaveText('180×120');
+  await expect(page.locator('.image-trail-panel__target-badge')).toHaveText('Selected');
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('single image');
   await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl(fixtureAssetPaths.assetOne));
 });
 
@@ -267,6 +271,7 @@ test('multi-image page requires picking and marks only the selected target', asy
   await expectPanelOpen(page);
 
   await expectPanelStatusMessage(page, '3 qualifying images found. Pick one target image.');
+  await openTargetControls(page);
   await page.getByRole('button', { name: 'Set host image' }).click();
   await expectPanelStatusMessage(page, 'Pick mode is active. 3 image candidates available.');
   await page.locator('#fixture-image-two').click();
@@ -275,6 +280,7 @@ test('multi-image page requires picking and marks only the selected target', asy
   await expect(page.locator('#fixture-image-one')).not.toHaveAttribute('data-image-trail-selected', 'true');
   await expect(page.locator('#fixture-image-three')).not.toHaveAttribute('data-image-trail-selected', 'true');
   await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl(fixtureAssetPaths.assetTwo));
+  await openTargetControls(page);
   await expect(page.getByRole('button', { name: 'Release host image' })).toBeVisible();
 });
 

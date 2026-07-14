@@ -195,7 +195,7 @@ async function waitForDownloadRequests(serviceWorker: Worker, count: number) {
 }
 
 async function encryptedOriginalsStorageText(page: Page): Promise<string> {
-  await openSettingsGroup(page, 'Maintenance');
+  await openSettingsGroup(page, 'System');
   const usage = page
     .locator('.image-trail-panel__storage-health dt', { hasText: 'Encrypted originals' })
     .locator('xpath=following-sibling::dd[1]');

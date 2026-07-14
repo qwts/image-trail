@@ -28,7 +28,74 @@ export function createSettingsSection(
   urlContext: SettingsUrlContext,
   dispatch: (action: PanelAction) => void,
 ): HTMLElement {
-  const importExportState: ImportExportViewState = {
+  const importExportState = importExportViewState(state);
+  const cloudBackupState = cloudBackupProviderState(state);
+
+  return createSettingsView(
+    state.bookmarkLimit,
+    {
+      limit: state.recentHistoryLimit,
+      retainedLimit: state.recentHistoryRetainedLimit,
+      overflowBehavior: state.recentHistoryOverflowBehavior,
+      sparseRowDisplayMode: state.recentSparseRowDisplayMode,
+    },
+    state.privacyModeEnabled,
+    state.searchableMetadataPolicy,
+    state.urlTemplates,
+    state.grabSourcePatterns,
+    urlContext.activeTemplateId,
+    urlContext.fields,
+    {
+      pinSaveStoragePreference: state.pinSaveStoragePreference,
+      blobKeyUnlocked: state.blobKeyUnlocked,
+      blobKeyAvailable: state.blobKeyAvailable,
+    },
+    {
+      visibleQueueCount: state.bookmarks.length,
+      recallCount: recallDeleteCountForQueue(state),
+      busy: state.importExportBusy || state.recall.busy,
+    },
+    state.storageUsage,
+    { identity: state.buildIdentity, overlayVisible: state.buildInfoOverlayVisible },
+    { limit: state.urlReviewStatusLimit, clearAfterExport: state.clearUrlReviewStatusAfterExport },
+    {
+      minimumIntervalMs: state.requestThrottleMs,
+      maxRequests: state.requestThrottleMaxRequests,
+      windowMs: state.requestThrottleWindowMs,
+    },
+    {
+      enabled: state.neighborPreloadEnabled,
+      radius: state.neighborPreloadRadius,
+      cacheLimit: state.neighborPreloadCacheLimit,
+      probeMethod: state.neighborPreloadProbeMethod,
+      feedback: state.loadFailureFeedback,
+    },
+    state.restoreWorkspaceLayoutEnabled,
+    {
+      privacy: [
+        createEncryptionView(
+          {
+            unlocked: state.blobKeyUnlocked,
+            keyReference: state.blobKeyReference,
+            hasKey: state.blobKeyAvailable,
+            busy: state.importExportBusy,
+            abandonedOriginalCount: state.storageUsage?.orphanedBlobCount ?? 0,
+          },
+          dispatch,
+        ),
+      ],
+      utilities: [
+        createImageTransferView(importExportState, dispatch),
+        createImportExportView(importExportState, dispatch),
+        createCloudBackupView(cloudBackupState, dispatch),
+      ],
+    },
+    dispatch,
+  );
+}
+
+function importExportViewState(state: PanelState): ImportExportViewState {
+  return {
     busy: state.importExportBusy,
     currentImageUrl: state.target.selectedUrl,
     selectedHistoryCount: state.selectedHistoryIds.length,
@@ -49,7 +116,10 @@ export function createSettingsSection(
     lastMessageIsError: state.importExportMessageIsError,
     restorePreview: state.importRestorePreview,
   };
-  const cloudBackupState: CloudBackupProviderState = {
+}
+
+function cloudBackupProviderState(state: PanelState): CloudBackupProviderState {
+  return {
     provider: 'pcloud',
     connectionState: state.pcloudBackup.connectionState,
     apiHost: state.pcloudBackup.apiHost,
@@ -90,70 +160,6 @@ export function createSettingsSection(
     message: state.pcloudBackup.message,
     messageIsError: state.pcloudBackup.messageIsError,
   };
-
-  return createSettingsView(
-    state.bookmarkLimit,
-    {
-      limit: state.recentHistoryLimit,
-      retainedLimit: state.recentHistoryRetainedLimit,
-      overflowBehavior: state.recentHistoryOverflowBehavior,
-      sparseRowDisplayMode: state.recentSparseRowDisplayMode,
-    },
-    state.privacyModeEnabled,
-    state.searchableMetadataPolicy,
-    state.urlTemplates,
-    state.grabSourcePatterns,
-    urlContext.activeTemplateId,
-    urlContext.fields,
-    {
-      pinSaveStoragePreference: state.pinSaveStoragePreference,
-      blobKeyUnlocked: state.blobKeyUnlocked,
-      blobKeyAvailable: state.blobKeyAvailable,
-    },
-    {
-      visibleQueueCount: state.bookmarks.length,
-      recallCount: recallDeleteCountForQueue(state),
-      busy: state.importExportBusy || state.recall.busy,
-    },
-    state.storageUsage,
-    {
-      identity: state.buildIdentity,
-      overlayVisible: state.buildInfoOverlayVisible,
-    },
-    {
-      limit: state.urlReviewStatusLimit,
-      clearAfterExport: state.clearUrlReviewStatusAfterExport,
-    },
-    {
-      minimumIntervalMs: state.requestThrottleMs,
-      maxRequests: state.requestThrottleMaxRequests,
-      windowMs: state.requestThrottleWindowMs,
-    },
-    {
-      enabled: state.neighborPreloadEnabled,
-      radius: state.neighborPreloadRadius,
-      cacheLimit: state.neighborPreloadCacheLimit,
-      probeMethod: state.neighborPreloadProbeMethod,
-      feedback: state.loadFailureFeedback,
-    },
-    state.restoreWorkspaceLayoutEnabled,
-    [
-      createEncryptionView(
-        {
-          unlocked: state.blobKeyUnlocked,
-          keyReference: state.blobKeyReference,
-          hasKey: state.blobKeyAvailable,
-          busy: state.importExportBusy,
-          abandonedOriginalCount: state.storageUsage?.orphanedBlobCount ?? 0,
-        },
-        dispatch,
-      ),
-      createImageTransferView(importExportState, dispatch),
-      createCloudBackupView(cloudBackupState, dispatch),
-      createImportExportView(importExportState, dispatch),
-    ],
-    dispatch,
-  );
 }
 
 function selectedRecordCount(state: PanelState): number {

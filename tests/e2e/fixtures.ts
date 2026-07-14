@@ -220,6 +220,13 @@ export async function applyUrlInEditor(page: Page, url: string): Promise<void> {
   await editor.press('Enter');
 }
 
+export async function openTargetControls(page: Page): Promise<void> {
+  const details = page.locator('.image-trail-panel__target-controls').filter({ visible: true }).first();
+  if ((await details.getAttribute('open')) !== null) return;
+  await details.locator('summary').click();
+  await expect(details).toHaveAttribute('open', '');
+}
+
 // Sets the parsed-field load-failure feedback mode (#450). The control lives in Settings → Automation
 // → Preload; the default is Mute, so tests that assert a red field ring or an HTTP-error status must
 // opt into Display/Alert. Self-contained: opens Settings, selects the mode, then closes Settings so

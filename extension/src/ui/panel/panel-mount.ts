@@ -1,5 +1,5 @@
 const ROOT_ID = 'image-trail-panel-root';
-const STYLE_PATH = 'src/ui/styles/panel.css';
+const STYLE_PATH = 'src/ui/styles/panel-entry.css';
 const STYLES_READY_FALLBACK_MS = 300;
 
 /**

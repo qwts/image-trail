@@ -105,5 +105,10 @@ test('manifest exposes panel stylesheet imports to content pages', () => {
   const resources = loadManifest().web_accessible_resources?.flatMap((entry) => entry.resources ?? []) ?? [];
 
   assert.ok(resources.includes('src/ui/styles/panel.css'), 'panel stylesheet should be web-accessible');
+  assert.ok(resources.includes('src/ui/styles/panel-entry.css'), 'panel entry stylesheet should be web-accessible');
+  assert.ok(resources.includes('src/ui/styles/handoff-baseline.css'), 'handoff stylesheet should be web-accessible');
+  for (const name of ['foundation', 'sections', 'controls', 'cloud', 'settings', 'records']) {
+    assert.ok(resources.includes(`src/ui/styles/panel-legacy-${name}.css`), `${name} panel module should be web-accessible`);
+  }
   assert.ok(resources.includes('src/ui/styles/fields.css'), 'imported parsed-fields stylesheet should be web-accessible');
 });

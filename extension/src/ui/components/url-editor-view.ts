@@ -30,7 +30,7 @@ export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEdi
         multiline: true,
         privacyMasked: true,
         maskedPlaceholder: PRIVACY_URL_TEXT,
-        rows: state.isDataUrl ? 1 : 4,
+        rows: state.isDataUrl ? 1 : 3,
         wrap: 'soft',
         spellcheck: false,
         disabled: state.url === null || state.isDataUrl === true,
@@ -41,7 +41,7 @@ export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEdi
         ariaLabel: 'Full image URL',
         multiline: true,
         value: state.isDataUrl ? 'data URL' : (state.url ?? ''),
-        rows: state.isDataUrl ? 1 : 4,
+        rows: state.isDataUrl ? 1 : 3,
         wrap: 'soft',
         spellcheck: false,
         disabled: state.url === null || state.isDataUrl === true,
@@ -55,6 +55,7 @@ export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEdi
   const applyUrl = (): void => {
     if (state.isDataUrl) return;
     callbacks.onApply(state.privacyMode ? (state.url ?? '') : value.value);
+    syncEditorStatus();
   };
 
   value.addEventListener('keydown', (event) => {
@@ -72,18 +73,38 @@ export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEdi
     callbacks.onRejectUnsupportedInput?.();
   });
 
+  const apply = createButton({
+    label: 'Apply to Host',
+    variant: 'primary',
+    disabled: true,
+    onClick: applyUrl,
+  });
+  const copy = createButton({
+    label: 'Copy',
+    variant: 'ghost',
+    disabled: state.url === null,
+    onClick: () => void navigator.clipboard?.writeText(state.privacyMode ? (state.url ?? '') : value.value),
+  });
+  const status = document.createElement('span');
+  status.className = 'image-trail-panel__url-editor-status';
+  const syncEditorStatus = (): void => {
+    const applied = state.url !== null && value.value === (state.isDataUrl ? 'data URL' : state.url);
+    apply.disabled = state.url === null || state.isDataUrl === true || state.privacyMode === true || applied;
+    status.classList.toggle('is-applied', applied);
+    status.textContent = applied ? 'in address bar' : 'not applied — refresh reverts';
+  };
+  value.addEventListener('input', syncEditorStatus);
+
   const footer = document.createElement('div');
   footer.className = 'image-trail-panel__url-editor-footer';
+  const actions = document.createElement('span');
+  actions.className = 'image-trail-panel__url-editor-actions';
+  actions.append(apply, copy);
   const hint = document.createElement('span');
   hint.className = 'image-trail-panel__url-editor-hint';
   hint.append(createKbd('Enter'), document.createTextNode(' apply URL'));
-  const apply = createButton({
-    label: 'Apply URL',
-    variant: 'primary',
-    disabled: state.url === null || state.isDataUrl === true,
-    onClick: applyUrl,
-  });
-  footer.append(hint, apply);
+  footer.append(actions, status, hint);
+  syncEditorStatus();
   wrapper.append(heading, value, footer);
   return wrapper;
 }

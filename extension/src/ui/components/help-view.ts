@@ -1,6 +1,7 @@
 import { createShortcutSettingsView } from './shortcut-settings-view.js';
 import { applySettingsPrimitiveContracts } from './settings-primitive-contracts.js';
 import { createSectionHeader } from './primitives.js';
+import { createSettingsDisclosure } from './settings-disclosure.js';
 
 interface HelpFeatureEntry {
   readonly label: string;
@@ -49,7 +50,7 @@ const HELP_FEATURES: readonly HelpFeatureEntry[] = [
   },
   {
     label: 'Settings',
-    description: 'The gear toggles grouped settings: Display, Privacy, Automation, Shortcuts, Maintenance, and URL learning.',
+    description: 'The gear toggles grouped settings: Display, Privacy, Automation, Utilities, and System.',
   },
 ];
 
@@ -64,12 +65,6 @@ export function createHelpView(): HTMLElement {
 
   const header = createSectionHeader({ title: 'Help', className: 'image-trail-panel__section-header' });
 
-  const shortcutsHeading = document.createElement('h4');
-  shortcutsHeading.textContent = 'Keyboard shortcuts';
-
-  const featuresHeading = document.createElement('h4');
-  featuresHeading.textContent = 'Feature guide';
-
   const features = document.createElement('dl');
   features.className = 'image-trail-panel__help-features';
   for (const feature of HELP_FEATURES) {
@@ -80,7 +75,20 @@ export function createHelpView(): HTMLElement {
     features.append(label, description);
   }
 
-  section.append(header, shortcutsHeading, createShortcutSettingsView(), featuresHeading, features);
+  const workspaceNote = document.createElement('p');
+  workspaceNote.className = 'image-trail-panel__meta';
+  workspaceNote.textContent =
+    'Every workspace section can detach into a floating window. Drag a section heading out, minimize the window with −, and restore it with ×.';
+  const about = document.createElement('p');
+  about.className = 'image-trail-panel__meta';
+  about.textContent = 'Image Trail keeps session Recents transient and durable pins in the extension-owned queue.';
+
+  section.append(
+    header,
+    createSettingsDisclosure('Shortcuts', 'help-shortcuts', [createShortcutSettingsView()], { defaultOpen: true }),
+    createSettingsDisclosure('Workspace', 'help-workspace', [workspaceNote, features]),
+    createSettingsDisclosure('About', 'help-about', [about]),
+  );
   applySettingsPrimitiveContracts(section);
   return section;
 }

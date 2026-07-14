@@ -113,7 +113,7 @@ async function deleteVisibleRecents(page: Page): Promise<void> {
 }
 
 async function deleteVisibleQueueRows(page: Page): Promise<void> {
-  await openSettingsGroup(page, 'Maintenance');
+  await openSettingsGroup(page, 'System');
   const deleteCurrent = page.getByRole('button', { name: /^Delete current queue \(\d+\)$/u });
   if ((await deleteCurrent.count()) > 0 && !(await deleteCurrent.isDisabled())) {
     await deleteCurrent.click();
