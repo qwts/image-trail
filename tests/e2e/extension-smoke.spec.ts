@@ -19,6 +19,10 @@ import {
 const primaryImage = '#fixture-primary-image';
 const primarySource = '#fixture-primary-source';
 
+function recentRowForUrl(page: Parameters<typeof imageNavigationSnapshot>[0], url: string) {
+  return page.locator(`.image-trail-panel__history-item[data-image-trail-row-id$="${url}"]`);
+}
+
 async function expectSelectedImage(page: Parameters<typeof imageNavigationSnapshot>[0], selector: string): Promise<void> {
   await expect(page.locator(selector)).toHaveAttribute('data-image-trail-selected', 'true');
   await expect(page.locator(selector)).toHaveCSS('outline-style', 'solid');
@@ -342,7 +346,8 @@ test('recent preview projects into selected host image and guards repeated curre
   const projectedTwo = await imageNavigationSnapshot(page, primaryImage);
   expect(projectedTwo.src).toMatch(/^data:image\/svg\+xml;base64,/u);
 
-  const assetOneRecent = page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' });
+  const assetOneUrl = fixtureUrl(fixtureAssetPaths.assetOne);
+  const assetOneRecent = recentRowForUrl(page, assetOneUrl);
   // A single click only selects (#426); the projected image must stay asset-two.
   await assetOneRecent.click();
   await expect(assetOneRecent).toHaveClass(/is-selected/u);
@@ -357,7 +362,7 @@ test('recent preview projects into selected host image and guards repeated curre
 
   // Enter exercises the repeated-preview guard with one activation. A synthetic second dblclick
   // can lose its final event when the first click rerenders the row under Playwright.
-  await page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' }).press('Enter');
+  await assetOneRecent.press('Enter');
   await expectPanelStatusMessage(page, 'Recent image is already projected into the selected host element.');
   expect(await imageNavigationSnapshot(page, primaryImage)).toEqual(projectedOne);
 });
@@ -371,7 +376,7 @@ test('focused recent row loads on Enter after arrow navigation (#390)', async ({
   await expectPanelStatusMessage(page, /Loaded .*asset-two\.svg/u);
 
   const assetTwoRecent = page.locator('.image-trail-panel__history-item', { hasText: 'asset-two.svg' });
-  const assetOneRecent = page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' });
+  const assetOneRecent = recentRowForUrl(page, fixtureUrl(fixtureAssetPaths.assetOne));
   await assetTwoRecent.click();
   await expect(assetTwoRecent).toBeFocused();
   await page.keyboard.press('ArrowDown');
@@ -401,7 +406,7 @@ test('previewing a recent after a failed load updates the URL editor and parsed 
 
   // Double-click projecting a recent must supersede the failed draft: the URL editor and the
   // parsed-field derivation follow the projected record, not the dead address.
-  const failedDraftRecent = page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' });
+  const failedDraftRecent = recentRowForUrl(page, fixtureUrl(fixtureAssetPaths.assetOne));
   // The first click selects and rerenders the row. Resolve the locator again for the second click
   // so this exercises the product's cross-render double-click tracker instead of a stale node.
   await failedDraftRecent.click();
