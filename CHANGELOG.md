@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.5.0
+
+### Minor Changes
+
+- bb93d32: Align the injected panel, Settings, Help, capture feedback, and detached-window presentation with the approved design-system handoff, and add versioned visual-acceptance coverage for every supplied screenshot.
+
 ## 0.4.0
 
 ### Minor Changes
