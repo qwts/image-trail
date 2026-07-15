@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.11.0
+
+### Minor Changes
+
+- 2884396: Add metadata-only source, record-kind, and image-type filters to Gallery.
+
 ## 0.10.2
 
 ### Patch Changes
