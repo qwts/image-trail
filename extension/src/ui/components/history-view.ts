@@ -22,7 +22,8 @@ export function createHistoryView(
   const sectionOpen = options?.sectionOpen !== false;
   const collapsible = options?.collapsible !== false;
   const scope = options?.scope ?? DEFAULT_RECENT_HISTORY_SCOPE;
-  const header = createHistoryHeader(sectionOpen, collapsible, scope, dispatch, options);
+  const header = createHistoryHeader(sectionOpen, collapsible, options?.displayOrder ?? DEFAULT_RECENT_DISPLAY_ORDER, dispatch);
+  const scopeRow = createHistoryScopeRow(scope, options?.pageUrl ?? window.location.href, options?.privacyMode === true, dispatch);
   const sectionActions = document.createElement('div');
   sectionActions.className = 'image-trail-panel__section-actions image-trail-panel__history-actions';
   if (displayItems.length > 0) {
@@ -228,7 +229,7 @@ export function createHistoryView(
     selectedIds.length > 0
       ? `${selectedIds.length} recent item(s) selected for export.`
       : 'Cmd/Ctrl-click rows to select recent items for export. Shift-click selects a range.';
-  section.append(header);
+  section.append(header, scopeRow);
   if (displayItems.length) section.append(sectionActions);
   // Collapsed (#438): the heading and bulk-action rows stay; the list content hides.
   if (sectionOpen) {
@@ -241,9 +242,8 @@ export function createHistoryView(
 function createHistoryHeader(
   sectionOpen: boolean,
   collapsible: boolean,
-  scope: RecentHistoryScope,
+  displayOrder: RecentDisplayOrder,
   dispatch: (action: HistoryAction) => void,
-  options?: HistoryViewOptions,
 ): HTMLElement {
   const heading = document.createElement('h3');
   heading.textContent = 'Recent history';
@@ -273,14 +273,23 @@ function createHistoryHeader(
   }
   const toolbar = document.createElement('div');
   toolbar.className = 'image-trail-panel__history-toolbar';
-  toolbar.append(
-    createRecentScopeControl(scope, options?.pageUrl ?? window.location.href, options?.privacyMode === true, (nextScope) =>
-      dispatch({ name: 'history/update-scope', scope: nextScope }),
-    ),
-    createRecentSortControl(options?.displayOrder ?? DEFAULT_RECENT_DISPLAY_ORDER, dispatch),
-  );
+  toolbar.append(createRecentSortControl(displayOrder, dispatch));
   header.append(heading, toolbar);
   return header;
+}
+
+function createHistoryScopeRow(
+  scope: RecentHistoryScope,
+  pageUrl: string,
+  privacyMode: boolean,
+  dispatch: (action: HistoryAction) => void,
+): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'image-trail-panel__history-context';
+  row.append(
+    createRecentScopeControl(scope, pageUrl, privacyMode, (nextScope) => dispatch({ name: 'history/update-scope', scope: nextScope })),
+  );
+  return row;
 }
 
 function createRecentSortControl(order: RecentDisplayOrder, dispatch: (action: HistoryAction) => void): HTMLSelectElement {
