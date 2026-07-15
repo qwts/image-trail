@@ -144,7 +144,25 @@ test('named placement transitions share one registry and persist changed v2 stat
   harness.controller.moveSection('history', rect(80, 90));
   await flushAsync();
   assert.equal(harness.placements.get('history')?.mode, 'floating');
+  assert.equal(harness.placements.get('history')?.floatingSizeMode, 'auto');
   assert.equal(harness.store.saves, 3);
+
+  harness.controller.resizeSection('history', { ...rect(80, 90), width: 410, height: 480 });
+  await flushAsync();
+  assert.equal(harness.placements.get('history')?.floatingSizeMode, 'user');
+  assert.deepEqual(harness.placements.get('history')?.floatingRect, { left: 80, top: 90, width: 410, height: 480 });
+  assert.equal(harness.store.saves, 4);
+});
+
+test('reattaching Recents or Queue resets the next detached window to automatic sizing', () => {
+  const harness = createHarness({ detachedSections: ['history'] });
+  harness.controller.prepareDetachedSection('history', rect(10, 12));
+  harness.controller.resizeSection('history', { ...rect(10, 12), height: 500 });
+  assert.equal(harness.placements.get('history')?.floatingSizeMode, 'user');
+
+  harness.controller.restoreSection('history');
+  harness.controller.prepareDetachedSection('history', rect(40, 50));
+  assert.equal(harness.placements.get('history')?.floatingSizeMode, 'auto');
 });
 
 test('opted-in attached collapse is captured in the same v2 section registry', async () => {

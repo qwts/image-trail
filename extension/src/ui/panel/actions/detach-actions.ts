@@ -2,7 +2,14 @@ import type { ActionEntries } from '../action-dispatch.js';
 import type { PanelActionDeps } from './deps.js';
 
 export type DetachableSectionActionName =
-  'section/detach' | 'section/restore' | 'workspace/move' | 'workspace/snap' | 'workspace/unsnap' | 'workspace/shade' | 'workspace/reorder';
+  | 'section/detach'
+  | 'section/restore'
+  | 'workspace/move'
+  | 'workspace/resize'
+  | 'workspace/snap'
+  | 'workspace/unsnap'
+  | 'workspace/shade'
+  | 'workspace/reorder';
 
 /**
  * Detachable-section lifecycle (issue #215): reduce, rerender, then hand keyboard focus across the
@@ -38,6 +45,11 @@ export function buildDetachableSectionActionEntries(deps: PanelActionDeps): Acti
     'workspace/move': {
       handle(action) {
         deps.moveWorkspaceSection(action.sectionId, action.floatingRect);
+      },
+    },
+    'workspace/resize': {
+      handle(action) {
+        deps.resizeWorkspaceSection(action.sectionId, action.floatingRect);
       },
     },
     'workspace/unsnap': {

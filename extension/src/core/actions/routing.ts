@@ -18,6 +18,7 @@ export const PANEL_ACTION_DOMAINS = {
   'section/detach': 'panel-session',
   'section/restore': 'panel-session',
   'workspace/move': 'panel-session',
+  'workspace/resize': 'panel-session',
   'workspace/snap': 'panel-session',
   'workspace/unsnap': 'panel-session',
   'workspace/shade': 'panel-session',

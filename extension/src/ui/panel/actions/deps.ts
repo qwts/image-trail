@@ -105,6 +105,10 @@ export interface PanelActionDeps {
     sectionId: import('../../../core/workspace-layout.js').DetachableSectionId,
     rect: import('../../../core/workspace-layout.js').WorkspaceFloatingRect,
   ): void;
+  resizeWorkspaceSection(
+    sectionId: import('../../../core/workspace-layout.js').DetachableSectionId,
+    rect: import('../../../core/workspace-layout.js').WorkspaceFloatingRect,
+  ): void;
   snapWorkspaceSection(
     sectionId: import('../../../core/workspace-layout.js').DetachableSectionId,
     edge: import('../../../core/workspace-layout.js').WorkspaceRailEdge,

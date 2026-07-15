@@ -95,12 +95,12 @@
             "tests/workspace-rails-feasibility.test.ts",
             "tests/dom/detachable-section.test.ts"
           ],
-          "notes": "Covers v2 schema sanitization and legacy migration, install-secret HMAC keys without raw URL persistence, one placement registry, panel and section restoration, shade/snap/unsnap/reorder transitions, pointer thresholds, viewport clamping and rail fallback, React DOM adoption, focus, and scroll preservation."
+          "notes": "Covers v2 schema sanitization and legacy migration, install-secret HMAC keys without raw URL persistence, one placement registry, panel and section restoration, shade/snap/unsnap/reorder/resize transitions, automatic-versus-user floating size ownership, pointer thresholds, viewport clamping and rail fallback, React DOM adoption, focus, and scroll preservation."
         },
         {
           "type": "storybook",
           "path": "extension/src/ui/render.stories.ts",
-          "notes": "Covers the handoff-sized left and top rail compositions, ordered cards, a floating window, React action dispatch, and representative Queue, Recents, and Controls bodies."
+          "notes": "Covers the handoff-sized left and top rail compositions, ordered cards, automatic Recents and user-sized Queue windows, React resize action dispatch, and representative Queue, Recents, and Controls bodies."
         },
         {
           "type": "playwright-e2e",
@@ -111,9 +111,10 @@
             "tests/e2e/workspace-lifecycle.spec.ts",
             "tests/e2e/workspace-accessibility.spec.ts",
             "tests/e2e/workspace-reload-persistence.spec.ts",
-            "tests/e2e/workspace-visual-states.spec.ts"
+            "tests/e2e/workspace-visual-states.spec.ts",
+            "tests/e2e/detached-auto-grow.spec.ts"
           ],
-          "notes": "Covers packaged four-edge snapping, pointer and keyboard previews, shade versus attached collapse, button and threshold-drag unsnap with cancel, rail order, extension-surface panel collision resolution, responsive rail fallback and clamping, focus handoff, deterministic floating/shaded/railed/restored artifacts, private persisted restore and reset across extension restart, local build-overlay stacking, and the overlay-only boundary across responsive, fixed/sticky, feed, nested-scroll, RTL, iframe, transformed-root, SPA, navigation, fullscreen, zoom-equivalent, narrow, reduced-motion, coarse-pointer, interrupted-drag, and exact host-baseline cases."
+          "notes": "Covers packaged four-edge snapping, pointer and keyboard previews, shade versus attached collapse, button and threshold-drag unsnap with cancel, rail order, Recents and Queue auto-growth until manual resize, stable user-owned height with further rows, continued resize access, reattach reset, extension-surface panel collision resolution, responsive rail fallback and clamping, focus handoff, deterministic floating/shaded/railed/restored artifacts, private persisted restore and reset across extension restart, local build-overlay stacking, and the overlay-only boundary across responsive, fixed/sticky, feed, nested-scroll, RTL, iframe, transformed-root, SPA, navigation, fullscreen, zoom-equivalent, narrow, reduced-motion, coarse-pointer, interrupted-drag, and exact host-baseline cases."
         },
         {
           "type": "manual",
@@ -1092,7 +1093,7 @@
             "tests/workspace-rails-feasibility.test.ts",
             "tests/dom/panel-layout-settings-view.test.ts"
           ],
-          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X). #217 Settings detach: detach control, window/placeholder conditional on the active Settings destination, wider window default, settings-action routing from the window, and the Escape-in-editable-control guard. #215 completion: Queue (bookmarks) detach, drag-out gesture (threshold, ghost cleanup, drop-position seeding, click suppression), and settings-section state branches. #408: registry-driven eligibility asserted across every section id (URL editor, Host target, Field Editor, Manual controls, Recents, Queue, Settings), summary-backed detach control placement beside the Show/Hide tail, section-surface drag-out with interactive-origin filtering, and Escape cancelling both surface drags and window drags. #398 per-site workspace persistence: layout sanitize/capture/equality helpers, restore gating on the opt-in flag, hydration of detached sections + positions + minimized state, debounced change-only saves, immediate capture on opt-in, reset clearing storage and reattaching, teardown-invalidated restores, and the settings-view toggle/reset dispatch contract. #520 adds the reflow strategy matrix, viewport geometry and pointer thresholds, overlay/adapter decision, and salted opaque URL-structure key prototype. #248 verifies the renamed Field Editor title in detached window accessibility labels."
+          "notes": "Covers detach/restore reducer idempotence plus the DOM contract: header detach control dispatch, placeholder restore, dialog window rendering with section content, Escape restore, title drag position + layout-state persistence, list-scroll preservation across rerenders, and minimized clearing, plus the #397 window chrome: minimize toggle (collapse, aria-expanded, layout-state persistence across rerenders) and close-to-restore (X). #217 Settings detach: detach control, window/placeholder conditional on the active Settings destination, wider window default, settings-action routing from the window, and the Escape-in-editable-control guard. #215 completion: Queue (bookmarks) detach, drag-out gesture (threshold, ghost cleanup, drop-position seeding, click suppression), and settings-section state branches. #408: registry-driven eligibility asserted across every section id (URL editor, Host target, Field Editor, Manual controls, Recents, Queue, Settings), summary-backed detach control placement beside the Show/Hide tail, section-surface drag-out with interactive-origin filtering, and Escape cancelling both surface drags and window drags. #398 per-site workspace persistence: layout sanitize/capture/equality helpers, restore gating on the opt-in flag, hydration of detached sections + positions + minimized state, debounced change-only saves, immediate capture on opt-in, reset clearing storage and reattaching, teardown-invalidated restores, and the settings-view toggle/reset dispatch contract. #520 adds the reflow strategy matrix, viewport geometry and pointer thresholds, overlay/adapter decision, and salted opaque URL-structure key prototype. #572 adds content-driven Recents and Queue height, explicit user resize ownership, persisted manual geometry, and reattach reset. #248 verifies the renamed Field Editor title in detached window accessibility labels."
         },
         {
           "type": "storybook",
@@ -1105,8 +1106,12 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/detachable-sections.spec.ts", "tests/e2e/workspace-rails-spike.spec.ts"],
-          "notes": "Browser-level detach/restore: floating dialog + placeholder, minimize/expand, close-to-restore with focus hand-off, drag-out placement at the drop point, Escape restore, and detached Settings following the gear toggle without duplication; #408 adds heading-surface drag-out placement and Escape mid-drag cancel. #398 adds the reload round-trip: opt in, detach + drag + minimize, reload restores the arrangement at the saved position, and Reset workspace layout reattaches everything. #520 uses disposable host fixtures to prove overlay cleanup and expose root-inset responsive/fixed failures, wrapper direct-child breakage, transform/layout divergence, and overlay fallback across responsive, fixed/sticky, feed, nested-scroll, iframe, transformed-root, fullscreen, RTL, SPA, and Shadow DOM layouts."
+          "paths": [
+            "tests/e2e/detachable-sections.spec.ts",
+            "tests/e2e/workspace-rails-spike.spec.ts",
+            "tests/e2e/detached-auto-grow.spec.ts"
+          ],
+          "notes": "Browser-level detach/restore: floating dialog + placeholder, minimize/expand, close-to-restore with focus hand-off, drag-out placement at the drop point, Escape restore, and detached Settings following the gear toggle without duplication; #408 adds heading-surface drag-out placement and Escape mid-drag cancel. #398 adds the reload round-trip: opt in, detach + drag + minimize, reload restores the arrangement at the saved position, and Reset workspace layout reattaches everything. #520 uses disposable host fixtures to prove overlay cleanup and expose root-inset responsive/fixed failures, wrapper direct-child breakage, transform/layout divergence, and overlay fallback across responsive, fixed/sticky, feed, nested-scroll, iframe, transformed-root, fullscreen, RTL, SPA, and Shadow DOM layouts. #572 verifies that detached Recents and Queue grow for new rows until manually resized, retain that user size as rows continue, remain resizable, and reset to automatic sizing after reattachment."
         }
       ]
     },

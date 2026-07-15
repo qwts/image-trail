@@ -111,6 +111,7 @@ function createHarness(): Harness {
     prepareDetachedWorkspaceSection: noop,
     restoreWorkspaceSection: noop,
     moveWorkspaceSection: noop,
+    resizeWorkspaceSection: noop,
     snapWorkspaceSection: noop,
     shadeWorkspaceSection: noop,
     reorderWorkspaceSection: noop,

@@ -8,6 +8,7 @@ export type DetachableSectionId = (typeof DETACHABLE_SECTION_IDS)[number];
 export const WORKSPACE_RAIL_EDGES = ['left', 'right', 'top', 'bottom'] as const;
 export type WorkspaceRailEdge = (typeof WORKSPACE_RAIL_EDGES)[number];
 export type WorkspaceSectionMode = 'attached' | 'floating' | 'railed';
+export type WorkspaceFloatingSizeMode = 'auto' | 'user';
 
 export interface PanelPosition {
   readonly left: number;
@@ -33,10 +34,13 @@ export interface StoredWorkspaceSectionLayout {
   readonly shaded: boolean;
   readonly collapsed: boolean;
   readonly floatingRect: WorkspaceFloatingRect | null;
+  /** Missing on layouts saved before #572; sanitize assigns the section default. */
+  readonly floatingSizeMode?: WorkspaceFloatingSizeMode | undefined;
 }
 
 export interface WorkspaceSectionLayout extends StoredWorkspaceSectionLayout {
   readonly sectionId: DetachableSectionId;
+  readonly floatingSizeMode: WorkspaceFloatingSizeMode;
 }
 
 export interface StoredWorkspaceLayout {
@@ -117,6 +121,7 @@ export function migrateLegacyWorkspaceLayout(layout: LegacyStoredWorkspaceLayout
     shaded: section.minimized,
     collapsed: false,
     floatingRect: section.position ? legacyFloatingRect(section.sectionId, section.position) : null,
+    floatingSizeMode: defaultFloatingSizeMode(section.sectionId),
   }));
   return {
     schemaVersion: WORKSPACE_LAYOUT_SCHEMA_VERSION,
@@ -153,7 +158,7 @@ export function workspaceLayoutsEqual(a: WorkspaceLayout, b: WorkspaceLayout): b
 export function floatingSection(
   sectionId: DetachableSectionId,
   floatingRect: WorkspaceFloatingRect | null,
-  options: { readonly shaded?: boolean; readonly collapsed?: boolean } = {},
+  options: { readonly shaded?: boolean; readonly collapsed?: boolean; readonly floatingSizeMode?: WorkspaceFloatingSizeMode } = {},
 ): WorkspaceSectionLayout {
   return {
     sectionId,
@@ -163,6 +168,7 @@ export function floatingSection(
     shaded: options.shaded ?? false,
     collapsed: options.collapsed ?? false,
     floatingRect,
+    floatingSizeMode: options.floatingSizeMode ?? defaultFloatingSizeMode(sectionId),
   };
 }
 
@@ -170,7 +176,12 @@ export function railedSection(
   sectionId: DetachableSectionId,
   edge: WorkspaceRailEdge,
   order: number,
-  options: { readonly shaded?: boolean; readonly collapsed?: boolean; readonly floatingRect?: WorkspaceFloatingRect | null } = {},
+  options: {
+    readonly shaded?: boolean;
+    readonly collapsed?: boolean;
+    readonly floatingRect?: WorkspaceFloatingRect | null;
+    readonly floatingSizeMode?: WorkspaceFloatingSizeMode;
+  } = {},
 ): WorkspaceSectionLayout {
   return {
     sectionId,
@@ -180,26 +191,46 @@ export function railedSection(
     shaded: options.shaded ?? false,
     collapsed: options.collapsed ?? false,
     floatingRect: options.floatingRect ?? null,
+    floatingSizeMode: options.floatingSizeMode ?? defaultFloatingSizeMode(sectionId),
   };
 }
 
 function sanitizeSection(section: StoredWorkspaceSectionLayout, sectionId: DetachableSectionId): WorkspaceSectionLayout {
   const floatingRect = finiteRect(section.floatingRect);
+  const floatingSizeMode = isFloatingSizeMode(section.floatingSizeMode) ? section.floatingSizeMode : defaultFloatingSizeMode(sectionId);
   if (section.mode === 'railed' && isWorkspaceRailEdge(section.edge)) {
     return railedSection(sectionId, section.edge, finiteOrder(section.order), {
       shaded: section.shaded,
       collapsed: section.collapsed,
       floatingRect,
+      floatingSizeMode,
     });
   }
   if (section.mode === 'floating') {
-    return floatingSection(sectionId, floatingRect, { shaded: section.shaded, collapsed: section.collapsed });
+    return floatingSection(sectionId, floatingRect, { shaded: section.shaded, collapsed: section.collapsed, floatingSizeMode });
   }
   return attachedSection(sectionId, section.collapsed);
 }
 
 export function attachedSection(sectionId: DetachableSectionId, collapsed = false): WorkspaceSectionLayout {
-  return { sectionId, mode: 'attached', edge: null, order: null, shaded: false, collapsed, floatingRect: null };
+  return {
+    sectionId,
+    mode: 'attached',
+    edge: null,
+    order: null,
+    shaded: false,
+    collapsed,
+    floatingRect: null,
+    floatingSizeMode: defaultFloatingSizeMode(sectionId),
+  };
+}
+
+function defaultFloatingSizeMode(sectionId: string): WorkspaceFloatingSizeMode {
+  return sectionId === 'history' || sectionId === 'bookmarks' ? 'auto' : 'user';
+}
+
+function isFloatingSizeMode(value: unknown): value is WorkspaceFloatingSizeMode {
+  return value === 'auto' || value === 'user';
 }
 
 function finiteOrder(order: number | null): number {
@@ -240,6 +271,7 @@ function sectionsEqual(a: WorkspaceSectionLayout, b: WorkspaceSectionLayout | un
     a.order === b.order &&
     a.shaded === b.shaded &&
     a.collapsed === b.collapsed &&
+    a.floatingSizeMode === b.floatingSizeMode &&
     rectsEqual(a.floatingRect, b.floatingRect)
   );
 }

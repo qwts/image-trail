@@ -186,6 +186,35 @@ export const WorkspaceTopRail: Story = {
     ]),
 };
 
+const workspaceSizeDispatch = fn();
+
+export const WorkspaceAutomaticAndUserSizing: Story = {
+  render: () =>
+    detachedPanelStory(
+      { detachedSections: ['history', 'bookmarks'] },
+      [
+        floatingSection('history', { left: 460, top: 16, width: 340, height: 180 }),
+        floatingSection('bookmarks', { left: 820, top: 16, width: 340, height: 360 }, { floatingSizeMode: 'user' }),
+      ],
+      workspaceSizeDispatch,
+    ),
+  play: async ({ canvasElement }) => {
+    workspaceSizeDispatch.mockClear();
+    const recents = canvasElement.querySelector<HTMLElement>('[data-image-trail-detached-window="history"]');
+    const queue = canvasElement.querySelector<HTMLElement>('[data-image-trail-detached-window="bookmarks"]');
+    await expect(recents).toHaveAttribute('data-workspace-size-mode', 'auto');
+    await expect(recents?.style.height).toBe('');
+    await expect(queue).toHaveAttribute('data-workspace-size-mode', 'user');
+    await expect(queue?.style.height).toBe('360px');
+
+    const canvas = within(canvasElement);
+    canvas
+      .getByRole('button', { name: 'Resize Queue' })
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    await expect(workspaceSizeDispatch).toHaveBeenCalledWith(expect.objectContaining({ name: 'workspace/resize', sectionId: 'bookmarks' }));
+  },
+};
+
 export const SettingsDetachedPrivacyMasked: Story = {
   render: () => detachedPanelStory({ activeDestination: 'settings', detachedSections: ['settings'], privacyModeEnabled: true }),
 };

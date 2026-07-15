@@ -76,8 +76,44 @@ test('every registered section detaches through the same control, placeholder, a
     const windowElement = detached.detachedRoot.querySelector<HTMLElement>(`[data-image-trail-detached-window="${id}"]`);
     assert.ok(windowElement);
     assert.equal(windowElement.getAttribute('aria-label'), `${title} (floating)`);
+    assert.equal(windowElement.dataset['workspaceSizeMode'], id === 'history' || id === 'bookmarks' ? 'auto' : 'user');
+    assert.ok(windowElement.querySelector(`[data-image-trail-resize="${id}"]`));
     assert.equal(detached.detachedRoot.querySelector('[data-image-trail-workspace="react"]') !== null, true);
   }
+});
+
+test('floating resize control commits user-owned geometry and stays available after rerender', () => {
+  const harness = createHarness();
+  harness.layoutState.workspaceSections.set('history', floatingSection('history', { left: 200, top: 80, width: 340, height: 320 }));
+  harness.render(panelState({ detachedSections: ['history'] }));
+  const windowElement = harness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="history"]');
+  const resize = windowElement?.querySelector<HTMLButtonElement>('[data-image-trail-resize="history"]');
+  assert.ok(windowElement && resize);
+  windowElement.getBoundingClientRect = () => ({
+    left: 200,
+    top: 80,
+    right: 540,
+    bottom: 400,
+    width: 340,
+    height: 320,
+    x: 200,
+    y: 80,
+    toJSON: () => ({}),
+  });
+
+  resize.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+  assert.deepEqual(harness.actions, [
+    { name: 'workspace/resize', sectionId: 'history', floatingRect: { left: 200, top: 80, width: 340, height: 336 } },
+  ]);
+
+  harness.layoutState.workspaceSections.set(
+    'history',
+    floatingSection('history', { left: 200, top: 80, width: 340, height: 336 }, { floatingSizeMode: 'user' }),
+  );
+  harness.render(panelState({ detachedSections: ['history'] }));
+  const rerendered = harness.detachedRoot.querySelector<HTMLElement>('[data-image-trail-detached-window="history"]');
+  assert.equal(rerendered?.dataset['workspaceSizeMode'], 'user');
+  assert.ok(rerendered?.querySelector('[data-image-trail-resize="history"]'));
 });
 
 test('surface drag engages at the fine-pointer threshold and records one floating placement', () => {

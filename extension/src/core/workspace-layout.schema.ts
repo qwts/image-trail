@@ -19,6 +19,7 @@ const storedWorkspaceSectionLayoutSchema = v.object({
   shaded: v.boolean(),
   collapsed: v.boolean(),
   floatingRect: v.nullable(floatingRectSchema),
+  floatingSizeMode: v.optional(v.picklist(['auto', 'user'])),
 });
 
 export const workspaceLayoutSchema = v.object({

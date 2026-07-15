@@ -29,6 +29,7 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 240px;
+  min-height: 120px;
   max-width: calc(100vw - 24px);
   max-height: calc(100vh - 24px);
   overflow: hidden;
@@ -37,6 +38,10 @@
   background: var(--it-drawer-bg);
   box-shadow: var(--it-shadow-panel), var(--it-highlight-top);
   backdrop-filter: blur(3px);
+}
+
+.image-trail-panel-root.image-trail-workspace__window[data-workspace-size-mode='auto'] {
+  grid-template-rows: auto minmax(0, auto);
 }
 
 .image-trail-panel-root.image-trail-workspace__window.is-opening {
@@ -144,6 +149,30 @@
   cursor: default;
 }
 
+.image-trail-workspace__window-resize {
+  all: unset;
+  position: absolute;
+  inset: auto 2px 2px auto;
+  display: grid;
+  place-items: end;
+  width: 18px;
+  height: 18px;
+  color: var(--it-text-dim);
+  cursor: nwse-resize;
+  font: 700 10px/1 var(--it-font-ui);
+  touch-action: none;
+}
+
+.image-trail-workspace__window-resize:hover,
+.image-trail-workspace__window-resize:focus-visible {
+  color: var(--it-accent);
+}
+
+.image-trail-workspace__window-resize:focus-visible {
+  outline: var(--it-focus-ring);
+  outline-offset: -1px;
+}
+
 .image-trail-workspace__dom-body {
   display: grid;
   min-width: 0;
@@ -168,6 +197,21 @@
 
 .image-trail-workspace__dom-body > .image-trail-panel__section > .image-trail-panel__section-header--with-actions > h3 {
   display: none;
+}
+
+.image-trail-workspace__window .image-trail-panel__history-section .image-trail-panel__record-list {
+  resize: none;
+}
+
+.image-trail-panel-root.image-trail-workspace__window[data-workspace-size-mode='auto']
+  .image-trail-workspace__dom-body
+  .image-trail-panel__history-section
+  .image-trail-panel__record-list {
+  grid-auto-rows: minmax(120px, max-content);
+  align-content: start;
+  block-size: auto;
+  max-block-size: none;
+  overflow: visible;
 }
 
 .image-trail-panel-root.image-trail-workspace__rail {

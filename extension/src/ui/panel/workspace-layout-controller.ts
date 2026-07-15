@@ -89,6 +89,7 @@ export class WorkspaceLayoutController {
       floatingSection(sectionId, floatingRect ?? current?.floatingRect ?? null, {
         shaded: current?.shaded ?? false,
         collapsed: current?.collapsed ?? false,
+        ...(current ? { floatingSizeMode: current.floatingSizeMode } : {}),
       }),
     );
   }
@@ -105,6 +106,20 @@ export class WorkspaceLayoutController {
       floatingSection(sectionId, floatingRect, {
         shaded: current?.shaded ?? false,
         collapsed: current?.collapsed ?? false,
+        ...(current ? { floatingSizeMode: current.floatingSizeMode } : {}),
+      }),
+    );
+    this.finishPlacementChange();
+  }
+
+  resizeSection(sectionId: DetachableSectionId, floatingRect: WorkspaceFloatingRect): void {
+    const current = this.deps.workspaceSections().get(sectionId);
+    this.deps.workspaceSections().set(
+      sectionId,
+      floatingSection(sectionId, floatingRect, {
+        shaded: current?.shaded ?? false,
+        collapsed: current?.collapsed ?? false,
+        floatingSizeMode: 'user',
       }),
     );
     this.finishPlacementChange();
@@ -125,6 +140,7 @@ export class WorkspaceLayoutController {
         shaded: current?.shaded ?? false,
         collapsed: current?.collapsed ?? false,
         floatingRect: current?.floatingRect ?? null,
+        ...(current ? { floatingSizeMode: current.floatingSizeMode } : {}),
       }),
     );
     this.finishPlacementChange();
@@ -266,6 +282,7 @@ export function createWorkspaceActionDeps(controller: WorkspaceLayoutController)
       controller.prepareDetachedSection(...args),
     restoreWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['restoreSection']>) => controller.restoreSection(...args),
     moveWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['moveSection']>) => controller.moveSection(...args),
+    resizeWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['resizeSection']>) => controller.resizeSection(...args),
     snapWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['snapSection']>) => controller.snapSection(...args),
     shadeWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['toggleSectionShade']>) => controller.toggleSectionShade(...args),
     reorderWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['reorderSection']>) => controller.reorderSection(...args),

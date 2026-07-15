@@ -10,6 +10,7 @@ const EFFECT_OWNED_ACTION_NAMES = [
   'target/set-object-fit',
   'target/release',
   'workspace/move',
+  'workspace/resize',
   'workspace/snap',
   'workspace/unsnap',
   'workspace/shade',

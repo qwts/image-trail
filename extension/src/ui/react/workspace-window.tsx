@@ -13,6 +13,7 @@ import {
 } from '../workspace/workspace-geometry.js';
 import { cancelWorkspaceGesture, registerWorkspaceGesture } from '../workspace/workspace-gesture.js';
 import { WorkspaceDomBody } from './workspace-dom-body.js';
+import { WorkspaceWindowResize } from './workspace-window-resize.js';
 
 export interface WorkspaceWindowEntry {
   readonly placement: WorkspaceSectionLayout & { readonly mode: 'floating'; readonly floatingRect: WorkspaceFloatingRect };
@@ -35,7 +36,14 @@ export function WorkspaceWindow({ entry, activeEdges, nextRailPositions, dispatc
   const [preview, setPreview] = useState<WorkspaceWindowPreview | null>(null);
   const rect = draftRect ?? entry.placement.floatingRect;
   const { placement, title } = entry;
-  const style = { left: rect.left, top: rect.top, width: rect.width, height: placement.shaded ? undefined : rect.height };
+  const automaticSize = placement.floatingSizeMode === 'auto';
+  const style = {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: placement.shaded || automaticSize ? undefined : rect.height,
+    maxHeight: Math.max(120, viewportSize().height - rect.top - 12),
+  };
   useEffect(() => () => cancelWorkspaceGesture(), []);
 
   const commitKeyboardSnap = (event: ReactKeyboardEvent<HTMLElement>): void => {
@@ -54,6 +62,7 @@ export function WorkspaceWindow({ entry, activeEdges, nextRailPositions, dispatc
         className={`image-trail-panel-root image-trail-workspace__window${placement.shaded ? ' is-shaded' : ''}${animate ? ' is-opening' : ''}`}
         data-image-trail-detached-window={placement.sectionId}
         data-workspace-mode="floating"
+        data-workspace-size-mode={placement.floatingSizeMode}
         role="dialog"
         aria-label={`${title} (floating)`}
         style={style}
@@ -86,6 +95,9 @@ export function WorkspaceWindow({ entry, activeEdges, nextRailPositions, dispatc
           <WorkspaceWindowActions placement={placement} title={title} dispatch={dispatch} />
         </header>
         {placement.shaded ? null : <WorkspaceDomBody content={entry.body} />}
+        {placement.shaded ? null : (
+          <WorkspaceWindowResize sectionId={placement.sectionId} title={title} setDraftRect={setDraftRect} dispatch={dispatch} />
+        )}
       </aside>
     </>
   );

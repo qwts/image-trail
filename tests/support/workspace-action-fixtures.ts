@@ -4,6 +4,11 @@ export const workspaceActionFixtures = {
     sectionId: 'history',
     floatingRect: { left: 10, top: 12, width: 340, height: 320 },
   },
+  'workspace/resize': {
+    name: 'workspace/resize',
+    sectionId: 'history',
+    floatingRect: { left: 10, top: 12, width: 380, height: 440 },
+  },
   'workspace/unsnap': {
     name: 'workspace/unsnap',
     sectionId: 'history',
@@ -22,6 +27,7 @@ export function workspaceActionDeps(record: (name: string) => void, recordAsync:
     prepareDetachedWorkspaceSection: () => record('prepareDetachedWorkspaceSection'),
     restoreWorkspaceSection: () => record('restoreWorkspaceSection'),
     moveWorkspaceSection: () => record('moveWorkspaceSection'),
+    resizeWorkspaceSection: () => record('resizeWorkspaceSection'),
     snapWorkspaceSection: () => record('snapWorkspaceSection'),
     shadeWorkspaceSection: () => record('shadeWorkspaceSection'),
     reorderWorkspaceSection: () => record('reorderWorkspaceSection'),

@@ -34,6 +34,22 @@ test('sanitize drops unknown ids, dedupes, and canonicalizes modes', () => {
   assert.equal(sanitized.sections[1]?.order, 0);
 });
 
+test('legacy v2 sections gain content sizing defaults without changing the schema version', () => {
+  const sanitized = sanitizeWorkspaceLayout(
+    layout([storedSectionWithoutSizeMode('history'), storedSectionWithoutSizeMode('bookmarks'), storedSectionWithoutSizeMode('settings')]),
+  );
+
+  assert.deepEqual(
+    sanitized.sections.map(({ sectionId, floatingSizeMode }) => [sectionId, floatingSizeMode]),
+    [
+      ['history', 'auto'],
+      ['bookmarks', 'auto'],
+      ['settings', 'user'],
+    ],
+  );
+  assert.equal(sanitized.schemaVersion, 2);
+});
+
 test('capture records every known section through one placement registry', () => {
   const placements = new Map([
     ['bookmarks', floatingSection('bookmarks', { left: 300, top: 40, width: 340, height: 320 })],
@@ -62,11 +78,18 @@ test('capture records every known section through one placement registry', () =>
   assert.equal(captured.sections.find((section) => section.sectionId === 'target')?.mode, 'attached');
 });
 
-test('workspace equality covers panel, rail, shade, collapse, and floating geometry', () => {
+test('workspace equality covers panel, rail, shade, collapse, size ownership, and floating geometry', () => {
   const a: WorkspaceLayout = layout([floatingSection('history', { left: 1, top: 2, width: 340, height: 320 })]);
   assert.equal(workspaceLayoutsEqual(a, layout([floatingSection('history', { left: 1, top: 2, width: 340, height: 320 })])), true);
   assert.equal(workspaceLayoutsEqual(a, layout([floatingSection('history', { left: 1, top: 3, width: 340, height: 320 })])), false);
   assert.equal(workspaceLayoutsEqual(a, layout([railedSection('history', 'left', 0)])), false);
+  assert.equal(
+    workspaceLayoutsEqual(
+      a,
+      layout([floatingSection('history', { left: 1, top: 2, width: 340, height: 320 }, { floatingSizeMode: 'user' })]),
+    ),
+    false,
+  );
   assert.equal(workspaceLayoutsEqual(a, { ...a, panelPosition: { left: 1, top: 2 } }), false);
 });
 
@@ -93,5 +116,17 @@ function layout(sections: StoredWorkspaceLayout['sections']): WorkspaceLayout {
     persistenceKeyVersion: WORKSPACE_LAYOUT_KEY_VERSION,
     panelPosition: null,
     sections: sections as WorkspaceLayout['sections'],
+  };
+}
+
+function storedSectionWithoutSizeMode(sectionId: 'history' | 'bookmarks' | 'settings'): StoredWorkspaceLayout['sections'][number] {
+  return {
+    sectionId,
+    mode: 'floating',
+    edge: null,
+    order: null,
+    shaded: false,
+    collapsed: false,
+    floatingRect: { left: 12, top: 12, width: 340, height: 320 },
   };
 }
