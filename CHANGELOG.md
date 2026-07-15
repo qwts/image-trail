@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.10.0
+
+### Minor Changes
+
+- c6c6978: Add React-rendered floating workspace windows and four edge rails with shade, snap, ordered stacks, keyboard previews, and private per-page layout restoration.
+
 ## 0.9.0
 
 ### Minor Changes
