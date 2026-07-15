@@ -19,17 +19,9 @@ import type { ImageDisplayRecord } from '../../core/display-records.js';
 import type { ProjectionReason } from '../../core/projection-session.js';
 import type { BookmarkStore, ImportedImageFile, PanelState } from '../../core/types.js';
 import { bookmarkSaveMessage, withoutRecentPinState } from './record-export-helpers.js';
+import type { RecordAddOptions, ValidatedRecordUrl } from './record-library-types.js';
 
-interface ValidatedRecordUrl extends ImageRecordUrlValidation {
-  readonly preloadDataUrl?: string;
-}
-
-export interface RecordAddOptions {
-  readonly trustLoadedImage?: boolean | undefined;
-  readonly width?: number | undefined;
-  readonly height?: number | undefined;
-  readonly projectionId?: string | undefined;
-}
+export type { RecordAddOptions } from './record-library-types.js';
 
 export interface RecordLibraryControllerDeps {
   getState(): PanelState;
@@ -53,12 +45,6 @@ export interface RecordLibraryControllerDeps {
   fetchThumbnailSource: typeof fetchThumbnailSource;
 }
 
-/**
- * Bookmark and recent-history record management, moved verbatim off `ImageTrailPanel`: add/pin/
- * remove flows, record URL validation, thumbnail resolution, and the serialized bookmark mutation
- * queue. Captured-original blob flows live in `CapturedOriginalsController`; the two reach each
- * other only through panel-mediated deps callbacks.
- */
 export class RecordLibraryController {
   private bookmarkMutationQueue: Promise<void> = Promise.resolve();
 
@@ -123,7 +109,7 @@ export class RecordLibraryController {
     const historyItem = createDisplayRecord({ ...draft, id: `${timestamp}:history:${file.name}`, source: 'history' });
     const recentHistoryStore = this.deps.recentHistoryStore();
     const history = recentHistoryStore
-      ? await recentHistoryStore.add(historyItem, window.location.href)
+      ? await recentHistoryStore.add(historyItem, window.location.href, { scope: this.deps.getState().recentHistoryScope })
       : [historyItem, ...this.deps.getState().history];
     this.deps.setState({
       ...this.deps.getState(),
@@ -155,7 +141,9 @@ export class RecordLibraryController {
     if (!item) return;
     if (!this.isProjectionActive(options)) return;
     const recentHistoryStore = this.deps.recentHistoryStore();
-    const history = recentHistoryStore ? await recentHistoryStore.add(item, window.location.href) : [item, ...next.slice(1)];
+    const history = recentHistoryStore
+      ? await recentHistoryStore.add(item, window.location.href, { scope: this.deps.getState().recentHistoryScope })
+      : [item, ...next.slice(1)];
     if (!this.isProjectionActive(options)) return;
     this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
     this.deps.render();
@@ -233,7 +221,9 @@ export class RecordLibraryController {
       lastUpdatedAt: Date.now(),
     });
     const recentHistoryStore = this.deps.recentHistoryStore();
-    const history = recentHistoryStore ? await recentHistoryStore.add(linkedHistory, window.location.href) : this.deps.getState().history;
+    const history = recentHistoryStore
+      ? await recentHistoryStore.add(linkedHistory, window.location.href, { scope: this.deps.getState().recentHistoryScope })
+      : this.deps.getState().history;
     this.deps.setState({
       ...this.deps.getState(),
       history,
@@ -321,7 +311,7 @@ export class RecordLibraryController {
     const blobId = existing && !existing.pinnedRecordId ? encryptedBlobIdForRecord(existing) : undefined;
     const recentHistoryStore = this.deps.recentHistoryStore();
     const history = recentHistoryStore
-      ? await recentHistoryStore.remove(id, window.location.href)
+      ? await recentHistoryStore.remove(id, window.location.href, { scope: this.deps.getState().recentHistoryScope })
       : reducePanelAction(this.deps.getState(), { name: 'history/remove', id }).history;
     this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
     this.deps.render();
@@ -334,7 +324,7 @@ export class RecordLibraryController {
     const recentHistoryStore = this.deps.recentHistoryStore();
     if (recentHistoryStore) {
       for (const record of records) {
-        await recentHistoryStore.remove(record.id, window.location.href);
+        await recentHistoryStore.remove(record.id, window.location.href, { scope: this.deps.getState().recentHistoryScope });
       }
     }
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'history/delete-all' }));

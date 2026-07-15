@@ -71,6 +71,27 @@ export const Narrow: Story = {
 
 const dispatchSpy = fn();
 
+export const ChangesScope: Story = {
+  render: () =>
+    panelStory(
+      createHistoryView(recentFixtures, [], false, true, dispatchSpy, {
+        blobKeyAvailable: true,
+        listBlockSize: null,
+        onListResize: mockDispatch<number>('history resize'),
+        sparseRowDisplayMode: 'adaptive',
+        scope: 'page',
+        pageUrl: 'https://example.test/gallery/page-2?private=1',
+      }),
+    ),
+  play: async ({ canvasElement }) => {
+    dispatchSpy.mockClear();
+    const select = canvasElement.querySelector<HTMLSelectElement>('select[aria-label="Recents scope"]');
+    if (!select) throw new Error('expected the Recents scope selector to render');
+    await userEvent.selectOptions(select, 'all');
+    await expect(dispatchSpy).toHaveBeenCalledWith({ name: 'history/update-scope', scope: 'all' });
+  },
+};
+
 export const SelectsRow: Story = {
   render: () => historyStory(recentFixtures, [], {}, dispatchSpy),
   play: async ({ canvasElement }) => {

@@ -21,6 +21,7 @@ export type LibraryActionName =
   | 'history-selection/toggle'
   | 'history-selection/select'
   | 'history-selection/clear'
+  | 'history/update-scope'
   | 'bookmark-selection/toggle'
   | 'bookmark-selection/single'
   | 'bookmark-selection/select'
@@ -34,13 +35,23 @@ function clearMatchingCaptureRetry(deps: PanelActionDeps, sourceType: 'history' 
   deps.reduce({ name: 'capture/clear' });
 }
 
-/** Recent history, bookmarks, and row selection. Bodies moved verbatim from the panel dispatch chain. */
-export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<LibraryActionName> {
-  const bookmarkCurrent: AnyActionDef = {
-    handle() {
-      void deps.bookmarkCurrentImage();
+function updateHistoryScopeAction(deps: PanelActionDeps): ActionEntries<'history/update-scope'>['history/update-scope'] {
+  return {
+    handle(action) {
+      if (deps.getState().recentHistoryScope === action.scope) return;
+      deps.reduce(action);
+      void deps.loadRecentHistory({ render: false }).then(() => deps.render());
     },
   };
+}
+
+function actionDef(handle: AnyActionDef['handle']): AnyActionDef {
+  return { handle };
+}
+
+/** Recent history, bookmarks, and row selection. Bodies moved verbatim from the panel dispatch chain. */
+export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<LibraryActionName> {
+  const bookmarkCurrent = actionDef(() => void deps.bookmarkCurrentImage());
   const reduceAndRender: AnyActionDef = {
     handle(action) {
       deps.reduce(action);
@@ -68,6 +79,7 @@ export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<
         void deps.deleteRecentHistory();
       },
     },
+    'history/update-scope': updateHistoryScopeAction(deps),
     'history/pin': {
       handle(action) {
         void deps.pinRecentHistory(action.id);

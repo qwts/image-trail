@@ -16,10 +16,13 @@ import type { PCloudBackupState } from './cloud/pcloud-provider.js';
 import type { PageContext, PageContextState } from './page-context.js';
 import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePreviewState } from './import-types.js';
 import type { WorkspacePanelAction } from './workspace-actions.js';
+import type { RecentHistoryScope } from './recent-history-scope.js';
+import type { LibraryPanelState, RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
+
+export type { RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
-export type RecentHistoryOverflowBehavior = 'drop-oldest' | 'keep-session';
 
 export interface TargetState {
   readonly mode: 'auto' | 'manual' | 'none';
@@ -157,9 +160,7 @@ export interface RecallState {
   readonly messageIsError?: boolean | undefined;
 }
 
-export type RecentSparseRowDisplayMode = 'adaptive' | 'full' | 'half' | 'compact';
-
-export interface PanelState {
+export interface PanelState extends LibraryPanelState {
   readonly visible: boolean;
   readonly minimized: boolean;
   readonly status: PanelStatus;
@@ -168,18 +169,6 @@ export interface PanelState {
   readonly target: TargetState;
   readonly pageContext: PageContextState;
   readonly draftUrl: string | null;
-  readonly history: readonly ImageDisplayRecord[];
-  readonly recentHistoryLimit: number;
-  readonly recentHistoryRetainedLimit: number;
-  readonly recentHistoryOverflowBehavior: RecentHistoryOverflowBehavior;
-  readonly recentSparseRowDisplayMode: RecentSparseRowDisplayMode;
-  readonly recentDisplayOrder: RecentDisplayOrder;
-  readonly bookmarks: readonly ImageDisplayRecord[];
-  readonly bookmarkOffset: number;
-  readonly bookmarkLimit: number;
-  readonly bookmarkTotal: number;
-  readonly bookmarkVisibilityScope: 'global' | 'site';
-  readonly queueDisplayOrder: QueueDisplayOrder;
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
   readonly privacyModeEnabled: boolean;
   readonly searchableMetadataPolicy: SearchableMetadataPolicy;
@@ -196,12 +185,8 @@ export interface PanelState {
   readonly loadFailureFeedback: LoadFailureFeedback;
   readonly downArrowAction: import('./keyboard-shortcuts.js').DownArrowAction;
   readonly secondaryControlsOpen: boolean;
-  readonly historySectionOpen: boolean;
-  readonly bookmarksSectionOpen: boolean;
   readonly detachedSections: readonly DetachableSectionId[];
   readonly restoreWorkspaceLayoutEnabled: boolean;
-  readonly hasOlderBookmarks: boolean;
-  readonly hasNewerBookmarks: boolean;
   readonly captureInProgress: boolean;
   readonly captureResult: CaptureResult | null;
   readonly captureRetryRequest: CaptureRetryRequest | null;
@@ -219,8 +204,6 @@ export interface PanelState {
   readonly helpOpen: boolean;
   readonly automation: AutomationState;
   readonly recall: RecallState;
-  readonly selectedHistoryIds: readonly string[];
-  readonly selectedBookmarkIds: readonly string[];
   readonly activeFieldId: string | null;
   readonly failedFieldId: string | null;
   readonly successfulFieldIds: readonly string[];
@@ -488,6 +471,7 @@ export type PanelAction =
     }
   | { readonly name: 'history/mark-pinned'; readonly id: string; readonly pinnedAt: string; readonly pinnedRecordId: string }
   | { readonly name: 'history/update-display-order'; readonly order: RecentDisplayOrder }
+  | { readonly name: 'history/update-scope'; readonly scope: RecentHistoryScope }
   | { readonly name: 'selection/select-visible' }
   | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle' | 'bookmark-selection/single'; readonly id: string }
   | {

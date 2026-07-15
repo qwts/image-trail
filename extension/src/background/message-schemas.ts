@@ -74,6 +74,7 @@ export const loadBookmarksRequestSchema = v.object({
 export const loadRecentHistoryRequestSchema = v.object({
   pageUrl: v.string(),
   includeRetained: v.optional(v.boolean()),
+  scope: v.optional(v.picklist(['page', 'site', 'all'])),
 });
 
 export const loadBookmarksByIdsRequestSchema = v.object({ ids: stringArraySchema });
@@ -83,9 +84,14 @@ export const findBookmarkByUrlRequestSchema = v.object({ url: v.string() });
 export const addRecentHistoryRequestSchema = v.object({
   pageUrl: v.string(),
   item: imageDisplayRecordSchema,
+  scope: v.optional(v.picklist(['page', 'site', 'all'])),
 });
 
-export const removeRecentHistoryRequestSchema = v.object({ pageUrl: v.string(), id: v.string() });
+export const removeRecentHistoryRequestSchema = v.object({
+  pageUrl: v.string(),
+  id: v.string(),
+  scope: v.optional(v.picklist(['page', 'site', 'all'])),
+});
 
 export const loadRecallCandidatesRequestSchema = v.object({
   offset: v.number(),

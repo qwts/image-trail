@@ -1,36 +1,12 @@
 import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import { DEFAULT_RECENT_DISPLAY_ORDER, sortRecentRecords, type RecentDisplayOrder } from '../../core/display-order.js';
-import type { RecentSparseRowDisplayMode } from '../../core/types.js';
+import { DEFAULT_RECENT_HISTORY_SCOPE, type RecentHistoryScope } from '../../core/recent-history-scope.js';
+import { createRecentScopeControl, recentHistoryEmptyText } from './recent-history-scope-view.js';
+import type { HistoryAction, HistoryViewOptions } from './history-view-actions.js';
 import { PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordExtensionLabel, recordTitle } from './record-metadata.js';
 import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { createRecordRow, type RecordRowState } from './record-row.js';
 import { selectedRangeIds } from './selection-ranges.js';
-
-type HistoryAction =
-  | { readonly name: 'history/pin'; readonly id: string }
-  | { readonly name: 'history/remove'; readonly id: string }
-  | { readonly name: 'history/delete-all' }
-  | { readonly name: 'history-selection/toggle'; readonly id: string }
-  | { readonly name: 'history-selection/select'; readonly ids: readonly string[]; readonly mode?: 'replace' | 'add' }
-  | { readonly name: 'history-selection/clear' }
-  | { readonly name: 'history/update-display-order'; readonly order: RecentDisplayOrder }
-  | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'history'; readonly sourceRecordId: string }
-  | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string | undefined }
-  | { readonly name: 'panel/history-section-open'; readonly open: boolean }
-  | { readonly name: 'capture/delete'; readonly id: string; readonly blobId: string };
-
-interface HistoryViewOptions {
-  readonly blobKeyAvailable: boolean;
-  /** Attached-panel collapse state (#438); detached windows always render open. */
-  readonly sectionOpen?: boolean;
-  /** False in detached windows (#441): the header renders without the toggle affordance. */
-  readonly collapsible?: boolean;
-  readonly listBlockSize: number | null;
-  readonly onListResize: (blockSize: number) => void;
-  readonly sparseRowDisplayMode: RecentSparseRowDisplayMode;
-  readonly displayOrder?: RecentDisplayOrder | undefined;
-  readonly privacyMode?: boolean;
-}
 
 export function createHistoryView(
   items: readonly ImageDisplayRecord[],
@@ -43,45 +19,10 @@ export function createHistoryView(
   const displayItems = sortRecentRecords(items, options?.displayOrder ?? DEFAULT_RECENT_DISPLAY_ORDER);
   const section = document.createElement('section');
   section.className = 'image-trail-panel__section image-trail-panel__history-section';
-
   const sectionOpen = options?.sectionOpen !== false;
   const collapsible = options?.collapsible !== false;
-  const heading = document.createElement('h3');
-  heading.textContent = 'Recent history';
-  const header = document.createElement('div');
-  header.className = 'image-trail-panel__section-header image-trail-panel__section-header--with-actions';
-  header.dataset['open'] = String(sectionOpen);
-  // Summary ergonomics (#441): the WHOLE header row is the toggle — hint area included — while
-  // clicks on its interactive children (toolbar buttons, queue menu, detach) pass through, and
-  // dragging the row still pops the section out (an engaged drag suppresses the click). A detached
-  // window renders the header non-interactive: it is always open there, and a live toggle would
-  // silently flip the ATTACHED collapse state behind the user's back.
-  if (collapsible) {
-    header.classList.add('image-trail-panel__section-header--collapsible');
-    header.setAttribute('role', 'button');
-    header.tabIndex = 0;
-    header.setAttribute('aria-expanded', String(sectionOpen));
-    header.setAttribute('aria-label', sectionOpen ? 'Hide the Recent history list' : 'Show the Recent history list');
-    header.title = sectionOpen ? 'Hide the Recent history list' : 'Show the Recent history list';
-    const toggleSection = (): void => dispatch({ name: 'panel/history-section-open', open: !sectionOpen });
-    header.addEventListener('click', (event) => {
-      const target = event.target;
-      if (target instanceof Element && target.closest('button, summary, details, input, select, a')) return;
-      event.preventDefault();
-      toggleSection();
-    });
-    header.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      if (event.target !== header) return;
-      event.preventDefault();
-      toggleSection();
-    });
-  }
-  header.append(heading);
-
-  const toolbar = document.createElement('div');
-  toolbar.className = 'image-trail-panel__history-toolbar';
-  toolbar.append(createRecentSortControl(options?.displayOrder ?? DEFAULT_RECENT_DISPLAY_ORDER, dispatch));
+  const scope = options?.scope ?? DEFAULT_RECENT_HISTORY_SCOPE;
+  const header = createHistoryHeader(sectionOpen, collapsible, scope, dispatch, options);
   const sectionActions = document.createElement('div');
   sectionActions.className = 'image-trail-panel__section-actions image-trail-panel__history-actions';
   if (displayItems.length > 0) {
@@ -280,16 +221,13 @@ export function createHistoryView(
 
   const empty = document.createElement('p');
   empty.className = 'image-trail-panel__meta';
-  empty.textContent = 'Loaded images will appear here newest-first.';
+  empty.textContent = recentHistoryEmptyText(scope);
   const selectionMeta = document.createElement('p');
   selectionMeta.className = 'image-trail-panel__meta';
   selectionMeta.textContent =
     selectedIds.length > 0
       ? `${selectedIds.length} recent item(s) selected for export.`
       : 'Cmd/Ctrl-click rows to select recent items for export. Shift-click selects a range.';
-  // Keep the sort control in the one-line heading. Bulk actions stay visible while collapsed, but
-  // render in their own row so they cannot wrap the collapse toggle header (#438/#448).
-  header.append(toolbar);
   section.append(header);
   if (displayItems.length) section.append(sectionActions);
   // Collapsed (#438): the heading and bulk-action rows stay; the list content hides.
@@ -298,6 +236,51 @@ export function createHistoryView(
     if (displayItems.length) section.append(list);
   }
   return section;
+}
+
+function createHistoryHeader(
+  sectionOpen: boolean,
+  collapsible: boolean,
+  scope: RecentHistoryScope,
+  dispatch: (action: HistoryAction) => void,
+  options?: HistoryViewOptions,
+): HTMLElement {
+  const heading = document.createElement('h3');
+  heading.textContent = 'Recent history';
+  const header = document.createElement('div');
+  header.className = 'image-trail-panel__section-header image-trail-panel__section-header--with-actions';
+  header.dataset['open'] = String(sectionOpen);
+  if (collapsible) {
+    header.classList.add('image-trail-panel__section-header--collapsible');
+    header.setAttribute('role', 'button');
+    header.tabIndex = 0;
+    header.setAttribute('aria-expanded', String(sectionOpen));
+    header.setAttribute('aria-label', sectionOpen ? 'Hide the Recent history list' : 'Show the Recent history list');
+    header.title = sectionOpen ? 'Hide the Recent history list' : 'Show the Recent history list';
+    const toggleSection = (): void => dispatch({ name: 'panel/history-section-open', open: !sectionOpen });
+    header.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('button, summary, details, input, select, a')) return;
+      event.preventDefault();
+      toggleSection();
+    });
+    header.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (event.target !== header) return;
+      event.preventDefault();
+      toggleSection();
+    });
+  }
+  const toolbar = document.createElement('div');
+  toolbar.className = 'image-trail-panel__history-toolbar';
+  toolbar.append(
+    createRecentScopeControl(scope, options?.pageUrl ?? window.location.href, options?.privacyMode === true, (nextScope) =>
+      dispatch({ name: 'history/update-scope', scope: nextScope }),
+    ),
+    createRecentSortControl(options?.displayOrder ?? DEFAULT_RECENT_DISPLAY_ORDER, dispatch),
+  );
+  header.append(heading, toolbar);
+  return header;
 }
 
 function createRecentSortControl(order: RecentDisplayOrder, dispatch: (action: HistoryAction) => void): HTMLSelectElement {

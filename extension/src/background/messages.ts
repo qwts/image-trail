@@ -21,11 +21,13 @@ import type {
   SaveWorkspaceLayoutResultMessage,
 } from './layout-messages.js';
 import type { OriginalBlobRequest, OriginalBlobResponse } from './original-blob-messages.js';
+import type { RecentHistoryRequest, RecentHistoryResponse } from './recent-history-messages.js';
 
 export { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
 export * from './album-messages.js';
 export * from './layout-messages.js';
 export * from './original-blob-messages.js';
+export * from './recent-history-messages.js';
 
 const deleteBlobResultPayloadSchema = v.object({
   deleted: v.boolean(),
@@ -518,42 +520,6 @@ export interface RemoveRecallBookmarksResultMessage {
   readonly payload: { readonly ok: boolean; readonly removedCount: number };
 }
 
-export interface LoadRecentHistoryMessage {
-  readonly type: typeof MessageType.LoadRecentHistory;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly pageUrl: string; readonly includeRetained?: boolean | undefined };
-}
-
-export interface LoadRecentHistoryResultMessage {
-  readonly type: typeof MessageType.LoadRecentHistoryResult;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly items: readonly import('../core/display-records.js').ImageDisplayRecord[] };
-}
-
-export interface AddRecentHistoryMessage {
-  readonly type: typeof MessageType.AddRecentHistory;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly pageUrl: string; readonly item: import('../core/display-records.js').ImageDisplayRecord };
-}
-
-export interface AddRecentHistoryResultMessage {
-  readonly type: typeof MessageType.AddRecentHistoryResult;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly items: readonly import('../core/display-records.js').ImageDisplayRecord[] };
-}
-
-export interface RemoveRecentHistoryMessage {
-  readonly type: typeof MessageType.RemoveRecentHistory;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly pageUrl: string; readonly id: string };
-}
-
-export interface RemoveRecentHistoryResultMessage {
-  readonly type: typeof MessageType.RemoveRecentHistoryResult;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly items: readonly import('../core/display-records.js').ImageDisplayRecord[] };
-}
-
 export interface LoadRecallCandidatesMessage {
   readonly type: typeof MessageType.LoadRecallCandidates;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -909,9 +875,7 @@ export type ExtensionRequest =
   | RemoveBookmarkMessage
   | RemoveBookmarksMessage
   | RemoveRecallBookmarksMessage
-  | LoadRecentHistoryMessage
-  | AddRecentHistoryMessage
-  | RemoveRecentHistoryMessage
+  | RecentHistoryRequest
   | LoadRecallCandidatesMessage
   | RecallRecordsMessage
   | LoadPanelPositionMessage
@@ -973,9 +937,7 @@ export type ExtensionResponse =
   | RemoveBookmarkResultMessage
   | RemoveBookmarksResultMessage
   | RemoveRecallBookmarksResultMessage
-  | LoadRecentHistoryResultMessage
-  | AddRecentHistoryResultMessage
-  | RemoveRecentHistoryResultMessage
+  | RecentHistoryResponse
   | LoadRecallCandidatesResultMessage
   | RecallRecordsResultMessage
   | LoadPanelPositionResultMessage
@@ -1298,42 +1260,6 @@ export function createRemoveRecallBookmarksResultMessage(
   payload: RemoveRecallBookmarksResultMessage['payload'],
 ): RemoveRecallBookmarksResultMessage {
   return { type: MessageType.RemoveRecallBookmarksResult, version: MESSAGE_PROTOCOL_VERSION, payload };
-}
-
-export function createLoadRecentHistoryMessage(
-  pageUrl: string,
-  options: { readonly includeRetained?: boolean } = {},
-): LoadRecentHistoryMessage {
-  return { type: MessageType.LoadRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl, ...options } };
-}
-
-export function createLoadRecentHistoryResultMessage(
-  items: readonly import('../core/display-records.js').ImageDisplayRecord[],
-): LoadRecentHistoryResultMessage {
-  return { type: MessageType.LoadRecentHistoryResult, version: MESSAGE_PROTOCOL_VERSION, payload: { items } };
-}
-
-export function createAddRecentHistoryMessage(
-  pageUrl: string,
-  item: import('../core/display-records.js').ImageDisplayRecord,
-): AddRecentHistoryMessage {
-  return { type: MessageType.AddRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl, item } };
-}
-
-export function createAddRecentHistoryResultMessage(
-  items: readonly import('../core/display-records.js').ImageDisplayRecord[],
-): AddRecentHistoryResultMessage {
-  return { type: MessageType.AddRecentHistoryResult, version: MESSAGE_PROTOCOL_VERSION, payload: { items } };
-}
-
-export function createRemoveRecentHistoryMessage(pageUrl: string, id: string): RemoveRecentHistoryMessage {
-  return { type: MessageType.RemoveRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl, id } };
-}
-
-export function createRemoveRecentHistoryResultMessage(
-  items: readonly import('../core/display-records.js').ImageDisplayRecord[],
-): RemoveRecentHistoryResultMessage {
-  return { type: MessageType.RemoveRecentHistoryResult, version: MESSAGE_PROTOCOL_VERSION, payload: { items } };
 }
 
 export function createLoadRecallCandidatesMessage(input: {
@@ -1700,21 +1626,6 @@ export function isRemoveBookmarksResultMessage(value: unknown): value is RemoveB
 export function isRemoveRecallBookmarksResultMessage(value: unknown): value is RemoveRecallBookmarksResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.RemoveRecallBookmarksResult;
-}
-
-export function isLoadRecentHistoryResultMessage(value: unknown): value is LoadRecentHistoryResultMessage {
-  if (!hasVersionedObjectShape(value)) return false;
-  return value.type === MessageType.LoadRecentHistoryResult;
-}
-
-export function isAddRecentHistoryResultMessage(value: unknown): value is AddRecentHistoryResultMessage {
-  if (!hasVersionedObjectShape(value)) return false;
-  return value.type === MessageType.AddRecentHistoryResult;
-}
-
-export function isRemoveRecentHistoryResultMessage(value: unknown): value is RemoveRecentHistoryResultMessage {
-  if (!hasVersionedObjectShape(value)) return false;
-  return value.type === MessageType.RemoveRecentHistoryResult;
 }
 
 export function isLoadRecallCandidatesResultMessage(value: unknown): value is LoadRecallCandidatesResultMessage {

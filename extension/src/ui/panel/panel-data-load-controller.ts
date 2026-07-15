@@ -73,8 +73,13 @@ export class PanelDataLoadController {
   loadRecentHistory = async (options: { readonly render?: boolean } = {}): Promise<void> => {
     const recentHistoryStore = this.deps.recentHistoryStore();
     if (!recentHistoryStore) return;
-    const history = await recentHistoryStore.load(window.location.href);
-    this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
+    const history = await recentHistoryStore.load(window.location.href, { scope: this.deps.getState().recentHistoryScope });
+    this.deps.setState({
+      ...this.deps.getState(),
+      history,
+      selectedHistoryIds: this.deps.getState().selectedHistoryIds.filter((id) => history.some((item) => item.id === id)),
+      lastUpdatedAt: Date.now(),
+    });
     if (options.render !== false) this.deps.render();
   };
 

@@ -191,6 +191,21 @@ test('deleting recents drops transient history and selections', () => {
   assert.equal(deleted.bookmarks, state.bookmarks);
 });
 
+test('changing Recents scope clears stale selection without changing transient rows', () => {
+  const state = {
+    ...createInitialPanelState(),
+    history: [createPanelRecordFixture({ id: 'history-1', source: 'history' })],
+    selectedHistoryIds: ['history-1'],
+  };
+
+  assert.equal(state.recentHistoryScope, 'site');
+  const updated = reducePanelAction(state, { name: 'history/update-scope', scope: 'all' });
+
+  assert.equal(updated.recentHistoryScope, 'all');
+  assert.deepEqual(updated.selectedHistoryIds, []);
+  assert.equal(updated.history, state.history);
+});
+
 test('recall delete count is derived from durable queue totals', () => {
   assert.equal(recallDeleteCountForQueue({ bookmarkTotal: 47, bookmarkLimit: 3 }), 44);
   assert.equal(recallDeleteCountForQueue({ bookmarkTotal: 2, bookmarkLimit: 3 }), 0);

@@ -1,0 +1,91 @@
+import type { Page, Worker } from '@playwright/test';
+
+import {
+  applyUrlInEditor,
+  expect,
+  expectPanelOpen,
+  expectPanelStatusMessage,
+  fixtureAssetPaths,
+  fixturePaths,
+  fixtureUrl,
+  openFixturePage,
+  test,
+  togglePanelFromExtensionAction,
+} from './fixtures.js';
+
+async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+}
+
+async function addRecent(page: Page, url: string): Promise<void> {
+  await applyUrlInEditor(page, url);
+  const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  await expectPanelStatusMessage(page, new RegExp(`(Loaded|Applied) .*${escapedUrl}`, 'u'));
+}
+
+async function clearAllRecents(page: Page): Promise<void> {
+  const scope = page.getByLabel('Recents scope');
+  await scope.selectOption('all');
+  const deleteRecents = page.getByRole('button', { name: /Delete recents/u });
+  if ((await deleteRecents.count()) > 0) await deleteRecents.click();
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(0);
+  await scope.selectOption('site');
+}
+
+async function seedOtherSiteRecent(page: Page, extensionId: string): Promise<unknown> {
+  const extensionPage = await page.context().newPage();
+  try {
+    await extensionPage.goto(`chrome-extension://${extensionId}/src/destinations/view.html?view=dashboard`);
+    return await extensionPage.evaluate(async () =>
+      chrome.runtime.sendMessage({
+        type: 'imageTrail.addRecentHistory',
+        version: 1,
+        payload: {
+          pageUrl: 'https://other.test/gallery',
+          item: {
+            id: 'other-site-recent',
+            url: 'https://images.other.test/asset-three.svg',
+            timestamp: '2026-07-15T00:00:00.000Z',
+            source: 'history',
+          },
+          scope: 'site',
+        },
+      }),
+    );
+  } finally {
+    await extensionPage.close();
+  }
+}
+
+test('Recents switches between current page, current site, and all sites', async ({ extensionId, page, serviceWorker }) => {
+  await openFixturePage(page, fixturePaths.singleImage);
+  await openPanel(page, serviceWorker);
+  await clearAllRecents(page);
+  await addRecent(page, fixtureUrl(fixtureAssetPaths.assetOne));
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(1);
+
+  await openFixturePage(page, fixturePaths.redrawImage);
+  await openPanel(page, serviceWorker);
+  await addRecent(page, fixtureUrl(fixtureAssetPaths.assetTwo));
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(2);
+
+  const scope = page.getByLabel('Recents scope');
+  await scope.focus();
+  await scope.selectOption('page');
+  await expect(scope).toBeFocused();
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(1);
+  await expect(page.locator('.image-trail-panel__history-item')).toContainText(['asset-two.svg']);
+
+  await scope.selectOption('site');
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(2);
+
+  const otherSiteResult = await seedOtherSiteRecent(page, extensionId);
+  expect(otherSiteResult).toMatchObject({ payload: { items: [{ id: 'other-site-recent' }] } });
+
+  await scope.focus();
+  await scope.selectOption('all');
+  await expect(scope).toBeFocused();
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(3);
+  await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-three.svg' })).toHaveCount(1);
+});

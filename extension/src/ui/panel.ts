@@ -65,6 +65,7 @@ import { UrlTemplateSettingsController } from './panel/url-template-settings-con
 import { ProjectionApplicationController, toTargetState } from './panel/projection-application-controller.js';
 import { dispatchPanelAction } from './panel/action-dispatch.js';
 import { buildPanelActionRegistry } from './panel/actions/registry.js';
+import { createLibrarySettingsActionDeps } from './panel/actions/library-settings-deps.js';
 import type { PanelActionDeps } from './panel/actions/deps.js';
 import { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../content/panel-services.js';
 import { hostnameFromLocation } from './panel-position.js';
@@ -571,34 +572,17 @@ export class ImageTrailPanel {
       urlTemplateSettings: () => this.urlTemplateSettings,
       recallExport: () => this.recallExport,
       recallRestore: () => this.recallRestore,
-      bookmarkCurrentImage: () => this.recordLibrary.bookmarkCurrentImage(),
-      removeRecentHistory: (id) => this.recordLibrary.removeRecentHistory(id),
-      deleteRecentHistory: () => this.recordLibrary.deleteRecentHistory(),
-      pinRecentHistory: (id) => this.recordLibrary.pinRecentHistory(id),
-      loadBookmark: (id) => this.recordLibrary.loadBookmark(id),
-      removeBookmark: (id) => this.recordLibrary.removeBookmark(id),
+      ...createLibrarySettingsActionDeps({
+        library: this.recordLibrary,
+        dataLoad: this.panelDataLoad,
+        settings: this.panelSettings,
+      }),
       openDestination: async (destination) => {
         const message = await openDestinationErrorMessage(destination);
         if (!message) return;
         this.state = destinationOpenErrorState(this.state, message);
         this.render();
       },
-      loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
-      refreshBookmarkThumbnails: () => this.recordLibrary.refreshBookmarkThumbnails(),
-      deleteVisibleBookmarks: () => this.recordLibrary.deleteVisibleBookmarks(),
-      deleteRecallBookmarks: () => this.recordLibrary.deleteRecallBookmarks(),
-      updateVisibleBookmarkSoftMax: (value) => this.panelSettings.updateVisibleBookmarkSoftMax(value),
-      updateRecentHistoryRetention: (input) => this.panelSettings.updateRecentHistoryRetention(input),
-      updateRecentSparseRowDisplayMode: (mode) => this.panelSettings.updateRecentSparseRowDisplayMode(mode),
-      updateDownArrowAction: (value) => this.panelSettings.updateDownArrowAction(value),
-      updatePinSaveStoragePreference: (value) => this.panelSettings.updatePinSaveStoragePreference(value),
-      updateUrlReviewStatusRetention: (limit, clearAfterExport) =>
-        this.panelSettings.updateUrlReviewStatusRetention(limit, clearAfterExport),
-      updateRequestThrottle: (minimumIntervalMs, maxRequests, windowMs) =>
-        this.panelSettings.updateRequestThrottle(minimumIntervalMs, maxRequests, windowMs),
-      updateNeighborPreload: (enabled, radius, cacheLimit, probeMethod, loadFailureFeedback) =>
-        this.panelSettings.updateNeighborPreload(enabled, radius, cacheLimit, probeMethod, loadFailureFeedback),
-      preloadMoreNeighbors: (radius, cacheLimit) => this.panelSettings.preloadMoreNeighbors(radius, cacheLimit),
       resetPanelPosition: () => this.panelPosition.resetPanelPosition(),
       ...createWorkspaceActionDeps(this.workspaceLayout),
       refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
