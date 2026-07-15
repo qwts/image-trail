@@ -198,12 +198,14 @@ test('stored recent rows render the original indicator', () => {
   assert.ok(row.querySelector('.image-trail-panel__stored-original-dot'));
 });
 
-test('the Recents sort control stays in the section header while bulk actions render below it (#448)', () => {
+test('Recents keeps sorting in the one-line header while scope and bulk actions render below it (#448)', () => {
   const actions: unknown[] = [];
   const view = buildHistoryView(actions);
+  const header = view.querySelector('.image-trail-panel__section-header--with-actions');
   const toolbar = view.querySelector('.image-trail-panel__section-header--with-actions .image-trail-panel__history-toolbar');
   assert.ok(toolbar?.querySelector('select[aria-label="Sort Recents"]'));
-  assert.ok(toolbar?.querySelector('select[aria-label="Recents scope"]'));
+  assert.equal(header?.querySelector('select[aria-label="Recents scope"]'), null);
+  assert.ok(view.querySelector('.image-trail-panel__history-context select[aria-label="Recents scope"]'));
   assert.ok(view.querySelector('.image-trail-panel__history-actions'), 'bulk actions stay outside the constrained header grid');
 });
 
@@ -292,6 +294,7 @@ test('a collapsed recents section keeps bulk actions but hides the list (#438)',
   assert.equal(view.querySelector('.image-trail-panel__record-list'), null, 'the list is hidden while collapsed');
   const selectAll = [...view.querySelectorAll('button')].find((button) => button.textContent === 'Select all recents');
   assert.ok(selectAll, 'the bulk-action row stays usable while collapsed');
+  assert.ok(view.querySelector('.image-trail-panel__history-context select[aria-label="Recents scope"]'));
 
   // Bulk-action clicks are outside the toggle — they must never toggle the collapse.
   selectAll.click();

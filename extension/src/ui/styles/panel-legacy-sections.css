@@ -250,16 +250,25 @@
 }
 
 .image-trail-panel-root .image-trail-panel__bookmark-toolbar,
-.image-trail-panel-root .image-trail-panel__history-toolbar {
+.image-trail-panel-root .image-trail-panel__history-toolbar,
+.image-trail-panel-root .image-trail-panel__history-context {
   display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
   min-width: 0;
 }
 
-/* Keep bulk controls out of the collapsible heading grid: sorting remains in the header while
-   existing Queue/Recents actions stay available in a predictable row when the list is collapsed. */
+.image-trail-panel-root .image-trail-panel__bookmark-toolbar {
+  flex-wrap: wrap;
+}
+
+.image-trail-panel-root .image-trail-panel__history-toolbar,
+.image-trail-panel-root .image-trail-panel__history-context {
+  flex-wrap: nowrap;
+}
+
+/* Keep context and bulk controls out of the collapsible heading grid: sorting remains in the
+   single-line header while scope and existing actions stay available when the list is collapsed. */
 .image-trail-panel-root .image-trail-panel__section-actions {
   display: flex;
   flex-wrap: wrap;
@@ -286,6 +295,10 @@
 .image-trail-panel-root .image-trail-panel__record-sort-select:focus-visible {
   outline: 2px solid rgb(114 207 255 / 88%);
   outline-offset: 2px;
+}
+
+.image-trail-panel-root .image-trail-panel__recent-scope-select {
+  max-inline-size: min(100%, 220px);
 }
 
 .image-trail-panel-root .image-trail-panel__bookmark-status-row {

@@ -58,6 +58,25 @@ async function seedOtherSiteRecent(page: Page, extensionId: string): Promise<unk
   }
 }
 
+test('Recents keeps its scope context below a one-line header at narrow widths', async ({ page, serviceWorker }) => {
+  await page.setViewportSize({ width: 340, height: 720 });
+  await openFixturePage(page, fixturePaths.singleImage);
+  await openPanel(page, serviceWorker);
+
+  const header = page.getByRole('button', { name: 'Hide the Recent history list' });
+  const scope = page.getByLabel('Recents scope');
+  const headerBox = (await header.boundingBox())!;
+  const scopeBox = (await scope.boundingBox())!;
+
+  expect(headerBox.height).toBeLessThan(44);
+  expect(scopeBox.y).toBeGreaterThanOrEqual(headerBox.y + headerBox.height);
+  expect(await scope.evaluate((element) => element.closest('.image-trail-panel__section-header') === null)).toBe(true);
+
+  await header.click({ position: { x: headerBox.width - 6, y: headerBox.height / 2 } });
+  await expect(scope).toBeVisible();
+  await expect(page.getByLabel('Sort Recents')).toBeVisible();
+});
+
 test('Recents switches between current page, current site, and all sites', async ({ extensionId, page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
   await openPanel(page, serviceWorker);
