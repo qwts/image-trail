@@ -193,6 +193,8 @@ function createHistorySection(target: PanelRenderTarget, state: PanelState): HTM
     },
     sparseRowDisplayMode: state.recentSparseRowDisplayMode,
     displayOrder: state.recentDisplayOrder,
+    scope: state.recentHistoryScope,
+    pageUrl: window.location.href,
     privacyMode: state.privacyModeEnabled,
   });
 }

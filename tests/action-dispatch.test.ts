@@ -31,7 +31,6 @@ interface Harness {
   patchState(patch: Partial<PanelState>): void;
 }
 
-// Every dependency logs; the real reducer preserves handler guards while collaborator stubs expose only touched methods.
 function createHarness(
   options: {
     readonly applyPanelStateResult?: boolean;
@@ -171,6 +170,7 @@ function createHarness(
     removeBookmark: () => recordAsync('removeBookmark'),
     openDestination: (destination) => recordAsync(`openDestination:${destination}`),
     loadBookmarkPage: (offset) => recordAsync(`loadBookmarkPage:${offset}`),
+    loadRecentHistory: () => recordAsync('loadRecentHistory'),
     refreshBookmarkThumbnails: () => recordAsync('refreshBookmarkThumbnails'),
     deleteVisibleBookmarks: () => recordAsync('deleteVisibleBookmarks'),
     deleteRecallBookmarks: () => recordAsync('deleteRecallBookmarks'),
@@ -247,6 +247,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   },
   'settings/update-recent-sparse-row-display-mode': { name: 'settings/update-recent-sparse-row-display-mode', mode: 'compact' },
   'history/update-display-order': { name: 'history/update-display-order', order: 'oldest-first' },
+  'history/update-scope': { name: 'history/update-scope', scope: 'all' },
   'bookmarks/update-display-order': { name: 'bookmarks/update-display-order', order: 'back-first' },
   'settings/update-pin-save-storage-preference': { name: 'settings/update-pin-save-storage-preference', value: 'encrypted' },
   'settings/update-privacy-mode': { name: 'settings/update-privacy-mode', enabled: true },
@@ -420,7 +421,6 @@ test('registry keys match the fixture domain with one entry per name and no tail
   const registry = buildPanelActionRegistry(harness.deps);
   const keys = Object.keys(registry);
   assert.equal(keys.length, Object.keys(fixtures).length);
-  // Spreading group maps would silently drop duplicates across groups; the per-group sum catches that.
   const groupKeySum = PANEL_ACTION_ENTRY_BUILDERS.reduce((sum, build) => sum + Object.keys(build(harness.deps)).length, 0);
   assert.equal(groupKeySum, keys.length);
   assert.ok(!keys.includes('toggle-panel'), 'toggle-panel must stay on the fallback tail');

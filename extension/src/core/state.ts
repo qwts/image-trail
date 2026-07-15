@@ -10,6 +10,7 @@ import { DEFAULT_SEARCHABLE_METADATA_POLICY } from './metadata-policy.js';
 import { DEFAULT_QUEUE_DISPLAY_ORDER, DEFAULT_RECENT_DISPLAY_ORDER } from './display-order.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT } from './preview-style.js';
 import { EMPTY_PAGE_CONTEXT_STATE } from './page-context.js';
+import { DEFAULT_RECENT_HISTORY_SCOPE } from './recent-history-scope.js';
 
 export const EMPTY_TARGET_STATE: TargetState = {
   mode: 'none',
@@ -62,6 +63,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     recentHistoryOverflowBehavior: 'drop-oldest',
     recentSparseRowDisplayMode: 'adaptive',
     recentDisplayOrder: DEFAULT_RECENT_DISPLAY_ORDER,
+    recentHistoryScope: DEFAULT_RECENT_HISTORY_SCOPE,
     bookmarks: [],
     bookmarkOffset: 0,
     bookmarkLimit: 30,

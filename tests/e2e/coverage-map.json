@@ -622,6 +622,44 @@
       ]
     },
     {
+      "id": "recents-scope-selector",
+      "issue": 69,
+      "acceptance": "Transient Recents page, site, and all-sites scopes",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Recents-Scope-Selector",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/invariants.test.ts",
+            "tests/recent-history-cache.test.ts",
+            "tests/recent-history-messages.test.ts",
+            "tests/recent-history-handlers.test.ts",
+            "tests/panel-state-queue-recents.test.ts",
+            "tests/action-dispatch.test.ts",
+            "tests/dom/action-dispatch.test.ts",
+            "tests/dom/history-view.test.ts",
+            "tests/dom/panel-data-load-controller.test.ts"
+          ],
+          "notes": "Covers origin-and-path page identity, hostname site identity, global insertion order, URL and id deduplication, scope-aware removal, site defaulting, selection cleanup, privacy-safe labels, message validation, and the invariant that Recents have no durable-storage write path."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/history-view.stories.ts",
+          "notes": "Covers the page/site/all-sites selector and its typed scope dispatch."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/recents-scope.spec.ts",
+          "notes": "Covers packaged-extension switching across two pages on one site and a second site, scoped row counts, labels, and focus retention after rerender."
+        },
+        {
+          "type": "manual",
+          "reason": "Service-worker lifecycle and privacy presentation require a packaged-extension smoke check.",
+          "notes": "Load images on two paths and two hostnames, verify Page/Site/All sites contents and private labels, then restart the extension service worker and verify Recents are empty while durable pins remain."
+        }
+      ]
+    },
+    {
       "id": "recents-to-queue-state-unification",
       "issue": 155,
       "acceptance": "Unified Recents-to-Queue saved state",

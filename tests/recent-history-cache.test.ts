@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RecentHistoryCache, recentHistoryKey } from '../extension/src/background/recent-history-cache.js';
+import { RecentHistoryCache, recentHistoryPageKey, recentHistorySiteKey } from '../extension/src/background/recent-history-cache.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
 import type { ImageDisplayRecord } from '../extension/src/core/display-records.js';
 
@@ -8,9 +8,11 @@ function record(id: string, url = `https://example.test/${id}.jpg`): ImageDispla
   return { id, url, label: `${id}.jpg`, timestamp: '2026-01-01T00:00:00.000Z' };
 }
 
-test('recentHistoryKey keys by hostname and falls back to "unknown" for an invalid URL', () => {
-  assert.equal(recentHistoryKey('https://example.test/page'), 'example.test');
-  assert.equal(recentHistoryKey('not a url'), 'unknown');
+test('recent history keys use hostname for sites and origin/path for pages', () => {
+  assert.equal(recentHistorySiteKey('https://example.test/page'), 'example.test');
+  assert.equal(recentHistoryPageKey('https://example.test/page?view=one#row'), 'https://example.test/page');
+  assert.equal(recentHistorySiteKey('not a url'), 'unknown');
+  assert.equal(recentHistoryPageKey('not a url'), 'unknown');
 });
 
 test('RecentHistoryCache.add is newest-first, deduped by url/id, and scoped per site', () => {
@@ -33,6 +35,55 @@ test('RecentHistoryCache.add is newest-first, deduped by url/id, and scoped per 
   assert.deepEqual(
     cache.load('https://a.test/page', DEFAULT_LOCAL_SETTINGS, true).map((item) => item.id),
     ['1b', '2'],
+  );
+});
+
+test('RecentHistoryCache exposes page, site, and all-site views without per-path buckets', () => {
+  const cache = new RecentHistoryCache();
+  cache.add('https://a.test/gallery?first=1', record('1'), DEFAULT_LOCAL_SETTINGS);
+  cache.add('https://a.test/gallery?second=1', record('2'), DEFAULT_LOCAL_SETTINGS);
+  cache.add('https://b.test/other', record('3'), DEFAULT_LOCAL_SETTINGS);
+  cache.add('https://a.test/details', record('4'), DEFAULT_LOCAL_SETTINGS);
+
+  assert.deepEqual(
+    cache.load('https://a.test/gallery?ignored=1', DEFAULT_LOCAL_SETTINGS, true, 'page').map((item) => item.id),
+    ['2', '1'],
+    'page scope uses origin + path and ignores query/hash fragmentation',
+  );
+  assert.deepEqual(
+    cache.load('https://a.test/gallery', DEFAULT_LOCAL_SETTINGS, true, 'site').map((item) => item.id),
+    ['4', '2', '1'],
+  );
+  assert.deepEqual(
+    cache.load('https://a.test/gallery', DEFAULT_LOCAL_SETTINGS, true, 'all').map((item) => item.id),
+    ['4', '3', '2', '1'],
+    'all-site scope preserves global insertion order',
+  );
+});
+
+test('RecentHistoryCache all-site view dedupes cross-site records and removes the visible identity globally', () => {
+  const cache = new RecentHistoryCache();
+  const sharedUrl = 'https://images.test/shared.jpg';
+  cache.add('https://a.test/gallery', record('a', sharedUrl), DEFAULT_LOCAL_SETTINGS);
+  cache.add('https://b.test/gallery', record('b', sharedUrl), DEFAULT_LOCAL_SETTINGS);
+
+  assert.deepEqual(
+    cache.load('https://a.test/gallery', DEFAULT_LOCAL_SETTINGS, true, 'all').map((item) => item.id),
+    ['b'],
+  );
+  assert.deepEqual(cache.remove('https://a.test/gallery', 'b', DEFAULT_LOCAL_SETTINGS, 'all'), []);
+  assert.deepEqual([...cache.values()].flat(), []);
+});
+
+test('RecentHistoryCache page removal leaves other pages in the site bucket intact', () => {
+  const cache = new RecentHistoryCache();
+  cache.add('https://a.test/gallery', record('1'), DEFAULT_LOCAL_SETTINGS);
+  cache.add('https://a.test/details', record('2'), DEFAULT_LOCAL_SETTINGS);
+
+  assert.deepEqual(cache.remove('https://a.test/gallery', '1', DEFAULT_LOCAL_SETTINGS, 'page'), []);
+  assert.deepEqual(
+    cache.load('https://a.test/details', DEFAULT_LOCAL_SETTINGS, true, 'site').map((item) => item.id),
+    ['2'],
   );
 });
 

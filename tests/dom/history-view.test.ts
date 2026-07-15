@@ -203,7 +203,48 @@ test('the Recents sort control stays in the section header while bulk actions re
   const view = buildHistoryView(actions);
   const toolbar = view.querySelector('.image-trail-panel__section-header--with-actions .image-trail-panel__history-toolbar');
   assert.ok(toolbar?.querySelector('select[aria-label="Sort Recents"]'));
+  assert.ok(toolbar?.querySelector('select[aria-label="Recents scope"]'));
   assert.ok(view.querySelector('.image-trail-panel__history-actions'), 'bulk actions stay outside the constrained header grid');
+});
+
+test('Recents scope control labels the current page/site, dispatches changes, and hides private URL metadata', () => {
+  const actions: unknown[] = [];
+  const view = createHistoryView([], [], false, true, (action) => actions.push(action), {
+    blobKeyAvailable: true,
+    listBlockSize: null,
+    onListResize: () => undefined,
+    sparseRowDisplayMode: 'adaptive',
+    scope: 'page',
+    pageUrl: 'https://images.example.test/gallery/private?token=secret',
+  });
+  const select = view.querySelector<HTMLSelectElement>('select[aria-label="Recents scope"]');
+  assert.ok(select);
+  assert.deepEqual(
+    Array.from(select.options, (option) => option.textContent),
+    ['Page: /gallery/private', 'Site: images.example.test', 'All sites'],
+  );
+  assert.match(view.textContent, /Images loaded on this page/u);
+  select.value = 'all';
+  select.dispatchEvent(new Event('change'));
+  assert.deepEqual(actions, [{ name: 'history/update-scope', scope: 'all' }]);
+
+  const privateView = createHistoryView([], [], false, true, () => undefined, {
+    blobKeyAvailable: true,
+    listBlockSize: null,
+    onListResize: () => undefined,
+    sparseRowDisplayMode: 'adaptive',
+    scope: 'site',
+    pageUrl: 'https://private.example.test/secret',
+    privacyMode: true,
+  });
+  assert.deepEqual(
+    Array.from(
+      privateView.querySelectorAll<HTMLSelectElement>('select[aria-label="Recents scope"] option'),
+      (option) => option.textContent,
+    ),
+    ['Current page', 'Current site', 'All sites'],
+  );
+  assert.doesNotMatch(privateView.textContent, /private\.example\.test|\/secret/u);
 });
 
 test('Recents sort control orders timestamps stably and dispatches its persisted display setting', () => {

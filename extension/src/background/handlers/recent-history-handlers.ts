@@ -29,17 +29,19 @@ export function createRecentHistoryMessageRegistry({
 }: RecentHistoryMessageHandlerDeps): Record<RecentHistoryRequestType, MessageDef<ExtensionRequest, ExtensionResponse>> {
   async function handleLoadRecentHistory(message: LoadRecentHistoryMessage): Promise<LoadRecentHistoryResultMessage['payload']> {
     const settings = await loadLocalSettings();
-    return { items: recentHistoryCache.load(message.payload.pageUrl, settings, message.payload.includeRetained ?? false) };
+    return {
+      items: recentHistoryCache.load(message.payload.pageUrl, settings, message.payload.includeRetained ?? false, message.payload.scope),
+    };
   }
 
   async function handleAddRecentHistory(message: AddRecentHistoryMessage): Promise<AddRecentHistoryResultMessage['payload']> {
     const settings = await loadLocalSettings();
-    return { items: recentHistoryCache.add(message.payload.pageUrl, message.payload.item, settings) };
+    return { items: recentHistoryCache.add(message.payload.pageUrl, message.payload.item, settings, message.payload.scope) };
   }
 
   async function handleRemoveRecentHistory(message: RemoveRecentHistoryMessage): Promise<RemoveRecentHistoryResultMessage['payload']> {
     const settings = await loadLocalSettings();
-    return { items: recentHistoryCache.remove(message.payload.pageUrl, message.payload.id, settings) };
+    return { items: recentHistoryCache.remove(message.payload.pageUrl, message.payload.id, settings, message.payload.scope) };
   }
 
   return {

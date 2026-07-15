@@ -192,7 +192,7 @@ export class CapturedOriginalsController {
           const recentHistoryStore = this.deps.recentHistoryStore();
           const history =
             recentHistoryStore && clearedHistory
-              ? await recentHistoryStore.add(clearedHistory, window.location.href)
+              ? await this.addRecentHistoryRecord(recentHistoryStore, clearedHistory)
               : this.deps.getState().history;
           this.deps.setState({
             ...this.deps.getState(),
@@ -298,7 +298,7 @@ export class CapturedOriginalsController {
     const updatedHistory = this.deps.getState().history.find((b) => b.id === recordId);
     const recentHistoryStore = this.deps.recentHistoryStore();
     if (updatedHistory && recentHistoryStore) {
-      const history = await recentHistoryStore.add(updatedHistory, window.location.href);
+      const history = await this.addRecentHistoryRecord(recentHistoryStore, updatedHistory);
       this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
     }
     const visibleBookmark = this.deps
@@ -322,6 +322,10 @@ export class CapturedOriginalsController {
 
   private async findSavedRecordByUrl(url: string): Promise<ImageDisplayRecord | null> {
     return (await this.deps.bookmarkStore()?.findByUrl(url)) ?? null;
+  }
+
+  private addRecentHistoryRecord(store: RecentHistoryStore, record: ImageDisplayRecord): Promise<readonly ImageDisplayRecord[]> {
+    return store.add(record, window.location.href, { scope: this.deps.getState().recentHistoryScope });
   }
 
   private async findSavedRecordDuringCapturePreflight(url: string): Promise<ImageDisplayRecord | null> {

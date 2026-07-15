@@ -91,6 +91,7 @@ function createHarness(): Harness {
     removeBookmark: noopAsync,
     openDestination: noopAsync,
     loadBookmarkPage: noopAsync,
+    loadRecentHistory: noopAsync,
     refreshBookmarkThumbnails: noopAsync,
     deleteVisibleBookmarks: noopAsync,
     deleteRecallBookmarks: noopAsync,

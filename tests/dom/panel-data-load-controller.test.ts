@@ -14,6 +14,7 @@ interface Harness {
   readonly controller: PanelDataLoadController;
   readonly log: string[];
   readonly loadPageInputs: { offset: number; currentPageUrl?: string | undefined }[];
+  readonly recentLoadInputs: unknown[];
   getState(): PanelState;
 }
 
@@ -21,6 +22,7 @@ function createHarness(): Harness {
   let state = createInitialPanelState(0);
   const log: string[] = [];
   const loadPageInputs: { offset: number; currentPageUrl?: string | undefined }[] = [];
+  const recentLoadInputs: unknown[] = [];
   const bookmarkStore: BookmarkStore = {
     loadPage: async (input: { offset: number; limit: number; scope?: 'global' | 'site'; currentPageUrl?: string }) => {
       loadPageInputs.push({ offset: input.offset, currentPageUrl: input.currentPageUrl });
@@ -35,7 +37,10 @@ function createHarness(): Harness {
     },
   } as unknown as BookmarkStore;
   const recentHistoryStore: RecentHistoryStore = {
-    load: async () => [createDisplayRecord({ url: 'https://images.example.test/a/2.jpg' })],
+    load: async (_pageUrl: string, options: { readonly scope?: 'page' | 'site' | 'all' }) => {
+      recentLoadInputs.push(options);
+      return [createDisplayRecord({ url: 'https://images.example.test/a/2.jpg' })];
+    },
   } as unknown as RecentHistoryStore;
   const deps: PanelDataLoadControllerDeps = {
     getState: () => state,
@@ -53,7 +58,7 @@ function createHarness(): Harness {
     syncGrabSettings: () => {},
     primeBufferedNav: () => {},
   };
-  return { controller: new PanelDataLoadController(deps), log, loadPageInputs, getState: () => state };
+  return { controller: new PanelDataLoadController(deps), log, loadPageInputs, recentLoadInputs, getState: () => state };
 }
 
 test('loadBookmarkPage loads a page scoped to the current page url and folds it into state', async () => {
@@ -77,6 +82,7 @@ test('loadRecentHistory loads the recents for the current page and stamps lastUp
   const before = harness.getState().lastUpdatedAt;
   await harness.controller.loadRecentHistory();
   assert.equal(harness.getState().history.length, 1);
+  assert.deepEqual(harness.recentLoadInputs, [{ scope: 'site' }]);
   assert.notEqual(harness.getState().lastUpdatedAt, before);
   assert.ok(harness.log.includes('render'));
 });
