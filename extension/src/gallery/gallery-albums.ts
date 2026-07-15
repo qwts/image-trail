@@ -1,7 +1,7 @@
 import type { AlbumListSnapshot } from '../data/albums-controller.js';
 import type { AlbumRecord } from '../data/types.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
-import type { GallerySearchPage, GallerySearchStore } from './gallery-search-loader.js';
+import type { GallerySearchStore, GallerySourcePage } from './gallery-search-loader.js';
 
 export interface GalleryAlbumSummary {
   readonly album: AlbumRecord;
@@ -24,7 +24,7 @@ export function selectedGalleryAlbum(albums: readonly GalleryAlbumSummary[], sel
 
 export function galleryListStore(items: readonly ImageDisplayRecord[]): GallerySearchStore {
   return {
-    async loadPage(input: { readonly offset: number; readonly limit: number }): Promise<GallerySearchPage> {
+    async loadPage(input: { readonly offset: number; readonly limit: number }): Promise<GallerySourcePage> {
       const offset = Math.max(0, input.offset);
       const limit = Math.max(0, input.limit);
       const pageItems = limit === 0 ? items : items.slice(offset, offset + limit);

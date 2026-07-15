@@ -1,29 +1,31 @@
-export interface GalleryInputFocus {
+export interface GalleryControlFocus {
+  readonly tagName: 'input' | 'select';
   readonly ariaLabel: string;
   readonly selectionStart: number | null;
   readonly selectionEnd: number | null;
   readonly selectionDirection: 'forward' | 'backward' | 'none' | null;
 }
 
-export function captureFocusedGalleryInput(container: HTMLElement): GalleryInputFocus | null {
+export function captureFocusedGalleryControl(container: HTMLElement): GalleryControlFocus | null {
   const active = document.activeElement;
-  if (!(active instanceof HTMLInputElement) || !container.contains(active)) return null;
+  if (!(active instanceof HTMLInputElement || active instanceof HTMLSelectElement) || !container.contains(active)) return null;
   const ariaLabel = active.getAttribute('aria-label');
   if (!ariaLabel) return null;
   return {
+    tagName: active instanceof HTMLInputElement ? 'input' : 'select',
     ariaLabel,
-    selectionStart: active.selectionStart,
-    selectionEnd: active.selectionEnd,
-    selectionDirection: active.selectionDirection,
+    selectionStart: active instanceof HTMLInputElement ? active.selectionStart : null,
+    selectionEnd: active instanceof HTMLInputElement ? active.selectionEnd : null,
+    selectionDirection: active instanceof HTMLInputElement ? active.selectionDirection : null,
   };
 }
 
-export function restoreFocusedGalleryInput(container: HTMLElement, focus: GalleryInputFocus): void {
-  const input = Array.from(container.querySelectorAll<HTMLInputElement>('input')).find(
+export function restoreFocusedGalleryControl(container: HTMLElement, focus: GalleryControlFocus): void {
+  const control = Array.from(container.querySelectorAll<HTMLInputElement | HTMLSelectElement>(focus.tagName)).find(
     (candidate) => candidate.getAttribute('aria-label') === focus.ariaLabel,
   );
-  if (!input || input.disabled) return;
-  input.focus({ preventScroll: true });
-  if (focus.selectionStart === null || focus.selectionEnd === null) return;
-  input.setSelectionRange(focus.selectionStart, focus.selectionEnd, focus.selectionDirection ?? undefined);
+  if (!control || control.disabled) return;
+  control.focus({ preventScroll: true });
+  if (!(control instanceof HTMLInputElement) || focus.selectionStart === null || focus.selectionEnd === null) return;
+  control.setSelectionRange(focus.selectionStart, focus.selectionEnd, focus.selectionDirection ?? undefined);
 }

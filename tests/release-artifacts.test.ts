@@ -80,6 +80,7 @@ test('artifact allowlist is derived from the manifest plus explicit application 
   assert.ok(expected.includes('src/background/service-worker.js'));
   assert.ok(expected.includes('src/content/content-script.js'));
   assert.ok(expected.includes('src/preview/preview.css'));
+  assert.ok(expected.includes('src/gallery/gallery-filters.css'));
   assert.ok(expected.includes('src/ui/styles/panel.css'));
   assert.ok(expected.includes('icons/icon16.png'));
   assert.deepEqual(artifacts.validateArtifactPaths(expected, manifest), []);

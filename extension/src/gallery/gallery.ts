@@ -11,11 +11,12 @@ import { sendRuntimeMessage } from '../content/runtime-message.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import { GALLERY_PAGE_LIMITS } from '../core/settings.js';
 import { DEFAULT_LOCAL_SETTINGS, LOCAL_SETTINGS_KEY, type PlaintextLocalSettings } from '../data/local-settings.js';
-import { galleryAlbumSummaries, galleryListStore, missingAlbumRecordCount, selectedGalleryAlbum } from './gallery-albums.js';
+import { galleryAlbumSummaries, selectedGalleryAlbum } from './gallery-albums.js';
 import { openActionForGalleryRecord } from './gallery-model.js';
 import { installGalleryLibraryRefreshHook } from './gallery-refresh.js';
-import { type GallerySearchPage, loadGallerySearchPage } from './gallery-search-loader.js';
-import { captureFocusedGalleryInput, restoreFocusedGalleryInput } from './gallery-focus.js';
+import { loadGalleryPageForSelection } from './gallery-page-loader.js';
+import { captureFocusedGalleryControl, restoreFocusedGalleryControl } from './gallery-focus.js';
+import { EMPTY_GALLERY_FILTERS, EMPTY_GALLERY_FILTER_FACETS, privacySafeGalleryFilters, type GalleryFilters } from './gallery-filters.js';
 import { createGalleryView, type GalleryViewState } from './gallery-view.js';
 import { DestinationDomBody, DestinationFrame } from '../destinations/destination-frame.js';
 import { renderReactSubtree } from '../ui/react/react-subtree.js';
@@ -36,6 +37,8 @@ let state: GalleryViewState = {
   albumMenuSelections: {},
   searchQuery: '',
   draftSearchQuery: '',
+  filters: EMPTY_GALLERY_FILTERS,
+  filterFacets: EMPTY_GALLERY_FILTER_FACETS,
   offset: 0,
   limit: DEFAULT_LOCAL_SETTINGS.galleryPageLimit,
   total: 0,
@@ -58,7 +61,7 @@ function root(): HTMLElement {
 
 function render(options: { readonly focusSearch?: boolean } = {}): void {
   const container = root();
-  const focusedInput = options.focusSearch ? null : captureFocusedGalleryInput(container);
+  const focusedControl = options.focusSearch ? null : captureFocusedGalleryControl(container);
   container.replaceChildren(
     createGalleryView(
       state,
@@ -86,6 +89,8 @@ function render(options: { readonly focusSearch?: boolean } = {}): void {
         },
         updateSearch,
         clearSearch,
+        updateFilters,
+        clearFilters,
         updatePageLimit: (limit) => {
           void updatePageLimit(limit);
         },
@@ -100,7 +105,7 @@ function render(options: { readonly focusSearch?: boolean } = {}): void {
     ),
   );
   if (options.focusSearch) focusSearchInput();
-  else if (focusedInput) restoreFocusedGalleryInput(container, focusedInput);
+  else if (focusedControl) restoreFocusedGalleryControl(container, focusedControl);
 }
 
 async function loadPage(
@@ -109,6 +114,7 @@ async function loadPage(
 ): Promise<void> {
   const generation = (loadGeneration += 1);
   const searchQuery = state.searchQuery;
+  const filters = state.filters;
   const selectedAlbumId = state.selectedAlbumId;
   const previousMessage = state.message;
   if (!options.silent) {
@@ -124,9 +130,14 @@ async function loadPage(
     ]);
     const albums = galleryAlbumSummaries(albumSnapshot);
     const selectedAlbum = selectedGalleryAlbum(albums, selectedAlbumId);
-    const pageResult = selectedAlbum
-      ? await loadAlbumPage(selectedAlbum, searchQuery, offset, settings)
-      : { page: await loadGalleryPage(searchQuery, offset, settings), missingCount: 0 };
+    const pageResult = await loadGalleryPageForSelection({
+      store: bookmarkStore,
+      album: selectedAlbum,
+      query: searchQuery,
+      filters,
+      offset,
+      settings,
+    });
     if (generation !== loadGeneration) return;
     state = {
       ...state,
@@ -134,6 +145,8 @@ async function loadPage(
       selectedAlbumId: selectedAlbum?.album.id ?? null,
       missingAlbumRecordCount: pageResult.missingCount,
       items: pageResult.page.items,
+      filters: pageResult.page.filters,
+      filterFacets: pageResult.page.facets,
       offset: pageResult.page.offset,
       limit: pageResult.page.limit,
       total: pageResult.page.total,
@@ -154,35 +167,6 @@ async function loadPage(
     };
   }
   render(options);
-}
-
-async function loadGalleryPage(query: string, offset: number, settings: PlaintextLocalSettings): Promise<GallerySearchPage> {
-  return loadGallerySearchPage({
-    store: bookmarkStore,
-    query,
-    offset,
-    limit: settings.galleryPageLimit,
-    privacyMode: settings.privacyModeEnabled,
-  });
-}
-
-async function loadAlbumPage(
-  album: NonNullable<ReturnType<typeof selectedGalleryAlbum>>,
-  query: string,
-  offset: number,
-  settings: PlaintextLocalSettings,
-): Promise<{ readonly page: GallerySearchPage; readonly missingCount: number }> {
-  const records = await bookmarkStore.loadByIds(album.recordIds);
-  return {
-    page: await loadGallerySearchPage({
-      store: galleryListStore(records),
-      query,
-      offset,
-      limit: settings.galleryPageLimit,
-      privacyMode: settings.privacyModeEnabled,
-    }),
-    missingCount: missingAlbumRecordCount(album, records),
-  };
 }
 
 async function loadLocalSettings(): Promise<PlaintextLocalSettings> {
@@ -210,6 +194,18 @@ function clearSearch(): void {
   searchTimer = null;
   state = { ...state, searchQuery: '', draftSearchQuery: '', offset: 0, message: 'Search cleared.' };
   void loadPage(0, { focusSearch: true });
+}
+
+function updateFilters(filters: GalleryFilters): void {
+  loadGeneration += 1;
+  state = { ...state, filters, offset: 0, message: null };
+  void loadPage(0);
+}
+
+function clearFilters(): void {
+  loadGeneration += 1;
+  state = { ...state, filters: EMPTY_GALLERY_FILTERS, offset: 0, message: 'Filters cleared.' };
+  void loadPage(0);
 }
 
 async function createAlbum(name: string): Promise<void> {
@@ -301,7 +297,12 @@ async function refreshSettingsFromStorage(options: { readonly reloadOnChange?: b
     const privacyChanged = settings.privacyModeEnabled !== state.privacyMode;
     const limitChanged = settings.galleryPageLimit !== state.limit;
     if (!privacyChanged && !limitChanged) return;
-    state = { ...state, privacyMode: settings.privacyModeEnabled, limit: settings.galleryPageLimit };
+    state = {
+      ...state,
+      filters: privacySafeGalleryFilters(state.filters, settings.privacyModeEnabled),
+      privacyMode: settings.privacyModeEnabled,
+      limit: settings.galleryPageLimit,
+    };
     render();
     const nextOffset = settings.galleryPageLimit === 0 ? 0 : state.offset;
     if (options.reloadOnChange ?? true) void loadPage(nextOffset);

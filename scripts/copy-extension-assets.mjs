@@ -18,6 +18,7 @@ const stylesheets = [
   'extension/src/preview/preview.css',
   'extension/src/gallery/gallery-tokens.css',
   'extension/src/gallery/gallery.css',
+  'extension/src/gallery/gallery-filters.css',
   'extension/src/destinations/destination-tokens.css',
   'extension/src/destinations/destination-page.css',
   'extension/src/destinations/destination-surfaces.css',

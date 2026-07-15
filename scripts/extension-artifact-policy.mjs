@@ -11,6 +11,7 @@ const STATIC_APPLICATION_ARTIFACTS = [
   'src/gallery/gallery.html',
   'src/gallery/gallery-tokens.css',
   'src/gallery/gallery.css',
+  'src/gallery/gallery-filters.css',
   'src/gallery/gallery.js',
   'src/destinations/view.html',
   'src/destinations/destination-tokens.css',

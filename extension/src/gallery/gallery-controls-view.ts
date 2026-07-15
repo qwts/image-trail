@@ -7,6 +7,7 @@ import {
   type StatusTone,
 } from '../ui/components/primitives.js';
 import type { GalleryAlbumSummary } from './gallery-albums.js';
+import { galleryFiltersActive } from './gallery-filters.js';
 import type { GalleryViewHandlers, GalleryViewState } from './gallery-view.js';
 
 export function createGalleryHeader(
@@ -267,25 +268,27 @@ function hasDraggedRecord(event: DragEvent): boolean {
 
 function pageText(state: GalleryViewState): string {
   const album = selectedAlbum(state);
+  const narrowed = state.searchQuery.trim() || galleryFiltersActive(state.filters);
   if (state.total === 0) {
-    if (state.searchQuery.trim()) return album ? 'No matching album records' : 'No matching durable records';
+    if (narrowed) return album ? 'No matching album records' : 'No matching durable records';
     return album ? `${album.album.name} album` : 'Durable pins and captured bookmarks';
   }
   if (state.limit === 0) return `${state.total} ${album ? 'album' : 'durable'} record${state.total === 1 ? '' : 's'}`;
   const start = Math.min(state.offset + 1, state.total);
   const end = Math.min(state.offset + state.items.length, state.total);
-  const suffix = state.searchQuery.trim() ? `matching ${album ? 'album' : 'durable'} records` : `${album ? 'album' : 'durable'} records`;
+  const suffix = narrowed ? `matching ${album ? 'album' : 'durable'} records` : `${album ? 'album' : 'durable'} records`;
   return `${start}-${end} of ${state.total} ${suffix}`;
 }
 
 function defaultStatusText(state: GalleryViewState): string {
   const album = selectedAlbum(state);
-  if (state.loading) return state.searchQuery.trim() ? 'Searching library...' : 'Loading library...';
+  const narrowed = state.searchQuery.trim() || galleryFiltersActive(state.filters);
+  if (state.loading) return narrowed ? 'Filtering library...' : 'Loading library...';
   if (state.missingAlbumRecordCount > 0) {
     return `${state.missingAlbumRecordCount} missing album record${state.missingAlbumRecordCount === 1 ? '' : 's'} skipped.`;
   }
   if (state.total === 0) {
-    if (state.searchQuery.trim()) return state.selectedAlbumId ? 'No album matches.' : 'No gallery matches.';
+    if (narrowed) return state.selectedAlbumId ? 'No album matches.' : 'No gallery matches.';
     return album ? 'Album is empty.' : 'No durable pins or bookmarks yet.';
   }
   return '';

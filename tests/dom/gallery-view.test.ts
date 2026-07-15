@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import type { ImageDisplayRecord } from '../../extension/src/core/display-records.js';
 import type { GalleryAlbumSummary } from '../../extension/src/gallery/gallery-albums.js';
+import { EMPTY_GALLERY_FILTERS, EMPTY_GALLERY_FILTER_FACETS } from '../../extension/src/gallery/gallery-filters.js';
 import { createGalleryView, type GalleryViewHandlers, type GalleryViewState } from '../../extension/src/gallery/gallery-view.js';
 
 const record: ImageDisplayRecord = {
@@ -48,6 +49,8 @@ function galleryState(overrides: Partial<GalleryViewState> = {}): GalleryViewSta
     albumMenuSelections: {},
     searchQuery: '',
     draftSearchQuery: '',
+    filters: EMPTY_GALLERY_FILTERS,
+    filterFacets: EMPTY_GALLERY_FILTER_FACETS,
     offset: 0,
     limit: 72,
     total: 0,
@@ -74,6 +77,8 @@ function galleryHandlers(overrides: Partial<GalleryViewHandlers> = {}): GalleryV
     removeRecordFromAlbum: () => assert.fail('unexpected album remove'),
     updateSearch: () => assert.fail('unexpected search'),
     clearSearch: () => assert.fail('unexpected clear'),
+    updateFilters: () => assert.fail('unexpected filter update'),
+    clearFilters: () => assert.fail('unexpected filter clear'),
     updatePageLimit: () => assert.fail('unexpected limit update'),
     loadPage: () => assert.fail('unexpected page load'),
     reload: () => assert.fail('unexpected reload'),
@@ -247,6 +252,74 @@ test('gallery limit form accepts zero as unlimited', () => {
 
   assert.deepEqual(limits, [24]);
   assert.match(view.textContent ?? '', /0 shows all/u);
+});
+
+test('gallery filter controls dispatch composable metadata filters and expose active state', () => {
+  const updates: unknown[] = [];
+  let cleared = false;
+  const view = createGalleryView(
+    galleryState({
+      items: [record],
+      total: 1,
+      filters: { sourceHost: 'images.example.test', recordKind: 'url-only', imageType: null },
+      filterFacets: { sourceHosts: ['images.example.test'], imageTypes: ['JPG', 'PNG'] },
+    }),
+    galleryHandlers({
+      updateFilters: (filters) => updates.push(filters),
+      clearFilters: () => {
+        cleared = true;
+      },
+    }),
+  );
+
+  const kind = view.querySelector<HTMLSelectElement>('select[aria-label="Filter by record kind"]');
+  const imageType = view.querySelector<HTMLSelectElement>('select[aria-label="Filter by image type"]');
+  assert.ok(kind);
+  assert.ok(imageType);
+  assert.equal(kind.value, 'url-only');
+  imageType.value = 'PNG';
+  imageType.dispatchEvent(new Event('change', { bubbles: true }));
+  buttonByText(view, 'Clear filters').click();
+
+  assert.deepEqual(updates, [{ sourceHost: 'images.example.test', recordKind: 'url-only', imageType: 'PNG' }]);
+  assert.equal(cleared, true);
+  assert.match(view.textContent ?? '', /2 filters active; results match every filter/u);
+  assert.match(view.textContent ?? '', /Source: images\.example\.test/u);
+  assert.match(view.textContent ?? '', /Kind: URL-only/u);
+});
+
+test('gallery filters distinguish no matches from an empty durable library', () => {
+  const filtered = createGalleryView(
+    galleryState({ filters: { ...EMPTY_GALLERY_FILTERS, imageType: 'PNG' }, filterFacets: { sourceHosts: [], imageTypes: ['PNG'] } }),
+    galleryHandlers(),
+  );
+  const empty = createGalleryView(galleryState(), galleryHandlers());
+
+  assert.match(filtered.textContent ?? '', /No matches/u);
+  assert.match(filtered.textContent ?? '', /No gallery matches/u);
+  assert.match(empty.textContent ?? '', /No durable images yet/u);
+});
+
+test('privacy mode removes URL-derived filter choices while keeping record-kind filtering available', () => {
+  const view = createGalleryView(
+    galleryState({
+      privacyMode: true,
+      filters: { sourceHost: null, recordKind: 'locked-private', imageType: null },
+      filterFacets: EMPTY_GALLERY_FILTER_FACETS,
+    }),
+    galleryHandlers(),
+  );
+
+  const source = view.querySelector<HTMLSelectElement>('select[aria-label="Filter by source host"]');
+  const kind = view.querySelector<HTMLSelectElement>('select[aria-label="Filter by record kind"]');
+  const imageType = view.querySelector<HTMLSelectElement>('select[aria-label="Filter by image type"]');
+  assert.ok(source);
+  assert.ok(kind);
+  assert.ok(imageType);
+  assert.equal(source.disabled, true);
+  assert.equal(imageType.disabled, true);
+  assert.equal(kind.disabled, false);
+  assert.equal(view.textContent?.includes('images.example.test'), false);
 });
 
 test('gallery album controls create select rename and delete albums', () => {

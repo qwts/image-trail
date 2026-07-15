@@ -4,6 +4,8 @@ import { recordDisplayName, recordExtensionLabel, recordMetadataText, recordTitl
 import { createRecordRow } from '../ui/components/record-row.js';
 import type { GalleryAlbumSummary } from './gallery-albums.js';
 import { createGalleryAlbumControls, createGalleryHeader, createGalleryStatus } from './gallery-controls-view.js';
+import { createGalleryFilterControls } from './gallery-filter-controls-view.js';
+import { galleryFiltersActive, type GalleryFilterFacets, type GalleryFilters } from './gallery-filters.js';
 import { galleryRecordKind, openActionForGalleryRecord } from './gallery-model.js';
 
 const RECORD_DRAG_MIME = 'application/x-image-trail-record-id';
@@ -17,6 +19,8 @@ export interface GalleryViewState {
   readonly albumMenuSelections: Readonly<Record<string, string>>;
   readonly searchQuery: string;
   readonly draftSearchQuery: string;
+  readonly filters: GalleryFilters;
+  readonly filterFacets: GalleryFilterFacets;
   readonly offset: number;
   readonly limit: number;
   readonly total: number;
@@ -40,6 +44,8 @@ export interface GalleryViewHandlers {
   readonly removeRecordFromAlbum: (albumId: string, recordId: string) => void;
   readonly updateSearch: (query: string) => void;
   readonly clearSearch: () => void;
+  readonly updateFilters: (filters: GalleryFilters) => void;
+  readonly clearFilters: () => void;
   readonly updatePageLimit: (limit: number) => void;
   readonly loadPage: (offset: number) => void;
   readonly reload: () => void;
@@ -55,6 +61,7 @@ export function createGalleryView(
   if (options.embedded) shell.classList.add('is-embedded');
   shell.append(
     createGalleryHeader(state, handlers, { showIdentity: !options.embedded }),
+    createGalleryFilterControls(state, handlers),
     createGalleryAlbumControls(state, handlers),
     createGalleryStatus(state),
     createGrid(state, handlers),
@@ -79,9 +86,9 @@ function createEmptyState(state: GalleryViewState): HTMLLIElement {
   if (state.message && /could not|failed/iu.test(state.message)) {
     title.textContent = 'Gallery unavailable';
     message.textContent = state.message;
-  } else if (state.searchQuery.trim()) {
+  } else if (state.searchQuery.trim() || galleryFiltersActive(state.filters)) {
     title.textContent = 'No matches';
-    message.textContent = 'Try a different URL, host, filename, label, or album.';
+    message.textContent = 'Try a different search, filter combination, or album.';
   } else if (state.selectedAlbumId) {
     title.textContent = 'Album is empty';
     message.textContent = 'Add a durable record from All Images or drag one onto this album.';

@@ -8,6 +8,14 @@ interface SeedRecord {
   readonly label: string;
   readonly thumbnail?: string;
   readonly timestamp: string;
+  readonly captureStatus?: 'captured';
+  readonly blobId?: string;
+  readonly storedOriginal?: {
+    readonly blobId: string;
+    readonly mimeType: string;
+    readonly byteLength: number;
+    readonly capturedAt: string;
+  };
 }
 
 const thumbnail = `data:image/svg+xml,${encodeURIComponent(`
@@ -23,10 +31,18 @@ const seedRecords: readonly SeedRecord[] = [
     label: 'Alpine lake',
     thumbnail,
     timestamp: '2026-07-14T03:00:00.000Z',
+    captureStatus: 'captured',
+    blobId: 'gallery-filter-original',
+    storedOriginal: {
+      blobId: 'gallery-filter-original',
+      mimeType: 'image/jpeg',
+      byteLength: 128,
+      capturedAt: '2026-07-14T03:00:00.000Z',
+    },
   },
   {
     id: 'gallery-middle',
-    url: 'https://images.example.test/coastline.webp',
+    url: 'https://cdn.example.test/coastline.webp',
     label: 'Coastline study',
     thumbnail,
     timestamp: '2026-07-14T02:00:00.000Z',
@@ -102,7 +118,26 @@ test('Gallery uses the shared design system without mutating durable queue order
   await search.fill('coast');
   await expect(page.locator('.image-trail-gallery__card')).toHaveCount(1);
   await expect(page.getByRole('button', { name: /Coastline study/u })).toBeVisible();
-  await page.getByRole('button', { name: 'Clear' }).click();
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await expect(page.locator('.image-trail-gallery__card')).toHaveCount(3);
+
+  const hostFilter = page.getByRole('combobox', { name: 'Filter by source host' });
+  await hostFilter.focus();
+  await hostFilter.selectOption('cdn.example.test');
+  await expect(hostFilter).toBeFocused();
+  await expect(page.locator('.image-trail-gallery__card-title')).toHaveText('Coastline study');
+  const typeFilter = page.getByRole('combobox', { name: 'Filter by image type' });
+  await typeFilter.selectOption('WEBP');
+  await expect(page.locator('.image-trail-gallery__card')).toHaveCount(1);
+  await page.getByRole('combobox', { name: 'Filter by record kind' }).selectOption('stored-original');
+  await expect(page.getByRole('heading', { name: 'No matches' })).toBeVisible();
+  await expect(page.locator('.image-trail-gallery__status')).toHaveText('No gallery matches.');
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(page.locator('.image-trail-gallery__card')).toHaveCount(3);
+
+  await page.getByRole('combobox', { name: 'Filter by record kind' }).selectOption('stored-original');
+  await expect(page.locator('.image-trail-gallery__card-title')).toHaveText('Alpine lake');
+  await page.getByRole('button', { name: 'Clear filters' }).click();
   await expect(page.locator('.image-trail-gallery__card')).toHaveCount(3);
 
   await page.getByRole('textbox', { name: 'New album' }).fill(galleryAlbumName);

@@ -11,7 +11,7 @@ const panel = `${panelEntry}\n${['foundation', 'sections', 'controls', 'cloud', 
   .join('\n')}`;
 const designSystem = read('extension/src/ui/styles/design-system.css');
 const galleryTokens = read('extension/src/gallery/gallery-tokens.css');
-const gallery = read('extension/src/gallery/gallery.css');
+const gallery = `${read('extension/src/gallery/gallery.css')}\n${read('extension/src/gallery/gallery-filters.css')}`;
 const galleryHtml = read('extension/src/gallery/gallery.html');
 const manifest = JSON.parse(read('extension/manifest.json')) as {
   web_accessible_resources: Array<{ resources: string[] }>;
@@ -64,6 +64,7 @@ test('panel and Gallery consume canonical tokens and shared primitives', () => {
   assert.doesNotMatch(gallery, /(?:^|\n)button(?:,|\s*\{)/u);
   assert.match(gallery, /var\(--it-header-bg\)/u);
   assert.ok(galleryHtml.indexOf('gallery-tokens.css') < galleryHtml.indexOf('gallery.css'));
+  assert.ok(galleryHtml.indexOf('gallery.css') < galleryHtml.indexOf('gallery-filters.css'));
 });
 
 test('the injected stylesheet can load its token dependency', () => {

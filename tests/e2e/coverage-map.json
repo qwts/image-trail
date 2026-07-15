@@ -213,27 +213,30 @@
         {
           "type": "unit-dom",
           "paths": [
+            "tests/gallery-filters.test.ts",
+            "tests/gallery-page-loader.test.ts",
+            "tests/gallery-search.test.ts",
             "tests/dom/gallery-view.test.ts",
             "tests/dom/gallery-focus.test.ts",
             "tests/design-tokens.test.ts",
             "tests/primitives-css.test.ts"
           ],
-          "notes": "Covers Gallery composition with shared Button, IconButton, Input, Card, SectionHeader, StatusPill, and RecordRow primitives; canonical tokens without compatibility aliases; native form semantics; paging, search, album, locked/privacy, empty, loading, error, and independent per-card album states."
+          "notes": "Covers Gallery composition with shared Button, IconButton, Input, Select, Badge, Card, SectionHeader, StatusPill, and RecordRow primitives; canonical tokens without compatibility aliases; native form semantics; paging, AND-composed source/kind/type filters, active-filter summary and clear behavior, search, album, locked/privacy, distinct empty/no-match, loading, error, focus restoration, and independent per-card album states."
         },
         {
           "type": "storybook",
           "path": "extension/src/ui/stories/gallery-view.stories.ts",
-          "notes": "Covers populated, interactive, locked/private, empty, loading, error, narrow, and reduced-motion Gallery states using the production view factory."
+          "notes": "Covers populated, interactive search/filter/clear controls, locked/private, empty, loading, error, narrow, and reduced-motion Gallery states using the production view factory."
         },
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/gallery-design-system.spec.ts",
-          "notes": "Covers the packaged extension Gallery with real durable IndexedDB records, shared primitive adoption, canonical queue order, debounced search, album creation and membership, native keyboard order with focus preserved through background refresh renders, narrow overflow, and reduced-motion behavior; verifies browsing, search, and album membership do not reorder the durable queue."
+          "notes": "Covers the packaged extension Gallery with real durable IndexedDB records, shared primitive adoption, canonical queue order, debounced search, source-host/image-type/record-kind filters with AND behavior, active-filter clear and no-match state, album creation and membership, native keyboard order with focus preserved through filter and background refresh renders, narrow overflow, and reduced-motion behavior; verifies browsing, search, filtering, and album membership do not reorder the durable queue."
         },
         {
           "type": "manual",
           "reason": "Browser zoom, drag-and-drop affordances, and final visual comparison against the supplied mocked-tab reference require a packaged-extension inspection.",
-          "notes": "Open Gallery from the packaged panel and compare its dark extension-page shell, hierarchy, density, type, borders, glows, status, cards, and controls with the mocked-tab handoff. Exercise 200% zoom, keyboard-only navigation, album drag/drop, locked/private records, captured-original indicators, no-results and load-error states, reduced motion, and confirm no context rail, destination navigation, Recents, or failed stylesheet requests appear."
+          "notes": "Open Gallery from the packaged panel and compare its dark extension-page shell, hierarchy, density, type, borders, glows, status, cards, and controls with the mocked-tab handoff. Exercise search plus source/kind/type filters, filter clearing, privacy mode, 200% zoom, keyboard-only navigation, album drag/drop, locked/private records, captured-original indicators, empty/no-match and load-error states, reduced motion, and confirm no context rail, destination navigation, Recents, or failed stylesheet requests appear."
         }
       ]
     },

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { captureFocusedGalleryInput, restoreFocusedGalleryInput } from '../../extension/src/gallery/gallery-focus.js';
+import { captureFocusedGalleryControl, restoreFocusedGalleryControl } from '../../extension/src/gallery/gallery-focus.js';
 
 test('Gallery input focus and selection survive a root render', () => {
   const container = document.createElement('main');
@@ -13,11 +13,11 @@ test('Gallery input focus and selection survive a root render', () => {
   search.focus();
   search.setSelectionRange(1, 4, 'forward');
 
-  const captured = captureFocusedGalleryInput(container);
+  const captured = captureFocusedGalleryControl(container);
   assert.ok(captured);
   const replacement = search.cloneNode(true) as HTMLInputElement;
   container.replaceChildren(replacement);
-  restoreFocusedGalleryInput(container, captured);
+  restoreFocusedGalleryControl(container, captured);
 
   assert.equal(document.activeElement, replacement);
   assert.equal(replacement.selectionStart, 1);
@@ -32,14 +32,42 @@ test('Gallery focus restoration ignores controls that disappear or become disabl
   container.append(input);
   document.body.append(container);
   input.focus();
-  const captured = captureFocusedGalleryInput(container);
+  const captured = captureFocusedGalleryControl(container);
   assert.ok(captured);
 
   const disabledReplacement = input.cloneNode(true) as HTMLInputElement;
   disabledReplacement.disabled = true;
   container.replaceChildren(disabledReplacement);
-  restoreFocusedGalleryInput(container, captured);
+  restoreFocusedGalleryControl(container, captured);
 
   assert.notEqual(document.activeElement, disabledReplacement);
+  container.remove();
+});
+
+test('Gallery select focus survives a filter render', () => {
+  const container = document.createElement('main');
+  const filter = document.createElement('select');
+  filter.setAttribute('aria-label', 'Filter by image type');
+  const all = document.createElement('option');
+  all.value = '';
+  all.textContent = 'All image types';
+  const png = document.createElement('option');
+  png.value = 'PNG';
+  png.textContent = 'PNG';
+  filter.append(all, png);
+  filter.value = 'PNG';
+  container.append(filter);
+  document.body.append(container);
+  filter.focus();
+
+  const captured = captureFocusedGalleryControl(container);
+  assert.ok(captured);
+  const replacement = filter.cloneNode(true) as HTMLSelectElement;
+  replacement.value = 'PNG';
+  container.replaceChildren(replacement);
+  restoreFocusedGalleryControl(container, captured);
+
+  assert.equal(document.activeElement, replacement);
+  assert.equal(replacement.value, 'PNG');
   container.remove();
 });

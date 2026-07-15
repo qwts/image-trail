@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import type { ImageDisplayRecord } from '../extension/src/core/display-records.js';
 import { galleryRecordMatchesSearch, gallerySearchText, normalizeGallerySearchQuery } from '../extension/src/gallery/gallery-search.js';
+import { EMPTY_GALLERY_FILTERS } from '../extension/src/gallery/gallery-filters.js';
 import { loadGallerySearchPage } from '../extension/src/gallery/gallery-search-loader.js';
 
 const records: readonly ImageDisplayRecord[] = [
@@ -56,6 +57,7 @@ test('gallery search paging preserves queue order within matches', async () => {
   const page = await loadGallerySearchPage({
     store: pagedStore(records),
     query: 'example',
+    filters: EMPTY_GALLERY_FILTERS,
     offset: 1,
     limit: 1,
     privacyMode: false,
@@ -74,6 +76,7 @@ test('gallery search treats zero limit as unlimited results', async () => {
   const page = await loadGallerySearchPage({
     store: pagedStore(records),
     query: 'example',
+    filters: EMPTY_GALLERY_FILTERS,
     offset: 2,
     limit: 0,
     privacyMode: false,
@@ -93,6 +96,7 @@ test('gallery search scans the durable list once per query', async () => {
   const page = await loadGallerySearchPage({
     store: pagedStore(records, calls),
     query: 'example',
+    filters: EMPTY_GALLERY_FILTERS,
     offset: 1,
     limit: 1,
     privacyMode: false,
@@ -105,6 +109,26 @@ test('gallery search scans the durable list once per query', async () => {
   assert.equal(calls.length, 1);
   assert.equal(calls[0]?.offset, 0);
   assert.equal(calls[0]?.limit, Number.MAX_SAFE_INTEGER);
+});
+
+test('gallery search and filters share one durable scan and preserve queue order', async () => {
+  const calls: { readonly offset: number; readonly limit: number }[] = [];
+  const page = await loadGallerySearchPage({
+    store: pagedStore(records, calls),
+    query: 'example',
+    filters: { sourceHost: null, recordKind: 'url-only', imageType: 'PNG' },
+    offset: 0,
+    limit: 72,
+    privacyMode: false,
+  });
+
+  assert.deepEqual(
+    page.items.map((record) => record.id),
+    ['b'],
+  );
+  assert.equal(page.total, 1);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(page.facets.sourceHosts, ['archive.example.test', 'cdn.example.test', 'images.example.test']);
 });
 
 function pagedStore(items: readonly ImageDisplayRecord[], calls: { readonly offset: number; readonly limit: number }[] = []) {

@@ -2,8 +2,10 @@ import type { Meta, StoryObj } from '@storybook/html-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
 import '../../gallery/gallery.css';
+import '../../gallery/gallery-filters.css';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
 import type { GalleryAlbumSummary } from '../../gallery/gallery-albums.js';
+import { EMPTY_GALLERY_FILTERS } from '../../gallery/gallery-filters.js';
 import { createGalleryView, type GalleryViewHandlers, type GalleryViewState } from '../../gallery/gallery-view.js';
 
 const action = fn();
@@ -82,6 +84,8 @@ export const InteractiveControls: Story = {
     await expect(action).toHaveBeenCalledWith('search', 'coast');
     await userEvent.click(canvas.getByRole('button', { name: 'Reload' }));
     await expect(action).toHaveBeenCalledWith('reload');
+    await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Filter by image type' }), 'WEBP');
+    await expect(action).toHaveBeenCalledWith('filters', { sourceHost: null, recordKind: null, imageType: 'WEBP' });
     await userEvent.click(canvas.getByRole('button', { name: 'Add Alpine lake to album' }));
     await expect(action).toHaveBeenCalledWith('toggle-album', 'pin-1');
   },
@@ -153,6 +157,8 @@ function state(overrides: Partial<GalleryViewState> = {}): GalleryViewState {
     albumMenuSelections: {},
     searchQuery: '',
     draftSearchQuery: '',
+    filters: EMPTY_GALLERY_FILTERS,
+    filterFacets: { sourceHosts: ['images.example.test'], imageTypes: ['JPG', 'PNG', 'WEBP'] },
     offset: 0,
     limit: 72,
     total: 0,
@@ -179,6 +185,8 @@ function handlers(): GalleryViewHandlers {
     removeRecordFromAlbum: (albumId, recordId) => action('remove-from-album', albumId, recordId),
     updateSearch: (query) => action('search', query),
     clearSearch: () => action('clear-search'),
+    updateFilters: (filters) => action('filters', filters),
+    clearFilters: () => action('clear-filters'),
     updatePageLimit: (limit) => action('page-limit', limit),
     loadPage: (offset) => action('load-page', offset),
     reload: () => action('reload'),
