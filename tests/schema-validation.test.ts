@@ -175,6 +175,15 @@ test('record schemas accept canonical fixtures and reject corrupted mutants with
   assert.equal(v.is(saveLocalSettingsRequestSchema, { settings: DEFAULT_LOCAL_SETTINGS }), true);
   assert.equal(
     v.is(saveLocalSettingsRequestSchema, {
+      settings: {
+        ...DEFAULT_LOCAL_SETTINGS,
+        searchableMetadataPolicy: { ...DEFAULT_LOCAL_SETTINGS.searchableMetadataPolicy, thumbnail: 'plaintext' },
+      },
+    }),
+    true,
+  );
+  assert.equal(
+    v.is(saveLocalSettingsRequestSchema, {
       settings: { ...DEFAULT_LOCAL_SETTINGS, showHistoryThumbnails: true, panelDock: 'left' },
     }),
     true,

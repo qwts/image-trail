@@ -12,6 +12,10 @@ const pageContextOverridesSchema = v.record(
   v.string(),
   v.object({ context: v.picklist(['single', 'gallery', 'feed']), updatedAt: v.number() }),
 );
+const searchableMetadataPolicyEntries = {
+  urlDerived: v.picklist(['plaintext', 'encrypted']),
+  albumName: v.picklist(['plaintext', 'encrypted']),
+};
 
 const plaintextLocalSettingsEntries = {
   schemaVersion: v.literal(1),
@@ -29,11 +33,7 @@ const plaintextLocalSettingsEntries = {
   queueDisplayOrder: v.picklist(['front-first', 'back-first']),
   pinSaveStoragePreference: v.picklist(['encrypted', 'plaintext']),
   privacyModeEnabled: v.boolean(),
-  searchableMetadataPolicy: v.object({
-    urlDerived: v.picklist(['plaintext', 'encrypted']),
-    albumName: v.picklist(['plaintext', 'encrypted']),
-    thumbnail: v.literal('encrypted'),
-  }),
+  searchableMetadataPolicy: v.object({ ...searchableMetadataPolicyEntries, thumbnail: v.literal('encrypted') }),
   buildInfoOverlayVisible: v.boolean(),
   previewObjectFit: v.picklist(['contain', 'cover', 'fill', 'none', 'scale-down']),
   previewFillScreen: v.boolean(),
@@ -59,6 +59,10 @@ export const saveLocalSettingsPayloadSchema = v.object({
   queueDisplayOrder: v.optional(v.picklist(['front-first', 'back-first'])),
   downArrowAction: v.optional(v.picklist(['capture', 'download', 'off'])),
   pageContextOverrides: v.optional(pageContextOverridesSchema),
+  searchableMetadataPolicy: v.object({
+    ...searchableMetadataPolicyEntries,
+    thumbnail: v.picklist(['plaintext', 'encrypted']),
+  }),
 });
 
 type _AssertPlaintextLocalSettings = Assert<MutuallyAssignable<v.InferOutput<typeof plaintextLocalSettingsSchema>, PlaintextLocalSettings>>;

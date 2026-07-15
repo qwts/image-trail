@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import { isBuildIdentity, type BuildIdentity } from '../core/build-info.js';
 import { storageUsageSummarySchema } from '../core/image/capture-result.schema.js';
 import type { ImageProbeMethod, ImageRequestIntent, ImageSourceProfile } from '../core/image/request-policy.js';
+import type { SaveLocalSettingsInput } from '../data/local-settings.js';
 import { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType, hasVersionedObjectShape } from './message-protocol.js';
 import type { MessageType as ProtocolMessageType } from './message-protocol.js';
 import type { AlbumRequest, AlbumResponse } from './album-messages.js';
@@ -670,13 +671,13 @@ export interface LoadLocalSettingsResultMessage {
     | { readonly ok: false; readonly message: string };
 }
 
-type LocalSettings = import('../data/local-settings.js').PlaintextLocalSettings;
 type BackwardCompatibleLocalSettingsKey =
   'recentSparseRowDisplayMode' | 'recentDisplayOrder' | 'queueDisplayOrder' | 'downArrowAction' | 'pageContextOverrides';
 type BackwardCompatibleLocalSettings = {
-  readonly [Key in BackwardCompatibleLocalSettingsKey]?: LocalSettings[Key] | undefined;
+  readonly [Key in BackwardCompatibleLocalSettingsKey]?: SaveLocalSettingsInput[Key] | undefined;
 };
-export type SaveLocalSettingsPayloadSettings = Omit<LocalSettings, BackwardCompatibleLocalSettingsKey> & BackwardCompatibleLocalSettings;
+export type SaveLocalSettingsPayloadSettings = Omit<SaveLocalSettingsInput, BackwardCompatibleLocalSettingsKey> &
+  BackwardCompatibleLocalSettings;
 
 export interface SaveLocalSettingsMessage {
   readonly type: typeof MessageType.SaveLocalSettings;
@@ -1367,9 +1368,7 @@ export function createLoadLocalSettingsResultMessage(payload: LoadLocalSettingsR
   return { type: MessageType.LoadLocalSettingsResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-export function createSaveLocalSettingsMessage(
-  settings: import('../data/local-settings.js').PlaintextLocalSettings,
-): SaveLocalSettingsMessage {
+export function createSaveLocalSettingsMessage(settings: SaveLocalSettingsInput): SaveLocalSettingsMessage {
   return { type: MessageType.SaveLocalSettings, version: MESSAGE_PROTOCOL_VERSION, payload: { settings } };
 }
 
