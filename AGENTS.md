@@ -151,13 +151,17 @@ can carry a stale copy until rebased or restarted from the main repo.
   store) plus a `no-restricted-syntax` rule in `eslint.config.js` banning an
   `envelope.updatedAt` sort. Run them together via the `/check` command
   (`.claude/commands/check.md`), which wraps the gates above and reports each invariant.
-- Every change summary (chat reply, issue comment, PR body) must end with:
+- Include the following block in change summaries only during an active,
+  synchronous collaboration where the agent is building the extension and the
+  user is manually testing that build:
   - **Working path:** output of `pwd` — the directory actually edited (Codex
     worktrees are often under `~/.codex/worktrees/`, not the main checkout).
   - **Build identity:** read `extension/dist/build-info.json` after `npm run
 build` and paste **Built local** time plus commit, branch, and worktree when
-    present (any may be null/absent). Do not omit this block; do not paraphrase
-    from memory.
+    present (any may be null/absent). Do not paraphrase from memory.
+- Omit the Working path / Build identity block from autonomous goal runs,
+  background work, routine issue or PR updates, documentation-only changes, and
+  any task where the user is not manually testing the build alongside the agent.
 - After the first implementation stretch, provide a manual test run before the
   PR enters final review.
 
