@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.12.1
+
+### Patch Changes
+
+- e179cf2: Report thumbnail storage as always encrypted and migrate legacy settings that incorrectly labeled it plaintext.
+
 ## 0.12.0
 
 ### Minor Changes
