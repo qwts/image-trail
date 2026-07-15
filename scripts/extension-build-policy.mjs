@@ -9,6 +9,15 @@ export function isReleaseBuild(environment = process.env) {
   return environment.IMAGE_TRAIL_RELEASE_BUILD === '1';
 }
 
+export function extensionOutputPath(sourcePath, pathApi = path) {
+  const sourceRoot = pathApi.join('extension', 'src');
+  const relativePath = pathApi.relative(sourceRoot, sourcePath);
+  if (!relativePath || relativePath === '..' || relativePath.startsWith(`..${pathApi.sep}`) || pathApi.isAbsolute(relativePath)) {
+    throw new Error(`Extension source path must be inside ${sourceRoot}: ${sourcePath}`);
+  }
+  return pathApi.join('extension', 'dist', 'src', relativePath);
+}
+
 export function extensionBuildOptions({ entryPoint, outfile, format, jsx = null, release = isReleaseBuild() }) {
   return {
     entryPoints: [entryPoint],

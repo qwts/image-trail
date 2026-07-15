@@ -21,7 +21,7 @@ const STATIC_APPLICATION_ARTIFACTS = [
 const TEXT_ARTIFACT = /\.(?:css|html|js|json)$/u;
 const RELEASE_BUILD_INFO_KEYS = ['branch', 'builtAt', 'commit', 'mode', 'schemaVersion', 'timezone', 'version', 'worktree'];
 const FORBIDDEN_RELEASE_TEXT = [
-  { pattern: /\/\/# sourceMappingURL=|\/\/# sourceURL=/u, message: 'contains source mapping metadata' },
+  { pattern: /(?:\/\/|\/\*)#\s*source(?:Mapping)?URL=/u, message: 'contains source mapping metadata' },
   { pattern: /\bdebugger\b/u, message: 'contains a debugger statement' },
   { pattern: /\bconsole\.debug\b/u, message: 'contains development debug logging' },
   { pattern: /\bprocess\.env\b|\bimport\.meta\.env\b/u, message: 'contains an unresolved environment reference' },

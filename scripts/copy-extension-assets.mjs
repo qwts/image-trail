@@ -1,7 +1,7 @@
 import { cp, mkdir, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import './write-extension-build-info.mjs';
-import { writeStylesheet } from './extension-build-policy.mjs';
+import { extensionOutputPath, writeStylesheet } from './extension-build-policy.mjs';
 
 await mkdir('extension/dist', { recursive: true });
 await cp('extension/manifest.json', 'extension/dist/manifest.json');
@@ -24,7 +24,7 @@ const stylesheets = [
 ];
 
 for (const sourcePath of stylesheets) {
-  await writeStylesheet(sourcePath, sourcePath.replace('extension/src/', 'extension/dist/src/'));
+  await writeStylesheet(sourcePath, extensionOutputPath(sourcePath));
 }
 
 async function stylesheetFiles(directory) {

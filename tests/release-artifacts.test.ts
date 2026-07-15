@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, win32 } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 type ArtifactPolicyModule = {
@@ -12,6 +12,7 @@ type ArtifactPolicyModule = {
 };
 
 type BuildPolicyModule = {
+  extensionOutputPath(sourcePath: string, pathApi?: typeof win32): string;
   extensionBuildOptions(input: {
     entryPoint: string;
     outfile: string;
@@ -102,6 +103,8 @@ test('release text audit rejects debug metadata, secrets, and build-machine path
     ['bundle.js', "process.env['NODE_ENV']"],
     ['bundle.js', 'process.env[key]'],
     ['bundle.js', '//# sourceMappingURL=bundle.js.map'],
+    ['bundle.js', '//#sourceMappingURL=bundle.js.map'],
+    ['bundle.css', '/*# sourceMappingURL=bundle.css.map */'],
     ['bundle.js', '-----BEGIN PRIVATE KEY-----'],
     ['bundle.js', 'AKIA1234567890ABCDEF'],
     ['bundle.js', 'const source = "/Users/example/image-trail"'],
@@ -115,6 +118,12 @@ test('release text audit rejects debug metadata, secrets, and build-machine path
     artifacts.validateReleaseArtifactText('bundle.js', 'console.warn("bounded failure");console.error("fatal failure")', '/workspace'),
     [],
   );
+});
+
+test('extension stylesheet output paths remain inside dist on Windows', () => {
+  const source = win32.join('extension', 'src', 'ui', 'styles', 'panel.css');
+  assert.equal(builds.extensionOutputPath(source, win32), win32.join('extension', 'dist', 'src', 'ui', 'styles', 'panel.css'));
+  assert.throws(() => builds.extensionOutputPath(win32.join('extension', 'outside.css'), win32), /must be inside/u);
 });
 
 test('release build identity rejects extra metadata and local build markers', () => {
