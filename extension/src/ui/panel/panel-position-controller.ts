@@ -177,7 +177,7 @@ export class PanelPositionController {
   setWorkspaceRailEdges(edges: ReadonlySet<WorkspaceRailEdge>, observeViewport = true): void {
     const root = this.deps.root();
     if (!root) return;
-    if (!this.restoredPanelPosition) {
+    if (!this.restoredPanelPosition && edges.size > 0) {
       const rect = root.getBoundingClientRect();
       this.restoredPanelPosition = { left: rect.left, top: rect.top };
     }

@@ -141,6 +141,14 @@ test('active rails shift and size only extension surfaces, then restore the base
   assert.equal(harness.root.style.maxHeight, '');
 });
 
+test('floating-only initialization leaves stylesheet placement authoritative', () => {
+  const harness = createHarness();
+  harness.controller.setWorkspaceRailEdges(new Set());
+  assert.equal(harness.root.style.left, '');
+  assert.equal(harness.root.style.top, '');
+  assert.deepEqual(harness.controller.currentPanelPosition(), { left: 100, top: 80 });
+});
+
 test('viewport observation reclamps floating-only workspaces and stops when minimized', () => {
   const harness = createHarness();
   harness.controller.setWorkspaceRailEdges(new Set(), true);

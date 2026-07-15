@@ -85,6 +85,7 @@ test.afterEach(async ({ extensionId, page }) => {
 
 test('Gallery uses the shared design system without mutating durable queue order', async ({ extensionId, page }) => {
   await openGallery(page, extensionId);
+  await clearDurableQueue(page);
   await seedGallery(page, seedRecords);
   await expect(page.locator('.image-trail-gallery__card')).toHaveCount(3);
 
@@ -149,6 +150,25 @@ async function seedGallery(page: Page, records: readonly SeedRecord[]): Promise<
     );
   }, records);
   expect(results.every((result) => result?.payload?.ok === true)).toBe(true);
+}
+
+async function clearDurableQueue(page: Page): Promise<void> {
+  const result = await page.evaluate(async () => {
+    const snapshot = await chrome.runtime.sendMessage({
+      type: 'imageTrail.loadBookmarks',
+      version: 1,
+      payload: { offset: 0, limit: 500, scope: 'global' },
+    });
+    const ids = (snapshot?.payload?.items ?? []).map((record: { id: string }) => record.id);
+    const removal = await chrome.runtime.sendMessage({
+      type: 'imageTrail.removeBookmarks',
+      version: 1,
+      payload: { ids },
+    });
+    return { removal, count: ids.length };
+  });
+  expect(result.removal?.payload?.ok).toBe(true);
+  expect(result.removal?.payload?.removedCount).toBe(result.count);
 }
 
 async function durableQueueLabels(page: Page): Promise<readonly string[]> {
