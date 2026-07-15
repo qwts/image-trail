@@ -66,15 +66,14 @@ export function createSearchableMetadataSettingsView(
 
   const urlSelect = createMetadataModeSelect(policy.urlDerived);
   const albumSelect = createMetadataModeSelect(policy.albumName);
-  const thumbnailSelect = createMetadataModeSelect(policy.thumbnail);
-  thumbnailSelect.disabled = true;
+  const thumbnailSelect = createEncryptedMetadataModeSelect();
   const dispatchCurrent = (): void => {
     dispatch({
       name: 'settings/update-metadata-policy',
       policy: {
         urlDerived: parseMetadataMode(urlSelect.value, policy.urlDerived),
         albumName: parseMetadataMode(albumSelect.value, policy.albumName),
-        thumbnail: policy.thumbnail,
+        thumbnail: 'encrypted',
       },
     });
   };
@@ -103,6 +102,18 @@ function createMetadataModeSelect(mode: SearchableMetadataMode): HTMLSelectEleme
     element.selected = mode === option.value;
     select.append(element);
   }
+  return select;
+}
+
+function createEncryptedMetadataModeSelect(): HTMLSelectElement {
+  const select = document.createElement('select');
+  select.className = 'image-trail-panel__settings-select';
+  select.disabled = true;
+  const option = document.createElement('option');
+  option.value = 'encrypted';
+  option.textContent = 'Encrypted';
+  option.selected = true;
+  select.append(option);
   return select;
 }
 

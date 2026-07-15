@@ -32,7 +32,7 @@ const plaintextLocalSettingsEntries = {
   searchableMetadataPolicy: v.object({
     urlDerived: v.picklist(['plaintext', 'encrypted']),
     albumName: v.picklist(['plaintext', 'encrypted']),
-    thumbnail: v.picklist(['plaintext', 'encrypted']),
+    thumbnail: v.literal('encrypted'),
   }),
   buildInfoOverlayVisible: v.boolean(),
   previewObjectFit: v.picklist(['contain', 'cover', 'fill', 'none', 'scale-down']),

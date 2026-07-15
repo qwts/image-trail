@@ -14,8 +14,8 @@ import { migrateLocalSettings } from '../extension/src/data/local-settings.js';
 
 const ENCRYPTED_POLICY: SearchableMetadataPolicy = { urlDerived: 'encrypted', albumName: 'encrypted', thumbnail: 'encrypted' };
 
-test('the default policy preserves today plaintext behaviour (opt-in only, no data change)', () => {
-  assert.deepEqual(DEFAULT_SEARCHABLE_METADATA_POLICY, { urlDerived: 'plaintext', albumName: 'plaintext', thumbnail: 'plaintext' });
+test('the default policy keeps thumbnails encrypted while preserving compatible URL and album defaults', () => {
+  assert.deepEqual(DEFAULT_SEARCHABLE_METADATA_POLICY, { urlDerived: 'plaintext', albumName: 'plaintext', thumbnail: 'encrypted' });
 });
 
 test('bookmarkSearchIndexKey returns the URL under the default policy and its hash only when opted in', async () => {
@@ -41,16 +41,26 @@ test('policy guards accept valid values and reject malformed ones', () => {
   assert.equal(isSearchableMetadataPolicy(null), false);
 });
 
-test('sanitizeSearchableMetadataPolicy repairs missing or invalid fields to the default', () => {
+test('sanitizeSearchableMetadataPolicy repairs fields and migrates legacy plaintext thumbnails to encrypted', () => {
   assert.deepEqual(sanitizeSearchableMetadataPolicy(undefined), DEFAULT_SEARCHABLE_METADATA_POLICY);
   assert.deepEqual(sanitizeSearchableMetadataPolicy({ urlDerived: 'encrypted', albumName: 'bogus', thumbnail: 'plaintext' }), {
     urlDerived: 'encrypted',
     albumName: 'plaintext',
-    thumbnail: 'plaintext',
+    thumbnail: 'encrypted',
   });
 });
 
-test('migrateLocalSettings defaults the policy for legacy settings and preserves a valid one', () => {
+test('migrateLocalSettings defaults the policy, preserves a valid one, and repairs a legacy thumbnail value', () => {
   assert.deepEqual(migrateLocalSettings({}).searchableMetadataPolicy, DEFAULT_SEARCHABLE_METADATA_POLICY);
   assert.deepEqual(migrateLocalSettings({ searchableMetadataPolicy: ENCRYPTED_POLICY }).searchableMetadataPolicy, ENCRYPTED_POLICY);
+  assert.deepEqual(
+    migrateLocalSettings({
+      searchableMetadataPolicy: {
+        urlDerived: 'plaintext',
+        albumName: 'plaintext',
+        thumbnail: 'plaintext',
+      } as unknown as SearchableMetadataPolicy,
+    }).searchableMetadataPolicy,
+    DEFAULT_SEARCHABLE_METADATA_POLICY,
+  );
 });
