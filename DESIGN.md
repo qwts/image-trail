@@ -158,7 +158,7 @@ Avoid these directions:
 
 ## Review Checklist
 
-Before accepting a design proposal, confirm:
+Review each design proposal against this checklist:
 
 - Current feature scope is preserved.
 - Storybook surfaces are used as the current-state reference.

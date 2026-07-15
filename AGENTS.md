@@ -29,11 +29,11 @@ can carry a stale copy until rebased or restarted from the main repo.
 
 ## Before Changing Code
 
-- **New issue work:** investigate and root-cause (or confirm scope) before
-  editing. State your understanding — problem, cause or confirmed scope, and
-  intended changes — and ask if it is correct. Do not edit files until the user
-  confirms or explicitly tells you to proceed.
-- **After confirmation:** update the issue with the agreed problem, root cause
+- **New issue work:** treat the user's request as authorization to implement the
+  stated scope. Investigate and root-cause (or confirm scope), state your
+  understanding — problem, cause or confirmed scope, and intended changes — then
+  proceed without a separate confirmation pause.
+- **After scope is established:** update the issue with the problem, root cause
   or scope, and plan (issue comment per wiki claim flow).
 - **During implementation:** post issue comments for each meaningful change
   slice: what changed and why.
@@ -82,7 +82,11 @@ can carry a stale copy until rebased or restarted from the main repo.
 - Open PRs with explicit close/fix references when the PR should complete an issue.
 - Review/issue feedback must get a visible reply before it is resolved or left open: say what commit/code fixed it, why no action was needed, or what linked follow-up owns it.
 - Do not resolve GitHub review threads silently. If no code change is needed, reply with the rationale first.
-- Commit intentional, scoped slices regularly after validating them; do not push, open PRs, close issues, resolve threads, or update broad project state unless the user has asked for that step.
+- Commit and push intentional, scoped slices after validation; open the PR ready
+  for review, resolve threads after a visible reply, merge when the documented
+  checks and review window pass, and complete linked issue state without asking
+  for separate approval. Keep every operation scoped to the requested work and
+  leave unrelated project state unchanged.
 - When a PR merges or issue work is abandoned, clean up the task worktree from the main checkout (`git worktree remove` then `git worktree prune`); see wiki [Contributing](https://github.com/qwts/image-trail/wiki/Contributing).
 - If a push seems to not trigger CI, or a PR shows a stale failing check from an
   older commit: check `gh pr view <n> --json mergeable` FIRST. GitHub silently
@@ -154,7 +158,8 @@ can carry a stale copy until rebased or restarted from the main repo.
 build` and paste **Built local** time plus commit, branch, and worktree when
     present (any may be null/absent). Do not omit this block; do not paraphrase
     from memory.
-- After the first implementation stretch, provide a manual test run before asking for final signoff or PR approval.
+- After the first implementation stretch, provide a manual test run before the
+  PR enters final review.
 
 ## Tooling
 
