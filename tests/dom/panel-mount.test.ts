@@ -56,6 +56,7 @@ test('mount() creates the scoped host under document.body with the shadow-rooted
 
     const host = mountedHost();
     assert.equal(host.parentElement, document.body, 'the host must be scoped to document.body, not documentElement');
+    assert.equal(host.style.pointerEvents, 'none', 'the zero-size shadow host must not intercept host-page hit testing');
     assert.equal(document.querySelectorAll(`#${ROOT_ID}`).length, 1);
 
     const shadow = host.shadowRoot;

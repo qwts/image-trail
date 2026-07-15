@@ -343,3 +343,14 @@
     animation: none;
   }
 }
+
+@media (pointer: coarse) {
+  .image-trail-workspace__window-header {
+    min-height: 53px;
+  }
+
+  .image-trail-workspace__window-actions button {
+    width: 44px;
+    height: 44px;
+  }
+}

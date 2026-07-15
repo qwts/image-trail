@@ -6,6 +6,7 @@ import path from 'node:path';
 import {
   applyUrlInEditor,
   clearDownloadRequestLog,
+  closeSettings,
   expect,
   expectPanelClosed,
   expectPanelOpen,
@@ -49,6 +50,17 @@ async function expectFeedback(page: Page, copy: string | RegExp): Promise<void> 
   expect(await feedback.textContent()).not.toMatch(/https?:\/\/|blob:/u);
 }
 
+async function ensureBlobKeyUnavailable(page: Page): Promise<void> {
+  await openSettingsGroup(page, 'Encrypted originals');
+  const clear = page.getByRole('button', { name: 'Clear key' });
+  if ((await clear.count()) > 0) {
+    await clear.click();
+    await page.getByRole('button', { name: 'Confirm clear key' }).click();
+    await expectPanelStatusMessage(page, /Encrypted blob key cleared/u);
+  }
+  await closeSettings(page);
+}
+
 async function waitForDownloads(serviceWorker: Worker, expected: number): Promise<void> {
   await expect.poll(async () => (await readDownloadRequestLog(serviceWorker)).length).toBe(expected);
 }
@@ -75,6 +87,7 @@ async function includeQueryFrame(page: Page): Promise<void> {
 
 test('canonical bare keys route surfaces and reset privacy-safe capture feedback', async ({ page, serviceWorker }) => {
   await openPanel(page, serviceWorker);
+  await ensureBlobKeyUnavailable(page);
 
   await page.keyboard.press('c');
   await expectFeedback(page, 'Pinned — unlock encryption to store the original');

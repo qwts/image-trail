@@ -34,15 +34,19 @@ class FakeWorkspaceLayoutStore implements WorkspaceLayoutStore {
   scope: WorkspaceLayoutScope | null = null;
   saves = 0;
   removes = 0;
+  saveError: Error | null = null;
+  loadError: Error | null = null;
 
   async load(scope: WorkspaceLayoutScope): Promise<StoredWorkspaceLayout | null> {
     this.scope = scope;
+    if (this.loadError) throw this.loadError;
     return this.stored;
   }
 
   async save(scope: WorkspaceLayoutScope, layout: StoredWorkspaceLayout): Promise<void> {
     this.scope = scope;
     this.saves += 1;
+    if (this.saveError) throw this.saveError;
     this.stored = layout;
   }
 
@@ -202,6 +206,58 @@ test('a restore invalidated by teardown never lands', async () => {
   harness.controller.invalidateRestore();
   release?.();
   await flushAsync();
+  assert.deepEqual(harness.state().detachedSections, []);
+});
+
+test('a rejected restore falls back to the current layout with privacy-safe feedback', async () => {
+  const harness = createHarness({ visible: true, restoreWorkspaceLayoutEnabled: true });
+  harness.store.loadError = new Error('private.example.test/gallery/secret');
+  harness.controller.queueWorkspaceRestore();
+  await flushAsync();
+
+  assert.deepEqual(harness.state().detachedSections, []);
+  assert.equal(harness.state().status, 'error');
+  assert.equal(harness.state().message, 'The saved workspace layout could not be restored. Using the current layout.');
+  assert.doesNotMatch(harness.state().message, /private|gallery|secret/iu);
+});
+
+test('a failed save does not poison the next workspace mutation', async () => {
+  const harness = createHarness({ visible: true, restoreWorkspaceLayoutEnabled: true, detachedSections: ['history'] });
+  harness.controller.prepareDetachedSection('history', rect(10, 12));
+  harness.store.saveError = new Error('runtime disconnected');
+  harness.controller.handleWorkspaceLayoutChanged();
+  await flushAsync();
+  assert.equal(harness.state().message, 'The workspace layout could not be saved.');
+
+  harness.store.saveError = null;
+  harness.controller.moveSection('history', rect(80, 90));
+  await flushAsync();
+  assert.equal(harness.store.stored?.sections.find((section) => section.sectionId === 'history')?.floatingRect?.left, 80);
+});
+
+test('reset is ordered after an in-flight save so stale geometry cannot reappear', async () => {
+  const harness = createHarness({ restoreWorkspaceLayoutEnabled: true, detachedSections: ['history'] });
+  harness.controller.prepareDetachedSection('history', rect(10, 12));
+  let releaseSave: (() => void) | undefined;
+  harness.store.save = async (scope, layoutToSave) => {
+    harness.store.scope = scope;
+    harness.store.saves += 1;
+    await new Promise<void>((resolve) => {
+      releaseSave = resolve;
+    });
+    harness.store.stored = layoutToSave;
+  };
+  harness.controller.handleWorkspaceLayoutChanged();
+  await flushAsync();
+
+  const reset = harness.controller.resetWorkspaceLayout();
+  await flushAsync();
+  assert.equal(harness.store.removes, 0);
+  releaseSave?.();
+  await reset;
+
+  assert.equal(harness.store.removes, 1);
+  assert.equal(harness.store.stored, null);
   assert.deepEqual(harness.state().detachedSections, []);
 });
 

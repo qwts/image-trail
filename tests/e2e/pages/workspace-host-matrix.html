@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Workspace host matrix</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font:
+          16px/1.5 system-ui,
+          sans-serif;
+      }
+
+      body {
+        min-height: 1900px;
+        margin: 0;
+        color: #dbe7ed;
+        background: #0b1115;
+      }
+
+      #host-fixed {
+        position: fixed;
+        z-index: 2;
+        top: 18px;
+        left: 48%;
+        padding: 4px 8px;
+        background: #28343b;
+      }
+
+      #host-app {
+        display: grid;
+        gap: 18px;
+        width: min(860px, calc(100% - 48px));
+        min-height: 1600px;
+        margin: 0 auto;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+
+      #host-sticky {
+        position: sticky;
+        z-index: 1;
+        top: 0;
+        padding: 8px;
+        background: #152027;
+      }
+
+      #host-target {
+        display: block;
+        width: min(640px, 100%);
+        height: 360px;
+        object-fit: cover;
+        border-radius: 12px;
+      }
+
+      #host-secondary-image {
+        display: block;
+        width: 240px;
+        height: 160px;
+        object-fit: cover;
+        border-radius: 8px;
+      }
+
+      #host-nested-scroll {
+        width: 320px;
+        height: 96px;
+        overflow: auto;
+        border: 1px solid #53646c;
+      }
+
+      #host-nested-scroll > div {
+        height: 360px;
+        padding: 12px;
+      }
+
+      #host-hit {
+        position: fixed;
+        z-index: 1;
+        top: 55%;
+        right: 32px;
+        width: 88px;
+        height: 44px;
+        transform: translateY(-50%);
+      }
+
+      #fullscreen-surface {
+        padding: 16px;
+        background: #0b1115;
+      }
+
+      body[data-case='responsive'] #host-app {
+        grid-template-columns: 1fr;
+      }
+
+      body[data-case='transformed-root'] #host-app {
+        transform: translateZ(0);
+      }
+
+      @media (min-width: 70rem) {
+        body[data-case='responsive'] #host-app {
+          grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="host-fixed">Fixed host chrome</div>
+    <button id="host-hit" type="button">Host hit target</button>
+    <main id="host-app">
+      <header id="host-sticky">Sticky host chrome</header>
+      <button id="host-focus" type="button">Host focus target</button>
+      <p id="host-selection">Preserve this host selection through workspace changes.</p>
+      <img id="host-target" src="/assets/asset-one.svg" alt="Workspace matrix target" />
+      <img id="host-secondary-image" src="/assets/asset-two.svg" alt="Secondary gallery image" />
+      <section id="host-nested-scroll" tabindex="0"><div>Nested scrolling host content</div></section>
+      <section id="host-feed">
+        <article>Feed row one</article>
+        <article>Feed row two</article>
+      </section>
+      <iframe id="host-frame" title="Host iframe" srcdoc="<p>Frame content</p>"></iframe>
+      <section id="fullscreen-surface">
+        <button id="fullscreen-button" type="button">Enter host fullscreen</button>
+      </section>
+      <button id="spa-navigate" type="button">Replace SPA route</button>
+    </main>
+    <script>
+      const scenario = new URLSearchParams(location.search).get('case') || 'responsive';
+      document.body.dataset.case = scenario;
+      if (scenario === 'rtl') document.documentElement.dir = 'rtl';
+      if (scenario === 'infinite-feed') {
+        document.querySelector('#host-feed').setAttribute('role', 'feed');
+        document.querySelector('#host-feed').dataset.infiniteFeed = 'true';
+      }
+      if (scenario === 'spa') document.querySelector('#host-app').dataset.spaRoot = 'true';
+      document.querySelector('#spa-navigate').addEventListener('click', () => {
+        history.pushState({ route: 2 }, '', `${location.pathname}?case=spa&route=2`);
+        document.querySelector('#host-app').dataset.route = '2';
+        document.querySelector('#host-selection').textContent = 'Replacement SPA route content.';
+      });
+      document.querySelector('#fullscreen-button').addEventListener('click', () => {
+        void document.querySelector('#fullscreen-surface').requestFullscreen();
+      });
+    </script>
+  </body>
+</html>

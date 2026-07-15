@@ -44,6 +44,7 @@ export class WorkspaceLayoutController {
   private restored = false;
   private lastPersistedLayout: WorkspaceLayout | null = null;
   private saveTimer: number | null = null;
+  private storeMutation: Promise<void> = Promise.resolve();
 
   constructor(private readonly deps: WorkspaceLayoutControllerDeps) {}
 
@@ -155,7 +156,11 @@ export class WorkspaceLayoutController {
     this.restorePromise = null;
     this.restored = true;
     this.cancelPendingSave();
-    await this.deps.workspaceLayoutStore()?.remove(scope);
+    const store = this.deps.workspaceLayoutStore();
+    if (store && !(await this.queueStoreMutation(() => store.remove(scope)))) {
+      this.reportStorageFailure('The saved workspace layout could not be reset.');
+      return;
+    }
     this.lastPersistedLayout = null;
     this.deps.workspaceSections().clear();
     this.deps.setState({
@@ -195,6 +200,10 @@ export class WorkspaceLayoutController {
         lastUpdatedAt: Date.now(),
       });
       this.deps.render();
+    } catch {
+      if (this.restoreAttempt === attempt && !this.restored) {
+        this.reportStorageFailure('The saved workspace layout could not be restored. Using the current layout.');
+      }
     } finally {
       if (this.restoreAttempt === attempt) this.restored = true;
     }
@@ -212,8 +221,28 @@ export class WorkspaceLayoutController {
       collapsed: collapsedSections(this.deps.getState()),
     });
     if (this.lastPersistedLayout && workspaceLayoutsEqual(this.lastPersistedLayout, layout)) return;
-    await store.save(scope, layout);
-    this.lastPersistedLayout = layout;
+    const saved = await this.queueStoreMutation(() => store.save(scope, layout));
+    if (saved) {
+      this.lastPersistedLayout = layout;
+    } else {
+      this.reportStorageFailure('The workspace layout could not be saved.');
+    }
+  }
+
+  private async queueStoreMutation(operation: () => Promise<void>): Promise<boolean> {
+    const result = this.storeMutation.then(operation).then(
+      () => true,
+      () => false,
+    );
+    this.storeMutation = result.then(() => undefined);
+    return result;
+  }
+
+  private reportStorageFailure(message: string): void {
+    const state = this.deps.getState();
+    if (!state.visible) return;
+    this.deps.setState({ ...state, status: 'error', message, lastUpdatedAt: Date.now() });
+    this.deps.render();
   }
 
   private cancelPendingSave(): void {

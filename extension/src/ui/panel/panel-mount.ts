@@ -96,6 +96,7 @@ export class PanelMount {
       width: '0',
       height: '0',
       overflow: 'visible',
+      pointerEvents: 'none',
       zIndex: '2147483647',
     });
     const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });

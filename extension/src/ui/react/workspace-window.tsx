@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 
 import type { PanelAction } from '../../core/types.js';
 import type { WorkspaceFloatingRect, WorkspaceRailEdge, WorkspaceSectionLayout } from '../../core/workspace-layout.js';
@@ -11,7 +11,7 @@ import {
   type WorkspaceSnapCandidate,
   type WorkspaceViewport,
 } from '../workspace/workspace-geometry.js';
-import { registerWorkspaceGesture } from '../workspace/workspace-gesture.js';
+import { cancelWorkspaceGesture, registerWorkspaceGesture } from '../workspace/workspace-gesture.js';
 import { WorkspaceDomBody } from './workspace-dom-body.js';
 
 export interface WorkspaceWindowEntry {
@@ -36,6 +36,7 @@ export function WorkspaceWindow({ entry, activeEdges, nextRailPositions, dispatc
   const rect = draftRect ?? entry.placement.floatingRect;
   const { placement, title } = entry;
   const style = { left: rect.left, top: rect.top, width: rect.width, height: placement.shaded ? undefined : rect.height };
+  useEffect(() => () => cancelWorkspaceGesture(), []);
 
   const commitKeyboardSnap = (event: ReactKeyboardEvent<HTMLElement>): void => {
     const edge = isEditable(event.target) ? null : keyboardEdge(event);

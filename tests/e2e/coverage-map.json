@@ -104,13 +104,21 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/detachable-sections.spec.ts", "tests/e2e/workspace-rails-spike.spec.ts"],
-          "notes": "Covers packaged four-edge snapping, pointer and keyboard previews, shade versus attached collapse, button and threshold-drag unsnap with cancel, rail order, extension-surface panel collision resolution, responsive rail fallback and clamping, focus handoff, fixed-viewport rail artifacts, private persisted restore and reset, local build-overlay stacking, and the overlay-only host boundary without host geometry, scroll, or focus mutation."
+          "paths": [
+            "tests/e2e/detachable-sections.spec.ts",
+            "tests/e2e/workspace-rails-spike.spec.ts",
+            "tests/e2e/workspace-host-layouts.spec.ts",
+            "tests/e2e/workspace-lifecycle.spec.ts",
+            "tests/e2e/workspace-accessibility.spec.ts",
+            "tests/e2e/workspace-reload-persistence.spec.ts",
+            "tests/e2e/workspace-visual-states.spec.ts"
+          ],
+          "notes": "Covers packaged four-edge snapping, pointer and keyboard previews, shade versus attached collapse, button and threshold-drag unsnap with cancel, rail order, extension-surface panel collision resolution, responsive rail fallback and clamping, focus handoff, deterministic floating/shaded/railed/restored artifacts, private persisted restore and reset across extension restart, local build-overlay stacking, and the overlay-only boundary across responsive, fixed/sticky, feed, nested-scroll, RTL, iframe, transformed-root, SPA, navigation, fullscreen, zoom-equivalent, narrow, reduced-motion, coarse-pointer, interrupted-drag, and exact host-baseline cases."
         },
         {
           "type": "manual",
           "reason": "The arbitrary-host overlay, browser zoom clamp, and final handoff visual fidelity need packaged-extension inspection.",
-          "notes": "At 1440x900, detach Queue, Recents, and Controls; snap and reorder them on each edge; shade and unshade; unsnap by pointer and keyboard; reload with restore enabled; reset; repeat at 200% zoom. Confirm rail width 344px, top and bottom height 240px, the center remains usable, the host does not reflow, focus and scroll survive, Recall remains panel-relative, and chrome matches handoff screenshot 11."
+          "notes": "Follow the canonical Workspace Rails Cross-Site Safety wiki script at 1440x900 and 200% zoom. Confirm rail width 344px, top and bottom height 240px, supported overlay and fallback behavior, exact host cleanup, keyboard and pointer escape paths, private persistence/reset, Recall remaining panel-relative, and chrome matching handoff screenshot 11."
         }
       ]
     },

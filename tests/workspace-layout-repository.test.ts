@@ -91,6 +91,37 @@ test('reset removes current and leftover legacy records without deleting the ins
   );
 });
 
+test('stale and corrupted v2 records fall back without exposing their payload', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const repository = new WorkspaceLayoutRepository(db);
+  await repository.put(privateScope, workspaceLayout());
+  const stored = (await metadataRecords(db)).find((record) => record['kind'] === 'workspaceLayoutV2');
+  assert.ok(stored);
+  await putMetadata(db, { ...stored, schemaVersion: 999 });
+
+  assert.equal(await repository.get(privateScope), null);
+  const serialized = JSON.stringify((await metadataRecords(db)).filter((record) => record['kind'] === 'workspaceLayoutV2'));
+  assert.doesNotMatch(serialized, /private-one|img-0042|#secret/iu);
+});
+
+test('a corrupted install secret is replaced and cannot unlock an old derived record', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const repository = new WorkspaceLayoutRepository(db);
+  await repository.put(privateScope, workspaceLayout());
+  await putMetadata(db, {
+    key: 'workspace-layout-install-secret',
+    kind: 'workspaceLayoutSecret',
+    encodedSecret: 'corrupt',
+    createdAt: '2026-07-14T00:00:00.000Z',
+  });
+
+  assert.equal(await repository.get(privateScope), null);
+  const secret = (await metadataRecords(db)).find((record) => record['kind'] === 'workspaceLayoutSecret');
+  assert.match(String(secret?.['encodedSecret']), /^[A-Za-z0-9_-]{43}$/u);
+});
+
 function workspaceLayout(): StoredWorkspaceLayout {
   return {
     schemaVersion: 2,

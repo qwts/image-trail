@@ -1,9 +1,9 @@
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, type PointerEvent as ReactPointerEvent } from 'react';
 
 import type { PanelAction } from '../../core/types.js';
 import type { WorkspaceFloatingRect, WorkspaceRailEdge, WorkspaceSectionLayout } from '../../core/workspace-layout.js';
 import { clampFloatingRect, currentPointerThresholds, viewportSize } from '../workspace/workspace-geometry.js';
-import { registerWorkspaceGesture } from '../workspace/workspace-gesture.js';
+import { cancelWorkspaceGesture, registerWorkspaceGesture } from '../workspace/workspace-gesture.js';
 import { WorkspaceDomBody } from './workspace-dom-body.js';
 
 export interface WorkspaceRailEntry {
@@ -29,32 +29,57 @@ export function WorkspaceRail({
           ⧉ {edge} dock
         </div>
         {entries.map((entry, index) => (
-          <section
+          <WorkspaceRailCard
             key={entry.placement.sectionId}
-            className={`image-trail-workspace__rail-card${entry.placement.shaded ? ' is-shaded' : ''}`}
-            data-image-trail-detached-window={entry.placement.sectionId}
-            data-workspace-mode="railed"
-          >
-            <header
-              className="image-trail-workspace__window-header"
-              tabIndex={0}
-              aria-label={`Move ${entry.title} from ${edge} rail; drag past the detach threshold to float`}
-              onPointerDown={(event) => startRailDrag(event, entry.placement, index, dispatch)}
-            >
-              <div className="image-trail-workspace__window-title">
-                <span className="image-trail-workspace__drag-grip" aria-hidden="true">
-                  ⠿
-                </span>
-                <h3>{entry.title}</h3>
-                <span className="image-trail-workspace__docked-label">· docked {edge}</span>
-              </div>
-              <WorkspaceRailActions entry={entry} edge={edge} index={index} count={entries.length} dispatch={dispatch} />
-            </header>
-            {entry.placement.shaded ? null : <WorkspaceDomBody content={entry.body} />}
-          </section>
+            entry={entry}
+            edge={edge}
+            index={index}
+            count={entries.length}
+            dispatch={dispatch}
+          />
         ))}
       </div>
     </aside>
+  );
+}
+
+function WorkspaceRailCard({
+  entry,
+  edge,
+  index,
+  count,
+  dispatch,
+}: {
+  readonly entry: WorkspaceRailEntry;
+  readonly edge: WorkspaceRailEdge;
+  readonly index: number;
+  readonly count: number;
+  readonly dispatch: (action: PanelAction) => void;
+}) {
+  useEffect(() => () => cancelWorkspaceGesture(), []);
+  return (
+    <section
+      className={`image-trail-workspace__rail-card${entry.placement.shaded ? ' is-shaded' : ''}`}
+      data-image-trail-detached-window={entry.placement.sectionId}
+      data-workspace-mode="railed"
+    >
+      <header
+        className="image-trail-workspace__window-header"
+        tabIndex={0}
+        aria-label={`Move ${entry.title} from ${edge} rail; drag past the detach threshold to float`}
+        onPointerDown={(event) => startRailDrag(event, entry.placement, index, dispatch)}
+      >
+        <div className="image-trail-workspace__window-title">
+          <span className="image-trail-workspace__drag-grip" aria-hidden="true">
+            ⠿
+          </span>
+          <h3>{entry.title}</h3>
+          <span className="image-trail-workspace__docked-label">· docked {edge}</span>
+        </div>
+        <WorkspaceRailActions entry={entry} edge={edge} index={index} count={count} dispatch={dispatch} />
+      </header>
+      {entry.placement.shaded ? null : <WorkspaceDomBody content={entry.body} />}
+    </section>
   );
 }
 

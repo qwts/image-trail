@@ -116,6 +116,7 @@ test('mount() creates the four roots inside a scoped host appended to document.b
   assert.ok(host, 'host element with the panel root id is created');
   assert.equal(doc.body.children.includes(host!), true, 'host is appended to document.body');
   assert.equal(doc.documentElement.children.length, 0, 'host is not appended to documentElement');
+  assert.equal(host.style['pointerEvents'], 'none', 'the zero-size shadow host must not intercept host-page hit testing');
 
   assert.ok(mount.root, 'root getter exposes the mounted aside');
   assert.ok(mount.contextRoot, 'contextRoot getter exposes the page-context root');
