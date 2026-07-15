@@ -59,11 +59,12 @@ async function showOnlySettingsGroup(panel: Locator, targetName: string): Promis
 
 test('panel shell matches the approved standard and narrow geometry', async ({ page, serviceWorker }, testInfo) => {
   const panel = await openPanel(page, serviceWorker);
-  const box = await panel.boundingBox();
-  expect(box).not.toBeNull();
-  expect(box!.x).toBeCloseTo(12, 0);
-  expect(box!.y).toBeCloseTo(12, 0);
-  expect(box!.width).toBeCloseTo(420, 0);
+  await expect
+    .poll(async () => {
+      const box = await panel.boundingBox();
+      return box ? { x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width) } : null;
+    })
+    .toEqual({ x: 12, y: 12, width: 420 });
   await expect(panel.locator('.image-trail-panel__target-utility')).toContainText('Selected');
   await expect(panel.locator('.image-trail-panel__dock-button')).toHaveCount(4);
   await captureArtifact(page, testInfo, '01-panel');
