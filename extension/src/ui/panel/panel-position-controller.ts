@@ -1,5 +1,7 @@
 import type { PanelPosition, PanelPositionStore, PanelState } from '../../core/types.js';
-import { clampPanelPosition, hostnameFromLocation } from '../panel-position.js';
+import type { WorkspaceRailEdge } from '../../core/workspace-layout.js';
+import { clampPanelPositionWithinInsets, hostnameFromLocation } from '../panel-position.js';
+import { workspacePanelInsets } from '../workspace/workspace-geometry.js';
 
 export interface PanelPositionControllerDeps {
   getState(): PanelState;
@@ -9,6 +11,7 @@ export interface PanelPositionControllerDeps {
   whenStylesReady(): Promise<void> | null;
   root(): HTMLElement | null;
   panelPositionStore(): PanelPositionStore | null;
+  onPositionChanged?(): void;
 }
 
 /**
@@ -23,6 +26,9 @@ export class PanelPositionController {
   private panelPositionRestorePromise: Promise<void> | null = null;
   private panelPositionRestoreAttempt = 0;
   private restoredPanelPosition: PanelPosition | null = null;
+  private workspaceEdges = new Set<WorkspaceRailEdge>();
+  private observingViewport = false;
+  private cancelPanelDrag: (() => void) | null = null;
 
   constructor(private readonly deps: PanelPositionControllerDeps) {}
 
@@ -40,10 +46,13 @@ export class PanelPositionController {
   // Panel-teardown reset: bumping the attempt counter aborts any in-flight restore, and clearing
   // the memoized promise lets the next mount start a fresh one.
   invalidateRestore(): void {
+    this.cancelPanelDrag?.();
     this.panelPositionRestoreAttempt += 1;
     this.panelPositionRestored = false;
     this.panelPositionRestorePromise = null;
     this.restoredPanelPosition = null;
+    this.workspaceEdges.clear();
+    this.updateViewportObservation(false);
   }
 
   private beginPanelPositionRestore(): Promise<void> {
@@ -84,6 +93,7 @@ export class PanelPositionController {
   readonly handlePanelDragStart = (event: PointerEvent): void => {
     const root = this.deps.root();
     if (event.button !== 0 || !root) return;
+    this.cancelPanelDrag?.();
     event.preventDefault();
     const startRect = root.getBoundingClientRect();
     const startX = event.clientX;
@@ -100,13 +110,20 @@ export class PanelPositionController {
       this.deps.renderRecallOnly();
     };
 
-    const onUp = (): void => {
+    const cleanup = (): void => {
       document.removeEventListener('pointermove', onMove, true);
       document.removeEventListener('pointerup', onUp, true);
       document.removeEventListener('pointercancel', onUp, true);
-      void this.savePanelPosition(latest);
+      if (this.cancelPanelDrag === cleanup) this.cancelPanelDrag = null;
     };
 
+    const onUp = (): void => {
+      cleanup();
+      void this.savePanelPosition(latest);
+      this.deps.onPositionChanged?.();
+    };
+
+    this.cancelPanelDrag = cleanup;
     document.addEventListener('pointermove', onMove, true);
     document.addEventListener('pointerup', onUp, true);
     document.addEventListener('pointercancel', onUp, true);
@@ -116,10 +133,11 @@ export class PanelPositionController {
     const root = this.deps.root();
     if (!root) return position;
     const rect = root.getBoundingClientRect();
-    return clampPanelPosition(
+    return clampPanelPositionWithinInsets(
       position,
       { width: rect.width, height: rect.height },
       { width: window.innerWidth, height: window.innerHeight },
+      workspacePanelInsets(this.workspaceEdges),
     );
   }
 
@@ -141,7 +159,54 @@ export class PanelPositionController {
 
   applyRestoredPanelPosition(): void {
     if (!this.restoredPanelPosition) return;
-    this.applyPanelPosition(this.restoredPanelPosition);
+    this.applyPanelPosition(this.clampPanelPosition(this.restoredPanelPosition));
+  }
+
+  currentPanelPosition(): PanelPosition | null {
+    if (this.restoredPanelPosition) return this.restoredPanelPosition;
+    const rect = this.deps.root()?.getBoundingClientRect();
+    return rect ? { left: rect.left, top: rect.top } : null;
+  }
+
+  restoreWorkspacePanelPosition(position: PanelPosition | null): void {
+    if (!position) return;
+    this.restoredPanelPosition = this.clampPanelPosition(position);
+    this.applyRestoredPanelPosition();
+  }
+
+  setWorkspaceRailEdges(edges: ReadonlySet<WorkspaceRailEdge>, observeViewport = true): void {
+    const root = this.deps.root();
+    if (!root) return;
+    if (!this.restoredPanelPosition) {
+      const rect = root.getBoundingClientRect();
+      this.restoredPanelPosition = { left: rect.left, top: rect.top };
+    }
+    this.workspaceEdges = new Set(edges);
+    this.applyWorkspacePanelHeight(root);
+    this.applyRestoredPanelPosition();
+    this.deps.renderRecallOnly();
+    this.updateViewportObservation(observeViewport);
+  }
+
+  private applyWorkspacePanelHeight(root: HTMLElement): void {
+    if (this.workspaceEdges.size === 0) {
+      root.style.removeProperty('max-height');
+      return;
+    }
+    const insets = workspacePanelInsets(this.workspaceEdges);
+    root.style.maxHeight = `${Math.max(120, window.innerHeight - insets.top - insets.bottom)}px`;
+  }
+
+  private readonly handleViewportChange = (): void => {
+    this.deps.render();
+  };
+
+  private updateViewportObservation(active: boolean): void {
+    if (active === this.observingViewport) return;
+    this.observingViewport = active;
+    const method = active ? 'addEventListener' : 'removeEventListener';
+    window[method]('resize', this.handleViewportChange);
+    window.visualViewport?.[method]('resize', this.handleViewportChange);
   }
 
   private async savePanelPosition(position: PanelPosition): Promise<void> {
@@ -161,6 +226,7 @@ export class PanelPositionController {
     this.restoredPanelPosition = null;
     this.panelPositionRestored = true;
     this.clearPanelPosition();
+    this.deps.onPositionChanged?.();
     this.deps.setState({
       ...this.deps.getState(),
       message: 'Panel position reset for this site.',

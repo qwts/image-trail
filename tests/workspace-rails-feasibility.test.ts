@@ -4,12 +4,11 @@ import assert from 'node:assert/strict';
 import {
   HANDOFF_RAIL_GEOMETRY,
   REFLOW_STRATEGY_EVIDENCE,
-  canonicalWorkspaceUrlStructure,
-  deriveWorkspaceLayoutKey,
   interactionThresholds,
   measureRailSpace,
   recommendRailMode,
 } from './support/workspace-rails-feasibility.js';
+import { canonicalWorkspaceUrlStructure, deriveWorkspaceLayoutKey } from '../extension/src/core/workspace-layout-key.js';
 
 test('the strategy matrix keeps overlay as the only general default', () => {
   assert.deepEqual(

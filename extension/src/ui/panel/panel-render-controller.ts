@@ -1,5 +1,6 @@
 import { reducePanelAction } from '../../core/actions.js';
 import type { PanelAction, PanelState } from '../../core/types.js';
+import type { WorkspaceRailEdge } from '../../core/workspace-layout.js';
 import { renderPanel, renderRecallDestination, type PanelLayoutState } from '../render.js';
 import { createKbd, createToast } from '../components/primitives.js';
 import { renderPanelToast } from '../components/panel-shell-view.js';
@@ -31,6 +32,7 @@ export interface PanelRenderControllerDeps {
   // Queue refresh after a panel-only render so Recall can use its targeted body refresh.
   refreshRecallIfOpen(): void;
   onWorkspaceLayoutChanged(): void;
+  onWorkspaceEdgesChanged(edges: ReadonlySet<WorkspaceRailEdge>, observeViewport: boolean): void;
 }
 
 // The captured active-element identity re-applied after a render swaps the panel DOM: the control is
@@ -66,8 +68,7 @@ export class PanelRenderController {
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
-    detachedWindowPositions: new Map(),
-    detachedWindowMinimized: new Set(),
+    workspaceSections: new Map(),
     collapsibleListScrollTops: new Map(),
     primaryPanelScrollTop: null,
     destinationScrollTops: new Map(),
@@ -76,7 +77,7 @@ export class PanelRenderController {
   constructor(private readonly deps: PanelRenderControllerDeps) {}
 
   /** Live session geometry for the detached workspace; the workspace-layout controller hydrates and captures it. */
-  workspaceGeometry(): Pick<PanelLayoutState, 'detachedWindowPositions' | 'detachedWindowMinimized'> {
+  workspaceGeometry(): Pick<PanelLayoutState, 'workspaceSections'> {
     return this.layoutState;
   }
 
@@ -125,6 +126,7 @@ export class PanelRenderController {
           dispatch: this.deps.dispatch,
           layoutState: this.layoutState,
           onWorkspaceLayoutChanged: () => this.deps.onWorkspaceLayoutChanged(),
+          onWorkspaceEdgesChanged: (edges, observeViewport) => this.deps.onWorkspaceEdgesChanged(edges, observeViewport),
           scrollAnchorId: this.deps.previewScrollAnchorId(),
           onPanelDragStart: this.deps.handlePanelDragStart,
         },

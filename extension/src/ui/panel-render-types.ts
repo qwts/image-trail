@@ -1,5 +1,5 @@
-import type { DetachableSectionId, PanelAction, PanelDestinationId } from '../core/types.js';
-import type { DetachedWindowPosition } from './components/detachable-section.js';
+import type { DetachableSectionId, PanelAction, PanelDestinationId, WorkspaceSectionLayout } from '../core/types.js';
+import type { WorkspaceRailEdge } from '../core/workspace-layout.js';
 import type { NumericFieldDisplayMode } from './parsed-fields-section.js';
 
 export interface PanelRenderTarget {
@@ -13,6 +13,8 @@ export interface PanelRenderTarget {
   readonly onPanelDragStart?: (event: PointerEvent) => void;
   /** Fired after detached-window geometry or minimized state changes. */
   readonly onWorkspaceLayoutChanged?: () => void;
+  /** Keeps the main panel inside the extension-owned corridor without moving host content. */
+  readonly onWorkspaceEdgesChanged?: (edges: ReadonlySet<WorkspaceRailEdge>, observeViewport: boolean) => void;
 }
 
 export interface PanelLayoutState {
@@ -20,8 +22,8 @@ export interface PanelLayoutState {
   fieldsPanelBlockSize: number | null;
   historyListBlockSize: number | null;
   fieldDisplayModes: Map<string, NumericFieldDisplayMode>;
-  detachedWindowPositions: Map<DetachableSectionId, DetachedWindowPosition>;
-  detachedWindowMinimized: Set<DetachableSectionId>;
+  /** Single session registry for attached, floating, and railed workspace placement. */
+  workspaceSections: Map<DetachableSectionId, WorkspaceSectionLayout>;
   /** Scroll offsets parked while collapsible record lists are absent from the DOM. */
   collapsibleListScrollTops: Map<string, number>;
   /** Primary workflow offset parked while a destination owns the panel scrollport. */

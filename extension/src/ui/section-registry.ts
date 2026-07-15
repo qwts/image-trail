@@ -1,4 +1,5 @@
 import type { DetachableSectionId, PanelState } from '../core/types.js';
+import { floatingSection } from '../core/workspace-layout.js';
 import {
   attachSectionDragOut,
   createDetachedSectionPlaceholder,
@@ -57,7 +58,14 @@ export function attachedSectionElements(
 function detachableSectionElement(definition: DetachableSectionDefinition, target: PanelRenderTarget, state: PanelState): HTMLElement {
   const element = definition.create(target, state);
   const onDragOutPosition = (id: DetachableSectionId, position: { readonly left: number; readonly top: number }): void => {
-    target.layoutState.detachedWindowPositions.set(id, position);
+    target.layoutState.workspaceSections.set(
+      id,
+      floatingSection(id, {
+        ...position,
+        width: sectionWindowInlineSize(definition),
+        height: 320,
+      }),
+    );
   };
   const dragOptions = {
     sectionId: definition.id,

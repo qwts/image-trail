@@ -1,7 +1,8 @@
 import type { ActionEntries } from '../action-dispatch.js';
 import type { PanelActionDeps } from './deps.js';
 
-export type DetachableSectionActionName = 'section/detach' | 'section/restore';
+export type DetachableSectionActionName =
+  'section/detach' | 'section/restore' | 'workspace/move' | 'workspace/snap' | 'workspace/unsnap' | 'workspace/shade' | 'workspace/reorder';
 
 /**
  * Detachable-section lifecycle (issue #215): reduce, rerender, then hand keyboard focus across the
@@ -18,6 +19,7 @@ export function buildDetachableSectionActionEntries(deps: PanelActionDeps): Acti
   return {
     'section/detach': {
       handle(action) {
+        deps.prepareDetachedWorkspaceSection(action.sectionId, action.floatingRect);
         deps.reduce(action);
         deps.render();
         deps.notifyWorkspaceLayoutChanged();
@@ -26,10 +28,41 @@ export function buildDetachableSectionActionEntries(deps: PanelActionDeps): Acti
     },
     'section/restore': {
       handle(action) {
+        deps.restoreWorkspaceSection(action.sectionId);
         deps.reduce(action);
         deps.render();
         deps.notifyWorkspaceLayoutChanged();
         focusControl(deps.panelMount().root, `[data-image-trail-detach="${action.sectionId}"]`);
+      },
+    },
+    'workspace/move': {
+      handle(action) {
+        deps.moveWorkspaceSection(action.sectionId, action.floatingRect);
+      },
+    },
+    'workspace/unsnap': {
+      handle(action) {
+        deps.moveWorkspaceSection(action.sectionId, action.floatingRect);
+        focusControl(
+          deps.panelMount().detachedRoot,
+          `[data-image-trail-detached-window="${action.sectionId}"][data-workspace-mode="floating"] .image-trail-workspace__window-header`,
+        );
+      },
+    },
+    'workspace/snap': {
+      handle(action) {
+        deps.snapWorkspaceSection(action.sectionId, action.edge);
+        focusControl(deps.panelMount().detachedRoot, `[data-image-trail-unsnap="${action.sectionId}"]`);
+      },
+    },
+    'workspace/shade': {
+      handle(action) {
+        deps.shadeWorkspaceSection(action.sectionId);
+      },
+    },
+    'workspace/reorder': {
+      handle(action) {
+        deps.reorderWorkspaceSection(action.sectionId, action.edge, action.order);
       },
     },
   };

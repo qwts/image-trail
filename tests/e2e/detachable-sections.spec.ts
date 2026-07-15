@@ -1,14 +1,45 @@
-import type { Page, Worker } from '@playwright/test';
+import type { Locator, Page, TestInfo, Worker } from '@playwright/test';
 
 import { expect, expectPanelOpen, fixturePaths, openFixturePage, test, togglePanelFromExtensionAction } from './fixtures.js';
 
 const detachHistoryName = 'Detach Recent history into a floating window (drag to place)';
-const historyWindowName = 'Recent history (detached)';
+const historyWindowName = 'Recent history (floating)';
 
 async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
+  const overlay = page.locator('#image-trail-build-identity-overlay');
+  if ((await overlay.count()) > 0) await overlay.evaluate((element) => element.remove());
+}
+
+async function captureArtifact(page: Page, testInfo: TestInfo, name: string): Promise<void> {
+  const path = testInfo.outputPath(`${name}.png`);
+  await page.screenshot({ path, animations: 'disabled' });
+  await testInfo.attach(name, { path, contentType: 'image/png' });
+}
+
+async function keyboardSnap(page: Page, floating: Locator, edge: 'left' | 'top' | 'right' | 'bottom'): Promise<void> {
+  const key = { left: 'ArrowLeft', top: 'ArrowUp', right: 'ArrowRight', bottom: 'ArrowDown' }[edge];
+  await floating.locator('.image-trail-workspace__window-header').focus();
+  await page.keyboard.down('Alt');
+  await page.keyboard.down(key);
+  const preview = page.locator(`.image-trail-workspace__snap-preview[data-edge="${edge}"]`);
+  await expect(preview).toBeVisible();
+  await expect(preview.locator('.image-trail-workspace__snap-label')).toContainText(new RegExp(`${edge} dock · position \\d+`, 'u'));
+  await page.keyboard.up(key);
+  await page.keyboard.up('Alt');
+}
+
+async function expectPanelOutsideRail(page: Page, rail: Locator, edge: 'left' | 'top' | 'right' | 'bottom'): Promise<void> {
+  const panelBox = await page.getByRole('dialog', { name: 'Image Trail panel' }).boundingBox();
+  const railBox = await rail.boundingBox();
+  expect(panelBox).not.toBeNull();
+  expect(railBox).not.toBeNull();
+  if (edge === 'left') expect(panelBox!.x).toBeGreaterThanOrEqual(railBox!.x + railBox!.width);
+  if (edge === 'right') expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(railBox!.x);
+  if (edge === 'top') expect(panelBox!.y).toBeGreaterThanOrEqual(railBox!.y + railBox!.height);
+  if (edge === 'bottom') expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(railBox!.y);
 }
 
 test('detaching Recent history opens a floating dialog with a panel placeholder and restore paths work', async ({
@@ -24,11 +55,11 @@ test('detaching Recent history opens a floating dialog with a panel placeholder 
   await expect(page.getByText('Recent history is open in a floating window.')).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Image Trail panel' }).locator('.image-trail-panel__history-section')).toHaveCount(0);
 
-  // Minimize collapses to the title bar; the window stays.
-  await windowEl.getByRole('button', { name: 'Minimize Recent history window' }).click();
-  await expect(windowEl.locator('.image-trail-panel__detached-body')).toBeHidden();
-  await windowEl.getByRole('button', { name: 'Expand Recent history window' }).click();
-  await expect(windowEl.locator('.image-trail-panel__detached-body')).toBeVisible();
+  // Shade is a workspace-chrome state distinct from the attached section collapse state.
+  await windowEl.getByRole('button', { name: 'Shade Recent history' }).click();
+  await expect(windowEl.locator('.image-trail-workspace__dom-body')).toHaveCount(0);
+  await windowEl.getByRole('button', { name: 'Unshade Recent history' }).click();
+  await expect(windowEl.locator('.image-trail-workspace__dom-body')).toBeVisible();
 
   // Close (X) restores the section into the panel and focuses the detach control.
   await windowEl.getByRole('button', { name: 'Restore Recent history into the panel' }).click();
@@ -101,13 +132,97 @@ test('dragging a section by its heading detaches at the drop point, and Escape c
   expect(Math.abs(windowBox!.y - (startY - 200 - 12))).toBeLessThanOrEqual(4);
 });
 
+test('React workspace chrome snaps to every edge with pointer and keyboard previews and ordered stacks', async ({
+  page,
+  serviceWorker,
+}, testInfo) => {
+  await openPanel(page, serviceWorker);
+  await page.setViewportSize({ width: 1_280, height: 800 });
+  await page.getByRole('button', { name: detachHistoryName }).click();
+
+  for (const edge of ['left', 'top', 'right', 'bottom'] as const) {
+    const floating = page.locator('[data-image-trail-detached-window="history"][data-workspace-mode="floating"]');
+    await keyboardSnap(page, floating, edge);
+    const rail = page.locator(`[data-edge="${edge}"].image-trail-workspace__rail`);
+    const card = rail.locator('[data-image-trail-detached-window="history"][data-workspace-mode="railed"]');
+    await expect(card).toBeVisible();
+    await expectPanelOutsideRail(page, rail, edge);
+    const unsnap = card.getByRole('button', { name: `Unsnap Recent history from ${edge} rail` });
+    await expect(unsnap).toBeFocused();
+    await captureArtifact(page, testInfo, `workspace-${edge}-rail`);
+    await unsnap.click();
+    await expect(floating).toBeVisible();
+    await expect(floating.locator('.image-trail-workspace__window-header')).toBeFocused();
+  }
+
+  const floating = page.locator('[data-image-trail-detached-window="history"][data-workspace-mode="floating"]');
+  const movedHeader = floating.locator('.image-trail-workspace__window-header');
+  const box = await movedHeader.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + 40, box!.y + 16);
+  await page.mouse.down();
+  await page.mouse.move(1, 300, { steps: 6 });
+  await expect(page.locator('.image-trail-workspace__snap-preview[data-edge="left"]')).toBeVisible();
+  await page.mouse.up();
+  const leftRail = page.locator('[data-edge="left"].image-trail-workspace__rail');
+  await expect(leftRail).toBeVisible();
+
+  await page.setViewportSize({ width: 800, height: 600 });
+  await expect(leftRail).toHaveCount(0);
+  await expect(floating).toBeVisible();
+  const clamped = await floating.boundingBox();
+  expect(clamped).not.toBeNull();
+  expect(clamped!.x).toBeGreaterThanOrEqual(12);
+  expect(clamped!.x + clamped!.width).toBeLessThanOrEqual(788);
+  const fallbackHeader = floating.locator('.image-trail-workspace__window-header');
+  await fallbackHeader.focus();
+  await page.keyboard.down('Alt');
+  await page.keyboard.down('ArrowLeft');
+  const fallbackPreview = page.locator('.image-trail-workspace__snap-preview.is-fallback[data-edge="left"]');
+  await expect(fallbackPreview).toBeVisible();
+  await expect(fallbackPreview.locator('.image-trail-workspace__snap-label')).toHaveText('keep floating');
+  await expect(
+    page.locator('[role="status"]').filter({ hasText: 'will stay floating because the left rail leaves too little center space' }),
+  ).toHaveCount(1);
+  await page.keyboard.up('ArrowLeft');
+  await page.keyboard.up('Alt');
+  await expect(leftRail).toHaveCount(0);
+
+  await page.setViewportSize({ width: 1_280, height: 800 });
+  await keyboardSnap(page, floating, 'left');
+  await expect(leftRail).toBeVisible();
+
+  await page.getByRole('button', { name: 'Detach Queue into a floating window (drag to place)' }).click();
+  await keyboardSnap(page, page.locator('[data-image-trail-detached-window="bookmarks"][data-workspace-mode="floating"]'), 'left');
+  await leftRail.getByRole('button', { name: 'Move Queue earlier in left rail' }).click();
+  await expect(leftRail.locator('[data-workspace-mode="railed"]').first()).toHaveAttribute('data-image-trail-detached-window', 'bookmarks');
+  await captureArtifact(page, testInfo, 'workspace-left-rail-stack');
+
+  const queueCard = leftRail.locator('[data-image-trail-detached-window="bookmarks"]');
+  const queueHeader = queueCard.locator('.image-trail-workspace__window-header');
+  const queueHeaderBox = await queueHeader.boundingBox();
+  expect(queueHeaderBox).not.toBeNull();
+  await page.mouse.move(queueHeaderBox!.x + 60, queueHeaderBox!.y + 16);
+  await page.mouse.down();
+  await page.mouse.move(700, 360, { steps: 4 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(queueCard).toBeVisible();
+
+  await page.mouse.move(queueHeaderBox!.x + 60, queueHeaderBox!.y + 16);
+  await page.mouse.down();
+  await page.mouse.move(700, 360, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.locator('[data-image-trail-detached-window="bookmarks"][data-workspace-mode="floating"]')).toBeVisible();
+});
+
 test('detached Settings follows the gear toggle without duplicating the surface', async ({ page, serviceWorker }) => {
   await openPanel(page, serviceWorker);
 
   await page.getByRole('button', { name: 'Show settings' }).click();
   await page.getByRole('button', { name: 'Detach Settings into a floating window (drag to place)' }).click();
 
-  const settingsWindow = page.getByRole('dialog', { name: 'Settings (detached)' });
+  const settingsWindow = page.getByRole('dialog', { name: 'Settings (floating)' });
   await expect(settingsWindow).toBeVisible();
   await expect(page.locator('.image-trail-panel__settings-section')).toHaveCount(1, {
     timeout: 5000,
@@ -144,12 +259,13 @@ test('the per-site workspace layout persists across a reload when opted in, and 
   const restoreToggle = page.getByLabel('Restore workspace layout per site');
   await restoreToggle.check();
   await page.getByRole('button', { name: 'Hide settings' }).click();
+  await page.getByRole('button', { name: 'Hide the Queue list' }).click();
 
-  // Detach Recent history, drag its window to a distinctive spot, and minimize it.
+  // Detach Recent history, drag its window to a distinctive spot, and shade it.
   await page.getByRole('button', { name: detachHistoryName }).click();
   const windowEl = page.getByRole('dialog', { name: historyWindowName });
   await expect(windowEl).toBeVisible();
-  const header = windowEl.locator('.image-trail-panel__detached-header');
+  const header = windowEl.locator('.image-trail-workspace__window-header');
   const headerBox = await header.boundingBox();
   expect(headerBox).not.toBeNull();
   // Park the window at the far left, well clear of the right-docked panel, so the restored
@@ -160,7 +276,7 @@ test('the per-site workspace layout persists across a reload when opted in, and 
   await page.mouse.up();
   const movedBox = await windowEl.boundingBox();
   expect(movedBox).not.toBeNull();
-  await windowEl.getByRole('button', { name: 'Minimize Recent history window' }).click();
+  await windowEl.getByRole('button', { name: 'Shade Recent history' }).click();
   // Let the debounced save (400ms) flush before reloading.
   await page.waitForTimeout(700);
 
@@ -168,14 +284,15 @@ test('the per-site workspace layout persists across a reload when opted in, and 
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
 
-  // The saved workspace restores: Recent history opens detached, at the dragged spot, still minimized.
+  // The saved workspace restores: Recent history opens detached, at the dragged spot, still shaded.
   const restoredWindow = page.getByRole('dialog', { name: historyWindowName });
   await expect(restoredWindow).toBeVisible();
   const restoredBox = await restoredWindow.boundingBox();
   expect(restoredBox).not.toBeNull();
   expect(Math.abs(restoredBox!.x - movedBox!.x)).toBeLessThanOrEqual(4);
   expect(Math.abs(restoredBox!.y - movedBox!.y)).toBeLessThanOrEqual(4);
-  await expect(restoredWindow.locator('.image-trail-panel__detached-body')).toBeHidden();
+  await expect(restoredWindow.locator('.image-trail-workspace__dom-body')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Show the Queue list' })).toBeVisible();
 
   // Reset clears the saved layout for the site and reattaches the section.
   await openSystemGroup();
@@ -183,6 +300,7 @@ test('the per-site workspace layout persists across a reload when opted in, and 
   await expect(restoredWindow).toHaveCount(0);
   await page.getByRole('button', { name: 'Hide settings' }).click();
   await expect(page.getByRole('button', { name: detachHistoryName })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hide the Queue list' })).toBeVisible();
 
   // Leave the shared profile the way we found it: opt back out.
   await openSystemGroup();
@@ -193,7 +311,7 @@ test('a detached section window keeps its header-row action toolbar usable (#430
   await openPanel(page, serviceWorker);
 
   await page.getByRole('button', { name: 'Detach Queue into a floating window (drag to place)' }).click();
-  const windowEl = page.getByRole('dialog', { name: 'Queue (detached)' });
+  const windowEl = page.getByRole('dialog', { name: 'Queue (floating)' });
   await expect(windowEl).toBeVisible();
 
   // The window chrome carries the title, but the header row must stay for its actions: the

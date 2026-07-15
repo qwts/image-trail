@@ -64,13 +64,13 @@ export function createPanelPositionMessageRegistry({
   async function handleLoadWorkspaceLayout(message: LoadWorkspaceLayoutMessage): Promise<LoadWorkspaceLayoutResultMessage['payload']> {
     const hostname = normalizeHostname(message.payload.hostname);
     if (!hostname) return { ok: true, layout: null };
-    return { ok: true, layout: await workspaceLayoutStore.load(hostname) };
+    return { ok: true, layout: await workspaceLayoutStore.load({ hostname, pageUrl: message.payload.pageUrl }) };
   }
 
   async function handleSaveWorkspaceLayout(message: SaveWorkspaceLayoutMessage): Promise<SaveWorkspaceLayoutResultMessage['payload']> {
     const hostname = normalizeHostname(message.payload.hostname);
     if (!hostname) return { ok: false };
-    await workspaceLayoutStore.save(hostname, message.payload.layout);
+    await workspaceLayoutStore.save({ hostname, pageUrl: message.payload.pageUrl }, message.payload.layout);
     return { ok: true };
   }
 
@@ -79,7 +79,7 @@ export function createPanelPositionMessageRegistry({
   ): Promise<DeleteWorkspaceLayoutResultMessage['payload']> {
     const hostname = normalizeHostname(message.payload.hostname);
     if (!hostname) return { ok: false };
-    await workspaceLayoutStore.remove(hostname);
+    await workspaceLayoutStore.remove({ hostname, pageUrl: message.payload.pageUrl });
     return { ok: true };
   }
 

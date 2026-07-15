@@ -45,7 +45,9 @@ export class BuildIdentityOverlay {
     host.style.position = 'fixed';
     host.style.top = '12px';
     host.style.right = '12px';
-    host.style.zIndex = '2147483647';
+    // Keep selectable build metadata above the host page but below Image Trail
+    // panel and workspace chrome so it cannot block rail controls.
+    host.style.zIndex = '2147483646';
     host.style.pointerEvents = 'none';
 
     const shadow = host.attachShadow({ mode: 'open' });

@@ -65,13 +65,14 @@ function buildPanelChromeEntries(deps: PanelActionDeps): ActionEntries<PanelChro
         deps.render();
       },
     },
-    // Session-local collapse for the Recents/Queue sections (#438); durable persistence is an
-    // explicit follow-up if wanted.
+    // Collapse remains session state unless workspace restoration is enabled; the workspace
+    // controller persists the same named v2 section record when the user has opted in.
     'panel/history-section-open': {
       handle(action) {
         if (deps.getState().historySectionOpen === action.open) return;
         deps.reduce(action);
         deps.render();
+        deps.notifyWorkspaceLayoutChanged();
       },
     },
     'panel/bookmarks-section-open': {
@@ -79,6 +80,7 @@ function buildPanelChromeEntries(deps: PanelActionDeps): ActionEntries<PanelChro
         if (deps.getState().bookmarksSectionOpen === action.open) return;
         deps.reduce(action);
         deps.render();
+        deps.notifyWorkspaceLayoutChanged();
       },
     },
     'panel/minimize': minimizeOrExpand,

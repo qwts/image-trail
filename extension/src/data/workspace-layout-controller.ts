@@ -1,26 +1,23 @@
-import type { StoredWorkspaceLayout, WorkspaceLayoutStore } from '../core/workspace-layout.js';
+import type { StoredWorkspaceLayout, WorkspaceLayoutScope, WorkspaceLayoutStore } from '../core/workspace-layout.js';
 import { openImageTrailDb } from './db.js';
 import { WorkspaceLayoutRepository } from './repositories/workspace-layout-repository.js';
 
 export class IndexedDbWorkspaceLayoutStore implements WorkspaceLayoutStore {
-  private ready: Promise<{
-    readonly db: IDBDatabase;
-    readonly repository: WorkspaceLayoutRepository;
-  } | null> | null = null;
+  private ready: Promise<{ readonly db: IDBDatabase; readonly repository: WorkspaceLayoutRepository } | null> | null = null;
 
-  async load(hostname: string): Promise<StoredWorkspaceLayout | null> {
+  async load(scope: WorkspaceLayoutScope): Promise<StoredWorkspaceLayout | null> {
     const context = await this.openContext();
-    return context ? context.repository.get(hostname) : null;
+    return context ? context.repository.get(scope) : null;
   }
 
-  async save(hostname: string, layout: StoredWorkspaceLayout): Promise<void> {
+  async save(scope: WorkspaceLayoutScope, layout: StoredWorkspaceLayout): Promise<void> {
     const context = await this.openContext();
-    await context?.repository.put(hostname, layout);
+    await context?.repository.put(scope, layout);
   }
 
-  async remove(hostname: string): Promise<void> {
+  async remove(scope: WorkspaceLayoutScope): Promise<void> {
     const context = await this.openContext();
-    await context?.repository.delete(hostname);
+    await context?.repository.delete(scope);
   }
 
   async close(): Promise<void> {
@@ -29,18 +26,12 @@ export class IndexedDbWorkspaceLayoutStore implements WorkspaceLayoutStore {
     this.ready = null;
   }
 
-  private openContext(): Promise<{
-    readonly db: IDBDatabase;
-    readonly repository: WorkspaceLayoutRepository;
-  } | null> {
+  private openContext(): Promise<{ readonly db: IDBDatabase; readonly repository: WorkspaceLayoutRepository } | null> {
     this.ready ??= this.createContext();
     return this.ready;
   }
 
-  private async createContext(): Promise<{
-    readonly db: IDBDatabase;
-    readonly repository: WorkspaceLayoutRepository;
-  } | null> {
+  private async createContext(): Promise<{ readonly db: IDBDatabase; readonly repository: WorkspaceLayoutRepository } | null> {
     const result = await openImageTrailDb();
     return result.db ? { db: result.db, repository: new WorkspaceLayoutRepository(result.db) } : null;
   }

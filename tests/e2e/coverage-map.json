@@ -82,6 +82,39 @@
       ]
     },
     {
+      "id": "workspace-rails-layout-v2",
+      "acceptance": "React workspace shade, floating windows, four edge rails, and private versioned restoration",
+      "wiki": "https://github.com/qwts/image-trail/wiki/ADR-0003-Workspace-Rails-And-Host-Reflow-Boundary",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/workspace-layout.test.ts",
+            "tests/workspace-layout-controller.test.ts",
+            "tests/workspace-layout-repository.test.ts",
+            "tests/workspace-rails-feasibility.test.ts",
+            "tests/dom/detachable-section.test.ts"
+          ],
+          "notes": "Covers v2 schema sanitization and legacy migration, install-secret HMAC keys without raw URL persistence, one placement registry, panel and section restoration, shade/snap/unsnap/reorder transitions, pointer thresholds, viewport clamping and rail fallback, React DOM adoption, focus, and scroll preservation."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/render.stories.ts",
+          "notes": "Covers the handoff-sized left and top rail compositions, ordered cards, a floating window, React action dispatch, and representative Queue, Recents, and Controls bodies."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": ["tests/e2e/detachable-sections.spec.ts", "tests/e2e/workspace-rails-spike.spec.ts"],
+          "notes": "Covers packaged four-edge snapping, pointer and keyboard previews, shade versus attached collapse, button and threshold-drag unsnap with cancel, rail order, extension-surface panel collision resolution, responsive rail fallback and clamping, focus handoff, fixed-viewport rail artifacts, private persisted restore and reset, local build-overlay stacking, and the overlay-only host boundary without host geometry, scroll, or focus mutation."
+        },
+        {
+          "type": "manual",
+          "reason": "The arbitrary-host overlay, browser zoom clamp, and final handoff visual fidelity need packaged-extension inspection.",
+          "notes": "At 1440x900, detach Queue, Recents, and Controls; snap and reorder them on each edge; shade and unshade; unsnap by pointer and keyboard; reload with restore enabled; reset; repeat at 200% zoom. Confirm rail width 344px, top and bottom height 240px, the center remains usable, the host does not reflow, focus and scroll survive, Recall remains panel-relative, and chrome matches handoff screenshot 11."
+        }
+      ]
+    },
+    {
       "id": "design-system-record-row",
       "acceptance": "Shared RecordRow across Queue, Recents, Recall, and Gallery",
       "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",

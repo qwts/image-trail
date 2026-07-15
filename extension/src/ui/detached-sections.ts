@@ -1,129 +1,129 @@
-import type { PanelState } from '../core/types.js';
-import { createDetachedSectionWindow, type DetachedWindowGeometry, type DetachedWindowPosition } from './components/detachable-section.js';
+import type { PanelState, WorkspaceSectionLayout } from '../core/types.js';
+import { floatingSection } from '../core/workspace-layout.js';
+import { renderReactWorkspace, type WorkspaceRenderEntry } from './react/workspace-renderer.js';
 import { sectionVisible, sectionWindowInlineSize, type DetachableSectionDefinition } from './section-registry.js';
-import { unmountReactSubtrees } from './react/react-subtree.js';
+import { clampFloatingRect, defaultFloatingRect, railGeometryFits, viewportSize } from './workspace/workspace-geometry.js';
 import type { PanelRenderTarget } from './render.js';
 
-const DETACHED_WINDOW_GAP = 8;
-const DETACHED_WINDOW_EDGE_PADDING = 12;
-const DETACHED_WINDOW_STACK_OFFSET = 24;
-/** A default-positioned window keeps at least this much of itself above the viewport's bottom edge. */
-const DETACHED_WINDOW_MIN_VISIBLE_BLOCK_SIZE = 120;
+interface ScrollSnapshot {
+  readonly lists: ReadonlyMap<string, number>;
+  readonly bodies: ReadonlyMap<string, number>;
+}
 
-/**
- * Own render pass for detached-section windows, mirroring the recall drawer: a separate root under
- * the shadow host, full swap per render, with per-window list scroll preserved across the swap.
- * Window geometry is session-transient extension-owned state on `PanelLayoutState`.
- */
+/** React owns workspace chrome; existing section views are adopted as DOM bodies. */
 export function renderDetachedSections(
   target: PanelRenderTarget,
   state: PanelState,
   definitions: readonly DetachableSectionDefinition[],
 ): void {
-  const detachedRoot = target.detachedRoot;
-  if (!detachedRoot) return;
-  unmountReactSubtrees(detachedRoot);
-  // A restored section must not reopen collapsed on its next detach: prune minimized flags for
-  // sections that are no longer detached. Window positions are intentionally kept — reopening at
-  // the last dragged spot is desired within a session.
-  for (const sectionId of Array.from(target.layoutState.detachedWindowMinimized)) {
-    if (!state.detachedSections.includes(sectionId)) target.layoutState.detachedWindowMinimized.delete(sectionId);
-  }
-  if (state.minimized || state.detachedSections.length === 0) {
-    detachedRoot.replaceChildren();
-    return;
-  }
-
-  const previousWindows = new Set<string>();
-  const previousListScroll = new Map<string, number>();
-  const previousBodyScroll = new Map<string, number>();
-  for (const windowEl of Array.from(detachedRoot.querySelectorAll<HTMLElement>('[data-image-trail-detached-window]'))) {
-    const sectionId = windowEl.dataset['imageTrailDetachedWindow'];
-    if (!sectionId) continue;
-    previousWindows.add(sectionId);
-    const list = windowEl.querySelector<HTMLElement>('.image-trail-panel__record-list');
-    if (list) previousListScroll.set(sectionId, list.scrollTop);
-    const body = windowEl.querySelector<HTMLElement>('.image-trail-panel__detached-body');
-    if (body) previousBodyScroll.set(sectionId, body.scrollTop);
-  }
-
-  detachedRoot.replaceChildren();
-  const visibleSections = state.detachedSections
-    .map((sectionId) => definitions.find((definition) => definition.id === sectionId))
-    .filter((definition): definition is DetachableSectionDefinition => definition !== undefined && sectionVisible(definition, state));
-  visibleSections.forEach((definition) => {
-    const sectionId = definition.id;
-    const content = definition.create(target, state);
-    // Default geometry stacks by the section's stable detach order, not the filtered index —
-    // otherwise a hidden neighbor (detached Settings while closed) toggling would shift windows
-    // that have no stored position yet.
-    const stackIndex = state.detachedSections.indexOf(sectionId);
-    const windowEl = createDetachedSectionWindow(
-      {
-        sectionId,
-        sectionTitle: definition.title,
-        geometry: detachedWindowGeometry(
-          target.root,
-          sectionWindowInlineSize(definition),
-          target.layoutState.detachedWindowPositions.get(sectionId),
-          stackIndex,
-        ),
-        animate: !previousWindows.has(sectionId),
-        minimized: target.layoutState.detachedWindowMinimized.has(sectionId),
-        onPositionChange: (id, position) => {
-          target.layoutState.detachedWindowPositions.set(id, position);
-          target.onWorkspaceLayoutChanged?.();
-        },
-        onMinimizedChange: (id, minimized) => {
-          if (minimized) target.layoutState.detachedWindowMinimized.add(id);
-          else target.layoutState.detachedWindowMinimized.delete(id);
-          target.onWorkspaceLayoutChanged?.();
-        },
-      },
-      content,
-      target.dispatch,
-    );
-    detachedRoot.append(windowEl);
-
-    restoreScroll(windowEl, '.image-trail-panel__record-list', previousListScroll.get(sectionId));
-    restoreScroll(windowEl, '.image-trail-panel__detached-body', previousBodyScroll.get(sectionId));
-  });
+  const root = target.detachedRoot;
+  if (!root) return;
+  const previousIds = detachedIds(root);
+  const scroll = captureScroll(root);
+  const entries = state.minimized ? [] : workspaceEntries(target, state, definitions);
+  target.onWorkspaceEdgesChanged?.(activeRailEdges(entries), true);
+  renderReactWorkspace(root, entries, target.dispatch, previousIds);
+  restoreScroll(root, scroll);
 }
 
-function restoreScroll(windowEl: HTMLElement, selector: string, scrollTop: number | undefined): void {
-  if (scrollTop === undefined) return;
-  const element = windowEl.querySelector<HTMLElement>(selector);
-  if (!element) return;
+function activeRailEdges(entries: readonly WorkspaceRenderEntry[]): ReadonlySet<NonNullable<WorkspaceSectionLayout['edge']>> {
+  return new Set(
+    entries.map((entry) => entry.placement.edge).filter((edge): edge is NonNullable<WorkspaceSectionLayout['edge']> => edge !== null),
+  );
+}
+
+function workspaceEntries(
+  target: PanelRenderTarget,
+  state: PanelState,
+  definitions: readonly DetachableSectionDefinition[],
+): WorkspaceRenderEntry[] {
+  const activeEdges = new Set<NonNullable<WorkspaceSectionLayout['edge']>>();
+  let normalized = false;
+  const entries = state.detachedSections
+    .map((sectionId, index) => {
+      const definition = definitions.find((candidate) => candidate.id === sectionId);
+      if (!definition || !sectionVisible(definition, state)) return null;
+      const placement = renderPlacement(target, definition, index, activeEdges);
+      if (placement !== target.layoutState.workspaceSections.get(sectionId)) {
+        target.layoutState.workspaceSections.set(sectionId, placement);
+        normalized = true;
+      }
+      return { placement, title: definition.title, body: definition.create(target, state) };
+    })
+    .filter((entry): entry is WorkspaceRenderEntry => entry !== null);
+  if (normalized) target.onWorkspaceLayoutChanged?.();
+  return entries;
+}
+
+function renderPlacement(
+  target: PanelRenderTarget,
+  definition: DetachableSectionDefinition,
+  stackIndex: number,
+  activeEdges: Set<NonNullable<WorkspaceSectionLayout['edge']>>,
+): WorkspaceSectionLayout {
+  const stored = target.layoutState.workspaceSections.get(definition.id) ?? floatingSection(definition.id, null);
+  const viewport = viewportSize();
+  if (stored.mode === 'railed' && stored.edge) {
+    const candidateEdges = new Set([...activeEdges, stored.edge]);
+    if (activeEdges.has(stored.edge) || railGeometryFits(viewport, candidateEdges)) {
+      activeEdges.add(stored.edge);
+      return stored;
+    }
+  }
+  const floatingRect = stored.floatingRect
+    ? clampFloatingRect(stored.floatingRect, viewport)
+    : defaultFloatingRect({
+        panelRect: target.root.getBoundingClientRect(),
+        width: sectionWindowInlineSize(definition),
+        stackIndex,
+        viewport,
+      });
+  if (stored.mode === 'floating' && stored.floatingRect && rectsEqual(stored.floatingRect, floatingRect)) return stored;
+  return floatingSection(definition.id, floatingRect, { shaded: stored.shaded, collapsed: stored.collapsed });
+}
+
+function rectsEqual(
+  a: NonNullable<WorkspaceSectionLayout['floatingRect']>,
+  b: NonNullable<WorkspaceSectionLayout['floatingRect']>,
+): boolean {
+  return a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
+}
+
+function detachedIds(root: HTMLElement): ReadonlySet<string> {
+  return new Set(
+    Array.from(root.querySelectorAll<HTMLElement>('[data-image-trail-detached-window]'))
+      .map((element) => element.dataset['imageTrailDetachedWindow'])
+      .filter((id): id is string => id !== undefined),
+  );
+}
+
+function captureScroll(root: HTMLElement): ScrollSnapshot {
+  const lists = new Map<string, number>();
+  const bodies = new Map<string, number>();
+  for (const windowElement of Array.from(root.querySelectorAll<HTMLElement>('[data-image-trail-detached-window]'))) {
+    const id = windowElement.dataset['imageTrailDetachedWindow'];
+    if (!id) continue;
+    const list = windowElement.querySelector<HTMLElement>('.image-trail-panel__record-list');
+    const body = windowElement.querySelector<HTMLElement>('.image-trail-workspace__dom-body');
+    if (list) lists.set(id, list.scrollTop);
+    if (body) bodies.set(id, body.scrollTop);
+  }
+  return { lists, bodies };
+}
+
+function restoreScroll(root: HTMLElement, snapshot: ScrollSnapshot): void {
+  for (const windowElement of Array.from(root.querySelectorAll<HTMLElement>('[data-image-trail-detached-window]'))) {
+    const id = windowElement.dataset['imageTrailDetachedWindow'];
+    if (!id) continue;
+    restoreElementScroll(windowElement.querySelector('.image-trail-panel__record-list'), snapshot.lists.get(id));
+    restoreElementScroll(windowElement.querySelector('.image-trail-workspace__dom-body'), snapshot.bodies.get(id));
+  }
+}
+
+function restoreElementScroll(element: Element | null, scrollTop: number | undefined): void {
+  if (!(element instanceof HTMLElement) || scrollTop === undefined) return;
   element.scrollTop = scrollTop;
   queueMicrotask(() => {
     element.scrollTop = scrollTop;
   });
-}
-
-function detachedWindowGeometry(
-  panelRoot: HTMLElement,
-  preferredInlineSize: number,
-  stored: DetachedWindowPosition | undefined,
-  index: number,
-): DetachedWindowGeometry {
-  // Mirror the stylesheet's `width: min(<preferred>, calc(100vw - 24px))` — never wider than the
-  // viewport, since the inline width would otherwise override the CSS max-width.
-  const availableInlineSize = Math.max(0, window.innerWidth - DETACHED_WINDOW_EDGE_PADDING * 2);
-  const inlineSize = Math.min(preferredInlineSize, availableInlineSize);
-  const maxLeft = window.innerWidth - inlineSize - DETACHED_WINDOW_EDGE_PADDING;
-  const maxTop = window.innerHeight - DETACHED_WINDOW_EDGE_PADDING - DETACHED_WINDOW_MIN_VISIBLE_BLOCK_SIZE;
-  if (stored) {
-    // A stored position can come from a larger viewport (a restored per-site workspace layout, or a
-    // resized window mid-session) — clamp it back into view instead of trusting it verbatim.
-    return {
-      left: Math.max(DETACHED_WINDOW_EDGE_PADDING, Math.min(stored.left, maxLeft)),
-      top: Math.max(DETACHED_WINDOW_EDGE_PADDING, Math.min(stored.top, maxTop)),
-      inlineSize,
-    };
-  }
-  const rect = panelRoot.getBoundingClientRect();
-  const stackOffset = index * DETACHED_WINDOW_STACK_OFFSET;
-  const left = Math.max(DETACHED_WINDOW_EDGE_PADDING, Math.min(rect.right + DETACHED_WINDOW_GAP + stackOffset, maxLeft));
-  const top = Math.max(DETACHED_WINDOW_EDGE_PADDING, Math.min(rect.top + stackOffset, maxTop));
-  return { left, top, inlineSize };
 }

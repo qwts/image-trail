@@ -117,14 +117,15 @@ export const savePanelPositionRequestSchema = v.object({
 
 export const deletePanelPositionRequestSchema = v.object({ hostname: v.string() });
 
-export const loadWorkspaceLayoutRequestSchema = v.object({ hostname: v.string() });
+export const loadWorkspaceLayoutRequestSchema = v.object({ hostname: v.string(), pageUrl: v.string() });
 
 export const saveWorkspaceLayoutRequestSchema = v.object({
   hostname: v.string(),
+  pageUrl: v.string(),
   layout: workspaceLayoutSchema,
 });
 
-export const deleteWorkspaceLayoutRequestSchema = v.object({ hostname: v.string() });
+export const deleteWorkspaceLayoutRequestSchema = v.object({ hostname: v.string(), pageUrl: v.string() });
 
 export const loadParsedFieldStateRequestSchema = v.object({ hostname: v.string(), pageUrl: v.string() });
 

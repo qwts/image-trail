@@ -120,12 +120,12 @@ function panelPositionFixture() {
   };
   const layouts = new Map<string, StoredWorkspaceLayout>();
   const workspaceLayoutStore: WorkspaceLayoutStore = {
-    load: async (hostname) => layouts.get(hostname) ?? null,
-    save: async (hostname, layout) => {
-      layouts.set(hostname, layout);
+    load: async (scope) => layouts.get(scope.pageUrl) ?? null,
+    save: async (scope, layout) => {
+      layouts.set(scope.pageUrl, layout);
     },
-    remove: async (hostname) => {
-      layouts.delete(hostname);
+    remove: async (scope) => {
+      layouts.delete(scope.pageUrl);
     },
   };
   return { positions, layouts, registry: createPanelPositionMessageRegistry({ panelPositionStore: store, workspaceLayoutStore }) };

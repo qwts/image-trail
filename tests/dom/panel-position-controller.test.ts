@@ -108,6 +108,17 @@ test('pointercancel ends the drag and persists the last clamped position', () =>
   assert.deepEqual(harness.saved, [{ hostname: 'images.example.test', position: { left: 110, top: 90 } }]);
 });
 
+test('teardown removes active panel-drag listeners without persisting stale geometry', () => {
+  const harness = createHarness();
+  harness.controller.handlePanelDragStart(pointerEvent('pointerdown', { clientX: 150, clientY: 120 }));
+  document.dispatchEvent(pointerEvent('pointermove', { clientX: 160, clientY: 130 }));
+  harness.controller.invalidateRestore();
+  document.dispatchEvent(pointerEvent('pointermove', { clientX: 500, clientY: 500 }));
+  document.dispatchEvent(pointerEvent('pointerup', { clientX: 500, clientY: 500 }));
+  assert.equal(harness.root.style.left, '110px');
+  assert.deepEqual(harness.saved, []);
+});
+
 test('restore-on-open clamps the persisted position and applies it to the root element', async () => {
   const harness = createHarness({ savedPosition: { left: 5000, top: -100 } });
   await harness.controller.ensurePanelPositionRestored();
@@ -115,6 +126,32 @@ test('restore-on-open clamps the persisted position and applies it to the root e
   assert.equal(harness.root.style.top, '12px');
   assert.equal(harness.root.style.right, 'auto');
   assert.deepEqual(harness.log, ['renderRecallOnly']);
+});
+
+test('active rails shift and size only extension surfaces, then restore the base panel position', () => {
+  const harness = createHarness();
+  harness.controller.setWorkspaceRailEdges(new Set(['left', 'top']));
+  assert.equal(harness.root.style.left, '368px');
+  assert.equal(harness.root.style.top, '264px');
+  assert.equal(harness.root.style.maxHeight, '492px');
+
+  harness.controller.setWorkspaceRailEdges(new Set(), false);
+  assert.equal(harness.root.style.left, '100px');
+  assert.equal(harness.root.style.top, '80px');
+  assert.equal(harness.root.style.maxHeight, '');
+});
+
+test('viewport observation reclamps floating-only workspaces and stops when minimized', () => {
+  const harness = createHarness();
+  harness.controller.setWorkspaceRailEdges(new Set(), true);
+  harness.log.length = 0;
+  window.dispatchEvent(new Event('resize'));
+  assert.deepEqual(harness.log, ['render']);
+
+  harness.controller.setWorkspaceRailEdges(new Set(), false);
+  harness.log.length = 0;
+  window.dispatchEvent(new Event('resize'));
+  assert.deepEqual(harness.log, []);
 });
 
 test('resetPanelPosition removes the applied inline styles and the stored entry', async () => {

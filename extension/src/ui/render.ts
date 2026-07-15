@@ -15,7 +15,7 @@ import { createMinimizedPanel, panelHasError, panelIsWaiting, renderPanelToast }
 import { createPanelHeader } from './react/panel-header.js';
 import { renderPageContextSwitcher } from './react/page-context-switcher.js';
 import { createPanelDestinationSurface } from './react/destination-surface.js';
-import { unmountReactSubtrees } from './react/react-subtree.js';
+import { unmountReactSubtree, unmountReactSubtrees } from './react/react-subtree.js';
 import type { PanelRenderTarget } from './panel-render-types.js';
 import { createParsedFieldsSection } from './parsed-fields-section.js';
 import { createCompactStatusElements } from './components/status-view.js';
@@ -69,7 +69,11 @@ export function renderPanel(target: PanelRenderTarget, state: PanelState): void 
   unmountReactSubtrees(target.root);
   if (state.minimized) {
     target.root.replaceChildren(createMinimizedPanel(state, target.dispatch));
-    target.detachedRoot?.replaceChildren();
+    if (target.detachedRoot) {
+      unmountReactSubtree(target.detachedRoot);
+      target.detachedRoot.replaceChildren();
+    }
+    target.onWorkspaceEdgesChanged?.(new Set(), false);
     if (state.activeDestination) restorePanelScrollTop(target.root, 0);
     return;
   }

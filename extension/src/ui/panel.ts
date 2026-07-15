@@ -49,7 +49,7 @@ import { PanelMount } from './panel/panel-mount.js';
 import { PageContextController } from './panel/page-context-controller.js';
 import { subscribeToPageAdapter } from './panel/panel-subscriptions.js';
 import { PanelPositionController } from './panel/panel-position-controller.js';
-import { WorkspaceLayoutController } from './panel/workspace-layout-controller.js';
+import { createWorkspaceActionDeps, WorkspaceLayoutController } from './panel/workspace-layout-controller.js';
 import { handlePanelShortcutAction } from './panel/shortcut-actions.js';
 import { PanelRenderController } from './panel/panel-render-controller.js';
 import { ParsedFieldStateRecordController } from './panel/parsed-field-state-record-controller.js';
@@ -283,6 +283,7 @@ export class ImageTrailPanel {
     whenStylesReady: () => this.panelMount.whenStylesReady(),
     root: () => this.panelMount.root,
     panelPositionStore: () => this.panelPositionStore,
+    onPositionChanged: () => this.workspaceLayout.handleWorkspaceLayoutChanged(),
   });
   private readonly workspaceLayout: WorkspaceLayoutController = new WorkspaceLayoutController({
     getState: () => this.state,
@@ -291,8 +292,9 @@ export class ImageTrailPanel {
     workspaceLayoutStore: () => this.workspaceLayoutStore,
     getLocalSettings: () => this.localSettings,
     saveLocalSettings: (settings) => this.panelSettings.saveLocalSettings(settings),
-    detachedWindowPositions: () => this.panelRender.workspaceGeometry().detachedWindowPositions,
-    detachedWindowMinimized: () => this.panelRender.workspaceGeometry().detachedWindowMinimized,
+    workspaceSections: () => this.panelRender.workspaceGeometry().workspaceSections,
+    panelPosition: () => this.panelPosition.currentPanelPosition(),
+    restorePanelPosition: (position) => this.panelPosition.restoreWorkspacePanelPosition(position),
   });
   private readonly recallDestination: RecallDestinationController = new RecallDestinationController({
     getState: () => this.state,
@@ -386,6 +388,7 @@ export class ImageTrailPanel {
     bufferedNavDebugSnapshot: () => this.bufferedNav.getDebugSnapshot(),
     refreshRecallIfOpen: () => this.recallDestination.refreshRecallIfOpen(),
     onWorkspaceLayoutChanged: () => this.workspaceLayout.handleWorkspaceLayoutChanged(),
+    onWorkspaceEdgesChanged: (edges, observeViewport) => this.panelPosition.setWorkspaceRailEdges(edges, observeViewport),
   });
   private readonly parsedFieldStateRecord: ParsedFieldStateRecordController = new ParsedFieldStateRecordController({
     getState: () => this.state,
@@ -597,9 +600,7 @@ export class ImageTrailPanel {
         this.panelSettings.updateNeighborPreload(enabled, radius, cacheLimit, probeMethod, loadFailureFeedback),
       preloadMoreNeighbors: (radius, cacheLimit) => this.panelSettings.preloadMoreNeighbors(radius, cacheLimit),
       resetPanelPosition: () => this.panelPosition.resetPanelPosition(),
-      updateWorkspaceLayoutRestore: (enabled) => this.workspaceLayout.updateWorkspaceLayoutRestore(enabled),
-      resetWorkspaceLayout: () => this.workspaceLayout.resetWorkspaceLayout(),
-      notifyWorkspaceLayoutChanged: () => this.workspaceLayout.handleWorkspaceLayoutChanged(),
+      ...createWorkspaceActionDeps(this.workspaceLayout),
       refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
       restoreParsedFieldStateForCurrentPanel: () => this.parsedFieldStateRecord.restoreParsedFieldStateForCurrentPanel(),
       openRecallDestination: () => this.recallDestination.openRecallDestination(),
@@ -623,8 +624,7 @@ export class ImageTrailPanel {
     };
   }
 
-  // The former dispatch chain's fall-through tail, kept verbatim: `toggle-panel`/`close-panel` and
-  // any unregistered action reduce first, then remount or tear down based on post-reduce visibility.
+  // The dispatch fall-through reduces unregistered actions, then mounts or tears down from post-reduce visibility.
   private readonly handleDefaultAction = (action: PanelAction): void => {
     this.state = reducePanelAction(this.state, action);
     if (!this.state.visible) {

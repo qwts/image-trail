@@ -2,36 +2,52 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createInitialPanelState } from '../extension/src/core/state.js';
-import type { DetachableSectionId, PanelPosition, PanelState, WorkspaceLayout, WorkspaceLayoutStore } from '../extension/src/core/types.js';
+import type { PanelState } from '../extension/src/core/types.js';
+import {
+  WORKSPACE_LAYOUT_KEY_VERSION,
+  WORKSPACE_LAYOUT_SCHEMA_VERSION,
+  floatingSection,
+  railedSection,
+  type DetachableSectionId,
+  type PanelPosition,
+  type StoredWorkspaceLayout,
+  type WorkspaceLayout,
+  type WorkspaceLayoutScope,
+  type WorkspaceLayoutStore,
+  type WorkspaceSectionLayout,
+} from '../extension/src/core/workspace-layout.js';
 import { WorkspaceLayoutController, type WorkspaceLayoutControllerDeps } from '../extension/src/ui/panel/workspace-layout-controller.js';
 
-// Minimal globals, following tests/panel-position-controller.test.ts: hostnameFromLocation reads
-// window.location, and the debounced save runs through window.setTimeout — run it synchronously so
-// assertions never need real timers.
 globalThis.window = {
-  location: { hostname: 'images.example.test' },
+  location: { hostname: 'images.example.test', href: 'https://images.example.test/gallery/42' },
+  innerWidth: 1_440,
+  innerHeight: 900,
   setTimeout: (callback: () => void): number => {
-    callback();
+    queueMicrotask(callback);
     return 1;
   },
   clearTimeout: (): void => {},
 } as unknown as Window & typeof globalThis;
 
 class FakeWorkspaceLayoutStore implements WorkspaceLayoutStore {
-  stored: WorkspaceLayout | null = null;
+  stored: StoredWorkspaceLayout | null = null;
+  scope: WorkspaceLayoutScope | null = null;
   saves = 0;
   removes = 0;
 
-  async load(): Promise<WorkspaceLayout | null> {
+  async load(scope: WorkspaceLayoutScope): Promise<StoredWorkspaceLayout | null> {
+    this.scope = scope;
     return this.stored;
   }
 
-  async save(_hostname: string, layout: WorkspaceLayout): Promise<void> {
+  async save(scope: WorkspaceLayoutScope, layout: StoredWorkspaceLayout): Promise<void> {
+    this.scope = scope;
     this.saves += 1;
     this.stored = layout;
   }
 
-  async remove(): Promise<void> {
+  async remove(scope: WorkspaceLayoutScope): Promise<void> {
+    this.scope = scope;
     this.removes += 1;
     this.stored = null;
   }
@@ -40,21 +56,18 @@ class FakeWorkspaceLayoutStore implements WorkspaceLayoutStore {
 interface Harness {
   readonly controller: WorkspaceLayoutController;
   readonly store: FakeWorkspaceLayoutStore;
-  readonly positions: Map<DetachableSectionId, PanelPosition>;
-  readonly minimized: Set<DetachableSectionId>;
+  readonly placements: Map<DetachableSectionId, WorkspaceSectionLayout>;
   state(): PanelState;
-  setState(state: PanelState): void;
   renders(): number;
-  savedSettings(): { restoreWorkspaceLayout: boolean } | null;
+  restoredPanelPosition(): PanelPosition | null;
 }
 
 function createHarness(initial?: Partial<PanelState>): Harness {
   let state: PanelState = { ...createInitialPanelState(), ...initial };
   let renders = 0;
-  let savedSettings: { restoreWorkspaceLayout: boolean } | null = null;
+  let restoredPanelPosition: PanelPosition | null = null;
   const store = new FakeWorkspaceLayoutStore();
-  const positions = new Map<DetachableSectionId, PanelPosition>();
-  const minimized = new Set<DetachableSectionId>();
+  const placements = new Map<DetachableSectionId, WorkspaceSectionLayout>();
   const deps: WorkspaceLayoutControllerDeps = {
     getState: () => state,
     setState: (next) => {
@@ -65,23 +78,20 @@ function createHarness(initial?: Partial<PanelState>): Harness {
     },
     workspaceLayoutStore: () => store,
     getLocalSettings: () => ({ restoreWorkspaceLayout: state.restoreWorkspaceLayoutEnabled }) as never,
-    saveLocalSettings: (settings) => {
-      savedSettings = settings as unknown as { restoreWorkspaceLayout: boolean };
+    saveLocalSettings: () => {},
+    workspaceSections: () => placements,
+    panelPosition: () => ({ left: 18, top: 24 }),
+    restorePanelPosition: (position) => {
+      restoredPanelPosition = position;
     },
-    detachedWindowPositions: () => positions,
-    detachedWindowMinimized: () => minimized,
   };
   return {
     controller: new WorkspaceLayoutController(deps),
     store,
-    positions,
-    minimized,
+    placements,
     state: () => state,
-    setState: (next) => {
-      state = next;
-    },
     renders: () => renders,
-    savedSettings: () => savedSettings,
+    restoredPanelPosition: () => restoredPanelPosition,
   };
 }
 
@@ -89,138 +99,121 @@ async function flushAsync(): Promise<void> {
   await new Promise((resolve) => setImmediate(resolve));
 }
 
-test('queueWorkspaceRestore is a no-op while the opt-in setting is off', async () => {
-  const harness = createHarness({ restoreWorkspaceLayoutEnabled: false });
-  harness.store.stored = { sections: [{ sectionId: 'history', position: null, minimized: false }] };
-
-  harness.controller.queueWorkspaceRestore();
+test('restore is opt-in and hydrates floating, rail, shade, and panel position', async () => {
+  const off = createHarness({ restoreWorkspaceLayoutEnabled: false });
+  off.store.stored = layout([floatingSection('history', null)]);
+  off.controller.queueWorkspaceRestore();
   await flushAsync();
+  assert.deepEqual(off.state().detachedSections, []);
 
-  assert.deepEqual(harness.state().detachedSections, []);
-  assert.equal(harness.renders(), 0);
-});
-
-test('restore hydrates detached sections, positions, and minimized state from the saved layout', async () => {
-  const harness = createHarness({ restoreWorkspaceLayoutEnabled: true });
-  harness.store.stored = {
-    sections: [
-      { sectionId: 'history', position: { left: 40, top: 60 }, minimized: false },
-      { sectionId: 'bookmarks', position: null, minimized: true },
-    ],
+  const on = createHarness({ restoreWorkspaceLayoutEnabled: true });
+  on.store.stored = {
+    ...layout([
+      floatingSection('history', rect(40, 60), { collapsed: true }),
+      railedSection('bookmarks', 'right', 0, { shaded: true, collapsed: true }),
+    ]),
+    panelPosition: { left: 8, top: 10 },
   };
-
-  harness.controller.queueWorkspaceRestore();
+  on.controller.queueWorkspaceRestore();
   await flushAsync();
-
-  assert.deepEqual(harness.state().detachedSections, ['history', 'bookmarks']);
-  assert.deepEqual(harness.positions.get('history'), { left: 40, top: 60 });
-  assert.equal(harness.positions.has('bookmarks'), false);
-  assert.equal(harness.minimized.has('bookmarks'), true);
-  assert.equal(harness.renders(), 1);
+  assert.deepEqual(on.state().detachedSections, ['history', 'bookmarks']);
+  assert.deepEqual(on.placements.get('history'), floatingSection('history', rect(40, 60), { collapsed: true }));
+  assert.equal(on.placements.get('bookmarks')?.shaded, true);
+  assert.equal(on.state().historySectionOpen, false);
+  assert.equal(on.state().bookmarksSectionOpen, false);
+  assert.deepEqual(on.restoredPanelPosition(), { left: 8, top: 10 });
+  assert.deepEqual(on.store.scope, { hostname: 'images.example.test', pageUrl: 'https://images.example.test/gallery/42' });
 });
 
-test('restore drops section ids the current build does not know', async () => {
-  const harness = createHarness({ restoreWorkspaceLayoutEnabled: true });
-  harness.store.stored = {
-    sections: [
-      { sectionId: 'time-machine' as DetachableSectionId, position: null, minimized: false },
-      { sectionId: 'controls', position: null, minimized: false },
-    ],
-  };
-
-  harness.controller.queueWorkspaceRestore();
-  await flushAsync();
-
-  assert.deepEqual(harness.state().detachedSections, ['controls']);
-});
-
-test('handleWorkspaceLayoutChanged persists the captured layout only when enabled and changed', async () => {
+test('named placement transitions share one registry and persist changed v2 state', async () => {
   const harness = createHarness({ restoreWorkspaceLayoutEnabled: true, detachedSections: ['history'] });
-  harness.positions.set('history', { left: 10, top: 12 });
-
-  harness.controller.handleWorkspaceLayoutChanged();
+  harness.controller.prepareDetachedSection('history', rect(10, 12));
+  harness.controller.snapSection('history', 'left');
+  harness.controller.toggleSectionShade('history');
   await flushAsync();
-  assert.equal(harness.store.saves, 1);
-  assert.deepEqual(harness.store.stored, {
-    sections: [{ sectionId: 'history', position: { left: 10, top: 12 }, minimized: false }],
-  });
 
-  // Unchanged layout → no second write.
-  harness.controller.handleWorkspaceLayoutChanged();
-  await flushAsync();
-  assert.equal(harness.store.saves, 1);
-
-  harness.positions.set('history', { left: 99, top: 12 });
-  harness.controller.handleWorkspaceLayoutChanged();
-  await flushAsync();
+  assert.deepEqual(harness.placements.get('history'), railedSection('history', 'left', 0, { shaded: true, floatingRect: rect(10, 12) }));
   assert.equal(harness.store.saves, 2);
+  assert.equal(harness.store.stored?.schemaVersion, 2);
+  assert.deepEqual(harness.store.stored?.panelPosition, { left: 18, top: 24 });
+
+  harness.controller.moveSection('history', rect(80, 90));
+  await flushAsync();
+  assert.equal(harness.placements.get('history')?.mode, 'floating');
+  assert.equal(harness.store.saves, 3);
 });
 
-test('handleWorkspaceLayoutChanged never writes while the setting is off', async () => {
-  const harness = createHarness({ restoreWorkspaceLayoutEnabled: false, detachedSections: ['history'] });
-
+test('opted-in attached collapse is captured in the same v2 section registry', async () => {
+  const harness = createHarness({ restoreWorkspaceLayoutEnabled: true, bookmarksSectionOpen: false });
   harness.controller.handleWorkspaceLayoutChanged();
   await flushAsync();
-
-  assert.equal(harness.store.saves, 0);
+  assert.equal(harness.store.stored?.sections.find((section) => section.sectionId === 'bookmarks')?.collapsed, true);
 });
 
-test('enabling the setting saves it and captures the current arrangement immediately', async () => {
-  const harness = createHarness({ restoreWorkspaceLayoutEnabled: false, detachedSections: ['controls'] });
+test('invalid rail admission keeps the section floating without persisting a transient snap', () => {
+  const harness = createHarness({ restoreWorkspaceLayoutEnabled: true, detachedSections: ['history'] });
+  harness.controller.prepareDetachedSection('history', rect(10, 12));
+  Object.assign(window, { innerWidth: 800, innerHeight: 600 });
+  harness.controller.snapSection('history', 'left');
+  assert.equal(harness.placements.get('history')?.mode, 'floating');
+  assert.equal(harness.store.saves, 0);
+  Object.assign(window, { innerWidth: 1_440, innerHeight: 900 });
+});
 
+test('enabling captures immediately; disabling keeps the durable layout', async () => {
+  const harness = createHarness({ restoreWorkspaceLayoutEnabled: false, detachedSections: ['controls'] });
+  harness.controller.prepareDetachedSection('controls', rect(4, 6));
   harness.controller.updateWorkspaceLayoutRestore(true);
   await flushAsync();
-
-  assert.equal(harness.state().restoreWorkspaceLayoutEnabled, true);
-  assert.equal(harness.savedSettings()?.restoreWorkspaceLayout, true);
   assert.equal(harness.store.saves, 1);
-  assert.deepEqual(
-    harness.store.stored?.sections.map((section) => section.sectionId),
-    ['controls'],
-  );
-  assert.equal(harness.renders(), 1);
-});
-
-test('disabling the setting stops persisting but keeps the stored layout', async () => {
-  const harness = createHarness({ restoreWorkspaceLayoutEnabled: true, detachedSections: ['controls'] });
-  harness.store.stored = { sections: [{ sectionId: 'controls', position: null, minimized: false }] };
+  assert.equal(harness.store.stored?.sections.find((section) => section.sectionId === 'controls')?.mode, 'floating');
 
   harness.controller.updateWorkspaceLayoutRestore(false);
   await flushAsync();
-
-  assert.equal(harness.state().restoreWorkspaceLayoutEnabled, false);
   assert.equal(harness.store.removes, 0);
   assert.notEqual(harness.store.stored, null);
 });
 
-test('resetWorkspaceLayout clears the stored layout, session geometry, and reattaches every section', async () => {
-  const harness = createHarness({ restoreWorkspaceLayoutEnabled: true, detachedSections: ['history', 'bookmarks'] });
-  harness.store.stored = { sections: [{ sectionId: 'history', position: { left: 1, top: 2 }, minimized: false }] };
-  harness.positions.set('history', { left: 1, top: 2 });
-  harness.minimized.add('bookmarks');
-
+test('reset removes durable state, clears the registry, and restores attached defaults', async () => {
+  const harness = createHarness({
+    restoreWorkspaceLayoutEnabled: true,
+    detachedSections: ['history', 'bookmarks'],
+    historySectionOpen: false,
+    bookmarksSectionOpen: false,
+  });
+  harness.placements.set('history', floatingSection('history', rect(1, 2)));
+  harness.store.stored = layout([...harness.placements.values()]);
   await harness.controller.resetWorkspaceLayout();
 
   assert.equal(harness.store.removes, 1);
   assert.deepEqual(harness.state().detachedSections, []);
-  assert.equal(harness.positions.size, 0);
-  assert.equal(harness.minimized.size, 0);
+  assert.equal(harness.state().historySectionOpen, true);
+  assert.equal(harness.state().bookmarksSectionOpen, true);
+  assert.equal(harness.placements.size, 0);
   assert.equal(harness.state().message, 'Workspace layout reset for this site.');
 });
 
-test('a restore invalidated by teardown never lands on the remounted panel', async () => {
+test('a restore invalidated by teardown never lands', async () => {
   const harness = createHarness({ restoreWorkspaceLayoutEnabled: true });
   let release: (() => void) | undefined;
-  harness.store.load = () =>
-    new Promise((resolve) => {
-      release = () => resolve({ sections: [{ sectionId: 'history', position: null, minimized: false }] });
-    });
-
+  harness.store.load = () => new Promise((resolve) => (release = () => resolve(layout([floatingSection('history', null)]))));
   harness.controller.queueWorkspaceRestore();
   await flushAsync();
   harness.controller.invalidateRestore();
   release?.();
   await flushAsync();
-
   assert.deepEqual(harness.state().detachedSections, []);
 });
+
+function layout(sections: StoredWorkspaceLayout['sections']): WorkspaceLayout {
+  return {
+    schemaVersion: WORKSPACE_LAYOUT_SCHEMA_VERSION,
+    persistenceKeyVersion: WORKSPACE_LAYOUT_KEY_VERSION,
+    panelPosition: null,
+    sections: sections as WorkspaceLayout['sections'],
+  };
+}
+
+function rect(left: number, top: number) {
+  return { left, top, width: 340, height: 320 } as const;
+}

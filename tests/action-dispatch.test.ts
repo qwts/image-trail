@@ -22,6 +22,7 @@ import type { BufferedNavigationController } from '../extension/src/ui/panel/buf
 import type { RecallExportController } from '../extension/src/ui/panel/recall-export-controller.js';
 import type { RecallRestoreController } from '../extension/src/ui/panel/recall-restore-controller.js';
 import type { UrlTemplateSettingsController } from '../extension/src/ui/panel/url-template-settings-controller.js';
+import { workspaceActionDeps, workspaceActionFixtures } from './support/workspace-action-fixtures.js';
 
 interface Harness {
   readonly deps: PanelActionDeps;
@@ -183,9 +184,7 @@ function createHarness(
     updateNeighborPreload: () => record('updateNeighborPreload'),
     preloadMoreNeighbors: () => record('preloadMoreNeighbors'),
     resetPanelPosition: () => recordAsync('resetPanelPosition'),
-    updateWorkspaceLayoutRestore: () => record('updateWorkspaceLayoutRestore'),
-    resetWorkspaceLayout: () => recordAsync('resetWorkspaceLayout'),
-    notifyWorkspaceLayoutChanged: () => record('notifyWorkspaceLayoutChanged'),
+    ...workspaceActionDeps(record, recordAsync),
     refreshStorageUsage: () => recordAsync('refreshStorageUsage'),
     restoreParsedFieldStateForCurrentPanel: () => record('restoreParsedFieldStateForCurrentPanel'),
     openRecallDestination: () => recordAsync('openRecallDestination'),
@@ -234,6 +233,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'panel/bookmarks-section-open': { name: 'panel/bookmarks-section-open', open: true },
   'section/detach': { name: 'section/detach', sectionId: 'history' },
   'section/restore': { name: 'section/restore', sectionId: 'history' },
+  ...workspaceActionFixtures,
   'panel/minimize': { name: 'panel/minimize' },
   'panel/expand': { name: 'panel/expand' },
   'settings/toggle': { name: 'settings/toggle' },

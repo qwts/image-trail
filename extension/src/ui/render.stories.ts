@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/html-vite';
-import { expect } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 
 import type { PanelState } from '../core/types.js';
 import { createInitialPanelState } from '../core/state.js';
+import { floatingSection, railedSection, type WorkspaceSectionLayout } from '../core/workspace-layout.js';
 import { DEFAULT_SEARCHABLE_METADATA_POLICY } from '../core/metadata-policy.js';
 import { EMPTY_PAGE_CONTEXT_STATE } from '../core/page-context.js';
 import { renderPanel, type PanelLayoutState } from './render.js';
@@ -150,12 +151,51 @@ export const SettingsDetached: Story = {
   },
 };
 
+const workspaceDispatch = fn();
+
+export const WorkspaceRailAndFloating: Story = {
+  render: () =>
+    detachedPanelStory(
+      { detachedSections: ['history', 'bookmarks', 'controls'] },
+      [
+        railedSection('history', 'left', 0),
+        railedSection('bookmarks', 'left', 1),
+        floatingSection('controls', { left: 520, top: 48, width: 340, height: 320 }),
+      ],
+      workspaceDispatch,
+    ),
+  play: async ({ canvasElement }) => {
+    workspaceDispatch.mockClear();
+    const canvas = within(canvasElement);
+    await expect(canvasElement.querySelector('[data-edge="left"].image-trail-workspace__rail')).not.toBeNull();
+    await expect(canvasElement.querySelectorAll('[data-workspace-mode="railed"]')).toHaveLength(2);
+    await userEvent.click(canvas.getByRole('button', { name: 'Shade Recent history' }));
+    const floatingHeader = canvas.getByLabelText('Move Manual controls; Alt plus an arrow key previews and snaps to an edge');
+    floatingHeader.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }));
+    floatingHeader.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', altKey: true, bubbles: true }));
+    await expect(workspaceDispatch).toHaveBeenCalledWith({ name: 'workspace/shade', sectionId: 'history' });
+    await expect(workspaceDispatch).toHaveBeenCalledWith({ name: 'workspace/snap', sectionId: 'controls', edge: 'bottom' });
+  },
+};
+
+export const WorkspaceTopRail: Story = {
+  render: () =>
+    detachedPanelStory({ detachedSections: ['history', 'bookmarks'] }, [
+      railedSection('history', 'top', 0),
+      railedSection('bookmarks', 'top', 1),
+    ]),
+};
+
 export const SettingsDetachedPrivacyMasked: Story = {
   render: () => detachedPanelStory({ activeDestination: 'settings', detachedSections: ['settings'], privacyModeEnabled: true }),
 };
 
 /** Panel plus a detached-window root in one canvas; fixed windows become absolute for the story. */
-function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
+function detachedPanelStory(
+  overrides: Partial<PanelState> = {},
+  placements: readonly WorkspaceSectionLayout[] = [floatingSection('settings', { left: 460, top: 16, width: 420, height: 640 })],
+  dispatch = mockDispatch('panel layout story action'),
+): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.style.position = 'relative';
   wrapper.style.minInlineSize = '940px';
@@ -176,8 +216,7 @@ function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
-    detachedWindowPositions: new Map([['settings', { left: 460, top: 16 }]]),
-    detachedWindowMinimized: new Set(),
+    workspaceSections: new Map(placements.map((placement) => [placement.sectionId, placement])),
     collapsibleListScrollTops: new Map(),
     primaryPanelScrollTop: null,
     destinationScrollTops: new Map(),
@@ -188,15 +227,12 @@ function detachedPanelStory(overrides: Partial<PanelState> = {}): HTMLElement {
     {
       root: host,
       detachedRoot,
-      dispatch: mockDispatch('panel layout story action'),
+      dispatch,
       layoutState,
     },
     panelState(overrides),
   );
 
-  for (const windowEl of Array.from(detachedRoot.querySelectorAll<HTMLElement>('.image-trail-panel__detached-window'))) {
-    windowEl.style.position = 'absolute';
-  }
   return wrapper;
 }
 
@@ -218,8 +254,7 @@ function panelLayoutStory(
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
-    detachedWindowPositions: new Map(),
-    detachedWindowMinimized: new Set(),
+    workspaceSections: new Map(),
     collapsibleListScrollTops: new Map(),
     primaryPanelScrollTop: null,
     destinationScrollTops: new Map(),

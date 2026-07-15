@@ -95,6 +95,25 @@ export interface PanelActionDeps {
   updateWorkspaceLayoutRestore(enabled: boolean): void;
   resetWorkspaceLayout(): Promise<void>;
   notifyWorkspaceLayoutChanged(): void;
+  prepareDetachedWorkspaceSection(
+    sectionId: import('../../../core/workspace-layout.js').DetachableSectionId,
+    rect?: import('../../../core/workspace-layout.js').WorkspaceFloatingRect,
+  ): void;
+  restoreWorkspaceSection(sectionId: import('../../../core/workspace-layout.js').DetachableSectionId): void;
+  moveWorkspaceSection(
+    sectionId: import('../../../core/workspace-layout.js').DetachableSectionId,
+    rect: import('../../../core/workspace-layout.js').WorkspaceFloatingRect,
+  ): void;
+  snapWorkspaceSection(
+    sectionId: import('../../../core/workspace-layout.js').DetachableSectionId,
+    edge: import('../../../core/workspace-layout.js').WorkspaceRailEdge,
+  ): void;
+  shadeWorkspaceSection(sectionId: import('../../../core/workspace-layout.js').DetachableSectionId): void;
+  reorderWorkspaceSection(
+    sectionId: import('../../../core/workspace-layout.js').DetachableSectionId,
+    edge: import('../../../core/workspace-layout.js').WorkspaceRailEdge,
+    order: number,
+  ): void;
   refreshStorageUsage(options?: { readonly render?: boolean }): Promise<void>;
   restoreParsedFieldStateForCurrentPanel(): void;
   openRecallDestination(): Promise<void>;

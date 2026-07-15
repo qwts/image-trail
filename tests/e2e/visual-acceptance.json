@@ -92,8 +92,8 @@
       "id": "11-detached-windows",
       "file": "11-detached-windows.png",
       "status": "automated",
-      "issues": [540],
-      "scenario": "detached-settings",
+      "issues": [521, 540],
+      "scenario": "stacked-floating-workspace",
       "test": "tests/e2e/design-baseline.spec.ts"
     },
     {

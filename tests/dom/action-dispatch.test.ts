@@ -106,7 +106,13 @@ function createHarness(): Harness {
     resetPanelPosition: noopAsync,
     updateWorkspaceLayoutRestore: noop,
     resetWorkspaceLayout: noopAsync,
-    notifyWorkspaceLayoutChanged: noop,
+    notifyWorkspaceLayoutChanged: () => record('notifyWorkspaceLayoutChanged'),
+    prepareDetachedWorkspaceSection: noop,
+    restoreWorkspaceSection: noop,
+    moveWorkspaceSection: noop,
+    snapWorkspaceSection: noop,
+    shadeWorkspaceSection: noop,
+    reorderWorkspaceSection: noop,
     refreshStorageUsage: noopAsync,
     restoreParsedFieldStateForCurrentPanel: () => record('restoreParsedFieldStateForCurrentPanel'),
     openRecallDestination: noopAsync,
@@ -159,6 +165,13 @@ test('panel/minimize saves field state before remounting and skips the expand-on
   } finally {
     document.body.innerHTML = '';
   }
+});
+
+test('Queue collapse notifies opted-in workspace persistence after state and DOM update', () => {
+  const harness = createHarness();
+  const registry = buildPanelActionRegistry(harness.deps);
+  dispatchPanelAction(registry, { name: 'panel/bookmarks-section-open', open: false }, () => assert.fail('unexpected fallback'));
+  assert.deepEqual(harness.log, ['reduce', 'render', 'notifyWorkspaceLayoutChanged']);
 });
 
 test('close-panel stays unregistered and the fallback tears the mounted roots down', () => {

@@ -1,5 +1,6 @@
 import type { DetachableSectionId, PanelAction } from '../../core/types.js';
 import { clampPanelPosition } from '../panel-position.js';
+import { currentPointerThresholds } from '../workspace/workspace-geometry.js';
 import { createButton, createIconButton, createSectionHeader } from './primitives.js';
 
 export interface DetachedWindowPosition {
@@ -13,7 +14,6 @@ export interface DetachedWindowGeometry extends DetachedWindowPosition {
 
 type DetachDispatch = (action: PanelAction) => void;
 
-const DRAG_OUT_THRESHOLD_PX = 6;
 const DRAG_GHOST_BLOCK_SIZE = 160;
 export const DEFAULT_DETACHED_WINDOW_INLINE_SIZE = 340;
 
@@ -47,6 +47,7 @@ export function beginDragOut(event: PointerEvent, handle: HTMLElement, options: 
   const listenerTarget: EventTarget = options.deferCaptureUntilEngaged ? window : handle;
   const startX = event.clientX;
   const startY = event.clientY;
+  const dragThreshold = currentPointerThresholds().detach;
   let ghost: HTMLElement | null = null;
 
   const dropPosition = (move: PointerEvent): DetachedWindowPosition =>
@@ -57,7 +58,7 @@ export function beginDragOut(event: PointerEvent, handle: HTMLElement, options: 
     );
   const onMove = (move: PointerEvent): void => {
     if (!ghost) {
-      if (Math.hypot(move.clientX - startX, move.clientY - startY) < DRAG_OUT_THRESHOLD_PX) return;
+      if (Math.hypot(move.clientX - startX, move.clientY - startY) < dragThreshold) return;
       if (options.deferCaptureUntilEngaged && typeof handle.setPointerCapture === 'function') handle.setPointerCapture(event.pointerId);
       ghost = document.createElement('div');
       ghost.className = 'image-trail-panel__detach-ghost';

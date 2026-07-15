@@ -117,9 +117,22 @@ test('Help replaces dashboard content with the approved grouped surface', async 
   await expect(panel.locator('.image-trail-panel__settings-section')).toHaveCount(0);
 });
 
-test('detached Settings preserves the approved floating-window chrome', async ({ page, serviceWorker }, testInfo) => {
-  await openSettings(page, serviceWorker);
-  await page.getByRole('button', { name: 'Detach Settings into a floating window (drag to place)' }).click();
-  await expect(page.getByRole('dialog', { name: 'Settings (detached)' })).toBeVisible();
+test('detached workspace preserves the approved stacked floating-window chrome', async ({ page, serviceWorker }, testInfo) => {
+  await openPanel(page, serviceWorker);
+  const shadedTitles = ['Host target', 'URL editor', 'Field Editor', 'Manual controls', 'Recent history'] as const;
+  for (const title of shadedTitles) {
+    const detach = page.getByRole('button', { name: `Detach ${title} into a floating window (drag to place)` });
+    await detach.scrollIntoViewIfNeeded();
+    await detach.click();
+    const floating = page.getByRole('dialog', { name: `${title} (floating)` });
+    await expect(floating).toBeVisible();
+    await floating.getByRole('button', { name: `Shade ${title}` }).click();
+  }
+  const detachQueue = page.getByRole('button', { name: 'Detach Queue into a floating window (drag to place)' });
+  await detachQueue.scrollIntoViewIfNeeded();
+  await detachQueue.click();
+  await expect(page.getByRole('dialog', { name: 'Queue (floating)' })).toBeVisible();
+  await page.getByRole('button', { name: 'Show help' }).click();
+  await expect(page.locator('.image-trail-panel__help-section')).toBeVisible();
   await captureArtifact(page, testInfo, '11-detached-windows');
 });

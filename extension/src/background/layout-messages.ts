@@ -1,4 +1,4 @@
-import type { PanelPosition, StoredWorkspaceLayout } from '../core/workspace-layout.js';
+import type { PanelPosition, StoredWorkspaceLayout, WorkspaceLayoutScope } from '../core/workspace-layout.js';
 import { MESSAGE_PROTOCOL_VERSION, MessageType, hasVersionedObjectShape } from './message-protocol.js';
 
 /**
@@ -49,7 +49,7 @@ export interface DeletePanelPositionResultMessage {
 export interface LoadWorkspaceLayoutMessage {
   readonly type: typeof MessageType.LoadWorkspaceLayout;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly hostname: string };
+  readonly payload: WorkspaceLayoutScope;
 }
 
 export interface LoadWorkspaceLayoutResultMessage {
@@ -63,6 +63,7 @@ export interface SaveWorkspaceLayoutMessage {
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload: {
     readonly hostname: string;
+    readonly pageUrl: string;
     readonly layout: StoredWorkspaceLayout;
   };
 }
@@ -76,7 +77,7 @@ export interface SaveWorkspaceLayoutResultMessage {
 export interface DeleteWorkspaceLayoutMessage {
   readonly type: typeof MessageType.DeleteWorkspaceLayout;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly hostname: string };
+  readonly payload: WorkspaceLayoutScope;
 }
 
 export interface DeleteWorkspaceLayoutResultMessage {
@@ -111,8 +112,8 @@ export function createDeletePanelPositionResultMessage(
   return { type: MessageType.DeletePanelPositionResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-export function createLoadWorkspaceLayoutMessage(hostname: string): LoadWorkspaceLayoutMessage {
-  return { type: MessageType.LoadWorkspaceLayout, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
+export function createLoadWorkspaceLayoutMessage(scope: WorkspaceLayoutScope): LoadWorkspaceLayoutMessage {
+  return { type: MessageType.LoadWorkspaceLayout, version: MESSAGE_PROTOCOL_VERSION, payload: scope };
 }
 
 export function createLoadWorkspaceLayoutResultMessage(
@@ -121,8 +122,8 @@ export function createLoadWorkspaceLayoutResultMessage(
   return { type: MessageType.LoadWorkspaceLayoutResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-export function createSaveWorkspaceLayoutMessage(hostname: string, layout: StoredWorkspaceLayout): SaveWorkspaceLayoutMessage {
-  return { type: MessageType.SaveWorkspaceLayout, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname, layout } };
+export function createSaveWorkspaceLayoutMessage(scope: WorkspaceLayoutScope, layout: StoredWorkspaceLayout): SaveWorkspaceLayoutMessage {
+  return { type: MessageType.SaveWorkspaceLayout, version: MESSAGE_PROTOCOL_VERSION, payload: { ...scope, layout } };
 }
 
 export function createSaveWorkspaceLayoutResultMessage(
@@ -131,8 +132,8 @@ export function createSaveWorkspaceLayoutResultMessage(
   return { type: MessageType.SaveWorkspaceLayoutResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-export function createDeleteWorkspaceLayoutMessage(hostname: string): DeleteWorkspaceLayoutMessage {
-  return { type: MessageType.DeleteWorkspaceLayout, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
+export function createDeleteWorkspaceLayoutMessage(scope: WorkspaceLayoutScope): DeleteWorkspaceLayoutMessage {
+  return { type: MessageType.DeleteWorkspaceLayout, version: MESSAGE_PROTOCOL_VERSION, payload: scope };
 }
 
 export function createDeleteWorkspaceLayoutResultMessage(

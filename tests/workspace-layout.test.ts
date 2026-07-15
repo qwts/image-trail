@@ -4,66 +4,94 @@ import assert from 'node:assert/strict';
 import * as v from 'valibot';
 
 import {
+  WORKSPACE_LAYOUT_KEY_VERSION,
+  WORKSPACE_LAYOUT_SCHEMA_VERSION,
   captureWorkspaceLayout,
+  floatingSection,
+  migrateLegacyWorkspaceLayout,
+  railedSection,
   sanitizeWorkspaceLayout,
   workspaceLayoutsEqual,
-  type DetachableSectionId,
+  type StoredWorkspaceLayout,
   type WorkspaceLayout,
 } from '../extension/src/core/workspace-layout.js';
 import { workspaceLayoutSchema } from '../extension/src/core/workspace-layout.schema.js';
 
-test('sanitizeWorkspaceLayout drops unknown section ids and dedupes by first occurrence', () => {
-  const layout = {
-    sections: [
-      { sectionId: 'history', position: { left: 10, top: 20 }, minimized: false },
-      { sectionId: 'time-machine' as DetachableSectionId, position: null, minimized: false },
-      { sectionId: 'history', position: { left: 99, top: 99 }, minimized: true },
-      { sectionId: 'settings', position: null, minimized: true },
-    ],
-  } as WorkspaceLayout;
+test('sanitize drops unknown ids, dedupes, and canonicalizes modes', () => {
+  const stored: StoredWorkspaceLayout = layout([
+    { ...floatingSection('history', { left: 10, top: 20, width: 340, height: 320 }), sectionId: 'history' },
+    { ...floatingSection('history', null), sectionId: 'time-machine' },
+    floatingSection('history', { left: 99, top: 99, width: 340, height: 320 }, { shaded: true }),
+    { ...railedSection('settings', 'left', 20), order: Number.NaN },
+  ]);
 
-  const sanitized = sanitizeWorkspaceLayout(layout);
+  const sanitized = sanitizeWorkspaceLayout(stored);
   assert.deepEqual(
     sanitized.sections.map((section) => section.sectionId),
     ['history', 'settings'],
   );
-  assert.deepEqual(sanitized.sections[0]?.position, { left: 10, top: 20 });
+  assert.deepEqual(sanitized.sections[0]?.floatingRect, { left: 10, top: 20, width: 340, height: 320 });
+  assert.equal(sanitized.sections[1]?.order, 0);
 });
 
-test('captureWorkspaceLayout preserves detach order and reads geometry maps', () => {
-  const positions = new Map<DetachableSectionId, { left: number; top: number }>([['bookmarks', { left: 300, top: 40 }]]);
-  const minimized = new Set<DetachableSectionId>(['history']);
+test('capture records every known section through one placement registry', () => {
+  const placements = new Map([
+    ['bookmarks', floatingSection('bookmarks', { left: 300, top: 40, width: 340, height: 320 })],
+    ['history', railedSection('history', 'right', 0, { shaded: true })],
+  ] as const);
+  const captured = captureWorkspaceLayout({
+    detachedSections: ['bookmarks', 'history'],
+    placements,
+    panelPosition: { left: 24, top: 36 },
+    collapsed: new Set(['bookmarks']),
+  });
 
-  const layout = captureWorkspaceLayout(['bookmarks', 'history'], positions, minimized);
-  assert.deepEqual(layout, {
-    sections: [
-      { sectionId: 'bookmarks', position: { left: 300, top: 40 }, minimized: false },
-      { sectionId: 'history', position: null, minimized: true },
-    ],
+  assert.equal(captured.sections.length, 8);
+  assert.deepEqual(captured.panelPosition, { left: 24, top: 36 });
+  assert.deepEqual(
+    captured.sections.find((section) => section.sectionId === 'bookmarks'),
+    {
+      ...floatingSection('bookmarks', { left: 300, top: 40, width: 340, height: 320 }),
+      collapsed: true,
+    },
+  );
+  assert.deepEqual(
+    captured.sections.find((section) => section.sectionId === 'history'),
+    railedSection('history', 'right', 0, { shaded: true }),
+  );
+  assert.equal(captured.sections.find((section) => section.sectionId === 'target')?.mode, 'attached');
+});
+
+test('workspace equality covers panel, rail, shade, collapse, and floating geometry', () => {
+  const a: WorkspaceLayout = layout([floatingSection('history', { left: 1, top: 2, width: 340, height: 320 })]);
+  assert.equal(workspaceLayoutsEqual(a, layout([floatingSection('history', { left: 1, top: 2, width: 340, height: 320 })])), true);
+  assert.equal(workspaceLayoutsEqual(a, layout([floatingSection('history', { left: 1, top: 3, width: 340, height: 320 })])), false);
+  assert.equal(workspaceLayoutsEqual(a, layout([railedSection('history', 'left', 0)])), false);
+  assert.equal(workspaceLayoutsEqual(a, { ...a, panelPosition: { left: 1, top: 2 } }), false);
+});
+
+test('schema remains permissive for newer section ids while validating v2 shape', () => {
+  const stored = v.parse(workspaceLayoutSchema, layout([{ ...floatingSection('history', null), sectionId: 'future-section' }]));
+  assert.deepEqual(sanitizeWorkspaceLayout(stored).sections, []);
+});
+
+test('legacy layouts migrate minimized windows to shaded v2 floating windows', () => {
+  const migrated = migrateLegacyWorkspaceLayout({
+    sections: [{ sectionId: 'history', position: { left: 9, top: 12 }, minimized: true }],
+  });
+  assert.deepEqual(migrated, {
+    schemaVersion: 2,
+    persistenceKeyVersion: 1,
+    panelPosition: null,
+    sections: [floatingSection('history', { left: 9, top: 12, width: 340, height: 160 }, { shaded: true })],
   });
 });
 
-test('workspaceLayoutsEqual compares section order, geometry, and minimized flags', () => {
-  const a: WorkspaceLayout = {
-    sections: [{ sectionId: 'history', position: { left: 1, top: 2 }, minimized: false }],
+function layout(sections: StoredWorkspaceLayout['sections']): WorkspaceLayout {
+  return {
+    schemaVersion: WORKSPACE_LAYOUT_SCHEMA_VERSION,
+    persistenceKeyVersion: WORKSPACE_LAYOUT_KEY_VERSION,
+    panelPosition: null,
+    sections: sections as WorkspaceLayout['sections'],
   };
-  assert.equal(workspaceLayoutsEqual(a, { sections: [{ sectionId: 'history', position: { left: 1, top: 2 }, minimized: false }] }), true);
-  assert.equal(workspaceLayoutsEqual(a, { sections: [{ sectionId: 'history', position: { left: 1, top: 3 }, minimized: false }] }), false);
-  assert.equal(workspaceLayoutsEqual(a, { sections: [{ sectionId: 'history', position: null, minimized: false }] }), false);
-  assert.equal(workspaceLayoutsEqual(a, { sections: [{ sectionId: 'history', position: { left: 1, top: 2 }, minimized: true }] }), false);
-  assert.equal(workspaceLayoutsEqual(a, { sections: [] }), false);
-});
-
-test('the storage schema accepts section ids from newer builds so sanitize can drop just those entries', () => {
-  // A strict picklist here would quarantine the whole per-site record on downgrade; the boundary
-  // stays permissive and sanitizeWorkspaceLayout filters instead.
-  const stored = v.parse(workspaceLayoutSchema, {
-    sections: [
-      { sectionId: 'section-from-a-newer-build', position: { left: 5, top: 6 }, minimized: false },
-      { sectionId: 'history', position: null, minimized: true },
-    ],
-  });
-  assert.deepEqual(sanitizeWorkspaceLayout(stored), {
-    sections: [{ sectionId: 'history', position: null, minimized: true }],
-  });
-});
+}

@@ -68,6 +68,7 @@
         "src/ui/styles/handoff-baseline.css",
         "src/ui/styles/destinations.css",
         "src/ui/styles/page-context.css",
+        "src/ui/styles/workspace-rails.css",
         "src/ui/styles/panel-legacy-foundation.css",
         "src/ui/styles/panel-legacy-sections.css",
         "src/ui/styles/panel-legacy-controls.css",

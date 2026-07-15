@@ -15,6 +15,7 @@ import type { DetachableSectionId } from './workspace-layout.js';
 import type { PCloudBackupState } from './cloud/pcloud-provider.js';
 import type { PageContext, PageContextState } from './page-context.js';
 import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePreviewState } from './import-types.js';
+import type { WorkspacePanelAction } from './workspace-actions.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
@@ -52,7 +53,6 @@ export type {
   PanelPosition,
   PanelPositionStore,
   StoredWorkspaceLayout,
-  StoredWorkspaceSectionLayout,
   WorkspaceLayout,
   WorkspaceLayoutStore,
   WorkspaceSectionLayout,
@@ -512,7 +512,7 @@ export type PanelAction =
   | { readonly name: 'destination/select' | 'destination/open-tab'; readonly destination: PanelDestinationId }
   | { readonly name: 'panel/history-section-open'; readonly open: boolean }
   | { readonly name: 'panel/bookmarks-section-open'; readonly open: boolean }
-  | { readonly name: 'section/detach' | 'section/restore'; readonly sectionId: DetachableSectionId }
+  | WorkspacePanelAction
   | { readonly name: 'settings/update-visible-bookmark-soft-max'; readonly value: number }
   | {
       readonly name: 'settings/update-recent-history-retention';

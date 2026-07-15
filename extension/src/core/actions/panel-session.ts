@@ -5,8 +5,24 @@ import type { PanelActionForDomain } from './routing.js';
 import { resolvePageContextState } from '../page-context.js';
 
 type PanelSessionAction = PanelActionForDomain<'panel-session'>;
+const EFFECT_OWNED_ACTION_NAMES = [
+  'target/fill-screen',
+  'target/set-object-fit',
+  'target/release',
+  'workspace/move',
+  'workspace/snap',
+  'workspace/unsnap',
+  'workspace/shade',
+  'workspace/reorder',
+  'destination/open-tab',
+  'undo-last',
+  'navigate-next',
+  'navigate-previous',
+] as const;
+type EffectOwnedAction = Extract<PanelSessionAction, { readonly name: (typeof EFFECT_OWNED_ACTION_NAMES)[number] }>;
 
 export function reducePanelSessionAction(state: PanelState, action: PanelSessionAction): PanelState {
+  if (isEffectOwnedAction(action)) return state;
   switch (action.name) {
     case 'toggle-panel':
       return state.visible ? closePanel(state) : showPanel(state);
@@ -93,15 +109,11 @@ export function reducePanelSessionAction(state: PanelState, action: PanelSession
       return { ...state, automation: { ...state.automation, retryPhase: 'stopped' }, lastUpdatedAt: Date.now() };
     case 'stop-all':
       return { ...state, automation: { ...EMPTY_AUTOMATION_STATE }, lastUpdatedAt: Date.now() };
-    case 'target/fill-screen':
-    case 'target/set-object-fit':
-    case 'target/release':
-    case 'destination/open-tab':
-    case 'undo-last':
-    case 'navigate-next':
-    case 'navigate-previous':
-      return state;
     default:
       return assertNeverAction(action);
   }
+}
+
+function isEffectOwnedAction(action: PanelSessionAction): action is EffectOwnedAction {
+  return EFFECT_OWNED_ACTION_NAMES.some((name) => name === action.name);
 }

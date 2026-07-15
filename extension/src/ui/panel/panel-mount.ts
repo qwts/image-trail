@@ -147,6 +147,7 @@ export class PanelMount {
   /** Removes the mounted host and clears root/styles-ready state. Subscriptions are left intact. */
   teardown(): void {
     if (this.contextRootEl) unmountReactSubtree(this.contextRootEl);
+    if (this.detachedRootEl) unmountReactSubtree(this.detachedRootEl);
     this.environment.document.getElementById(ROOT_ID)?.remove();
     this.rootEl = null;
     this.contextRootEl = null;

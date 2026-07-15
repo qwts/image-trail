@@ -1,12 +1,19 @@
-import type { DetachableSectionId, PanelPosition, PanelState, WorkspaceLayoutStore } from '../../core/types.js';
+import type { DetachableSectionId, PanelPosition, PanelState, WorkspaceLayoutStore, WorkspaceSectionLayout } from '../../core/types.js';
 import type { PlaintextLocalSettings } from '../../content/panel-services.js';
 import {
+  attachedSection,
   captureWorkspaceLayout,
+  floatingSection,
+  railedSection,
   sanitizeWorkspaceLayout,
   workspaceLayoutsEqual,
   type WorkspaceLayout,
+  type WorkspaceLayoutScope,
+  type WorkspaceFloatingRect,
+  type WorkspaceRailEdge,
 } from '../../core/workspace-layout.js';
 import { hostnameFromLocation } from '../panel-position.js';
+import { railGeometryFits, viewportSize } from '../workspace/workspace-geometry.js';
 
 const WORKSPACE_LAYOUT_SAVE_DEBOUNCE_MS = 400;
 
@@ -18,8 +25,9 @@ export interface WorkspaceLayoutControllerDeps {
   getLocalSettings(): PlaintextLocalSettings;
   saveLocalSettings(settings: PlaintextLocalSettings): void;
   // The live session geometry owned by the render controller; restore hydrates these, capture reads them.
-  detachedWindowPositions(): Map<DetachableSectionId, PanelPosition>;
-  detachedWindowMinimized(): Set<DetachableSectionId>;
+  workspaceSections(): Map<DetachableSectionId, WorkspaceSectionLayout>;
+  panelPosition(): PanelPosition | null;
+  restorePanelPosition(position: PanelPosition | null): void;
 }
 
 /**
@@ -72,20 +80,89 @@ export class WorkspaceLayoutController {
     this.deps.render();
   }
 
+  prepareDetachedSection(sectionId: DetachableSectionId, floatingRect?: WorkspaceFloatingRect): void {
+    const current = this.deps.workspaceSections().get(sectionId);
+    if (current?.mode === 'floating' && floatingRect === undefined) return;
+    this.deps.workspaceSections().set(
+      sectionId,
+      floatingSection(sectionId, floatingRect ?? current?.floatingRect ?? null, {
+        shaded: current?.shaded ?? false,
+        collapsed: current?.collapsed ?? false,
+      }),
+    );
+  }
+
+  restoreSection(sectionId: DetachableSectionId): void {
+    const current = this.deps.workspaceSections().get(sectionId);
+    this.deps.workspaceSections().set(sectionId, attachedSection(sectionId, current?.collapsed ?? false));
+  }
+
+  moveSection(sectionId: DetachableSectionId, floatingRect: WorkspaceFloatingRect): void {
+    const current = this.deps.workspaceSections().get(sectionId);
+    this.deps.workspaceSections().set(
+      sectionId,
+      floatingSection(sectionId, floatingRect, {
+        shaded: current?.shaded ?? false,
+        collapsed: current?.collapsed ?? false,
+      }),
+    );
+    this.finishPlacementChange();
+  }
+
+  snapSection(sectionId: DetachableSectionId, edge: WorkspaceRailEdge): void {
+    const placements = this.deps.workspaceSections();
+    const current = placements.get(sectionId);
+    const otherRails = [...placements.values()].filter((section) => section.sectionId !== sectionId && section.mode === 'railed');
+    const activeEdges = new Set(
+      otherRails.map((section) => section.edge).filter((candidate): candidate is WorkspaceRailEdge => candidate !== null),
+    );
+    if (!railGeometryFits(viewportSize(), new Set([...activeEdges, edge]))) return;
+    const order = otherRails.filter((section) => section.edge === edge).length;
+    placements.set(
+      sectionId,
+      railedSection(sectionId, edge, order, {
+        shaded: current?.shaded ?? false,
+        collapsed: current?.collapsed ?? false,
+        floatingRect: current?.floatingRect ?? null,
+      }),
+    );
+    this.finishPlacementChange();
+  }
+
+  toggleSectionShade(sectionId: DetachableSectionId): void {
+    const current = this.deps.workspaceSections().get(sectionId);
+    if (!current || current.mode === 'attached') return;
+    this.deps.workspaceSections().set(sectionId, { ...current, shaded: !current.shaded });
+    this.finishPlacementChange();
+  }
+
+  reorderSection(sectionId: DetachableSectionId, edge: WorkspaceRailEdge, order: number): void {
+    const placements = this.deps.workspaceSections();
+    const current = placements.get(sectionId);
+    if (!current || current.mode !== 'railed') return;
+    const siblings = [...placements.values()]
+      .filter((section) => section.mode === 'railed' && section.edge === edge && section.sectionId !== sectionId)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    siblings.splice(Math.max(0, Math.min(order, siblings.length)), 0, { ...current, edge });
+    siblings.forEach((section, index) => placements.set(section.sectionId, { ...section, order: index }));
+    this.finishPlacementChange();
+  }
+
   async resetWorkspaceLayout(): Promise<void> {
-    const hostname = hostnameFromLocation();
-    if (!hostname) return;
+    const scope = currentScope();
+    if (!scope) return;
     this.restoreAttempt += 1;
     this.restorePromise = null;
     this.restored = true;
     this.cancelPendingSave();
-    await this.deps.workspaceLayoutStore()?.remove(hostname);
+    await this.deps.workspaceLayoutStore()?.remove(scope);
     this.lastPersistedLayout = null;
-    this.deps.detachedWindowPositions().clear();
-    this.deps.detachedWindowMinimized().clear();
+    this.deps.workspaceSections().clear();
     this.deps.setState({
       ...this.deps.getState(),
       detachedSections: [],
+      historySectionOpen: true,
+      bookmarksSectionOpen: true,
       message: 'Workspace layout reset for this site.',
       status: 'ready',
       lastUpdatedAt: Date.now(),
@@ -97,21 +174,24 @@ export class WorkspaceLayoutController {
     const store = this.deps.workspaceLayoutStore();
     if (!store || this.restored) return;
     try {
-      const hostname = hostnameFromLocation();
-      if (!hostname) return;
-      const saved = await store.load(hostname);
+      const scope = currentScope();
+      if (!scope) return;
+      const saved = await store.load(scope);
       if (!saved || this.restoreAttempt !== attempt || this.restored) return;
       const layout = sanitizeWorkspaceLayout(saved);
-      const positions = this.deps.detachedWindowPositions();
-      const minimized = this.deps.detachedWindowMinimized();
+      const placements = this.deps.workspaceSections();
+      placements.clear();
       for (const section of layout.sections) {
-        if (section.position) positions.set(section.sectionId, section.position);
-        if (section.minimized) minimized.add(section.sectionId);
+        placements.set(section.sectionId, section);
       }
+      this.deps.restorePanelPosition(layout.panelPosition);
       this.lastPersistedLayout = layout;
+      const currentState = this.deps.getState();
       this.deps.setState({
-        ...this.deps.getState(),
-        detachedSections: layout.sections.map((section) => section.sectionId),
+        ...currentState,
+        detachedSections: layout.sections.filter((section) => section.mode !== 'attached').map((section) => section.sectionId),
+        historySectionOpen: restoredSectionOpen(layout, 'history', currentState.historySectionOpen),
+        bookmarksSectionOpen: restoredSectionOpen(layout, 'bookmarks', currentState.bookmarksSectionOpen),
         lastUpdatedAt: Date.now(),
       });
       this.deps.render();
@@ -123,15 +203,16 @@ export class WorkspaceLayoutController {
   private async persistWorkspaceLayout(): Promise<void> {
     const store = this.deps.workspaceLayoutStore();
     if (!store || !this.deps.getState().restoreWorkspaceLayoutEnabled) return;
-    const hostname = hostnameFromLocation();
-    if (!hostname) return;
-    const layout = captureWorkspaceLayout(
-      this.deps.getState().detachedSections,
-      this.deps.detachedWindowPositions(),
-      this.deps.detachedWindowMinimized(),
-    );
+    const scope = currentScope();
+    if (!scope) return;
+    const layout = captureWorkspaceLayout({
+      detachedSections: this.deps.getState().detachedSections,
+      placements: this.deps.workspaceSections(),
+      panelPosition: this.deps.panelPosition(),
+      collapsed: collapsedSections(this.deps.getState()),
+    });
     if (this.lastPersistedLayout && workspaceLayoutsEqual(this.lastPersistedLayout, layout)) return;
-    await store.save(hostname, layout);
+    await store.save(scope, layout);
     this.lastPersistedLayout = layout;
   }
 
@@ -140,4 +221,41 @@ export class WorkspaceLayoutController {
     window.clearTimeout(this.saveTimer);
     this.saveTimer = null;
   }
+
+  private finishPlacementChange(): void {
+    this.deps.render();
+    this.handleWorkspaceLayoutChanged();
+  }
+}
+
+export function createWorkspaceActionDeps(controller: WorkspaceLayoutController) {
+  return {
+    updateWorkspaceLayoutRestore: (enabled: boolean) => controller.updateWorkspaceLayoutRestore(enabled),
+    resetWorkspaceLayout: () => controller.resetWorkspaceLayout(),
+    notifyWorkspaceLayoutChanged: () => controller.handleWorkspaceLayoutChanged(),
+    prepareDetachedWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['prepareDetachedSection']>) =>
+      controller.prepareDetachedSection(...args),
+    restoreWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['restoreSection']>) => controller.restoreSection(...args),
+    moveWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['moveSection']>) => controller.moveSection(...args),
+    snapWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['snapSection']>) => controller.snapSection(...args),
+    shadeWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['toggleSectionShade']>) => controller.toggleSectionShade(...args),
+    reorderWorkspaceSection: (...args: Parameters<WorkspaceLayoutController['reorderSection']>) => controller.reorderSection(...args),
+  };
+}
+
+function currentScope(): WorkspaceLayoutScope | null {
+  const hostname = hostnameFromLocation();
+  return hostname ? { hostname, pageUrl: window.location.href } : null;
+}
+
+function collapsedSections(state: PanelState): ReadonlySet<DetachableSectionId> {
+  const collapsed = new Set<DetachableSectionId>();
+  if (!state.historySectionOpen) collapsed.add('history');
+  if (!state.bookmarksSectionOpen) collapsed.add('bookmarks');
+  return collapsed;
+}
+
+function restoredSectionOpen(layout: WorkspaceLayout, sectionId: DetachableSectionId, fallback: boolean): boolean {
+  const section = layout.sections.find((candidate) => candidate.sectionId === sectionId);
+  return section ? !section.collapsed : fallback;
 }
