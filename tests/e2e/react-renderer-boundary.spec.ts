@@ -45,7 +45,7 @@ test('React Host target keeps detached focus, actions, and subtree lifecycle sta
   await openPanel(page, serviceWorker);
 
   await page.getByRole('button', { name: 'Detach Host target into a floating window (drag to place)' }).click();
-  const targetWindow = page.getByRole('dialog', { name: 'Host target (detached)' });
+  const targetWindow = page.getByRole('dialog', { name: 'Host target (floating)' });
   await expect(targetWindow).toBeVisible();
   await expect(targetWindow.locator('[data-image-trail-react-root]')).toHaveCount(1);
 
@@ -55,12 +55,12 @@ test('React Host target keeps detached focus, actions, and subtree lifecycle sta
   await fit.selectOption('cover');
   await expect(fit).toHaveValue('cover');
   await expect(fit).toBeFocused();
-  await expect(page.locator('[data-image-trail-react-root]')).toHaveCount(3);
+  await expect(page.locator('[data-image-trail-react-root]')).toHaveCount(4);
   await expect(page.locator('.image-trail-page-context-root[data-image-trail-react-root]')).toHaveCount(1);
 
   await targetWindow.getByRole('button', { name: 'Restore Host target into the panel' }).focus();
   await page.keyboard.press('Escape');
   await expect(targetWindow).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Detach Host target into a floating window (drag to place)' })).toBeFocused();
-  await expect(page.locator('[data-image-trail-react-root]')).toHaveCount(3);
+  await expect(page.locator('[data-image-trail-react-root]')).toHaveCount(4);
 });
