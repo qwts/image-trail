@@ -1138,14 +1138,15 @@
           "paths": [
             "tests/searchable-metadata-policy.test.ts",
             "tests/searchable-metadata-store.test.ts",
+            "tests/thumbnail-at-rest.test.ts",
             "tests/dom/settings-view.test.ts"
           ],
-          "notes": "Covers the policy model (plaintext default preserving current behaviour, URL index-key derivation, guards, local-settings sanitize), the durable store keeping the raw URL index under the default while an opt-in encrypted policy hashes only NEW records yet stays findable/dedupable by real URL, dual-encoding lookup resolving a legacy plaintext row after switching to encrypted without ever rewriting existing records, and the Searchable metadata settings control dispatching the updated policy."
+          "notes": "Covers the policy model (compatible URL/album defaults, encrypted-only thumbnails, URL index-key derivation, guards, and legacy local-settings sanitize), storage inspection proving locked-session thumbnail bytes stay inside an AES-GCM bookmark envelope, the durable store keeping the raw URL index under the default while an opt-in encrypted policy hashes only NEW records yet stays findable/dedupable by real URL, dual-encoding lookup resolving a legacy plaintext row after switching to encrypted without rewriting existing records, and both Settings surfaces reporting the immutable encrypted thumbnail policy."
         },
         {
           "type": "deferred",
           "issue": 451,
-          "notes": "Album-name encryption (Slice 2) and the thumbnail class + full field-inventory doc/ADR (Slice 3) land in follow-up slices of this issue; Playwright coverage of the URL policy toggle is added when the setting surface is exercised end-to-end."
+          "notes": "Album-name encryption (Slice 2) remains follow-up scope. Thumbnail bytes are confirmed encrypted at rest in both durable storage paths by #573; Playwright coverage of the URL policy toggle is added when the setting surface is exercised end-to-end."
         }
       ]
     },

@@ -124,6 +124,11 @@ export function PrivacySettingsGroup({ settings, disabled, save }: SettingsGroup
             <option value="encrypted">Encrypted</option>
           </select>
         </SettingField>
+        <SettingField label="Thumbnails">
+          <select value="encrypted" disabled aria-label="Thumbnail storage policy">
+            <option value="encrypted">Encrypted</option>
+          </select>
+        </SettingField>
       </div>
       <div className="image-trail-destination-page__unavailable">
         <strong>Encrypted originals</strong>

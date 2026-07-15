@@ -54,6 +54,8 @@ test('metadata changes preserve untouched and always-encrypted fields', () => {
   assert.ok(urlSelect);
   assert.ok(thumbnailSelect);
   assert.equal(thumbnailSelect.disabled, true);
+  assert.equal(thumbnailSelect.value, 'encrypted');
+  assert.equal(thumbnailSelect.options.length, 1);
   urlSelect.value = 'plaintext';
   urlSelect.dispatchEvent(new Event('change'));
   assert.deepEqual(actions, [

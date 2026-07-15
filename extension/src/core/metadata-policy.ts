@@ -10,9 +10,9 @@ import { computeSha256 } from './image/fingerprints.js';
 // for URLs, sealed in the envelope for album names).
 //
 // This governs AT-REST metadata and is distinct from Privacy mode, which only masks the DISPLAY for
-// screen sharing. It affects only what NEW records write; it never migrates or rewrites existing
-// records. The default preserves today's behaviour exactly (plaintext), so enabling the feature is
-// entirely opt-in and changes nothing about data already on disk.
+// screen sharing. URL-derived metadata and album names remain user-selectable. Thumbnail bytes are
+// always encrypted: inline bookmark thumbnails live inside the bookmark AES-GCM envelope and
+// protected-pin thumbnails live in the encrypted thumbnail repository.
 
 export type SearchableMetadataMode = 'plaintext' | 'encrypted';
 
@@ -28,15 +28,15 @@ export interface SearchableMetadataPolicy {
   readonly albumName: SearchableMetadataMode;
   // Thumbnail/preview bytes. Already encrypted everywhere at rest — 'encrypted' is the only supported
   // state; there is no plaintext-thumbnail write path.
-  readonly thumbnail: SearchableMetadataMode;
+  readonly thumbnail: 'encrypted';
 }
 
-// Conservative and compatible with existing records: the default preserves today's plaintext
-// behaviour, so nothing on disk changes unless the user opts a class into 'encrypted'.
+// URL and album defaults preserve compatibility. Thumbnail storage has no plaintext mode; legacy
+// settings that claimed otherwise are sanitized to the effective encrypted-at-rest contract.
 export const DEFAULT_SEARCHABLE_METADATA_POLICY: SearchableMetadataPolicy = {
   urlDerived: 'plaintext',
   albumName: 'plaintext',
-  thumbnail: 'plaintext',
+  thumbnail: 'encrypted',
 };
 
 export function isSearchableMetadataMode(value: unknown): value is SearchableMetadataMode {
@@ -47,9 +47,7 @@ export function isSearchableMetadataPolicy(value: unknown): value is SearchableM
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
   return (
-    isSearchableMetadataMode(record['urlDerived']) &&
-    isSearchableMetadataMode(record['albumName']) &&
-    isSearchableMetadataMode(record['thumbnail'])
+    isSearchableMetadataMode(record['urlDerived']) && isSearchableMetadataMode(record['albumName']) && record['thumbnail'] === 'encrypted'
   );
 }
 
@@ -59,7 +57,7 @@ export function sanitizeSearchableMetadataPolicy(value: unknown): SearchableMeta
   return {
     urlDerived: isSearchableMetadataMode(record['urlDerived']) ? record['urlDerived'] : DEFAULT_SEARCHABLE_METADATA_POLICY.urlDerived,
     albumName: isSearchableMetadataMode(record['albumName']) ? record['albumName'] : DEFAULT_SEARCHABLE_METADATA_POLICY.albumName,
-    thumbnail: isSearchableMetadataMode(record['thumbnail']) ? record['thumbnail'] : DEFAULT_SEARCHABLE_METADATA_POLICY.thumbnail,
+    thumbnail: 'encrypted',
   };
 }
 

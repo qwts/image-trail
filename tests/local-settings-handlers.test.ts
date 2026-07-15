@@ -66,3 +66,17 @@ test('settings persistence does not fail when tab notification is unavailable', 
   assert.deepEqual(result, { ok: true });
   assert.deepEqual(harness.read(), DEFAULT_LOCAL_SETTINGS);
 });
+
+test('legacy plaintext thumbnail policy passes save validation input and persists as encrypted', async () => {
+  const harness = storageHarness(null);
+  const tabs: SettingsTabMessenger = { query: async () => [], sendMessage: async () => undefined };
+  const legacySettings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    searchableMetadataPolicy: { ...DEFAULT_LOCAL_SETTINGS.searchableMetadataPolicy, thumbnail: 'plaintext' as const },
+  };
+
+  const result = await handleSaveLocalSettings(createSaveLocalSettingsMessage(legacySettings), harness.storage, tabs);
+
+  assert.deepEqual(result, { ok: true });
+  assert.equal((harness.read() as typeof DEFAULT_LOCAL_SETTINGS).searchableMetadataPolicy.thumbnail, 'encrypted');
+});

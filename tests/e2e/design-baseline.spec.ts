@@ -97,6 +97,11 @@ for (const [groupName, artifactName] of settingsGroups) {
     const panel = await openSettings(page, serviceWorker);
     await showOnlySettingsGroup(panel, groupName);
     await expect(settingsGroup(panel, groupName)).toHaveAttribute('open', '');
+    if (groupName === 'Privacy') {
+      const thumbnailPolicy = settingsGroup(panel, groupName).getByRole('combobox', { name: 'Thumbnails' });
+      await expect(thumbnailPolicy).toBeDisabled();
+      await expect(thumbnailPolicy).toHaveValue('encrypted');
+    }
     await captureArtifact(page, testInfo, artifactName);
   });
 }

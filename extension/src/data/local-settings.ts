@@ -22,6 +22,7 @@ import type { ImageProbeMethod } from '../core/image/request-policy.js';
 import {
   DEFAULT_SEARCHABLE_METADATA_POLICY,
   sanitizeSearchableMetadataPolicy,
+  type SearchableMetadataMode,
   type SearchableMetadataPolicy,
 } from '../core/metadata-policy.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT, isObjectFitMode, type ObjectFitMode } from '../core/preview-style.js';
@@ -116,7 +117,13 @@ export interface LocalSettingsStore {
 }
 
 export type LocalSettingsMigrationInput = {
-  readonly [Key in keyof PlaintextLocalSettings]?: PlaintextLocalSettings[Key] | undefined;
+  readonly [Key in Exclude<keyof PlaintextLocalSettings, 'searchableMetadataPolicy'>]?: PlaintextLocalSettings[Key] | undefined;
+} & { readonly searchableMetadataPolicy?: unknown };
+
+export type SaveLocalSettingsInput = Omit<PlaintextLocalSettings, 'searchableMetadataPolicy'> & {
+  readonly searchableMetadataPolicy: Omit<SearchableMetadataPolicy, 'thumbnail'> & {
+    readonly thumbnail: SearchableMetadataMode;
+  };
 };
 
 export class LocalSettingsRepository {
