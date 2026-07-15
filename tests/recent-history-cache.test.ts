@@ -75,6 +75,31 @@ test('RecentHistoryCache all-site view dedupes cross-site records and removes th
   assert.deepEqual([...cache.values()].flat(), []);
 });
 
+test('RecentHistoryCache.update preserves the original page, site, and insertion sequence', () => {
+  const cache = new RecentHistoryCache();
+  cache.add('https://a.test/gallery', record('a'), DEFAULT_LOCAL_SETTINGS);
+  cache.add('https://b.test/other', record('b'), DEFAULT_LOCAL_SETTINGS);
+
+  const pinned = { ...record('b'), pinnedRecordId: 'pin-b', pinnedAt: '2026-07-15T00:00:00.000Z' };
+  cache.update('https://a.test/gallery', pinned, DEFAULT_LOCAL_SETTINGS, 'all');
+
+  assert.deepEqual(
+    cache.load('https://a.test/gallery', DEFAULT_LOCAL_SETTINGS, true, 'all').map((item) => item.id),
+    ['b', 'a'],
+    'metadata updates retain global insertion order',
+  );
+  assert.deepEqual(
+    cache.load('https://b.test/other', DEFAULT_LOCAL_SETTINGS, true, 'site'),
+    [pinned],
+    'the updated row stays in its original site bucket',
+  );
+  assert.deepEqual(
+    cache.load('https://a.test/gallery', DEFAULT_LOCAL_SETTINGS, true, 'site').map((item) => item.id),
+    ['a'],
+    'the current site does not adopt an off-site row',
+  );
+});
+
 test('RecentHistoryCache page removal leaves other pages in the site bucket intact', () => {
   const cache = new RecentHistoryCache();
   cache.add('https://a.test/gallery', record('1'), DEFAULT_LOCAL_SETTINGS);

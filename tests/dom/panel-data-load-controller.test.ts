@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createInitialPanelState } from '../../extension/src/core/state.js';
-import { createDisplayRecord } from '../../extension/src/core/display-records.js';
+import { createDisplayRecord, type ImageDisplayRecord } from '../../extension/src/core/display-records.js';
 import type { BookmarkStore, PanelState } from '../../extension/src/core/types.js';
 import type { RecentHistoryStore } from '../../extension/src/content/recent-history-store.js';
 import { PanelDataLoadController, type PanelDataLoadControllerDeps } from '../../extension/src/ui/panel/panel-data-load-controller.js';
@@ -16,9 +16,10 @@ interface Harness {
   readonly loadPageInputs: { offset: number; currentPageUrl?: string | undefined }[];
   readonly recentLoadInputs: unknown[];
   getState(): PanelState;
+  patchState(patch: Partial<PanelState>): void;
 }
 
-function createHarness(): Harness {
+function createHarness(options: { readonly recentLoad?: RecentHistoryStore['load'] } = {}): Harness {
   let state = createInitialPanelState(0);
   const log: string[] = [];
   const loadPageInputs: { offset: number; currentPageUrl?: string | undefined }[] = [];
@@ -37,10 +38,12 @@ function createHarness(): Harness {
     },
   } as unknown as BookmarkStore;
   const recentHistoryStore: RecentHistoryStore = {
-    load: async (_pageUrl: string, options: { readonly scope?: 'page' | 'site' | 'all' }) => {
-      recentLoadInputs.push(options);
-      return [createDisplayRecord({ url: 'https://images.example.test/a/2.jpg' })];
-    },
+    load:
+      options.recentLoad ??
+      (async (_pageUrl: string, loadOptions: { readonly scope?: 'page' | 'site' | 'all' }) => {
+        recentLoadInputs.push(loadOptions);
+        return [createDisplayRecord({ url: 'https://images.example.test/a/2.jpg' })];
+      }),
   } as unknown as RecentHistoryStore;
   const deps: PanelDataLoadControllerDeps = {
     getState: () => state,
@@ -58,7 +61,24 @@ function createHarness(): Harness {
     syncGrabSettings: () => {},
     primeBufferedNav: () => {},
   };
-  return { controller: new PanelDataLoadController(deps), log, loadPageInputs, recentLoadInputs, getState: () => state };
+  return {
+    controller: new PanelDataLoadController(deps),
+    log,
+    loadPageInputs,
+    recentLoadInputs,
+    getState: () => state,
+    patchState: (patch) => {
+      state = { ...state, ...patch };
+    },
+  };
+}
+
+function deferred<T>(): { readonly promise: Promise<T>; resolve(value: T): void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
 }
 
 test('loadBookmarkPage loads a page scoped to the current page url and folds it into state', async () => {
@@ -85,6 +105,27 @@ test('loadRecentHistory loads the recents for the current page and stamps lastUp
   assert.deepEqual(harness.recentLoadInputs, [{ scope: 'site' }]);
   assert.notEqual(harness.getState().lastUpdatedAt, before);
   assert.ok(harness.log.includes('render'));
+});
+
+test('loadRecentHistory ignores a stale response after the scope changes', async () => {
+  const siteLoad = deferred<readonly ImageDisplayRecord[]>();
+  const allLoad = deferred<readonly ImageDisplayRecord[]>();
+  const siteRecord = createDisplayRecord({ id: 'site-row', url: 'https://images.example.test/site.jpg' });
+  const allRecord = createDisplayRecord({ id: 'all-row', url: 'https://other.test/all.jpg' });
+  const harness = createHarness({
+    recentLoad: async (_pageUrl, options) => (options?.scope === 'all' ? allLoad.promise : siteLoad.promise),
+  });
+
+  const first = harness.controller.loadRecentHistory();
+  harness.patchState({ recentHistoryScope: 'all' });
+  const second = harness.controller.loadRecentHistory();
+  allLoad.resolve([allRecord]);
+  await second;
+  siteLoad.resolve([siteRecord]);
+  await first;
+
+  assert.deepEqual(harness.getState().history, [allRecord]);
+  assert.equal(harness.log.filter((entry) => entry === 'render').length, 1);
 });
 
 test('loadSettingsBookmarksAndRecents loads settings, bookmarks and recents then renders once', async () => {

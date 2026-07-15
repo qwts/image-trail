@@ -87,6 +87,12 @@ export const addRecentHistoryRequestSchema = v.object({
   scope: v.optional(v.picklist(['page', 'site', 'all'])),
 });
 
+export const updateRecentHistoryRequestSchema = v.object({
+  pageUrl: v.string(),
+  item: imageDisplayRecordSchema,
+  scope: v.optional(v.picklist(['page', 'site', 'all'])),
+});
+
 export const removeRecentHistoryRequestSchema = v.object({
   pageUrl: v.string(),
   id: v.string(),

@@ -71,6 +71,24 @@ export class RecentHistoryCache {
     return this.load(pageUrl, settings, false, scope);
   }
 
+  update(
+    pageUrl: string,
+    item: ImageDisplayRecord,
+    settings: PlaintextLocalSettings,
+    scope: RecentHistoryScope = DEFAULT_RECENT_HISTORY_SCOPE,
+  ): readonly ImageDisplayRecord[] {
+    for (const [key, entries] of this.bySite) {
+      const index = entries.findIndex((entry) => entry.item.id === item.id);
+      if (index < 0) continue;
+      this.bySite.set(
+        key,
+        entries.map((entry, entryIndex) => (entryIndex === index ? { ...entry, item } : entry)),
+      );
+      break;
+    }
+    return this.load(pageUrl, settings, false, scope);
+  }
+
   remove(
     pageUrl: string,
     id: string,

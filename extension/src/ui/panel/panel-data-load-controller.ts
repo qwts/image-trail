@@ -29,6 +29,7 @@ export interface PanelDataLoadControllerDeps {
  */
 export class PanelDataLoadController {
   private storageUsageRequestId = 0;
+  private recentHistoryRequestId = 0;
 
   constructor(private readonly deps: PanelDataLoadControllerDeps) {}
 
@@ -73,7 +74,10 @@ export class PanelDataLoadController {
   loadRecentHistory = async (options: { readonly render?: boolean } = {}): Promise<void> => {
     const recentHistoryStore = this.deps.recentHistoryStore();
     if (!recentHistoryStore) return;
-    const history = await recentHistoryStore.load(window.location.href, { scope: this.deps.getState().recentHistoryScope });
+    const scope = this.deps.getState().recentHistoryScope;
+    const requestId = (this.recentHistoryRequestId += 1);
+    const history = await recentHistoryStore.load(window.location.href, { scope });
+    if (requestId !== this.recentHistoryRequestId || this.deps.getState().recentHistoryScope !== scope) return;
     this.deps.setState({
       ...this.deps.getState(),
       history,

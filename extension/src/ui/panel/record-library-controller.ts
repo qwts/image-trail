@@ -222,7 +222,7 @@ export class RecordLibraryController {
     });
     const recentHistoryStore = this.deps.recentHistoryStore();
     const history = recentHistoryStore
-      ? await recentHistoryStore.add(linkedHistory, window.location.href, { scope: this.deps.getState().recentHistoryScope })
+      ? await recentHistoryStore.update(linkedHistory, window.location.href, { scope: this.deps.getState().recentHistoryScope })
       : this.deps.getState().history;
     this.deps.setState({
       ...this.deps.getState(),

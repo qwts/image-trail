@@ -7,6 +7,7 @@ import {
   createAddRecentHistoryResultMessage,
   createLoadRecentHistoryResultMessage,
   createRemoveRecentHistoryResultMessage,
+  createUpdateRecentHistoryResultMessage,
   type AddRecentHistoryMessage,
   type AddRecentHistoryResultMessage,
   type ExtensionRequest,
@@ -15,11 +16,16 @@ import {
   type LoadRecentHistoryResultMessage,
   type RemoveRecentHistoryMessage,
   type RemoveRecentHistoryResultMessage,
+  type UpdateRecentHistoryMessage,
+  type UpdateRecentHistoryResultMessage,
 } from '../messages.js';
 import type { ServiceWorkerContext } from '../service-worker-context.js';
 
 type RecentHistoryRequestType =
-  typeof MessageType.LoadRecentHistory | typeof MessageType.AddRecentHistory | typeof MessageType.RemoveRecentHistory;
+  | typeof MessageType.LoadRecentHistory
+  | typeof MessageType.AddRecentHistory
+  | typeof MessageType.UpdateRecentHistory
+  | typeof MessageType.RemoveRecentHistory;
 
 export type RecentHistoryMessageHandlerDeps = Pick<ServiceWorkerContext, 'recentHistoryCache' | 'loadLocalSettings'>;
 
@@ -37,6 +43,11 @@ export function createRecentHistoryMessageRegistry({
   async function handleAddRecentHistory(message: AddRecentHistoryMessage): Promise<AddRecentHistoryResultMessage['payload']> {
     const settings = await loadLocalSettings();
     return { items: recentHistoryCache.add(message.payload.pageUrl, message.payload.item, settings, message.payload.scope) };
+  }
+
+  async function handleUpdateRecentHistory(message: UpdateRecentHistoryMessage): Promise<UpdateRecentHistoryResultMessage['payload']> {
+    const settings = await loadLocalSettings();
+    return { items: recentHistoryCache.update(message.payload.pageUrl, message.payload.item, settings, message.payload.scope) };
   }
 
   async function handleRemoveRecentHistory(message: RemoveRecentHistoryMessage): Promise<RemoveRecentHistoryResultMessage['payload']> {
@@ -59,6 +70,12 @@ export function createRecentHistoryMessageRegistry({
       // failed validation reaches this fallback too, and its `item` may be malformed.
       fallback: (message) =>
         createAddRecentHistoryResultMessage(v.is(imageDisplayRecordSchema, message.payload.item) ? [message.payload.item] : []),
+    }),
+    [MessageType.UpdateRecentHistory]: defineMessage({
+      requestSchema: requestSchemas.updateRecentHistoryRequestSchema,
+      handle: (message: UpdateRecentHistoryMessage) => handleUpdateRecentHistory(message),
+      respond: (result) => createUpdateRecentHistoryResultMessage(result.items),
+      fallback: () => createUpdateRecentHistoryResultMessage([]),
     }),
     [MessageType.RemoveRecentHistory]: defineMessage({
       requestSchema: requestSchemas.removeRecentHistoryRequestSchema,

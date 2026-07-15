@@ -640,7 +640,7 @@
             "tests/dom/history-view.test.ts",
             "tests/dom/panel-data-load-controller.test.ts"
           ],
-          "notes": "Covers origin-and-path page identity, hostname site identity, global insertion order, URL and id deduplication, scope-aware removal, site defaulting, selection cleanup, privacy-safe labels, message validation, the dedicated scope row outside the collapse header, and the invariant that Recents have no durable-storage write path."
+          "notes": "Covers origin-and-path page identity, hostname site identity, global insertion order, URL and id deduplication, scope-aware removal, provenance-preserving metadata updates, stale scope-load rejection, site defaulting, selection cleanup, privacy-safe labels, message validation, the dedicated scope row outside the collapse header, and the invariant that Recents have no durable-storage write path."
         },
         {
           "type": "storybook",

@@ -17,6 +17,7 @@ interface Harness {
   readonly log: string[];
   readonly savedBookmarks: ImageDisplayRecord[];
   readonly historyAddLog: { record: ImageDisplayRecord; pageUrl: string }[];
+  readonly historyUpdateLog: { record: ImageDisplayRecord; pageUrl: string }[];
   getState(): PanelState;
   patchState(patch: Partial<PanelState>): void;
 }
@@ -26,6 +27,7 @@ function createHarness(options: { readonly findSelectedImage?: () => HTMLImageEl
   const log: string[] = [];
   const savedBookmarks: ImageDisplayRecord[] = [];
   const historyAddLog: { record: ImageDisplayRecord; pageUrl: string }[] = [];
+  const historyUpdateLog: { record: ImageDisplayRecord; pageUrl: string }[] = [];
   let historyRows: ImageDisplayRecord[] = [];
   const bookmarkStore = {
     findByUrl: async () => null,
@@ -41,6 +43,11 @@ function createHarness(options: { readonly findSelectedImage?: () => HTMLImageEl
   const recentHistoryStore = {
     add: async (record: ImageDisplayRecord, pageUrl: string) => {
       historyAddLog.push({ record, pageUrl });
+      historyRows = [record, ...historyRows.filter((row) => row.id !== record.id)];
+      return historyRows;
+    },
+    update: async (record: ImageDisplayRecord, pageUrl: string) => {
+      historyUpdateLog.push({ record, pageUrl });
       historyRows = [record, ...historyRows.filter((row) => row.id !== record.id)];
       return historyRows;
     },
@@ -93,6 +100,7 @@ function createHarness(options: { readonly findSelectedImage?: () => HTMLImageEl
     log,
     savedBookmarks,
     historyAddLog,
+    historyUpdateLog,
     getState: () => state,
     patchState: (patch) => {
       state = { ...state, ...patch };
@@ -182,14 +190,16 @@ test('deleteRecentHistory leaves linked durable originals intact', async () => {
   ]);
 });
 
-test('markRecentHistoryRowPinned re-saves the pinned row and prunes stale selections', async () => {
+test('markRecentHistoryRowPinned updates the original transient row and prunes stale selections', async () => {
   const harness = createHarness();
   const row = capturedHistoryRecord('history-1');
   harness.patchState({ history: [row], selectedHistoryIds: ['history-1', 'gone'] });
   const bookmark = createDisplayRecord({ ...row, id: row.url, source: 'bookmark' });
   await harness.controller.markRecentHistoryRowPinned('history-1', bookmark);
-  assert.equal(harness.historyAddLog.length, 1);
-  assert.equal(harness.historyAddLog[0]?.record.pinnedRecordId, bookmark.id);
+  assert.equal(harness.historyAddLog.length, 0);
+  assert.equal(harness.historyUpdateLog.length, 1);
+  assert.equal(harness.historyUpdateLog[0]?.record.pinnedRecordId, bookmark.id);
+  assert.equal(harness.historyUpdateLog[0]?.pageUrl, 'https://images.example.test/gallery');
   assert.deepEqual(harness.getState().selectedHistoryIds, ['history-1']);
 });
 

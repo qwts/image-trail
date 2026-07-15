@@ -106,5 +106,11 @@ test('Recents switches between current page, current site, and all sites', async
   await scope.selectOption('all');
   await expect(scope).toBeFocused();
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(3);
-  await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-three.svg' })).toHaveCount(1);
+  const otherSiteRow = page.locator('.image-trail-panel__history-item', { hasText: 'asset-three.svg' });
+  await expect(otherSiteRow).toHaveCount(1);
+
+  await otherSiteRow.getByRole('button', { name: 'Pin' }).click();
+  await scope.selectOption('site');
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(2);
+  await expect(otherSiteRow).toHaveCount(0);
 });

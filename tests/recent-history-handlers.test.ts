@@ -7,6 +7,7 @@ import {
   MessageType,
   createAddRecentHistoryMessage,
   createLoadRecentHistoryMessage,
+  createUpdateRecentHistoryMessage,
   type ExtensionRequest,
   type ExtensionResponse,
   type LoadRecentHistoryResultMessage,
@@ -51,5 +52,14 @@ test('recent history handlers compose page, site, and all scopes through the tra
   assert.deepEqual(
     (await load('all')).payload.items.map((item) => item.id),
     ['b-one', 'a-two', 'a-one'],
+  );
+
+  await registry[MessageType.UpdateRecentHistory].handle(
+    createUpdateRecentHistoryMessage('https://a.example/page-one', { ...record('b-one'), pinnedRecordId: 'pin-b' }, { scope: 'all' }),
+  );
+  assert.deepEqual(
+    (await load('site')).payload.items.map((item) => item.id),
+    ['a-two', 'a-one'],
+    'updating an all-sites row from another site does not re-home it',
   );
 });

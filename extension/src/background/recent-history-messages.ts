@@ -31,6 +31,18 @@ export interface AddRecentHistoryResultMessage {
   readonly payload: { readonly items: readonly ImageDisplayRecord[] };
 }
 
+export interface UpdateRecentHistoryMessage {
+  readonly type: typeof MessageType.UpdateRecentHistory;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: RecentHistoryRequestPayload & { readonly item: ImageDisplayRecord };
+}
+
+export interface UpdateRecentHistoryResultMessage {
+  readonly type: typeof MessageType.UpdateRecentHistoryResult;
+  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
+  readonly payload: { readonly items: readonly ImageDisplayRecord[] };
+}
+
 export interface RemoveRecentHistoryMessage {
   readonly type: typeof MessageType.RemoveRecentHistory;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -43,8 +55,10 @@ export interface RemoveRecentHistoryResultMessage {
   readonly payload: { readonly items: readonly ImageDisplayRecord[] };
 }
 
-export type RecentHistoryRequest = LoadRecentHistoryMessage | AddRecentHistoryMessage | RemoveRecentHistoryMessage;
-export type RecentHistoryResponse = LoadRecentHistoryResultMessage | AddRecentHistoryResultMessage | RemoveRecentHistoryResultMessage;
+export type RecentHistoryRequest =
+  LoadRecentHistoryMessage | AddRecentHistoryMessage | UpdateRecentHistoryMessage | RemoveRecentHistoryMessage;
+export type RecentHistoryResponse =
+  LoadRecentHistoryResultMessage | AddRecentHistoryResultMessage | UpdateRecentHistoryResultMessage | RemoveRecentHistoryResultMessage;
 
 export function createLoadRecentHistoryMessage(
   pageUrl: string,
@@ -69,6 +83,18 @@ export function createAddRecentHistoryResultMessage(items: readonly ImageDisplay
   return { type: MessageType.AddRecentHistoryResult, version: MESSAGE_PROTOCOL_VERSION, payload: { items } };
 }
 
+export function createUpdateRecentHistoryMessage(
+  pageUrl: string,
+  item: ImageDisplayRecord,
+  options: { readonly scope?: RecentHistoryScope } = {},
+): UpdateRecentHistoryMessage {
+  return { type: MessageType.UpdateRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl, item, ...options } };
+}
+
+export function createUpdateRecentHistoryResultMessage(items: readonly ImageDisplayRecord[]): UpdateRecentHistoryResultMessage {
+  return { type: MessageType.UpdateRecentHistoryResult, version: MESSAGE_PROTOCOL_VERSION, payload: { items } };
+}
+
 export function createRemoveRecentHistoryMessage(
   pageUrl: string,
   id: string,
@@ -87,6 +113,10 @@ export function isLoadRecentHistoryResultMessage(value: unknown): value is LoadR
 
 export function isAddRecentHistoryResultMessage(value: unknown): value is AddRecentHistoryResultMessage {
   return hasVersionedObjectShape(value) && value.type === MessageType.AddRecentHistoryResult;
+}
+
+export function isUpdateRecentHistoryResultMessage(value: unknown): value is UpdateRecentHistoryResultMessage {
+  return hasVersionedObjectShape(value) && value.type === MessageType.UpdateRecentHistoryResult;
 }
 
 export function isRemoveRecentHistoryResultMessage(value: unknown): value is RemoveRecentHistoryResultMessage {
