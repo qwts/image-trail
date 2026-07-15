@@ -238,6 +238,8 @@ test('release workflow checks out a supplied tag and publishes assets without st
   assert.match(workflow, /tag:\s*\n\s+description: 'Existing exact v<package-version> tag/u);
   assert.match(workflow, /ref: \$\{\{ steps\.release\.outputs\.tag \}\}/u);
   assert.match(workflow, /run: npm run ci/u);
+  assert.match(workflow, /npx playwright install --with-deps chromium/u);
+  assert.match(workflow, /run: npm run test:e2e:release/u);
   assert.match(workflow, /npm run package:release -- --tag/u);
   assert.match(workflow, /Release tag must be stable three-component semver/u);
   assert.match(workflow, /git merge-base --is-ancestor "\$\(git rev-list -n 1 "\$TAG_NAME"\)" origin\/main/u);

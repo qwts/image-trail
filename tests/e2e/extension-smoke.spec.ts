@@ -152,7 +152,7 @@ test('the panel header Help toggle shows the grouped handoff shortcut reference 
   await expect(page.locator('.image-trail-panel__help-section')).toHaveCount(0);
 });
 
-test('surfaces the build-info overlay toggle in Settings', async ({ page, serviceWorker }) => {
+test('build-info overlay follows the release visibility policy', async ({ page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
@@ -164,6 +164,10 @@ test('surfaces the build-info overlay toggle in Settings', async ({ page, servic
   await expect(toggle).toBeVisible();
   await toggle.check();
   const overlayHost = page.locator('#image-trail-build-identity-overlay');
+  if (process.env['IMAGE_TRAIL_RELEASE_BUILD'] === '1') {
+    await expect(overlayHost).toHaveCount(0);
+    return;
+  }
   await expect(overlayHost).toHaveCount(1);
   await expect(overlayHost).toHaveCSS('pointer-events', 'none');
 

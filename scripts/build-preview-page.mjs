@@ -3,7 +3,7 @@
 import { buildExtensionEntry } from './extension-build-policy.mjs';
 
 await buildExtensionEntry({
-  entryPoint: 'extension/src/content/content-script.ts',
-  outfile: 'extension/dist/src/content/content-script.js',
+  entryPoint: 'extension/src/preview/preview.js',
+  outfile: 'extension/dist/src/preview/preview.js',
   format: 'iife',
 });

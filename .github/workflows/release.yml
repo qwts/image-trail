@@ -63,6 +63,12 @@ jobs:
       - name: Run required validation
         run: npm run ci
 
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke-test hardened release build
+        run: npm run test:e2e:release
+
       - name: Build and package release
         run: npm run package:release -- --tag "${{ steps.release.outputs.tag }}"
 

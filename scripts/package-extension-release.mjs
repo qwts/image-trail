@@ -2,12 +2,13 @@
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { evaluateVersionArtifacts } from './check-version-policy.mjs';
+import { auditExtensionArtifacts } from './extension-artifact-policy.mjs';
 
 const execFileAsync = promisify(execFile);
 const STABLE_SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
@@ -45,18 +46,6 @@ export function releaseArtifactNames(version) {
   return { archive, checksum: `${archive}.sha256` };
 }
 
-async function collectFiles(directory, relativeDirectory = '') {
-  const files = [];
-  const entries = await readdir(path.join(directory, relativeDirectory), { withFileTypes: true });
-  for (const entry of entries) {
-    const relativePath = path.posix.join(relativeDirectory, entry.name);
-    if (entry.isSymbolicLink()) throw new Error(`Release build contains a symbolic link: ${relativePath}`);
-    if (entry.isDirectory()) files.push(...(await collectFiles(directory, relativePath)));
-    if (entry.isFile()) files.push(relativePath);
-  }
-  return files.sort();
-}
-
 function requestedTag(args) {
   const index = args.indexOf('--tag');
   if (index === -1) return null;
@@ -82,7 +71,13 @@ async function main() {
   const tag = requestedTag(process.argv.slice(2));
   if (tag) errors.push(...validateReleaseTag(tag, version));
 
-  const files = await collectFiles(DIST_DIRECTORY);
+  const artifactAudit = await auditExtensionArtifacts({
+    directory: DIST_DIRECTORY,
+    rootDirectory: process.cwd(),
+    requireRelease: true,
+  });
+  const files = artifactAudit.files;
+  errors.push(...artifactAudit.errors);
   errors.push(...validateArchiveEntries(files));
   if (errors.length > 0) {
     throw new Error(`Release package validation failed:\n${errors.map((error) => `  - ${error}`).join('\n')}`);

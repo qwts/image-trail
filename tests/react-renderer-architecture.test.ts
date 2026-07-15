@@ -8,11 +8,13 @@ const read = (path: string): string => readFileSync(resolve(process.cwd(), path)
 test('React is a direct renderer dependency bundled in production mode', () => {
   const manifest = JSON.parse(read('package.json')) as { dependencies?: Record<string, string> };
   const buildScript = read('scripts/build-content-script.mjs');
+  const buildPolicy = read('scripts/extension-build-policy.mjs');
 
   assert.match(manifest.dependencies?.['react'] ?? '', /^\^19\./u);
   assert.match(manifest.dependencies?.['react-dom'] ?? '', /^\^19\./u);
-  assert.match(buildScript, /'process\.env\.NODE_ENV':\s*'"production"'/u);
-  assert.doesNotMatch(buildScript, /external:\s*\[[^\]]*react/u);
+  assert.match(buildScript, /buildExtensionEntry/u);
+  assert.match(buildPolicy, /'process\.env\.NODE_ENV':\s*'"production"'/u);
+  assert.doesNotMatch(`${buildScript}\n${buildPolicy}`, /external:\s*\[[^\]]*react/u);
 });
 
 test('the production renderer uses local JSX compilation without prototype runtime shortcuts', () => {
