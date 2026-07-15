@@ -99,6 +99,8 @@ test('release text audit rejects debug metadata, secrets, and build-machine path
     ['bundle.js', 'debugger;'],
     ['bundle.js', 'console.debug("private URL")'],
     ['bundle.js', 'process.env.NODE_ENV'],
+    ['bundle.js', "process.env['NODE_ENV']"],
+    ['bundle.js', 'process.env[key]'],
     ['bundle.js', '//# sourceMappingURL=bundle.js.map'],
     ['bundle.js', '-----BEGIN PRIVATE KEY-----'],
     ['bundle.js', 'AKIA1234567890ABCDEF'],

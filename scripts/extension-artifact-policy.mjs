@@ -24,7 +24,7 @@ const FORBIDDEN_RELEASE_TEXT = [
   { pattern: /\/\/# sourceMappingURL=|\/\/# sourceURL=/u, message: 'contains source mapping metadata' },
   { pattern: /\bdebugger\b/u, message: 'contains a debugger statement' },
   { pattern: /\bconsole\.debug\b/u, message: 'contains development debug logging' },
-  { pattern: /\bprocess\.env\.|\bimport\.meta\.env\b/u, message: 'contains an unresolved environment reference' },
+  { pattern: /\bprocess\.env\b|\bimport\.meta\.env\b/u, message: 'contains an unresolved environment reference' },
   { pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/u, message: 'contains private key material' },
   { pattern: /\bgh[pousr]_[A-Za-z0-9]{36,}\b/u, message: 'contains a GitHub token-shaped value' },
   { pattern: /\bAKIA[0-9A-Z]{16}\b/u, message: 'contains an AWS access-key-shaped value' },
