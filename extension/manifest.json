@@ -64,6 +64,7 @@
     {
       "resources": [
         "src/ui/styles/panel.css",
+        "src/ui/styles/interop-workflow.css",
         "src/ui/styles/panel-entry.css",
         "src/ui/styles/handoff-baseline.css",
         "src/ui/styles/destinations.css",

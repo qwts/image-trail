@@ -2,6 +2,7 @@ import type { PanelState } from '../core/types.js';
 import { renderDetachedSections } from './detached-sections.js';
 import { attachedSectionElements, type DetachableSectionDefinition } from './section-registry.js';
 import { createBookmarksView } from './components/bookmarks-view.js';
+import { addInteropBookmarkActions } from './components/interop-bookmark-actions.js';
 import { createUrlEditorView } from './components/url-editor-view.js';
 import { createHelpView } from './components/help-view.js';
 import { createHistoryView } from './components/history-view.js';
@@ -231,7 +232,7 @@ function createHistorySection(target: PanelRenderTarget, state: PanelState): HTM
 }
 
 function createBookmarksSection(target: PanelRenderTarget, state: PanelState): HTMLElement {
-  return createBookmarksView(
+  const section = createBookmarksView(
     state.target.selectedUrl,
     state.bookmarks,
     state.selectedBookmarkIds,
@@ -255,6 +256,7 @@ function createBookmarksSection(target: PanelRenderTarget, state: PanelState): H
     },
     target.dispatch,
   );
+  return addInteropBookmarkActions(section, state.bookmarks, state.selectedBookmarkIds, !state.blobKeyUnlocked && state.blobKeyAvailable);
 }
 
 export function renderRecallDestination(target: PanelRenderTarget, state: PanelState): void {
