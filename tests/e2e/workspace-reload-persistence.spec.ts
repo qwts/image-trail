@@ -59,7 +59,7 @@ base('packaged extension restart restores private workspace state and reset remo
 async function workspaceMetadata(worker: Worker): Promise<Record<string, unknown>[]> {
   return worker.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('image-trail', 10);
+      const request = indexedDB.open('image-trail');
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
