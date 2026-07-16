@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.16.0
+
+### Minor Changes
+
+- 50a780d: Add durable, deterministic sync journals with explicit conflict and delete review.
+
 ## 0.15.0
 
 ### Minor Changes
