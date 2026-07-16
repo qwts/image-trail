@@ -263,3 +263,25 @@ test('invariant: the ESLint rule blocks sorting a queue by envelope.updatedAt', 
     'sorting a queue by queueUpdatedAt must not be flagged',
   );
 });
+
+test('invariant: interoperability custody never reaches host-page, provider, log, or extension storage APIs', () => {
+  const interopCustodyModules = [
+    'extension/src/data/interop/pairing-bundle.ts',
+    'extension/src/data/interop/pairing-import.ts',
+    'extension/src/data/repositories/interop-keys-repository.ts',
+  ];
+  const forbidden: readonly (readonly [RegExp, string])[] = [
+    [/\blocalStorage\b/u, 'host-page localStorage'],
+    [/\bsessionStorage\b/u, 'host-page sessionStorage'],
+    [/chrome\.storage/u, 'extension storage containing serializable plaintext'],
+    [/\bconsole\.(?:debug|info|log|warn|error)\b/u, 'logging'],
+    [/pcloud|google\s*drive|icloud|storageprovider/iu, 'provider access'],
+  ];
+
+  for (const relativePath of interopCustodyModules) {
+    const source = readFileSync(resolve(process.cwd(), relativePath), 'utf8');
+    for (const [pattern, label] of forbidden) {
+      assert.equal(pattern.test(source), false, `${relativePath} must not use ${label}.`);
+    }
+  }
+});

@@ -4,7 +4,7 @@ import type { EncryptedEnvelope, EncryptionAlgorithm, KeyKind, KeyReference, Key
 
 export const encryptionAlgorithmSchema = v.picklist(['AES-GCM']);
 
-export const keyKindSchema = v.picklist(['root', 'history', 'bookmark', 'metadata', 'export', 'blob', 'download']);
+export const keyKindSchema = v.picklist(['root', 'history', 'bookmark', 'metadata', 'export', 'blob', 'download', 'interop']);
 
 export const keyWrappingModeSchema = v.picklist(['session', 'password', 'webauthn', 'imported', 'indexeddb']);
 
