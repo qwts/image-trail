@@ -8,13 +8,14 @@ import {
   type SearchableMetadataPolicy,
 } from '../core/metadata-policy.js';
 import type { BookmarkStore, PinSaveStoragePreference } from '../core/types.js';
+import { findInteropBookmarkBySourceUrl, findStoredBookmarkByUrl } from './bookmark-record-lookup.js';
 import type { ActiveBlobKey } from './crypto/blob-keyring.js';
 import { openImageTrailDb } from './db.js';
 import { ensureDurableBookmarkKey, type DurableBookmarkKeyContext } from './durable-bookmark-key.js';
 import { DEFAULT_LOCAL_SETTINGS } from './local-settings.js';
 import { DEFAULT_QUEUE_DISPLAY_ORDER, queueTimeForRecord, sortQueueRecords, type QueueDisplayOrder } from '../core/display-order.js';
 import { BlobsRepository } from './repositories/blobs-repository.js';
-import { BookmarksRepository, type EncryptedBookmarkRecord } from './repositories/bookmarks-repository.js';
+import { BookmarksRepository } from './repositories/bookmarks-repository.js';
 import { EncryptedPinsRepository, type EncryptedPinRecord } from './repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from './repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from './repositories/keys-repository.js';
@@ -163,8 +164,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const proposedIndexUrl = importedDataUrl ? `image-trail-import:${bookmark.id}` : await bookmarkSearchIndexKey(bookmark.url, policy);
     const existing = importedDataUrl
       ? await context.repository.getEncrypted(bookmark.id)
-      : ((await this.findPlainRecordByUrl(context, bookmark.url, policy)) ??
-        (await this.findInteropPlainRecordBySourceUrl(context, bookmark.url)));
+      : await findStoredBookmarkByUrl(context.repository, context.bookmarkKey.key, bookmark.url, policy);
     const existingPayload = existing ? await context.repository.openRecord(existing, context.bookmarkKey.key).catch(() => null) : null;
     const indexUrl = existingPayload?.interop ? existing!.url : proposedIndexUrl;
     const uuid = existing?.uuid ?? crypto.randomUUID();
@@ -188,33 +188,6 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
 
   private async searchableMetadataPolicy(): Promise<SearchableMetadataPolicy> {
     return (await this.options.getSearchableMetadataPolicy?.()) ?? DEFAULT_SEARCHABLE_METADATA_POLICY;
-  }
-
-  // Dedup lookup for a real bookmark URL (#451). The index value is the URL under a 'plaintext' policy
-  // and its hash under 'encrypted'. Existing records are never rewritten, so a store can hold both
-  // encodings after the policy is toggled; we try the current-policy key first and fall back to the
-  // other encoding so dedup keeps resolving every row regardless of when it was written.
-  private async findPlainRecordByUrl(
-    context: BookmarkContext,
-    url: string,
-    policy: SearchableMetadataPolicy,
-  ): Promise<EncryptedBookmarkRecord | undefined> {
-    const primary = await context.repository.getEncryptedByUrl(await bookmarkSearchIndexKey(url, policy));
-    if (primary) return primary;
-    const fallbackKey = policy.urlDerived === 'plaintext' ? await hashSearchableUrl(url) : url;
-    return context.repository.getEncryptedByUrl(fallbackKey);
-  }
-
-  private async findInteropPlainRecordBySourceUrl(context: BookmarkContext, url: string): Promise<EncryptedBookmarkRecord | undefined> {
-    for (const encrypted of await context.repository.listEncrypted()) {
-      try {
-        const payload = await context.repository.openRecord(encrypted, context.bookmarkKey.key);
-        if (payload.interop?.record.sourceUrl === url) return encrypted;
-      } catch {
-        // Unreadable records cannot participate in source URL matching.
-      }
-    }
-    return undefined;
   }
 
   async loadRecallPage(input: {
@@ -334,7 +307,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       }
     }
 
-    const plain = await this.findPlainRecordByUrl(context, url, await this.searchableMetadataPolicy());
+    const plain = await findStoredBookmarkByUrl(context.repository, context.bookmarkKey.key, url, await this.searchableMetadataPolicy());
     if (!plain) return null;
     try {
       const payload = await context.repository.openRecord(plain, context.bookmarkKey.key);
@@ -490,7 +463,9 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     urlHash: string,
   ): Promise<ImageDisplayRecord> {
     const existingProtected = await context.encryptedPins.getByUrlHash(urlHash);
-    const interopPlain = existingProtected ? undefined : await this.findInteropPlainRecordBySourceUrl(context, bookmark.url);
+    const interopPlain = existingProtected
+      ? undefined
+      : await findInteropBookmarkBySourceUrl(context.repository, context.bookmarkKey.key, bookmark.url);
     const plainPinId = existingProtected?.plainPinId ?? interopPlain?.uuid ?? crypto.randomUUID();
     const existingPlain = await context.repository.getEncrypted(plainPinId);
     const encryptedPinId = existingProtected?.id ?? crypto.randomUUID();

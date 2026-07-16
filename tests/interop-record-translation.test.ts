@@ -8,6 +8,7 @@ import { parseInteropEnvelope } from '../extension/src/core/interop/messages.js'
 import type { InteropAlbum, InteropRecord } from '../extension/src/core/interop/records.js';
 import { IndexedDbAlbumStore } from '../extension/src/data/albums-controller.js';
 import { IndexedDbBookmarkStore } from '../extension/src/data/bookmarks-controller.js';
+import { createAndActivateWrappedBlobKey, lockBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
 import { openImageTrailDb } from '../extension/src/data/db.js';
 import { InteropRecordTranslationStore } from '../extension/src/data/interop/record-translation.js';
 import { DataStore } from '../extension/src/data/schema.js';
@@ -67,6 +68,7 @@ test('canonical Overlook records persist as encrypted durable pins and export ex
     assert.equal(page.items[0]?.thumbnail, undefined);
     assert.equal(page.items[0]?.storedOriginal, undefined);
     assert.equal(page.items[0]?.source, 'favorites');
+    assert.equal((await bookmarks.findByUrl(fixture.record.sourceUrl!))?.id, imported.pinId);
 
     const albumSnapshot = await albums.listSnapshot();
     assert.equal(albumSnapshot.albums[0]?.name, fixture.albums[0]?.name);
@@ -95,6 +97,61 @@ test('canonical Overlook records persist as encrypted durable pins and export ex
     await translator.close();
     await bookmarks.close();
     await albums.close();
+  }
+});
+
+test('returning Image Trail protected pins keep their relationship and canonical custody', async () => {
+  await deleteImageTrailDb();
+  const fixture = recordFixture('round-trip-record-message.json');
+  const { active } = await createAndActivateWrappedBlobKey({
+    password: 'interop-protected-password',
+    uuid: 'interop-protected-key',
+    now: '2026-07-16T08:00:00.000Z',
+  });
+  const bookmarks = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  const translator = new InteropRecordTranslationStore();
+  try {
+    const saved = await bookmarks.save(
+      createDisplayRecord({
+        id: fixture.record.sourceUrl!,
+        url: fixture.record.sourceUrl!,
+        label: 'private-origin.jpg',
+        timestamp: '2026-07-16T08:01:00.000Z',
+        source: 'bookmark',
+      }),
+    );
+    assert.ok(saved.protectedPin?.encryptedPinId);
+    const protectedPinId = saved.protectedPin.encryptedPinId;
+    const record: InteropRecord = {
+      ...fixture.record,
+      identity: {
+        ...fixture.record.identity,
+        origin: { product: 'image-trail', localId: saved.id },
+      },
+    };
+
+    const imported = await translator.importRecord({ ...fixture, record });
+    const page = await bookmarks.loadPage({ offset: 0, limit: 10 });
+    const found = await bookmarks.findByUrl(record.sourceUrl!);
+    const lockedBookmarks = new IndexedDbBookmarkStore();
+    const lockedPage = await lockedBookmarks.loadPage({ offset: 0, limit: 10 });
+    await lockedBookmarks.close();
+
+    assert.equal(imported.pinId, saved.id);
+    assert.equal(page.total, 1);
+    assert.equal(page.items[0]?.id, saved.id);
+    assert.equal(page.items[0]?.queueUpdatedAt, saved.queueUpdatedAt);
+    assert.equal(found?.id, saved.id);
+    assert.equal(found?.privacyStatus, 'unlocked');
+    assert.equal(found?.protectedPin?.encryptedPinId, protectedPinId);
+    assert.equal(lockedPage.items[0]?.id, saved.id);
+    assert.equal(lockedPage.items[0]?.privacyStatus, 'locked');
+    assert.equal(lockedPage.items[0]?.protectedPin?.encryptedPinId, protectedPinId);
+    assert.deepEqual(await translator.exportRecord(record.identity.interopId), { ...fixture, record });
+  } finally {
+    await translator.close();
+    await bookmarks.close();
+    lockBlobKey();
   }
 });
 

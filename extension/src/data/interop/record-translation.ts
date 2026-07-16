@@ -85,7 +85,7 @@ export class InteropRecordTranslationStore {
     const displayUrl = interopDisplayUrl(normalized.record);
     const now = normalized.receivedAt ?? canonicalQueueTime(normalized.record);
     const payload = translatePayload(normalized, displayUrl, previous);
-    const indexUrl = `${INTERNAL_RECORD_PREFIX}${normalized.record.identity.interopId}`;
+    const indexUrl = previous?.protectedPin ? localOrigin!.url : `${INTERNAL_RECORD_PREFIX}${normalized.record.identity.interopId}`;
 
     await context.bookmarks.sealAndPut(
       pinId,
@@ -244,6 +244,13 @@ function translatePayload(
   previous: DurableBookmarkPayloadV1 | null,
 ): DurableBookmarkPayloadV1 {
   const record = input.record;
+  const interop: DurableInteropRecordV1 = {
+    schemaVersion: 1,
+    record,
+    albums: input.albums,
+    reviewCategory: input.reviewCategory,
+  };
+  if (previous?.protectedPin) return { ...previous, interop };
   return {
     url: displayUrl,
     title: record.title ?? undefined,
@@ -256,12 +263,7 @@ function translatePayload(
     capturedAt: record.timestamps.capturedAt ?? undefined,
     sourceCompatibility: record.sourceCompatibility === 'favorites' ? 'favorites' : undefined,
     storedOriginal: input.verifiedOriginal ?? retainedOriginal(record, previous),
-    interop: {
-      schemaVersion: 1,
-      record,
-      albums: input.albums,
-      reviewCategory: input.reviewCategory,
-    },
+    interop,
   };
 }
 
@@ -284,7 +286,7 @@ async function localOriginTarget(context: TranslationContext, record: InteropRec
   const encrypted = await context.bookmarks.getEncrypted(record.identity.origin.localId);
   if (!encrypted) return null;
   const payload = await context.bookmarks.openRecord(encrypted, context.bookmarkKey.key).catch(() => null);
-  return payload?.protectedPin ? null : encrypted;
+  return payload ? encrypted : null;
 }
 
 async function listStoredInteropPins(context: TranslationContext): Promise<readonly StoredInteropPin[]> {
