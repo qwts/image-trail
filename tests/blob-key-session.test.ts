@@ -41,6 +41,7 @@ class FakeClock implements SessionUnlockClock {
 class MemorySessionStorage implements BlobKeySessionStorage {
   readonly values = new Map<string, unknown>();
   accessLevel: string | null = null;
+  rejectAccessLevel = false;
 
   get(key: string): Promise<Record<string, unknown>> {
     return Promise.resolve({ [key]: this.values.get(key) });
@@ -57,6 +58,7 @@ class MemorySessionStorage implements BlobKeySessionStorage {
   }
 
   setAccessLevel(options: { accessLevel: 'TRUSTED_CONTEXTS' }): Promise<void> {
+    if (this.rejectAccessLevel) return Promise.reject(new Error('access-level blocked'));
     this.accessLevel = options.accessLevel;
     return Promise.resolve();
   }
@@ -117,4 +119,29 @@ test('malformed worker-recovery state fails closed and is erased', async () => {
   assert.equal(await session.restore(), null);
   assert.equal(session.restoreFailed, true);
   assert.equal(storage.values.size, 0);
+});
+
+test('does not persist raw key material when trusted-context hardening fails', async () => {
+  const storage = new MemorySessionStorage();
+  storage.rejectAccessLevel = true;
+  const session = new BlobKeySession();
+  session.configureStorage(storage);
+
+  const active = await session.unlock(createKeyReference('blob', 'untrusted-storage'), await generateAesGcmKey(true), undefined, 10);
+
+  assert.equal(active.key.extractable, false);
+  assert.equal(session.restoreFailed, true);
+  assert.equal(storage.values.size, 0);
+});
+
+test('missing session storage fails closed without preventing an in-memory unlock', async () => {
+  const session = new BlobKeySession();
+  session.configureStorage(undefined);
+
+  assert.equal(await session.restore(), null);
+  assert.equal(session.restoreFailed, true);
+  const active = await session.unlock(createKeyReference('blob', 'memory-only'), await generateAesGcmKey(true), undefined, 10);
+
+  assert.equal(active.key.extractable, false);
+  assert.equal(session.restoreFailed, true);
 });

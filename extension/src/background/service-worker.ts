@@ -120,7 +120,11 @@ interface PreviewPayload {
 }
 const previewPayloads = new Map<string, PreviewPayload>();
 const imageRequests = new ImageRequestManager();
-configureBlobKeySessionStorage(chrome.storage.session);
+try {
+  configureBlobKeySessionStorage(chrome.storage?.session);
+} catch {
+  configureBlobKeySessionStorage(undefined);
+}
 const bookmarkStore = new IndexedDbBookmarkStore({
   getActiveBlobKey: restoreActiveBlobKey,
   getPinSaveStoragePreference: async () => (await loadLocalSettings()).pinSaveStoragePreference,

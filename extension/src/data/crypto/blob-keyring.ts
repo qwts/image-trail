@@ -33,7 +33,7 @@ export interface WrappedBlobKey {
 
 const blobKeySession = new BlobKeySession();
 
-export function configureBlobKeySessionStorage(storage: BlobKeySessionStorage): void {
+export function configureBlobKeySessionStorage(storage?: BlobKeySessionStorage): void {
   blobKeySession.configureStorage(storage);
 }
 

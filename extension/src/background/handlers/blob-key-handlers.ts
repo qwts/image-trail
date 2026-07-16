@@ -76,10 +76,10 @@ export function createBlobKeyMessageRegistry({
     const hasKey = blobKeys.length > 0;
     const snapshot = getBlobKeySessionSnapshot();
     const reason = hasKey
-      ? didBlobKeySessionRestoreFail()
-        ? 'worker-restart'
-        : snapshot.status === 'locked'
-          ? snapshot.reason
+      ? snapshot.status === 'locked' && snapshot.reason
+        ? snapshot.reason
+        : didBlobKeySessionRestoreFail()
+          ? 'worker-restart'
           : undefined
       : undefined;
     const message =

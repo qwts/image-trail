@@ -79,6 +79,7 @@ async function importActiveKey(rawKey: string, crypto: Crypto): Promise<CryptoKe
 export class BlobKeySession {
   private readonly state: SessionUnlockState<'blob'>;
   private storage: BlobKeySessionStorage | null = null;
+  private storageTrusted: Promise<boolean> = Promise.resolve(false);
   private rawKey: string | null = null;
   private restoreAttempted = false;
   private recoveryFailure = false;
@@ -90,11 +91,11 @@ export class BlobKeySession {
     this.state = new SessionUnlockState<'blob'>(clock, () => this.expirePersistedSession());
   }
 
-  configureStorage(storage: BlobKeySessionStorage): void {
-    this.storage = storage;
+  configureStorage(storage?: BlobKeySessionStorage): void {
+    this.storage = storage ?? null;
     this.restoreAttempted = false;
-    this.recoveryFailure = false;
-    void storage.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' }).catch(() => {});
+    this.recoveryFailure = !storage;
+    this.storageTrusted = storage ? this.confirmTrustedStorage(storage) : Promise.resolve(false);
   }
 
   peek(): ActiveBlobKeySession | null {
@@ -104,10 +105,12 @@ export class BlobKeySession {
 
   async restore(): Promise<ActiveBlobKeySession | null> {
     const active = this.peek();
-    if (active || this.restoreAttempted || !this.storage) return active;
+    if (active || this.restoreAttempted) return active;
+    const storage = await this.trustedStorage();
     this.restoreAttempted = true;
+    if (!storage) return null;
     try {
-      const value = (await this.storage.get(SESSION_STORAGE_KEY))[SESSION_STORAGE_KEY];
+      const value = (await storage.get(SESSION_STORAGE_KEY))[SESSION_STORAGE_KEY];
       if (value === undefined) return null;
       const stored = parseStoredSession(value);
       if (!stored) {
@@ -141,7 +144,7 @@ export class BlobKeySession {
     this.state.unlock(keyReference, key, now, timeoutMinutes);
     this.restoreAttempted = true;
     this.recoveryFailure = false;
-    await this.persist();
+    if (!(await this.persist())) this.recoveryFailure = true;
     return { reference: keyReference, key };
   }
 
@@ -171,9 +174,11 @@ export class BlobKeySession {
     return this.recoveryFailure;
   }
 
-  private async persist(): Promise<void> {
+  private async persist(): Promise<boolean> {
     const snapshot = this.state.snapshot;
-    if (!this.storage || !this.rawKey || snapshot.status !== 'unlocked') return;
+    if (!this.rawKey || snapshot.status !== 'unlocked') return false;
+    const storage = await this.trustedStorage();
+    if (!storage) return false;
     const record: StoredBlobKeySession = {
       version: 1,
       keyReference: snapshot.keyReference,
@@ -182,7 +187,15 @@ export class BlobKeySession {
       lastActivityAt: snapshot.lastActivityAt,
       timeoutMinutes: snapshot.timeoutMinutes,
     };
-    await this.storage.set({ [SESSION_STORAGE_KEY]: record });
+    try {
+      await storage.set({ [SESSION_STORAGE_KEY]: record });
+      return true;
+    } catch {
+      this.recoveryFailure = true;
+      this.storageTrusted = Promise.resolve(false);
+      await this.clearPersistedSession();
+      return false;
+    }
   }
 
   private expirePersistedSession(): void {
@@ -192,6 +205,30 @@ export class BlobKeySession {
 
   private async clearPersistedSession(): Promise<void> {
     this.rawKey = null;
-    await this.storage?.remove(SESSION_STORAGE_KEY);
+    try {
+      await this.storage?.remove(SESSION_STORAGE_KEY);
+    } catch {
+      this.recoveryFailure = true;
+    }
+  }
+
+  private async confirmTrustedStorage(storage: BlobKeySessionStorage): Promise<boolean> {
+    try {
+      if (!storage.setAccessLevel) throw new Error('Session storage access-level hardening is unavailable.');
+      await storage.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+      return true;
+    } catch {
+      this.recoveryFailure = true;
+      try {
+        await storage.remove(SESSION_STORAGE_KEY);
+      } catch {
+        // Recovery remains disabled and locked even when cleanup is blocked.
+      }
+      return false;
+    }
+  }
+
+  private async trustedStorage(): Promise<BlobKeySessionStorage | null> {
+    return this.storage && (await this.storageTrusted) ? this.storage : null;
   }
 }
