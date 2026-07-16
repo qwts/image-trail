@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.17.0
+
+### Minor Changes
+
+- ef2ce9c: Add isolated, resumable pCloud, Google Drive, and signed native iCloud interoperability transports.
+
 ## 0.16.0
 
 ### Minor Changes
