@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.14.0
+
+### Minor Changes
+
+- b39c226: Persist canonical Overlook records and album metadata in encrypted durable pins with deterministic interop previews and exact round-trip export.
+
 ## 0.13.0
 
 ### Minor Changes
