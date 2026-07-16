@@ -1,0 +1,36 @@
+import { createKeyReference } from './crypto/key-reference.js';
+import type { KeyReference, StoredKeyRecord } from './crypto/types.js';
+import { generateAesGcmKey } from './crypto/webcrypto.js';
+import type { KeysRepository } from './repositories/keys-repository.js';
+
+interface DurableBookmarkKeyRecord extends StoredKeyRecord<'bookmark'> {
+  readonly key: CryptoKey;
+}
+
+export interface DurableBookmarkKeyContext {
+  readonly reference: KeyReference<'bookmark'>;
+  readonly key: CryptoKey;
+}
+
+export async function ensureDurableBookmarkKey(repository: KeysRepository): Promise<DurableBookmarkKeyContext> {
+  const existing = (await repository.listByKind('bookmark')).find(isDurableBookmarkKeyRecord);
+  if (existing) return { reference: existing, key: existing.key };
+
+  const uuid = crypto.randomUUID();
+  const reference = createKeyReference('bookmark', uuid);
+  const now = new Date().toISOString();
+  const record: DurableBookmarkKeyRecord = {
+    ...reference,
+    key: await generateAesGcmKey(false),
+    createdAt: now,
+    updatedAt: now,
+    wrapping: { mode: 'indexeddb', algorithm: 'none' },
+    extractable: false,
+  };
+  await repository.put(record);
+  return { reference, key: record.key };
+}
+
+function isDurableBookmarkKeyRecord(record: StoredKeyRecord): record is DurableBookmarkKeyRecord {
+  return typeof CryptoKey !== 'undefined' && record.kind === 'bookmark' && record.key instanceof CryptoKey;
+}

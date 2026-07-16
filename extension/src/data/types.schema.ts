@@ -1,4 +1,6 @@
 import * as v from 'valibot';
+import { interopReviewCategorySchema } from '../core/interop/contract.js';
+import { interopAlbumSchema, interopRecordSchema } from '../core/interop/records.js';
 import type { Assert, MutuallyAssignable } from '../core/schema-assert.js';
 import { storedOriginalReferenceSchema } from '../core/image/capture-result.schema.js';
 import { encryptionAlgorithmSchema, keyReferenceForKind } from './crypto/types.schema.js';
@@ -59,6 +61,14 @@ export const durableBookmarkPayloadSchema = v.object({
   sourceCompatibility: v.optional(v.literal('favorites')),
   storedOriginal: v.optional(storedOriginalReferenceSchema),
   protectedPin: v.optional(protectedPinRelationshipSchema),
+  interop: v.optional(
+    v.object({
+      schemaVersion: v.literal(1),
+      record: interopRecordSchema,
+      albums: v.pipe(v.array(interopAlbumSchema), v.readonly()),
+      reviewCategory: interopReviewCategorySchema,
+    }),
+  ),
 });
 
 export const durableEncryptedPinPayloadSchema = v.object({

@@ -268,6 +268,7 @@ test('invariant: interoperability custody never reaches host-page, provider, log
   const interopCustodyModules = [
     'extension/src/data/interop/pairing-bundle.ts',
     'extension/src/data/interop/pairing-import.ts',
+    'extension/src/data/interop/record-translation.ts',
     'extension/src/data/repositories/interop-keys-repository.ts',
   ];
   const forbidden: readonly (readonly [RegExp, string])[] = [

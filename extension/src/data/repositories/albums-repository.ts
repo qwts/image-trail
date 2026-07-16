@@ -129,6 +129,29 @@ export class AlbumsRepository {
     return added;
   }
 
+  async replaceRecords(
+    albumId: string,
+    recordIds: readonly string[],
+    now = new Date().toISOString(),
+  ): Promise<readonly AlbumMembershipRecord[]> {
+    const uniqueIds = [...new Set(recordIds.map((id) => id.trim()).filter(Boolean))];
+    const transaction = this.db.transaction([DataStore.Albums, DataStore.AlbumMemberships], 'readwrite');
+    const albums = transaction.objectStore(DataStore.Albums);
+    const album = hydrateRecord(DataStore.Albums, albumRecordSchema, await requestToPromise<unknown>(albums.get(albumId)));
+    if (!album) {
+      await transactionDone(transaction);
+      return [];
+    }
+
+    const memberships = transaction.objectStore(DataStore.AlbumMemberships);
+    await deleteCursorRange(memberships.index(SchemaIndex.AlbumMembershipsByAlbumId).openCursor(IDBKeyRange.only(albumId)));
+    const replaced = uniqueIds.map((recordId, position) => albumMembershipRecord(albumId, recordId, position, now));
+    for (const membership of replaced) memberships.put(membership);
+    albums.put({ ...album, updatedAt: now });
+    await transactionDone(transaction);
+    return replaced;
+  }
+
   async removeRecord(albumId: string, recordId: string, now = new Date().toISOString()): Promise<boolean> {
     const transaction = this.db.transaction([DataStore.Albums, DataStore.AlbumMemberships], 'readwrite');
     const albums = transaction.objectStore(DataStore.Albums);

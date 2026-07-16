@@ -9,10 +9,8 @@ import {
 } from '../core/metadata-policy.js';
 import type { BookmarkStore, PinSaveStoragePreference } from '../core/types.js';
 import type { ActiveBlobKey } from './crypto/blob-keyring.js';
-import { createKeyReference } from './crypto/key-reference.js';
-import type { KeyReference, StoredKeyRecord } from './crypto/types.js';
-import { generateAesGcmKey } from './crypto/webcrypto.js';
 import { openImageTrailDb } from './db.js';
+import { ensureDurableBookmarkKey, type DurableBookmarkKeyContext } from './durable-bookmark-key.js';
 import { DEFAULT_LOCAL_SETTINGS } from './local-settings.js';
 import { DEFAULT_QUEUE_DISPLAY_ORDER, queueTimeForRecord, sortQueueRecords, type QueueDisplayOrder } from '../core/display-order.js';
 import { BlobsRepository } from './repositories/blobs-repository.js';
@@ -21,15 +19,6 @@ import { EncryptedPinsRepository, type EncryptedPinRecord } from './repositories
 import { EncryptedPinThumbnailsRepository } from './repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from './repositories/keys-repository.js';
 import type { DurableBookmarkPayloadV1, DurableEncryptedPinPayloadV1, ProtectedPinRelationshipV1 } from './types.js';
-
-interface DurableBookmarkKeyRecord extends StoredKeyRecord<'bookmark'> {
-  readonly key: CryptoKey;
-}
-
-interface BookmarkKeyContext {
-  readonly reference: KeyReference<'bookmark'>;
-  readonly key: CryptoKey;
-}
 
 interface ProtectedBookmarkOptions {
   readonly getActiveBlobKey?: () => ActiveBlobKey | null | Promise<ActiveBlobKey | null>;
@@ -40,7 +29,7 @@ interface ProtectedBookmarkOptions {
 type BookmarkContext = {
   readonly db: IDBDatabase;
   readonly repository: BookmarksRepository;
-  readonly bookmarkKey: BookmarkKeyContext;
+  readonly bookmarkKey: DurableBookmarkKeyContext;
   readonly encryptedPins: EncryptedPinsRepository;
   readonly encryptedThumbnails: EncryptedPinThumbnailsRepository;
   readonly blobs: BlobsRepository;
@@ -171,15 +160,17 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const importedDataUrl = bookmark.url.startsWith('data:image/');
 
     const policy = await this.searchableMetadataPolicy();
-    const indexUrl = importedDataUrl ? `image-trail-import:${bookmark.id}` : await bookmarkSearchIndexKey(bookmark.url, policy);
+    const proposedIndexUrl = importedDataUrl ? `image-trail-import:${bookmark.id}` : await bookmarkSearchIndexKey(bookmark.url, policy);
     const existing = importedDataUrl
       ? await context.repository.getEncrypted(bookmark.id)
-      : await this.findPlainRecordByUrl(context, bookmark.url, policy);
+      : ((await this.findPlainRecordByUrl(context, bookmark.url, policy)) ??
+        (await this.findInteropPlainRecordBySourceUrl(context, bookmark.url)));
     const existingPayload = existing ? await context.repository.openRecord(existing, context.bookmarkKey.key).catch(() => null) : null;
+    const indexUrl = existingPayload?.interop ? existing!.url : proposedIndexUrl;
     const uuid = existing?.uuid ?? crypto.randomUUID();
     await context.repository.sealAndPut(
       uuid,
-      toPayload(bookmark),
+      toPayload(bookmark, existingPayload?.interop),
       context.bookmarkKey.key,
       context.bookmarkKey.reference,
       existing?.envelope.updatedAt,
@@ -212,6 +203,18 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     if (primary) return primary;
     const fallbackKey = policy.urlDerived === 'plaintext' ? await hashSearchableUrl(url) : url;
     return context.repository.getEncryptedByUrl(fallbackKey);
+  }
+
+  private async findInteropPlainRecordBySourceUrl(context: BookmarkContext, url: string): Promise<EncryptedBookmarkRecord | undefined> {
+    for (const encrypted of await context.repository.listEncrypted()) {
+      try {
+        const payload = await context.repository.openRecord(encrypted, context.bookmarkKey.key);
+        if (payload.interop?.record.sourceUrl === url) return encrypted;
+      } catch {
+        // Unreadable records cannot participate in source URL matching.
+      }
+    }
+    return undefined;
   }
 
   async loadRecallPage(input: {
@@ -487,7 +490,8 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     urlHash: string,
   ): Promise<ImageDisplayRecord> {
     const existingProtected = await context.encryptedPins.getByUrlHash(urlHash);
-    const plainPinId = existingProtected?.plainPinId ?? crypto.randomUUID();
+    const interopPlain = existingProtected ? undefined : await this.findInteropPlainRecordBySourceUrl(context, bookmark.url);
+    const plainPinId = existingProtected?.plainPinId ?? interopPlain?.uuid ?? crypto.randomUUID();
     const existingPlain = await context.repository.getEncrypted(plainPinId);
     const encryptedPinId = existingProtected?.id ?? crypto.randomUUID();
     const existingPlainPayload = existingPlain
@@ -517,7 +521,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       });
       await context.repository.sealAndPut(
         plainPinId,
-        toRelationshipPayload(relationship),
+        toRelationshipPayload(relationship, existingPlainPayload?.interop),
         context.bookmarkKey.key,
         context.bookmarkKey.reference,
         existingPlain?.envelope.updatedAt,
@@ -635,7 +639,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   private async loadRecallPageByScanning(
     context: {
       readonly repository: BookmarksRepository;
-      readonly bookmarkKey: BookmarkKeyContext;
+      readonly bookmarkKey: DurableBookmarkKeyContext;
     },
     input: {
       readonly scope?: 'global' | 'site' | undefined;
@@ -733,36 +737,13 @@ async function removeReplacedOriginal(
   await context.blobs.remove(previousBlobId);
 }
 
-async function ensureDurableBookmarkKey(repository: KeysRepository): Promise<BookmarkKeyContext> {
-  const existing = (await repository.listByKind('bookmark')).find(isDurableBookmarkKeyRecord);
-  if (existing) return { reference: existing, key: existing.key };
-
-  const uuid = crypto.randomUUID();
-  const reference = createKeyReference('bookmark', uuid);
-  const now = new Date().toISOString();
-  const record: DurableBookmarkKeyRecord = {
-    ...reference,
-    key: await generateAesGcmKey(false),
-    createdAt: now,
-    updatedAt: now,
-    wrapping: { mode: 'indexeddb', algorithm: 'none' },
-    extractable: false,
-  };
-  await repository.put(record);
-  return { reference, key: record.key };
-}
-
-function isDurableBookmarkKeyRecord(record: StoredKeyRecord): record is DurableBookmarkKeyRecord {
-  return typeof CryptoKey !== 'undefined' && record.kind === 'bookmark' && record.key instanceof CryptoKey;
-}
-
 function clampPageOffset(offset: number, limit: number, total: number): number {
   if (total <= 0) return 0;
   const lastPageOffset = Math.floor((total - 1) / limit) * limit;
   return Math.min(offset, lastPageOffset);
 }
 
-function toPayload(record: ImageDisplayRecord): DurableBookmarkPayloadV1 {
+function toPayload(record: ImageDisplayRecord, interop?: DurableBookmarkPayloadV1['interop']): DurableBookmarkPayloadV1 {
   return {
     url: record.url,
     title: record.title,
@@ -784,6 +765,7 @@ function toPayload(record: ImageDisplayRecord): DurableBookmarkPayloadV1 {
           queueUpdatedAt: record.timestamp,
         })
       : undefined,
+    interop,
   };
 }
 
@@ -844,13 +826,17 @@ function toProtectedPayload(record: ImageDisplayRecord, thumbnailId: string | un
   };
 }
 
-function toRelationshipPayload(relationship: ProtectedPinRelationshipV1): DurableBookmarkPayloadV1 {
+function toRelationshipPayload(
+  relationship: ProtectedPinRelationshipV1,
+  interop?: DurableBookmarkPayloadV1['interop'],
+): DurableBookmarkPayloadV1 {
   return {
     url: privatePinUrl(relationship.plainPinId),
     label: 'Private pin',
     bookmarkedAt: relationship.queueUpdatedAt,
     sourceCompatibility: 'favorites',
     protectedPin: relationship,
+    interop,
   };
 }
 

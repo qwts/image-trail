@@ -1,4 +1,6 @@
 import type { EncryptionAlgorithm, KeyReference } from './crypto/types.js';
+import type { InteropReviewCategory } from '../core/interop/contract.js';
+import type { InteropAlbum, InteropRecord } from '../core/interop/records.js';
 
 export type DataStoreName =
   | 'metadata'
@@ -90,6 +92,14 @@ export interface DurableBookmarkPayloadV1 {
   readonly sourceCompatibility?: 'favorites' | undefined;
   readonly storedOriginal?: StoredOriginalReference | undefined;
   readonly protectedPin?: ProtectedPinRelationshipV1 | undefined;
+  readonly interop?: DurableInteropRecordV1 | undefined;
+}
+
+export interface DurableInteropRecordV1 {
+  readonly schemaVersion: 1;
+  readonly record: InteropRecord;
+  readonly albums: readonly InteropAlbum[];
+  readonly reviewCategory: InteropReviewCategory;
 }
 
 export interface ProtectedPinRelationshipV1 {
