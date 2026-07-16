@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.12.3
+
+### Patch Changes
+
+- 9627f35: Keep encrypted originals unlocked for the configured inactivity period across Manifest V3 worker restarts, with 5, 10, 15 minute and Never policies plus immediate manual lock.
+
 ## 0.12.2
 
 ### Patch Changes
