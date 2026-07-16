@@ -118,4 +118,33 @@ describe('Google Drive drive.file interoperability adapter (#588)', () => {
     assert.deepEqual((await store.list('pairings/a', null)).entries, [{ path: 'pairings/a/object.bin', bytes: 3 }]);
     assert.ok(requests.some((request) => request.startsWith('PUT /upload-session')));
   });
+
+  test('continues a partial resumable upload from the provider-acknowledged byte', async () => {
+    const uploaded: number[] = [];
+    let uploadRequest = 0;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/drive/v3/files')
+        return Response.json({
+          files: url.searchParams.get('q')?.includes("name = 'Image Trail Interop'") ? [{ id: 'root-1' }] : [],
+        });
+      if (url.pathname.startsWith('/upload/drive/v3/files'))
+        return new Response(null, { status: 200, headers: { location: 'https://www.googleapis.com/upload-session' } });
+      if (url.pathname === '/upload-session') {
+        uploadRequest += 1;
+        const body = new Uint8Array((init?.body as ArrayBuffer) ?? new ArrayBuffer(0));
+        if (uploadRequest === 1) {
+          uploaded.push(body[0] as number);
+          return new Response(null, { status: 308, headers: { range: 'bytes=0-0' } });
+        }
+        uploaded.push(...body);
+        return Response.json({ id: 'file-1', size: String(uploaded.length) });
+      }
+      throw new Error(`Unexpected request: ${String(input)}`);
+    };
+    const store = new GoogleDriveInteropObjectStore({ accessToken: () => Promise.resolve('drive-file-token'), fetchImpl });
+
+    assert.deepEqual(await store.put('pairings/a/object.bin', new Uint8Array([4, 5, 6])), { bytes: 3 });
+    assert.deepEqual(uploaded, [4, 5, 6]);
+  });
 });

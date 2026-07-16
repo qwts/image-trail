@@ -89,15 +89,7 @@ export class GoogleDriveInteropObjectStore implements InteropObjectStore {
     const location = started.headers.get('location');
     if (location === null || new URL(location).hostname !== 'www.googleapis.com')
       throw new InteropTransportError('Google Drive returned an unsafe resumable location.', 'corrupt', false);
-    const uploaded = await this.authorized(location, {
-      method: 'PUT',
-      headers: {
-        'content-length': String(bytes.byteLength),
-        'content-range': bytes.byteLength === 0 ? 'bytes */0' : `bytes 0-${String(bytes.byteLength - 1)}/${String(bytes.byteLength)}`,
-      },
-      body: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-    });
-    if (!uploaded.ok) throw await this.responseError(uploaded);
+    const uploaded = await this.uploadResumable(location, bytes);
     const file = (await uploaded.json()) as DriveFile;
     const stored = bytesValue(file.size);
     if (stored === null) throw new InteropTransportError('Google Drive returned incomplete upload metadata.', 'partial-failure', true);
@@ -236,6 +228,30 @@ export class GoogleDriveInteropObjectStore implements InteropObjectStore {
       return this.authorized(url, init, true);
     }
     return response;
+  }
+
+  private async uploadResumable(location: string, bytes: Uint8Array): Promise<Response> {
+    let offset = 0;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const remaining = bytes.subarray(offset);
+      const response = await this.authorized(location, {
+        method: 'PUT',
+        headers: {
+          'content-length': String(remaining.byteLength),
+          'content-range':
+            bytes.byteLength === 0 ? 'bytes */0' : `bytes ${String(offset)}-${String(bytes.byteLength - 1)}/${String(bytes.byteLength)}`,
+        },
+        body: remaining.buffer.slice(remaining.byteOffset, remaining.byteOffset + remaining.byteLength) as ArrayBuffer,
+      });
+      if (response.ok) return response;
+      if (response.status !== 308) throw await this.responseError(response);
+      const range = response.headers.get('range')?.match(/^bytes=0-(\d+)$/u);
+      const nextOffset = range?.[1] === undefined ? 0 : Number(range[1]) + 1;
+      if (!Number.isSafeInteger(nextOffset) || nextOffset <= offset || nextOffset >= bytes.byteLength)
+        throw new InteropTransportError('Google Drive returned an invalid resumable upload range.', 'partial-failure', true);
+      offset = nextOffset;
+    }
+    throw new InteropTransportError('Google Drive did not complete the resumable upload.', 'partial-failure', true);
   }
 
   private async responseError(response: Response): Promise<InteropTransportError> {
