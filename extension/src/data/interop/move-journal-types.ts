@@ -10,7 +10,7 @@ import {
   type InteropTransferPhase,
 } from '../../core/interop/contract.js';
 import { interopCountsSchema, interopEnvelopeSchema, type InteropCounts, type InteropEnvelope } from '../../core/interop/messages.js';
-import { interopRecordSchema, type InteropRecord } from '../../core/interop/records.js';
+import { interopAlbumSchema, interopRecordSchema, type InteropAlbum, type InteropRecord } from '../../core/interop/records.js';
 
 export const moveItemStateSchema = v.picklist(['queued', 'received', 'acknowledged', 'finalizing', 'finalized', 'rejected', 'failed']);
 export const moveOriginalVerificationSchema = v.picklist(['pending', 'verified', 'metadata-only', 'unavailable']);
@@ -39,6 +39,7 @@ export interface MoveItemRecord {
   readonly sourceLocalId: string;
   readonly reviewCategory: InteropReviewCategory;
   readonly record: InteropRecord;
+  readonly albums: readonly InteropAlbum[];
   readonly state: MoveItemState;
   readonly targetLocalId: string | null;
   readonly metadataPersisted: boolean;
@@ -104,6 +105,7 @@ export const moveItemRecordSchema = v.object({
   sourceLocalId: v.pipe(v.string(), v.minLength(1)),
   reviewCategory: interopReviewCategorySchema,
   record: interopRecordSchema,
+  albums: v.pipe(v.array(interopAlbumSchema), v.readonly()),
   state: moveItemStateSchema,
   targetLocalId: v.nullable(v.pipe(v.string(), v.minLength(1))),
   metadataPersisted: v.boolean(),

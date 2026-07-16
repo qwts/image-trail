@@ -63,7 +63,8 @@ export class MoveJournalRepository {
     if (
       item.sourceMessageId !== envelope.header.messageId ||
       item.reviewCategory !== envelope.payload.reviewCategory ||
-      !sameMoveValue(item.record, envelope.payload.record)
+      !sameMoveValue(item.record, envelope.payload.record) ||
+      !sameMoveValue(item.albums, envelope.payload.albums)
     ) {
       transaction.abort();
       throw new MoveJournalError('Move item identity was replayed with different content.');
@@ -109,7 +110,13 @@ export class MoveJournalRepository {
     const items = transaction.objectStore(DataStore.MoveItems);
     const id = moveItemId(request.header.transferId, request.payload.record.identity.interopId);
     const existing = hydrateRecord(DataStore.MoveItems, moveItemRecordSchema, await requestToPromise<unknown>(items.get(id)));
-    if (existing && (existing.sourceMessageId !== request.header.messageId || !sameMoveValue(existing.record, request.payload.record))) {
+    if (
+      existing &&
+      (existing.sourceMessageId !== request.header.messageId ||
+        existing.reviewCategory !== request.payload.reviewCategory ||
+        !sameMoveValue(existing.record, request.payload.record) ||
+        !sameMoveValue(existing.albums, request.payload.albums))
+    ) {
       transaction.abort();
       throw new MoveJournalError('Move item identity was replayed with different content.');
     }

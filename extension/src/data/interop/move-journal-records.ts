@@ -47,6 +47,7 @@ export function queuedMoveItem(envelope: MoveRecordEnvelope): MoveItemRecord {
     sourceLocalId: envelope.payload.record.identity.origin.localId,
     reviewCategory: envelope.payload.reviewCategory,
     record: envelope.payload.record,
+    albums: envelope.payload.albums,
     state: 'queued',
     targetLocalId: null,
     metadataPersisted: false,

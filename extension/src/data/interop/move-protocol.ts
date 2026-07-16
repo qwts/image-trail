@@ -3,7 +3,12 @@ import { parseInteropEnvelope, type InteropEnvelope, type InteropError } from '.
 import type { InteropRecord } from '../../core/interop/records.js';
 import type { StoredOriginalReference } from '../types.js';
 import type { InteropRecordTranslationStore } from './record-translation.js';
-import { isMoveAcknowledgementEnvelope, isMoveRecordEnvelope, type MoveAcknowledgementEnvelope } from './move-journal-records.js';
+import {
+  isMoveAcknowledgementEnvelope,
+  isMoveRecordEnvelope,
+  sameMoveValue,
+  type MoveAcknowledgementEnvelope,
+} from './move-journal-records.js';
 import { MoveJournalError, type MoveJournalRepository } from './move-journal-repository.js';
 import type { MoveOriginalVerification, StoredMoveJournal } from './move-journal-types.js';
 
@@ -87,7 +92,7 @@ export class MoveProtocolService {
       throw new MoveProtocolError('Only the target product may receive a Move request.');
     }
     const replayed = await this.journals.responseForReceipt(request.header.pairingId, request.header.messageId);
-    if (replayed) this.assertReplayIdentity(request, replayed);
+    if (replayed) await this.assertReplayIdentity(request, replayed);
     if (
       replayed &&
       isMoveAcknowledgementEnvelope(replayed) &&
@@ -248,7 +253,10 @@ export class MoveProtocolService {
     return request;
   }
 
-  private assertReplayIdentity(request: ReturnType<MoveProtocolService['requireRecordRequest']>, replayed: InteropEnvelope): void {
+  private async assertReplayIdentity(
+    request: ReturnType<MoveProtocolService['requireRecordRequest']>,
+    replayed: InteropEnvelope,
+  ): Promise<void> {
     if (
       replayed.header.transferId !== request.header.transferId ||
       replayed.header.pairingId !== request.header.pairingId ||
@@ -256,6 +264,16 @@ export class MoveProtocolService {
       replayed.header.targetProduct !== request.header.sourceProduct
     ) {
       throw new MoveProtocolError('Move replay identity was reused across transfer identities.');
+    }
+    const item = await this.journals.getItem(request.header.transferId, request.payload.record.identity.interopId);
+    if (
+      !item ||
+      item.sourceMessageId !== request.header.messageId ||
+      item.reviewCategory !== request.payload.reviewCategory ||
+      !sameMoveValue(item.record, request.payload.record) ||
+      !sameMoveValue(item.albums, request.payload.albums)
+    ) {
+      throw new MoveProtocolError('Move replay identity was reused with different content.');
     }
   }
 

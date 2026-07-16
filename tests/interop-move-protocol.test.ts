@@ -139,6 +139,35 @@ test('metadata-only Move resumes across every durable boundary without claiming 
     await target.service.receive(request, { verify: () => assert.fail('accepted replay must not verify') }),
     acknowledgement,
   );
+  assert.equal(request.payload.kind, 'record');
+  if (request.payload.kind !== 'record') throw new Error('record fixture expected');
+  const alternate = fixture('round-trip-record-message');
+  assert.equal(alternate.payload.kind, 'record');
+  if (alternate.payload.kind !== 'record') throw new Error('record fixture expected');
+  const changedReplays = [
+    parseInteropEnvelope({
+      ...request,
+      payload: { ...request.payload, record: { ...request.payload.record, title: 'Changed replay title' } },
+    }),
+    parseInteropEnvelope({ ...request, payload: { ...request.payload, reviewCategory: 'eligible' } }),
+    parseInteropEnvelope({ ...request, payload: { ...request.payload, albums: alternate.payload.albums } }),
+    parseInteropEnvelope({
+      ...request,
+      payload: {
+        ...request.payload,
+        record: {
+          ...request.payload.record,
+          identity: { ...request.payload.record.identity, interopId: '59999999-9999-4999-8999-999999999999' },
+        },
+      },
+    }),
+  ];
+  for (const changedReplay of changedReplays) {
+    await assert.rejects(
+      target.service.receive(changedReplay, { verify: () => assert.fail('changed replay must fail before verification') }),
+      /reused with different content/u,
+    );
+  }
   await assert.rejects(
     target.service.receive(
       parseInteropEnvelope({ ...request, header: { ...request.header, transferId: '59999999-9999-4999-8999-999999999999' } }),
