@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.15.0
+
+### Minor Changes
+
+- f470df2: Add durable acknowledged Move journals with replay-safe counts and verified source deletion guards.
+
 ## 0.14.1
 
 ### Patch Changes
