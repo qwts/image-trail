@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.14.1
+
+### Patch Changes
+
+- 1388a80: Keep imported interop pins discoverable by their source URL and preserve protected Image Trail relationships during round trips.
+
 ## 0.14.0
 
 ### Minor Changes
