@@ -22,6 +22,7 @@ function HeaderActions({ state, dispatch }: { readonly state: PanelState; readon
   );
   return (
     <div className="image-trail-panel__header-actions image-trail-ds__panel-header-actions">
+      {state.blobKeyAvailable && state.blobKeyUnlocked ? action('Lock workspace', 'Lock', () => dispatch({ name: 'blob-key/lock' })) : null}
       {action(state.helpOpen ? 'Hide help' : 'Show help', '?', () => dispatch({ name: 'help/toggle' }), state.helpOpen)}
       {action('Minimize panel', '−', () => dispatch({ name: 'panel/minimize' }))}
       {action('Close panel', '×', () => dispatch({ name: 'close-panel' }))}

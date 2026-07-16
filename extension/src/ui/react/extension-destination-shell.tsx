@@ -12,6 +12,7 @@ interface ExtensionDestinationShellProps {
   readonly routes: readonly DestinationRouteLink[];
   readonly sourceState: DestinationSourceState | 'checking';
   readonly onReturnToSource: () => void;
+  readonly onLock?: (() => void) | undefined;
   readonly children: ReactNode;
 }
 
@@ -34,11 +35,12 @@ export function ExtensionDestinationShell({
   routes,
   sourceState,
   onReturnToSource,
+  onLock,
   children,
 }: ExtensionDestinationShellProps) {
   const current = extensionDestination(destination);
   return (
-    <div className="image-trail-destination-page" data-destination={destination}>
+    <div className="image-trail-destination-page" data-destination={destination} tabIndex={-1}>
       <header className="image-trail-destination-page__header">
         <div className="image-trail-destination-page__identity">
           <span className="image-trail-destination-page__glyph" aria-hidden="true">
@@ -63,14 +65,21 @@ export function ExtensionDestinationShell({
             );
           })}
         </nav>
-        <button
-          type="button"
-          className="image-trail-destination-page__return"
-          disabled={sourceState !== 'connected'}
-          onClick={onReturnToSource}
-        >
-          {returnLabel(sourceState)}
-        </button>
+        <div className="image-trail-destination-page__session-actions">
+          {onLock ? (
+            <button type="button" className="image-trail-destination-page__lock" onClick={onLock}>
+              Lock
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="image-trail-destination-page__return"
+            disabled={sourceState !== 'connected'}
+            onClick={onReturnToSource}
+          >
+            {returnLabel(sourceState)}
+          </button>
+        </div>
       </header>
       <main className="image-trail-destination-page__main">
         <div className="image-trail-destination-page__content" data-destination={destination}>

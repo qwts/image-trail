@@ -52,11 +52,14 @@ let state: GalleryViewState = {
 let searchTimer: number | null = null;
 let loadGeneration = 0;
 let settingsRefreshInFlight = false;
+let galleryRoot: HTMLElement | null = null;
 
 function root(): HTMLElement {
+  if (galleryRoot) return galleryRoot;
   const element = document.getElementById('image-trail-gallery-root');
   if (!element) throw new Error('Gallery root is missing.');
-  return element;
+  galleryRoot = element;
+  return galleryRoot;
 }
 
 function render(options: { readonly focusSearch?: boolean } = {}): void {
@@ -370,9 +373,11 @@ async function showPreviewResult(preview: Promise<Awaited<ReturnType<CaptureCont
 document.addEventListener('DOMContentLoaded', () => {
   const shellRoot = document.getElementById('image-trail-destination-shell-root');
   if (!shellRoot) throw new Error('Gallery destination shell root is missing.');
+  const contentRoot = root();
+  contentRoot.remove();
   renderReactSubtree(
     shellRoot,
-    createElement(DestinationFrame, { destination: 'gallery' }, createElement(DestinationDomBody, { content: root() })),
+    createElement(DestinationFrame, { destination: 'gallery' }, createElement(DestinationDomBody, { content: contentRoot })),
   );
   installSettingsRefreshHooks();
   installGalleryLibraryRefreshHook({

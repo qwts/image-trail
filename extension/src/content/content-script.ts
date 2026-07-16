@@ -28,6 +28,7 @@ import { sendRuntimeMessage } from './runtime-message.js';
 import { classifyTarget, matchesKeyCodeShortcut, shouldRouteKeyboardShortcut } from './keyboard.js';
 import { LOCAL_SETTINGS_KEY } from '../data/local-settings.js';
 import { SecureSessionActivityController } from './secure-session-activity.js';
+import { isSecureSessionChangeMessage } from '../background/secure-session-change-message.js';
 
 interface ImageTrailContentController {
   readonly panel: ImageTrailPanel;
@@ -143,6 +144,10 @@ function createController(): ImageTrailContentController {
   }
 
   const handleMessage = (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void): boolean => {
+    if (isSecureSessionChangeMessage(message)) {
+      panel.refreshSecureSessionStatus();
+      return false;
+    }
     if (isSettingsChangeMessage(message)) {
       void panel.reloadLocalSettings();
       return false;

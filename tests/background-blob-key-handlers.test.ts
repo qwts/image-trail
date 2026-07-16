@@ -20,6 +20,7 @@ import {
   type ImportBlobKeyBackupResultMessage,
 } from '../extension/src/background/messages.js';
 import { openFreshImageTrailDb } from './indexeddb-test-helpers.js';
+import type { SecureSessionStatus } from '../extension/src/core/secure-session-state.js';
 
 type AnyEntry = MessageDef<ExtensionRequest, ExtensionResponse>;
 type Registry = ReturnType<typeof createBlobKeyMessageRegistry>;
@@ -37,11 +38,15 @@ let registry: Registry;
 const noDbRegistry: Registry = createBlobKeyMessageRegistry({ getDb: async () => null });
 let keyReference = '';
 let backupFileContent = '';
+const secureSessionChanges: SecureSessionStatus[] = [];
 
 before(async () => {
   lockBlobKey();
   db = await openFreshImageTrailDb();
-  registry = createBlobKeyMessageRegistry({ getDb: async () => db });
+  registry = createBlobKeyMessageRegistry({
+    getDb: async () => db,
+    notifySecureSessionChange: (status) => secureSessionChanges.push(status),
+  });
 });
 
 after(() => {
@@ -116,6 +121,13 @@ test('a locked key reports hasKey without a reference, and unlock reactivates it
     message: 'Encrypted storage locked.',
   });
 
+  const rejected = await handleAndRespond<BlobKeyResultMessage>(registry[MessageType.UnlockBlobKey], createUnlockBlobKeyMessage('wrong'));
+  assert.deepEqual(rejected.payload, {
+    ok: false,
+    reason: 'wrong-password',
+    message: 'Password did not unlock encrypted storage.',
+  });
+
   const unlocked = await handleAndRespond<BlobKeyResultMessage>(registry[MessageType.UnlockBlobKey], createUnlockBlobKeyMessage(password));
   assert.equal(unlocked.payload.ok, true);
   assert.equal(unlocked.payload.keyReference, keyReference);
@@ -139,6 +151,7 @@ test('clear locks the keyring and removes every stored blob key', async () => {
 });
 
 test('import refuses blank passwords and unreadable files, then restores the exported backup once', async () => {
+  secureSessionChanges.length = 0;
   const blank = await handleAndRespond<ImportBlobKeyBackupResultMessage>(
     registry[MessageType.ImportBlobKeyBackup],
     createImportBlobKeyBackupMessage(backupFileContent, ' '),
@@ -159,6 +172,7 @@ test('import refuses blank passwords and unreadable files, then restores the exp
   assert.equal(imported.payload.ok, true);
   assert.equal(imported.payload.keyReference, keyReference);
   assert.equal(imported.payload.ok && imported.payload.imported, true);
+  assert.deepEqual(secureSessionChanges, [{ unlocked: false, keyReference: null, hasKey: true }]);
 
   const again = await handleAndRespond<ImportBlobKeyBackupResultMessage>(
     registry[MessageType.ImportBlobKeyBackup],
@@ -166,6 +180,7 @@ test('import refuses blank passwords and unreadable files, then restores the exp
   );
   assert.equal(again.payload.ok, true);
   assert.equal(again.payload.ok && again.payload.imported, false);
+  assert.equal(secureSessionChanges.length, 1, 're-importing the same stored key emits no duplicate transition');
 });
 
 test('fallbacks return the documented degraded payloads', () => {

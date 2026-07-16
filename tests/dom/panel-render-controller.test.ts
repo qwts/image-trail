@@ -46,7 +46,9 @@ function createHarness(): Harness {
     setState: (next) => {
       state = next;
     },
-    dispatch: () => {},
+    dispatch: (action) => {
+      log.push(`dispatch:${action.name}:${'password' in action ? action.password : ''}`);
+    },
     root: () => root,
     contextRoot: () => null,
     detachedRoot: () => detachedRoot,
@@ -135,6 +137,85 @@ test('render preserves focus on a control inside a detached-section window acros
   assert.equal(document.activeElement, refocused, 'focus stays inside the detached window across the re-render');
 });
 
+test('secure-session lock replaces panel and detached DOM, then restores layout and focus after unlock', () => {
+  const harness = createHarness();
+  harness.patchState({
+    visible: true,
+    blobKeyAvailable: true,
+    blobKeyUnlocked: true,
+    detachedSections: ['history'],
+    bookmarks: [
+      {
+        id: 'private-pin',
+        url: 'https://secret.example.test/private.jpg',
+        label: 'Secret filename.jpg',
+        timestamp: '2026-07-16T00:00:00.000Z',
+        queueUpdatedAt: '2026-07-16T00:00:00.000Z',
+        source: 'bookmark',
+        thumbnail: 'data:image/png;base64,c2VjcmV0',
+      },
+    ],
+  });
+  harness.controller.render();
+  const restore = harness.detachedRoot.querySelector<HTMLButtonElement>('[data-image-trail-restore="history"]');
+  assert.ok(restore);
+  restore.focus();
+  harness.controller.showShortcutFeedback('Secret capture status');
+  assert.equal(harness.toastRoot.textContent, 'Secret capture status');
+
+  harness.patchState({ blobKeyUnlocked: false, message: 'Encrypted storage locked.' });
+  harness.controller.render();
+  const lock = harness.root.querySelector<HTMLElement>('[data-secure-workspace-lock="true"]');
+  const password = lock?.querySelector<HTMLInputElement>('[data-secure-workspace-password="true"]');
+  assert.ok(lock);
+  assert.ok(password);
+  assert.equal(document.activeElement, password, 'focus enters the lock form');
+  assert.equal(harness.detachedRoot.childElementCount, 0, 'detached workspace DOM is removed');
+  assert.equal(harness.root.textContent?.includes('Secret filename.jpg'), false);
+  assert.equal(harness.root.innerHTML.includes('secret.example.test'), false);
+  assert.equal(harness.root.querySelector('img'), null);
+  assert.equal(harness.toastRoot.childElementCount, 0, 'locking removes out-of-band feedback');
+  harness.controller.showShortcutFeedback('Late secret capture status');
+  harness.controller.showBufferedNavigationToast('Late secret navigation status');
+  assert.equal(harness.toastRoot.childElementCount, 0, 'locked workspaces reject delayed feedback');
+
+  harness.patchState({ blobKeyUnlocked: true, status: 'ready', message: 'Encrypted storage unlocked.' });
+  harness.controller.render();
+  const restored = harness.detachedRoot.querySelector<HTMLButtonElement>('[data-image-trail-restore="history"]');
+  assert.ok(restored, 'detached layout is restored');
+  assert.equal(document.activeElement, restored, 'focus returns to the safely recreated control');
+  assert.equal(harness.root.querySelector('[data-secure-workspace-lock="true"]'), null);
+});
+
+test('failed and in-progress unlock renders only the opaque lock surface without duplicate workspace DOM', () => {
+  const harness = createHarness();
+  harness.patchState({
+    visible: true,
+    blobKeyAvailable: true,
+    blobKeyUnlocked: false,
+    status: 'error',
+    message: 'Password did not unlock encrypted storage.',
+  });
+  harness.controller.render();
+  assert.equal(harness.root.querySelectorAll('[data-secure-workspace-lock="true"]').length, 1);
+  assert.equal(harness.root.querySelectorAll('.image-trail-panel__header').length, 0);
+  assert.equal(harness.root.querySelector('[role="alert"]')?.textContent, 'Password did not unlock encrypted storage.');
+  const password = harness.root.querySelector<HTMLInputElement>('[data-secure-workspace-password="true"]');
+  const form = password?.closest('form');
+  assert.ok(password);
+  assert.ok(form);
+  password.value = 'correct horse';
+  form.requestSubmit();
+  assert.ok(harness.log.includes('dispatch:blob-key/unlock:correct horse'));
+  assert.equal(password.value, '', 'the lock form clears its password after dispatch');
+
+  harness.patchState({ status: 'ready', message: 'Unlocking secure workspace…' });
+  harness.controller.render();
+  assert.equal(harness.root.querySelectorAll('[data-secure-workspace-lock="true"]').length, 1);
+  assert.equal(harness.root.querySelector('input')?.disabled, true);
+  assert.equal(harness.root.querySelector('button')?.textContent, 'Unlocking…');
+});
+
 test('render restores a focused text input value and selection range across a re-render', () => {
   const harness = createHarness();
   harness.patchState({
@@ -163,6 +244,22 @@ test('renderRecallOnly rewrites only the recall root, leaving the panel root unt
   const panelHtml = harness.root.innerHTML;
   harness.controller.renderRecallOnly();
   assert.equal(harness.root.innerHTML, panelHtml, 'the main panel DOM is not rebuilt by a recall-only render');
+});
+
+test('renderRecallOnly is a no-op while the opaque workspace lock is mounted', () => {
+  const harness = createHarness();
+  harness.patchState({ visible: true, blobKeyAvailable: true, blobKeyUnlocked: false });
+  harness.controller.render();
+  const lock = harness.root.querySelector('[data-secure-workspace-lock="true"]');
+  assert.ok(lock);
+
+  harness.controller.renderRecallOnly();
+
+  assert.equal(
+    harness.root.querySelector('[data-secure-workspace-lock="true"]'),
+    lock,
+    'Recall cannot recursively replace the lock surface',
+  );
 });
 
 test('renderBufferedDebugOverlay renders one cell per buffer index and marks the cursor', () => {

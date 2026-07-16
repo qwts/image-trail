@@ -87,6 +87,7 @@ export class BlobKeySession {
   constructor(
     clock?: SessionUnlockClock,
     private readonly crypto: Crypto = getCrypto(),
+    private readonly onSessionChanged: (snapshot: SessionUnlockSnapshot<'blob'>) => void = () => undefined,
   ) {
     this.state = new SessionUnlockState<'blob'>(clock, () => this.expirePersistedSession());
   }
@@ -124,6 +125,7 @@ export class BlobKeySession {
         await this.clearPersistedSession();
         return null;
       }
+      this.onSessionChanged(this.state.snapshot);
       return this.peek();
     } catch {
       this.recoveryFailure = true;
@@ -145,6 +147,7 @@ export class BlobKeySession {
     this.restoreAttempted = true;
     this.recoveryFailure = false;
     if (!(await this.persist())) this.recoveryFailure = true;
+    this.onSessionChanged(this.state.snapshot);
     return { reference: keyReference, key };
   }
 
@@ -164,6 +167,7 @@ export class BlobKeySession {
     this.state.lock(reason);
     this.restoreAttempted = true;
     await this.clearPersistedSession();
+    this.onSessionChanged(this.state.snapshot);
   }
 
   get snapshot(): SessionUnlockSnapshot<'blob'> {
@@ -201,6 +205,7 @@ export class BlobKeySession {
   private expirePersistedSession(): void {
     this.restoreAttempted = true;
     void this.clearPersistedSession();
+    this.onSessionChanged(this.state.snapshot);
   }
 
   private async clearPersistedSession(): Promise<void> {

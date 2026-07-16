@@ -1,4 +1,5 @@
 import { captureFailureMessage } from '../../core/image/capture-result.js';
+import { secureSessionRequiresUnlock } from '../../core/secure-session-state.js';
 import type { PanelAction, PanelState } from '../../core/types.js';
 import { createButton, createIconButton, createStatusPill, createToast, type StatusTone, type ToastTone } from './primitives.js';
 
@@ -67,6 +68,16 @@ export function createDomPanelHeader(state: PanelState, callbacks: PanelShellCal
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__header-actions image-trail-ds__panel-header-actions';
   actions.append(
+    ...(state.blobKeyAvailable && state.blobKeyUnlocked
+      ? [
+          createIconButton({
+            glyph: 'Lock',
+            label: 'Lock workspace',
+            className: 'image-trail-panel__icon-button image-trail-panel__lock-button',
+            onClick: () => callbacks.dispatch({ name: 'blob-key/lock' }),
+          }),
+        ]
+      : []),
     createIconButton({
       glyph: '?',
       label: state.helpOpen ? 'Hide help' : 'Show help',
@@ -146,7 +157,8 @@ function toastMessage(state: PanelState): string {
 export function renderPanelToast(toastRoot: HTMLElement | null | undefined, state: PanelState): void {
   if (!toastRoot) return;
   const message = toastMessage(state);
-  const showToast = state.visible && state.status !== 'closed' && message.length > 0;
+  const workspaceLocked = secureSessionRequiresUnlock({ unlocked: state.blobKeyUnlocked, hasKey: state.blobKeyAvailable });
+  const showToast = !workspaceLocked && state.visible && state.status !== 'closed' && message.length > 0;
   const label = panelHasError(state) ? 'Error' : panelIsWaiting(state) ? 'Working' : statusSummary(state);
   const tone: ToastTone = panelHasError(state) ? 'error' : panelIsWaiting(state) ? 'warning' : 'ready';
   const toastKey = showToast ? [tone, String(panelIsWaiting(state)), label, message].join('\u0000') : '';

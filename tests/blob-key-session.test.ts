@@ -4,7 +4,7 @@ import test from 'node:test';
 import { BlobKeySession, type BlobKeySessionStorage } from '../extension/src/data/crypto/blob-key-session.js';
 import { createKeyReference } from '../extension/src/data/crypto/key-reference.js';
 import { generateAesGcmKey } from '../extension/src/data/crypto/webcrypto.js';
-import type { SessionUnlockClock } from '../extension/src/data/runtime/session-unlock.js';
+import type { SessionUnlockClock, SessionUnlockSnapshot } from '../extension/src/data/runtime/session-unlock.js';
 
 class FakeClock implements SessionUnlockClock {
   private nowMs = Date.parse('2026-07-16T00:00:00.000Z');
@@ -84,7 +84,8 @@ test('restores an unwrapped key from memory-only session storage after a worker 
 test('activity extends the persisted session and timeout removes its key material', async () => {
   const clock = new FakeClock();
   const storage = new MemorySessionStorage();
-  const session = new BlobKeySession(clock);
+  const changes: SessionUnlockSnapshot<'blob'>[] = [];
+  const session = new BlobKeySession(clock, undefined, (snapshot) => changes.push(snapshot));
   session.configureStorage(storage);
   await session.unlock(createKeyReference('blob', 'timeout'), await generateAesGcmKey(true), undefined, 5);
 
@@ -95,6 +96,11 @@ test('activity extends the persisted session and timeout removes its key materia
 
   assert.deepEqual(session.snapshot, { status: 'locked', reason: 'timeout' });
   assert.equal(storage.values.size, 0);
+  assert.deepEqual(
+    changes.map((snapshot) => snapshot.status),
+    ['unlocked', 'locked'],
+  );
+  assert.deepEqual(changes.at(-1), { status: 'locked', reason: 'timeout' });
 });
 
 test('manual lock immediately clears the in-memory and session-storage key', async () => {

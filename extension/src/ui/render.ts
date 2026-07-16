@@ -19,6 +19,9 @@ import { unmountReactSubtree, unmountReactSubtrees } from './react/react-subtree
 import type { PanelRenderTarget } from './panel-render-types.js';
 import { createParsedFieldsSection } from './parsed-fields-section.js';
 import { createCompactStatusElements } from './components/status-view.js';
+import { createWorkspaceLockView } from './components/lock-view.js';
+import { secureSessionRequiresUnlock } from '../core/secure-session-state.js';
+import { SECURE_WORKSPACE_UNLOCKING_MESSAGE } from './panel/secure-session-ui-controller.js';
 import { isPanelDestinationId } from './destination-registry.js';
 import {
   capturePanelRenderSnapshot,
@@ -54,19 +57,47 @@ function cachedFieldEditorViewModel(state: PanelState): ReturnType<typeof create
 }
 
 export function renderPanel(target: PanelRenderTarget, state: PanelState): void {
+  const workspaceLocked = secureSessionRequiresUnlock({ unlocked: state.blobKeyUnlocked, hasKey: state.blobKeyAvailable });
   const previousValue = target.root.dataset['destination'];
   const previousDestination = isPanelDestinationId(previousValue) ? previousValue : undefined;
   if (!previousDestination && state.activeDestination) target.layoutState.primaryPanelScrollTop = target.root.scrollTop;
-  if (target.contextRoot) renderPageContextSwitcher(target.contextRoot, state.pageContext, target.dispatch);
-  target.root.dataset['surface'] = state.helpOpen ? 'help' : (state.activeDestination ?? 'dashboard');
+  if (target.contextRoot && !workspaceLocked) renderPageContextSwitcher(target.contextRoot, state.pageContext, target.dispatch);
+  target.root.dataset['surface'] = workspaceLocked ? 'locked' : state.helpOpen ? 'help' : (state.activeDestination ?? 'dashboard');
   if (state.activeDestination) target.root.dataset['destination'] = state.activeDestination;
   else delete target.root.dataset['destination'];
-  target.root.classList.toggle('is-minimized', state.minimized);
+  target.root.classList.toggle('is-minimized', state.minimized && !workspaceLocked);
+  target.root.classList.toggle('is-workspace-locked', workspaceLocked);
   target.root.classList.toggle('is-waiting', panelIsWaiting(state));
   target.root.classList.toggle('has-status-error', panelHasError(state));
-  renderPanelToast(target.toastRoot, state);
+  if (workspaceLocked && target.toastRoot) {
+    target.toastRoot.replaceChildren();
+    delete target.toastRoot.dataset['imageTrailToastKey'];
+  } else {
+    renderPanelToast(target.toastRoot, state);
+  }
   const snapshot = capturePanelRenderSnapshot(target);
   unmountReactSubtrees(target.root);
+  if (workspaceLocked) {
+    target.root.replaceChildren(
+      createWorkspaceLockView(
+        {
+          unlocking: state.message === SECURE_WORKSPACE_UNLOCKING_MESSAGE,
+          ...(state.status === 'error' ? { errorMessage: state.message } : {}),
+        },
+        target.dispatch,
+      ),
+    );
+    if (target.contextRoot) {
+      unmountReactSubtree(target.contextRoot);
+      target.contextRoot.replaceChildren();
+    }
+    if (target.detachedRoot) {
+      unmountReactSubtree(target.detachedRoot);
+      target.detachedRoot.replaceChildren();
+    }
+    target.onWorkspaceEdgesChanged?.(new Set(), false);
+    return;
+  }
   if (state.minimized) {
     target.root.replaceChildren(createMinimizedPanel(state, target.dispatch));
     if (target.detachedRoot) {

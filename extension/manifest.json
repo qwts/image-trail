@@ -80,6 +80,7 @@
         "src/ui/styles/primitives.css",
         "src/ui/styles/feedback-primitives.css",
         "src/ui/styles/shortcut-feedback.css",
+        "src/ui/styles/workspace-lock.css",
         "src/ui/styles/panel-shell.css",
         "src/ui/styles/primary-workflow.css",
         "src/ui/styles/record-row.css",

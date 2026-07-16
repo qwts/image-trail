@@ -1,4 +1,5 @@
 import { MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
+import type { SecureSessionStatus } from '../core/secure-session-state.js';
 
 export interface BlobKeyStatusMessage {
   readonly type: typeof MessageType.BlobKeyStatus;
@@ -9,21 +10,7 @@ export interface BlobKeyStatusMessage {
 export interface BlobKeyStatusResultMessage {
   readonly type: typeof MessageType.BlobKeyStatusResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload:
-    | {
-        readonly unlocked: true;
-        readonly keyReference: string;
-        readonly hasKey: true;
-        readonly reason?: undefined;
-        readonly message?: undefined;
-      }
-    | {
-        readonly unlocked: false;
-        readonly keyReference: null;
-        readonly hasKey: boolean;
-        readonly reason?: 'manual' | 'timeout' | 'worker-restart' | undefined;
-        readonly message?: string | undefined;
-      };
+  readonly payload: SecureSessionStatus;
 }
 
 export interface SetupBlobKeyMessage {

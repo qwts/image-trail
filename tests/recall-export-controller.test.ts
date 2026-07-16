@@ -68,6 +68,21 @@ test('refreshBlobKeyStatus mirrors the capture store status', async () => {
   assert.equal(harness.getState().blobKeyAvailable, true);
 });
 
+test('unlock fails closed when the runtime request rejects', async () => {
+  const harness = createExportHarness({
+    requestBlobKeyStatus: async () => ({ unlocked: false, keyReference: null, hasKey: true }),
+    unlockBlobKey: async () => Promise.reject(new Error('message channel failed')),
+  });
+  await harness.controller.refreshBlobKeyStatus();
+
+  await harness.controller.unlockBlobKey('blob-pass');
+
+  assert.equal(harness.getState().blobKeyUnlocked, false);
+  assert.equal(harness.getState().blobKeyAvailable, true);
+  assert.equal(harness.getState().status, 'error');
+  assert.equal(harness.getState().message, 'Image Trail could not unlock the secure session.');
+});
+
 test('clearBlobKey locks encrypted originals back down', async () => {
   const harness = createExportHarness({
     requestBlobKeyStatus: async () => ({ unlocked: true, keyReference: 'key-1', hasKey: true }),

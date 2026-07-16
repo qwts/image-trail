@@ -103,7 +103,7 @@ import { createPCloudMessageRegistry } from './handlers/pcloud-handlers.js';
 import { createUrlTemplateMessageRegistry } from './handlers/url-template-handlers.js';
 import { handleLoadLocalSettings, handleSaveLocalSettings, loadLocalSettings } from './handlers/local-settings-handlers.js';
 import { normalizeHostname } from './handlers/hostname.js';
-import { createRuntimeLibraryChangeNotifier } from './library-change-notifier.js';
+import { createChangeNotifiers } from './change-notifiers.js';
 import type { ServiceWorkerContext } from './service-worker-context.js';
 import { createShortcutActionMessage } from './shortcut-action-message.js';
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
@@ -135,7 +135,7 @@ const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
 const urlReviewStatusStore = new IndexedDbUrlReviewStatusStore();
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
 const recentHistoryCache = new RecentHistoryCache();
-const notifyLibraryChange = createRuntimeLibraryChangeNotifier(chrome.runtime);
+const { notifyLibraryChange, notifySecureSessionChange } = createChangeNotifiers(chrome.runtime, chrome.tabs);
 
 /** Composition-root context handed to extracted handler modules; see {@link ServiceWorkerContext}. */
 const context: ServiceWorkerContext = {
@@ -958,7 +958,7 @@ const messageRegistry = {
     respond: (result) => createFetchLinkedPageResultMessage(result),
     fallback: () => createFetchLinkedPageResultMessage({ ok: false, reason: 'unknown', message: 'Linked page fetch failed.' }),
   }),
-  ...createBlobKeyMessageRegistry(context),
+  ...createBlobKeyMessageRegistry({ ...context, notifySecureSessionChange }),
   [MessageType.GrantPermissionAndCapture]: defineMessage({
     requestSchema: requestSchemas.grantPermissionAndCaptureRequestSchema,
     handle: (message: GrantPermissionAndCaptureMessage) => handleGrantPermissionAndCapture(message),

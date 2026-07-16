@@ -1,0 +1,80 @@
+.image-trail-panel-root.image-trail-panel.is-workspace-locked {
+  min-block-size: 300px;
+  padding: 0;
+  overflow: hidden;
+  border-color: rgb(139 246 220 / 54%);
+  background: #07110f;
+}
+
+.image-trail-panel-root .image-trail-workspace-lock {
+  box-sizing: border-box;
+  display: grid;
+  align-content: center;
+  gap: var(--it-space-6);
+  min-block-size: 300px;
+  padding: 32px;
+  background: #07110f;
+  color: var(--it-text);
+}
+
+.image-trail-panel-root .image-trail-workspace-lock__emblem {
+  justify-self: start;
+  padding: 4px 8px;
+  border: 1px solid rgb(139 246 220 / 55%);
+  border-radius: var(--it-radius-control);
+  color: var(--it-accent);
+  letter-spacing: 0.12em;
+  font: var(--it-type-micro);
+}
+
+.image-trail-panel-root .image-trail-workspace-lock h2,
+.image-trail-panel-root .image-trail-workspace-lock p {
+  margin: 0;
+}
+
+.image-trail-panel-root .image-trail-workspace-lock__form,
+.image-trail-panel-root .image-trail-workspace-lock__form label {
+  display: grid;
+  gap: var(--it-space-5);
+}
+
+.image-trail-panel-root .image-trail-workspace-lock__form label {
+  color: var(--it-text-2);
+  font: var(--it-type-label);
+}
+
+.image-trail-panel-root .image-trail-workspace-lock__form input,
+.image-trail-panel-root .image-trail-workspace-lock__form button {
+  box-sizing: border-box;
+  min-block-size: 36px;
+  border: 1px solid var(--it-border-control);
+  border-radius: var(--it-radius-control);
+  background: var(--it-control-bg);
+  color: var(--it-text);
+  font: var(--it-type-body);
+}
+
+.image-trail-panel-root .image-trail-workspace-lock__form input {
+  inline-size: 100%;
+  padding-inline: 10px;
+}
+
+.image-trail-panel-root .image-trail-workspace-lock__form button {
+  padding-inline: 12px;
+  cursor: pointer;
+}
+
+.image-trail-panel-root .image-trail-workspace-lock__form button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.image-trail-panel-root .image-trail-workspace-lock__form :focus-visible {
+  outline: var(--it-focus-ring);
+  outline-offset: var(--it-focus-offset);
+}
+
+.image-trail-panel-root .image-trail-workspace-lock__error {
+  color: var(--it-error);
+  font: var(--it-type-body);
+}

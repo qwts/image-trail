@@ -816,6 +816,28 @@
       ]
     },
     {
+      "id": "secure-workspace-lock",
+      "acceptance": "One opaque secure-session lock for every Image Trail workspace and record surface",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Secure-Workspace-Lock",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": ["tests/secure-workspace-lock.test.ts", "tests/blob-key-session.test.ts", "tests/dom/panel-render-controller.test.ts"],
+          "notes": "Covers validated lock broadcasts to extension pages and injected tabs, timeout/manual/unlocked status mapping, listener cleanup, fail-closed panel replacement, removal of detached and sensitive DOM, unlock errors, one lock instance, and safe layout/focus restoration."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/stories/extension-destinations.stories.tsx",
+          "notes": "Covers the destination lock boundary with protected children unmounted, wrong-password persistence, successful unlock, and the unlocked manual Lock control."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": ["tests/e2e/secure-session.spec.ts", "tests/e2e/import-export-settings.spec.ts"],
+          "notes": "Covers one real extension key session across the panel, a detached Recents window, Dashboard, Gallery, and a decrypted preview tab; verifies no protected DOM remains while locked, cold-start Gallery content stays detached, failed unlock cannot flash content, key-import unlock cannot recurse through Recall rendering, cross-context unlock restores every surface, and the injected panel host is never duplicated."
+        }
+      ]
+    },
+    {
       "id": "settings-utility-layout",
       "acceptance": "Settings utility layout",
       "repoPath": "docs/acceptance-tests/settings-utility-layout.md",

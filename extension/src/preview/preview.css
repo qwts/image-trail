@@ -29,3 +29,77 @@ p {
   max-width: 42rem;
   padding: 1rem;
 }
+
+.image-trail-preview-lock {
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: #050a09;
+}
+
+.image-trail-preview-lock > section {
+  display: grid;
+  box-sizing: border-box;
+  width: min(100%, 430px);
+  gap: 16px;
+  padding: 32px;
+  border: 1px solid rgb(124 255 168 / 42%);
+  border-radius: 12px;
+  background: #07110f;
+  box-shadow: 0 24px 64px rgb(0 0 0 / 50%);
+}
+
+.image-trail-preview-lock h1,
+.image-trail-preview-lock p {
+  margin: 0;
+  padding: 0;
+}
+
+.image-trail-preview-lock span {
+  justify-self: start;
+  padding: 4px 8px;
+  border: 1px solid rgb(124 255 168 / 52%);
+  border-radius: 6px;
+  color: #daffe9;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+.image-trail-preview-lock form,
+.image-trail-preview-lock label {
+  display: grid;
+  gap: 10px;
+}
+
+.image-trail-preview-lock input,
+.image-trail-preview-lock button {
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid rgb(124 255 168 / 30%);
+  border-radius: 7px;
+  background: #111b18;
+  color: #eee;
+  font: inherit;
+}
+
+.image-trail-preview-lock button {
+  cursor: pointer;
+}
+
+.image-trail-preview-lock button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.image-trail-preview-lock :focus-visible {
+  outline: 2px solid #7cffa8;
+  outline-offset: 2px;
+}
+
+.image-trail-preview-lock__error {
+  color: #ff8b8b;
+}

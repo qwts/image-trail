@@ -12,12 +12,15 @@ import { DashboardDestination } from '../../destinations/dashboard-destination.j
 import type { DashboardSnapshot, DestinationServices, RecallWindow } from '../../destinations/destination-services.js';
 import { RecallDestination } from '../../destinations/recall-destination.js';
 import { SettingsDestination } from '../../destinations/settings-destination.js';
+import { DestinationFrame } from '../../destinations/destination-frame.js';
+import type { SecureSessionClient } from '../../content/secure-session-client.js';
 import { ExtensionDestinationShell, type DestinationRouteLink } from '../react/extension-destination-shell.js';
 import { renderReactSubtree } from '../react/react-subtree.js';
 
 const recalled = fn<(ids: readonly string[]) => void>();
 const saved = fn<(privacyModeEnabled: boolean) => void>();
 const savedDownArrowAction = fn<(value: string) => void>();
+const secureUnlock = fn<SecureSessionClient['unlock']>();
 const routes: readonly DestinationRouteLink[] = [
   { id: 'dashboard', href: '#dashboard' },
   { id: 'gallery', href: '#gallery' },
@@ -125,6 +128,24 @@ export const SettingsError: Story = {
   },
 };
 
+export const SecureWorkspaceLockBoundary: Story = {
+  render: () => secureWorkspacePage(),
+  play: async ({ canvasElement }) => {
+    secureUnlock.mockClear();
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole('heading', { name: 'Image Trail is locked' })).toBeVisible();
+    await expect(canvas.queryByText('Sensitive durable workspace')).not.toBeInTheDocument();
+    await userEvent.type(canvas.getByLabelText('Password'), 'wrong');
+    await userEvent.click(canvas.getByRole('button', { name: 'Unlock workspace' }));
+    await expect(await canvas.findByRole('alert')).toHaveTextContent('Password did not unlock encrypted storage.');
+    await expect(canvas.queryByText('Sensitive durable workspace')).not.toBeInTheDocument();
+    await userEvent.type(canvas.getByLabelText('Password'), 'correct');
+    await userEvent.click(canvas.getByRole('button', { name: 'Unlock workspace' }));
+    await expect(await canvas.findByText('Sensitive durable workspace')).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Lock' })).toBeVisible();
+  },
+};
+
 export const Narrow: Story = {
   render: () => page('settings', <SettingsDestination services={services()} />, { width: 360 }),
   play: async ({ canvasElement }) => {
@@ -224,4 +245,26 @@ function thumbnail(): string {
   return `data:image/svg+xml,${encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><rect width="240" height="160" fill="#173d56"/></svg>',
   )}`;
+}
+
+function secureWorkspacePage(): HTMLElement {
+  secureUnlock.mockImplementation(async (password) =>
+    password === 'correct'
+      ? { ok: true, keyReference: 'blob:storybook', message: 'Unlocked.' }
+      : { ok: false, reason: 'wrong-password', message: 'Password did not unlock encrypted storage.' },
+  );
+  const client: SecureSessionClient = {
+    status: async () => ({ unlocked: false, keyReference: null, hasKey: true, reason: 'manual' }),
+    unlock: secureUnlock,
+    lock: async () => ({ ok: true, keyReference: '', message: 'Locked.' }),
+    subscribe: () => () => undefined,
+  };
+  const host = document.createElement('div');
+  renderReactSubtree(
+    host,
+    <DestinationFrame destination="dashboard" secureSessionClient={client}>
+      <p>Sensitive durable workspace</p>
+    </DestinationFrame>,
+  );
+  return host;
 }

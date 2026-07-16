@@ -6,6 +6,7 @@ import { createKbd, createToast } from '../components/primitives.js';
 import { renderPanelToast } from '../components/panel-shell-view.js';
 import { isFocusablePanelControl } from './export-download.js';
 import type { BufferedNavigationDebugSnapshot } from './buffered-navigation-controller.js';
+import { secureSessionRequiresUnlock } from '../../core/secure-session-state.js';
 
 const FINITE_CAPTURE_ERROR_MS = 2400;
 const SHORTCUT_FEEDBACK_MS = 1400;
@@ -63,6 +64,8 @@ export class PanelRenderController {
   private bufferedNavigationToastTimer: number | null = null;
   private shortcutFeedbackTimer: number | null = null;
   private shortcutFeedback: { readonly message: string; readonly tone: ShortcutFeedbackTone } | null = null;
+  private workspaceWasLocked = false;
+  private preLockFocus: FocusedPanelControlSnapshot | null = null;
   private readonly layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
     fieldsPanelBlockSize: null,
@@ -116,7 +119,10 @@ export class PanelRenderController {
   render(): void {
     const root = this.deps.root();
     if (root) {
+      const state = this.deps.getState();
+      const workspaceLocked = secureSessionRequiresUnlock({ unlocked: state.blobKeyUnlocked, hasKey: state.blobKeyAvailable });
       const focusedControl = this.captureFocusedPanelControl();
+      if (workspaceLocked && !this.workspaceWasLocked) this.preLockFocus = focusedControl;
       renderPanel(
         {
           root,
@@ -130,15 +136,27 @@ export class PanelRenderController {
           scrollAnchorId: this.deps.previewScrollAnchorId(),
           onPanelDragStart: this.deps.handlePanelDragStart,
         },
-        this.deps.getState(),
+        state,
       );
-      this.renderShortcutFeedback();
-      this.restoreFocusedPanelControl(focusedControl);
-      if (!this.deps.getState().minimized && this.deps.panelStylesReady()) {
+      if (workspaceLocked) {
+        this.clearShortcutFeedback();
+        this.focusWorkspaceLockPassword();
+      } else if (this.workspaceWasLocked) {
+        this.renderShortcutFeedback();
+        if (this.preLockFocus) this.restoreFocusedPanelControl(this.preLockFocus);
+        else this.focusablePanelControls('panel')[0]?.focus();
+        this.preLockFocus = null;
+      } else {
+        this.renderShortcutFeedback();
+        this.restoreFocusedPanelControl(focusedControl);
+      }
+      this.workspaceWasLocked = workspaceLocked;
+      if (!workspaceLocked && !state.minimized && this.deps.panelStylesReady()) {
         this.deps.queuePanelPositionRestore();
         this.deps.applyRestoredPanelPosition();
       }
-      this.renderBufferedDebugOverlay();
+      if (workspaceLocked) root.querySelector('.image-trail-panel__buffer-debug')?.remove();
+      else this.renderBufferedDebugOverlay();
     }
   }
 
@@ -172,7 +190,7 @@ export class PanelRenderController {
   showBufferedNavigationToast(message: string): void {
     const root = this.deps.root();
     const toastRoot = this.deps.toastRoot();
-    if (!root || !toastRoot) return;
+    if (!root || !toastRoot || this.workspaceIsLocked()) return;
     if (this.bufferedNavigationToastTimer !== null) {
       window.clearTimeout(this.bufferedNavigationToastTimer);
       this.bufferedNavigationToastTimer = null;
@@ -206,7 +224,7 @@ export class PanelRenderController {
   }
 
   showShortcutFeedback(message: string, tone: ShortcutFeedbackTone = 'success'): void {
-    if (!this.deps.root() || !this.deps.toastRoot()) return;
+    if (!this.deps.root() || !this.deps.toastRoot() || this.workspaceIsLocked()) return;
     this.clearShortcutFeedbackTimer();
     this.shortcutFeedback = { message, tone };
     this.renderShortcutFeedback();
@@ -233,6 +251,17 @@ export class PanelRenderController {
     if (this.shortcutFeedbackTimer === null) return;
     window.clearTimeout(this.shortcutFeedbackTimer);
     this.shortcutFeedbackTimer = null;
+  }
+
+  private workspaceIsLocked(): boolean {
+    const state = this.deps.getState();
+    return secureSessionRequiresUnlock({ unlocked: state.blobKeyUnlocked, hasKey: state.blobKeyAvailable });
+  }
+
+  private focusWorkspaceLockPassword(): void {
+    const password = this.deps.root()?.querySelector<HTMLInputElement>('[data-secure-workspace-password="true"]');
+    if (!password) return;
+    password.focus();
   }
 
   private renderShortcutFeedback(): void {
@@ -340,6 +369,10 @@ export class PanelRenderController {
   renderRecallOnly(): void {
     const root = this.deps.root();
     if (!root) return;
+    const state = this.deps.getState();
+    if (secureSessionRequiresUnlock({ unlocked: state.blobKeyUnlocked, hasKey: state.blobKeyAvailable })) {
+      return;
+    }
     renderRecallDestination(
       {
         root,
@@ -349,7 +382,7 @@ export class PanelRenderController {
         scrollAnchorId: this.deps.previewScrollAnchorId(),
         onPanelDragStart: this.deps.handlePanelDragStart,
       },
-      this.deps.getState(),
+      state,
     );
   }
 }

@@ -31,7 +31,12 @@ export interface WrappedBlobKey {
   readonly metadata: StoredKeyRecord<'blob'>;
 }
 
-const blobKeySession = new BlobKeySession();
+let sessionChanged: (snapshot: SessionUnlockSnapshot<'blob'>) => void = () => undefined;
+const blobKeySession = new BlobKeySession(undefined, undefined, (snapshot) => sessionChanged(snapshot));
+
+export function configureBlobKeySessionChangeListener(listener?: (snapshot: SessionUnlockSnapshot<'blob'>) => void): void {
+  sessionChanged = listener ?? (() => undefined);
+}
 
 export function configureBlobKeySessionStorage(storage?: BlobKeySessionStorage): void {
   blobKeySession.configureStorage(storage);

@@ -36,6 +36,7 @@ import {
   type UnlockBlobKeyMessage,
 } from '../messages.js';
 import type { ServiceWorkerContext } from '../service-worker-context.js';
+import { noopSecureSessionChangeNotifier, type SecureSessionChangeNotifier } from '../secure-session-change-notifier.js';
 
 type BlobKeyRequestType =
   | typeof MessageType.BlobKeyStatus
@@ -49,6 +50,7 @@ type BlobKeyRequestType =
 
 export type BlobKeyMessageHandlerDeps = Pick<ServiceWorkerContext, 'getDb'> & {
   readonly loadLocalSettings?: ServiceWorkerContext['loadLocalSettings'] | undefined;
+  readonly notifySecureSessionChange?: SecureSessionChangeNotifier | undefined;
 };
 
 function isStoredBlobKey(record: StoredKeyRecord | undefined): record is StoredKeyRecord<'blob'> {
@@ -62,6 +64,7 @@ function latestKeyByCreatedAt(keys: readonly StoredKeyRecord[]): StoredKeyRecord
 export function createBlobKeyMessageRegistry({
   getDb,
   loadLocalSettings,
+  notifySecureSessionChange = noopSecureSessionChangeNotifier,
 }: BlobKeyMessageHandlerDeps): Record<BlobKeyRequestType, MessageDef<ExtensionRequest, ExtensionResponse>> {
   const loadSettings = loadLocalSettings ?? (async () => DEFAULT_LOCAL_SETTINGS);
 
@@ -121,7 +124,11 @@ export function createBlobKeyMessageRegistry({
     if (!isStoredBlobKey(blobKey)) {
       return { ok: false, reason: 'missing-key', message: 'No encrypted blob key exists. Set up encrypted storage first.' };
     }
-    await activateWrappedBlobKey(blobKey, password, (await loadSettings()).blobKeyInactivityTimeoutMinutes);
+    try {
+      await activateWrappedBlobKey(blobKey, password, (await loadSettings()).blobKeyInactivityTimeoutMinutes);
+    } catch {
+      return { ok: false, reason: 'wrong-password', message: 'Password did not unlock encrypted storage.' };
+    }
     return { ok: true, keyReference: blobKey.reference, message: `Encrypted blob storage unlocked with ${blobKey.reference}.` };
   }
 
@@ -147,6 +154,7 @@ export function createBlobKeyMessageRegistry({
     for (const key of blobKeys) {
       await keys.remove(key.reference);
     }
+    notifySecureSessionChange({ unlocked: false, keyReference: null, hasKey: false });
     return { ok: true, keyReference: '', message: 'Encrypted blob key cleared. Import a key backup to recover encrypted originals.' };
   }
 
@@ -197,6 +205,7 @@ export function createBlobKeyMessageRegistry({
       };
     }
     await keys.put(result.record);
+    notifySecureSessionChange({ unlocked: false, keyReference: null, hasKey: true });
     return {
       ok: true,
       keyReference: result.record.reference,

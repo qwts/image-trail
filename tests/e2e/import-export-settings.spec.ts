@@ -210,10 +210,12 @@ async function importKeyBackup(page: Page, fileContent: string, password: string
   await keyBackup.getByRole('button', { name: 'Import key backup' }).click();
 }
 
-async function unlockEncryptedOriginals(page: Page): Promise<void> {
-  await openEncryptedOriginals(page);
-  await page.getByLabel('Encrypted originals password').fill(encryptionPassword);
-  await page.getByRole('button', { name: 'Unlock' }).click();
+async function unlockWorkspaceAfterKeyImport(page: Page): Promise<void> {
+  const lock = page.locator('[data-secure-workspace-lock="true"]');
+  await expect(lock).toBeVisible();
+  await lock.getByLabel('Password').fill(encryptionPassword);
+  await lock.getByRole('button', { name: 'Unlock workspace' }).click();
+  await expect(lock).toHaveCount(0, { timeout: 20_000 });
   await expectPanelStatusMessage(page, /Encrypted blob storage unlocked with blob:[a-f0-9-]+\./u);
   await closeSettings(page);
 }
@@ -380,8 +382,7 @@ test('key backup import fails closed with a wrong password and restores the capt
     await expectPanelStatusMessage(cleanSession.page, /Failed to unwrap key backup|Key backup import failed|decrypt/u);
     await expect(cleanSession.page.locator('.image-trail-panel__encryption-badge')).toHaveText('AES-GCM');
     await importKeyBackup(cleanSession.page, fileContent, backupPassword);
-    await expectPanelStatusMessage(cleanSession.page, /Imported key backup for blob:[a-f0-9-]+\./u);
-    await unlockEncryptedOriginals(cleanSession.page);
+    await unlockWorkspaceAfterKeyImport(cleanSession.page);
   } finally {
     await cleanSession.close();
   }
@@ -392,8 +393,7 @@ test('key backup import fails closed with a wrong password and restores the capt
   await expect(page.locator('.image-trail-panel__encryption-badge')).toHaveText('AES-GCM');
 
   await importKeyBackup(page, fileContent, backupPassword);
-  await expectPanelStatusMessage(page, /Imported key backup for blob:[a-f0-9-]+\./u);
-  await unlockEncryptedOriginals(page);
+  await unlockWorkspaceAfterKeyImport(page);
   await expect(queueRow.locator('.image-trail-panel__stored-original-dot')).toHaveAttribute('title', 'Original stored');
 });
 
