@@ -1,5 +1,5 @@
 export type EncryptionAlgorithm = 'AES-GCM';
-export type KeyKind = 'root' | 'history' | 'bookmark' | 'metadata' | 'export' | 'blob' | 'download';
+export type KeyKind = 'root' | 'history' | 'bookmark' | 'metadata' | 'export' | 'blob' | 'download' | 'interop';
 export type KeyWrappingMode = 'session' | 'password' | 'webauthn' | 'imported' | 'indexeddb';
 export type KeyReferenceString<K extends KeyKind = KeyKind> = `${K}:${string}`;
 
