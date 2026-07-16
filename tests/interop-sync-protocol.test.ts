@@ -195,3 +195,42 @@ test('incremental checkpoints are monotonic and changes are ordered by canonical
   assert.equal((await repository.advanceCheckpoint(SESSION_ID, 'overlook', 2, now())).checkpoints.overlook, 2);
   assert.equal((await repository.advanceCheckpoint(SESSION_ID, 'overlook', 1, now())).checkpoints.overlook, 2);
 });
+
+test('reviewed direction, scope, and transfer identity fail closed', async (t) => {
+  const db = await openFreshImageTrailDb();
+  t.after(() => db.close());
+  const repository = new SyncJournalRepository(db);
+  const service = new SyncProtocolService('image-trail', repository, { now: clock() });
+  await assert.rejects(
+    service.start({
+      sessionId: SESSION_ID,
+      pairingId: PAIRING_ID,
+      sourceProduct: 'image-trail',
+      targetProduct: 'overlook',
+      direction: 'overlook-to-image-trail',
+      scope: { kind: 'all', localIds: [] },
+    }),
+    /direction does not match/u,
+  );
+  await assert.rejects(
+    service.start({
+      sessionId: SESSION_ID,
+      pairingId: PAIRING_ID,
+      sourceProduct: 'image-trail',
+      targetProduct: 'overlook',
+      direction: 'image-trail-to-overlook',
+      scope: { kind: 'selected', localIds: [] },
+    }),
+    /scope ids/u,
+  );
+  await service.start({
+    sessionId: SESSION_ID,
+    pairingId: PAIRING_ID,
+    sourceProduct: 'image-trail',
+    targetProduct: 'overlook',
+    direction: 'image-trail-to-overlook',
+    scope: { kind: 'all', localIds: [] },
+  });
+  const envelope = syncEnvelope(conflictPair().remote, '2d5b09d6-1be9-44a0-aac3-f06cbdc4617b');
+  await assert.rejects(service.receive(SESSION_ID, envelope, conflictPair().local), /does not match the durable session identity/u);
+});

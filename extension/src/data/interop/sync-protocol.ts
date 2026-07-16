@@ -36,7 +36,7 @@ function singleRecordAnalysis(record: InteropRecord): SyncAnalysis {
 function sameParticipants(session: SyncSessionRecord, source: InteropProduct, target: InteropProduct): boolean {
   return (
     (session.sourceProduct === source && session.targetProduct === target) ||
-    (session.sourceProduct === target && session.targetProduct === source)
+    (session.direction === 'two-way' && session.sourceProduct === target && session.targetProduct === source)
   );
 }
 
@@ -80,6 +80,7 @@ export class SyncProtocolService {
     const session = await this.repository.getSession(sessionId);
     if (session === undefined) throw new SyncProtocolError('Sync session does not exist.');
     if (
+      envelope.header.transferId !== sessionId ||
       session.pairingId !== envelope.header.pairingId ||
       !sameParticipants(session, envelope.header.sourceProduct, envelope.header.targetProduct) ||
       envelope.header.targetProduct !== this.localProduct
