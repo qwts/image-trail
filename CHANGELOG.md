@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.13.0
+
+### Minor Changes
+
+- ebccfa0: Adopt the canonical Overlook interoperability contract and secure pairing key custody.
+
 ## 0.12.4
 
 ### Patch Changes
