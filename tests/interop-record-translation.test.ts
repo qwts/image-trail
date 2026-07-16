@@ -109,6 +109,7 @@ test('returning Image Trail protected pins keep their relationship and canonical
     now: '2026-07-16T08:00:00.000Z',
   });
   const bookmarks = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  const lockedBookmarks = new IndexedDbBookmarkStore();
   const translator = new InteropRecordTranslationStore();
   try {
     const saved = await bookmarks.save(
@@ -133,9 +134,7 @@ test('returning Image Trail protected pins keep their relationship and canonical
     const imported = await translator.importRecord({ ...fixture, record });
     const page = await bookmarks.loadPage({ offset: 0, limit: 10 });
     const found = await bookmarks.findByUrl(record.sourceUrl!);
-    const lockedBookmarks = new IndexedDbBookmarkStore();
     const lockedPage = await lockedBookmarks.loadPage({ offset: 0, limit: 10 });
-    await lockedBookmarks.close();
 
     assert.equal(imported.pinId, saved.id);
     assert.equal(page.total, 1);
@@ -147,10 +146,27 @@ test('returning Image Trail protected pins keep their relationship and canonical
     assert.equal(lockedPage.items[0]?.id, saved.id);
     assert.equal(lockedPage.items[0]?.privacyStatus, 'locked');
     assert.equal(lockedPage.items[0]?.protectedPin?.encryptedPinId, protectedPinId);
+    lockBlobKey();
+    const lockedResave = await lockedBookmarks.save(
+      createDisplayRecord({
+        id: record.sourceUrl!,
+        url: record.sourceUrl!,
+        label: 'must-not-rewrite-private-pin.jpg',
+        timestamp: '2026-07-16T08:02:00.000Z',
+        source: 'bookmark',
+      }),
+    );
+    const afterLockedSave = await lockedBookmarks.loadPage({ offset: 0, limit: 10 });
+    assert.equal(lockedResave.id, saved.id);
+    assert.equal(lockedResave.privacyStatus, 'locked');
+    assert.equal(lockedResave.protectedPin?.encryptedPinId, protectedPinId);
+    assert.equal(afterLockedSave.total, 1);
+    assert.equal(afterLockedSave.items[0]?.protectedPin?.encryptedPinId, protectedPinId);
     assert.deepEqual(await translator.exportRecord(record.identity.interopId), { ...fixture, record });
   } finally {
     await translator.close();
     await bookmarks.close();
+    await lockedBookmarks.close();
     lockBlobKey();
   }
 });

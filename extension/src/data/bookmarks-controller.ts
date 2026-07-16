@@ -166,6 +166,9 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       ? await context.repository.getEncrypted(bookmark.id)
       : await findStoredBookmarkByUrl(context.repository, context.bookmarkKey.key, bookmark.url, policy);
     const existingPayload = existing ? await context.repository.openRecord(existing, context.bookmarkKey.key).catch(() => null) : null;
+    if (existing && existingPayload?.protectedPin) {
+      return { ...toDisplayRecord(existing.uuid, existingPayload, existing.queueUpdatedAt), pinSaveStorage };
+    }
     const indexUrl = existingPayload?.interop ? existing!.url : proposedIndexUrl;
     const uuid = existing?.uuid ?? crypto.randomUUID();
     await context.repository.sealAndPut(
