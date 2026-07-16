@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.12.4
+
+### Patch Changes
+
+- e64a217: Replace every protected workspace and preview with one opaque unlock surface whenever encrypted storage is locked.
+
 ## 0.12.3
 
 ### Patch Changes
