@@ -9,7 +9,10 @@
       "$ref": "#/$defs/__schema11"
     }
   },
-  "required": ["header", "payload"],
+  "required": [
+    "header",
+    "payload"
+  ],
   "additionalProperties": false,
   "$defs": {
     "__schema0": {
@@ -89,15 +92,28 @@
     },
     "__schema6": {
       "type": "string",
-      "enum": ["image-trail", "overlook"]
+      "enum": [
+        "image-trail",
+        "overlook"
+      ]
     },
     "__schema7": {
       "type": "string",
-      "enum": ["move", "sync"]
+      "enum": [
+        "move",
+        "sync"
+      ]
     },
     "__schema8": {
       "type": "string",
-      "enum": ["manifest", "record", "blob", "acknowledgement", "journal", "error"]
+      "enum": [
+        "manifest",
+        "record",
+        "blob",
+        "acknowledgement",
+        "journal",
+        "error"
+      ]
     },
     "__schema9": {
       "type": "string",
@@ -149,7 +165,14 @@
               "$ref": "#/$defs/__schema12"
             }
           },
-          "required": ["kind", "schemaVersion", "recordInteropIds", "albumInteropIds", "blobCount", "counts"],
+          "required": [
+            "kind",
+            "schemaVersion",
+            "recordInteropIds",
+            "albumInteropIds",
+            "blobCount",
+            "counts"
+          ],
           "additionalProperties": false
         },
         {
@@ -189,7 +212,10 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["product", "localId"],
+                      "required": [
+                        "product",
+                        "localId"
+                      ],
                       "additionalProperties": false
                     },
                     "contentHash": {
@@ -204,7 +230,11 @@
                       ]
                     }
                   },
-                  "required": ["interopId", "origin", "contentHash"],
+                  "required": [
+                    "interopId",
+                    "origin",
+                    "contentHash"
+                  ],
                   "additionalProperties": false
                 },
                 "revision": {
@@ -251,7 +281,10 @@
                 },
                 "recordKind": {
                   "type": "string",
-                  "enum": ["web-bookmark", "photo"]
+                  "enum": [
+                    "web-bookmark",
+                    "photo"
+                  ]
                 },
                 "title": {
                   "anyOf": [
@@ -302,7 +335,10 @@
                           "maximum": 9007199254740991
                         }
                       },
-                      "required": ["width", "height"],
+                      "required": [
+                        "width",
+                        "height"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -374,7 +410,13 @@
                       ]
                     }
                   },
-                  "required": ["bookmarkedAt", "capturedAt", "downloadedAt", "takenAt", "importedAt"],
+                  "required": [
+                    "bookmarkedAt",
+                    "capturedAt",
+                    "downloadedAt",
+                    "takenAt",
+                    "importedAt"
+                  ],
                   "additionalProperties": false
                 },
                 "sourceCompatibility": {
@@ -465,7 +507,10 @@
                         "minLength": 1
                       }
                     },
-                    "required": ["product", "localId"],
+                    "required": [
+                      "product",
+                      "localId"
+                    ],
                     "additionalProperties": false
                   },
                   "revision": {
@@ -495,7 +540,11 @@
                           "$ref": "#/$defs/__schema13"
                         }
                       },
-                      "required": ["recordInteropId", "position", "revision"],
+                      "required": [
+                        "recordInteropId",
+                        "position",
+                        "revision"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -515,16 +564,38 @@
                     ]
                   }
                 },
-                "required": ["schemaVersion", "interopId", "origin", "revision", "name", "members", "roundTripMetadata", "deletedAt"],
+                "required": [
+                  "schemaVersion",
+                  "interopId",
+                  "origin",
+                  "revision",
+                  "name",
+                  "members",
+                  "roundTripMetadata",
+                  "deletedAt"
+                ],
                 "additionalProperties": false
               }
             },
             "reviewCategory": {
               "type": "string",
-              "enum": ["eligible", "duplicate", "conflict", "metadata-only", "unsupported", "skipped"]
+              "enum": [
+                "eligible",
+                "duplicate",
+                "conflict",
+                "metadata-only",
+                "unsupported",
+                "skipped"
+              ]
             }
           },
-          "required": ["kind", "schemaVersion", "record", "albums", "reviewCategory"],
+          "required": [
+            "kind",
+            "schemaVersion",
+            "record",
+            "albums",
+            "reviewCategory"
+          ],
           "additionalProperties": false
         },
         {
@@ -555,7 +626,16 @@
               "$ref": "#/$defs/__schema24"
             }
           },
-          "required": ["kind", "schemaVersion", "recordInteropId", "role", "blob", "encryptedPath", "chunkIndex", "chunkCount"],
+          "required": [
+            "kind",
+            "schemaVersion",
+            "recordInteropId",
+            "role",
+            "blob",
+            "encryptedPath",
+            "chunkIndex",
+            "chunkCount"
+          ],
           "additionalProperties": false
         },
         {
@@ -571,7 +651,10 @@
             },
             "status": {
               "type": "string",
-              "enum": ["accepted", "rejected"]
+              "enum": [
+                "accepted",
+                "rejected"
+              ]
             },
             "recordInteropId": {
               "type": "string",
@@ -594,7 +677,11 @@
             },
             "originalVerification": {
               "type": "string",
-              "enum": ["verified", "metadata-only", "unavailable"]
+              "enum": [
+                "verified",
+                "metadata-only",
+                "unavailable"
+              ]
             },
             "acknowledgedMessageIds": {
               "readOnly": true,
@@ -668,7 +755,11 @@
               },
               "additionalProperties": {
                 "type": "string",
-                "enum": ["keep-image-trail", "keep-overlook", "keep-both"]
+                "enum": [
+                  "keep-image-trail",
+                  "keep-overlook",
+                  "keep-both"
+                ]
               }
             },
             "reviewedDeleteInteropIds": {
@@ -715,7 +806,11 @@
               "$ref": "#/$defs/__schema26"
             }
           },
-          "required": ["kind", "schemaVersion", "error"],
+          "required": [
+            "kind",
+            "schemaVersion",
+            "error"
+          ],
           "additionalProperties": false
         }
       ]
@@ -802,7 +897,10 @@
           "maximum": 9007199254740991
         }
       },
-      "required": ["imageTrail", "overlook"],
+      "required": [
+        "imageTrail",
+        "overlook"
+      ],
       "additionalProperties": false
     },
     "__schema14": {
@@ -832,7 +930,13 @@
               "pattern": "^[a-f0-9]{64}$"
             }
           },
-          "required": ["state", "blobId", "mimeType", "byteLength", "contentHash"],
+          "required": [
+            "state",
+            "blobId",
+            "mimeType",
+            "byteLength",
+            "contentHash"
+          ],
           "additionalProperties": false
         },
         {
@@ -840,7 +944,10 @@
           "properties": {
             "state": {
               "type": "string",
-              "enum": ["metadata-only", "unavailable"]
+              "enum": [
+                "metadata-only",
+                "unavailable"
+              ]
             },
             "blobId": {
               "type": "null"
@@ -881,10 +988,22 @@
             },
             "reason": {
               "type": "string",
-              "enum": ["not-captured", "missing", "provider-unavailable", "unsupported-format"]
+              "enum": [
+                "not-captured",
+                "missing",
+                "provider-unavailable",
+                "unsupported-format"
+              ]
             }
           },
-          "required": ["state", "blobId", "mimeType", "byteLength", "contentHash", "reason"],
+          "required": [
+            "state",
+            "blobId",
+            "mimeType",
+            "byteLength",
+            "contentHash",
+            "reason"
+          ],
           "additionalProperties": false
         }
       ]
@@ -899,7 +1018,10 @@
           "$ref": "#/$defs/__schema16"
         }
       },
-      "required": ["imageTrail", "overlook"],
+      "required": [
+        "imageTrail",
+        "overlook"
+      ],
       "additionalProperties": false
     },
     "__schema16": {
@@ -951,7 +1073,10 @@
     },
     "__schema21": {
       "type": "string",
-      "enum": ["original", "thumbnail"]
+      "enum": [
+        "original",
+        "thumbnail"
+      ]
     },
     "__schema22": {
       "type": "string",
@@ -1011,7 +1136,12 @@
           ]
         }
       },
-      "required": ["code", "message", "retryable", "recordInteropId"],
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "recordInteropId"
+      ],
       "additionalProperties": false
     }
   },

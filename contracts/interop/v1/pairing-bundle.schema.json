@@ -43,7 +43,12 @@
           "$ref": "#/$defs/__schema0"
         }
       },
-      "required": ["name", "hash", "iterations", "salt"],
+      "required": [
+        "name",
+        "hash",
+        "iterations",
+        "salt"
+      ],
       "additionalProperties": false
     },
     "cipher": {
@@ -60,11 +65,23 @@
           "$ref": "#/$defs/__schema0"
         }
       },
-      "required": ["name", "iv", "ciphertext"],
+      "required": [
+        "name",
+        "iv",
+        "ciphertext"
+      ],
       "additionalProperties": false
     }
   },
-  "required": ["magic", "formatVersion", "pairingId", "keyId", "createdAt", "kdf", "cipher"],
+  "required": [
+    "magic",
+    "formatVersion",
+    "pairingId",
+    "keyId",
+    "createdAt",
+    "kdf",
+    "cipher"
+  ],
   "additionalProperties": false,
   "$defs": {
     "__schema0": {
