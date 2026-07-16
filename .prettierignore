@@ -3,4 +3,5 @@ dist/
 extension/dist/
 .test-dist/
 coverage/
+contracts/interop/v1/
 .claude/
