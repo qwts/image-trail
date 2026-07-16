@@ -71,6 +71,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     bookmarkVisibilityScope: 'global',
     queueDisplayOrder: DEFAULT_QUEUE_DISPLAY_ORDER,
     pinSaveStoragePreference: 'encrypted',
+    blobKeyInactivityTimeoutMinutes: 10,
     privacyModeEnabled: false,
     searchableMetadataPolicy: DEFAULT_SEARCHABLE_METADATA_POLICY,
     buildInfoOverlayVisible: true,

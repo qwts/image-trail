@@ -130,6 +130,7 @@ test('loadLocalSettings syncs state, governor, and preview prefs from the store,
     storeSettings: {
       ...DEFAULT_LOCAL_SETTINGS,
       visibleBookmarkSoftMax: 12,
+      blobKeyInactivityTimeoutMinutes: 15,
       buildInfoOverlayVisible: false,
       recentHistoryLimit: 2,
       recentHistoryRetainedLimit: 4,
@@ -159,6 +160,7 @@ test('loadLocalSettings syncs state, governor, and preview prefs from the store,
   assert.equal(harness.getLocalSettings().visibleBookmarkSoftMax, 12);
   const state = harness.getState();
   assert.equal(state.bookmarkLimit, 12);
+  assert.equal(state.blobKeyInactivityTimeoutMinutes, 15);
   assert.equal(state.buildInfoOverlayVisible, false);
   assert.equal(state.recentHistoryLimit, 2);
   assert.equal(state.recentHistoryRetainedLimit, 4);
@@ -240,6 +242,18 @@ test('updateVisibleBookmarkSoftMax reloads the first page and refreshes recall o
   assert.equal(harness.getState().bookmarkLimit, 50);
   assert.equal(harness.getLocalSettings().visibleBookmarkSoftMax, 50);
   assert.deepEqual(harness.log, ['loadBookmarkPage:0', 'renderPanelAndRefreshRecall']);
+});
+
+test('updateBlobKeyInactivityTimeout persists and renders a supported policy change', () => {
+  const harness = createHarness();
+  harness.controller.updateBlobKeyInactivityTimeout('never');
+  assert.equal(harness.getState().blobKeyInactivityTimeoutMinutes, 'never');
+  assert.equal(harness.getLocalSettings().blobKeyInactivityTimeoutMinutes, 'never');
+  assert.equal(harness.saved.length, 1);
+  assert.deepEqual(harness.log, ['render']);
+
+  harness.controller.updateBlobKeyInactivityTimeout('never');
+  assert.equal(harness.saved.length, 1, 'unchanged policy is a no-op');
 });
 
 test('updateRecentHistoryRetention reloads session history only when the limit grows in keep-session mode', async () => {

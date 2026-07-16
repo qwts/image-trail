@@ -1,5 +1,15 @@
-import { activateWrappedBlobKey, createAndActivateWrappedBlobKey, getActiveBlobKey, lockBlobKey } from '../../data/crypto/blob-keyring.js';
+import {
+  activateWrappedBlobKey,
+  createAndActivateWrappedBlobKey,
+  didBlobKeySessionRestoreFail,
+  getActiveBlobKey,
+  getBlobKeySessionSnapshot,
+  lockBlobKey,
+  recordBlobKeyActivity,
+  restoreActiveBlobKey,
+} from '../../data/crypto/blob-keyring.js';
 import type { StoredKeyRecord } from '../../data/crypto/types.js';
+import { DEFAULT_LOCAL_SETTINGS } from '../../data/local-settings.js';
 import { exportStoredKeyBackupWithPassword, importStoredKeyBackupWithPassword } from '../../data/import-export/key-backup.js';
 import { KeysRepository } from '../../data/repositories/keys-repository.js';
 import { defineMessage, type MessageDef } from '../message-dispatch.js';
@@ -11,6 +21,7 @@ import {
   createExportBlobKeyBackupResultMessage,
   createImportBlobKeyBackupResultMessage,
   type BlobKeyResultMessage,
+  type BlobKeyActivityMessage,
   type BlobKeyStatusMessage,
   type BlobKeyStatusResultMessage,
   type ClearBlobKeyMessage,
@@ -20,6 +31,7 @@ import {
   type ExtensionResponse,
   type ImportBlobKeyBackupMessage,
   type ImportBlobKeyBackupResultMessage,
+  type LockBlobKeyMessage,
   type SetupBlobKeyMessage,
   type UnlockBlobKeyMessage,
 } from '../messages.js';
@@ -29,11 +41,15 @@ type BlobKeyRequestType =
   | typeof MessageType.BlobKeyStatus
   | typeof MessageType.SetupBlobKey
   | typeof MessageType.UnlockBlobKey
+  | typeof MessageType.LockBlobKey
+  | typeof MessageType.BlobKeyActivity
   | typeof MessageType.ClearBlobKey
   | typeof MessageType.ExportBlobKeyBackup
   | typeof MessageType.ImportBlobKeyBackup;
 
-export type BlobKeyMessageHandlerDeps = Pick<ServiceWorkerContext, 'getDb'>;
+export type BlobKeyMessageHandlerDeps = Pick<ServiceWorkerContext, 'getDb'> & {
+  readonly loadLocalSettings?: ServiceWorkerContext['loadLocalSettings'] | undefined;
+};
 
 function isStoredBlobKey(record: StoredKeyRecord | undefined): record is StoredKeyRecord<'blob'> {
   return record?.kind === 'blob';
@@ -45,14 +61,37 @@ function latestKeyByCreatedAt(keys: readonly StoredKeyRecord[]): StoredKeyRecord
 
 export function createBlobKeyMessageRegistry({
   getDb,
+  loadLocalSettings,
 }: BlobKeyMessageHandlerDeps): Record<BlobKeyRequestType, MessageDef<ExtensionRequest, ExtensionResponse>> {
+  const loadSettings = loadLocalSettings ?? (async () => DEFAULT_LOCAL_SETTINGS);
+
   async function handleBlobKeyStatus(): Promise<BlobKeyStatusResultMessage['payload']> {
-    const activeBlobKey = getActiveBlobKey();
-    if (activeBlobKey) return { unlocked: true, keyReference: activeBlobKey.reference.reference, hasKey: true };
+    const activeBlobKey = await restoreActiveBlobKey();
+    if (activeBlobKey) {
+      return { unlocked: true, keyReference: activeBlobKey.reference.reference, hasKey: true };
+    }
     const db = await getDb();
     if (!db) return { unlocked: false, keyReference: null, hasKey: false };
     const blobKeys = await new KeysRepository(db).listByKind('blob');
-    return { unlocked: false, keyReference: null, hasKey: blobKeys.length > 0 };
+    const hasKey = blobKeys.length > 0;
+    const snapshot = getBlobKeySessionSnapshot();
+    const reason = hasKey
+      ? didBlobKeySessionRestoreFail()
+        ? 'worker-restart'
+        : snapshot.status === 'locked'
+          ? snapshot.reason
+          : undefined
+      : undefined;
+    const message =
+      reason === 'timeout'
+        ? 'Encrypted storage locked after the configured inactivity period. Unlock to continue.'
+        : reason === 'worker-restart'
+          ? 'Encrypted storage locked because the extension worker restarted. Unlock to continue.'
+          : reason === 'manual'
+            ? 'Encrypted storage locked.'
+            : undefined;
+    const locked = { unlocked: false as const, keyReference: null, hasKey };
+    return reason && message ? { ...locked, reason, message } : locked;
   }
 
   async function handleSetupBlobKey(message: SetupBlobKeyMessage): Promise<BlobKeyResultMessage['payload']> {
@@ -60,7 +99,8 @@ export function createBlobKeyMessageRegistry({
     if (!password) return { ok: false, reason: 'empty-password', message: 'Enter a password to set up encrypted blob storage.' };
     const db = await getDb();
     if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
-    const wrapped = await createAndActivateWrappedBlobKey({ password });
+    const timeoutMinutes = (await loadSettings()).blobKeyInactivityTimeoutMinutes;
+    const wrapped = await createAndActivateWrappedBlobKey({ password, timeoutMinutes });
     await new KeysRepository(db).put(wrapped.metadata);
     return {
       ok: true,
@@ -81,12 +121,25 @@ export function createBlobKeyMessageRegistry({
     if (!isStoredBlobKey(blobKey)) {
       return { ok: false, reason: 'missing-key', message: 'No encrypted blob key exists. Set up encrypted storage first.' };
     }
-    await activateWrappedBlobKey(blobKey, password);
+    await activateWrappedBlobKey(blobKey, password, (await loadSettings()).blobKeyInactivityTimeoutMinutes);
     return { ok: true, keyReference: blobKey.reference, message: `Encrypted blob storage unlocked with ${blobKey.reference}.` };
   }
 
+  async function handleLockBlobKey(): Promise<BlobKeyResultMessage['payload']> {
+    await lockBlobKey('manual');
+    return { ok: true, keyReference: '', message: 'Encrypted storage locked.' };
+  }
+
+  async function handleBlobKeyActivity(): Promise<BlobKeyStatusResultMessage['payload']> {
+    if (await recordBlobKeyActivity()) {
+      const active = getActiveBlobKey();
+      if (active) return { unlocked: true, keyReference: active.reference.reference, hasKey: true };
+    }
+    return handleBlobKeyStatus();
+  }
+
   async function handleClearBlobKey(): Promise<BlobKeyResultMessage['payload']> {
-    lockBlobKey();
+    await lockBlobKey();
     const db = await getDb();
     if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
     const keys = new KeysRepository(db);
@@ -170,6 +223,18 @@ export function createBlobKeyMessageRegistry({
       handle: (message: UnlockBlobKeyMessage) => handleUnlockBlobKey(message),
       respond: (result) => createBlobKeyResultMessage(result),
       fallback: () => createBlobKeyResultMessage({ ok: false, reason: 'unknown', message: 'Blob key unlock failed.' }),
+    }),
+    [MessageType.LockBlobKey]: defineMessage({
+      requestSchema: requestSchemas.emptyPayloadSchema,
+      handle: (_message: LockBlobKeyMessage) => handleLockBlobKey(),
+      respond: (result) => createBlobKeyResultMessage(result),
+      fallback: () => createBlobKeyResultMessage({ ok: false, reason: 'unknown', message: 'Blob key lock failed.' }),
+    }),
+    [MessageType.BlobKeyActivity]: defineMessage({
+      requestSchema: requestSchemas.emptyPayloadSchema,
+      handle: (_message: BlobKeyActivityMessage) => handleBlobKeyActivity(),
+      respond: (result) => createBlobKeyStatusResultMessage(result),
+      fallback: () => createBlobKeyStatusResultMessage({ unlocked: false, keyReference: null, hasKey: false }),
     }),
     [MessageType.ClearBlobKey]: defineMessage({
       requestSchema: requestSchemas.emptyPayloadSchema,

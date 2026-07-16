@@ -18,6 +18,8 @@ import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePrevie
 import type { WorkspacePanelAction } from './workspace-actions.js';
 import type { RecentHistoryScope } from './recent-history-scope.js';
 import type { LibraryPanelState, RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
+import type { SessionInactivityTimeoutMinutes } from './secure-session-policy.js';
+import type { SecureSessionPanelAction } from './secure-session-actions.js';
 
 export type { RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
 
@@ -170,6 +172,7 @@ export interface PanelState extends LibraryPanelState {
   readonly pageContext: PageContextState;
   readonly draftUrl: string | null;
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
+  readonly blobKeyInactivityTimeoutMinutes: SessionInactivityTimeoutMinutes;
   readonly privacyModeEnabled: boolean;
   readonly searchableMetadataPolicy: SearchableMetadataPolicy;
   readonly buildInfoOverlayVisible: boolean;
@@ -506,6 +509,7 @@ export type PanelAction =
     }
   | { readonly name: 'settings/update-recent-sparse-row-display-mode'; readonly mode: RecentSparseRowDisplayMode }
   | { readonly name: 'settings/update-pin-save-storage-preference'; readonly value: PinSaveStoragePreference }
+  | SecureSessionPanelAction
   | { readonly name: 'settings/update-privacy-mode'; readonly enabled: boolean }
   | { readonly name: 'settings/update-metadata-policy'; readonly policy: SearchableMetadataPolicy }
   | { readonly name: 'settings/update-workspace-layout-restore'; readonly enabled: boolean }
@@ -556,11 +560,6 @@ export type PanelAction =
       readonly blobId?: string | undefined;
       readonly scrollAnchorId?: string | undefined;
     }
-  | { readonly name: 'blob-key/setup' | 'blob-key/unlock'; readonly password: string }
-  | { readonly name: 'blob-key/clear' }
-  | { readonly name: 'blob-key/export'; readonly password: string }
-  | { readonly name: 'blob-key/import'; readonly fileContent: string; readonly password: string }
-  | { readonly name: 'blob-key/status'; readonly unlocked: boolean; readonly keyReference?: string | null; readonly hasKey?: boolean }
   | { readonly name: 'import-export/complete'; readonly message: string }
   | { readonly name: 'import-export/error'; readonly message: string }
   | { readonly name: 'import/restore-preview-ready'; readonly preview: ImportRestorePreviewState }

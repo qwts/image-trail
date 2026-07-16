@@ -484,31 +484,28 @@ export class ImageTrailPanel {
   get visible(): boolean {
     return this.state.visible;
   }
-
+  refreshSecureSessionStatus(): void {
+    void this.recallExport.refreshBlobKeyStatus();
+  }
   get statusMessage(): string {
     return this.state.message;
   }
-
   setBuildIdentity(buildIdentity: BuildIdentity | null): void {
     this.state = { ...this.state, buildIdentity };
     if (this.state.visible && this.state.activeDestination === 'settings') this.render();
   }
-
   setBuildInfoOverlayVisible(visible: boolean): void {
     this.dispatch({ name: 'settings/update-build-info-overlay-visibility', visible });
   }
-
   reloadLocalSettings(): Promise<void> {
     return this.panelSettings.loadLocalSettings({ render: this.state.visible, reloadQueue: true });
   }
-
   toggle(): PanelState {
     const wasVisible = this.state.visible;
     this.dispatch({ name: 'toggle-panel' });
     if (!wasVisible && this.state.visible) this.parsedFieldStateRecord.restoreParsedFieldStateForCurrentPanel();
     return this.state;
   }
-
   destroy(): void {
     this.state = reducePanelAction(this.state, { name: 'close-panel' });
     this.slideshow.destroy();
@@ -518,7 +515,6 @@ export class ImageTrailPanel {
     this.neighborPreload.dispose();
     this.cleanupMountedElements({ releaseTarget: true });
   }
-
   private cleanupMountedElements(options: { readonly releaseTarget?: boolean } = {}): void {
     this.pageContext.stop();
     if (options.releaseTarget) {
@@ -533,12 +529,10 @@ export class ImageTrailPanel {
     this.panelRender.clearFiniteCaptureErrorTimer();
     this.panelRender.clearShortcutFeedback();
   }
-
   disconnect(): void {
     this.destroy();
     this.panelMount.disposeSubscriptions();
   }
-
   private scheduleFiniteCaptureErrorReset(updatedAt: number, mode: 'status' | 'capture-result', durationMs?: number): void {
     this.panelRender.scheduleFiniteCaptureErrorReset(updatedAt, mode, durationMs);
   }
@@ -627,15 +621,12 @@ export class ImageTrailPanel {
     this.pageAdapter.autoSelectSingleImage();
     this.render();
   };
-
   // Built in a field initializer; safe because every deps member is a lazy closure, so nothing
   // dereferences the constructor-assigned collaborators (keyboard/slideshow/retry) until a handler runs.
   private readonly actionRegistry = buildPanelActionRegistry(this.createActionDeps());
-
   private dispatch = (action: PanelAction): void => {
     dispatchPanelAction(this.actionRegistry, action, this.handleDefaultAction);
   };
-
   handleShortcutAction(action: string): boolean {
     return handlePanelShortcutAction(action, {
       getState: () => this.state,
@@ -648,23 +639,18 @@ export class ImageTrailPanel {
       showFeedback: (message, tone) => this.panelRender.showShortcutFeedback(message, tone),
     });
   }
-
   private currentUrlModel(): ParsedUrlModel {
     return urlModelFromRawUrl(this.currentRawUrl(), this.state);
   }
-
   private currentNavigationBaseModel(): ParsedUrlModel {
     return urlModelFromRawUrl(this.currentNavigationBaseRawUrl(), this.state);
   }
-
   private currentRawUrl(): string {
     return this.draftUrl() ?? this.projectedSourceUrl() ?? this.pageUrl();
   }
-
   private currentNavigationBaseRawUrl(): string {
     return this.state.failedFieldId && this.state.target.selectedUrl ? this.state.target.selectedUrl : this.currentRawUrl();
   }
-
   private projectedSourceUrl(): string | null {
     const snapshot = this.pageAdapter.getSnapshot();
     return snapshot.selected?.url ?? this.state.target.selectedUrl ?? null;

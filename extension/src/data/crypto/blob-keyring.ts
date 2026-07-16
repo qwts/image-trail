@@ -2,6 +2,13 @@ import { createKeyReference } from './key-reference.js';
 import { PBKDF2_ITERATIONS, unwrapKeyWithPassword, wrapKeyWithPassword } from './password-wrap.js';
 import type { KeyReference, StoredKeyRecord } from './types.js';
 import { generateAesGcmKey } from './webcrypto.js';
+import { BlobKeySession, type BlobKeySessionStorage } from './blob-key-session.js';
+import {
+  DEFAULT_SESSION_INACTIVITY_TIMEOUT_MINUTES,
+  type SessionInactivityTimeoutMinutes,
+  type SessionLockReason,
+  type SessionUnlockSnapshot,
+} from '../runtime/session-unlock.js';
 
 function toBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -24,27 +31,51 @@ export interface WrappedBlobKey {
   readonly metadata: StoredKeyRecord<'blob'>;
 }
 
-let activeBlobKey: ActiveBlobKey | null = null;
+const blobKeySession = new BlobKeySession();
 
-export function getActiveBlobKey(): ActiveBlobKey | null {
-  return activeBlobKey;
+export function configureBlobKeySessionStorage(storage: BlobKeySessionStorage): void {
+  blobKeySession.configureStorage(storage);
 }
 
-export function lockBlobKey(): void {
-  activeBlobKey = null;
+export function getActiveBlobKey(): ActiveBlobKey | null {
+  return blobKeySession.peek();
+}
+
+export function restoreActiveBlobKey(): Promise<ActiveBlobKey | null> {
+  return blobKeySession.restore();
+}
+
+export function lockBlobKey(reason: SessionLockReason = 'manual'): Promise<void> {
+  return blobKeySession.lock(reason);
+}
+
+export function recordBlobKeyActivity(): Promise<boolean> {
+  return blobKeySession.recordActivity();
+}
+
+export function updateBlobKeyInactivityTimeout(timeoutMinutes: SessionInactivityTimeoutMinutes): Promise<boolean> {
+  return blobKeySession.updateTimeout(timeoutMinutes);
+}
+
+export function getBlobKeySessionSnapshot(): SessionUnlockSnapshot<'blob'> {
+  return blobKeySession.snapshot;
+}
+
+export function didBlobKeySessionRestoreFail(): boolean {
+  return blobKeySession.restoreFailed;
 }
 
 export async function createAndActivateWrappedBlobKey(input: {
   readonly password: string;
   readonly uuid?: string;
   readonly now?: string;
+  readonly timeoutMinutes?: SessionInactivityTimeoutMinutes;
 }): Promise<WrappedBlobKey> {
   const uuid = input.uuid ?? crypto.randomUUID();
   const now = input.now ?? new Date().toISOString();
   const reference = createKeyReference('blob', uuid);
   const extractableKey = await generateAesGcmKey(true);
   const wrapped = await wrapKeyWithPassword(extractableKey, input.password);
-  const activeKey = await unwrapKeyWithPassword(wrapped.wrappedKey, wrapped.iv, input.password, wrapped.salt, wrapped.iterations, false);
   const metadata: StoredKeyRecord<'blob'> = {
     ...reference,
     createdAt: now,
@@ -59,27 +90,35 @@ export async function createAndActivateWrappedBlobKey(input: {
     },
     extractable: false,
   };
-  activeBlobKey = { reference, key: activeKey };
-  return { active: activeBlobKey, metadata };
+  const active = await blobKeySession.unlock(
+    reference,
+    extractableKey,
+    now,
+    input.timeoutMinutes ?? DEFAULT_SESSION_INACTIVITY_TIMEOUT_MINUTES,
+  );
+  return { active, metadata };
 }
 
-export async function activateWrappedBlobKey(metadata: StoredKeyRecord<'blob'>, password: string): Promise<ActiveBlobKey> {
+export async function activateWrappedBlobKey(
+  metadata: StoredKeyRecord<'blob'>,
+  password: string,
+  timeoutMinutes: SessionInactivityTimeoutMinutes = DEFAULT_SESSION_INACTIVITY_TIMEOUT_MINUTES,
+): Promise<ActiveBlobKey> {
   if (metadata.wrapping.mode !== 'password' || metadata.wrapping.algorithm !== 'AES-GCM') {
     throw new Error('Blob key is not password wrapped.');
   }
   if (!metadata.wrapping.wrappedKey || !metadata.wrapping.iv || !metadata.wrapping.salt || !metadata.wrapping.iterations) {
     throw new Error('Blob key wrapping metadata is incomplete.');
   }
-  const key = await unwrapKeyWithPassword(
+  const extractableKey = await unwrapKeyWithPassword(
     fromBase64(metadata.wrapping.wrappedKey),
     fromBase64(metadata.wrapping.iv),
     password,
     fromBase64(metadata.wrapping.salt),
     metadata.wrapping.iterations,
-    false,
+    true,
   );
-  activeBlobKey = { reference: metadata, key };
-  return activeBlobKey;
+  return blobKeySession.unlock(metadata, extractableKey, undefined, timeoutMinutes);
 }
 
 export { PBKDF2_ITERATIONS };

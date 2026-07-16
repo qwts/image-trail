@@ -32,6 +32,7 @@ const plaintextLocalSettingsEntries = {
   bookmarkVisibilityScope: v.picklist(['global', 'site']),
   queueDisplayOrder: v.picklist(['front-first', 'back-first']),
   pinSaveStoragePreference: v.picklist(['encrypted', 'plaintext']),
+  blobKeyInactivityTimeoutMinutes: v.picklist([5, 10, 15, 'never']),
   privacyModeEnabled: v.boolean(),
   searchableMetadataPolicy: v.object({ ...searchableMetadataPolicyEntries, thumbnail: v.literal('encrypted') }),
   buildInfoOverlayVisible: v.boolean(),

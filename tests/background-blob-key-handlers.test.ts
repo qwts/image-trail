@@ -108,7 +108,13 @@ test('export refuses a blank password, then produces a backup file for the store
 test('a locked key reports hasKey without a reference, and unlock reactivates it', async () => {
   lockBlobKey();
   const locked = await handleAndRespond<BlobKeyStatusResultMessage>(registry[MessageType.BlobKeyStatus], createBlobKeyStatusMessage());
-  assert.deepEqual(locked.payload, { unlocked: false, keyReference: null, hasKey: true });
+  assert.deepEqual(locked.payload, {
+    unlocked: false,
+    keyReference: null,
+    hasKey: true,
+    reason: 'manual',
+    message: 'Encrypted storage locked.',
+  });
 
   const unlocked = await handleAndRespond<BlobKeyResultMessage>(registry[MessageType.UnlockBlobKey], createUnlockBlobKeyMessage(password));
   assert.equal(unlocked.payload.ok, true);

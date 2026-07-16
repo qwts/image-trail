@@ -41,6 +41,7 @@ import {
   PRIVATE_PIN_EXPORT_LOCKED_MESSAGE,
   selectedRecords,
 } from './record-export-helpers.js';
+import { SecureSessionUiController } from './secure-session-ui-controller.js';
 
 /**
  * Collaborator that owns the blob-key, pCloud backup, and data/image export flows extracted from
@@ -73,47 +74,22 @@ export interface RecallExportControllerDeps {
 }
 
 export class RecallExportController {
-  constructor(private readonly deps: RecallExportControllerDeps) {}
+  private readonly secureSession: SecureSessionUiController;
+
+  constructor(private readonly deps: RecallExportControllerDeps) {
+    this.secureSession = new SecureSessionUiController(deps);
+  }
 
   async setupBlobKey(password: string): Promise<void> {
-    const captureStore = this.deps.captureStore();
-    if (!captureStore) return;
-    const result = await captureStore.setupBlobKey(password);
-    this.deps.setState(
-      reducePanelAction(
-        { ...this.deps.getState(), message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() },
-        { name: 'blob-key/status', unlocked: result.ok, keyReference: result.ok ? result.keyReference : null, hasKey: result.ok },
-      ),
-    );
-    if (result.ok) {
-      await this.deps.loadBookmarkPage(this.deps.getState().bookmarkOffset, { render: false });
-      this.deps.renderPanelAndRefreshRecall();
-      return;
-    }
-    this.deps.render();
+    return this.secureSession.setup(password);
   }
 
   async unlockBlobKey(password: string): Promise<void> {
-    const captureStore = this.deps.captureStore();
-    if (!captureStore) return;
-    const result = await captureStore.unlockBlobKey(password);
-    this.deps.setState(
-      reducePanelAction(
-        { ...this.deps.getState(), message: result.message, status: result.ok ? 'ready' : 'error', lastUpdatedAt: Date.now() },
-        {
-          name: 'blob-key/status',
-          unlocked: result.ok,
-          keyReference: result.ok ? result.keyReference : null,
-          hasKey: this.deps.getState().blobKeyAvailable,
-        },
-      ),
-    );
-    if (result.ok) {
-      await this.deps.loadBookmarkPage(this.deps.getState().bookmarkOffset, { render: false });
-      this.deps.renderPanelAndRefreshRecall();
-      return;
-    }
-    this.deps.render();
+    return this.secureSession.unlock(password);
+  }
+
+  async lockBlobKey(): Promise<void> {
+    return this.secureSession.lock();
   }
 
   async clearBlobKey(): Promise<void> {
@@ -130,18 +106,7 @@ export class RecallExportController {
   }
 
   async refreshBlobKeyStatus(): Promise<void> {
-    const captureStore = this.deps.captureStore();
-    if (!captureStore) return;
-    const result = await captureStore.requestBlobKeyStatus();
-    this.deps.setState(
-      reducePanelAction(this.deps.getState(), {
-        name: 'blob-key/status',
-        unlocked: result.unlocked,
-        keyReference: result.keyReference,
-        hasKey: result.hasKey,
-      }),
-    );
-    this.deps.render();
+    return this.secureSession.refresh();
   }
 
   async refreshPCloudProviderStatus(): Promise<void> {

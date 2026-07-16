@@ -30,7 +30,6 @@ interface Harness {
   getState(): PanelState;
   patchState(patch: Partial<PanelState>): void;
 }
-
 function createHarness(
   options: {
     readonly applyPanelStateResult?: boolean;
@@ -91,6 +90,7 @@ function createHarness(
   const recallExport = {
     setupBlobKey: () => recordAsync('recallExport.setupBlobKey'),
     unlockBlobKey: () => recordAsync('recallExport.unlockBlobKey'),
+    lockBlobKey: () => recordAsync('recallExport.lockBlobKey'),
     clearBlobKey: () => recordAsync('recallExport.clearBlobKey'),
     exportBlobKeyBackup: () => recordAsync('recallExport.exportBlobKeyBackup'),
     importBlobKeyBackup: () => recordAsync('recallExport.importBlobKeyBackup'),
@@ -175,6 +175,7 @@ function createHarness(
     deleteVisibleBookmarks: () => recordAsync('deleteVisibleBookmarks'),
     deleteRecallBookmarks: () => recordAsync('deleteRecallBookmarks'),
     updateVisibleBookmarkSoftMax: () => recordAsync('updateVisibleBookmarkSoftMax'),
+    updateBlobKeyInactivityTimeout: (value) => record(`updateBlobKeyInactivityTimeout:${String(value)}`),
     updateRecentHistoryRetention: () => recordAsync('updateRecentHistoryRetention'),
     updateRecentSparseRowDisplayMode: () => record('updateRecentSparseRowDisplayMode'),
     updateDownArrowAction: (value) => record(`updateDownArrowAction:${value}`),
@@ -215,7 +216,6 @@ function createHarness(
     },
   };
 }
-
 const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> } = {
   'start-target-picker': { name: 'start-target-picker' },
   'stop-target-picker': { name: 'stop-target-picker' },
@@ -239,6 +239,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'settings/toggle': { name: 'settings/toggle' },
   'help/toggle': { name: 'help/toggle' },
   'settings/update-visible-bookmark-soft-max': { name: 'settings/update-visible-bookmark-soft-max', value: 10 },
+  'settings/update-blob-key-inactivity-timeout': { name: 'settings/update-blob-key-inactivity-timeout', value: 10 },
   'settings/update-recent-history-retention': {
     name: 'settings/update-recent-history-retention',
     limit: 20,
@@ -334,6 +335,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'capture/preview': { name: 'capture/preview', url: 'https://example.com/image-1.jpg' },
   'blob-key/setup': { name: 'blob-key/setup', password: 'passphrase' },
   'blob-key/unlock': { name: 'blob-key/unlock', password: 'passphrase' },
+  'blob-key/lock': { name: 'blob-key/lock' },
   'blob-key/clear': { name: 'blob-key/clear' },
   'blob-key/export': { name: 'blob-key/export', password: 'passphrase' },
   'blob-key/import': { name: 'blob-key/import', fileContent: '{}', password: 'passphrase' },
@@ -391,7 +393,6 @@ test('dispatchPanelAction routes a registered action to its handler and skips th
   assert.deepEqual(handled, [{ name: 'navigate-next' }]);
   assert.equal(fallbackCount, 0);
 });
-
 test('dispatchPanelAction hands unregistered actions to the fallback exactly once', () => {
   const harness = createHarness();
   const registry = buildPanelActionRegistry(harness.deps);
@@ -403,7 +404,6 @@ test('dispatchPanelAction hands unregistered actions to the fallback exactly onc
   assert.deepEqual(fallbackActions, [action]);
   assert.deepEqual(harness.log, [], 'no registry handler may run for a fallback action');
 });
-
 test('every registered action routes to a handler, never the fallback', () => {
   const harness = createHarness();
   const registry = buildPanelActionRegistry(harness.deps);

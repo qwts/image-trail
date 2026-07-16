@@ -1,4 +1,5 @@
 import type { PanelAction } from '../../core/types.js';
+import type { SessionInactivityTimeoutMinutes } from '../../core/secure-session-policy.js';
 import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
 import { createBadge } from './primitives.js';
@@ -9,20 +10,27 @@ type EncryptionAction = Extract<
   PanelAction,
   {
     readonly name:
-      'blob-key/setup' | 'blob-key/unlock' | 'blob-key/clear' | 'blob-key/export' | 'blob-key/import' | 'capture/cleanup-orphans';
+      | 'blob-key/setup'
+      | 'blob-key/unlock'
+      | 'blob-key/lock'
+      | 'blob-key/clear'
+      | 'blob-key/export'
+      | 'blob-key/import'
+      | 'capture/cleanup-orphans'
+      | 'settings/update-blob-key-inactivity-timeout';
   }
 >;
 
-export function createEncryptionView(
-  state: {
-    readonly unlocked: boolean;
-    readonly keyReference: string | null;
-    readonly hasKey: boolean;
-    readonly busy: boolean;
-    readonly abandonedOriginalCount: number;
-  },
-  dispatch: (action: EncryptionAction) => void,
-): HTMLElement {
+interface EncryptionViewState {
+  readonly unlocked: boolean;
+  readonly keyReference: string | null;
+  readonly hasKey: boolean;
+  readonly busy: boolean;
+  readonly abandonedOriginalCount: number;
+  readonly inactivityTimeoutMinutes: SessionInactivityTimeoutMinutes;
+}
+
+export function createEncryptionView(state: EncryptionViewState, dispatch: (action: EncryptionAction) => void): HTMLElement {
   const section = document.createElement('details');
   section.className = 'image-trail-panel__settings-templates image-trail-panel__encryption image-trail-ds__settings-integration';
   section.classList.toggle('is-waiting', state.busy);
@@ -30,7 +38,6 @@ export function createEncryptionView(
   section.addEventListener('toggle', () => {
     encryptedOriginalsOpen = section.open;
   });
-
   const header = document.createElement('div');
   header.className = 'image-trail-panel__encryption-header';
 
@@ -62,7 +69,7 @@ export function createEncryptionView(
       ? 'Unlock encrypted blob storage before capturing original image bytes.'
       : 'Create the first encrypted blob storage key before capturing original image bytes.';
 
-  body.append(description);
+  body.append(description, createInactivityControls(state.inactivityTimeoutMinutes, dispatch));
 
   const cleanup = document.createElement('button');
   cleanup.type = 'button';
@@ -76,7 +83,11 @@ export function createEncryptionView(
     if (state.abandonedOriginalCount > 0) {
       body.append(createActionGroup('Maintenance', [cleanup], { secondary: true }));
     }
-    body.append(createKeyBackupControls(state, dispatch), createLockControls(state, dispatch));
+    body.append(
+      createSessionLockControls(state, dispatch),
+      createKeyBackupControls(state, dispatch),
+      createKeyRemovalControls(state, dispatch),
+    );
     section.append(summary, body);
     return section;
   }
@@ -203,7 +214,17 @@ function createKeyBackupControls(
   return group;
 }
 
-function createLockControls(state: { readonly busy: boolean }, dispatch: (action: EncryptionAction) => void): HTMLElement {
+function createSessionLockControls(state: { readonly busy: boolean }, dispatch: (action: EncryptionAction) => void): HTMLElement {
+  const lock = document.createElement('button');
+  lock.type = 'button';
+  lock.textContent = 'Lock now';
+  lock.className = 'image-trail-panel__secondary-action';
+  lock.disabled = state.busy;
+  lock.addEventListener('click', () => dispatch({ name: 'blob-key/lock' }));
+  return createActionGroup('Session', [lock]);
+}
+
+function createKeyRemovalControls(state: { readonly busy: boolean }, dispatch: (action: EncryptionAction) => void): HTMLElement {
   let confirming = false;
 
   const clear = document.createElement('button');
@@ -225,6 +246,50 @@ function createLockControls(state: { readonly busy: boolean }, dispatch: (action
   });
 
   return createActionGroup('Key removal', [clear], { secondary: true });
+}
+
+function createInactivityControls(
+  timeoutMinutes: SessionInactivityTimeoutMinutes,
+  dispatch: (action: EncryptionAction) => void,
+): HTMLElement {
+  const group = document.createElement('div');
+  group.className = 'image-trail-panel__subsection';
+  const heading = document.createElement('h4');
+  heading.className = 'image-trail-panel__action-group-title';
+  heading.textContent = 'Automatic lock';
+  const field = document.createElement('label');
+  field.className = 'image-trail-panel__settings-field';
+  const label = document.createElement('span');
+  label.textContent = 'Lock after inactivity';
+  const select = document.createElement('select');
+  select.className = 'image-trail-panel__settings-select';
+  for (const option of [
+    { value: '5', label: '5 minutes' },
+    { value: '10', label: '10 minutes' },
+    { value: '15', label: '15 minutes' },
+    { value: 'never', label: 'Never' },
+  ]) {
+    const element = document.createElement('option');
+    element.value = option.value;
+    element.textContent = option.label;
+    element.selected = String(timeoutMinutes) === option.value;
+    select.append(element);
+  }
+  select.addEventListener('change', () => {
+    const value = select.value === 'never' ? 'never' : Number(select.value);
+    if (value === 'never' || value === 5 || value === 10 || value === 15) {
+      dispatch({ name: 'settings/update-blob-key-inactivity-timeout', value });
+    }
+  });
+  const description = document.createElement('p');
+  description.className = 'image-trail-panel__settings-empty';
+  description.textContent =
+    timeoutMinutes === 'never'
+      ? 'Stays unlocked until manual lock, extension reload/update, or browser shutdown.'
+      : `Locks after ${timeoutMinutes} minutes without pointer or keyboard activity.`;
+  field.append(label, select);
+  group.append(heading, field, description);
+  return group;
 }
 
 function readFileInput(input: HTMLInputElement, onRead: (fileContent: string) => void): void {

@@ -37,6 +37,7 @@ import {
   type QueueDisplayOrder,
   type RecentDisplayOrder,
 } from '../core/display-order.js';
+import type { SessionInactivityTimeoutMinutes } from '../core/secure-session-policy.js';
 
 export interface PlaintextLocalSettings {
   readonly schemaVersion: 1;
@@ -53,6 +54,7 @@ export interface PlaintextLocalSettings {
   readonly bookmarkVisibilityScope: 'global' | 'site';
   readonly queueDisplayOrder: QueueDisplayOrder;
   readonly pinSaveStoragePreference: PinSaveStoragePreference;
+  readonly blobKeyInactivityTimeoutMinutes: SessionInactivityTimeoutMinutes;
   readonly privacyModeEnabled: boolean;
   readonly searchableMetadataPolicy: SearchableMetadataPolicy;
   readonly buildInfoOverlayVisible: boolean;
@@ -86,6 +88,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   bookmarkVisibilityScope: 'global',
   queueDisplayOrder: DEFAULT_QUEUE_DISPLAY_ORDER,
   pinSaveStoragePreference: 'encrypted',
+  blobKeyInactivityTimeoutMinutes: 10,
   privacyModeEnabled: false,
   searchableMetadataPolicy: DEFAULT_SEARCHABLE_METADATA_POLICY,
   buildInfoOverlayVisible: true,
@@ -183,6 +186,9 @@ export function migrateLocalSettings(input: LocalSettingsMigrationInput): Plaint
     pinSaveStoragePreference: isPinSaveStoragePreference(input.pinSaveStoragePreference)
       ? input.pinSaveStoragePreference
       : DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference,
+    blobKeyInactivityTimeoutMinutes: isSessionInactivityTimeoutMinutes(input.blobKeyInactivityTimeoutMinutes)
+      ? input.blobKeyInactivityTimeoutMinutes
+      : DEFAULT_LOCAL_SETTINGS.blobKeyInactivityTimeoutMinutes,
     privacyModeEnabled: input.privacyModeEnabled === true,
     searchableMetadataPolicy: sanitizeSearchableMetadataPolicy(input.searchableMetadataPolicy),
     buildInfoOverlayVisible: input.buildInfoOverlayVisible !== false,
@@ -218,6 +224,10 @@ export function isImageProbeMethod(value: unknown): value is ImageProbeMethod {
 
 export function isPinSaveStoragePreference(value: unknown): value is PinSaveStoragePreference {
   return value === 'encrypted' || value === 'plaintext';
+}
+
+export function isSessionInactivityTimeoutMinutes(value: unknown): value is SessionInactivityTimeoutMinutes {
+  return value === 5 || value === 10 || value === 15 || value === 'never';
 }
 
 export function isRecentHistoryOverflowBehavior(value: unknown): value is RecentHistoryOverflowBehavior {

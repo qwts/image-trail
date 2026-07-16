@@ -1,6 +1,8 @@
 import {
   createLoadBuildIdentityMessage,
+  createBlobKeyActivityMessage,
   isLoadBuildIdentityResultMessage,
+  isBlobKeyStatusResultMessage,
   createStatusMessage,
   createUnknownMessageResponse,
   isExtensionRequest,
@@ -25,6 +27,7 @@ import { ImageTrailPanel } from '../ui/panel.js';
 import { sendRuntimeMessage } from './runtime-message.js';
 import { classifyTarget, matchesKeyCodeShortcut, shouldRouteKeyboardShortcut } from './keyboard.js';
 import { LOCAL_SETTINGS_KEY } from '../data/local-settings.js';
+import { SecureSessionActivityController } from './secure-session-activity.js';
 
 interface ImageTrailContentController {
   readonly panel: ImageTrailPanel;
@@ -125,6 +128,13 @@ function createController(): ImageTrailContentController {
     },
   );
   buildOverlay.load(panel, localSettingsStore);
+  const secureSessionActivity = new SecureSessionActivityController({
+    sendActivity: async () => {
+      const response = await sendRuntimeMessage(createBlobKeyActivityMessage());
+      return isBlobKeyStatusResultMessage(response) ? response.payload : { unlocked: false };
+    },
+    onLocked: () => panel.refreshSecureSessionStatus(),
+  });
 
   function toggleBuildIdentityOverlay(): boolean {
     const toggled = buildOverlay.toggle();
@@ -196,6 +206,7 @@ function createController(): ImageTrailContentController {
     if (hasRuntimeMessaging()) chrome.runtime.onMessage.removeListener(handleMessage);
     chrome.storage?.onChanged.removeListener(handleStorageChanged);
     document.removeEventListener('keydown', handleKeyDown, true);
+    secureSessionActivity.disconnect();
     window.removeEventListener('pagehide', handlePageHide);
     buildOverlay.hide();
     panel.disconnect();
@@ -205,6 +216,7 @@ function createController(): ImageTrailContentController {
   chrome.runtime.onMessage.addListener(handleMessage);
   chrome.storage?.onChanged.addListener(handleStorageChanged);
   document.addEventListener('keydown', handleKeyDown, true);
+  secureSessionActivity.connect(document);
   window.addEventListener('pagehide', handlePageHide);
 
   return { panel, destroy };

@@ -72,6 +72,7 @@ function encryptionState(overrides: Partial<EncryptionStoryState> = {}): Encrypt
     hasKey: false,
     busy: false,
     abandonedOriginalCount: 0,
+    inactivityTimeoutMinutes: 10,
     ...overrides,
   };
 }

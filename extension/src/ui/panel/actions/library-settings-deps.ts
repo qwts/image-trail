@@ -21,6 +21,7 @@ type LibrarySettingsActionDeps = Pick<
   | 'updateRecentSparseRowDisplayMode'
   | 'updateDownArrowAction'
   | 'updatePinSaveStoragePreference'
+  | 'updateBlobKeyInactivityTimeout'
   | 'updateUrlReviewStatusRetention'
   | 'updateRequestThrottle'
   | 'updateNeighborPreload'
@@ -49,6 +50,7 @@ export function createLibrarySettingsActionDeps(input: {
     updateRecentSparseRowDisplayMode: (mode) => input.settings.updateRecentSparseRowDisplayMode(mode),
     updateDownArrowAction: (value) => input.settings.updateDownArrowAction(value),
     updatePinSaveStoragePreference: (value) => input.settings.updatePinSaveStoragePreference(value),
+    updateBlobKeyInactivityTimeout: (value) => input.settings.updateBlobKeyInactivityTimeout(value),
     updateUrlReviewStatusRetention: (limit, clearAfterExport) => input.settings.updateUrlReviewStatusRetention(limit, clearAfterExport),
     updateRequestThrottle: (interval, maxRequests, windowMs) => input.settings.updateRequestThrottle(interval, maxRequests, windowMs),
     updateNeighborPreload: (enabled, radius, cacheLimit, probeMethod, feedback) =>

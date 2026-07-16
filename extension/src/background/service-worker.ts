@@ -8,7 +8,7 @@ import { IndexedDbParsedFieldStateStore } from '../data/parsed-field-state-contr
 import { IndexedDbUrlTemplateStore } from '../data/url-template-controller.js';
 import { IndexedDbUrlReviewStatusStore } from '../data/url-review-status-controller.js';
 import { RecentHistoryCache } from './recent-history-cache.js';
-import { getActiveBlobKey } from '../data/crypto/blob-keyring.js';
+import { configureBlobKeySessionStorage, restoreActiveBlobKey, updateBlobKeyInactivityTimeout } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
 import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFileHeader } from '../data/import-export/encrypted-image.js';
 import { openImageTrailDb } from '../data/db.js';
@@ -105,7 +105,6 @@ import { normalizeHostname } from './handlers/hostname.js';
 import { createRuntimeLibraryChangeNotifier } from './library-change-notifier.js';
 import type { ServiceWorkerContext } from './service-worker-context.js';
 import { createShortcutActionMessage } from './shortcut-action-message.js';
-
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const TOGGLE_BUILD_IDENTITY_COMMAND = 'toggle-build-info-overlay';
 const BROWSER_COMMAND_ACTIONS = new Map(BROWSER_COMMAND_SHORTCUTS.map((shortcut) => [shortcut.command, shortcut.action]));
@@ -113,17 +112,16 @@ const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
 const PREVIEW_TTL_MS = 60_000;
 const MAX_LINKED_PAGE_BYTES = 2 * 1024 * 1024;
 const MAX_LINKED_PAGE_TIMEOUT_MS = 15_000;
-
 interface PreviewPayload {
   readonly dataUrl: string;
   readonly byteLength: number;
   readonly createdAt: number;
 }
-
 const previewPayloads = new Map<string, PreviewPayload>();
 const imageRequests = new ImageRequestManager();
+configureBlobKeySessionStorage(chrome.storage.session);
 const bookmarkStore = new IndexedDbBookmarkStore({
-  getActiveBlobKey,
+  getActiveBlobKey: restoreActiveBlobKey,
   getPinSaveStoragePreference: async () => (await loadLocalSettings()).pinSaveStoragePreference,
   getSearchableMetadataPolicy: async () => (await loadLocalSettings()).searchableMetadataPolicy,
 });
@@ -148,7 +146,6 @@ const context: ServiceWorkerContext = {
   getDb,
   loadLocalSettings,
 };
-
 async function requestStatus(tabId: number): Promise<boolean> {
   try {
     const response = await chrome.tabs.sendMessage(tabId, createPingMessage());
@@ -157,17 +154,13 @@ async function requestStatus(tabId: number): Promise<boolean> {
     return false;
   }
 }
-
 async function ensureContentScript(tabId: number): Promise<void> {
   if (await requestStatus(tabId)) return;
-
   await chrome.scripting.executeScript({ target: { tabId }, files: [CONTENT_SCRIPT_FILE] });
-
   if (!(await requestStatus(tabId))) {
     throw new Error('Injected content script did not return a valid Image Trail status response.');
   }
 }
-
 async function sendToggle(tabId: number): Promise<void> {
   await ensureContentScript(tabId);
   const response = await chrome.tabs.sendMessage(tabId, createTogglePanelMessage());
@@ -175,7 +168,6 @@ async function sendToggle(tabId: number): Promise<void> {
     console.warn('Image Trail received an unexpected toggle response.', response);
   }
 }
-
 async function sendToggleBuildIdentityOverlay(tabId: number): Promise<void> {
   await ensureContentScript(tabId);
   const response = await chrome.tabs.sendMessage(tabId, createToggleBuildIdentityOverlayMessage());
@@ -183,7 +175,6 @@ async function sendToggleBuildIdentityOverlay(tabId: number): Promise<void> {
     console.warn('Image Trail received an unexpected build-info toggle response.', response);
   }
 }
-
 async function sendShortcutAction(tabId: number, action: string): Promise<void> {
   await ensureContentScript(tabId);
   const response = await chrome.tabs.sendMessage(tabId, createShortcutActionMessage(action));
@@ -191,21 +182,17 @@ async function sendShortcutAction(tabId: number, action: string): Promise<void> 
     console.warn('Image Trail received an unexpected shortcut action response.', response);
   }
 }
-
 function supportedTabId(tab: chrome.tabs.Tab): number | null {
   if (typeof tab.id === 'number' && tab.url && SUPPORTED_PAGE_PATTERN.test(tab.url)) return tab.id;
   return null;
 }
-
 let dbPromise: Promise<IDBDatabase | null> | null = null;
-
 function getDb(): Promise<IDBDatabase | null> {
   if (!dbPromise) {
     dbPromise = openImageTrailDb().then((result) => (result.status.ok ? result.db : null));
   }
   return dbPromise;
 }
-
 async function referencedBlobIds(): Promise<Set<string>> {
   const referenced = new Set(await bookmarkStore.loadOriginalBlobIds());
   for (const history of recentHistoryCache.values()) {
@@ -215,7 +202,6 @@ async function referencedBlobIds(): Promise<Set<string>> {
   }
   return referenced;
 }
-
 function arrayBufferToBase64(bytes: ArrayBuffer | Uint8Array): string {
   const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const chunks: string[] = [];
@@ -226,7 +212,6 @@ function arrayBufferToBase64(bytes: ArrayBuffer | Uint8Array): string {
   const binary = chunks.join('');
   return btoa(binary);
 }
-
 function dataUrlToImageBytes(
   dataUrl: string,
 ):
@@ -245,7 +230,6 @@ function dataUrlToImageBytes(
     return { ok: false, message: 'Imported image data could not be decoded.' };
   }
 }
-
 function createPreviewForDataUrl(dataUrl: string): Promise<import('./messages.js').CreateBlobPreviewResultMessage['payload']> {
   const parsed = dataUrlToImageBytes(dataUrl);
   if (!parsed.ok) return Promise.resolve({ ok: false, reason: 'invalid-data-url', message: parsed.message });
@@ -261,10 +245,9 @@ function createPreviewForDataUrl(dataUrl: string): Promise<import('./messages.js
       return { ok: false as const, reason: 'preview-blocked', message: 'Preview tab could not be opened by the extension.' };
     });
 }
-
 async function handleCaptureImage(message: CaptureImageMessage): Promise<import('../core/image/capture-result.js').CaptureResult> {
   const url = message.payload.url;
-  const activeBlobKey = getActiveBlobKey();
+  const activeBlobKey = await restoreActiveBlobKey();
   if (!activeBlobKey) {
     return {
       status: 'failed',
@@ -272,7 +255,6 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
       message: 'Encrypted blob storage must be unlocked before original image capture.',
     };
   }
-
   const bytesResult = url.startsWith('data:image/')
     ? dataUrlToImageBytes(url)
     : await (async () => {
@@ -290,12 +272,10 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
       ? { status: 'remote-only', reason: 'permission-needed', message: bytesResult.message, origin: bytesResult.origin }
       : { status: 'failed', reason: 'unknown', message: bytesResult.message };
   }
-
   const db = await getDb();
   if (!db) {
     return { status: 'failed', reason: 'unknown', message: 'Database unavailable.' };
   }
-
   const blobs = new BlobsRepository(db);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -355,7 +335,7 @@ async function handleCleanupOrphanedBlobs(): Promise<import('./messages.js').Cle
 }
 
 async function handleRetrieveBlob(message: RetrieveBlobMessage): Promise<import('./messages.js').RetrieveBlobResultMessage['payload']> {
-  const activeBlobKey = getActiveBlobKey();
+  const activeBlobKey = await restoreActiveBlobKey();
   if (!activeBlobKey) {
     return { ok: false, reason: 'encryption-locked', message: 'Encrypted blob storage must be unlocked before retrieval.' };
   }
@@ -655,7 +635,7 @@ async function handleDownloadImage(message: DownloadImageMessage): Promise<impor
 async function handleExportEncryptedImage(
   message: ExportEncryptedImageMessage,
 ): Promise<import('./messages.js').ExportEncryptedImageResultMessage['payload']> {
-  const activeBlobKey = getActiveBlobKey();
+  const activeBlobKey = await restoreActiveBlobKey();
   if (!activeBlobKey) {
     return { ok: false, reason: 'encryption-locked', message: 'Unlock encrypted originals before exporting encrypted images.' };
   }
@@ -687,7 +667,7 @@ async function imageBytesFromStoredBlob(
   | { readonly ok: true; readonly bytes: ArrayBuffer; readonly mimeType: string; readonly sourceUrl: string }
   | { readonly ok: false; readonly reason: string; readonly message: string }
 > {
-  const activeBlobKey = getActiveBlobKey();
+  const activeBlobKey = await restoreActiveBlobKey();
   if (!activeBlobKey) {
     return { ok: false, reason: 'encryption-locked', message: 'Unlock encrypted originals before exporting encrypted images.' };
   }
@@ -747,7 +727,7 @@ async function handleImportEncryptedImage(
     };
   }
 
-  const activeBlobKey = getActiveBlobKey();
+  const activeBlobKey = await restoreActiveBlobKey();
   if (!activeBlobKey) {
     return { ok: false, reason: 'encryption-locked', message: 'Unlock encrypted originals before importing encrypted images.' };
   }
@@ -900,9 +880,11 @@ const messageRegistry = {
   [MessageType.SaveLocalSettings]: defineMessage({
     requestSchema: requestSchemas.saveLocalSettingsRequestSchema,
     handle: async (message: SaveLocalSettingsMessage) => {
-      return handleSaveLocalSettings(message, chrome.storage.local, chrome.tabs, (settings) =>
+      const result = await handleSaveLocalSettings(message, chrome.storage.local, chrome.tabs, (settings) =>
         recentHistoryCache.pruneForSettings(settings),
       );
+      if (result.ok) await updateBlobKeyInactivityTimeout(message.payload.settings.blobKeyInactivityTimeoutMinutes);
+      return result;
     },
     respond: (result) => createSaveLocalSettingsResultMessage(result),
     fallback: () => createSaveLocalSettingsResultMessage({ ok: false }),

@@ -112,6 +112,7 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().bookmarkVisibilityScope, 'global');
   assert.equal(repository.load().queueDisplayOrder, 'front-first');
   assert.equal(repository.load().pinSaveStoragePreference, 'encrypted');
+  assert.equal(repository.load().blobKeyInactivityTimeoutMinutes, 10);
   assert.equal(repository.load().privacyModeEnabled, true);
   assert.equal(repository.load().previewObjectFit, 'contain');
   assert.equal(repository.load().previewFillScreen, true);
@@ -125,6 +126,21 @@ test('loads typed plaintext local settings through defaults and migrations', () 
   assert.equal(repository.load().secondaryControlsOpen, false);
   repository.save({ ...DEFAULT_LOCAL_SETTINGS, pinSaveStoragePreference: 'plaintext' });
   assert.equal(repository.load().pinSaveStoragePreference, 'plaintext');
+});
+
+test('migrates only supported encrypted-session inactivity choices', () => {
+  for (const value of [5, 10, 15, 'never'] as const) {
+    const repository = new LocalSettingsRepository({
+      getItem: () => JSON.stringify({ blobKeyInactivityTimeoutMinutes: value }),
+      setItem: () => {},
+    });
+    assert.equal(repository.load().blobKeyInactivityTimeoutMinutes, value);
+  }
+  const invalid = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ blobKeyInactivityTimeoutMinutes: 1 }),
+    setItem: () => {},
+  });
+  assert.equal(invalid.load().blobKeyInactivityTimeoutMinutes, 10);
 });
 
 test('migrates the extension-owned Down arrow assignment safely', () => {
@@ -496,15 +512,19 @@ test('migrates neighbor preload settings safely', () => {
 test('tracks session unlock state without persisting key material', async () => {
   const session = await createSessionKey('history', 'unlock-key', '2026-06-16T00:00:00.000Z');
   const unlock = new SessionUnlockState();
+  const now = Date.now();
 
   assert.deepEqual(unlock.snapshot, { status: 'locked' });
-  unlock.unlock(session.reference, session.key, '2026-06-16T00:00:00.000Z');
+  unlock.unlock(session.reference, session.key, now);
   assert.deepEqual(unlock.snapshot, {
     status: 'unlocked',
     keyReference: session.reference,
-    unlockedAt: '2026-06-16T00:00:00.000Z',
+    unlockedAt: new Date(now).toISOString(),
+    lastActivityAt: new Date(now).toISOString(),
+    timeoutMinutes: 10,
+    expiresAt: new Date(now + 10 * 60_000).toISOString(),
   });
   assert.equal(unlock.getActiveKey(session.reference), session.key);
   unlock.lock();
-  assert.deepEqual(unlock.snapshot, { status: 'locked' });
+  assert.deepEqual(unlock.snapshot, { status: 'locked', reason: 'manual' });
 });

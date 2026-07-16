@@ -17,6 +17,7 @@ type DisplaySettingsActionName =
   | 'history/update-display-order'
   | 'bookmarks/update-display-order'
   | 'settings/update-pin-save-storage-preference'
+  | 'settings/update-blob-key-inactivity-timeout'
   | 'settings/update-privacy-mode'
   | 'settings/update-metadata-policy'
   | 'settings/update-build-info-overlay-visibility';
@@ -141,6 +142,11 @@ function buildDisplaySettingsEntries(deps: PanelActionDeps): ActionEntries<Displ
     'settings/update-pin-save-storage-preference': {
       handle(action) {
         deps.updatePinSaveStoragePreference(action.value);
+      },
+    },
+    'settings/update-blob-key-inactivity-timeout': {
+      handle(action) {
+        deps.updateBlobKeyInactivityTimeout(action.value);
       },
     },
     'settings/update-privacy-mode': {

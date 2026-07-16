@@ -32,7 +32,7 @@ interface BookmarkKeyContext {
 }
 
 interface ProtectedBookmarkOptions {
-  readonly getActiveBlobKey?: () => ActiveBlobKey | null;
+  readonly getActiveBlobKey?: () => ActiveBlobKey | null | Promise<ActiveBlobKey | null>;
   readonly getPinSaveStoragePreference?: () => PinSaveStoragePreference | Promise<PinSaveStoragePreference>;
   readonly getSearchableMetadataPolicy?: () => SearchableMetadataPolicy | Promise<SearchableMetadataPolicy>;
 }
@@ -140,7 +140,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const bookmark = createDisplayRecord({ ...record, id: importedDataUrl ? record.id : record.url, source: 'bookmark' });
     if (!context) return bookmark;
 
-    const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
+    const activeBlobKey = (await this.options.getActiveBlobKey?.()) ?? null;
     const preference = (await this.options.getPinSaveStoragePreference?.()) ?? DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference;
     if (preference === 'plaintext') {
       if (activeBlobKey && (await this.hasProtectedPinForBookmark(context, bookmark))) {
@@ -319,7 +319,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   async findByUrl(url: string): Promise<ImageDisplayRecord | null> {
     const context = await this.openContext();
     if (!context) return null;
-    const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
+    const activeBlobKey = (await this.options.getActiveBlobKey?.()) ?? null;
     if (activeBlobKey) {
       const protectedRecord = await context.encryptedPins.getByUrlHash(await hashSearchableUrl(url));
       if (protectedRecord) {
@@ -422,7 +422,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   }
 
   private async loadMergedRecords(context: BookmarkContext): Promise<readonly ImageDisplayRecord[]> {
-    const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
+    const activeBlobKey = (await this.options.getActiveBlobKey?.()) ?? null;
     const plain = [...(await this.loadPlainRecords(context))];
     if (!activeBlobKey) return plain;
     const keyReference = activeBlobKey.reference.reference;
@@ -449,7 +449,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   }
 
   private async loadRecordsByIds(context: BookmarkContext, ids: readonly string[]): Promise<readonly ImageDisplayRecord[]> {
-    const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
+    const activeBlobKey = (await this.options.getActiveBlobKey?.()) ?? null;
     const records: ImageDisplayRecord[] = [];
     for (const id of ids) {
       const relationship = await context.repository.getEncrypted(id);
@@ -602,7 +602,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     context: BookmarkContext,
     records: readonly ImageDisplayRecord[],
   ): Promise<readonly ImageDisplayRecord[]> {
-    const activeBlobKey = this.options.getActiveBlobKey?.() ?? null;
+    const activeBlobKey = (await this.options.getActiveBlobKey?.()) ?? null;
     if (!activeBlobKey) return records;
     const loaded: ImageDisplayRecord[] = [];
     for (const record of records) {

@@ -794,6 +794,28 @@
       ]
     },
     {
+      "id": "encrypted-session-inactivity",
+      "acceptance": "Encrypted-session inactivity and MV3 worker recovery",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Encrypted-Session-Inactivity",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/session-unlock.test.ts",
+            "tests/blob-key-session.test.ts",
+            "tests/secure-session-activity.test.ts",
+            "tests/dom/encryption-view.test.ts"
+          ],
+          "notes": "Covers every timeout policy, fake-clock expiry and activity resets, settings changes, manual lock, trusted memory-only session recovery, malformed recovery failure, throttled pointer/keyboard activity, and Settings controls."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/secure-session.spec.ts",
+          "notes": "Stops the real extension service worker through CDP without a keepalive, then verifies that capture restores the memory-only session key and that manual lock clears the unlocked state."
+        }
+      ]
+    },
+    {
       "id": "settings-utility-layout",
       "acceptance": "Settings utility layout",
       "repoPath": "docs/acceptance-tests/settings-utility-layout.md",

@@ -105,12 +105,15 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
       };
     case 'settings/update-down-arrow-action':
       return { ...state, downArrowAction: action.value, lastUpdatedAt: Date.now() };
+    case 'settings/update-blob-key-inactivity-timeout':
+      return { ...state, blobKeyInactivityTimeoutMinutes: action.value, lastUpdatedAt: Date.now() };
     case 'blob-key/status':
       return {
         ...state,
         blobKeyUnlocked: action.unlocked,
         blobKeyAvailable: action.unlocked || action.hasKey === true,
         blobKeyReference: action.unlocked ? (action.keyReference ?? state.blobKeyReference) : null,
+        message: action.message ?? state.message,
         lastUpdatedAt: Date.now(),
       };
     case 'import-export/start':
@@ -310,6 +313,7 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
     case 'neighbor-preload/manual':
     case 'blob-key/setup':
     case 'blob-key/unlock':
+    case 'blob-key/lock':
     case 'blob-key/clear':
     case 'blob-key/export':
     case 'blob-key/import':

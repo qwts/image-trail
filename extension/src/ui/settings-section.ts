@@ -81,6 +81,7 @@ export function createSettingsSection(
             hasKey: state.blobKeyAvailable,
             busy: state.importExportBusy,
             abandonedOriginalCount: state.storageUsage?.orphanedBlobCount ?? 0,
+            inactivityTimeoutMinutes: state.blobKeyInactivityTimeoutMinutes,
           },
           dispatch,
         ),

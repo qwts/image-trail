@@ -82,6 +82,7 @@ export interface PanelActionDeps {
   updateRecentSparseRowDisplayMode(mode: PlaintextLocalSettings['recentSparseRowDisplayMode']): void;
   updateDownArrowAction(value: PlaintextLocalSettings['downArrowAction']): void;
   updatePinSaveStoragePreference(value: PlaintextLocalSettings['pinSaveStoragePreference']): void;
+  updateBlobKeyInactivityTimeout(value: PlaintextLocalSettings['blobKeyInactivityTimeoutMinutes']): void;
   updateUrlReviewStatusRetention(limit: number, clearAfterExport: boolean): Promise<void>;
   updateRequestThrottle(minimumIntervalMs: number, maxRequests: number, windowMs: number): void;
   updateNeighborPreload(

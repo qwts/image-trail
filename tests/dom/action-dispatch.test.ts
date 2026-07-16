@@ -96,6 +96,7 @@ function createHarness(): Harness {
     deleteVisibleBookmarks: noopAsync,
     deleteRecallBookmarks: noopAsync,
     updateVisibleBookmarkSoftMax: noopAsync,
+    updateBlobKeyInactivityTimeout: noop,
     updateRecentHistoryRetention: noopAsync,
     updateRecentSparseRowDisplayMode: noop,
     updateDownArrowAction: noop,

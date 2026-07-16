@@ -11,6 +11,7 @@ type CaptureActionName =
   | 'capture/preview'
   | 'blob-key/setup'
   | 'blob-key/unlock'
+  | 'blob-key/lock'
   | 'blob-key/clear'
   | 'blob-key/export'
   | 'blob-key/import';
@@ -105,6 +106,11 @@ function buildCaptureActionEntries(deps: PanelActionDeps): ActionEntries<Capture
     'blob-key/unlock': {
       handle(action) {
         void deps.recallExport().unlockBlobKey(action.password);
+      },
+    },
+    'blob-key/lock': {
+      handle() {
+        void deps.recallExport().lockBlobKey();
       },
     },
     'blob-key/clear': {

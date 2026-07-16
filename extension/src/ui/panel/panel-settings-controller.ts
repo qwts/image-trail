@@ -89,6 +89,7 @@ export class PanelSettingsController {
       pinSaveStoragePreference: settings.pinSaveStoragePreference,
       queueDisplayOrder: settings.queueDisplayOrder,
       privacyModeEnabled: settings.privacyModeEnabled,
+      blobKeyInactivityTimeoutMinutes: settings.blobKeyInactivityTimeoutMinutes,
       searchableMetadataPolicy: settings.searchableMetadataPolicy,
       buildInfoOverlayVisible: settings.buildInfoOverlayVisible,
       urlReviewStatusLimit: settings.urlReviewStatusLimit,
@@ -210,6 +211,13 @@ export class PanelSettingsController {
     if (value === this.deps.getState().pinSaveStoragePreference) return;
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'settings/update-pin-save-storage-preference', value }));
     this.saveLocalSettings({ ...this.deps.getLocalSettings(), pinSaveStoragePreference: value });
+    this.deps.render();
+  }
+
+  updateBlobKeyInactivityTimeout(value: PlaintextLocalSettings['blobKeyInactivityTimeoutMinutes']): void {
+    if (value === this.deps.getState().blobKeyInactivityTimeoutMinutes) return;
+    this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'settings/update-blob-key-inactivity-timeout', value }));
+    this.saveLocalSettings({ ...this.deps.getLocalSettings(), blobKeyInactivityTimeoutMinutes: value });
     this.deps.render();
   }
 
