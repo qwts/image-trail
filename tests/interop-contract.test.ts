@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import 'fake-indexeddb/auto';
@@ -75,7 +75,21 @@ async function assertDeterministicInteropKey(key: CryptoKey): Promise<void> {
 
 test('vendored interoperability artifacts match the pinned canonical Photos contract', () => {
   const output = execFileSync(process.execPath, ['scripts/check-interop-contract.mjs'], { encoding: 'utf8' });
-  assert.equal(output, 'Verified 9 canonical interop files from c159af6cab7d20539d55143165f5d6bf69fc751e.\n');
+  assert.equal(output, 'Verified 10 canonical interop files from d75346749046ca9ac337e4d987d0e4ad7fed1c8e.\n');
+});
+
+test('maps every companion epic scenario to current cross-repository evidence', () => {
+  const output = execFileSync(process.execPath, ['scripts/check-interop-acceptance.mjs'], { encoding: 'utf8' });
+  assert.equal(output, 'Verified 10 interop scenarios with 40 automated evidence references; manual 0/4.\n');
+});
+
+test('refuses companion evidence from a checkout that is not pinned to the reviewed revision', () => {
+  const result = spawnSync(process.execPath, ['scripts/check-interop-acceptance.mjs'], {
+    encoding: 'utf8',
+    env: { ...process.env, INTEROP_PHOTOS_ROOT: process.cwd() },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /evidence checkout must be pinned/u);
 });
 
 test('canonical valid and round-trip fixtures parse without changing their data', () => {

@@ -60,6 +60,8 @@ jobs:
   ci:
     name: CI
     runs-on: ubuntu-latest
+    env:
+      INTEROP_PHOTOS_ROOT: ${{ github.workspace }}/node_modules/.interop-photos
 
     steps:
       - name: Checkout
@@ -81,6 +83,19 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Keep the companion checkout under the already-ignored dependency tree:
+      # repo-wide Image Trail lint and format tooling must not treat Photos as
+      # local source, while the acceptance gate still reads its pinned evidence.
+      - name: Checkout pinned Photos acceptance evidence
+        uses: actions/checkout@v7
+        with:
+          repository: qwts/photos
+          ref: d75346749046ca9ac337e4d987d0e4ad7fed1c8e
+          path: node_modules/.interop-photos
+
+      - name: Interop acceptance evidence
+        run: npm run check:interop-acceptance
 
       - name: Version policy
         env:
