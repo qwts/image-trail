@@ -117,7 +117,7 @@ export function createPCloudMessageRegistry(): Record<PCloudRequestType, Message
 
 export function createCloudMessageRegistry(
   getDb: () => Promise<IDBDatabase | null>,
-  finalizeSourceRecord?: ((sourceLocalId: string) => Promise<void>) | undefined,
+  finalizeSourceRecord?: ((sourceLocalId: string, sourceUpdatedAt: string) => Promise<void>) | undefined,
 ): Record<PCloudRequestType | typeof MessageType.InteropRuntime, MessageDef<ExtensionRequest, ExtensionResponse>> {
   return {
     ...createPCloudMessageRegistry(),
@@ -128,11 +128,11 @@ export function createCloudMessageRegistry(
 export function createInteropSourceFinalizer(
   getDb: () => Promise<IDBDatabase | null>,
   notifyLibraryChange: LibraryChangeNotifier,
-): (sourceLocalId: string) => Promise<void> {
-  return async (sourceLocalId) => {
+): (sourceLocalId: string, sourceUpdatedAt: string) => Promise<void> {
+  return async (sourceLocalId, sourceUpdatedAt) => {
     const db = await getDb();
     if (!db) throw new Error('Move source storage is unavailable.');
-    if (await finalizeInteropMoveSource(db, sourceLocalId)) {
+    if (await finalizeInteropMoveSource(db, sourceLocalId, sourceUpdatedAt)) {
       notifyLibraryChange({ topic: 'bookmarks', reason: 'bookmarks-removed', recordIds: [sourceLocalId] });
     }
   };

@@ -110,7 +110,7 @@ export class SecureMoveAcknowledgementRepository {
     await transactionDone(transaction);
   }
 
-  async pendingFinalization(transferId: string): Promise<readonly SecureMoveItem[]> {
+  async pendingFinalization(transferId: string): Promise<readonly (SecureMoveItem & { readonly sourceUpdatedAt: string })[]> {
     const transaction = this.db.transaction(DataStore.MoveItems, 'readonly');
     const items = await secureMoveItemsIn(transaction, transferId);
     await transactionDone(transaction);

@@ -13,7 +13,7 @@ const FINALIZATION_STORES = [
   DataStore.OriginalBlobIndex,
 ];
 
-export async function finalizeInteropMoveSource(db: IDBDatabase, sourceLocalId: string): Promise<boolean> {
+export async function finalizeInteropMoveSource(db: IDBDatabase, sourceLocalId: string, reviewedSourceUpdatedAt: string): Promise<boolean> {
   const bookmarks = new BookmarksRepository(db);
   const encrypted = await bookmarks.getEncrypted(sourceLocalId);
   if (!encrypted) return false;
@@ -22,7 +22,7 @@ export async function finalizeInteropMoveSource(db: IDBDatabase, sourceLocalId: 
   const transaction = db.transaction(FINALIZATION_STORES, 'readwrite');
   const bookmarkStore = transaction.objectStore(DataStore.Bookmarks);
   const current = await requestToPromise<EncryptedBookmarkRecord | undefined>(bookmarkStore.get(sourceLocalId));
-  if (!current || current.envelope.updatedAt !== encrypted.envelope.updatedAt) {
+  if (!current || current.envelope.updatedAt !== encrypted.envelope.updatedAt || current.envelope.updatedAt !== reviewedSourceUpdatedAt) {
     transaction.abort();
     throw new Error('Move source changed after review; finalization was stopped.');
   }

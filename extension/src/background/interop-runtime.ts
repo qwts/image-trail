@@ -39,7 +39,7 @@ export interface InteropRuntimeDependencies {
   readonly disconnectGoogleDrive: () => Promise<void>;
   readonly probeICloud: () => Promise<void>;
   readonly openProvider: (provider: InteropProviderId) => Promise<InteropObjectStore | null>;
-  readonly finalizeSourceRecord: (sourceLocalId: string) => Promise<void>;
+  readonly finalizeSourceRecord: (sourceLocalId: string, sourceUpdatedAt: string) => Promise<void>;
 }
 
 const PROVIDERS: Record<InteropProviderId, { readonly label: string; readonly disconnected: string }> = {

@@ -15,6 +15,7 @@ export const secureMoveItemSchema = v.object({
   interopId: v.string(),
   sourceMessageId: v.string(),
   sourceLocalId: v.string(),
+  sourceUpdatedAt: v.optional(timestampSchema),
   reviewCategory: v.picklist(['eligible', 'duplicate', 'conflict', 'metadata-only', 'unsupported', 'skipped']),
   state: v.picklist(['queued', 'acknowledged', 'finalizing', 'finalized', 'rejected', 'failed']),
   targetLocalId: v.optional(v.nullable(v.string())),
@@ -45,6 +46,7 @@ export interface SecureMoveQueueItem {
   readonly sequence: number;
   readonly interopId: string;
   readonly sourceLocalId: string;
+  readonly sourceUpdatedAt: string;
   readonly reviewCategory: InteropReviewCategory;
   readonly path: string;
   readonly ciphertext: Uint8Array;
@@ -56,8 +58,10 @@ export function acknowledged(item: SecureMoveItem): boolean {
   return item.acknowledgedAt !== null;
 }
 
-export function finalizable(item: SecureMoveItem): boolean {
-  return acknowledged(item) && item.originalVerification !== 'metadata-only' && item.finalizedAt === null;
+export function finalizable(item: SecureMoveItem): item is SecureMoveItem & { readonly sourceUpdatedAt: string } {
+  return (
+    acknowledged(item) && item.sourceUpdatedAt !== undefined && item.originalVerification !== 'metadata-only' && item.finalizedAt === null
+  );
 }
 
 export function phaseFor(items: readonly SecureMoveItem[]): MoveJournalRecord['phase'] {
@@ -139,6 +143,7 @@ export class SecureMoveOutboxRepository {
         interopId: queued.interopId,
         sourceMessageId: queued.messageId,
         sourceLocalId: queued.sourceLocalId,
+        sourceUpdatedAt: queued.sourceUpdatedAt,
         reviewCategory: queued.reviewCategory,
         state: 'queued',
         targetLocalId: null,
@@ -155,6 +160,7 @@ export class SecureMoveOutboxRepository {
         existingItem &&
         (existingItem.sourceMessageId !== item.sourceMessageId ||
           existingItem.sourceLocalId !== item.sourceLocalId ||
+          existingItem.sourceUpdatedAt !== item.sourceUpdatedAt ||
           existingItem.reviewCategory !== item.reviewCategory)
       ) {
         transaction.abort();

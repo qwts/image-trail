@@ -162,9 +162,9 @@ test('accepted sealed acknowledgement finalizes an eligible source exactly once'
   await uploadAcknowledgement(db, pairing, store);
   const finalized: string[] = [];
   const reconciler = new MoveAcknowledgementReconciler(db, store, {
-    finalize: async (sourceLocalId) => {
+    finalize: async (sourceLocalId, sourceUpdatedAt) => {
       finalized.push(sourceLocalId);
-      assert.equal(await finalizeInteropMoveSource(db, sourceLocalId), true);
+      assert.equal(await finalizeInteropMoveSource(db, sourceLocalId, sourceUpdatedAt), true);
     },
   });
   const locked = await reconciler.reconcile({ transferId: TRANSFER_ID, total: 1, pairing, allowFinalization: false });
@@ -195,6 +195,32 @@ test('metadata-only original acknowledgement never authorizes source deletion', 
   assert.equal(progress.counts.acknowledged, 1);
   assert.equal(progress.counts.finalized, 0);
   assert.equal(finalizations, 0);
+});
+
+test('source edits made after review stop finalization', async (t) => {
+  const { db, pairing, store } = await setup(false);
+  t.after(() => db.close());
+  await uploadAcknowledgement(db, pairing, store);
+  const bookmarks = new BookmarksRepository(db);
+  const key = await ensureDurableBookmarkKey(new KeysRepository(db));
+  const encrypted = await bookmarks.getEncrypted('bookmark-1');
+  assert.ok(encrypted);
+  const payload = await bookmarks.openRecord(encrypted, key.key);
+  await bookmarks.sealAndPut(
+    encrypted.uuid,
+    { ...payload, title: 'Edited after review' },
+    key.key,
+    key.reference,
+    '2026-07-17T12:05:00.000Z',
+    encrypted.url,
+    encrypted.queueUpdatedAt,
+  );
+  const progress = await new MoveAcknowledgementReconciler(db, store, {
+    finalize: (sourceLocalId, sourceUpdatedAt) => finalizeInteropMoveSource(db, sourceLocalId, sourceUpdatedAt).then(() => undefined),
+  }).reconcile({ transferId: TRANSFER_ID, total: 1, pairing, allowFinalization: true });
+  assert.equal(progress.journal.phase, 'failed');
+  assert.equal(progress.counts.finalized, 0);
+  assert.equal((await bookmarks.getEncrypted('bookmark-1'))?.envelope.updatedAt, '2026-07-17T12:05:00.000Z');
 });
 
 test('acknowledgement that does not cover the sealed source message fails closed', async (t) => {
