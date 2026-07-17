@@ -103,11 +103,7 @@ function createProviderSetup(state: InteropVisibleWorkflow, handlers: InteropWor
   provider.disabled = handlers.onProviderChange === undefined;
   provider.addEventListener('change', () => handlers.onProviderChange?.(provider.value as InteropProviderId));
   const connectLabel = state.provider.state === 'reconnect-required' ? 'Reconnect provider' : 'Connect provider';
-  const connect = button(
-    connectLabel,
-    handlers.onConnect,
-    state.provider.id === 'pcloud' || ['connected', 'unavailable'].includes(state.provider.state),
-  );
+  const connect = button(connectLabel, handlers.onConnect, ['connected', 'unavailable'].includes(state.provider.state));
   const file = document.createElement('input');
   file.type = 'file';
   file.accept = 'application/json,.json';

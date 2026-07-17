@@ -49,6 +49,30 @@ test('provider setup dispatches the selected isolated provider and connect actio
   assert.deepEqual(calls, ['provider:icloud-drive', 'connect']);
 });
 
+test('disconnected pCloud exposes the separate interoperability authorization action', () => {
+  let connects = 0;
+  const state = {
+    ...blockedInteropWorkflow('settings', 0),
+    provider: {
+      id: 'pcloud' as const,
+      label: 'pCloud',
+      state: 'disconnected' as const,
+      detail: 'Separate pCloud interoperability access is not configured.',
+    },
+  };
+  const view = createInteropWorkflowView(state, {
+    onClose: () => undefined,
+    onConnect: () => {
+      connects += 1;
+    },
+  });
+  const connect = Array.from(view.querySelectorAll('button')).find((control) => control.textContent === 'Connect provider');
+  assert.ok(connect instanceof HTMLButtonElement);
+  assert.equal(connect.disabled, false);
+  connect.click();
+  assert.equal(connects, 1);
+});
+
 test('conflict choice carries explicit apply-to-all intent', () => {
   const calls: unknown[] = [];
   const state = {
