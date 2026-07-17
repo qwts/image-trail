@@ -6,10 +6,7 @@ import type { StoredInteropKeyRecord } from '../repositories/interop-keys-reposi
 import { InteropRecordExportStore } from './record-export.js';
 import { sealInteropMessage } from './sealed-message.js';
 import { SecureSyncOutboxRepository, type SecureSyncProgress, type SecureSyncQueueItem } from './secure-sync-outbox-repository.js';
-
-function outboxPath(sequence: number, messageId: string): string {
-  return `messages/outbox/${String(sequence).padStart(12, '0')}-${messageId}.json.aesgcm`;
-}
+import { syncMessagePath } from './sync-paths.js';
 
 export class SyncOutboxPublishError extends Error {
   override readonly name = 'SyncOutboxPublishError';
@@ -81,7 +78,7 @@ export class SyncOutboxPublisher {
           sourceLocalId: item.localId,
           messageId,
           sequence,
-          path: outboxPath(sequence, messageId),
+          path: syncMessagePath(sequence, messageId),
           reviewCategory: item.reviewCategory,
           ciphertext,
         });

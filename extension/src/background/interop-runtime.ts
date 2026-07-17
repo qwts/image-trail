@@ -10,15 +10,15 @@ import type {
   InteropRuntimeSnapshot,
 } from '../core/interop/runtime-state.js';
 import { importInteropPairingBundle } from '../data/interop/pairing-import.js';
-import type { ActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { MoveOutboxPublishError, type MoveOutboxProgress } from '../data/interop/move-outbox-publisher.js';
 import { SyncOutboxPublishError } from '../data/interop/sync-outbox-publisher.js';
 import type { SecureSyncProgress } from '../data/interop/secure-sync-outbox-repository.js';
-import type { InteropObjectStore } from '../core/interop/transport.js';
 import { InteropMoveRuntime, InteropMoveSetupError } from './interop-move-runtime.js';
 import { InteropSyncRuntime, InteropSyncSetupError } from './interop-sync-runtime.js';
 import { INTEROP_PROVIDERS, interopPairingState, interopProviderStatus } from './interop-runtime-provider.js';
 import * as progressViews from './interop-runtime-progress.js';
+import type { InteropRuntimeDependencies } from './interop-runtime-dependencies.js';
+export type { InteropRuntimeDependencies } from './interop-runtime-dependencies.js';
 import {
   activeInteropRuntimeSelection,
   clearActiveSyncRuntimeSelection,
@@ -28,22 +28,6 @@ import {
 } from './interop-runtime-preferences.js';
 
 const STORAGE_KEY = 'interopRuntimePreferences';
-
-export interface InteropRuntimeDependencies {
-  readonly storage: {
-    get(key: string): Promise<Record<string, unknown>>;
-    set(items: Record<string, unknown>): Promise<void>;
-  };
-  readonly getDb: () => Promise<IDBDatabase | null>;
-  readonly getActiveBlobKey: () => Promise<ActiveBlobKey | null>;
-  readonly probePCloud: (interactive: boolean) => Promise<boolean>;
-  readonly disconnectPCloud: () => Promise<void>;
-  readonly probeGoogleDrive: (interactive: boolean) => Promise<void>;
-  readonly disconnectGoogleDrive: () => Promise<void>;
-  readonly probeICloud: () => Promise<void>;
-  readonly openProvider: (provider: InteropProviderId) => Promise<InteropObjectStore | null>;
-  readonly finalizeSourceRecord: (sourceLocalId: string, sourceUpdatedAt: string) => Promise<void>;
-}
 
 export class InteropRuntime {
   constructor(private readonly dependencies: InteropRuntimeDependencies) {}
@@ -296,7 +280,7 @@ export class InteropRuntime {
   ): Promise<MoveOutboxProgress | SecureSyncProgress | null> {
     const active = activeInteropRuntimeSelection(selected);
     if (!active.id || !sameInteropRecordIds(active.recordIds, context.recordIds)) return null;
-    if (selected.operation === 'sync') return this.syncRuntime().status(active.id);
+    if (selected.operation === 'sync') return this.syncRuntime().status(active.id, context.locked ? undefined : provider);
     return this.moveRuntime().status({
       transferId: active.id,
       total: context.total,
@@ -334,6 +318,7 @@ export class InteropRuntime {
       'paired',
       view.counts,
       view.processed,
+      view.conflicts,
     );
   }
 
@@ -348,7 +333,18 @@ export class InteropRuntime {
       error instanceof SyncOutboxPublishError
         ? progressViews.syncProgressFailureView(error.progress, cause, error.message)
         : progressViews.moveProgressFailureView(error.progress, cause, error.message);
-    return this.result(context, selected, view.phase, provider.state, provider.detail, view.error, 'paired', view.counts, view.processed);
+    return this.result(
+      context,
+      selected,
+      view.phase,
+      provider.state,
+      provider.detail,
+      view.error,
+      'paired',
+      view.counts,
+      view.processed,
+      view.conflicts,
+    );
   }
 
   private unsupportedAction(
@@ -377,6 +373,7 @@ export class InteropRuntime {
     pairing?: InteropRuntimeSnapshot['pairing'],
     counts: InteropCounts = progressViews.emptyInteropCounts(context.total),
     processed = 0,
+    conflicts: InteropRuntimeSnapshot['conflicts'] = [],
   ): Promise<InteropRuntimeResult> {
     const snapshot: InteropRuntimeSnapshot = {
       entry: context.entry,
@@ -387,7 +384,7 @@ export class InteropRuntime {
       phase,
       counts,
       processed,
-      conflicts: [],
+      conflicts,
       error,
       locked: context.locked,
     };

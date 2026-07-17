@@ -35,8 +35,16 @@ import { SecureMoveOutboxRepository } from '../extension/src/data/interop/secure
 import { isMoveRecordEnvelope } from '../extension/src/data/interop/move-journal-records.js';
 import { openInteropMessage, sealInteropMessage } from '../extension/src/data/interop/sealed-message.js';
 import { moveAcknowledgementPath } from '../extension/src/data/interop/move-acknowledgement-reconciler.js';
+import { parseSyncMessagePath, syncMessagePath } from '../extension/src/data/interop/sync-paths.js';
 
 const context = { entry: 'selection' as const, total: 3, recordIds: ['bookmark-1', 'bookmark-2', 'bookmark-3'], locked: false };
+
+test('Sync message paths bind a positive sequence and canonical message id', () => {
+  const messageId = '36931c95-5e91-4cb3-9400-7fbe18245785';
+  assert.deepEqual(parseSyncMessagePath(syncMessagePath(12, messageId)), { sequence: 12, messageId });
+  assert.throws(() => parseSyncMessagePath(`messages/outbox/000000000000-${messageId}.json.aesgcm`), /positive/u);
+  assert.throws(() => syncMessagePath(0, messageId), /outside/u);
+});
 
 class MemoryStore implements InteropObjectStore {
   readonly provider = 'google-drive' as const;
@@ -360,6 +368,7 @@ test('runtime Sync publishes a pairing-key-sealed selected snapshot without plai
     key.reference,
     '2026-07-17T12:00:00.000Z',
   );
+  const queueUpdatedAt = (await new BookmarksRepository(db).getEncrypted('bookmark-1'))?.queueUpdatedAt;
   const selected = { entry: 'bookmark' as const, total: 1, recordIds: ['bookmark-1'], locked: false };
   await runtime.dispatch(selected, { name: 'select-provider', provider: 'google-drive' });
   await runtime.dispatch(selected, {
@@ -407,6 +416,50 @@ test('runtime Sync publishes a pairing-key-sealed selected snapshot without plai
   const resumedAfterFailure = await runtime.dispatch(selected, { name: 'resume' });
   assert.equal(resumedAfterFailure.snapshot.phase, 'reviewing');
   assert.equal(resumedAfterFailure.snapshot.processed, 1);
+  assert.equal(envelope.payload.kind, 'record');
+  if (envelope.payload.kind !== 'record') throw new Error('Expected a Sync record envelope.');
+  const remoteMessageId = crypto.randomUUID();
+  const remote = parseInteropEnvelope({
+    header: {
+      ...envelope.header,
+      messageId: remoteMessageId,
+      sourceProduct: 'overlook',
+      targetProduct: 'image-trail',
+      sequence: 2,
+    },
+    payload: {
+      ...envelope.payload,
+      record: {
+        ...envelope.payload.record,
+        title: 'Private Overlook title',
+        revision: { imageTrail: 1, overlook: 1 },
+        fieldRevisions: { ...envelope.payload.record.fieldRevisions, title: { imageTrail: 0, overlook: 1 } },
+      },
+    },
+  });
+  const remoteCiphertext = await sealInteropMessage(remote, pairing);
+  await new EncryptedInteropTransport(store).upload(
+    { pairingId: pairing.pairingId, transferId: sessionId },
+    syncMessagePath(2, remoteMessageId),
+    remoteCiphertext,
+  );
+  remoteCiphertext.fill(0);
+  const reviewed = await runtime.dispatch(selected, { name: 'status' });
+  assert.equal(reviewed.snapshot.counts.eligible, 0);
+  assert.equal(reviewed.snapshot.counts.conflict, 1);
+  assert.deepEqual(reviewed.snapshot.conflicts, [
+    { interopId: envelope.payload.record.identity.interopId, label: 'Sync record', fields: ['title'] },
+  ]);
+  assert.equal((await new BookmarksRepository(db).getEncrypted('bookmark-1'))?.queueUpdatedAt, queueUpdatedAt);
+  const inboxTransaction = db.transaction('secureSyncInbox', 'readonly');
+  const inbox = await result(inboxTransaction.objectStore('secureSyncInbox').getAll());
+  assert.doesNotMatch(JSON.stringify(inbox), /Private Overlook title|private\.example\.test|sync\.jpg/u);
+  const inboxRow = inbox[0] as { ciphertext?: ArrayBuffer } | undefined;
+  assert.ok(inboxRow?.ciphertext);
+  const openedRemote = await openInteropMessage(new Uint8Array(inboxRow.ciphertext), pairing);
+  assert.equal(openedRemote.payload.kind === 'record' ? openedRemote.payload.record.title : null, 'Private Overlook title');
+  assert.equal((await runtime.dispatch(selected, { name: 'status' })).snapshot.counts.conflict, 1);
+  assert.equal((await runtime.dispatch({ ...selected, locked: true }, { name: 'status' })).snapshot.conflicts.length, 0);
   const paused = await runtime.dispatch(selected, { name: 'pause' });
   assert.equal(paused.snapshot.phase, 'paused');
   const resumed = await runtime.dispatch(selected, { name: 'resume' });

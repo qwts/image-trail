@@ -1,22 +1,25 @@
 import type { InteropCounts } from '../core/interop/messages.js';
 import type { InteropErrorCode, InteropTransferPhase } from '../core/interop/contract.js';
-import type { InteropProviderState, InteropRuntimeError } from '../core/interop/runtime-state.js';
+import type { InteropProviderState, InteropRuntimeConflict, InteropRuntimeError } from '../core/interop/runtime-state.js';
 import { InteropTransportError } from '../core/interop/transport.js';
 import type { MoveOutboxProgress } from '../data/interop/move-outbox-publisher.js';
 import type { SecureSyncProgress } from '../data/interop/secure-sync-outbox-repository.js';
 import { InteropMoveSetupError } from './interop-move-runtime.js';
 import { InteropSyncSetupError } from './interop-sync-runtime.js';
+import { SyncInboxScanError } from '../data/interop/sync-inbox-scanner.js';
 
 export interface InteropRuntimeProgressView {
   readonly phase: InteropTransferPhase;
   readonly error: InteropRuntimeError | null;
   readonly counts: InteropCounts;
   readonly processed: number;
+  readonly conflicts: readonly InteropRuntimeConflict[];
 }
 
 export function interopRuntimeError(error: unknown): InteropRuntimeError {
   if (error instanceof InteropMoveSetupError) return { code: error.code, message: error.message, retryable: error.retryable };
   if (error instanceof InteropSyncSetupError) return { code: error.code, message: error.message, retryable: error.retryable };
+  if (error instanceof SyncInboxScanError) return { code: error.code, message: error.message, retryable: false };
   if (error instanceof InteropTransportError) {
     const code: InteropErrorCode =
       error.code === 'unsupported' ? 'provider-unavailable' : error.code === 'not-found' ? 'provider-unavailable' : error.code;
@@ -36,8 +39,9 @@ export function syncProgressView(progress: SecureSyncProgress, error: InteropRun
     error: interrupted
       ? { code: 'interrupted', message: 'Encrypted Sync publication is incomplete. Resume to continue.', retryable: true }
       : error,
-    counts: progress.counts,
-    processed: progress.delivered,
+    counts: progress.inbound?.counts ?? progress.counts,
+    processed: Math.max(progress.delivered, progress.inbound?.received ?? 0),
+    conflicts: progress.inbound?.conflicts.map((conflict) => ({ ...conflict, label: 'Sync record' })) ?? [],
   };
 }
 
@@ -49,8 +53,9 @@ export function syncProgressFailureView(
   return {
     phase: 'failed',
     error: { code: cause.code === 'provider-unavailable' ? 'partial-failure' : cause.code, message, retryable: true },
-    counts: progress.counts,
-    processed: progress.delivered,
+    counts: progress.inbound?.counts ?? progress.counts,
+    processed: Math.max(progress.delivered, progress.inbound?.received ?? 0),
+    conflicts: progress.inbound?.conflicts.map((conflict) => ({ ...conflict, label: 'Sync record' })) ?? [],
   };
 }
 
@@ -82,6 +87,7 @@ export function moveProgressView(progress: MoveOutboxProgress, providerError: In
         : providerError,
     counts: progress.counts,
     processed: progress.delivered,
+    conflicts: [],
   };
 }
 
@@ -95,6 +101,7 @@ export function moveProgressFailureView(
     error: { code: cause.code === 'provider-unavailable' ? 'partial-failure' : cause.code, message, retryable: true },
     counts: progress.counts,
     processed: progress.delivered,
+    conflicts: [],
   };
 }
 

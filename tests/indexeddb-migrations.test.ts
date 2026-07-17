@@ -29,6 +29,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
       DataStore.MoveOutbox,
       DataStore.MoveReceipts,
       DataStore.SecureSyncItems,
+      DataStore.SecureSyncInbox,
       DataStore.SecureSyncOutbox,
       DataStore.SecureSyncSessions,
       DataStore.SyncAudit,
@@ -61,6 +62,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
       DataStore.SyncReceipts,
       DataStore.SyncSessions,
       DataStore.SecureSyncItems,
+      DataStore.SecureSyncInbox,
       DataStore.SecureSyncOutbox,
       DataStore.SecureSyncSessions,
     ],
@@ -82,6 +84,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   const syncAudit = transaction.objectStore(DataStore.SyncAudit);
   const syncItems = transaction.objectStore(DataStore.SyncItems);
   const secureSyncItems = transaction.objectStore(DataStore.SecureSyncItems);
+  const secureSyncInbox = transaction.objectStore(DataStore.SecureSyncInbox);
   const secureSyncOutbox = transaction.objectStore(DataStore.SecureSyncOutbox);
 
   assert.deepEqual(asArray(keys.indexNames), [SchemaIndex.KeysByKind, SchemaIndex.KeysByReference, SchemaIndex.KeysByUuid].sort());
@@ -132,6 +135,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   assert.deepEqual(asArray(syncItems.indexNames), [SchemaIndex.SyncItemsBySessionId]);
   assert.deepEqual(asArray(syncAudit.indexNames), [SchemaIndex.SyncAuditBySessionId]);
   assert.deepEqual(asArray(secureSyncItems.indexNames), [SchemaIndex.SecureSyncItemsBySessionId]);
+  assert.deepEqual(asArray(secureSyncInbox.indexNames), [SchemaIndex.SecureSyncInboxBySessionId]);
   assert.deepEqual(asArray(secureSyncOutbox.indexNames), [SchemaIndex.SecureSyncOutboxBySessionId]);
 
   const metadata = await new Promise((resolve, reject) => {
@@ -228,6 +232,25 @@ test('IndexedDB v12 migration adds pairing-key-sealed Sync runtime stores to an 
   assert.deepEqual(asArray(transaction.objectStore(DataStore.SecureSyncSessions).indexNames), []);
   assert.deepEqual(asArray(transaction.objectStore(DataStore.SecureSyncItems).indexNames), [SchemaIndex.SecureSyncItemsBySessionId]);
   assert.deepEqual(asArray(transaction.objectStore(DataStore.SecureSyncOutbox).indexNames), [SchemaIndex.SecureSyncOutboxBySessionId]);
+  await transactionDone(transaction);
+});
+
+test('IndexedDB v13 migration adds the pairing-key-sealed Sync inbox to an existing database', async (t) => {
+  await deleteImageTrailDb();
+  const legacyDb = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(IMAGE_TRAIL_DB_NAME, 12);
+    request.onupgradeneeded = () => request.result.createObjectStore(DataStore.Metadata, { keyPath: 'key' });
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  legacyDb.close();
+
+  const opened = await openImageTrailDb();
+  assert.equal(opened.status.ok, true, opened.status.message);
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+  const transaction = opened.db.transaction(DataStore.SecureSyncInbox, 'readonly');
+  assert.deepEqual(asArray(transaction.objectStore(DataStore.SecureSyncInbox).indexNames), [SchemaIndex.SecureSyncInboxBySessionId]);
   await transactionDone(transaction);
 });
 

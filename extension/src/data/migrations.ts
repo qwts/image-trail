@@ -188,6 +188,11 @@ export function migrateImageTrailDb(db: IDBDatabase, oldVersion: number, transac
     secureSyncOutbox.createIndex(SchemaIndex.SecureSyncOutboxBySessionId, 'sessionId', { unique: false });
   }
 
+  if (oldVersion < 13) {
+    const secureSyncInbox = db.createObjectStore(DataStore.SecureSyncInbox, { keyPath: 'messageId' });
+    secureSyncInbox.createIndex(SchemaIndex.SecureSyncInboxBySessionId, 'sessionId', { unique: false });
+  }
+
   const metadata = transaction?.objectStore(DataStore.Metadata);
   metadata?.put({
     key: 'schema',

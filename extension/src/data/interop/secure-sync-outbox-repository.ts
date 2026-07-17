@@ -6,6 +6,7 @@ import type { InteropProviderId } from '../../core/interop/runtime-state.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
 import { DataStore, SchemaIndex } from '../schema.js';
 import { hydrateRecord, hydrateRecords } from '../repositories/hydration.js';
+import type { SyncField } from '../../core/interop/sync-resolution.js';
 
 const providerSchema = v.picklist(['pcloud', 'google-drive', 'icloud-drive']);
 const phaseSchema = v.picklist(['transferring', 'reviewing', 'paused', 'cancelled', 'failed']);
@@ -64,6 +65,13 @@ export interface SecureSyncProgress {
   readonly counts: InteropCounts;
   readonly delivered: number;
   readonly pending: number;
+  readonly inbound?:
+    | {
+        readonly received: number;
+        readonly counts: InteropCounts;
+        readonly conflicts: readonly { readonly interopId: string; readonly fields: readonly SyncField[] }[];
+      }
+    | undefined;
 }
 
 const STORES = [DataStore.SecureSyncSessions, DataStore.SecureSyncItems, DataStore.SecureSyncOutbox];
@@ -184,6 +192,20 @@ export class SecureSyncOutboxRepository {
     const rows = await this.outboxIn(transaction, sessionId);
     await transactionDone(transaction);
     return rows.filter((row) => row.deliveredAt === null);
+  }
+
+  async items(sessionId: string): Promise<readonly SecureSyncItem[]> {
+    const transaction = this.db.transaction(DataStore.SecureSyncItems, 'readonly');
+    const rows = await this.itemsIn(transaction, sessionId);
+    await transactionDone(transaction);
+    return rows;
+  }
+
+  async messages(sessionId: string): Promise<readonly SecureSyncOutboxRecord[]> {
+    const transaction = this.db.transaction(DataStore.SecureSyncOutbox, 'readonly');
+    const rows = await this.outboxIn(transaction, sessionId);
+    await transactionDone(transaction);
+    return rows;
   }
 
   async markDelivered(messageId: string, at: string): Promise<void> {
