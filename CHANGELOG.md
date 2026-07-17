@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.20.0
+
+### Minor Changes
+
+- 7caf6dd: Queue reviewed Move selections with stable canonical identities and a restart-safe pairing-key-encrypted provider outbox without changing bookmark queue order.
+
 ## 0.19.0
 
 ### Minor Changes
