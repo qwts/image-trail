@@ -31,9 +31,12 @@ test('sealed interop original binds identity, metadata, hash, and exact bytes', 
     contentHash: '0371f308fa6ea8c4f0bc120e8bdffb029550caa156b2b0bb1846c7745aa74add',
   };
   const sealed = await sealInteropBlob({ pairing, transferId: TRANSFER_ID, recordInteropId: INTEROP_ID, blob, bytes });
+  const providerVisible = new TextDecoder().decode(sealed);
+  assert.doesNotMatch(providerVisible, /0371f308|source-blob-1|image\/jpeg/u);
   const result = await openInteropBlob(sealed, pairing);
-  assert.equal(result.header.transferId, TRANSFER_ID);
-  assert.equal(result.header.recordInteropId, INTEROP_ID);
+  assert.equal(result.descriptor.transferId, TRANSFER_ID);
+  assert.equal(result.descriptor.recordInteropId, INTEROP_ID);
+  assert.equal(result.descriptor.contentHash, blob.contentHash);
   assert.deepEqual(result.bytes, bytes);
   result.bytes.fill(0);
   const corrupted = sealed.slice();

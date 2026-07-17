@@ -25,6 +25,12 @@ const sealedBlobHeaderSchema = v.strictObject({
   magic: v.literal(SEALED_BLOB_MAGIC),
   schemaVersion: v.literal(1),
   pairingId: interopUuidSchema,
+  keyId: v.pipe(v.string(), v.regex(/^interop:[0-9a-f-]+$/iu)),
+  cipher: v.strictObject({ name: v.literal('AES-GCM'), iv: canonicalBase64Schema }),
+});
+
+const sealedBlobDescriptorSchema = v.strictObject({
+  schemaVersion: v.literal(1),
   transferId: interopUuidSchema,
   recordInteropId: interopUuidSchema,
   role: v.literal('original'),
@@ -32,11 +38,10 @@ const sealedBlobHeaderSchema = v.strictObject({
   mimeType: v.pipe(v.string(), v.minLength(1)),
   byteLength: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   contentHash: sha256Schema,
-  keyId: v.pipe(v.string(), v.regex(/^interop:[0-9a-f-]+$/iu)),
-  cipher: v.strictObject({ name: v.literal('AES-GCM'), iv: canonicalBase64Schema }),
 });
 
 export type SealedInteropBlobHeader = v.InferOutput<typeof sealedBlobHeaderSchema>;
+export type SealedInteropBlobDescriptor = v.InferOutput<typeof sealedBlobDescriptorSchema>;
 
 function base64(bytes: Uint8Array): string {
   let binary = '';
@@ -87,6 +92,11 @@ export async function sealInteropBlob(input: {
     magic: SEALED_BLOB_MAGIC,
     schemaVersion: 1,
     pairingId: input.pairing.pairingId,
+    keyId: input.pairing.reference,
+    cipher: { name: 'AES-GCM', iv: base64(iv) },
+  });
+  const descriptor = v.parse(sealedBlobDescriptorSchema, {
+    schemaVersion: 1,
     transferId: input.transferId,
     recordInteropId: input.recordInteropId,
     role: 'original',
@@ -94,21 +104,24 @@ export async function sealInteropBlob(input: {
     mimeType: input.blob.mimeType,
     byteLength: input.blob.byteLength,
     contentHash: input.blob.contentHash,
-    keyId: input.pairing.reference,
-    cipher: { name: 'AES-GCM', iv: base64(iv) },
   });
   const headerBytes = encoder.encode(JSON.stringify(header));
+  const descriptorBytes = encoder.encode(JSON.stringify(descriptor));
   if (headerBytes.byteLength > MAX_HEADER_BYTES) throw new Error('Encrypted interop blob header is too large.');
+  if (descriptorBytes.byteLength > MAX_HEADER_BYTES) throw new Error('Encrypted interop blob descriptor is too large.');
+  const plaintext = encodeFile(descriptorBytes, input.bytes);
   try {
     const ciphertext = new Uint8Array(
       await crypto.subtle.encrypt(
         { name: 'AES-GCM', iv: iv as BufferSource, additionalData: headerBytes as BufferSource, tagLength: 128 },
         input.pairing.key,
-        input.bytes as BufferSource,
+        plaintext as BufferSource,
       ),
     );
     return encodeFile(headerBytes, ciphertext);
   } finally {
+    plaintext.fill(0);
+    descriptorBytes.fill(0);
     headerBytes.fill(0);
     iv.fill(0);
   }
@@ -118,7 +131,11 @@ export async function openInteropBlob(
   file: Uint8Array,
   pairing: StoredInteropKeyRecord,
   crypto: Crypto = getCrypto(),
-): Promise<{ readonly header: SealedInteropBlobHeader; readonly bytes: Uint8Array }> {
+): Promise<{
+  readonly header: SealedInteropBlobHeader;
+  readonly descriptor: SealedInteropBlobDescriptor;
+  readonly bytes: Uint8Array;
+}> {
   const decoded = decodeFile(file);
   let header: SealedInteropBlobHeader;
   try {
@@ -131,6 +148,8 @@ export async function openInteropBlob(
   }
   const iv = fromBase64(header.cipher.iv);
   let plaintext: Uint8Array | null = null;
+  let descriptorBytes: Uint8Array | null = null;
+  let bytes: Uint8Array | null = null;
   try {
     plaintext = new Uint8Array(
       await crypto.subtle.decrypt(
@@ -139,15 +158,21 @@ export async function openInteropBlob(
         decoded.ciphertext as BufferSource,
       ),
     );
-    if (plaintext.byteLength !== header.byteLength || (await digest(plaintext, crypto)) !== header.contentHash) {
+    const opened = decodeFile(plaintext);
+    descriptorBytes = opened.headerBytes;
+    bytes = opened.ciphertext;
+    const descriptor = v.parse(sealedBlobDescriptorSchema, JSON.parse(decoder.decode(descriptorBytes)) as unknown);
+    if (bytes.byteLength !== descriptor.byteLength || (await digest(bytes, crypto)) !== descriptor.contentHash) {
       throw new Error('Encrypted interop blob content verification failed.');
     }
-    return { header, bytes: plaintext };
+    return { header, descriptor, bytes };
   } catch (error) {
-    plaintext?.fill(0);
+    bytes?.fill(0);
     if (error instanceof Error && error.message.includes('content verification')) throw error;
     throw new Error('Encrypted interop blob could not be opened.', { cause: error });
   } finally {
+    plaintext?.fill(0);
+    descriptorBytes?.fill(0);
     decoded.ciphertext.fill(0);
     decoded.headerBytes.fill(0);
     iv.fill(0);
