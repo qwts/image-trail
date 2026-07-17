@@ -125,6 +125,7 @@ test('Gallery uses the shared design system without mutating durable queue order
   await hostFilter.focus();
   await hostFilter.selectOption('cdn.example.test');
   await expect(hostFilter).toBeFocused();
+  await expect(page.locator('.image-trail-gallery__card')).toHaveCount(1);
   await expect(page.locator('.image-trail-gallery__card-title')).toHaveText('Coastline study');
   const typeFilter = page.getByRole('combobox', { name: 'Filter by image type' });
   await typeFilter.selectOption('WEBP');
