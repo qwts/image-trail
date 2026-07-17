@@ -1062,7 +1062,8 @@
         },
         {
           "type": "unit-dom",
-          "path": "tests/form-controls.test.ts"
+          "paths": ["tests/form-controls.test.ts", "tests/dom/form-controls.test.ts", "tests/dom/panel-render-controller.test.ts"],
+          "notes": "Covers accessible password and file-picker labeling plus native file-chooser focus, selection, cancellation, and render-time focus restoration without moving the Settings scroll position."
         }
       ]
     },

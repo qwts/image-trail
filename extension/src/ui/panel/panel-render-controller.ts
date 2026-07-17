@@ -346,7 +346,7 @@ export class PanelRenderController {
       return;
     }
     if (nextControl instanceof HTMLInputElement && nextControl.type === 'file') {
-      nextControl.focus();
+      nextControl.focus({ preventScroll: true });
       return;
     }
     if (focusedControl.value !== undefined && (nextControl instanceof HTMLInputElement || nextControl instanceof HTMLTextAreaElement)) {
@@ -357,7 +357,7 @@ export class PanelRenderController {
         // Some input types, such as number, do not support selection ranges.
       }
     }
-    nextControl.focus();
+    nextControl.focus({ preventScroll: true });
   }
 
   private focusablePanelControls(scope: 'panel' | 'detached'): HTMLElement[] {

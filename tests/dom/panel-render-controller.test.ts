@@ -137,6 +137,36 @@ test('render preserves focus on a control inside a detached-section window acros
   assert.equal(document.activeElement, refocused, 'focus stays inside the detached window across the re-render');
 });
 
+test('render restores file-input focus without scrolling Settings', () => {
+  const harness = createHarness();
+  harness.patchState({ visible: true, activeDestination: 'settings' });
+  harness.controller.render();
+  const settings = harness.root.querySelector<HTMLElement>('.image-trail-panel__settings-section');
+  const fileInput = settings?.querySelector<HTMLInputElement>('input[type="file"]');
+  assert.ok(settings);
+  assert.ok(fileInput);
+  settings.scrollTop = 240;
+  fileInput.focus();
+
+  const nativeFocus = HTMLElement.prototype.focus;
+  const focusOptions: Array<FocusOptions | undefined> = [];
+  HTMLElement.prototype.focus = function (options?: FocusOptions): void {
+    focusOptions.push(options);
+    if (!options?.preventScroll) this.closest<HTMLElement>('.image-trail-panel__settings-section')!.scrollTop = 999;
+    nativeFocus.call(this, options);
+  };
+  try {
+    harness.controller.render();
+  } finally {
+    HTMLElement.prototype.focus = nativeFocus;
+  }
+
+  const restoredSettings = harness.root.querySelector<HTMLElement>('.image-trail-panel__settings-section');
+  assert.ok(restoredSettings);
+  assert.equal(restoredSettings.scrollTop, 240);
+  assert.equal(focusOptions.at(-1)?.preventScroll, true);
+});
+
 test('secure-session lock replaces panel and detached DOM, then restores layout and focus after unlock', () => {
   const harness = createHarness();
   harness.patchState({
