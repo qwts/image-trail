@@ -10,7 +10,14 @@ import {
   preflightChromeInteropAction,
 } from '../extension/src/background/interop-runtime-chrome.js';
 import { InteropRuntime, type InteropRuntimeDependencies } from '../extension/src/background/interop-runtime.js';
-import { InteropTransportError, sha256, type InteropObjectPage, type InteropObjectStore } from '../extension/src/core/interop/transport.js';
+import {
+  EncryptedInteropTransport,
+  InteropTransportError,
+  sha256,
+  type InteropObjectPage,
+  type InteropObjectStore,
+} from '../extension/src/core/interop/transport.js';
+import { parseInteropEnvelope } from '../extension/src/core/interop/messages.js';
 import {
   createInteropRuntimeMessage,
   createInteropRuntimeResultMessage,
@@ -23,6 +30,11 @@ import { openImageTrailDb } from '../extension/src/data/db.js';
 import { ensureDurableBookmarkKey } from '../extension/src/data/durable-bookmark-key.js';
 import { BookmarksRepository } from '../extension/src/data/repositories/bookmarks-repository.js';
 import { KeysRepository } from '../extension/src/data/repositories/keys-repository.js';
+import { InteropKeysRepository } from '../extension/src/data/repositories/interop-keys-repository.js';
+import { SecureMoveOutboxRepository } from '../extension/src/data/interop/secure-move-outbox-repository.js';
+import { isMoveRecordEnvelope } from '../extension/src/data/interop/move-journal-records.js';
+import { openInteropMessage, sealInteropMessage } from '../extension/src/data/interop/sealed-message.js';
+import { moveAcknowledgementPath } from '../extension/src/data/interop/move-acknowledgement-reconciler.js';
 
 const context = { entry: 'selection' as const, total: 3, recordIds: ['bookmark-1', 'bookmark-2', 'bookmark-3'], locked: false };
 
@@ -41,8 +53,13 @@ class MemoryStore implements InteropObjectStore {
     const bytes = this.objects.get(path);
     return bytes ? Promise.resolve(bytes.slice()) : Promise.reject(new InteropTransportError('missing', 'not-found', false));
   }
-  list(_prefix: string, _cursor: string | null): Promise<InteropObjectPage> {
-    return Promise.resolve({ entries: [], nextCursor: null });
+  list(prefix: string, _cursor: string | null): Promise<InteropObjectPage> {
+    return Promise.resolve({
+      entries: [...this.objects.entries()]
+        .filter(([path]) => path.startsWith(prefix))
+        .map(([path, bytes]) => ({ path, bytes: bytes.byteLength })),
+      nextCursor: null,
+    });
   }
   delete(path: string): Promise<void> {
     this.objects.delete(path);
@@ -81,9 +98,10 @@ async function harness(overrides: Partial<InteropRuntimeDependencies> = {}) {
       throw new Error('Signed Overlook iCloud host is missing.');
     },
     openProvider: async () => null,
+    finalizeSourceRecord: async () => undefined,
     ...overrides,
   };
-  return { runtime: new InteropRuntime(dependencies), db: opened.db, probes };
+  return { runtime: new InteropRuntime(dependencies), db: opened.db, probes, getStored: () => value };
 }
 
 test('runtime messages and request schema accept the typed provider boundary', () => {
@@ -252,7 +270,13 @@ test('pairing import stores non-extractable custody while unavailable publicatio
 
 test('runtime start publishes the exact reviewed selection and reloads durable Move progress', async (t) => {
   const store = new MemoryStore();
-  const { runtime, db } = await harness({ openProvider: async () => store });
+  const finalized: string[] = [];
+  const { runtime, db, getStored } = await harness({
+    openProvider: async () => store,
+    finalizeSourceRecord: async (sourceLocalId) => {
+      finalized.push(sourceLocalId);
+    },
+  });
   t.after(() => db.close());
   const key = await ensureDurableBookmarkKey(new KeysRepository(db));
   await new BookmarksRepository(db).sealAndPut(
@@ -275,6 +299,48 @@ test('runtime start publishes the exact reviewed selection and reloads durable M
   const restored = await runtime.dispatch(selectedContext, { name: 'status' });
   assert.equal(restored.snapshot.phase, 'awaiting-acknowledgement');
   assert.equal(restored.snapshot.processed, 1);
+  const pairing = (await new InteropKeysRepository(db).list())[0];
+  assert.ok(pairing);
+  const transferId = (getStored() as { activeTransferId?: string }).activeTransferId;
+  assert.ok(transferId);
+  const outbox = (await new SecureMoveOutboxRepository(db).outbox(transferId))[0];
+  assert.ok(outbox);
+  const source = await openInteropMessage(new Uint8Array(outbox.ciphertext.slice(0)), pairing);
+  assert.equal(isMoveRecordEnvelope(source), true);
+  if (!isMoveRecordEnvelope(source)) throw new Error('Expected a Move record envelope.');
+  const acknowledgement = parseInteropEnvelope({
+    header: {
+      ...source.header,
+      messageId: '77777777-7777-4777-8777-777777777777',
+      sourceProduct: 'overlook',
+      targetProduct: 'image-trail',
+      kind: 'acknowledgement',
+      createdAt: '2026-07-17T12:05:00.000Z',
+    },
+    payload: {
+      kind: 'acknowledgement',
+      schemaVersion: 1,
+      status: 'accepted',
+      recordInteropId: source.payload.record.identity.interopId,
+      targetLocalId: 'overlook-1',
+      metadataPersisted: true,
+      originalVerification: 'unavailable',
+      acknowledgedMessageIds: [source.header.messageId],
+      errors: [],
+    },
+  });
+  const sealed = await sealInteropMessage(acknowledgement, pairing);
+  await new EncryptedInteropTransport(store).upload(
+    { pairingId: pairing.pairingId, transferId },
+    moveAcknowledgementPath(acknowledgement.header.sequence, acknowledgement.header.messageId),
+    sealed,
+  );
+  sealed.fill(0);
+  const completed = await runtime.dispatch(selectedContext, { name: 'status' });
+  assert.equal(completed.snapshot.phase, 'completed');
+  assert.equal(completed.snapshot.counts.acknowledged, 1);
+  assert.equal(completed.snapshot.counts.finalized, 1);
+  assert.deepEqual(finalized, ['bookmark-1']);
 });
 
 test('locked workspaces never start or expose provider setup through a successful result', async (t) => {

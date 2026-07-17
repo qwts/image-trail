@@ -1,14 +1,33 @@
 import type { InteropCounts } from '../core/interop/messages.js';
-import type { InteropTransferPhase } from '../core/interop/contract.js';
+import type { InteropErrorCode, InteropTransferPhase } from '../core/interop/contract.js';
 import type { InteropProviderState, InteropRuntimeError } from '../core/interop/runtime-state.js';
+import { InteropTransportError } from '../core/interop/transport.js';
 import type { MoveOutboxProgress } from '../data/interop/move-outbox-publisher.js';
-import type { InteropMoveSetupError } from './interop-move-runtime.js';
+import { InteropMoveSetupError } from './interop-move-runtime.js';
 
 export interface InteropRuntimeProgressView {
   readonly phase: InteropTransferPhase;
   readonly error: InteropRuntimeError | null;
   readonly counts: InteropCounts;
   readonly processed: number;
+}
+
+export function interopRuntimeError(error: unknown): InteropRuntimeError {
+  if (error instanceof InteropMoveSetupError) return { code: error.code, message: error.message, retryable: error.retryable };
+  if (error instanceof InteropTransportError) {
+    const code: InteropErrorCode =
+      error.code === 'unsupported' ? 'provider-unavailable' : error.code === 'not-found' ? 'provider-unavailable' : error.code;
+    return { code, message: error.message, retryable: error.retryable };
+  }
+  return {
+    code: 'provider-unavailable',
+    message: error instanceof Error ? error.message : 'Interoperability provider is unavailable.',
+    retryable: false,
+  };
+}
+
+export function interopProviderFailureState(error: InteropRuntimeError): InteropProviderState {
+  return error.code === 'auth-expired' ? 'reconnect-required' : error.code === 'provider-unavailable' ? 'unavailable' : 'disconnected';
 }
 
 export function emptyInteropCounts(total: number): InteropCounts {

@@ -90,6 +90,17 @@ describe('encrypted interop transport (#588)', () => {
       (error: unknown) => error instanceof InteropTransportError && error.code === 'corrupt',
     );
   });
+
+  test('discovers logical encrypted objects across provider pages without exposing chunks', async () => {
+    const store = new MemoryInteropStore();
+    const transport = new EncryptedInteropTransport(store, 2);
+    await transport.upload(SCOPE, 'messages/acknowledgements/000000000001-a.json.aesgcm', new Uint8Array([1, 2, 3]));
+    await transport.upload(SCOPE, 'messages/acknowledgements/000000000002-b.json.aesgcm', new Uint8Array([4, 5, 6]));
+    assert.deepEqual(await transport.listPaths(SCOPE, 'messages/acknowledgements'), [
+      'messages/acknowledgements/000000000001-a.json.aesgcm',
+      'messages/acknowledgements/000000000002-b.json.aesgcm',
+    ]);
+  });
 });
 
 describe('signed iCloud native client (#588)', () => {

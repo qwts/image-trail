@@ -43,7 +43,11 @@ export function hasConfiguredDriveOAuth(manifest: unknown): boolean {
   );
 }
 
-export function createChromeInteropRuntime(getDb: () => Promise<IDBDatabase | null>): InteropRuntime {
+export function createChromeInteropRuntime(
+  getDb: () => Promise<IDBDatabase | null>,
+  finalizeSourceRecord: (sourceLocalId: string) => Promise<void> = () =>
+    Promise.reject(new Error('Move source finalization is not composed.')),
+): InteropRuntime {
   const pcloud = createChromePCloudInteropAuth();
   return new InteropRuntime({
     storage: chrome.storage.local,
@@ -71,5 +75,6 @@ export function createChromeInteropRuntime(getDb: () => Promise<IDBDatabase | nu
         return createChromeIdentityInteropDriveStore(false);
       return null;
     },
+    finalizeSourceRecord,
   });
 }

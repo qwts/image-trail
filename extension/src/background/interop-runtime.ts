@@ -13,9 +13,9 @@ import { importInteropPairingBundle } from '../data/interop/pairing-import.js';
 import type { ActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { MoveOutboxPublishError, type MoveOutboxProgress } from '../data/interop/move-outbox-publisher.js';
 import { InteropKeysRepository } from '../data/repositories/interop-keys-repository.js';
-import { InteropTransportError, type InteropObjectStore } from '../core/interop/transport.js';
+import type { InteropObjectStore } from '../core/interop/transport.js';
 import { InteropMoveRuntime, InteropMoveSetupError } from './interop-move-runtime.js';
-import { emptyInteropCounts, moveProgressFailureView, moveProgressView, moveSetupFailureView } from './interop-runtime-progress.js';
+import * as progressViews from './interop-runtime-progress.js';
 import {
   parseInteropRuntimePreferences,
   sameInteropRecordIds,
@@ -39,6 +39,7 @@ export interface InteropRuntimeDependencies {
   readonly disconnectGoogleDrive: () => Promise<void>;
   readonly probeICloud: () => Promise<void>;
   readonly openProvider: (provider: InteropProviderId) => Promise<InteropObjectStore | null>;
+  readonly finalizeSourceRecord: (sourceLocalId: string) => Promise<void>;
 }
 
 const PROVIDERS: Record<InteropProviderId, { readonly label: string; readonly disconnected: string }> = {
@@ -46,23 +47,6 @@ const PROVIDERS: Record<InteropProviderId, { readonly label: string; readonly di
   'google-drive': { label: 'Google Drive', disconnected: 'Connect Google Drive for the dedicated Image Trail Interop folder.' },
   'icloud-drive': { label: 'iCloud Drive', disconnected: 'Install and authorize the signed Overlook interoperability host.' },
 };
-
-function runtimeError(error: unknown): InteropRuntimeError {
-  if (error instanceof InteropTransportError) {
-    const code: InteropErrorCode =
-      error.code === 'unsupported' ? 'provider-unavailable' : error.code === 'not-found' ? 'provider-unavailable' : error.code;
-    return { code, message: error.message, retryable: error.retryable };
-  }
-  return {
-    code: 'provider-unavailable',
-    message: error instanceof Error ? error.message : 'Interoperability provider is unavailable.',
-    retryable: false,
-  };
-}
-
-function providerFailureState(error: InteropRuntimeError): InteropProviderState {
-  return error.code === 'auth-expired' ? 'reconnect-required' : error.code === 'provider-unavailable' ? 'unavailable' : 'disconnected';
-}
 
 export class InteropRuntime {
   constructor(private readonly dependencies: InteropRuntimeDependencies) {}
@@ -93,8 +77,16 @@ export class InteropRuntime {
     if (action.name === 'start') return this.start(context, selected, provider);
     if (action.name === 'resume') return this.resume(context, selected, provider);
     if (action.name === 'status') {
-      const active = await this.activeProgress(context, selected);
-      if (active) return this.progressResult(context, selected, provider, active);
+      try {
+        const active = await this.activeProgress(context, selected, provider.state === 'connected' ? selected.provider : undefined);
+        if (active) return this.progressResult(context, selected, provider, active);
+      } catch (error) {
+        const normalized = progressViews.interopRuntimeError(error);
+        const local = await this.activeProgress(context, selected);
+        return local
+          ? this.progressResult(context, selected, provider, local, normalized, 'failed')
+          : this.result(context, selected, 'failed', provider.state, provider.detail, normalized);
+      }
     }
     return this.result(context, selected, 'queued', provider.state, provider.detail, provider.error);
   }
@@ -115,7 +107,7 @@ export class InteropRuntime {
         },
         pairing: 'invalid',
         phase: 'failed',
-        counts: emptyInteropCounts(context.total),
+        counts: progressViews.emptyInteropCounts(context.total),
         processed: 0,
         conflicts: [],
         error: { code: 'provider-unavailable', message: 'Interoperability status could not be loaded.', retryable: true },
@@ -229,7 +221,7 @@ export class InteropRuntime {
     } catch (error) {
       if (error instanceof MoveOutboxPublishError) return this.progressFailure(context, active, provider, error);
       if (error instanceof InteropMoveSetupError) {
-        const failure = moveSetupFailureView(error, provider.state);
+        const failure = progressViews.moveSetupFailureView(error, provider.state);
         return this.result(context, active, 'failed', failure.providerState, provider.detail, failure.error);
       }
       return this.result(context, active, 'failed', provider.state, provider.detail, {
@@ -262,34 +254,50 @@ export class InteropRuntime {
         },
       );
     }
+    if (context.locked) {
+      return this.result(context, selected, 'failed', provider.state, provider.detail, {
+        code: 'wrong-key',
+        message: 'Unlock Image Trail before applying Move acknowledgements or finalizing source records.',
+        retryable: true,
+      });
+    }
     try {
       const progress = await this.moveRuntime().resume({
         provider: selected.provider,
         transferId: selected.activeTransferId,
         total: context.total,
+        allowFinalization: true,
       });
       return this.progressResult(context, selected, provider, progress);
     } catch (error) {
       if (error instanceof MoveOutboxPublishError) return this.progressFailure(context, selected, provider, error);
       if (error instanceof InteropMoveSetupError) {
-        const failure = moveSetupFailureView(error, provider.state);
+        const failure = progressViews.moveSetupFailureView(error, provider.state);
         return this.result(context, selected, 'failed', failure.providerState, provider.detail, failure.error);
       }
-      return this.result(context, selected, 'failed', provider.state, provider.detail, {
-        code: 'interrupted',
-        message: error instanceof Error ? error.message : 'Move resume failed.',
-        retryable: true,
-      });
+      const normalized = progressViews.interopRuntimeError(error);
+      return this.result(context, selected, 'failed', provider.state, provider.detail, normalized);
     }
   }
 
-  private async activeProgress(context: InteropRuntimeContext, selected: RuntimePreferences): Promise<MoveOutboxProgress | null> {
+  private async activeProgress(
+    context: InteropRuntimeContext,
+    selected: RuntimePreferences,
+    provider?: InteropProviderId,
+  ): Promise<MoveOutboxProgress | null> {
     if (!selected.activeTransferId || !sameInteropRecordIds(selected.activeRecordIds, context.recordIds)) return null;
-    return this.moveRuntime().status(selected.activeTransferId, context.total);
+    return this.moveRuntime().status({
+      transferId: selected.activeTransferId,
+      total: context.total,
+      provider,
+      allowFinalization: !!provider && !context.locked,
+    });
   }
 
   private moveRuntime(): InteropMoveRuntime {
-    return new InteropMoveRuntime(this.dependencies.getDb, this.dependencies.openProvider, this.dependencies.getActiveBlobKey);
+    return new InteropMoveRuntime(this.dependencies.getDb, this.dependencies.openProvider, this.dependencies.getActiveBlobKey, {
+      finalize: this.dependencies.finalizeSourceRecord,
+    });
   }
 
   private progressResult(
@@ -297,9 +305,21 @@ export class InteropRuntime {
     selected: RuntimePreferences,
     provider: { readonly state: InteropProviderState; readonly detail: string; readonly error: InteropRuntimeError | null },
     progress: MoveOutboxProgress,
+    error = provider.error,
+    phase?: InteropRuntimeSnapshot['phase'],
   ): Promise<InteropRuntimeResult> {
-    const view = moveProgressView(progress, provider.error);
-    return this.result(context, selected, view.phase, provider.state, provider.detail, view.error, 'paired', view.counts, view.processed);
+    const view = progressViews.moveProgressView(progress, error);
+    return this.result(
+      context,
+      selected,
+      phase ?? view.phase,
+      provider.state,
+      provider.detail,
+      view.error,
+      'paired',
+      view.counts,
+      view.processed,
+    );
   }
 
   private progressFailure(
@@ -308,8 +328,8 @@ export class InteropRuntime {
     provider: { readonly state: InteropProviderState; readonly detail: string; readonly error: InteropRuntimeError | null },
     error: MoveOutboxPublishError,
   ): Promise<InteropRuntimeResult> {
-    const cause = runtimeError(error.sourceError);
-    const view = moveProgressFailureView(error.progress, cause, error.message);
+    const cause = progressViews.interopRuntimeError(error.sourceError);
+    const view = progressViews.moveProgressFailureView(error.progress, cause, error.message);
     return this.result(context, selected, view.phase, provider.state, provider.detail, view.error, 'paired', view.counts, view.processed);
   }
 
@@ -341,8 +361,8 @@ export class InteropRuntime {
       else await this.dependencies.probeICloud();
       return { state: 'connected', detail: `${PROVIDERS[provider].label} is connected.`, error: null };
     } catch (error) {
-      const normalized = runtimeError(error);
-      return { state: providerFailureState(normalized), detail: normalized.message, error: normalized };
+      const normalized = progressViews.interopRuntimeError(error);
+      return { state: progressViews.interopProviderFailureState(normalized), detail: normalized.message, error: normalized };
     }
   }
 
@@ -354,7 +374,7 @@ export class InteropRuntime {
     detail = PROVIDERS[selected.provider].disconnected,
     error: InteropRuntimeError | null = null,
     pairing?: InteropRuntimeSnapshot['pairing'],
-    counts: InteropCounts = emptyInteropCounts(context.total),
+    counts: InteropCounts = progressViews.emptyInteropCounts(context.total),
     processed = 0,
   ): Promise<InteropRuntimeResult> {
     const snapshot: InteropRuntimeSnapshot = {

@@ -9,16 +9,22 @@ import { moveItemId, moveJournalRecordSchema, type MoveJournalRecord, type Store
 
 const timestampSchema = v.pipe(v.string(), v.isoTimestamp());
 
-const secureMoveItemSchema = v.object({
+export const secureMoveItemSchema = v.object({
   id: v.string(),
   transferId: v.string(),
   interopId: v.string(),
   sourceMessageId: v.string(),
   sourceLocalId: v.string(),
   reviewCategory: v.picklist(['eligible', 'duplicate', 'conflict', 'metadata-only', 'unsupported', 'skipped']),
-  state: v.literal('queued'),
-  acknowledgedAt: v.null(),
-  finalizedAt: v.null(),
+  state: v.picklist(['queued', 'acknowledged', 'finalizing', 'finalized', 'rejected', 'failed']),
+  targetLocalId: v.optional(v.nullable(v.string())),
+  metadataPersisted: v.optional(v.boolean()),
+  originalVerification: v.optional(v.picklist(['pending', 'verified', 'metadata-only', 'unavailable'])),
+  acknowledgementMessageId: v.optional(v.nullable(v.string())),
+  acknowledgedMessageIds: v.optional(v.array(v.string())),
+  error: v.optional(v.unknown()),
+  acknowledgedAt: v.nullable(timestampSchema),
+  finalizedAt: v.nullable(timestampSchema),
 });
 
 const secureMoveOutboxSchema = v.object({
@@ -46,6 +52,22 @@ export interface SecureMoveQueueItem {
 
 const STORES = [DataStore.MoveJournals, DataStore.MoveItems, DataStore.MoveOutbox, DataStore.MoveAudit];
 
+export function acknowledged(item: SecureMoveItem): boolean {
+  return item.acknowledgedAt !== null;
+}
+
+export function finalizable(item: SecureMoveItem): boolean {
+  return acknowledged(item) && item.originalVerification !== 'metadata-only' && item.finalizedAt === null;
+}
+
+export function phaseFor(items: readonly SecureMoveItem[]): MoveJournalRecord['phase'] {
+  if (items.some((item) => item.state === 'failed' || item.state === 'rejected')) return 'failed';
+  if (items.some((item) => item.state === 'finalizing')) return 'finalizing';
+  if (items.some((item) => item.state === 'queued')) return 'awaiting-acknowledgement';
+  if (items.length > 0 && items.every((item) => item.state === 'finalized')) return 'completed';
+  return 'acknowledged';
+}
+
 function countsFor(items: readonly SecureMoveItem[]): InteropCounts {
   const counts: InteropCounts = {
     total: items.length,
@@ -60,10 +82,15 @@ function countsFor(items: readonly SecureMoveItem[]): InteropCounts {
     finalized: 0,
   };
   for (const item of items) counts[item.reviewCategory === 'metadata-only' ? 'metadataOnly' : item.reviewCategory] += 1;
+  for (const item of items) {
+    if (item.state === 'failed' || item.state === 'rejected') counts.failed += 1;
+    if (acknowledged(item)) counts.acknowledged += 1;
+    if (item.finalizedAt !== null) counts.finalized += 1;
+  }
   return counts;
 }
 
-async function itemsIn(transaction: IDBTransaction, transferId: string): Promise<readonly SecureMoveItem[]> {
+export async function secureMoveItemsIn(transaction: IDBTransaction, transferId: string): Promise<readonly SecureMoveItem[]> {
   const values = await requestToPromise<unknown[]>(
     transaction.objectStore(DataStore.MoveItems).index(SchemaIndex.MoveItemsByTransferId).getAll(transferId),
   );
@@ -114,6 +141,12 @@ export class SecureMoveOutboxRepository {
         sourceLocalId: queued.sourceLocalId,
         reviewCategory: queued.reviewCategory,
         state: 'queued',
+        targetLocalId: null,
+        metadataPersisted: false,
+        originalVerification: 'pending',
+        acknowledgementMessageId: null,
+        acknowledgedMessageIds: [],
+        error: null,
         acknowledgedAt: null,
         finalizedAt: null,
       };
@@ -191,7 +224,7 @@ export class SecureMoveOutboxRepository {
       moveJournalRecordSchema,
       await requestToPromise<unknown>(transaction.objectStore(DataStore.MoveJournals).get(transferId)),
     );
-    const items = await itemsIn(transaction, transferId);
+    const items = await secureMoveItemsIn(transaction, transferId);
     const outbox = await this.outboxIn(transaction, transferId);
     await transactionDone(transaction);
     return journal ? { journal: { ...journal, counts: countsFor(items) }, pending: outbox.filter((row) => !row.deliveredAt).length } : null;
@@ -209,6 +242,28 @@ export class SecureMoveOutboxRepository {
     const rows = await this.outboxIn(transaction, transferId);
     await transactionDone(transaction);
     return rows;
+  }
+
+  async item(transferId: string, interopId: string): Promise<SecureMoveItem | undefined> {
+    const transaction = this.db.transaction(DataStore.MoveItems, 'readonly');
+    const item = hydrateRecord(
+      DataStore.MoveItems,
+      secureMoveItemSchema,
+      await requestToPromise<unknown>(transaction.objectStore(DataStore.MoveItems).get(moveItemId(transferId, interopId))),
+    );
+    await transactionDone(transaction);
+    return item;
+  }
+
+  async outboxMessage(messageId: string): Promise<SecureMoveOutboxRecord | undefined> {
+    const transaction = this.db.transaction(DataStore.MoveOutbox, 'readonly');
+    const row = hydrateRecord(
+      DataStore.MoveOutbox,
+      secureMoveOutboxSchema,
+      await requestToPromise<unknown>(transaction.objectStore(DataStore.MoveOutbox).get(messageId)),
+    );
+    await transactionDone(transaction);
+    return row;
   }
 
   async markDelivered(messageId: string, at: string): Promise<void> {

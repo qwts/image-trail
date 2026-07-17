@@ -28,6 +28,8 @@ import {
 import { PCLOUD_HOST_PERMISSION, requestHostPermission } from '../permissions.js';
 import { preflightChromeInteropAction } from '../interop-runtime-chrome.js';
 import { createChromeInteropRuntime, createInteropRuntimeMessageRegistry } from './interop-runtime-handlers.js';
+import type { LibraryChangeNotifier } from '../library-change-notifier.js';
+import { finalizeInteropMoveSource } from '../../data/interop/move-source-finalizer.js';
 
 async function connectPCloudWithPermission(): ReturnType<typeof connectPCloudProvider> {
   const granted = await requestHostPermission(PCLOUD_HOST_PERMISSION);
@@ -115,9 +117,23 @@ export function createPCloudMessageRegistry(): Record<PCloudRequestType, Message
 
 export function createCloudMessageRegistry(
   getDb: () => Promise<IDBDatabase | null>,
+  finalizeSourceRecord?: ((sourceLocalId: string) => Promise<void>) | undefined,
 ): Record<PCloudRequestType | typeof MessageType.InteropRuntime, MessageDef<ExtensionRequest, ExtensionResponse>> {
   return {
     ...createPCloudMessageRegistry(),
-    ...createInteropRuntimeMessageRegistry(createChromeInteropRuntime(getDb), preflightChromeInteropAction),
+    ...createInteropRuntimeMessageRegistry(createChromeInteropRuntime(getDb, finalizeSourceRecord), preflightChromeInteropAction),
+  };
+}
+
+export function createInteropSourceFinalizer(
+  getDb: () => Promise<IDBDatabase | null>,
+  notifyLibraryChange: LibraryChangeNotifier,
+): (sourceLocalId: string) => Promise<void> {
+  return async (sourceLocalId) => {
+    const db = await getDb();
+    if (!db) throw new Error('Move source storage is unavailable.');
+    if (await finalizeInteropMoveSource(db, sourceLocalId)) {
+      notifyLibraryChange({ topic: 'bookmarks', reason: 'bookmarks-removed', recordIds: [sourceLocalId] });
+    }
   };
 }

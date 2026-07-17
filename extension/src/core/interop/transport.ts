@@ -96,9 +96,13 @@ function scopePath(scope: InteropTransportScope): string {
   return `pairings/${v.parse(interopUuidSchema, scope.pairingId)}/transfers/${v.parse(interopUuidSchema, scope.transferId)}`;
 }
 
+function objectRoot(scope: InteropTransportScope): string {
+  return `${scopePath(scope)}/objects`;
+}
+
 function objectKey(scope: InteropTransportScope, path: string): string {
   const safe = assertSafeInteropPath(path);
-  return `${scopePath(scope)}/objects/${safe}`;
+  return `${objectRoot(scope)}/${safe}`;
 }
 
 function chunkKey(scope: InteropTransportScope, path: string, index: number): string {
@@ -211,7 +215,32 @@ export class EncryptedInteropTransport {
   }
 
   list(scope: InteropTransportScope, cursor: string | null = null): Promise<InteropObjectPage> {
-    return this.store.list(`${scopePath(scope)}/objects`, cursor);
+    return this.store.list(objectRoot(scope), cursor);
+  }
+
+  /** Lists logical encrypted objects, hiding provider manifests and chunks. */
+  async listPaths(scope: InteropTransportScope, prefixInput: string): Promise<readonly string[]> {
+    const prefix = assertSafeInteropPath(prefixInput);
+    const root = `${objectRoot(scope)}/`;
+    const providerPrefix = `${root}${prefix}`;
+    const paths = new Set<string>();
+    const cursors = new Set<string>();
+    let cursor: string | null = null;
+    do {
+      const page = await this.store.list(providerPrefix, cursor);
+      for (const entry of page.entries) {
+        if (!entry.path.startsWith(root) || !entry.path.endsWith('.manifest.json')) continue;
+        const logical = entry.path.slice(root.length, -'.manifest.json'.length);
+        if (logical.includes('.chunks/') || !logical.startsWith(prefix)) continue;
+        paths.add(assertSafeInteropPath(logical));
+      }
+      cursor = page.nextCursor;
+      if (cursor !== null) {
+        if (cursors.has(cursor)) throw new InteropTransportError('Provider repeated an interoperability list cursor.', 'corrupt', false);
+        cursors.add(cursor);
+      }
+    } while (cursor !== null);
+    return [...paths].sort((left, right) => left.localeCompare(right));
   }
 
   quota(): Promise<{ readonly usedBytes: number; readonly totalBytes: number | null }> {

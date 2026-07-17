@@ -1,6 +1,7 @@
 import type { InteropProviderId } from '../core/interop/runtime-state.js';
 import type { InteropObjectStore } from '../core/interop/transport.js';
 import { MoveOutboxPublisher, readMoveOutboxProgress, type MoveOutboxProgress } from '../data/interop/move-outbox-publisher.js';
+import { MoveAcknowledgementReconciler, type MoveSourceRecordFinalizer } from '../data/interop/move-acknowledgement-reconciler.js';
 import { InteropKeysRepository, type StoredInteropKeyRecord } from '../data/repositories/interop-keys-repository.js';
 import type { ActiveBlobKey } from '../data/crypto/blob-keyring.js';
 
@@ -21,6 +22,7 @@ export class InteropMoveRuntime {
     private readonly getDb: () => Promise<IDBDatabase | null>,
     private readonly openProvider: (provider: InteropProviderId) => Promise<InteropObjectStore | null>,
     private readonly getActiveBlobKey: () => Promise<ActiveBlobKey | null>,
+    private readonly finalizer: MoveSourceRecordFinalizer,
   ) {}
 
   async start(input: {
@@ -44,6 +46,7 @@ export class InteropMoveRuntime {
     readonly provider: InteropProviderId;
     readonly transferId: string;
     readonly total: number;
+    readonly allowFinalization: boolean;
   }): Promise<MoveOutboxProgress> {
     const db = await this.requireDb();
     const progress = await readMoveOutboxProgress(db, input.transferId, input.total);
@@ -51,12 +54,34 @@ export class InteropMoveRuntime {
     const pairing = await this.pairing(db, progress.journal.pairingId);
     if (!pairing) throw new InteropMoveSetupError('The Move journal pairing key is unavailable.', 'wrong-key', false);
     const store = await this.requireProvider(input.provider);
-    return new MoveOutboxPublisher(db, store).resume(input.transferId, pairing, input.total);
+    await new MoveOutboxPublisher(db, store).resume(input.transferId, pairing, input.total);
+    return new MoveAcknowledgementReconciler(db, store, this.finalizer).reconcile({
+      transferId: input.transferId,
+      total: input.total,
+      pairing,
+      allowFinalization: input.allowFinalization,
+    });
   }
 
-  async status(transferId: string, total: number): Promise<MoveOutboxProgress | null> {
+  async status(input: {
+    readonly transferId: string;
+    readonly total: number;
+    readonly provider?: InteropProviderId | undefined;
+    readonly allowFinalization?: boolean | undefined;
+  }): Promise<MoveOutboxProgress | null> {
     const db = await this.getDb();
-    return db ? readMoveOutboxProgress(db, transferId, total) : null;
+    if (!db) return null;
+    const progress = await readMoveOutboxProgress(db, input.transferId, input.total);
+    if (!progress || !input.provider) return progress;
+    const pairing = await this.pairing(db, progress.journal.pairingId);
+    if (!pairing) throw new InteropMoveSetupError('The Move journal pairing key is unavailable.', 'wrong-key', false);
+    const store = await this.requireProvider(input.provider);
+    return new MoveAcknowledgementReconciler(db, store, this.finalizer).reconcile({
+      transferId: input.transferId,
+      total: input.total,
+      pairing,
+      allowFinalization: input.allowFinalization ?? false,
+    });
   }
 
   private async requireDb(): Promise<IDBDatabase> {
