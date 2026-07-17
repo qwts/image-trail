@@ -5,6 +5,20 @@ import { createChromeIdentityInteropDriveStore } from './interop-google-drive-st
 import { OverlookICloudNativeClient } from './interop-icloud-client.js';
 import { createChromePCloudInteropAuth } from './interop-pcloud-auth.js';
 import { InteropRuntime } from './interop-runtime.js';
+import { PCLOUD_HOST_PERMISSION, requestHostPermission } from './permissions.js';
+
+export async function ensurePCloudInteropHostPermission(
+  interactive: boolean,
+  request: (pattern: string) => Promise<boolean> = requestHostPermission,
+): Promise<void> {
+  if (!interactive) return;
+  if (await request(PCLOUD_HOST_PERMISSION)) return;
+  throw new InteropTransportError(
+    'pCloud interoperability access was not granted. Connect again to approve access only to pCloud hosts.',
+    'provider-unavailable',
+    false,
+  );
+}
 
 export function hasConfiguredDriveOAuth(manifest: unknown): boolean {
   if (!manifest || typeof manifest !== 'object') return false;
@@ -25,7 +39,10 @@ export function createChromeInteropRuntime(getDb: () => Promise<IDBDatabase | nu
     storage: chrome.storage.local,
     getDb,
     getActiveBlobKey: restoreActiveBlobKey,
-    probePCloud: (interactive) => pcloud.probe(interactive),
+    probePCloud: async (interactive) => {
+      await ensurePCloudInteropHostPermission(interactive);
+      return pcloud.probe(interactive);
+    },
     disconnectPCloud: () => pcloud.disconnect(),
     probeGoogleDrive: async (interactive) => {
       if (!hasConfiguredDriveOAuth(chrome.runtime.getManifest())) {

@@ -4,7 +4,7 @@ import test from 'node:test';
 import { IDBFactory } from 'fake-indexeddb';
 import * as v from 'valibot';
 
-import { hasConfiguredDriveOAuth } from '../extension/src/background/interop-runtime-chrome.js';
+import { ensurePCloudInteropHostPermission, hasConfiguredDriveOAuth } from '../extension/src/background/interop-runtime-chrome.js';
 import { InteropRuntime, type InteropRuntimeDependencies } from '../extension/src/background/interop-runtime.js';
 import { InteropTransportError, sha256, type InteropObjectPage, type InteropObjectStore } from '../extension/src/core/interop/transport.js';
 import {
@@ -127,6 +127,21 @@ test('Google Drive is enabled only for a non-empty drive.file OAuth manifest', (
     }),
     true,
   );
+});
+
+test('pCloud requests its optional host permission only for an interactive connection', async () => {
+  const requested: string[] = [];
+  const request = async (pattern: string): Promise<boolean> => {
+    requested.push(pattern);
+    return false;
+  };
+  await ensurePCloudInteropHostPermission(false, request);
+  assert.deepEqual(requested, []);
+  await assert.rejects(
+    ensurePCloudInteropHostPermission(true, request),
+    (error: unknown) => error instanceof InteropTransportError && error.code === 'provider-unavailable',
+  );
+  assert.deepEqual(requested, ['https://*.pcloud.com/*']);
 });
 
 test('provider choice is durable and connection probes never reuse backup custody', async (t) => {
