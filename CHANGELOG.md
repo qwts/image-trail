@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.19.0
+
+### Minor Changes
+
+- a33f243: Replace the Transfer & Sync placeholder with a schema-validated background runtime, durable isolated provider choice, and live provider and Overlook pairing controls.
+
 ## 0.18.2
 
 ### Patch Changes
