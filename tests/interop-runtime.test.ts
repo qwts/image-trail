@@ -4,7 +4,11 @@ import test from 'node:test';
 import { IDBFactory } from 'fake-indexeddb';
 import * as v from 'valibot';
 
-import { ensurePCloudInteropHostPermission, hasConfiguredDriveOAuth } from '../extension/src/background/interop-runtime-chrome.js';
+import {
+  ensurePCloudInteropHostPermission,
+  hasConfiguredDriveOAuth,
+  preflightChromeInteropAction,
+} from '../extension/src/background/interop-runtime-chrome.js';
 import { InteropRuntime, type InteropRuntimeDependencies } from '../extension/src/background/interop-runtime.js';
 import { InteropTransportError, sha256, type InteropObjectPage, type InteropObjectStore } from '../extension/src/core/interop/transport.js';
 import {
@@ -13,6 +17,8 @@ import {
   isInteropRuntimeResultMessage,
 } from '../extension/src/background/interop-runtime-messages.js';
 import { interopRuntimeRequestSchema } from '../extension/src/background/message-schemas.js';
+import { createInteropRuntimeMessageRegistry } from '../extension/src/background/handlers/interop-runtime-handlers.js';
+import { dispatchRequest } from '../extension/src/background/message-dispatch.js';
 import { openImageTrailDb } from '../extension/src/data/db.js';
 import { ensureDurableBookmarkKey } from '../extension/src/data/durable-bookmark-key.js';
 import { BookmarksRepository } from '../extension/src/data/repositories/bookmarks-repository.js';
@@ -115,6 +121,27 @@ test('runtime messages and request schema accept the typed provider boundary', (
     },
   });
   assert.equal(isInteropRuntimeResultMessage(result), true);
+  assert.equal(v.safeParse(interopRuntimeRequestSchema, { context, action: { name: 'connect' } }).success, false);
+});
+
+test('provider permission preflight starts in the synchronous message-listener stack', async (t) => {
+  const { runtime, db } = await harness();
+  t.after(() => db.close());
+  let preflightStarted = false;
+  let respond!: () => void;
+  const response = new Promise<void>((resolve) => {
+    respond = resolve;
+  });
+  const registry = createInteropRuntimeMessageRegistry(runtime, () => {
+    preflightStarted = true;
+    return Promise.resolve();
+  });
+  const dispatched = dispatchRequest(registry, createInteropRuntimeMessage(context, { name: 'connect', provider: 'pcloud' }), () =>
+    respond(),
+  );
+  assert.equal(dispatched, true);
+  assert.equal(preflightStarted, true);
+  await response;
 });
 
 test('Google Drive is enabled only for a non-empty drive.file OAuth manifest', () => {
@@ -142,6 +169,11 @@ test('pCloud requests its optional host permission only for an interactive conne
     (error: unknown) => error instanceof InteropTransportError && error.code === 'provider-unavailable',
   );
   assert.deepEqual(requested, ['https://*.pcloud.com/*']);
+  requested.length = 0;
+  await preflightChromeInteropAction({ name: 'connect', provider: 'google-drive' }, request);
+  assert.deepEqual(requested, []);
+  await assert.rejects(preflightChromeInteropAction({ name: 'connect', provider: 'pcloud' }, request));
+  assert.deepEqual(requested, ['https://*.pcloud.com/*']);
 });
 
 test('provider choice is durable and connection probes never reuse backup custody', async (t) => {
@@ -154,7 +186,7 @@ test('provider choice is durable and connection probes never reuse backup custod
   const selected = await runtime.dispatch(context, { name: 'select-provider', provider: 'google-drive' });
   assert.equal(selected.snapshot.provider.state, 'connected');
   assert.deepEqual(probes, [false]);
-  await runtime.dispatch(context, { name: 'connect' });
+  await runtime.dispatch(context, { name: 'connect', provider: 'google-drive' });
   assert.deepEqual(probes, [false, true]);
   const restored = await runtime.dispatch(context, { name: 'status' });
   assert.equal(restored.snapshot.provider.id, 'google-drive');
@@ -178,7 +210,7 @@ test('pCloud connect and disconnect use isolated interop custody', async (t) => 
   t.after(() => db.close());
   const initial = await runtime.dispatch(context, { name: 'status' });
   assert.equal(initial.snapshot.provider.state, 'disconnected');
-  const connectedResult = await runtime.dispatch(context, { name: 'connect' });
+  const connectedResult = await runtime.dispatch(context, { name: 'connect', provider: 'pcloud' });
   assert.equal(connectedResult.snapshot.provider.state, 'connected');
   assert.deepEqual(pcloudProbes, [false, true]);
   const disconnected = await runtime.dispatch(context, { name: 'disconnect' });

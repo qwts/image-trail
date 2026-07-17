@@ -16,7 +16,7 @@ export interface InteropRuntimeContext {
 export type InteropRuntimeAction =
   | { readonly name: 'status' }
   | { readonly name: 'select-provider'; readonly provider: InteropProviderId }
-  | { readonly name: 'connect' }
+  | { readonly name: 'connect'; readonly provider: InteropProviderId }
   | { readonly name: 'disconnect' }
   | { readonly name: 'import-pairing'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'set-operation'; readonly operation: InteropOperation }
@@ -24,7 +24,7 @@ export type InteropRuntimeAction =
   | { readonly name: 'pause' }
   | { readonly name: 'resume' }
   | { readonly name: 'cancel' }
-  | { readonly name: 'reconnect' }
+  | { readonly name: 'reconnect'; readonly provider: InteropProviderId }
   | {
       readonly name: 'resolve-conflict';
       readonly interopId: string;
