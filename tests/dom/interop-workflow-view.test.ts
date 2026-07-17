@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { createInteropRuntimeResultMessage } from '../../extension/src/background/interop-runtime-messages.js';
 import { createInteropWorkflowView, openInteropWorkflow } from '../../extension/src/ui/components/interop-workflow-view.js';
 import { blockedInteropWorkflow } from '../../extension/src/ui/interop/visible-workflow.js';
 
@@ -154,4 +155,47 @@ test('open workflow traps keyboard focus inside the active shadow root', () => {
   close.click();
   assert.equal(shadow.activeElement, opener);
   host.remove();
+});
+
+test('open workflow ignores an older status response after a newer operation response', async (t) => {
+  let resolveStatus: ((value: unknown) => void) | undefined;
+  let resolveOperation: ((value: unknown) => void) | undefined;
+  Object.defineProperty(globalThis, 'chrome', {
+    configurable: true,
+    value: {
+      runtime: {
+        id: 'test-extension',
+        sendMessage: (message: { payload: { action: { name: string } } }) =>
+          new Promise((resolve) => {
+            if (message.payload.action.name === 'status') resolveStatus = resolve;
+            else resolveOperation = resolve;
+          }),
+      },
+    },
+  });
+  t.after(() => Reflect.deleteProperty(globalThis, 'chrome'));
+
+  openInteropWorkflow('bookmark', 1);
+  const dialog = document.querySelector('[role="dialog"][aria-label="Transfer and Sync"]');
+  assert.ok(dialog instanceof HTMLElement);
+  const sync = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Sync');
+  assert.ok(sync instanceof HTMLButtonElement);
+  sync.click();
+  assert.ok(resolveOperation);
+  resolveOperation(
+    createInteropRuntimeResultMessage({
+      ok: true,
+      snapshot: { ...blockedInteropWorkflow('bookmark', 1), operation: 'sync', error: null },
+    }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(dialog.textContent ?? '', /Sync with Overlook/u);
+
+  assert.ok(resolveStatus);
+  resolveStatus(createInteropRuntimeResultMessage({ ok: true, snapshot: blockedInteropWorkflow('bookmark', 1) }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(dialog.textContent ?? '', /Sync with Overlook/u);
+  Array.from(dialog.querySelectorAll('button'))
+    .find((control) => control.textContent === 'Close')
+    ?.click();
 });

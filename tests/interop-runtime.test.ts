@@ -5,6 +5,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import * as v from 'valibot';
 
 import { InteropRuntime, type InteropRuntimeDependencies } from '../extension/src/background/interop-runtime.js';
+import { InteropTransportError } from '../extension/src/core/interop/transport.js';
 import {
   createInteropRuntimeMessage,
   createInteropRuntimeResultMessage,
@@ -15,7 +16,7 @@ import { openImageTrailDb } from '../extension/src/data/db.js';
 
 const context = { entry: 'selection' as const, total: 3, locked: false };
 
-async function harness() {
+async function harness(overrides: Partial<InteropRuntimeDependencies> = {}) {
   const opened = await openImageTrailDb(new IDBFactory());
   assert.ok(opened.db);
   let value: unknown;
@@ -35,6 +36,7 @@ async function harness() {
     probeICloud: async () => {
       throw new Error('Signed Overlook iCloud host is missing.');
     },
+    ...overrides,
   };
   return { runtime: new InteropRuntime(dependencies), db: opened.db, probes };
 }
@@ -90,6 +92,23 @@ test('provider choice is durable and connection probes never reuse backup custod
   assert.deepEqual(probes, [false, true]);
   const restored = await runtime.dispatch(context, { name: 'status' });
   assert.equal(restored.snapshot.provider.id, 'google-drive');
+});
+
+test('an unconfigured Google OAuth client keeps Drive unavailable without claiming connection', async (t) => {
+  const { runtime, db } = await harness({
+    probeGoogleDrive: async () => {
+      throw new InteropTransportError(
+        'Google Drive interoperability requires a configured extension OAuth client.',
+        'provider-unavailable',
+        false,
+      );
+    },
+  });
+  t.after(() => db.close());
+  const result = await runtime.dispatch(context, { name: 'select-provider', provider: 'google-drive' });
+  assert.equal(result.ok, false);
+  assert.equal(result.snapshot.provider.state, 'unavailable');
+  assert.match(result.snapshot.provider.detail, /configured extension OAuth client/u);
 });
 
 test('pairing import stores non-extractable custody while start fails without claiming transfer', async (t) => {

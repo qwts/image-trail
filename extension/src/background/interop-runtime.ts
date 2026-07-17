@@ -11,7 +11,6 @@ import type {
 } from '../core/interop/runtime-state.js';
 import { importInteropPairingBundle } from '../data/interop/pairing-import.js';
 import { InteropKeysRepository } from '../data/repositories/interop-keys-repository.js';
-import { createChromeIdentityInteropDriveStore } from './interop-google-drive-store.js';
 import { OverlookICloudNativeClient } from './interop-icloud-client.js';
 import { InteropTransportError } from '../core/interop/transport.js';
 
@@ -281,8 +280,12 @@ export function createChromeInteropRuntime(getDb: () => Promise<IDBDatabase | nu
   return new InteropRuntime({
     storage: chrome.storage.local,
     getDb,
-    probeGoogleDrive: async (interactive) => {
-      await createChromeIdentityInteropDriveStore(interactive).quota();
+    probeGoogleDrive: async (_interactive) => {
+      throw new InteropTransportError(
+        'Google Drive interoperability requires a configured extension OAuth client.',
+        'provider-unavailable',
+        false,
+      );
     },
     disconnectGoogleDrive: () => chrome.identity.clearAllCachedAuthTokens(),
     probeICloud: async () => {

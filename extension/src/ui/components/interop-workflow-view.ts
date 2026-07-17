@@ -103,7 +103,11 @@ function createProviderSetup(state: InteropVisibleWorkflow, handlers: InteropWor
   provider.disabled = handlers.onProviderChange === undefined;
   provider.addEventListener('change', () => handlers.onProviderChange?.(provider.value as InteropProviderId));
   const connectLabel = state.provider.state === 'reconnect-required' ? 'Reconnect provider' : 'Connect provider';
-  const connect = button(connectLabel, handlers.onConnect, state.provider.id === 'pcloud' || state.provider.state === 'connected');
+  const connect = button(
+    connectLabel,
+    handlers.onConnect,
+    state.provider.id === 'pcloud' || ['connected', 'unavailable'].includes(state.provider.state),
+  );
   const file = document.createElement('input');
   file.type = 'file';
   file.accept = 'application/json,.json';
@@ -260,9 +264,11 @@ export function openInteropWorkflow(entry: InteropEntryContext, total: number, l
     if (previousFocus?.isConnected) previousFocus.focus();
   };
   const context: InteropRuntimeContext = { entry, total, locked };
+  let latestRequest = 0;
   const dispatch = async (action: InteropRuntimeAction): Promise<void> => {
+    const request = ++latestRequest;
     const result = await dispatchInteropRuntime(context, action);
-    if (result && scrim.isConnected) render(result.snapshot);
+    if (result && request === latestRequest && scrim.isConnected) render(result.snapshot);
   };
   const handlers: InteropWorkflowHandlers = {
     onClose: close,
