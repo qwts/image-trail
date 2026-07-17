@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.23.0
+
+### Minor Changes
+
+- 3001da8: Transfer captured originals as pairing-key-encrypted files and require verified destination custody before completing a Move.
+
 ## 0.22.0
 
 ### Minor Changes
