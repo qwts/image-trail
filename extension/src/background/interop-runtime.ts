@@ -10,10 +10,9 @@ import type {
   InteropRuntimeSnapshot,
 } from '../core/interop/runtime-state.js';
 import { importInteropPairingBundle } from '../data/interop/pairing-import.js';
-import { restoreActiveBlobKey, type ActiveBlobKey } from '../data/crypto/blob-keyring.js';
+import type { ActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { MoveOutboxPublishError, type MoveOutboxProgress } from '../data/interop/move-outbox-publisher.js';
 import { InteropKeysRepository } from '../data/repositories/interop-keys-repository.js';
-import { OverlookICloudNativeClient } from './interop-icloud-client.js';
 import { InteropTransportError, type InteropObjectStore } from '../core/interop/transport.js';
 import { InteropMoveRuntime, InteropMoveSetupError } from './interop-move-runtime.js';
 import { emptyInteropCounts, moveProgressFailureView, moveProgressView, moveSetupFailureView } from './interop-runtime-progress.js';
@@ -34,6 +33,8 @@ export interface InteropRuntimeDependencies {
   readonly storage: RuntimeStorage;
   readonly getDb: () => Promise<IDBDatabase | null>;
   readonly getActiveBlobKey: () => Promise<ActiveBlobKey | null>;
+  readonly probePCloud: (interactive: boolean) => Promise<boolean>;
+  readonly disconnectPCloud: () => Promise<void>;
   readonly probeGoogleDrive: (interactive: boolean) => Promise<void>;
   readonly disconnectGoogleDrive: () => Promise<void>;
   readonly probeICloud: () => Promise<void>;
@@ -158,7 +159,8 @@ export class InteropRuntime {
   }
 
   private async disconnect(context: InteropRuntimeContext, selected: RuntimePreferences): Promise<InteropRuntimeResult> {
-    if (selected.provider === 'google-drive') await this.dependencies.disconnectGoogleDrive();
+    if (selected.provider === 'pcloud') await this.dependencies.disconnectPCloud();
+    else if (selected.provider === 'google-drive') await this.dependencies.disconnectGoogleDrive();
     return this.result(context, selected, 'queued', 'disconnected', PROVIDERS[selected.provider].disconnected);
   }
 
@@ -328,9 +330,11 @@ export class InteropRuntime {
     provider: InteropProviderId,
     interactive: boolean,
   ): Promise<{ readonly state: InteropProviderState; readonly detail: string; readonly error: InteropRuntimeError | null }> {
-    if (provider === 'pcloud') return { state: 'unavailable', detail: PROVIDERS.pcloud.disconnected, error: null };
     try {
-      if (provider === 'google-drive') await this.dependencies.probeGoogleDrive(interactive);
+      if (provider === 'pcloud') {
+        const connected = await this.dependencies.probePCloud(interactive);
+        if (!connected) return { state: 'disconnected', detail: PROVIDERS.pcloud.disconnected, error: null };
+      } else if (provider === 'google-drive') await this.dependencies.probeGoogleDrive(interactive);
       else await this.dependencies.probeICloud();
       return { state: 'connected', detail: `${PROVIDERS[provider].label} is connected.`, error: null };
     } catch (error) {
@@ -369,24 +373,4 @@ export class InteropRuntime {
   private save(value: RuntimePreferences): Promise<void> {
     return this.dependencies.storage.set({ [STORAGE_KEY]: value });
   }
-}
-
-export function createChromeInteropRuntime(getDb: () => Promise<IDBDatabase | null>): InteropRuntime {
-  return new InteropRuntime({
-    storage: chrome.storage.local,
-    getDb,
-    getActiveBlobKey: restoreActiveBlobKey,
-    probeGoogleDrive: async (_interactive) => {
-      throw new InteropTransportError(
-        'Google Drive interoperability requires a configured extension OAuth client.',
-        'provider-unavailable',
-        false,
-      );
-    },
-    disconnectGoogleDrive: () => chrome.identity.clearAllCachedAuthTokens(),
-    probeICloud: async () => {
-      await new OverlookICloudNativeClient(chrome.runtime.id).request({ operation: 'status' });
-    },
-    openProvider: async (_provider) => null,
-  });
 }

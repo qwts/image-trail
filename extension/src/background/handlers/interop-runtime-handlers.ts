@@ -1,4 +1,5 @@
-import { createChromeInteropRuntime, type InteropRuntime } from '../interop-runtime.js';
+import { createChromeInteropRuntime } from '../interop-runtime-chrome.js';
+import type { InteropRuntime } from '../interop-runtime.js';
 import { defineMessage, type MessageDef } from '../message-dispatch.js';
 import * as requestSchemas from '../message-schemas.js';
 import { MessageType, type ExtensionRequest, type ExtensionResponse } from '../messages.js';

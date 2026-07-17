@@ -4,6 +4,7 @@ import test from 'node:test';
 import { IDBFactory } from 'fake-indexeddb';
 import * as v from 'valibot';
 
+import { hasConfiguredDriveOAuth } from '../extension/src/background/interop-runtime-chrome.js';
 import { InteropRuntime, type InteropRuntimeDependencies } from '../extension/src/background/interop-runtime.js';
 import { InteropTransportError, sha256, type InteropObjectPage, type InteropObjectStore } from '../extension/src/core/interop/transport.js';
 import {
@@ -64,6 +65,8 @@ async function harness(overrides: Partial<InteropRuntimeDependencies> = {}) {
     },
     getDb: async () => opened.db,
     getActiveBlobKey: async () => null,
+    probePCloud: async () => false,
+    disconnectPCloud: async () => undefined,
     probeGoogleDrive: async (interactive) => {
       probes.push(interactive);
     },
@@ -114,12 +117,24 @@ test('runtime messages and request schema accept the typed provider boundary', (
   assert.equal(isInteropRuntimeResultMessage(result), true);
 });
 
+test('Google Drive is enabled only for a non-empty drive.file OAuth manifest', () => {
+  assert.equal(hasConfiguredDriveOAuth({}), false);
+  assert.equal(hasConfiguredDriveOAuth({ oauth2: { client_id: '', scopes: ['https://www.googleapis.com/auth/drive.file'] } }), false);
+  assert.equal(hasConfiguredDriveOAuth({ oauth2: { client_id: 'client-id', scopes: ['openid'] } }), false);
+  assert.equal(
+    hasConfiguredDriveOAuth({
+      oauth2: { client_id: 'client-id', scopes: ['https://www.googleapis.com/auth/drive.file'] },
+    }),
+    true,
+  );
+});
+
 test('provider choice is durable and connection probes never reuse backup custody', async (t) => {
   const { runtime, db, probes } = await harness();
   t.after(() => db.close());
   const initial = await runtime.dispatch(context, { name: 'status' });
   assert.equal(initial.snapshot.provider.id, 'pcloud');
-  assert.equal(initial.snapshot.provider.state, 'unavailable');
+  assert.equal(initial.snapshot.provider.state, 'disconnected');
   assert.match(initial.snapshot.provider.detail, /Separate pCloud interoperability access/u);
   const selected = await runtime.dispatch(context, { name: 'select-provider', provider: 'google-drive' });
   assert.equal(selected.snapshot.provider.state, 'connected');
@@ -128,6 +143,32 @@ test('provider choice is durable and connection probes never reuse backup custod
   assert.deepEqual(probes, [false, true]);
   const restored = await runtime.dispatch(context, { name: 'status' });
   assert.equal(restored.snapshot.provider.id, 'google-drive');
+});
+
+test('pCloud connect and disconnect use isolated interop custody', async (t) => {
+  let connected = false;
+  const pcloudProbes: boolean[] = [];
+  let disconnects = 0;
+  const { runtime, db } = await harness({
+    probePCloud: async (interactive) => {
+      pcloudProbes.push(interactive);
+      if (interactive) connected = true;
+      return connected;
+    },
+    disconnectPCloud: async () => {
+      connected = false;
+      disconnects += 1;
+    },
+  });
+  t.after(() => db.close());
+  const initial = await runtime.dispatch(context, { name: 'status' });
+  assert.equal(initial.snapshot.provider.state, 'disconnected');
+  const connectedResult = await runtime.dispatch(context, { name: 'connect' });
+  assert.equal(connectedResult.snapshot.provider.state, 'connected');
+  assert.deepEqual(pcloudProbes, [false, true]);
+  const disconnected = await runtime.dispatch(context, { name: 'disconnect' });
+  assert.equal(disconnected.snapshot.provider.state, 'disconnected');
+  assert.equal(disconnects, 1);
 });
 
 test('an unconfigured Google OAuth client keeps Drive unavailable without claiming connection', async (t) => {

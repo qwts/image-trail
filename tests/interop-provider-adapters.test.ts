@@ -6,10 +6,66 @@ import {
   GoogleDriveInteropObjectStore,
   createChromeIdentityInteropDriveStore,
 } from '../extension/src/background/interop-google-drive-store.js';
+import { PCloudInteropAuth } from '../extension/src/background/interop-pcloud-auth.js';
+import {
+  PCLOUD_INTEROP_CONNECTION_KEY,
+  PCloudInteropConnectionStore,
+} from '../extension/src/background/interop-pcloud-connection-store.js';
 import { PCloudInteropObjectStore } from '../extension/src/background/interop-pcloud-store.js';
 import { InteropTransportError } from '../extension/src/core/interop/transport.js';
 
 describe('pCloud interoperability namespace (#588)', () => {
+  test('authorizes and stores only a dedicated interop credential', async () => {
+    const values = new Map<string, unknown>();
+    const restricted: string[] = [];
+    const store = new PCloudInteropConnectionStore(
+      {
+        get: async (key) => ({ [key]: values.get(key) }),
+        set: async (items) => {
+          for (const [key, value] of Object.entries(items)) values.set(key, value);
+        },
+        remove: async (key) => {
+          values.delete(key);
+        },
+      },
+      async () => {
+        restricted.push('trusted');
+      },
+    );
+    const auth = new PCloudInteropAuth({
+      store,
+      redirectUrl: 'https://extension.test/pcloud-interop',
+      createState: () => 'interop-state',
+      now: () => '2026-07-17T12:00:00.000Z',
+      launchAuthFlow: async (input) => {
+        const url = new URL(input);
+        assert.equal(url.searchParams.get('redirect_uri'), 'https://extension.test/pcloud-interop');
+        assert.equal(url.searchParams.get('state'), 'interop-state');
+        return 'https://extension.test/pcloud-interop#access_token=interop-token&hostname=api.pcloud.com&state=interop-state';
+      },
+      fetchImpl: async (input, init) => {
+        assert.equal(String(input), 'https://api.pcloud.com/userinfo');
+        assert.equal((init?.body as URLSearchParams).get('access_token'), 'interop-token');
+        return Response.json({ result: 0, usedquota: 12, quota: 100 });
+      },
+    });
+
+    assert.equal(await auth.probe(false), false);
+    assert.equal(await auth.probe(true), true);
+    assert.deepEqual(values.get(PCLOUD_INTEROP_CONNECTION_KEY), {
+      schemaVersion: 1,
+      provider: 'pcloud-interop',
+      accessToken: 'interop-token',
+      apiHost: 'api.pcloud.com',
+      connectedAt: '2026-07-17T12:00:00.000Z',
+    });
+    assert.equal(values.has('imageTrail.pcloudConnection'), false);
+    assert.equal((await auth.openProvider())?.provider, 'pcloud');
+    await auth.disconnect();
+    assert.equal(values.has(PCLOUD_INTEROP_CONNECTION_KEY), false);
+    assert.ok(restricted.length >= 4);
+  });
+
   test('writes and verifies only below the interop root with separate custody', async () => {
     let uploaded = new Uint8Array();
     const paths: string[] = [];
