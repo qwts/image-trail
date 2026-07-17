@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.18.2
+
+### Patch Changes
+
+- 8adb43e: Add the reviewed Chrome Web Store screenshot and promotional tile for the release submission package.
+
 ## 0.18.1
 
 ### Patch Changes
