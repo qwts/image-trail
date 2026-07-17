@@ -11,7 +11,7 @@
         {
           "type": "unit-dom",
           "paths": ["tests/dom/interop-workflow-view.test.ts", "tests/dom/bookmarks-view.test.ts"],
-          "notes": "Covers exact review and custody counts, provider and pairing gating, conflict apply-to-all intent, Queue and captured-original entry points, and a locked DOM that contains no protected rows or provider detail."
+          "notes": "Covers exact review and custody counts, live provider selection and pairing controls, provider and pairing gating, conflict apply-to-all intent, Queue and captured-original entry points, and a locked DOM that contains no protected rows or provider detail."
         },
         {
           "type": "storybook",
@@ -21,7 +21,7 @@
         {
           "type": "playwright-e2e",
           "paths": ["tests/e2e/interop-ui.spec.ts", "tests/e2e/gallery-design-system.spec.ts", "tests/e2e/detachable-sections.spec.ts"],
-          "notes": "The focused packaged workflow checks the Queue entry, honest provider and progress state, disabled start gate, and preserved queue order; existing workflows guard Gallery and detached-panel behavior."
+          "notes": "The focused packaged workflow checks the Queue entry, background-owned provider state, visible pairing import, disabled start gate, and preserved queue order; existing workflows guard Gallery and detached-panel behavior."
         },
         {
           "type": "manual",

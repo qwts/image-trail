@@ -1,4 +1,6 @@
 import type { InteropConflictAction, InteropOperation } from '../../core/interop/contract.js';
+import type { InteropProviderId, InteropRuntimeAction, InteropRuntimeContext } from '../../core/interop/runtime-state.js';
+import { dispatchInteropRuntime } from '../../content/interop-runtime-client.js';
 import {
   INTEROP_REVIEW_LABELS,
   blockedInteropWorkflow,
@@ -11,6 +13,9 @@ import {
 export interface InteropWorkflowHandlers {
   readonly onClose: () => void;
   readonly onOperationChange?: (operation: InteropOperation) => void;
+  readonly onProviderChange?: (provider: InteropProviderId) => void;
+  readonly onConnect?: () => void;
+  readonly onImportPairing?: (fileContent: string, password: string) => void;
   readonly onStart?: () => void;
   readonly onPause?: () => void;
   readonly onResume?: () => void;
@@ -75,6 +80,46 @@ function createSummary(state: InteropVisibleWorkflow, handlers: InteropWorkflowH
   detail.textContent = state.provider.detail;
   provider.append(label, status, detail);
   return [header, operation, provider];
+}
+
+function createProviderSetup(state: InteropVisibleWorkflow, handlers: InteropWorkflowHandlers): HTMLElement {
+  const setup = document.createElement('fieldset');
+  setup.className = 'image-trail-interop__setup';
+  const legend = document.createElement('legend');
+  legend.textContent = 'Provider and pairing';
+  const provider = document.createElement('select');
+  provider.setAttribute('aria-label', 'Transfer provider');
+  for (const [value, label] of [
+    ['pcloud', 'pCloud'],
+    ['google-drive', 'Google Drive'],
+    ['icloud-drive', 'iCloud Drive'],
+  ] as const) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    option.selected = state.provider.id === value;
+    provider.append(option);
+  }
+  provider.disabled = handlers.onProviderChange === undefined;
+  provider.addEventListener('change', () => handlers.onProviderChange?.(provider.value as InteropProviderId));
+  const connectLabel = state.provider.state === 'reconnect-required' ? 'Reconnect provider' : 'Connect provider';
+  const connect = button(connectLabel, handlers.onConnect, state.provider.id === 'pcloud' || state.provider.state === 'connected');
+  const file = document.createElement('input');
+  file.type = 'file';
+  file.accept = 'application/json,.json';
+  file.setAttribute('aria-label', 'Overlook pairing key');
+  const password = document.createElement('input');
+  password.type = 'password';
+  password.autocomplete = 'off';
+  password.placeholder = 'Pairing key password';
+  password.setAttribute('aria-label', 'Pairing key password');
+  const importButton = button('Import pairing key', () => {
+    const selected = file.files?.[0];
+    if (!selected || password.value === '') return;
+    void selected.text().then((fileContent) => handlers.onImportPairing?.(fileContent, password.value));
+  });
+  setup.append(legend, provider, connect, file, password, importButton);
+  return setup;
 }
 
 function createReviewAndProgress(state: InteropVisibleWorkflow): readonly HTMLElement[] {
@@ -158,6 +203,7 @@ export function createInteropWorkflowView(state: InteropVisibleWorkflow, handler
 
   root.append(
     ...createSummary(state, handlers),
+    createProviderSetup(state, handlers),
     ...createReviewAndProgress(state),
     createConflicts(state, handlers),
     ...createErrorAndControls(state, handlers),
@@ -165,7 +211,25 @@ export function createInteropWorkflowView(state: InteropVisibleWorkflow, handler
   return root;
 }
 
-export function openBlockedInteropWorkflow(entry: InteropEntryContext, total: number, locked = false): void {
+function trapInteropFocus(scrim: HTMLElement, close: () => void): void {
+  scrim.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') close();
+    if (event.key !== 'Tab') return;
+    const controls = Array.from(scrim.querySelectorAll<HTMLElement>(FOCUSABLE_CONTROL_SELECTOR));
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && event.target === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && event.target === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+}
+
+export function openInteropWorkflow(entry: InteropEntryContext, total: number, locked = false): void {
   let focused = document.activeElement;
   while (focused instanceof HTMLElement && focused.shadowRoot?.activeElement instanceof HTMLElement) {
     focused = focused.shadowRoot.activeElement;
@@ -195,25 +259,34 @@ export function openBlockedInteropWorkflow(entry: InteropEntryContext, total: nu
     }
     if (previousFocus?.isConnected) previousFocus.focus();
   };
-  scrim.append(createInteropWorkflowView(blockedInteropWorkflow(entry, total, locked), { onClose: close }));
+  const context: InteropRuntimeContext = { entry, total, locked };
+  const dispatch = async (action: InteropRuntimeAction): Promise<void> => {
+    const result = await dispatchInteropRuntime(context, action);
+    if (result && scrim.isConnected) render(result.snapshot);
+  };
+  const handlers: InteropWorkflowHandlers = {
+    onClose: close,
+    onOperationChange: (operation) => void dispatch({ name: 'set-operation', operation }),
+    onProviderChange: (provider) => void dispatch({ name: 'select-provider', provider }),
+    onConnect: () => void dispatch({ name: 'connect' }),
+    onImportPairing: (fileContent, password) => void dispatch({ name: 'import-pairing', fileContent, password }),
+    onStart: () => void dispatch({ name: 'start' }),
+    onPause: () => void dispatch({ name: 'pause' }),
+    onResume: () => void dispatch({ name: 'resume' }),
+    onCancel: () => void dispatch({ name: 'cancel' }),
+    onReconnect: () => void dispatch({ name: 'reconnect' }),
+    onDisconnect: () => void dispatch({ name: 'disconnect' }),
+    onConflict: (interopId, action, applyToAll) => void dispatch({ name: 'resolve-conflict', interopId, action, applyToAll }),
+  };
+  const render = (state: InteropVisibleWorkflow): void => {
+    scrim.replaceChildren(createInteropWorkflowView(state, handlers));
+  };
+  render(blockedInteropWorkflow(entry, total, locked));
   scrim.addEventListener('click', (event) => {
     if (event.target === scrim) close();
   });
-  scrim.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') close();
-    if (event.key !== 'Tab') return;
-    const controls = Array.from(scrim.querySelectorAll<HTMLElement>(FOCUSABLE_CONTROL_SELECTOR));
-    const first = controls[0];
-    const last = controls.at(-1);
-    if (!first || !last) return;
-    if (event.shiftKey && event.target === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && event.target === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  });
+  trapInteropFocus(scrim, close);
   modalParent.append(scrim);
   scrim.querySelector<HTMLElement>(FOCUSABLE_CONTROL_SELECTOR)?.focus();
+  if (!locked) void dispatch({ name: 'status' });
 }

@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, type MouseEvent, type ReactNode } from 'react'
 import type { ImageDisplayRecord } from '../../core/display-records.js';
 import type { PanelAction, PanelDestinationId, PanelState } from '../../core/types.js';
 import { isCapturedOriginalRecord } from '../components/bookmarks-view.js';
-import { openBlockedInteropWorkflow } from '../components/interop-workflow-view.js';
+import { openInteropWorkflow } from '../components/interop-workflow-view.js';
 import { recordDisplayName, recordTitle } from '../components/record-metadata.js';
 import { panelDestination } from '../destination-registry.js';
 import { destinationDockSelector } from './destination-dock.js';
@@ -136,7 +136,7 @@ function GalleryBody({ state, dispatch }: { readonly state: PanelState; readonly
       <button
         type="button"
         disabled={state.bookmarks.length === 0}
-        onClick={() => openBlockedInteropWorkflow('gallery', state.bookmarks.length, !state.blobKeyUnlocked && state.blobKeyAvailable)}
+        onClick={() => openInteropWorkflow('gallery', state.bookmarks.length, !state.blobKeyUnlocked && state.blobKeyAvailable)}
       >
         Transfer &amp; Sync
       </button>

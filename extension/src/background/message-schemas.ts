@@ -21,6 +21,31 @@ import { EXTENSION_DESTINATION_IDS } from '../core/destinations.js';
  * payloads accept `{}` and tolerate extra keys the same way.
  */
 export const emptyPayloadSchema = v.object({}) as v.GenericSchema<unknown, Record<string, never>>;
+const interopRuntimeContextSchema = v.object({
+  entry: v.picklist(['bookmark', 'selection', 'album', 'gallery', 'captured-original', 'settings']),
+  total: v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER)),
+  locked: v.boolean(),
+});
+const interopRuntimeActionSchema = v.variant('name', [
+  v.object({ name: v.literal('status') }),
+  v.object({ name: v.literal('select-provider'), provider: v.picklist(['pcloud', 'google-drive', 'icloud-drive']) }),
+  v.object({ name: v.literal('connect') }),
+  v.object({ name: v.literal('disconnect') }),
+  v.object({ name: v.literal('import-pairing'), fileContent: v.string(), password: v.string() }),
+  v.object({ name: v.literal('set-operation'), operation: v.picklist(['move', 'sync']) }),
+  v.object({ name: v.literal('start') }),
+  v.object({ name: v.literal('pause') }),
+  v.object({ name: v.literal('resume') }),
+  v.object({ name: v.literal('cancel') }),
+  v.object({ name: v.literal('reconnect') }),
+  v.object({
+    name: v.literal('resolve-conflict'),
+    interopId: v.string(),
+    action: v.picklist(['keep-image-trail', 'keep-overlook', 'keep-both']),
+    applyToAll: v.boolean(),
+  }),
+]);
+export const interopRuntimeRequestSchema = v.object({ context: interopRuntimeContextSchema, action: interopRuntimeActionSchema });
 export const openDestinationRequestSchema = v.object({ destination: v.picklist(EXTENSION_DESTINATION_IDS) });
 export const destinationSourceStatusRequestSchema = v.object({ sourceTabId: v.optional(v.number()) });
 export const focusDestinationSourceRequestSchema = v.object({ sourceTabId: v.number() });

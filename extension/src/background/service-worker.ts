@@ -99,7 +99,7 @@ import { createRecallMessageRegistry } from './handlers/recall-handlers.js';
 import { createBlobKeyMessageRegistry } from './handlers/blob-key-handlers.js';
 import { createOriginalBlobMessageRegistry } from './handlers/original-blob-handlers.js';
 import { createDestinationMessageRegistry } from './handlers/destination-page-handler.js';
-import { createPCloudMessageRegistry } from './handlers/pcloud-handlers.js';
+import { createCloudMessageRegistry } from './handlers/pcloud-handlers.js';
 import { createUrlTemplateMessageRegistry } from './handlers/url-template-handlers.js';
 import { handleLoadLocalSettings, handleSaveLocalSettings, loadLocalSettings } from './handlers/local-settings-handlers.js';
 import { normalizeHostname } from './handlers/hostname.js';
@@ -896,7 +896,7 @@ const messageRegistry = {
     respond: (result) => createSaveLocalSettingsResultMessage(result),
     fallback: () => createSaveLocalSettingsResultMessage({ ok: false }),
   }),
-  ...createPCloudMessageRegistry(),
+  ...createCloudMessageRegistry(getDb),
   [MessageType.DeleteBlob]: defineMessage({
     requestSchema: requestSchemas.deleteBlobRequestSchema,
     handle: (message: DeleteBlobMessage) => handleDeleteBlob(message),

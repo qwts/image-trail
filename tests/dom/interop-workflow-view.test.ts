@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createInteropWorkflowView, openBlockedInteropWorkflow } from '../../extension/src/ui/components/interop-workflow-view.js';
+import { createInteropWorkflowView, openInteropWorkflow } from '../../extension/src/ui/components/interop-workflow-view.js';
 import { blockedInteropWorkflow } from '../../extension/src/ui/interop/visible-workflow.js';
 
 test('renders exact review and progress counts without claiming unavailable work completed', () => {
@@ -18,7 +18,34 @@ test('locked workflow does not render protected review, provider, count, or conf
   assert.equal(view.classList.contains('image-trail-interop--locked'), true);
   assert.equal(view.querySelector('.image-trail-interop__review'), null);
   assert.equal(view.querySelector('.image-trail-interop__provider'), null);
+  assert.equal(view.querySelector('.image-trail-interop__setup'), null);
   assert.doesNotMatch(view.textContent ?? '', /9|captured original|No interop provider/);
+});
+
+test('provider setup dispatches the selected isolated provider and connect action', () => {
+  const calls: string[] = [];
+  const state = {
+    ...blockedInteropWorkflow('settings', 0),
+    provider: {
+      id: 'google-drive' as const,
+      label: 'Google Drive',
+      state: 'disconnected' as const,
+      detail: 'Connect the isolated provider.',
+    },
+  };
+  const view = createInteropWorkflowView(state, {
+    onClose: () => undefined,
+    onProviderChange: (provider) => calls.push(`provider:${provider}`),
+    onConnect: () => calls.push('connect'),
+  });
+  const provider = view.querySelector('[aria-label="Transfer provider"]');
+  assert.ok(provider instanceof HTMLSelectElement);
+  provider.value = 'icloud-drive';
+  provider.dispatchEvent(new Event('change'));
+  const connect = Array.from(view.querySelectorAll('button')).find((control) => control.textContent === 'Connect provider');
+  assert.ok(connect instanceof HTMLButtonElement);
+  connect.click();
+  assert.deepEqual(calls, ['provider:icloud-drive', 'connect']);
 });
 
 test('conflict choice carries explicit apply-to-all intent', () => {
@@ -80,7 +107,7 @@ test('open workflow makes the panel inert and restores focus when closed', () =>
   document.body.append(panel);
   opener.focus();
 
-  openBlockedInteropWorkflow('bookmark', 1);
+  openInteropWorkflow('bookmark', 1);
   assert.equal(panel.inert, true);
   assert.equal(panel.style.pointerEvents, 'none');
   const dialog = document.querySelector('[role="dialog"][aria-label="Transfer and Sync"]');
@@ -106,17 +133,23 @@ test('open workflow traps keyboard focus inside the active shadow root', () => {
   document.body.append(host);
   opener.focus();
 
-  openBlockedInteropWorkflow('bookmark', 1);
+  openInteropWorkflow('bookmark', 1);
   const dialog = shadow.querySelector('[role="dialog"][aria-label="Transfer and Sync"]');
   assert.ok(dialog instanceof HTMLElement);
   const close = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Close');
   assert.ok(close instanceof HTMLButtonElement);
-  assert.equal(shadow.activeElement, close);
+  const controls = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex]'));
+  const first = controls[0];
+  const last = controls.at(-1);
+  assert.ok(first);
+  assert.ok(last);
+  assert.equal(shadow.activeElement, first);
 
   const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
-  close.dispatchEvent(tab);
+  last.focus();
+  last.dispatchEvent(tab);
   assert.equal(tab.defaultPrevented, true);
-  assert.equal(shadow.activeElement, close);
+  assert.equal(shadow.activeElement, first);
 
   close.click();
   assert.equal(shadow.activeElement, opener);

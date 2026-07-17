@@ -26,6 +26,7 @@ import {
   uploadPCloudBackup,
 } from '../pcloud-provider.js';
 import { PCLOUD_HOST_PERMISSION, requestHostPermission } from '../permissions.js';
+import { createChromeInteropRuntime, createInteropRuntimeMessageRegistry } from './interop-runtime-handlers.js';
 
 async function connectPCloudWithPermission(): ReturnType<typeof connectPCloudProvider> {
   const granted = await requestHostPermission(PCLOUD_HOST_PERMISSION);
@@ -109,4 +110,10 @@ export function createPCloudMessageRegistry(): Record<PCloudRequestType, Message
         }),
     }),
   };
+}
+
+export function createCloudMessageRegistry(
+  getDb: () => Promise<IDBDatabase | null>,
+): Record<PCloudRequestType | typeof MessageType.InteropRuntime, MessageDef<ExtensionRequest, ExtensionResponse>> {
+  return { ...createPCloudMessageRegistry(), ...createInteropRuntimeMessageRegistry(createChromeInteropRuntime(getDb)) };
 }

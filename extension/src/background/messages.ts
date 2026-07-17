@@ -31,14 +31,12 @@ import type {
 } from './layout-messages.js';
 import type { OriginalBlobRequest, OriginalBlobResponse } from './original-blob-messages.js';
 import type { RecentHistoryRequest, RecentHistoryResponse } from './recent-history-messages.js';
-
 export { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
 export * from './album-messages.js';
 export * from './blob-key-messages.js';
 export * from './layout-messages.js';
 export * from './original-blob-messages.js';
 export * from './recent-history-messages.js';
-
 const deleteBlobResultPayloadSchema = v.object({
   deleted: v.boolean(),
   usage: storageUsageSummarySchema,
@@ -835,6 +833,7 @@ export type ExtensionRequest =
   | UploadPCloudBackupMessage
   | ListPCloudBackupsMessage
   | DownloadPCloudBackupMessage
+  | import('./interop-runtime-messages.js').InteropRuntimeMessage
   | ListUrlTemplatesMessage
   | SaveUrlTemplateMessage
   | DeleteUrlTemplateMessage
@@ -894,6 +893,7 @@ export type ExtensionResponse =
   | UploadPCloudBackupResultMessage
   | ListPCloudBackupsResultMessage
   | DownloadPCloudBackupResultMessage
+  | import('./interop-runtime-messages.js').InteropRuntimeResultMessage
   | ListUrlTemplatesResultMessage
   | SaveUrlTemplateResultMessage
   | DeleteUrlTemplateResultMessage

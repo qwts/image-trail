@@ -1,6 +1,6 @@
 import { expect, expectPanelOpen, fixturePaths, openFixturePage, test, togglePanelFromExtensionAction } from './fixtures.js';
 
-test('a Queue record opens an honest blocked transfer review without reordering the Queue', async ({ page, serviceWorker }) => {
+test('a Queue record opens the live transfer setup without reordering the Queue', async ({ page, serviceWorker }) => {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
@@ -15,7 +15,9 @@ test('a Queue record opens an honest blocked transfer review without reordering 
   await row.getByRole('button', { name: 'Move / Sync' }).click();
   const dialog = page.getByRole('dialog', { name: 'Transfer and Sync' });
   await expect(dialog).toContainText('bookmark · Queued');
-  await expect(dialog).toContainText('No interop provider');
+  await expect(dialog).toContainText('pCloud');
+  await expect(dialog.getByLabel('Transfer provider')).toHaveValue('pcloud');
+  await expect(dialog.getByLabel('Overlook pairing key')).toBeVisible();
   await expect(dialog).toContainText('0 / 1 processed · 0 acknowledged · 0 finalized');
   await expect(dialog.getByRole('button', { name: 'Start move' })).toBeDisabled();
 

@@ -1,5 +1,5 @@
 import type { ImageDisplayRecord } from '../../core/display-records.js';
-import { openBlockedInteropWorkflow } from './interop-workflow-view.js';
+import { openInteropWorkflow } from './interop-workflow-view.js';
 
 function hasStoredOriginal(record: ImageDisplayRecord): boolean {
   return record.captureStatus === 'captured' || !!record.storedOriginal || record.protectedPin?.hasStoredOriginal === true;
@@ -20,7 +20,7 @@ export function createInteropQueueButton(
     const first = records[0];
     const entry =
       selectedIds.length > 0 ? 'selection' : records.length === 1 && first && hasStoredOriginal(first) ? 'captured-original' : 'album';
-    openBlockedInteropWorkflow(entry, records.length, locked);
+    openInteropWorkflow(entry, records.length, locked);
   });
   return control;
 }
@@ -31,7 +31,7 @@ export function createInteropRecordButton(item: ImageDisplayRecord, locked: bool
   control.textContent = 'Move / Sync';
   control.title = 'Review this record for Move to Overlook or Sync with Overlook.';
   control.addEventListener('click', () => {
-    openBlockedInteropWorkflow(hasStoredOriginal(item) ? 'captured-original' : 'bookmark', 1, locked);
+    openInteropWorkflow(hasStoredOriginal(item) ? 'captured-original' : 'bookmark', 1, locked);
   });
   return control;
 }

@@ -27,12 +27,19 @@
 .image-trail-interop__provider,
 .image-trail-interop__progress,
 .image-trail-interop__error,
+.image-trail-interop__setup,
 .image-trail-interop__segmented {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   margin-block: 10px;
+}
+
+.image-trail-interop__setup input,
+.image-trail-interop__setup select {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .image-trail-interop h3,

@@ -1,41 +1,9 @@
-import type { InteropErrorCode, InteropOperation, InteropTransferPhase } from '../../core/interop/contract.js';
+import type { InteropErrorCode, InteropTransferPhase } from '../../core/interop/contract.js';
 import type { InteropCounts } from '../../core/interop/messages.js';
+import type { InteropEntryContext, InteropRuntimeSnapshot } from '../../core/interop/runtime-state.js';
 
-export type InteropEntryContext = 'bookmark' | 'selection' | 'album' | 'gallery' | 'captured-original' | 'settings';
-export type InteropProviderId = 'pcloud' | 'google-drive' | 'icloud-drive';
-export type InteropProviderState = 'disconnected' | 'connecting' | 'connected' | 'reconnect-required' | 'unavailable';
-export type InteropPairingState = 'unpaired' | 'pairing' | 'paired' | 'invalid';
-
-export interface InteropVisibleConflict {
-  readonly interopId: string;
-  readonly label: string;
-  readonly fields: readonly string[];
-}
-
-export interface InteropVisibleError {
-  readonly code: InteropErrorCode;
-  readonly message: string;
-  readonly retryable: boolean;
-}
-
-export interface InteropVisibleWorkflow {
-  readonly entry: InteropEntryContext;
-  readonly operation: InteropOperation;
-  readonly target: 'overlook';
-  readonly provider: {
-    readonly id: InteropProviderId | null;
-    readonly label: string;
-    readonly state: InteropProviderState;
-    readonly detail: string;
-  };
-  readonly pairing: InteropPairingState;
-  readonly phase: InteropTransferPhase;
-  readonly counts: InteropCounts;
-  readonly processed: number;
-  readonly conflicts: readonly InteropVisibleConflict[];
-  readonly error: InteropVisibleError | null;
-  readonly locked: boolean;
-}
+export type InteropVisibleWorkflow = InteropRuntimeSnapshot;
+export type { InteropEntryContext } from '../../core/interop/runtime-state.js';
 
 export const EMPTY_INTEROP_COUNTS: InteropCounts = Object.freeze({
   total: 0,
@@ -56,10 +24,10 @@ export function blockedInteropWorkflow(entry: InteropEntryContext, total: number
     operation: 'move',
     target: 'overlook',
     provider: {
-      id: null,
-      label: 'No interop provider',
-      state: 'disconnected',
-      detail: 'Connect an isolated Transfer & Sync provider and import a pairing bundle before review.',
+      id: 'pcloud',
+      label: 'pCloud',
+      state: 'unavailable',
+      detail: 'Separate pCloud interoperability access is not configured.',
     },
     pairing: 'unpaired',
     phase: 'queued',
