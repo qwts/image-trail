@@ -78,6 +78,9 @@ export class InteropRuntime {
       await this.save(selected);
     }
 
+    if ((action.name === 'connect' || action.name === 'reconnect') && action.provider !== selected.provider)
+      return this.unsupportedAction(context, selected, 'failed', 'The selected provider changed before connection started.');
+
     if (action.name === 'import-pairing') return this.importPairing(context, selected, action.fileContent, action.password);
     if (action.name === 'disconnect') return this.disconnect(context, selected);
     if (action.name === 'cancel') return this.result(context, selected, 'cancelled', 'disconnected');

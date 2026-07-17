@@ -30,7 +30,7 @@ const interopRuntimeContextSchema = v.object({
 const interopRuntimeActionSchema = v.variant('name', [
   v.object({ name: v.literal('status') }),
   v.object({ name: v.literal('select-provider'), provider: v.picklist(['pcloud', 'google-drive', 'icloud-drive']) }),
-  v.object({ name: v.literal('connect') }),
+  v.object({ name: v.literal('connect'), provider: v.picklist(['pcloud', 'google-drive', 'icloud-drive']) }),
   v.object({ name: v.literal('disconnect') }),
   v.object({ name: v.literal('import-pairing'), fileContent: v.string(), password: v.string() }),
   v.object({ name: v.literal('set-operation'), operation: v.picklist(['move', 'sync']) }),
@@ -38,7 +38,7 @@ const interopRuntimeActionSchema = v.variant('name', [
   v.object({ name: v.literal('pause') }),
   v.object({ name: v.literal('resume') }),
   v.object({ name: v.literal('cancel') }),
-  v.object({ name: v.literal('reconnect') }),
+  v.object({ name: v.literal('reconnect'), provider: v.picklist(['pcloud', 'google-drive', 'icloud-drive']) }),
   v.object({
     name: v.literal('resolve-conflict'),
     interopId: v.string(),

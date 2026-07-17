@@ -6,6 +6,7 @@ import { OverlookICloudNativeClient } from './interop-icloud-client.js';
 import { createChromePCloudInteropAuth } from './interop-pcloud-auth.js';
 import { InteropRuntime } from './interop-runtime.js';
 import { PCLOUD_HOST_PERMISSION, requestHostPermission } from './permissions.js';
+import type { InteropRuntimeAction } from '../core/interop/runtime-state.js';
 
 export async function ensurePCloudInteropHostPermission(
   interactive: boolean,
@@ -18,6 +19,15 @@ export async function ensurePCloudInteropHostPermission(
     'provider-unavailable',
     false,
   );
+}
+
+export function preflightChromeInteropAction(
+  action: InteropRuntimeAction,
+  request: (pattern: string) => Promise<boolean> = requestHostPermission,
+): Promise<void> {
+  return (action.name === 'connect' || action.name === 'reconnect') && action.provider === 'pcloud'
+    ? ensurePCloudInteropHostPermission(true, request)
+    : Promise.resolve();
 }
 
 export function hasConfiguredDriveOAuth(manifest: unknown): boolean {
@@ -39,10 +49,7 @@ export function createChromeInteropRuntime(getDb: () => Promise<IDBDatabase | nu
     storage: chrome.storage.local,
     getDb,
     getActiveBlobKey: restoreActiveBlobKey,
-    probePCloud: async (interactive) => {
-      await ensurePCloudInteropHostPermission(interactive);
-      return pcloud.probe(interactive);
-    },
+    probePCloud: (interactive) => pcloud.probe(interactive),
     disconnectPCloud: () => pcloud.disconnect(),
     probeGoogleDrive: async (interactive) => {
       if (!hasConfiguredDriveOAuth(chrome.runtime.getManifest())) {

@@ -264,6 +264,7 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     if (previousFocus?.isConnected) previousFocus.focus();
   };
   const context: InteropRuntimeContext = { entry, total: recordIds.length, recordIds, locked };
+  let selectedProvider: InteropProviderId = 'pcloud';
   let latestRequest = 0;
   const dispatch = async (action: InteropRuntimeAction): Promise<void> => {
     const request = ++latestRequest;
@@ -273,18 +274,22 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
   const handlers: InteropWorkflowHandlers = {
     onClose: close,
     onOperationChange: (operation) => void dispatch({ name: 'set-operation', operation }),
-    onProviderChange: (provider) => void dispatch({ name: 'select-provider', provider }),
-    onConnect: () => void dispatch({ name: 'connect' }),
+    onProviderChange: (provider) => {
+      selectedProvider = provider;
+      void dispatch({ name: 'select-provider', provider });
+    },
+    onConnect: () => void dispatch({ name: 'connect', provider: selectedProvider }),
     onImportPairing: (fileContent, password) => void dispatch({ name: 'import-pairing', fileContent, password }),
     onStart: () => void dispatch({ name: 'start' }),
     onPause: () => void dispatch({ name: 'pause' }),
     onResume: () => void dispatch({ name: 'resume' }),
     onCancel: () => void dispatch({ name: 'cancel' }),
-    onReconnect: () => void dispatch({ name: 'reconnect' }),
+    onReconnect: () => void dispatch({ name: 'reconnect', provider: selectedProvider }),
     onDisconnect: () => void dispatch({ name: 'disconnect' }),
     onConflict: (interopId, action, applyToAll) => void dispatch({ name: 'resolve-conflict', interopId, action, applyToAll }),
   };
   const render = (state: InteropVisibleWorkflow): void => {
+    selectedProvider = state.provider.id;
     scrim.replaceChildren(createInteropWorkflowView(state, handlers));
   };
   render(blockedInteropWorkflow(entry, recordIds.length, locked));
