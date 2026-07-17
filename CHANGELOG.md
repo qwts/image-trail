@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.21.0
+
+### Minor Changes
+
+- f7fe872: Connect Move publication to separately authorized pCloud interoperability storage and enable Google Drive when the extension has a drive.file OAuth client.
+
 ## 0.20.0
 
 ### Minor Changes
