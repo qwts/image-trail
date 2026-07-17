@@ -4,6 +4,7 @@ import path from 'node:path';
 const STATIC_APPLICATION_ARTIFACTS = [
   'build-info.json',
   'manifest.json',
+  'THIRD-PARTY-LICENSES.txt',
   'src/content/content-script.js',
   'src/preview/preview.html',
   'src/preview/preview.css',

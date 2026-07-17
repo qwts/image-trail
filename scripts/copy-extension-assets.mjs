@@ -5,6 +5,9 @@ import { extensionOutputPath, writeStylesheet } from './extension-build-policy.m
 
 await mkdir('extension/dist', { recursive: true });
 await cp('extension/manifest.json', 'extension/dist/manifest.json');
+// Ship third-party attribution inside the packaged extension so shipped bundles
+// carry the notices for the code they include (react, react-dom, scheduler).
+await cp('THIRD-PARTY-LICENSES.txt', 'extension/dist/THIRD-PARTY-LICENSES.txt');
 await cp('extension/icons', 'extension/dist/icons', { recursive: true });
 await mkdir('extension/dist/src/preview', { recursive: true });
 await cp('extension/src/preview/preview.html', 'extension/dist/src/preview/preview.html');

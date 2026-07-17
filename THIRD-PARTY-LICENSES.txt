@@ -1,0 +1,8 @@
+Image Trail — Third-Party Software Notices
+
+Image Trail itself is proprietary; see LICENSE. It bundles the following
+third-party packages, each distributed under its own license as noted below.
+
+- react@19.2.7 (MIT)
+- react-dom@19.2.7 (MIT)
+- scheduler@0.27.0 (MIT)

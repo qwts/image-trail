@@ -77,6 +77,8 @@ test('artifact allowlist is derived from the manifest plus explicit application 
   const manifest = manifestFixture();
   const expected = artifacts.expectedExtensionArtifacts(manifest);
   assert.ok(expected.includes('manifest.json'));
+  // Third-party attribution must ship inside the packaged extension.
+  assert.ok(expected.includes('THIRD-PARTY-LICENSES.txt'));
   assert.ok(expected.includes('src/background/service-worker.js'));
   assert.ok(expected.includes('src/content/content-script.js'));
   assert.ok(expected.includes('src/preview/preview.css'));

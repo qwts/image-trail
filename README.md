@@ -97,6 +97,20 @@ npm run ci
 `npm run ci` runs lint, format check, coverage-gated tests, and build. The
 coverage gate uses `.c8rc.json`; CI uploads `coverage/lcov.info` when it runs.
 
+## Licensing
+
+Image Trail is proprietary, all-rights-reserved software. See [`LICENSE`](LICENSE)
+for the terms; no license to use, copy, modify, or distribute it is granted
+without prior written permission.
+
+The extension bundles third-party open-source packages (react, react-dom, and
+their runtime dependencies), each under its own permissive license. Their
+notices ship inside the packaged extension as `THIRD-PARTY-LICENSES.txt`.
+`npm run ci` runs `npm run check:licenses`, which fails the build if any shipped
+dependency carries a non-permissive or unknown license and verifies the
+attribution file is current. Regenerate it with `npm run licenses:write` after
+changing production dependencies.
+
 ## README Freshness Contract
 
 `README.md` is the stable public front door for the project. Keep it current
