@@ -118,7 +118,9 @@ export class MoveAcknowledgementReconciler {
       source.header.pairingId !== acknowledgement.header.pairingId ||
       source.header.sequence !== acknowledgement.header.sequence ||
       source.payload.record.identity.interopId !== acknowledgement.payload.recordInteropId ||
-      !acknowledgement.payload.acknowledgedMessageIds.includes(source.header.messageId)
+      !(item.sourceMessageIds ?? [source.header.messageId]).every((messageId) =>
+        acknowledgement.payload.acknowledgedMessageIds.includes(messageId),
+      )
     ) {
       throw corrupt('Move acknowledgement does not cover the reviewed source message.');
     }

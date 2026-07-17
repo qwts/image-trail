@@ -2,11 +2,14 @@ import * as v from 'valibot';
 
 import type { InteropReviewCategory, InteropRevisionVector } from '../../core/interop/contract.js';
 import { interopRecordSchema, type InteropBlobReference, type InteropRecord } from '../../core/interop/records.js';
+import { sha256 } from '../../core/interop/transport.js';
+import { openBlobPayload } from '../crypto/binary-envelope.js';
 import { ensureDurableBookmarkKey } from '../durable-bookmark-key.js';
 import type { ActiveBlobKey } from '../crypto/blob-keyring.js';
 import { BookmarksRepository, type EncryptedBookmarkRecord } from '../repositories/bookmarks-repository.js';
 import { EncryptedPinsRepository, type EncryptedPinRecord } from '../repositories/encrypted-pins-repository.js';
 import { KeysRepository } from '../repositories/keys-repository.js';
+import { BlobsRepository } from '../repositories/blobs-repository.js';
 import type { DurableBookmarkPayloadV1, DurableEncryptedPinPayloadV1, DurableInteropRecordV1 } from '../types.js';
 
 export interface CanonicalRecordExport {
@@ -15,7 +18,10 @@ export interface CanonicalRecordExport {
   readonly record: InteropRecord;
   readonly albums: DurableInteropRecordV1['albums'];
   readonly reviewCategory: InteropReviewCategory;
+  readonly original?: { readonly reference: AvailableInteropBlob; readonly bytes: Uint8Array } | undefined;
 }
+
+type AvailableInteropBlob = Extract<InteropBlobReference, { readonly state: 'available' }>;
 
 export interface CanonicalRecordExportReview {
   readonly requested: number;
@@ -67,14 +73,15 @@ function unavailableBlob(reason: 'not-captured' | 'provider-unavailable'): Inter
   };
 }
 
-function originalReference(payload: ExportPayload): InteropBlobReference {
-  const original = payload.storedOriginal;
-  return original
+function originalReference(payload: ExportPayload, original: AvailableInteropBlob | null): InteropBlobReference {
+  if (original) return original;
+  const stored = payload.storedOriginal;
+  return stored
     ? {
         state: 'metadata-only',
         blobId: null,
-        mimeType: original.mimeType,
-        byteLength: original.byteLength,
+        mimeType: stored.mimeType,
+        byteLength: stored.byteLength,
         contentHash: null,
         reason: 'provider-unavailable',
       }
@@ -95,7 +102,12 @@ function thumbnailReference(payload: ExportPayload): InteropBlobReference {
   };
 }
 
-function canonicalRecord(localId: string, payload: ExportPayload, interopId: string): InteropRecord | null {
+function canonicalRecord(
+  localId: string,
+  payload: ExportPayload,
+  interopId: string,
+  original: AvailableInteropBlob | null,
+): InteropRecord | null {
   const url = sourceUrl(payload.url);
   if (url === null) return null;
   const revision = INITIAL_REVISION;
@@ -128,7 +140,7 @@ function canonicalRecord(localId: string, payload: ExportPayload, interopId: str
       importedAt: null,
     },
     sourceCompatibility: payload.sourceCompatibility ?? null,
-    original: originalReference(payload),
+    original: originalReference(payload, original),
     thumbnail: thumbnailReference(payload),
     albumIds: [],
     roundTripMetadata: { imageTrail: {}, overlook: {} },
@@ -136,15 +148,22 @@ function canonicalRecord(localId: string, payload: ExportPayload, interopId: str
   });
 }
 
-function custody(localId: string, payload: ExportPayload, createId: () => string): DurableInteropRecordV1 | null {
-  if (payload.interop) return payload.interop;
-  const record = canonicalRecord(localId, payload, createId());
+function custody(
+  localId: string,
+  payload: ExportPayload,
+  original: AvailableInteropBlob | null,
+  createId: () => string,
+): DurableInteropRecordV1 | null {
+  const existing = payload.interop;
+  const record = existing
+    ? { ...existing.record, original: originalReference(payload, original) }
+    : canonicalRecord(localId, payload, createId(), original);
   if (record === null) return null;
   return {
     schemaVersion: 1,
     record,
-    albums: [],
-    reviewCategory: payload.storedOriginal ? 'metadata-only' : 'eligible',
+    albums: existing?.albums ?? [],
+    reviewCategory: payload.storedOriginal ? (original ? 'eligible' : 'metadata-only') : (existing?.reviewCategory ?? 'eligible'),
   };
 }
 
@@ -176,7 +195,8 @@ export class InteropRecordExportStore {
         : payload?.protectedPin
           ? null
           : payload;
-      const interop = exportPayload ? custody(localId, exportPayload, this.#createId) : null;
+      const original = exportPayload ? await this.openOriginal(exportPayload, activeBlobKey) : null;
+      const interop = exportPayload ? custody(localId, exportPayload, original?.reference ?? null, this.#createId) : null;
       if (!encrypted || !payload || !exportPayload || !interop) {
         unsupported += 1;
         continue;
@@ -227,9 +247,57 @@ export class InteropRecordExportStore {
         record: interop.record,
         albums: interop.albums,
         reviewCategory: interop.reviewCategory,
+        ...(original ? { original } : {}),
       });
     }
     return { requested: uniqueIds.length, unsupported, records };
+  }
+
+  private async openOriginal(
+    payload: ExportPayload,
+    activeBlobKey: ActiveBlobKey | null,
+  ): Promise<{ readonly reference: AvailableInteropBlob; readonly bytes: Uint8Array } | null> {
+    if (!payload.storedOriginal || !activeBlobKey) return null;
+    const record = await new BlobsRepository(this.db).get(payload.storedOriginal.blobId);
+    if (!record || record.kind !== 'original' || record.key.reference !== activeBlobKey.reference.reference) return null;
+    let bytes: Uint8Array | null = null;
+    try {
+      const opened = await openBlobPayload({
+        key: activeBlobKey.key,
+        iv: record.iv,
+        ciphertext: record.ciphertext,
+        aad: {
+          id: record.id,
+          kind: record.kind,
+          schemaVersion: record.schemaVersion,
+          algorithm: record.algorithm,
+          createdAt: record.createdAt,
+          key: record.key,
+        },
+      });
+      bytes = new Uint8Array(opened.bytes);
+      if (
+        opened.metadata.mimeType !== payload.storedOriginal.mimeType ||
+        opened.metadata.byteLength !== payload.storedOriginal.byteLength ||
+        bytes.byteLength !== payload.storedOriginal.byteLength
+      ) {
+        bytes.fill(0);
+        return null;
+      }
+      return {
+        reference: {
+          state: 'available',
+          blobId: payload.storedOriginal.blobId,
+          mimeType: opened.metadata.mimeType,
+          byteLength: bytes.byteLength,
+          contentHash: await sha256(bytes),
+        },
+        bytes,
+      };
+    } catch {
+      bytes?.fill(0);
+      return null;
+    }
   }
 
   private async open(

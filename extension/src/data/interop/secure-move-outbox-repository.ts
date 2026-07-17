@@ -14,6 +14,7 @@ export const secureMoveItemSchema = v.object({
   transferId: v.string(),
   interopId: v.string(),
   sourceMessageId: v.string(),
+  sourceMessageIds: v.optional(v.array(v.string())),
   sourceLocalId: v.string(),
   sourceUpdatedAt: v.optional(timestampSchema),
   reviewCategory: v.picklist(['eligible', 'duplicate', 'conflict', 'metadata-only', 'unsupported', 'skipped']),
@@ -31,6 +32,7 @@ export const secureMoveItemSchema = v.object({
 const secureMoveOutboxSchema = v.object({
   messageId: v.string(),
   transferId: v.string(),
+  interopId: v.optional(v.string()),
   sequence: v.number(),
   path: v.string(),
   ciphertext: v.instance(ArrayBuffer),
@@ -50,6 +52,15 @@ export interface SecureMoveQueueItem {
   readonly reviewCategory: InteropReviewCategory;
   readonly path: string;
   readonly ciphertext: Uint8Array;
+  readonly attachments?: readonly SecureMoveQueueMessage[] | undefined;
+}
+
+export interface SecureMoveQueueMessage {
+  readonly messageId: string;
+  readonly sequence: number;
+  readonly path: string;
+  readonly ciphertext: Uint8Array;
+  readonly acknowledgementRequired?: boolean | undefined;
 }
 
 const STORES = [DataStore.MoveJournals, DataStore.MoveItems, DataStore.MoveOutbox, DataStore.MoveAudit];
@@ -113,7 +124,8 @@ export class SecureMoveOutboxRepository {
     readonly at: string;
   }): Promise<void> {
     if (input.items.length === 0) throw new Error('Secure Move outbox batch cannot be empty.');
-    if (new Set(input.items.map((item) => item.messageId)).size !== input.items.length) {
+    const messageIds = input.items.flatMap((item) => [item.messageId, ...(item.attachments ?? []).map((row) => row.messageId)]);
+    if (new Set(messageIds).size !== messageIds.length) {
       throw new Error('Secure Move outbox batch contains duplicate message identities.');
     }
     const transaction = this.db.transaction(STORES, 'readwrite');
@@ -142,6 +154,10 @@ export class SecureMoveOutboxRepository {
         transferId: input.transferId,
         interopId: queued.interopId,
         sourceMessageId: queued.messageId,
+        sourceMessageIds: [
+          queued.messageId,
+          ...(queued.attachments ?? []).filter((row) => row.acknowledgementRequired !== false).map((row) => row.messageId),
+        ],
         sourceLocalId: queued.sourceLocalId,
         sourceUpdatedAt: queued.sourceUpdatedAt,
         reviewCategory: queued.reviewCategory,
@@ -159,6 +175,7 @@ export class SecureMoveOutboxRepository {
       if (
         existingItem &&
         (existingItem.sourceMessageId !== item.sourceMessageId ||
+          JSON.stringify(existingItem.sourceMessageIds ?? [existingItem.sourceMessageId]) !== JSON.stringify(item.sourceMessageIds) ||
           existingItem.sourceLocalId !== item.sourceLocalId ||
           existingItem.sourceUpdatedAt !== item.sourceUpdatedAt ||
           existingItem.reviewCategory !== item.reviewCategory)
@@ -167,34 +184,39 @@ export class SecureMoveOutboxRepository {
         throw new Error('Secure Move item identity was replayed with different metadata.');
       }
       items.put(existingItem ?? item);
-      const existingOutbox = hydrateRecord(
-        DataStore.MoveOutbox,
-        secureMoveOutboxSchema,
-        await requestToPromise<unknown>(outbox.get(queued.messageId)),
-      );
-      if (
-        existingOutbox &&
-        (existingOutbox.transferId !== input.transferId ||
-          existingOutbox.sequence !== queued.sequence ||
-          existingOutbox.path !== queued.path)
-      ) {
-        transaction.abort();
-        throw new Error('Secure Move message identity was replayed across outbox objects.');
-      }
-      if (!existingOutbox) {
-        const ciphertext = queued.ciphertext.buffer.slice(
-          queued.ciphertext.byteOffset,
-          queued.ciphertext.byteOffset + queued.ciphertext.byteLength,
-        ) as ArrayBuffer;
-        outbox.put({
-          messageId: queued.messageId,
-          transferId: input.transferId,
-          sequence: queued.sequence,
-          path: queued.path,
-          ciphertext,
-          createdAt: input.at,
-          deliveredAt: null,
-        } satisfies SecureMoveOutboxRecord);
+      for (const message of [queued, ...(queued.attachments ?? [])]) {
+        const existingOutbox = hydrateRecord(
+          DataStore.MoveOutbox,
+          secureMoveOutboxSchema,
+          await requestToPromise<unknown>(outbox.get(message.messageId)),
+        );
+        if (
+          existingOutbox &&
+          (existingOutbox.transferId !== input.transferId ||
+            existingOutbox.interopId !== queued.interopId ||
+            existingOutbox.sequence !== message.sequence ||
+            existingOutbox.path !== message.path)
+        ) {
+          transaction.abort();
+          throw new Error('Secure Move message identity was replayed across outbox objects.');
+        }
+        if (!existingOutbox) {
+          const ciphertext = message.ciphertext.buffer.slice(
+            message.ciphertext.byteOffset,
+            message.ciphertext.byteOffset + message.ciphertext.byteLength,
+          ) as ArrayBuffer;
+          outbox.put({
+            messageId: message.messageId,
+            transferId: input.transferId,
+            interopId: queued.interopId,
+            sequence: message.sequence,
+            path: message.path,
+            ciphertext,
+            createdAt: input.at,
+            deliveredAt: null,
+          } satisfies SecureMoveOutboxRecord);
+        }
+        lastSequence = Math.max(lastSequence, message.sequence);
       }
       const eventKey = `${queued.messageId}:queued`;
       if ((await requestToPromise<IDBValidKey | undefined>(audit.getKey(eventKey))) === undefined) {
@@ -203,11 +225,10 @@ export class SecureMoveOutboxRepository {
           transferId: input.transferId,
           interopId: queued.interopId,
           event: 'queued',
-          details: { sourceMessageId: queued.messageId },
+          details: { sourceMessageIds: item.sourceMessageIds },
           createdAt: input.at,
         });
       }
-      lastSequence = Math.max(lastSequence, queued.sequence);
     }
     const journal: MoveJournalRecord = existingJournal ?? {
       transferId: input.transferId,
@@ -233,7 +254,16 @@ export class SecureMoveOutboxRepository {
     const items = await secureMoveItemsIn(transaction, transferId);
     const outbox = await this.outboxIn(transaction, transferId);
     await transactionDone(transaction);
-    return journal ? { journal: { ...journal, counts: countsFor(items) }, pending: outbox.filter((row) => !row.deliveredAt).length } : null;
+    const pendingIds = new Set(
+      outbox
+        .filter((row) => !row.deliveredAt)
+        .map((row) => row.interopId)
+        .filter((id): id is string => !!id),
+    );
+    const legacyPending = outbox.filter((row) => !row.deliveredAt && !row.interopId).length;
+    return journal
+      ? { journal: { ...journal, counts: countsFor(items) }, pending: Math.min(items.length, pendingIds.size + legacyPending) }
+      : null;
   }
 
   async pending(transferId: string): Promise<readonly SecureMoveOutboxRecord[]> {

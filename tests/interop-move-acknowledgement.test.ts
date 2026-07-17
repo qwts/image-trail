@@ -12,6 +12,10 @@ import {
   type InteropObjectStore,
 } from '../extension/src/core/interop/transport.js';
 import { openImageTrailDb } from '../extension/src/data/db.js';
+import { sealBlobPayload } from '../extension/src/data/crypto/binary-envelope.js';
+import type { ActiveBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
+import { createKeyReference } from '../extension/src/data/crypto/key-reference.js';
+import { generateAesGcmKey } from '../extension/src/data/crypto/webcrypto.js';
 import { ensureDurableBookmarkKey } from '../extension/src/data/durable-bookmark-key.js';
 import { MoveAcknowledgementReconciler, moveAcknowledgementPath } from '../extension/src/data/interop/move-acknowledgement-reconciler.js';
 import { isMoveRecordEnvelope, type MoveRecordEnvelope } from '../extension/src/data/interop/move-journal-records.js';
@@ -21,6 +25,7 @@ import { importInteropPairingBundle } from '../extension/src/data/interop/pairin
 import { openInteropMessage, sealInteropMessage } from '../extension/src/data/interop/sealed-message.js';
 import { SecureMoveOutboxRepository } from '../extension/src/data/interop/secure-move-outbox-repository.js';
 import { BookmarksRepository } from '../extension/src/data/repositories/bookmarks-repository.js';
+import { BlobsRepository } from '../extension/src/data/repositories/blobs-repository.js';
 import { InteropKeysRepository, type StoredInteropKeyRecord } from '../extension/src/data/repositories/interop-keys-repository.js';
 import { KeysRepository } from '../extension/src/data/repositories/keys-repository.js';
 
@@ -28,6 +33,9 @@ const INTEROP_ID = '11111111-1111-4111-8111-111111111111';
 const SOURCE_MESSAGE_ID = '22222222-2222-4222-8222-222222222222';
 const ACKNOWLEDGEMENT_ID = '33333333-3333-4333-8333-333333333333';
 const TRANSFER_ID = '44444444-4444-4444-8444-444444444444';
+const BLOB_MESSAGE_ID = '55555555-5555-4555-8555-555555555555';
+const BLOB_STORAGE_ID = '66666666-6666-4666-8666-666666666666';
+const BLOB_KEY_ID = '77777777-7777-4777-8777-777777777777';
 
 class MemoryStore implements InteropObjectStore {
   readonly provider = 'pcloud' as const;
@@ -66,7 +74,7 @@ class MemoryStore implements InteropObjectStore {
   }
 }
 
-async function setup(captured: boolean) {
+async function setup(captured: boolean, availableOriginal = false) {
   const opened = await openImageTrailDb(new IDBFactory());
   assert.ok(opened.db);
   const key = await ensureDurableBookmarkKey(new KeysRepository(opened.db));
@@ -99,11 +107,39 @@ async function setup(captured: boolean) {
   const pairing = (await new InteropKeysRepository(opened.db).list())[0];
   assert.ok(pairing);
   const store = new MemoryStore();
-  const ids = [INTEROP_ID, SOURCE_MESSAGE_ID];
+  let activeBlobKey: ActiveBlobKey | null = null;
+  if (availableOriginal) {
+    const reference = createKeyReference('blob', BLOB_KEY_ID);
+    const key = await generateAesGcmKey(false);
+    const bytes = Uint8Array.from({ length: 42 }, (_value, index) => index);
+    const createdAt = '2026-07-17T12:01:00.000Z';
+    const aad = {
+      id: 'blob-1',
+      kind: 'original' as const,
+      schemaVersion: 1 as const,
+      algorithm: 'AES-GCM' as const,
+      createdAt,
+      key: reference,
+    };
+    const sealed = await sealBlobPayload({
+      key,
+      aad,
+      metadata: {
+        mimeType: 'image/jpeg',
+        byteLength: bytes.byteLength,
+        sourceUrl: 'https://example.test/image.jpg',
+        capturedAt: createdAt,
+      },
+      bytes: bytes.buffer,
+    });
+    await new BlobsRepository(opened.db).put({ ...aad, ...sealed, referenceCount: 1 });
+    activeBlobKey = { reference, key };
+  }
+  const ids = [INTEROP_ID, SOURCE_MESSAGE_ID, BLOB_MESSAGE_ID, BLOB_STORAGE_ID];
   await new MoveOutboxPublisher(opened.db, store, {
     now: () => '2026-07-17T12:03:00.000Z',
     createId: () => ids.shift() ?? crypto.randomUUID(),
-  }).start({ transferId: TRANSFER_ID, recordIds: ['bookmark-1'], pairing });
+  }).start({ transferId: TRANSFER_ID, recordIds: ['bookmark-1'], pairing, activeBlobKey });
   return { db: opened.db, pairing, store };
 }
 
@@ -239,4 +275,22 @@ test('acknowledgement that does not cover the sealed source message fails closed
   const progress = await new SecureMoveOutboxRepository(db).progress(TRANSFER_ID);
   assert.equal(progress?.journal.phase, 'awaiting-acknowledgement');
   assert.equal(progress?.journal.counts.acknowledged, 0);
+});
+
+test('verified original acknowledgement must cover the blob message', async (t) => {
+  const { db, pairing, store } = await setup(true, true);
+  t.after(() => db.close());
+  await uploadAcknowledgement(db, pairing, store);
+  await assert.rejects(
+    new MoveAcknowledgementReconciler(db, store, { finalize: async () => undefined }).reconcile({
+      transferId: TRANSFER_ID,
+      total: 1,
+      pairing,
+      allowFinalization: true,
+    }),
+    (error: unknown) => error instanceof InteropTransportError && error.code === 'corrupt',
+  );
+  const item = await new SecureMoveOutboxRepository(db).item(TRANSFER_ID, INTEROP_ID);
+  assert.deepEqual(item?.sourceMessageIds, [SOURCE_MESSAGE_ID, BLOB_MESSAGE_ID]);
+  assert.equal(item?.acknowledgedAt, null);
 });
