@@ -196,28 +196,41 @@ export class InteropRecordExportStore {
           ? null
           : payload;
       const original = exportPayload ? await this.openOriginal(exportPayload, activeBlobKey) : null;
-      const interop = exportPayload ? custody(localId, exportPayload, original?.reference ?? null, this.#createId) : null;
-      if (!encrypted || !payload || !exportPayload || !interop) {
-        unsupported += 1;
-        continue;
-      }
-      if (protectedPin && activeBlobKey) {
-        if (!protectedPin.payload.interop || payload.interop) {
-          await encryptedPins.sealAndPut({
-            id: protectedPin.record.id,
-            plainPinId: protectedPin.record.plainPinId,
-            urlHash: protectedPin.record.urlHash,
-            queueUpdatedAt: protectedPin.record.queueUpdatedAt,
-            payload: { ...protectedPin.payload, interop },
-            key: activeBlobKey.key,
-            keyReference: activeBlobKey.reference,
-            now: this.#now(),
-          });
+      let retainedOriginal = false;
+      try {
+        const interop = exportPayload ? custody(localId, exportPayload, original?.reference ?? null, this.#createId) : null;
+        if (!encrypted || !payload || !exportPayload || !interop) {
+          unsupported += 1;
+          continue;
         }
-        if (payload.interop) {
+        if (protectedPin && activeBlobKey) {
+          if (!protectedPin.payload.interop || payload.interop) {
+            await encryptedPins.sealAndPut({
+              id: protectedPin.record.id,
+              plainPinId: protectedPin.record.plainPinId,
+              urlHash: protectedPin.record.urlHash,
+              queueUpdatedAt: protectedPin.record.queueUpdatedAt,
+              payload: { ...protectedPin.payload, interop },
+              key: activeBlobKey.key,
+              keyReference: activeBlobKey.reference,
+              now: this.#now(),
+            });
+          }
+          if (payload.interop) {
+            await bookmarks.sealAndPut(
+              encrypted.uuid,
+              { ...payload, interop: undefined },
+              key.key,
+              key.reference,
+              this.#now(),
+              encrypted.url,
+              encrypted.queueUpdatedAt,
+            );
+          }
+        } else if (!payload.interop) {
           await bookmarks.sealAndPut(
             encrypted.uuid,
-            { ...payload, interop: undefined },
+            { ...payload, interop },
             key.key,
             key.reference,
             this.#now(),
@@ -225,30 +238,23 @@ export class InteropRecordExportStore {
             encrypted.queueUpdatedAt,
           );
         }
-      } else if (!payload.interop) {
-        await bookmarks.sealAndPut(
-          encrypted.uuid,
-          { ...payload, interop },
-          key.key,
-          key.reference,
-          this.#now(),
-          encrypted.url,
-          encrypted.queueUpdatedAt,
-        );
+        const reviewedSource = await bookmarks.getEncrypted(localId);
+        if (!reviewedSource) {
+          unsupported += 1;
+          continue;
+        }
+        records.push({
+          localId,
+          sourceUpdatedAt: reviewedSource.envelope.updatedAt,
+          record: interop.record,
+          albums: interop.albums,
+          reviewCategory: interop.reviewCategory,
+          ...(original ? { original } : {}),
+        });
+        retainedOriginal = true;
+      } finally {
+        if (!retainedOriginal) original?.bytes.fill(0);
       }
-      const reviewedSource = await bookmarks.getEncrypted(localId);
-      if (!reviewedSource) {
-        unsupported += 1;
-        continue;
-      }
-      records.push({
-        localId,
-        sourceUpdatedAt: reviewedSource.envelope.updatedAt,
-        record: interop.record,
-        albums: interop.albums,
-        reviewCategory: interop.reviewCategory,
-        ...(original ? { original } : {}),
-      });
     }
     return { requested: uniqueIds.length, unsupported, records };
   }
