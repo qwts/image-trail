@@ -412,6 +412,15 @@ test('runtime Sync publishes a pairing-key-sealed selected snapshot without plai
   const resumed = await runtime.dispatch(selected, { name: 'resume' });
   assert.equal(resumed.snapshot.phase, 'reviewing');
   assert.equal(resumed.snapshot.processed, 1);
+  const cancelled = await runtime.dispatch(selected, { name: 'cancel' });
+  assert.equal(cancelled.snapshot.phase, 'cancelled');
+  const afterCancel = getStored() as { activeTransferId?: string; activeSyncSessionId?: string };
+  assert.equal(afterCancel.activeTransferId, moveTransferId);
+  assert.equal(afterCancel.activeSyncSessionId, undefined);
+  const statusAfterCancel = await runtime.dispatch(selected, { name: 'status' });
+  assert.equal(statusAfterCancel.snapshot.phase, 'queued');
+  const restarted = await runtime.dispatch(selected, { name: 'start' });
+  assert.equal(restarted.snapshot.phase, 'reviewing');
 });
 
 test('locked workspaces never start or expose provider setup through a successful result', async (t) => {

@@ -41,6 +41,16 @@ export function activeInteropRuntimeSelection(value: InteropRuntimePreferences):
     : { id: value.activeTransferId, recordIds: value.activeRecordIds };
 }
 
+export function clearActiveSyncRuntimeSelection(value: InteropRuntimePreferences): InteropRuntimePreferences {
+  return {
+    provider: value.provider,
+    operation: value.operation,
+    ...(value.activeTransferId && value.activeRecordIds
+      ? { activeTransferId: value.activeTransferId, activeRecordIds: value.activeRecordIds }
+      : {}),
+  };
+}
+
 export function sameInteropRecordIds(left: readonly string[] | undefined, right: readonly string[]): boolean {
   return !!left && left.length === right.length && left.every((id, index) => id === right[index]);
 }

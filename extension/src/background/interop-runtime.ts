@@ -21,6 +21,7 @@ import { INTEROP_PROVIDERS, interopPairingState, interopProviderStatus } from '.
 import * as progressViews from './interop-runtime-progress.js';
 import {
   activeInteropRuntimeSelection,
+  clearActiveSyncRuntimeSelection,
   parseInteropRuntimePreferences,
   sameInteropRecordIds,
   type InteropRuntimePreferences as RuntimePreferences,
@@ -28,13 +29,11 @@ import {
 
 const STORAGE_KEY = 'interopRuntimePreferences';
 
-interface RuntimeStorage {
-  get(key: string): Promise<Record<string, unknown>>;
-  set(items: Record<string, unknown>): Promise<void>;
-}
-
 export interface InteropRuntimeDependencies {
-  readonly storage: RuntimeStorage;
+  readonly storage: {
+    get(key: string): Promise<Record<string, unknown>>;
+    set(items: Record<string, unknown>): Promise<void>;
+  };
   readonly getDb: () => Promise<IDBDatabase | null>;
   readonly getActiveBlobKey: () => Promise<ActiveBlobKey | null>;
   readonly probePCloud: (interactive: boolean) => Promise<boolean>;
@@ -71,7 +70,9 @@ export class InteropRuntime {
         try {
           const progress = await this.syncRuntime().control(active.id, action.name);
           const provider = await interopProviderStatus(this.dependencies, selected.provider, false);
-          return this.progressResult(context, selected, provider, progress);
+          const resultPreferences = action.name === 'cancel' ? clearActiveSyncRuntimeSelection(selected) : selected;
+          if (action.name === 'cancel') await this.save(resultPreferences);
+          return this.progressResult(context, resultPreferences, provider, progress);
         } catch (error) {
           return this.unsupportedAction(context, selected, 'failed', error instanceof Error ? error.message : 'Sync control failed.');
         }
