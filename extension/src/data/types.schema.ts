@@ -48,6 +48,13 @@ export const durableHistoryPayloadSchema = v.object({
   storedOriginal: v.optional(storedOriginalReferenceSchema),
 });
 
+const durableInteropRecordSchema = v.object({
+  schemaVersion: v.literal(1),
+  record: interopRecordSchema,
+  albums: v.pipe(v.array(interopAlbumSchema), v.readonly()),
+  reviewCategory: interopReviewCategorySchema,
+});
+
 export const durableBookmarkPayloadSchema = v.object({
   url: v.string(),
   title: v.optional(v.string()),
@@ -61,14 +68,7 @@ export const durableBookmarkPayloadSchema = v.object({
   sourceCompatibility: v.optional(v.literal('favorites')),
   storedOriginal: v.optional(storedOriginalReferenceSchema),
   protectedPin: v.optional(protectedPinRelationshipSchema),
-  interop: v.optional(
-    v.object({
-      schemaVersion: v.literal(1),
-      record: interopRecordSchema,
-      albums: v.pipe(v.array(interopAlbumSchema), v.readonly()),
-      reviewCategory: interopReviewCategorySchema,
-    }),
-  ),
+  interop: v.optional(durableInteropRecordSchema),
 });
 
 export const durableEncryptedPinPayloadSchema = v.object({
@@ -83,6 +83,7 @@ export const durableEncryptedPinPayloadSchema = v.object({
   sourceCompatibility: v.optional(v.literal('favorites')),
   storedOriginal: v.optional(storedOriginalReferenceSchema),
   thumbnailId: v.optional(v.string()),
+  interop: v.optional(durableInteropRecordSchema),
 });
 
 export const durableDownloadPayloadSchema = v.object({

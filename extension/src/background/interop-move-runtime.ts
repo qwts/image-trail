@@ -2,6 +2,7 @@ import type { InteropProviderId } from '../core/interop/runtime-state.js';
 import type { InteropObjectStore } from '../core/interop/transport.js';
 import { MoveOutboxPublisher, readMoveOutboxProgress, type MoveOutboxProgress } from '../data/interop/move-outbox-publisher.js';
 import { InteropKeysRepository, type StoredInteropKeyRecord } from '../data/repositories/interop-keys-repository.js';
+import type { ActiveBlobKey } from '../data/crypto/blob-keyring.js';
 
 export class InteropMoveSetupError extends Error {
   override readonly name = 'InteropMoveSetupError';
@@ -19,6 +20,7 @@ export class InteropMoveRuntime {
   constructor(
     private readonly getDb: () => Promise<IDBDatabase | null>,
     private readonly openProvider: (provider: InteropProviderId) => Promise<InteropObjectStore | null>,
+    private readonly getActiveBlobKey: () => Promise<ActiveBlobKey | null>,
   ) {}
 
   async start(input: {
@@ -34,6 +36,7 @@ export class InteropMoveRuntime {
       transferId: input.transferId,
       recordIds: input.recordIds,
       pairing,
+      activeBlobKey: await this.getActiveBlobKey(),
     });
   }
 

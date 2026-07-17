@@ -63,6 +63,7 @@ async function harness(overrides: Partial<InteropRuntimeDependencies> = {}) {
       },
     },
     getDb: async () => opened.db,
+    getActiveBlobKey: async () => null,
     probeGoogleDrive: async (interactive) => {
       probes.push(interactive);
     },

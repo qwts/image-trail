@@ -10,6 +10,7 @@ import type {
   InteropRuntimeSnapshot,
 } from '../core/interop/runtime-state.js';
 import { importInteropPairingBundle } from '../data/interop/pairing-import.js';
+import { restoreActiveBlobKey, type ActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { MoveOutboxPublishError, type MoveOutboxProgress } from '../data/interop/move-outbox-publisher.js';
 import { InteropKeysRepository } from '../data/repositories/interop-keys-repository.js';
 import { OverlookICloudNativeClient } from './interop-icloud-client.js';
@@ -32,6 +33,7 @@ interface RuntimeStorage {
 export interface InteropRuntimeDependencies {
   readonly storage: RuntimeStorage;
   readonly getDb: () => Promise<IDBDatabase | null>;
+  readonly getActiveBlobKey: () => Promise<ActiveBlobKey | null>;
   readonly probeGoogleDrive: (interactive: boolean) => Promise<void>;
   readonly disconnectGoogleDrive: () => Promise<void>;
   readonly probeICloud: () => Promise<void>;
@@ -282,7 +284,7 @@ export class InteropRuntime {
   }
 
   private moveRuntime(): InteropMoveRuntime {
-    return new InteropMoveRuntime(this.dependencies.getDb, this.dependencies.openProvider);
+    return new InteropMoveRuntime(this.dependencies.getDb, this.dependencies.openProvider, this.dependencies.getActiveBlobKey);
   }
 
   private progressResult(
@@ -373,6 +375,7 @@ export function createChromeInteropRuntime(getDb: () => Promise<IDBDatabase | nu
   return new InteropRuntime({
     storage: chrome.storage.local,
     getDb,
+    getActiveBlobKey: restoreActiveBlobKey,
     probeGoogleDrive: async (_interactive) => {
       throw new InteropTransportError(
         'Google Drive interoperability requires a configured extension OAuth client.',

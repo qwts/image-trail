@@ -475,6 +475,9 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const existingPlainPayload = existingPlain
       ? await context.repository.openRecord(existingPlain, context.bookmarkKey.key).catch(() => null)
       : null;
+    const existingProtectedPayload = existingProtected
+      ? await context.encryptedPins.openRecord(existingProtected, activeBlobKey.key).catch(() => null)
+      : null;
     const queueUpdatedAt = existingPlain?.queueUpdatedAt ?? existingProtected?.queueUpdatedAt ?? bookmark.timestamp;
     let thumbnail: { readonly id: string } | null = null;
     try {
@@ -484,12 +487,11 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         plainPinId,
         urlHash,
         queueUpdatedAt,
-        payload: toProtectedPayload(bookmark, thumbnail?.id),
+        payload: toProtectedPayload(bookmark, thumbnail?.id, existingProtectedPayload?.interop ?? existingPlainPayload?.interop),
         key: activeBlobKey.key,
         keyReference: activeBlobKey.reference,
         now: existingProtected?.envelope.updatedAt,
       });
-
       const relationship = protectedRelationship({
         plainPinId,
         encryptedPinId,
@@ -499,14 +501,13 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       });
       await context.repository.sealAndPut(
         plainPinId,
-        toRelationshipPayload(relationship, existingPlainPayload?.interop),
+        toRelationshipPayload(relationship),
         context.bookmarkKey.key,
         context.bookmarkKey.reference,
         existingPlain?.envelope.updatedAt,
         privatePinUrl(plainPinId),
         queueUpdatedAt,
       );
-
       await removeReplacedOriginal(context, existingPlainPayload, relationship.storedOriginalBlobId);
       this.invalidateMergedRecordsCache();
       return this.openProtectedDisplayRecord(context, protectedRecord, activeBlobKey);
@@ -787,8 +788,11 @@ function toDisplayRecord(id: string, payload: DurableBookmarkPayloadV1, queueUpd
     source: payload.sourceCompatibility ?? 'bookmark',
   });
 }
-
-function toProtectedPayload(record: ImageDisplayRecord, thumbnailId: string | undefined): DurableEncryptedPinPayloadV1 {
+function toProtectedPayload(
+  record: ImageDisplayRecord,
+  thumbnailId: string | undefined,
+  interop?: DurableEncryptedPinPayloadV1['interop'],
+): DurableEncryptedPinPayloadV1 {
   return {
     url: record.url,
     title: record.title,
@@ -801,20 +805,16 @@ function toProtectedPayload(record: ImageDisplayRecord, thumbnailId: string | un
     sourceCompatibility: 'favorites',
     storedOriginal: record.storedOriginal,
     thumbnailId,
+    interop,
   };
 }
-
-function toRelationshipPayload(
-  relationship: ProtectedPinRelationshipV1,
-  interop?: DurableBookmarkPayloadV1['interop'],
-): DurableBookmarkPayloadV1 {
+function toRelationshipPayload(relationship: ProtectedPinRelationshipV1): DurableBookmarkPayloadV1 {
   return {
     url: privatePinUrl(relationship.plainPinId),
     label: 'Private pin',
     bookmarkedAt: relationship.queueUpdatedAt,
     sourceCompatibility: 'favorites',
     protectedPin: relationship,
-    interop,
   };
 }
 

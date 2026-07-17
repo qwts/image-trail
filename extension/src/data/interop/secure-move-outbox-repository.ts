@@ -34,6 +34,16 @@ const secureMoveOutboxSchema = v.object({
 export type SecureMoveItem = v.InferOutput<typeof secureMoveItemSchema>;
 export type SecureMoveOutboxRecord = v.InferOutput<typeof secureMoveOutboxSchema>;
 
+export interface SecureMoveQueueItem {
+  readonly messageId: string;
+  readonly sequence: number;
+  readonly interopId: string;
+  readonly sourceLocalId: string;
+  readonly reviewCategory: InteropReviewCategory;
+  readonly path: string;
+  readonly ciphertext: Uint8Array;
+}
+
 const STORES = [DataStore.MoveJournals, DataStore.MoveItems, DataStore.MoveOutbox, DataStore.MoveAudit];
 
 function countsFor(items: readonly SecureMoveItem[]): InteropCounts {
@@ -65,18 +75,16 @@ async function itemsIn(transaction: IDBTransaction, transferId: string): Promise
 export class SecureMoveOutboxRepository {
   constructor(private readonly db: IDBDatabase) {}
 
-  async queue(input: {
+  async queueBatch(input: {
     readonly pairingId: string;
     readonly transferId: string;
-    readonly messageId: string;
-    readonly sequence: number;
-    readonly interopId: string;
-    readonly sourceLocalId: string;
-    readonly reviewCategory: InteropReviewCategory;
-    readonly path: string;
-    readonly ciphertext: Uint8Array;
+    readonly items: readonly SecureMoveQueueItem[];
     readonly at: string;
   }): Promise<void> {
+    if (input.items.length === 0) throw new Error('Secure Move outbox batch cannot be empty.');
+    if (new Set(input.items.map((item) => item.messageId)).size !== input.items.length) {
+      throw new Error('Secure Move outbox batch contains duplicate message identities.');
+    }
     const transaction = this.db.transaction(STORES, 'readwrite');
     const journals = transaction.objectStore(DataStore.MoveJournals);
     const existingJournal = hydrateRecord(
@@ -93,53 +101,74 @@ export class SecureMoveOutboxRepository {
       transaction.abort();
       throw new Error('Secure Move journal identity was reused across participants.');
     }
-    const item: SecureMoveItem = {
-      id: moveItemId(input.transferId, input.interopId),
-      transferId: input.transferId,
-      interopId: input.interopId,
-      sourceMessageId: input.messageId,
-      sourceLocalId: input.sourceLocalId,
-      reviewCategory: input.reviewCategory,
-      state: 'queued',
-      acknowledgedAt: null,
-      finalizedAt: null,
-    };
     const items = transaction.objectStore(DataStore.MoveItems);
-    const existingItem = hydrateRecord(DataStore.MoveItems, secureMoveItemSchema, await requestToPromise<unknown>(items.get(item.id)));
-    if (
-      existingItem &&
-      (existingItem.sourceMessageId !== item.sourceMessageId ||
-        existingItem.sourceLocalId !== item.sourceLocalId ||
-        existingItem.reviewCategory !== item.reviewCategory)
-    ) {
-      transaction.abort();
-      throw new Error('Secure Move item identity was replayed with different metadata.');
-    }
-    items.put(existingItem ?? item);
     const outbox = transaction.objectStore(DataStore.MoveOutbox);
-    const existingOutbox = hydrateRecord(
-      DataStore.MoveOutbox,
-      secureMoveOutboxSchema,
-      await requestToPromise<unknown>(outbox.get(input.messageId)),
-    );
-    if (existingOutbox && (existingOutbox.transferId !== input.transferId || existingOutbox.path !== input.path)) {
-      transaction.abort();
-      throw new Error('Secure Move message identity was replayed across outbox objects.');
-    }
-    if (!existingOutbox) {
-      const ciphertext = input.ciphertext.buffer.slice(
-        input.ciphertext.byteOffset,
-        input.ciphertext.byteOffset + input.ciphertext.byteLength,
-      ) as ArrayBuffer;
-      outbox.put({
-        messageId: input.messageId,
+    const audit = transaction.objectStore(DataStore.MoveAudit);
+    let lastSequence = existingJournal?.lastSequence ?? 0;
+    for (const queued of input.items) {
+      const item: SecureMoveItem = {
+        id: moveItemId(input.transferId, queued.interopId),
         transferId: input.transferId,
-        sequence: input.sequence,
-        path: input.path,
-        ciphertext,
-        createdAt: input.at,
-        deliveredAt: null,
-      } satisfies SecureMoveOutboxRecord);
+        interopId: queued.interopId,
+        sourceMessageId: queued.messageId,
+        sourceLocalId: queued.sourceLocalId,
+        reviewCategory: queued.reviewCategory,
+        state: 'queued',
+        acknowledgedAt: null,
+        finalizedAt: null,
+      };
+      const existingItem = hydrateRecord(DataStore.MoveItems, secureMoveItemSchema, await requestToPromise<unknown>(items.get(item.id)));
+      if (
+        existingItem &&
+        (existingItem.sourceMessageId !== item.sourceMessageId ||
+          existingItem.sourceLocalId !== item.sourceLocalId ||
+          existingItem.reviewCategory !== item.reviewCategory)
+      ) {
+        transaction.abort();
+        throw new Error('Secure Move item identity was replayed with different metadata.');
+      }
+      items.put(existingItem ?? item);
+      const existingOutbox = hydrateRecord(
+        DataStore.MoveOutbox,
+        secureMoveOutboxSchema,
+        await requestToPromise<unknown>(outbox.get(queued.messageId)),
+      );
+      if (
+        existingOutbox &&
+        (existingOutbox.transferId !== input.transferId ||
+          existingOutbox.sequence !== queued.sequence ||
+          existingOutbox.path !== queued.path)
+      ) {
+        transaction.abort();
+        throw new Error('Secure Move message identity was replayed across outbox objects.');
+      }
+      if (!existingOutbox) {
+        const ciphertext = queued.ciphertext.buffer.slice(
+          queued.ciphertext.byteOffset,
+          queued.ciphertext.byteOffset + queued.ciphertext.byteLength,
+        ) as ArrayBuffer;
+        outbox.put({
+          messageId: queued.messageId,
+          transferId: input.transferId,
+          sequence: queued.sequence,
+          path: queued.path,
+          ciphertext,
+          createdAt: input.at,
+          deliveredAt: null,
+        } satisfies SecureMoveOutboxRecord);
+      }
+      const eventKey = `${queued.messageId}:queued`;
+      if ((await requestToPromise<IDBValidKey | undefined>(audit.getKey(eventKey))) === undefined) {
+        audit.put({
+          eventKey,
+          transferId: input.transferId,
+          interopId: queued.interopId,
+          event: 'queued',
+          details: { sourceMessageId: queued.messageId },
+          createdAt: input.at,
+        });
+      }
+      lastSequence = Math.max(lastSequence, queued.sequence);
     }
     const journal: MoveJournalRecord = existingJournal ?? {
       transferId: input.transferId,
@@ -147,23 +176,11 @@ export class SecureMoveOutboxRepository {
       sourceProduct: 'image-trail',
       targetProduct: 'overlook',
       phase: 'awaiting-acknowledgement',
-      lastSequence: input.sequence,
+      lastSequence,
       createdAt: input.at,
       updatedAt: input.at,
     };
-    journals.put({ ...journal, lastSequence: Math.max(journal.lastSequence, input.sequence), updatedAt: input.at });
-    const audit = transaction.objectStore(DataStore.MoveAudit);
-    const eventKey = `${input.messageId}:queued`;
-    if ((await requestToPromise<IDBValidKey | undefined>(audit.getKey(eventKey))) === undefined) {
-      audit.put({
-        eventKey,
-        transferId: input.transferId,
-        interopId: input.interopId,
-        event: 'queued',
-        details: { sourceMessageId: input.messageId },
-        createdAt: input.at,
-      });
-    }
+    journals.put({ ...journal, lastSequence, updatedAt: input.at });
     await transactionDone(transaction);
   }
 

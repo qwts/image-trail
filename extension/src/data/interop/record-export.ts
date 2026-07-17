@@ -3,9 +3,11 @@ import * as v from 'valibot';
 import type { InteropReviewCategory, InteropRevisionVector } from '../../core/interop/contract.js';
 import { interopRecordSchema, type InteropBlobReference, type InteropRecord } from '../../core/interop/records.js';
 import { ensureDurableBookmarkKey } from '../durable-bookmark-key.js';
+import type { ActiveBlobKey } from '../crypto/blob-keyring.js';
 import { BookmarksRepository, type EncryptedBookmarkRecord } from '../repositories/bookmarks-repository.js';
+import { EncryptedPinsRepository, type EncryptedPinRecord } from '../repositories/encrypted-pins-repository.js';
 import { KeysRepository } from '../repositories/keys-repository.js';
-import type { DurableBookmarkPayloadV1, DurableInteropRecordV1 } from '../types.js';
+import type { DurableBookmarkPayloadV1, DurableEncryptedPinPayloadV1, DurableInteropRecordV1 } from '../types.js';
 
 export interface CanonicalRecordExport {
   readonly localId: string;
@@ -26,6 +28,7 @@ interface RecordExportOptions {
 }
 
 const INITIAL_REVISION: InteropRevisionVector = { imageTrail: 1, overlook: 0 };
+type ExportPayload = DurableBookmarkPayloadV1 | DurableEncryptedPinPayloadV1;
 
 function nonEmpty(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? '';
@@ -46,7 +49,7 @@ function timestamp(value: string | undefined): string | null {
   return Number.isNaN(parsed.valueOf()) ? null : parsed.toISOString();
 }
 
-function dimensions(payload: DurableBookmarkPayloadV1): InteropRecord['dimensions'] {
+function dimensions(payload: ExportPayload): InteropRecord['dimensions'] {
   return Number.isSafeInteger(payload.width) && Number.isSafeInteger(payload.height) && payload.width! > 0 && payload.height! > 0
     ? { width: payload.width!, height: payload.height! }
     : null;
@@ -63,7 +66,7 @@ function unavailableBlob(reason: 'not-captured' | 'provider-unavailable'): Inter
   };
 }
 
-function originalReference(payload: DurableBookmarkPayloadV1): InteropBlobReference {
+function originalReference(payload: ExportPayload): InteropBlobReference {
   const original = payload.storedOriginal;
   return original
     ? {
@@ -77,9 +80,10 @@ function originalReference(payload: DurableBookmarkPayloadV1): InteropBlobRefere
     : unavailableBlob('not-captured');
 }
 
-function thumbnailReference(payload: DurableBookmarkPayloadV1): InteropBlobReference {
-  if (!payload.thumbnail) return unavailableBlob('not-captured');
-  const mimeType = /^data:([^;,]+)[;,]/u.exec(payload.thumbnail)?.[1] ?? null;
+function thumbnailReference(payload: ExportPayload): InteropBlobReference {
+  const thumbnail = 'thumbnail' in payload ? payload.thumbnail : 'thumbnailId' in payload ? payload.thumbnailId : undefined;
+  if (!thumbnail) return unavailableBlob('not-captured');
+  const mimeType = /^data:([^;,]+)[;,]/u.exec(thumbnail)?.[1] ?? null;
   return {
     state: 'metadata-only',
     blobId: null,
@@ -90,7 +94,7 @@ function thumbnailReference(payload: DurableBookmarkPayloadV1): InteropBlobRefer
   };
 }
 
-function canonicalRecord(localId: string, payload: DurableBookmarkPayloadV1, interopId: string): InteropRecord | null {
+function canonicalRecord(localId: string, payload: ExportPayload, interopId: string): InteropRecord | null {
   const url = sourceUrl(payload.url);
   if (url === null) return null;
   const revision = INITIAL_REVISION;
@@ -131,7 +135,7 @@ function canonicalRecord(localId: string, payload: DurableBookmarkPayloadV1, int
   });
 }
 
-function custody(localId: string, payload: DurableBookmarkPayloadV1, createId: () => string): DurableInteropRecordV1 | null {
+function custody(localId: string, payload: ExportPayload, createId: () => string): DurableInteropRecordV1 | null {
   if (payload.interop) return payload.interop;
   const record = canonicalRecord(localId, payload, createId());
   if (record === null) return null;
@@ -155,21 +159,52 @@ export class InteropRecordExportStore {
     this.#createId = options.createId ?? (() => crypto.randomUUID());
   }
 
-  async review(recordIds: readonly string[]): Promise<CanonicalRecordExportReview> {
+  async review(recordIds: readonly string[], activeBlobKey: ActiveBlobKey | null = null): Promise<CanonicalRecordExportReview> {
     const uniqueIds = [...new Set(recordIds.map((id) => id.trim()).filter(Boolean))];
     const bookmarks = new BookmarksRepository(this.db);
+    const encryptedPins = new EncryptedPinsRepository(this.db);
     const key = await ensureDurableBookmarkKey(new KeysRepository(this.db));
     const records: CanonicalRecordExport[] = [];
     let unsupported = 0;
     for (const localId of uniqueIds) {
       const encrypted = await bookmarks.getEncrypted(localId);
       const payload = await this.open(bookmarks, encrypted, key.key);
-      const interop = payload ? custody(localId, payload, this.#createId) : null;
-      if (!encrypted || !payload || !interop) {
+      const protectedPin = await this.openProtected(encryptedPins, payload, activeBlobKey);
+      const exportPayload = protectedPin
+        ? { ...protectedPin.payload, interop: protectedPin.payload.interop ?? payload?.interop }
+        : payload?.protectedPin
+          ? null
+          : payload;
+      const interop = exportPayload ? custody(localId, exportPayload, this.#createId) : null;
+      if (!encrypted || !payload || !exportPayload || !interop) {
         unsupported += 1;
         continue;
       }
-      if (!payload.interop) {
+      if (protectedPin && activeBlobKey) {
+        if (!protectedPin.payload.interop || payload.interop) {
+          await encryptedPins.sealAndPut({
+            id: protectedPin.record.id,
+            plainPinId: protectedPin.record.plainPinId,
+            urlHash: protectedPin.record.urlHash,
+            queueUpdatedAt: protectedPin.record.queueUpdatedAt,
+            payload: { ...protectedPin.payload, interop },
+            key: activeBlobKey.key,
+            keyReference: activeBlobKey.reference,
+            now: this.#now(),
+          });
+        }
+        if (payload.interop) {
+          await bookmarks.sealAndPut(
+            encrypted.uuid,
+            { ...payload, interop: undefined },
+            key.key,
+            key.reference,
+            this.#now(),
+            encrypted.url,
+            encrypted.queueUpdatedAt,
+          );
+        }
+      } else if (!payload.interop) {
         await bookmarks.sealAndPut(
           encrypted.uuid,
           { ...payload, interop },
@@ -198,6 +233,22 @@ export class InteropRecordExportStore {
     if (!encrypted) return null;
     try {
       return await bookmarks.openRecord(encrypted, key);
+    } catch {
+      return null;
+    }
+  }
+
+  private async openProtected(
+    pins: EncryptedPinsRepository,
+    relationship: DurableBookmarkPayloadV1 | null,
+    activeBlobKey: ActiveBlobKey | null,
+  ): Promise<{ readonly record: EncryptedPinRecord; readonly payload: DurableEncryptedPinPayloadV1 } | null> {
+    const id = relationship?.protectedPin?.encryptedPinId;
+    if (!id || !activeBlobKey) return null;
+    const record = await pins.get(id);
+    if (!record || record.plainPinId !== relationship.protectedPin?.plainPinId) return null;
+    try {
+      return { record, payload: await pins.openRecord(record, activeBlobKey.key) };
     } catch {
       return null;
     }

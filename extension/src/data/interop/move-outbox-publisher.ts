@@ -4,7 +4,8 @@ import { INTEROP_CONTRACT_VERSION, INTEROP_MAGIC } from '../../core/interop/cont
 import { EncryptedInteropTransport, type InteropObjectStore } from '../../core/interop/transport.js';
 import { InteropRecordExportStore } from './record-export.js';
 import { sealInteropMessage } from './sealed-message.js';
-import { SecureMoveOutboxRepository } from './secure-move-outbox-repository.js';
+import { SecureMoveOutboxRepository, type SecureMoveQueueItem } from './secure-move-outbox-repository.js';
+import type { ActiveBlobKey } from '../crypto/blob-keyring.js';
 import type { StoredInteropKeyRecord } from '../repositories/interop-keys-repository.js';
 import type { StoredMoveJournal } from './move-journal-types.js';
 
@@ -19,6 +20,7 @@ export interface MoveOutboxProgress {
 interface MoveOutboxPublisherOptions {
   readonly now?: (() => string) | undefined;
   readonly createId?: (() => string) | undefined;
+  readonly seal?: typeof sealInteropMessage | undefined;
 }
 
 export class MoveOutboxPublishError extends Error {
@@ -57,6 +59,7 @@ function outboxPath(sequence: number, messageId: string): string {
 export class MoveOutboxPublisher {
   readonly #now: () => string;
   readonly #createId: () => string;
+  readonly #seal: typeof sealInteropMessage;
 
   constructor(
     private readonly db: IDBDatabase,
@@ -65,50 +68,51 @@ export class MoveOutboxPublisher {
   ) {
     this.#now = options.now ?? (() => new Date().toISOString());
     this.#createId = options.createId ?? (() => crypto.randomUUID());
+    this.#seal = options.seal ?? sealInteropMessage;
   }
 
   async start(input: {
     readonly transferId: string;
     readonly recordIds: readonly string[];
     readonly pairing: StoredInteropKeyRecord;
+    readonly activeBlobKey?: ActiveBlobKey | null | undefined;
   }): Promise<MoveOutboxProgress> {
     const reviewed = await new InteropRecordExportStore(this.db, {
       now: this.#now,
       createId: this.#createId,
-    }).review(input.recordIds);
+    }).review(input.recordIds, input.activeBlobKey ?? null);
     if (reviewed.records.length === 0) throw new Error('No supported Image Trail records were available for Move.');
     const outbox = new SecureMoveOutboxRepository(this.db);
     const createdAt = this.#now();
     let sequence = 0;
-    for (const item of reviewed.records) {
-      sequence += 1;
-      const envelope = parseInteropEnvelope({
-        header: {
-          magic: INTEROP_MAGIC,
-          contractVersion: INTEROP_CONTRACT_VERSION,
-          messageId: this.#createId(),
-          transferId: input.transferId,
-          pairingId: input.pairing.pairingId,
-          sourceProduct: 'image-trail',
-          targetProduct: 'overlook',
-          operation: 'move',
-          kind: 'record',
-          createdAt,
-          sequence,
-        },
-        payload: {
-          kind: 'record',
-          schemaVersion: 1,
-          record: item.record,
-          albums: item.albums,
-          reviewCategory: item.reviewCategory,
-        },
-      });
-      const ciphertext = await sealInteropMessage(envelope, input.pairing);
-      try {
-        await outbox.queue({
-          pairingId: input.pairing.pairingId,
-          transferId: input.transferId,
+    const queued: SecureMoveQueueItem[] = [];
+    try {
+      for (const item of reviewed.records) {
+        sequence += 1;
+        const envelope = parseInteropEnvelope({
+          header: {
+            magic: INTEROP_MAGIC,
+            contractVersion: INTEROP_CONTRACT_VERSION,
+            messageId: this.#createId(),
+            transferId: input.transferId,
+            pairingId: input.pairing.pairingId,
+            sourceProduct: 'image-trail',
+            targetProduct: 'overlook',
+            operation: 'move',
+            kind: 'record',
+            createdAt,
+            sequence,
+          },
+          payload: {
+            kind: 'record',
+            schemaVersion: 1,
+            record: item.record,
+            albums: item.albums,
+            reviewCategory: item.reviewCategory,
+          },
+        });
+        const ciphertext = await this.#seal(envelope, input.pairing);
+        queued.push({
           messageId: envelope.header.messageId,
           sequence: envelope.header.sequence,
           interopId: item.record.identity.interopId,
@@ -116,11 +120,16 @@ export class MoveOutboxPublisher {
           reviewCategory: item.reviewCategory,
           path: outboxPath(envelope.header.sequence, envelope.header.messageId),
           ciphertext,
-          at: createdAt,
         });
-      } finally {
-        ciphertext.fill(0);
       }
+      await outbox.queueBatch({
+        pairingId: input.pairing.pairingId,
+        transferId: input.transferId,
+        items: queued,
+        at: createdAt,
+      });
+    } finally {
+      for (const item of queued) item.ciphertext.fill(0);
     }
     return this.publish(input.transferId, input.pairing, reviewed.requested);
   }

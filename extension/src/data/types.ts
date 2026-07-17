@@ -135,6 +135,7 @@ export interface DurableEncryptedPinPayloadV1 {
   readonly sourceCompatibility?: 'favorites' | undefined;
   readonly storedOriginal?: StoredOriginalReference | undefined;
   readonly thumbnailId?: string | undefined;
+  readonly interop?: DurableInteropRecordV1 | undefined;
 }
 
 export interface DurableDownloadPayloadV1 {
