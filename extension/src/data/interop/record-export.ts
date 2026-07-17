@@ -11,6 +11,7 @@ import type { DurableBookmarkPayloadV1, DurableEncryptedPinPayloadV1, DurableInt
 
 export interface CanonicalRecordExport {
   readonly localId: string;
+  readonly sourceUpdatedAt: string;
   readonly record: InteropRecord;
   readonly albums: DurableInteropRecordV1['albums'];
   readonly reviewCategory: InteropReviewCategory;
@@ -215,8 +216,14 @@ export class InteropRecordExportStore {
           encrypted.queueUpdatedAt,
         );
       }
+      const reviewedSource = await bookmarks.getEncrypted(localId);
+      if (!reviewedSource) {
+        unsupported += 1;
+        continue;
+      }
       records.push({
         localId,
+        sourceUpdatedAt: reviewedSource.envelope.updatedAt,
         record: interop.record,
         albums: interop.albums,
         reviewCategory: interop.reviewCategory,
