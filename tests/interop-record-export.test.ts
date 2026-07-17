@@ -202,6 +202,45 @@ test('ordinary encrypted pins gain stable canonical custody without changing que
   assert.equal((await new BookmarksRepository(opened.db).getEncrypted('bookmark-1'))?.queueUpdatedAt, '2026-07-17T12:03:00.000Z');
 });
 
+test('record review zeroes decrypted original bytes when canonical review rejects the record', async (t) => {
+  const opened = await openImageTrailDb(new IDBFactory());
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+  await seedBookmark(opened.db, 'bookmark-1', 'not a valid URL');
+  const bytes = Uint8Array.from({ length: 42 }, (_value, index) => index);
+  const exporter = new InteropRecordExportStore(opened.db, { createId: () => INTEROP_ID });
+  const testHook = exporter as unknown as {
+    openOriginal: () => Promise<{
+      readonly reference: {
+        readonly state: 'available';
+        readonly blobId: string;
+        readonly mimeType: string;
+        readonly byteLength: number;
+        readonly contentHash: string;
+      };
+      readonly bytes: Uint8Array;
+    }>;
+  };
+  testHook.openOriginal = () =>
+    Promise.resolve({
+      reference: {
+        state: 'available',
+        blobId: 'blob-1',
+        mimeType: 'image/jpeg',
+        byteLength: bytes.byteLength,
+        contentHash: '00'.repeat(32),
+      },
+      bytes,
+    });
+  const review = await exporter.review(['bookmark-1']);
+  assert.equal(review.unsupported, 1);
+  assert.deepEqual(review.records, []);
+  assert.equal(
+    bytes.every((byte) => byte === 0),
+    true,
+  );
+});
+
 test('unlocked captured originals queue an available record, blob message, and encrypted file as one record of progress', async (t) => {
   const opened = await openImageTrailDb(new IDBFactory());
   assert.ok(opened.db);
