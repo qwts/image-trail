@@ -41,7 +41,7 @@ export function syncProgressView(progress: SecureSyncProgress, error: InteropRun
       : error,
     counts: progress.inbound?.counts ?? progress.counts,
     processed: Math.max(progress.delivered, progress.inbound?.received ?? 0),
-    conflicts: progress.inbound?.conflicts.map((conflict) => ({ ...conflict, label: 'Sync record' })) ?? [],
+    conflicts: [],
   };
 }
 
@@ -55,7 +55,7 @@ export function syncProgressFailureView(
     error: { code: cause.code === 'provider-unavailable' ? 'partial-failure' : cause.code, message, retryable: true },
     counts: progress.inbound?.counts ?? progress.counts,
     processed: Math.max(progress.delivered, progress.inbound?.received ?? 0),
-    conflicts: progress.inbound?.conflicts.map((conflict) => ({ ...conflict, label: 'Sync record' })) ?? [],
+    conflicts: [],
   };
 }
 

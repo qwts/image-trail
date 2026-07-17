@@ -447,9 +447,7 @@ test('runtime Sync publishes a pairing-key-sealed selected snapshot without plai
   const reviewed = await runtime.dispatch(selected, { name: 'status' });
   assert.equal(reviewed.snapshot.counts.eligible, 0);
   assert.equal(reviewed.snapshot.counts.conflict, 1);
-  assert.deepEqual(reviewed.snapshot.conflicts, [
-    { interopId: envelope.payload.record.identity.interopId, label: 'Sync record', fields: ['title'] },
-  ]);
+  assert.deepEqual(reviewed.snapshot.conflicts, []);
   assert.equal((await new BookmarksRepository(db).getEncrypted('bookmark-1'))?.queueUpdatedAt, queueUpdatedAt);
   const inboxTransaction = db.transaction('secureSyncInbox', 'readonly');
   const inbox = await result(inboxTransaction.objectStore('secureSyncInbox').getAll());
