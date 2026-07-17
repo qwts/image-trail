@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.22.0
+
+### Minor Changes
+
+- d928490: Discover sealed Move acknowledgements from connected interoperability providers and finalize eligible source bookmarks only after verified destination custody.
+
 ## 0.21.0
 
 ### Minor Changes
