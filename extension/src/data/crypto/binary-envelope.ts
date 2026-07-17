@@ -107,5 +107,9 @@ export async function openBlobPayload(input: {
   readonly aad: BlobAadMetadata;
 }): Promise<OpenedBlobPayload> {
   const plaintext = await decryptAesGcm(input.key, new Uint8Array(input.ciphertext), fromBase64(input.iv), aad(input.aad));
-  return decodePayload(plaintext);
+  try {
+    return decodePayload(plaintext);
+  } finally {
+    plaintext.fill(0);
+  }
 }

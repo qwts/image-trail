@@ -13,11 +13,14 @@ import {
 import { ensureDurableBookmarkKey } from '../extension/src/data/durable-bookmark-key.js';
 import { openImageTrailDb } from '../extension/src/data/db.js';
 import { createKeyReference } from '../extension/src/data/crypto/key-reference.js';
+import { sealBlobPayload } from '../extension/src/data/crypto/binary-envelope.js';
 import { generateAesGcmKey } from '../extension/src/data/crypto/webcrypto.js';
 import { importInteropPairingBundle } from '../extension/src/data/interop/pairing-import.js';
 import { MoveOutboxPublishError, MoveOutboxPublisher } from '../extension/src/data/interop/move-outbox-publisher.js';
 import { InteropRecordExportStore } from '../extension/src/data/interop/record-export.js';
 import { openInteropMessage, sealInteropMessage } from '../extension/src/data/interop/sealed-message.js';
+import { openInteropBlob, sealInteropBlob } from '../extension/src/data/interop/sealed-blob.js';
+import { BlobsRepository } from '../extension/src/data/repositories/blobs-repository.js';
 import { SecureMoveOutboxRepository } from '../extension/src/data/interop/secure-move-outbox-repository.js';
 import { BookmarksRepository } from '../extension/src/data/repositories/bookmarks-repository.js';
 import { EncryptedPinsRepository } from '../extension/src/data/repositories/encrypted-pins-repository.js';
@@ -30,6 +33,8 @@ const TRANSFER_ID = '33333333-3333-4333-8333-333333333333';
 const SECOND_INTEROP_ID = '44444444-4444-4444-8444-444444444444';
 const SECOND_MESSAGE_ID = '55555555-5555-4555-8555-555555555555';
 const BLOB_KEY_ID = '66666666-6666-4666-8666-666666666666';
+const BLOB_MESSAGE_ID = '77777777-7777-4777-8777-777777777777';
+const BLOB_STORAGE_ID = '88888888-8888-4888-8888-888888888888';
 
 class MemoryStore implements InteropObjectStore {
   readonly provider = 'pcloud' as const;
@@ -152,6 +157,33 @@ async function seedProtectedBookmark(db: IDBDatabase) {
   return active;
 }
 
+async function seedOriginalBlob(db: IDBDatabase) {
+  const active = { reference: createKeyReference('blob', BLOB_KEY_ID), key: await generateAesGcmKey(false) };
+  const bytes = Uint8Array.from({ length: 42 }, (_value, index) => index);
+  const createdAt = '2026-07-17T12:01:00.000Z';
+  const aad = {
+    id: 'blob-1',
+    kind: 'original' as const,
+    schemaVersion: 1 as const,
+    algorithm: 'AES-GCM' as const,
+    createdAt,
+    key: active.reference,
+  };
+  const sealed = await sealBlobPayload({
+    key: active.key,
+    aad,
+    metadata: {
+      mimeType: 'image/jpeg',
+      byteLength: bytes.byteLength,
+      sourceUrl: 'https://example.test/original.jpg',
+      capturedAt: createdAt,
+    },
+    bytes: bytes.buffer,
+  });
+  await new BlobsRepository(db).put({ ...aad, ...sealed, referenceCount: 1 });
+  return { active, bytes };
+}
+
 test('ordinary encrypted pins gain stable canonical custody without changing queue order', async (t) => {
   const opened = await openImageTrailDb(new IDBFactory());
   assert.ok(opened.db);
@@ -168,6 +200,58 @@ test('ordinary encrypted pins gain stable canonical custody without changing que
   assert.equal(first.records[0]?.reviewCategory, 'metadata-only');
   assert.equal(first.records[0]?.record.original.state, 'metadata-only');
   assert.equal((await new BookmarksRepository(opened.db).getEncrypted('bookmark-1'))?.queueUpdatedAt, '2026-07-17T12:03:00.000Z');
+});
+
+test('unlocked captured originals queue an available record, blob message, and encrypted file as one record of progress', async (t) => {
+  const opened = await openImageTrailDb(new IDBFactory());
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+  await seedBookmark(opened.db);
+  const { active, bytes } = await seedOriginalBlob(opened.db);
+  await importInteropPairingBundle({
+    db: opened.db,
+    bundle: JSON.parse(readFileSync('contracts/interop/v1/fixtures/valid-pairing-bundle.json', 'utf8')) as unknown,
+    password: 'fixture-password',
+  });
+  const pairing = (await new InteropKeysRepository(opened.db).list())[0];
+  assert.ok(pairing);
+  const ids = [INTEROP_ID, MESSAGE_ID, BLOB_MESSAGE_ID, BLOB_STORAGE_ID];
+  const store = new MemoryStore();
+  const captured: { value?: Uint8Array } = {};
+  const progress = await new MoveOutboxPublisher(opened.db, store, {
+    createId: () => ids.shift() ?? crypto.randomUUID(),
+    sealBlob: (input) => {
+      captured.value = input.bytes;
+      return sealInteropBlob(input);
+    },
+  }).start({ transferId: TRANSFER_ID, recordIds: ['bookmark-1'], pairing, activeBlobKey: active });
+  assert.equal(progress.delivered, 1);
+  assert.equal(progress.pending, 0);
+  assert.equal(progress.counts.eligible, 1);
+  assert.equal(progress.counts.metadataOnly, 0);
+  const repository = new SecureMoveOutboxRepository(opened.db);
+  const outbox = await repository.outbox(TRANSFER_ID);
+  assert.equal(outbox.length, 3);
+  const envelopes = await Promise.all(
+    outbox
+      .filter((row) => row.path.endsWith('.json.aesgcm'))
+      .map((row) => openInteropMessage(new Uint8Array(row.ciphertext.slice(0)), pairing)),
+  );
+  const record = envelopes.find((envelope) => envelope.payload.kind === 'record');
+  const blob = envelopes.find((envelope) => envelope.payload.kind === 'blob');
+  assert.equal(record?.payload.kind === 'record' ? record.payload.record.original.state : null, 'available');
+  assert.equal(blob?.payload.kind === 'blob' ? blob.payload.encryptedPath : null, `blobs/${INTEROP_ID}/original.bin.aesgcm`);
+  const binary = outbox.find((row) => row.path.endsWith('.bin.aesgcm'));
+  assert.ok(binary);
+  const openedBlob = await openInteropBlob(new Uint8Array(binary.ciphertext.slice(0)), pairing);
+  assert.deepEqual(openedBlob.bytes, bytes);
+  openedBlob.bytes.fill(0);
+  assert.ok(captured.value);
+  assert.equal(
+    captured.value.every((byte) => byte === 0),
+    true,
+  );
+  assert.deepEqual((await repository.item(TRANSFER_ID, INTEROP_ID))?.sourceMessageIds, [MESSAGE_ID, BLOB_MESSAGE_ID]);
 });
 
 test('unlocked protected pins export real metadata and keep canonical custody behind the session key', async (t) => {
