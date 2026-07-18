@@ -1,5 +1,12 @@
 # image-trail
 
+## 0.24.6
+
+### Patch Changes
+
+- d19624c: Fix buffered parsed-field navigation by serializing image bytes safely across extension runtime messages.
+- 3f849f5: Reject malformed SHA-256 fingerprints at the buffered-image runtime message boundary.
+
 ## 0.24.5
 
 ### Patch Changes
