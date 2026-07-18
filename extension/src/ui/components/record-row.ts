@@ -105,6 +105,18 @@ function createRecordBody(options: RecordRowOptions): HTMLElement {
   const body = document.createElement(options.layout === 'gallery' ? 'span' : 'div');
   body.className = classNames('image-trail-ds__record-body', options.bodyClassName);
 
+  const identity = document.createElement('span');
+  identity.className = 'image-trail-ds__record-identity';
+  if (options.source) identity.append(createRecordSource(options));
+  if (options.storedOriginal) identity.append(createStoredOriginalIndicator());
+  body.append(identity);
+
+  const name = document.createElement('span');
+  name.className = classNames('image-trail-ds__record-name', options.nameClassName);
+  name.textContent = options.name;
+  if (options.nameTitle) name.title = options.nameTitle;
+  body.append(name);
+
   if (options.meta) {
     const meta = document.createElement('span');
     meta.className = classNames('image-trail-ds__record-meta', options.metaClassName);
@@ -112,18 +124,6 @@ function createRecordBody(options: RecordRowOptions): HTMLElement {
     meta.title = options.metaTitle ?? options.meta;
     body.append(meta);
   }
-
-  const identity = document.createElement('span');
-  identity.className = 'image-trail-ds__record-identity';
-  if (options.source) identity.append(createRecordSource(options));
-  if (options.storedOriginal) identity.append(createStoredOriginalIndicator());
-
-  const name = document.createElement('span');
-  name.className = classNames('image-trail-ds__record-name', options.nameClassName);
-  name.textContent = options.name;
-  if (options.nameTitle) name.title = options.nameTitle;
-  identity.append(name);
-  body.append(identity);
 
   if (options.warning) {
     const warning = document.createElement('span');

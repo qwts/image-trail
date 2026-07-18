@@ -91,6 +91,7 @@ function createHarness(options: { readonly pinFails?: boolean } = {}): Harness {
     markRecentHistoryRowPinned: async (id) => {
       log.push(`markRecentHistoryRowPinned:${id}`);
     },
+    createTargetThumbnail: async () => undefined,
     captureStore: () => captureStore,
     bookmarkStore: () => bookmarkStore,
     recentHistoryStore: () => recentHistoryStore,

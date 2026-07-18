@@ -156,6 +156,18 @@ export function imageExtensionFromUrl(url: string): string | null {
   }
 }
 
+export function imageExtensionForRecord(
+  record: Pick<ImageDisplayRecord, 'url' | 'title' | 'label' | 'thumbnail' | 'storedOriginal'>,
+): string | null {
+  return (
+    imageExtensionFromImageType(record.storedOriginal?.mimeType) ??
+    imageExtensionFromValue(record.label) ??
+    imageExtensionFromValue(record.title) ??
+    imageExtensionFromUrl(record.url) ??
+    imageExtensionFromUrl(record.thumbnail ?? '')
+  );
+}
+
 export function imageExtensionFromValue(value: string | undefined): string | null {
   if (!value) return null;
   const cleanName = value.split(/[?#]/u)[0] ?? value;

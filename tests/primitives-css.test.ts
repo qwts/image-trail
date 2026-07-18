@@ -56,6 +56,7 @@ test('RecordRow styles keep selection stronger than stored-original and cover pr
   assert.match(recordRowCss, /data-state='locked-encrypted'[\s\S]*var\(--it-opacity-locked\)/u);
   assert.match(recordRowCss, /data-state='key-unavailable'[\s\S]*var\(--it-opacity-key-gone\)/u);
   assert.match(recordRowCss, /record-stored-original[\s\S]*inline-size:\s*6px/u);
+  assert.match(recordRowCss, /record-name[\s\S]*inline-size:\s*100%;[\s\S]*max-inline-size:\s*100%/u);
   assert.match(recordRowCss, /record-privacy-veil[\s\S]*backdrop-filter:\s*var\(--it-blur-privacy\)/u);
 });
 

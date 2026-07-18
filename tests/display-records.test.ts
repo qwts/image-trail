@@ -4,6 +4,7 @@ import {
   createDisplayRecord,
   displayTitleForRecord,
   encryptedBlobIdForRecord,
+  imageExtensionForRecord,
   imageExtensionFromUrl,
   isDurableImageSourceUrl,
   normalizeDisplayLabel,
@@ -50,6 +51,23 @@ test('image extension detection supports image service format hints', () => {
   assert.equal(imageExtensionFromUrl('https://pbs.twimg.com/media/example?format=jpg&name=large'), 'JPG');
   assert.equal(imageExtensionFromUrl('https://images.example.test/render?mime=image%2Fwebp'), 'WEBP');
   assert.equal(imageExtensionFromUrl('data:image/png;base64,abc'), 'PNG');
+});
+
+test('record extension prefers captured MIME and resolved names over the navigation URL', () => {
+  assert.equal(
+    imageExtensionForRecord({
+      url: 'https://example.test/navigation.png',
+      label: 'source.webp',
+      storedOriginal: {
+        blobId: 'blob-1',
+        mimeType: 'image/jpeg',
+        byteLength: 1024,
+        capturedAt: '2026-07-18T00:00:00.000Z',
+      },
+    }),
+    'JPEG',
+  );
+  assert.equal(imageExtensionForRecord({ url: 'https://example.test/navigation.png', label: 'source.webp' }), 'WEBP');
 });
 
 test('data image display records keep DOM labels, titles, and generated ids bounded', () => {

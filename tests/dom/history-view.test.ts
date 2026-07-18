@@ -198,6 +198,26 @@ test('stored recent rows render the original indicator', () => {
   assert.ok(row.querySelector('.image-trail-panel__stored-original-dot'));
 });
 
+test('stored recent rows label the captured source MIME before the navigation suffix', () => {
+  const actions: unknown[] = [];
+  const captured = {
+    ...record,
+    url: 'https://images.example.test/navigation.png',
+    label: 'navigation.png',
+    captureStatus: 'captured' as const,
+    blobId: 'blob-webp',
+    storedOriginal: {
+      blobId: 'blob-webp',
+      mimeType: 'image/webp',
+      byteLength: 1024,
+      capturedAt: '2026-06-25T15:30:00.000Z',
+    },
+  };
+  const view = buildHistoryView(actions, [], [captured]);
+
+  assert.equal(view.querySelector('.image-trail-panel__bookmark-source')?.textContent, 'WEBP');
+});
+
 test('Recents keeps sorting in the one-line header while scope and bulk actions render below it (#448)', () => {
   const actions: unknown[] = [];
   const view = buildHistoryView(actions);
