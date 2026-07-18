@@ -20,6 +20,7 @@ test('orphan cleanup protects new blobs and selects only old unreferenced blobs'
 test('orphan cleanup fails safe for invalid or future creation times', () => {
   const blobs = [
     { id: 'invalid-time', createdAt: 'not-a-date' },
+    { id: 'parseable-invalid-time', createdAt: '0' },
     { id: 'future-time', createdAt: new Date(now + 1).toISOString() },
   ];
 
