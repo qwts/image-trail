@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.24.1
+
+### Patch Changes
+
+- 9acb894: Keep inbound Sync conflicts count-only until conflict resolution is available.
+
 ## 0.24.0
 
 ### Minor Changes
