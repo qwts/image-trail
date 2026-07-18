@@ -1,26 +1,16 @@
 import type { CaptureStore } from '../../content/capture-controller.js';
 import type { RecentHistoryStore } from '../../content/recent-history-store.js';
 import { reducePanelAction } from '../../core/actions.js';
-import {
-  createDisplayRecord,
-  isDurableImageSourceUrl,
-  recordHasStoredOriginal,
-  withoutStoredOriginal,
-} from '../../core/display-records.js';
+import { isDurableImageSourceUrl, recordHasStoredOriginal, withoutStoredOriginal } from '../../core/display-records.js';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
 import { isCapturedResult, type CaptureResult, type CaptureRetryRequest, type CaptureSourceType } from '../../core/image/capture-result.js';
 import type { BookmarkStore, PanelState } from '../../core/types.js';
 import { bookmarkSaveMessage, recordHasBlobId } from './record-export-helpers.js';
 import { MissingOriginalRepairController } from './missing-original-repair-controller.js';
+import { createTargetCaptureRecord } from './target-capture-record.js';
 
 function captureRetryMatches(left: CaptureRetryRequest | null, right: CaptureRetryRequest): boolean {
   return left?.url === right.url && left.sourceType === right.sourceType && left.sourceRecordId === right.sourceRecordId;
-}
-
-function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {
-  const match = value?.match(/^\s*(\d+)\s*[x×]\s*(\d+)\s*$/iu);
-  if (!match) return {};
-  return { width: Number(match[1]), height: Number(match[2]) };
 }
 
 export interface CapturedOriginalsControllerDeps {
@@ -41,6 +31,7 @@ export interface CapturedOriginalsControllerDeps {
     options?: { readonly timestamp?: string; readonly render?: boolean },
   ): Promise<{ readonly ok: true; readonly record: ImageDisplayRecord } | { readonly ok: false; readonly message: string }>;
   markRecentHistoryRowPinned(id: string, bookmark: ImageDisplayRecord): Promise<void>;
+  createTargetThumbnail?(url: string): Promise<string | undefined>;
   captureStore(): CaptureStore | null;
   bookmarkStore(): BookmarkStore | null;
   recentHistoryStore(): RecentHistoryStore | null;
@@ -205,24 +196,12 @@ export class CapturedOriginalsController {
       }
     }
     if (isCapturedResult(result) && sourceType === 'target') {
-      const capturedAt = new Date().toISOString();
-      const dimensions = parseDimensionText(this.deps.getState().target.selectedDimensions);
-      const draft = createDisplayRecord({
-        id: url,
+      const draft = await createTargetCaptureRecord({
         url,
-        timestamp: capturedAt,
-        width: dimensions.width,
-        height: dimensions.height,
-        source: 'bookmark',
-        capturedAt,
-        captureStatus: 'captured',
-        blobId: result.blobId,
-        storedOriginal: {
-          blobId: result.blobId,
-          mimeType: result.mimeType,
-          byteLength: result.byteLength,
-          capturedAt,
-        },
+        result,
+        state: this.deps.getState(),
+        existingSavedRecord: await this.findSavedRecordByUrl(url),
+        createTargetThumbnail: this.deps.createTargetThumbnail,
       });
       const bookmarkStore = this.deps.bookmarkStore();
       if (!bookmarkStore) {

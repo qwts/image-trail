@@ -1,6 +1,6 @@
 import {
   IMAGE_RECORD_EXTENSIONS,
-  imageExtensionFromUrl,
+  imageExtensionForRecord,
   recordHasStoredOriginal,
   sourceImageUrlFrom,
   type ImageDisplayRecord,
@@ -87,7 +87,7 @@ export function sourceHostForGalleryRecord(record: ImageDisplayRecord): string |
 
 export function imageTypeForGalleryRecord(record: ImageDisplayRecord): GalleryImageTypeFilter | null {
   if (record.privacyStatus === 'locked') return null;
-  const extension = imageExtensionFromUrl(record.url);
+  const extension = imageExtensionForRecord(record);
   return isGalleryImageType(extension) ? extension : 'UNKNOWN';
 }
 

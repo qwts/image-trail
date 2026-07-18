@@ -170,7 +170,7 @@
             "tests/dom/gallery-view.test.ts",
             "tests/primitives-css.test.ts"
           ],
-          "notes": "Covers the canonical thumbnail, source/name/meta hierarchy, selected/locked/key-unavailable/privacy states, stored-original indicator, native Gallery button semantics, shared adoption across all four record surfaces, existing row interactions, and stylesheet packaging."
+          "notes": "Covers the canonical thumbnail, dedicated source/name/meta tracks, long-name truncation contract, captured-MIME source labels, selected/locked/key-unavailable/privacy states, stored-original indicator, native Gallery button semantics, shared adoption across all four record surfaces, existing row interactions, and stylesheet packaging (#661)."
         },
         {
           "type": "storybook",
@@ -711,7 +711,7 @@
             "tests/dom/record-library-controller.test.ts",
             "tests/dom/captured-originals-controller.test.ts"
           ],
-          "notes": "Covers saved-row lookup messages, plain/protected URL lookup without queue-order mutation, original preservation during re-save/import, explicit original clearing, recent enrichment from off-page saved rows, duplicate pin prevention, stale all-scope pin responses being discarded after a Recents scope change, capture skip/update behavior, post-capture blob cleanup on failed durable save, linked recent cleanup, and Delete original resolving non-visible durable rows."
+          "notes": "Covers saved-row lookup messages, plain/protected URL lookup without queue-order mutation, original and thumbnail preservation during re-save/import, target-capture DOM thumbnail creation with URL-fetch fallback and permission-retry completion, explicit original clearing, recent enrichment from off-page saved rows, duplicate pin prevention, stale all-scope pin responses being discarded after a Recents scope change, capture skip/update behavior, post-capture blob cleanup on failed durable save, linked recent cleanup, and Delete original resolving non-visible durable rows (#661)."
         },
         {
           "type": "playwright-e2e",

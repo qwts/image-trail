@@ -26,6 +26,11 @@ test('RecordRow renders the canonical thumbnail, hierarchy, actions, and stored-
   assert.equal(row.body.querySelector('.image-trail-ds__record-meta')?.textContent, '1920 x 1080');
   assert.equal(row.body.querySelector('.image-trail-ds__record-source')?.textContent, 'JPG');
   assert.equal(row.body.querySelector('.image-trail-ds__record-name')?.textContent, 'photo.jpg');
+  assert.equal(row.body.querySelector('.image-trail-ds__record-identity .image-trail-ds__record-name'), null);
+  assert.deepEqual(
+    Array.from(row.body.children, (child) => child.classList[0]),
+    ['image-trail-ds__record-identity', 'image-trail-ds__record-name', 'image-trail-ds__record-meta'],
+  );
   assert.ok(row.root.querySelector('.image-trail-ds__record-stored-original'));
   assert.equal(row.root.querySelector('.image-trail-ds__record-actions'), actions);
 });

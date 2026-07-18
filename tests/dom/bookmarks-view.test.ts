@@ -185,6 +185,26 @@ test('stored queue rows render the original indicator and clear action', () => {
   assert.deepEqual(actions, [{ name: 'bookmark/clear', id: 'row-1' }]);
 });
 
+test('stored queue rows label the captured source MIME before the navigation suffix', () => {
+  const actions: unknown[] = [];
+  const captured = {
+    ...record,
+    url: 'https://images.example.test/navigation.png',
+    label: 'navigation.png',
+    captureStatus: 'captured' as const,
+    blobId: 'blob-webp',
+    storedOriginal: {
+      blobId: 'blob-webp',
+      mimeType: 'image/webp',
+      byteLength: 1024,
+      capturedAt: '2026-06-25T15:30:00.000Z',
+    },
+  };
+  const view = buildBookmarksView(actions, { items: [captured] });
+
+  assert.equal(view.querySelector('.image-trail-panel__bookmark-source')?.textContent, 'WEBP');
+});
+
 test('Pin current dispatches pin/current', () => {
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions);

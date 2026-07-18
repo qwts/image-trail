@@ -11,6 +11,7 @@ import {
   CapturedOriginalsController,
   type CapturedOriginalsControllerDeps,
 } from '../extension/src/ui/panel/captured-originals-controller.js';
+import { createTargetThumbnailWithUrlFallback } from '../extension/src/ui/panel/target-capture-record.js';
 
 const USAGE: StorageUsageSummary = { blobCount: 2, totalBytes: 4096 };
 const CAPTURED: CaptureResult = { status: 'captured', blobId: 'blob-1', mimeType: 'image/jpeg', byteLength: 2048 };
@@ -28,6 +29,7 @@ interface HarnessOptions {
   readonly captureResult?: CaptureResult;
   readonly permissionRetryResult?: CaptureResult;
   readonly deleteBlobThrows?: boolean;
+  readonly targetThumbnail?: string | undefined;
 }
 
 // Window-free capture paths only; the history-sourceType flow reaches window.location.href on its
@@ -100,6 +102,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
     markRecentHistoryRowPinned: async (id) => {
       log.push(`markRecentHistoryRowPinned:${id}`);
     },
+    createTargetThumbnail: async () => options.targetThumbnail,
     captureStore: () => captureStore as CaptureStore | null,
     bookmarkStore: () => bookmarkStore as BookmarkStore | null,
     recentHistoryStore: () => null as RecentHistoryStore | null,
@@ -317,7 +320,12 @@ test('repairBookmarkOriginal bypasses stale stored-original metadata and preserv
 });
 
 test('captureImage target flow updates an existing uncaptured saved row', async () => {
-  const existing = createDisplayRecord({ id: 'bookmark-existing', url: 'https://example.test/pic.jpg', source: 'bookmark' });
+  const existing = createDisplayRecord({
+    id: 'bookmark-existing',
+    url: 'https://example.test/pic.jpg',
+    thumbnail: 'data:image/jpeg;base64,existing',
+    source: 'bookmark',
+  });
   const savedDrafts: ImageDisplayRecord[] = [];
   const harness = createHarness({
     bookmarkStore: {
@@ -333,6 +341,7 @@ test('captureImage target flow updates an existing uncaptured saved row', async 
 
   assert.ok(harness.log.includes('requestCapture:https://example.test/pic.jpg:target'));
   assert.equal(savedDrafts[0]?.url, existing.url);
+  assert.equal(savedDrafts[0]?.thumbnail, existing.thumbnail);
   assert.equal(savedDrafts[0]?.storedOriginal?.blobId, 'blob-1');
   assert.equal(harness.log.at(-1), 'renderPanelAndRefreshRecall');
 });
@@ -359,6 +368,7 @@ test('captureImage target flow saves a stored-original pin with parsed dimension
   const initial = createInitialPanelState(0);
   const savedDrafts: ImageDisplayRecord[] = [];
   const capturing = createHarness({
+    targetThumbnail: 'data:image/jpeg;base64,new-thumbnail',
     bookmarkStore: {
       saveResult: async (record) => {
         savedDrafts.push(record);
@@ -371,10 +381,28 @@ test('captureImage target flow saves a stored-original pin with parsed dimension
   assert.equal(savedDrafts.length, 1);
   assert.equal(savedDrafts[0]?.width, 800);
   assert.equal(savedDrafts[0]?.height, 600);
+  assert.equal(savedDrafts[0]?.thumbnail, 'data:image/jpeg;base64,new-thumbnail');
   assert.equal(savedDrafts[0]?.storedOriginal?.blobId, 'blob-1');
   assert.match(capturing.getState().message, /^Captured 2\.0 KB image\./);
   assert.equal(capturing.log.at(-1), 'renderPanelAndRefreshRecall');
   assert.ok(capturing.log.indexOf('refreshStorageUsage:false') < capturing.log.indexOf('renderPanelAndRefreshRecall'));
+});
+
+test('target capture thumbnail falls back to the source URL when the DOM canvas is unavailable', async () => {
+  const calls: string[] = [];
+  const thumbnail = await createTargetThumbnailWithUrlFallback('https://example.test/cross-origin.webp', {} as HTMLImageElement, {
+    fromImage: async () => {
+      calls.push('image');
+      return null;
+    },
+    fromUrl: async (url) => {
+      calls.push(url);
+      return 'data:image/jpeg;base64,fetched';
+    },
+  });
+
+  assert.equal(thumbnail, 'data:image/jpeg;base64,fetched');
+  assert.deepEqual(calls, ['image', 'https://example.test/cross-origin.webp']);
 });
 
 test('captureImage bookmark flow re-saves the updated bookmark and re-pages the current offset', async () => {
