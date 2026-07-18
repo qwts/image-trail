@@ -77,13 +77,18 @@ test('invariant: the recents layer exposes no durable browser-storage write path
     'extension/src/data/runtime/runtime-history.ts',
     'extension/src/background/recent-history-cache.ts',
   ];
+  const durableChromeStoragePattern = /chrome\.storage(?:\?\.|\.)(?:local|sync|managed)/;
   const forbidden: readonly (readonly [RegExp, string])[] = [
     [/\bindexedDB\b/, 'indexedDB'],
-    [/chrome\.storage\.(?:local|sync|managed)/, 'durable chrome.storage'],
+    [durableChromeStoragePattern, 'durable chrome.storage'],
     [/openImageTrailDb/, 'openImageTrailDb'],
     [/from ['"][^'"]*\/repositories\//, 'a data repository import'],
     [/from ['"][^'"]*\/data\/db(\.js)?['"]/, 'the IndexedDB module'],
   ];
+
+  for (const durableAccess of ['chrome.storage.local', 'chrome.storage?.local']) {
+    assert.match(durableAccess, durableChromeStoragePattern);
+  }
 
   for (const relativePath of recentsModules) {
     const source = readFileSync(resolve(process.cwd(), relativePath), 'utf8');
@@ -99,7 +104,7 @@ test('invariant: the recents layer exposes no durable browser-storage write path
   const compositionRoot = readFileSync(resolve(process.cwd(), 'extension/src/background/service-worker.ts'), 'utf8');
   assert.match(
     compositionRoot,
-    /new RecentHistoryCache\(chrome\.storage\?\.session\)/,
+    /new\s+RecentHistoryCache\s*\(\s*chrome\.storage\?\.session\s*\)/,
     'the production recents cache must use browser-session storage so MV3 worker suspension does not clear it',
   );
 });
