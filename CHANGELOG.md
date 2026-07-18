@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.24.2
+
+### Patch Changes
+
+- 8fbb04a: Preserve captured originals when an existing plain or protected pin is re-saved without new original metadata.
+
 ## 0.24.1
 
 ### Patch Changes
