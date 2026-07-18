@@ -1,0 +1,18 @@
+{
+  "description": "Process-tree guard: deny shell commands that bypass scripts/run-guarded.mjs. Complements .codex/rules/process-guard.rules; requires one-time trust via /hooks.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/scripts/guard-agent-command.mjs\" --protocol=codex",
+            "timeout": 30,
+            "statusMessage": "Checking command against the process-tree guard policy"
+          }
+        ]
+      }
+    ]
+  }
+}

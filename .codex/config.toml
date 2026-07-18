@@ -1,1 +1,26 @@
+# Project-scoped Codex config — managed by scripts/bootstrap-codex-env.mjs.
+# Loaded (CLI + Desktop + IDE) only when the project is trusted
+# (projects.<path>.trust_level = "trusted" in ~/.codex/config.toml). Keys like
+# notify/model_provider are user-side only and ignored here by design.
+# Companion layers in this directory:
+#   rules/process-guard.rules — hard-forbids unguarded test runners
+#   hooks.json               — PreToolUse deny for variants rules cannot match
+#   environments/environment.toml — Desktop worktree setup/cleanup
 approval_policy = "on-request"
+
+# Filesystem containment: writes stay inside the workspace (plus /tmp and
+# $TMPDIR). <root>/.git, <root>/.codex, and <root>/.agents remain read-only
+# inside the sandbox, so an agent cannot edit its own policy layers. This does
+# NOT cap memory — the process-tree guard (scripts/run-guarded.mjs) is the
+# memory control.
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+# Dependency installs and browser downloads need outbound network in the dev
+# loop; the guard is a resource backstop, not an exfiltration control.
+network_access = true
+
+[features]
+# Hooks are stable-on in current Desktop builds; pinned so older CLI installs
+# load .codex/hooks.json too instead of silently skipping it.
+hooks = true

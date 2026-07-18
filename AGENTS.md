@@ -175,12 +175,18 @@ build` and paste **Built local** time plus commit, branch, and worktree when
   `test-storybook`, or `c8` directly, and never call `:run`/`:inner` npm
   scripts — use the guarded entrypoints. Claude Code and Cursor deny these
   mechanically via checked-in hooks (scoped to guarded checkouts; quoted
-  mentions in commit messages/PR bodies are fine); Codex and raw terminals
-  rely on this rule. `IMAGE_TRAIL_GUARD_DISABLE` is human-only.
+  mentions in commit messages/PR bodies are fine); Codex denies them via
+  `.codex/rules/process-guard.rules` (execpolicy `forbidden`) plus the
+  `.codex/hooks.json` PreToolUse hook (requires the project trusted and the
+  hook trusted once via `/hooks`); raw terminals rely on this rule.
+  `IMAGE_TRAIL_GUARD_DISABLE` is human-only.
 - If a command returns while still running (live session/cell), poll or
   terminate it before launching anything else. The guard refuses a second run
   in the same worktree ("another guarded run is active") — treat that as a
-  stop, not a prompt to retry.
+  stop, not a prompt to retry. In Codex, unified-exec sessions deliberately
+  survive a turn interrupt: poll the returned session (empty stdin write) or
+  send Ctrl-C to it — never start a replacement command while one is live
+  (that pile-up is how the 2026-07-18 incident compounded).
 - A run killed for `rss-limit`/`timeout` is a real failure: read
   `.guard/last-run.json`, report it, and do not rerun with a higher limit to
   make it pass. Knobs and details: `docs/agent-process-guard.md`.

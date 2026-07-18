@@ -99,15 +99,74 @@ bypass, mitigated by the scripts being guard-by-default.
 
 ### Codex (#670)
 
-Codex exposes no project-scoped command hook or child-process RSS/coalition
-limit (confirmed against the current public manual and installed command
-schema), so the enforcement point IS the npm scripts: any `npm test`-family
-command Codex runs is guarded. `AGENTS.md` carries the written rules
-(secondary control): use guarded entrypoints only; when an execution returns a
-live session/cell ID, poll or terminate it before launching anything else —
-the worktree lock also refuses a second run mechanically. Recommend
-`sandbox_mode = "workspace-write"` in `~/.codex/config.toml` for filesystem
-containment; it does not cap memory.
+An earlier revision of this section claimed Codex had no project-scoped
+command hook. That is out of date: current Codex (Desktop 0.145.x /
+CLI 0.144.x, July 2026) loads a repo-side `.codex/` policy layer for trusted
+projects, and the incident forensics (`~/.codex/process_manager/
+chat_processes.json`) show the incident session composed **raw
+`node --import … --test` commands**, bypassing the npm scripts entirely — so
+guarded scripts alone were never sufficient for Codex. Enforcement is now
+three mechanical layers plus the written rules:
+
+1. **execpolicy rules** — `.codex/rules/process-guard.rules` hard-forbids the
+   clean argv prefixes (`node --test`, `npx playwright test`, `c8`,
+   `test-storybook`, every `:run`/`:inner` script, headed e2e) with
+   `decision = "forbidden"`; the most restrictive decision wins, so a
+   user-side "always allow" cannot override it. It also auto-allows the
+   guarded entrypoints and bounded gates so approval friction never tempts a
+   raw-runner workaround. Prefix matching cannot see argument-order variants
+   (`node --import … --test`) or unsplittable `bash -lc` wrappers — layer 2
+   covers those. Validate with
+   `codex execpolicy check --rules .codex/rules/process-guard.rules -- <cmd…>`.
+2. **PreToolUse hook** — `.codex/hooks.json` runs
+   `scripts/guard-agent-command.mjs --protocol=codex` (same regexes as the
+   Claude/Cursor protocols; Codex argv arrays are joined before matching) and
+   denies via the Claude-compatible hook wire. Requires one-time per-user
+   trust (`/hooks`, hash-pinned — re-approve after edits).
+3. **Project config** — `.codex/config.toml` pins
+   `sandbox_mode = "workspace-write"` (filesystem containment; `<root>/.git`,
+   `.codex`, and `.agents` stay read-only inside the sandbox, so an agent
+   cannot edit its own policy layers) and `features.hooks = true`. It cannot
+   cap memory.
+
+Both repo layers load **only when the project is trusted**
+(`projects.<path>.trust_level = "trusted"` in `~/.codex/config.toml`) — an
+untrusted checkout silently skips them, so the trust entry is part of setup
+verification, and the guarded npm scripts remain the floor either way.
+
+Codex-native execution facts that shape the rest (verified against
+`codex-rs` source and the installed binaries; largely undocumented):
+
+- **No native RSS/coalition/CPU limit exists** for spawned commands — the
+  only `setrlimit` in the codebase disables core dumps on Codex itself, and
+  Seatbelt/SBPL expresses access control (filesystem/network/IPC), not
+  resource limits. The guard remains the only memory ceiling.
+- Shell commands get a **10 s default timeout** (model can extend per call);
+  timeout and turn-cancellation kill the **whole process group** (children are
+  spawned as `setsid` group leaders; SIGTERM → SIGKILL ladder).
+- **Unified-exec sessions survive turn interrupts by design** (up to 64 live
+  sessions; poll windows up to 5 min). Poll (empty stdin write) or Ctrl-C the
+  session before launching anything else; the guard's worktree lock refuses a
+  second guarded run mechanically.
+- On macOS there is **no parent-death signal**, so children can outlive a
+  hard-killed Codex app (upstream issues document orphaned workers/zombies).
+  The guard's group-kill and stale-lock recovery cover guarded runs; anything
+  else is cleaned up manually.
+- Desktop **managed worktrees** live under `~/.codex/worktrees` (retention
+  default: 15 most recent, configurable in Settings → Worktrees; snapshots on
+  delete). `.codex/environments/environment.toml` provisions them (Node from
+  `.nvmrc`, `npm ci`, fatal initial build) — Desktop-only; **Codex cloud does
+  not read it** (cloud environments are configured at
+  chatgpt.com/codex/settings/environments and run in externally capped ~8 GB
+  containers).
+
+`AGENTS.md` stays the secondary, written control (guarded entrypoints only;
+poll-before-replace). Rollout to other repos is scripted:
+`node scripts/bootstrap-codex-env.mjs` derives the repo's rules from
+`package.json` (guarded entrypoints = scripts using `run-guarded.mjs`) and
+writes the invariant `.codex/` layer; `--check` verifies an existing setup and
+probes the rules against a local `codex` CLI. The full reproducibility plan
+(invariants vs parameters, manual steps, verification) is on #670.
 
 ### CI (`.github/workflows/ci.yml`)
 
@@ -121,9 +180,14 @@ A memory-runaway or hung suite now fails the build instead of passing on a
 
 ## Bypass cases (accepted, documented)
 
-- A human (or agent whose environment lacks hooks — e.g. Codex) running raw
-  `node --test` / `npx playwright test` in a terminal. Mitigation: guarded
-  scripts are the paved road; AGENTS.md forbids the raw forms.
+- A human running raw `node --test` / `npx playwright test` in a terminal.
+  Mitigation: guarded scripts are the paved road; AGENTS.md forbids the raw
+  forms. (Codex agents no longer have this bypass: execpolicy rules and the
+  repo hook deny the raw forms mechanically for trusted checkouts.)
+- A Codex checkout that is untrusted, or whose repo hook was never trusted via
+  `/hooks`, silently skips the `.codex/` policy layers. The guarded npm
+  scripts remain the floor; setup verification (bootstrap `--check` + a live
+  denial probe) exists to catch this.
 - `IMAGE_TRAIL_GUARD_DISABLE=1` — intentional, warns loudly.
 - Non-test entrypoints (`npm run build`, `npm run storybook` dev server) are
   unguarded today; extend with a `--label build` wrapper if they ever misbehave.
