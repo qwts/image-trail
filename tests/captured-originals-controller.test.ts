@@ -11,6 +11,7 @@ import {
   CapturedOriginalsController,
   type CapturedOriginalsControllerDeps,
 } from '../extension/src/ui/panel/captured-originals-controller.js';
+import { createTargetThumbnailWithUrlFallback } from '../extension/src/ui/panel/target-capture-record.js';
 
 const USAGE: StorageUsageSummary = { blobCount: 2, totalBytes: 4096 };
 const CAPTURED: CaptureResult = { status: 'captured', blobId: 'blob-1', mimeType: 'image/jpeg', byteLength: 2048 };
@@ -385,6 +386,23 @@ test('captureImage target flow saves a stored-original pin with parsed dimension
   assert.match(capturing.getState().message, /^Captured 2\.0 KB image\./);
   assert.equal(capturing.log.at(-1), 'renderPanelAndRefreshRecall');
   assert.ok(capturing.log.indexOf('refreshStorageUsage:false') < capturing.log.indexOf('renderPanelAndRefreshRecall'));
+});
+
+test('target capture thumbnail falls back to the source URL when the DOM canvas is unavailable', async () => {
+  const calls: string[] = [];
+  const thumbnail = await createTargetThumbnailWithUrlFallback('https://example.test/cross-origin.webp', {} as HTMLImageElement, {
+    fromImage: async () => {
+      calls.push('image');
+      return null;
+    },
+    fromUrl: async (url) => {
+      calls.push(url);
+      return 'data:image/jpeg;base64,fetched';
+    },
+  });
+
+  assert.equal(thumbnail, 'data:image/jpeg;base64,fetched');
+  assert.deepEqual(calls, ['image', 'https://example.test/cross-origin.webp']);
 });
 
 test('captureImage bookmark flow re-saves the updated bookmark and re-pages the current offset', async () => {

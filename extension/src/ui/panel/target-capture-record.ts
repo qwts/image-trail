@@ -1,4 +1,4 @@
-import { createThumbnailDataUrlFromImage } from '../../content/thumbnail-generator.js';
+import { createThumbnailDataUrlFromImage, createThumbnailDataUrlFromUrl } from '../../content/thumbnail-generator.js';
 import { createDisplayRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import type { CaptureResult } from '../../core/image/capture-result.js';
 import type { PanelState } from '../../core/types.js';
@@ -41,9 +41,20 @@ async function targetThumbnail(input: TargetCaptureRecordInput): Promise<string 
   if (input.createTargetThumbnail) return input.createTargetThumbnail(input.url);
   if (typeof document === 'undefined' || input.state.target.selectedUrl !== input.url) return undefined;
   const handleId = input.state.target.selectedHandleId;
-  if (!handleId) return undefined;
-  const image = document.querySelector<HTMLImageElement>(`[data-image-trail-handle="${handleId}"]`);
-  return image ? ((await createThumbnailDataUrlFromImage(image)) ?? undefined) : undefined;
+  const image = handleId ? document.querySelector<HTMLImageElement>(`[data-image-trail-handle="${handleId}"]`) : null;
+  return createTargetThumbnailWithUrlFallback(input.url, image);
+}
+
+export async function createTargetThumbnailWithUrlFallback(
+  url: string,
+  image: HTMLImageElement | null,
+  generators: {
+    readonly fromImage: typeof createThumbnailDataUrlFromImage;
+    readonly fromUrl: typeof createThumbnailDataUrlFromUrl;
+  } = { fromImage: createThumbnailDataUrlFromImage, fromUrl: createThumbnailDataUrlFromUrl },
+): Promise<string | undefined> {
+  const domThumbnail = image ? await generators.fromImage(image) : null;
+  return domThumbnail ?? (await generators.fromUrl(url)) ?? undefined;
 }
 
 function parseDimensionText(value: string | null): { readonly width?: number; readonly height?: number } {
