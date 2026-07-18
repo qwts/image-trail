@@ -29,6 +29,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
@@ -275,7 +276,7 @@ function checkRulesWithCodex(rulesPath) {
   }
 }
 
-function main() {
+async function main() {
   const packagePath = path.join(repoRoot, 'package.json');
   if (!existsSync(packagePath)) {
     console.error(`No package.json in ${repoRoot}; pass --repo <path> to the repo root.`);
@@ -298,6 +299,27 @@ function main() {
     fail('No npm scripts invoke run-guarded.mjs; guard the test entrypoints before bootstrapping.');
   }
 
+  // A guarded script here or an :inner name is accounted for; any OTHER script
+  // that directly invokes a raw test runner is an unguarded entrypoint the
+  // hook cannot see (it only observes `npm run <name>`), so the bootstrap
+  // refuses until the script is wrapped in run-guarded.mjs (or renamed
+  // :inner/:run if it is guard-internal). Classification reuses the hook's own
+  // deny regexes so the two layers can never disagree.
+  const guardHookPath = path.join(repoRoot, 'scripts/guard-agent-command.mjs');
+  if (existsSync(guardHookPath)) {
+    const { evaluateCommand } = await import(pathToFileURL(guardHookPath).href);
+    const accounted = new Set([...sets.guarded, ...sets.humanOnly, ...sets.inner]);
+    for (const [name, command] of Object.entries(packageJson.scripts ?? {})) {
+      if (accounted.has(name)) continue;
+      if (!evaluateCommand(command).allow) {
+        fail(
+          `npm script "${name}" invokes a raw test runner unguarded — wrap it in ` +
+            'run-guarded.mjs (or use an :inner/:run suffix if it is guard-internal).',
+        );
+      }
+    }
+  }
+
   const rulesContent = renderRules(sets, packageJson);
   const rulesRelative = '.codex/rules/process-guard.rules';
 
@@ -309,7 +331,10 @@ function main() {
     const rulesPath = path.join(repoRoot, rulesRelative);
     if (existsSync(rulesPath)) {
       if (readFileSync(rulesPath, 'utf8') !== rulesContent) {
-        note(`${rulesRelative}: differs from generated output (hand-maintained or stale)`);
+        fail(
+          `${rulesRelative}: differs from the generated output — npm scripts changed without ` +
+            'regenerating; rerun node scripts/bootstrap-codex-env.mjs --force.',
+        );
       }
       checkRulesWithCodex(rulesPath);
     }
@@ -350,4 +375,4 @@ Manual steps (cannot be automated; once per user+machine):
   process.exit(problems.length > 0 ? 1 : 0);
 }
 
-main();
+await main();
