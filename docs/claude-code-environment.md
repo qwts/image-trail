@@ -81,14 +81,19 @@ a blocked script inside a string). The hook is now scoped:
 - **cwd-aware.** The PreToolUse payload's `cwd` (adjusted for a leading
   `cd <path> &&`) is resolved; commands executing outside a guarded checkout
   are allowed untouched. "Guarded checkout" = inside `CLAUDE_PROJECT_DIR`
-  (fallback: the script's own repo root) or any directory carrying the
-  rollout marker `scripts/run-guarded.mjs` — so other checkouts/worktrees of
-  guarded repos stay covered, and unrelated repos are out of scope.
-- **Mentions are not invocations.** Quoted strings and heredoc bodies are
-  stripped before matching, so commit messages, PR bodies, and grep patterns
-  that mention `node --test` or `test-storybook` pass. A blocked command
-  smuggled through quoting falls through to the guard wrapper itself — that
-  is the accepted fail-open trade.
+  (fallback: the script's own repo root) or any directory whose ancestry
+  carries the rollout marker `scripts/run-guarded.mjs` — so other
+  checkouts/worktrees of guarded repos stay covered (including their
+  subdirectories), and unrelated repos are out of scope.
+- **Mentions are not invocations — but nested shell payloads are.** Quoted
+  strings and heredoc bodies are stripped before matching, so commit
+  messages, PR bodies, and grep patterns that mention `node --test` or
+  `test-storybook` pass. The exception: a quoted string that is the payload
+  of a nested shell (`bash -lc "…"`, `sh -c '…'`) is executable, so it is
+  unwrapped and scanned instead of stripped, recursively. Anything deeper
+  (payloads assembled from variables, `node -e` spawning children) falls
+  through to the guard wrapper itself — that is the accepted fail-open
+  trade.
 - **`IMAGE_TRAIL_GUARD_DISABLE` is agent-denied.** The env escape hatch stays
   human-only; the check runs before the `run-guarded.mjs` allowlist so a
   disabled guard invocation cannot slip through.
