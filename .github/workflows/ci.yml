@@ -107,6 +107,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: npm run check:version-policy
 
+      - name: Agent environment (guard wiring)
+        run: npm run check:agent-env
+
       - name: Lint
         run: npm run lint
 

@@ -174,7 +174,9 @@ build` and paste **Built local** time plus commit, branch, and worktree when
 - Never invoke `node --test`, `.test-dist` output, `playwright test`,
   `test-storybook`, or `c8` directly, and never call `:run`/`:inner` npm
   scripts — use the guarded entrypoints. Claude Code and Cursor deny these
-  mechanically via checked-in hooks; Codex and raw terminals rely on this rule.
+  mechanically via checked-in hooks (scoped to guarded checkouts; quoted
+  mentions in commit messages/PR bodies are fine); Codex and raw terminals
+  rely on this rule. `IMAGE_TRAIL_GUARD_DISABLE` is human-only.
 - If a command returns while still running (live session/cell), poll or
   terminate it before launching anything else. The guard refuses a second run
   in the same worktree ("another guarded run is active") — treat that as a
@@ -189,6 +191,10 @@ build` and paste **Built local** time plus commit, branch, and worktree when
 - For hard isolation, agent sessions can run in `.devcontainer/` (kernel-level
   12 GB cap, headless-only); see the isolation tiers in
   `docs/agent-process-guard.md`.
+- The Claude Code environment (settings/permissions/hooks and the bootstrap
+  for rolling the setup out to other repos) is documented in
+  `docs/claude-code-environment.md`; `npm run check:agent-env` (part of
+  `npm run ci`) fails if that wiring drifts.
 
 ## Tooling
 

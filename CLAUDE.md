@@ -50,6 +50,11 @@ CI additionally runs `npm run test:cov` — a `c8` coverage gate over the unit +
 DOM suites that fails below the `.c8rc.json` thresholds (lines/branches) and
 writes `coverage/lcov.info`. Treat the thresholds as a ratchet: only raise them.
 
+The Claude Code environment itself (checked-in `.claude/settings.json`
+permissions and hooks, the process-tree guard, and the per-repo bootstrap) is
+documented in `docs/claude-code-environment.md`; `npm run check:agent-env`
+guards that wiring in CI.
+
 Product invariants are enforced as executable checks: `tests/invariants.test.ts`
 (recents never persisted; queue order is `queueUpdatedAt`, not envelope `updatedAt`;
 Recall pages the queue producer, not the blob store) and the `no-restricted-syntax`

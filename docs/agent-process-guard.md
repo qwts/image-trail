@@ -56,14 +56,27 @@ details — never call them directly.
 
 ### Claude Code (#671)
 
+Full environment record: `docs/claude-code-environment.md` (settings
+architecture, permissions posture, hook lifecycle decisions, sandbox
+evaluation, isolation surfaces, and the reproducible bootstrap).
+
 `.claude/settings.json` registers a `PreToolUse` hook on `Bash`
 (`scripts/guard-agent-command.mjs --protocol=claude`) that denies direct
 `node --test`, `.test-dist` execution, `playwright test`, `test-storybook`,
-`c8`, and `:run`/`:inner` scripts, steering the agent to the guarded
-entrypoints. Applies to terminal, IDE integration, and headless runs alike
-because project settings are checked in. Background-shell etiquette (poll or
-terminate a live command before starting another) is enforced mechanically by
-the worktree lock: a second guarded run refuses to start while one is active.
+`c8`, `:run`/`:inner` scripts, and agent use of `IMAGE_TRAIL_GUARD_DISABLE`,
+steering the agent to the guarded entrypoints. The hook is scoped: it only
+polices commands executing inside a guarded checkout (cwd-aware, leading-`cd`
+resolved, other checkouts recognized by the `scripts/run-guarded.mjs`
+marker), and quoted/heredoc mentions of blocked patterns are not treated as
+invocations. A `SessionStart` hook (`scripts/guard-session-context.mjs`)
+tells a new/resumed/compacted session about an active guarded run or a
+previous kill, so a fresh context polls instead of relaunching. Applies to
+terminal, IDE integration, and headless runs alike because project settings
+are checked in. Background-shell etiquette (poll or terminate a live command
+before starting another) is enforced mechanically by the worktree lock: a
+second guarded run refuses to start while one is active.
+`npm run check:agent-env` (in `npm run ci`) fails the build if any of this
+wiring drifts.
 
 ### Cursor (#673)
 
