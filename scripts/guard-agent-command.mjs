@@ -49,6 +49,16 @@ const BLOCKED = [
     pattern: /\bnpm\s+run\s+[\w:.-]*:(run|inner)(?![\w:-])/u,
     what: 'unguarded inner npm script',
   },
+  {
+    // Headed/interactive runs open GUI windows on the shared desktop and steal
+    // the user's focus. Human-only; agents use headless test:e2e.
+    pattern: /\bnpm\s+run\s+test:e2e:(ui|headed)(?![\w:-])/u,
+    what: 'headed/interactive e2e run',
+    reason:
+      "Blocked headed/interactive e2e run: GUI windows on the shared desktop steal the user's " +
+      'focus. These scripts are human-only; agents run the headless `npm run test:e2e` instead. ' +
+      'See docs/agent-process-guard.md.',
+  },
 ];
 
 export function evaluateCommand(command) {
@@ -56,11 +66,11 @@ export function evaluateCommand(command) {
   // Explicit guard invocations (e.g. rerunning with custom limits) are the
   // sanctioned path even when the wrapped command matches a blocked pattern.
   if (command.includes('run-guarded.mjs')) return { allow: true };
-  for (const { pattern, what } of BLOCKED) {
+  for (const { pattern, what, reason } of BLOCKED) {
     if (pattern.test(command)) {
       return {
         allow: false,
-        reason: `Blocked ${what}: it bypasses the repository process-tree memory guard. ${GUIDANCE}`,
+        reason: reason ?? `Blocked ${what}: it bypasses the repository process-tree memory guard. ${GUIDANCE}`,
       };
     }
   }
@@ -80,7 +90,7 @@ function respond(protocol, verdict) {
       : {
           permission: 'deny',
           agentMessage: verdict.reason,
-          userMessage: 'Blocked an unguarded test command (see docs/agent-process-guard.md).',
+          userMessage: 'Blocked by repo agent test policy (see docs/agent-process-guard.md).',
         };
     process.stdout.write(`${JSON.stringify(body)}\n`);
     return;

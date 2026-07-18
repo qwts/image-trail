@@ -182,6 +182,13 @@ build` and paste **Built local** time plus commit, branch, and worktree when
 - A run killed for `rss-limit`/`timeout` is a real failure: read
   `.guard/last-run.json`, report it, and do not rerun with a higher limit to
   make it pass. Knobs and details: `docs/agent-process-guard.md`.
+- GUI apps must not steal the user's desktop focus. Agents run headless:
+  `npm run test:e2e` (already headless) and `npm run test:stories:ci`.
+  `test:e2e:ui` / `test:e2e:headed` are human-only (hooks deny them), and
+  `npm run storybook` no longer auto-opens a browser.
+- For hard isolation, agent sessions can run in `.devcontainer/` (kernel-level
+  12 GB cap, headless-only); see the isolation tiers in
+  `docs/agent-process-guard.md`.
 
 ## Tooling
 

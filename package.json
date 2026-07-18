@@ -27,7 +27,7 @@
     "lint:dead": "knip",
     "typecheck": "tsc --noEmit",
     "ci": "npm run check:version-policy && npm run check:licenses && npm run check:interop-contract && npm run check:interop-acceptance && npm run lint && npm run format:check && npm run check:acceptance-coverage && npm run test:cov && npm run build",
-    "storybook": "storybook dev -p 6006",
+    "storybook": "storybook dev -p 6006 --no-open",
     "build:storybook": "storybook build",
     "build": "npm run clean && tsc --noEmit -p tsconfig.json && node scripts/build-content-script.mjs && node scripts/build-service-worker.mjs && node scripts/build-gallery-page.mjs && node scripts/build-destination-pages.mjs && node scripts/build-preview-page.mjs && node scripts/copy-extension-assets.mjs && npm run check:artifacts && node scripts/check-version-policy.mjs --artifacts-only --build-info",
     "build:release": "IMAGE_TRAIL_RELEASE_BUILD=1 npm run build && node scripts/audit-extension-artifacts.mjs --require-release && node scripts/check-version-policy.mjs --artifacts-only --build-info --require-build-mode=release",

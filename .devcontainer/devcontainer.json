@@ -1,0 +1,26 @@
+{
+  // Agent sandbox for Image Trail (#670–#673): run agent sessions in here to get
+  // a HARD, kernel-enforced memory wall (the in-repo guard is the soft tier) and
+  // zero desktop presence — in-container browsers are headless Linux processes,
+  // so agent-launched apps can never steal macOS focus.
+  //
+  // Works with VS Code / Cursor "Reopen in Container", Claude Code
+  // (devcontainer support), and Codex cloud environments. Requires a container
+  // runtime (Docker Desktop, OrbStack, or Apple container). Manual testing of
+  // the built extension in your own Chrome stays on the host by design.
+  //
+  // Node major matches .nvmrc (24) — bump both together.
+  "name": "Image Trail agent sandbox",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
+  // The container is the enforcement point: 12 GB hard memory cap (no swap
+  // headroom beyond it), a pid ceiling against fork bombs, and Chromium's
+  // /dev/shm requirement. A runaway inside dies by cgroup OOM-kill; the host
+  // never destabilizes.
+  "runArgs": ["--memory=12g", "--memory-swap=12g", "--pids-limit=2048", "--shm-size=1g"],
+  "postCreateCommand": "npm ci && npx playwright install --with-deps chromium",
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  }
+}

@@ -136,13 +136,57 @@ ceilings above were set from measured peaks with headroom:
 - Full `npm test` (typecheck + compile + unit + single-worker DOM): peak
   1199 MB aggregate across 18 processes → 4096 MB default (~3.4×).
 - `npm run test:e2e` (3 Playwright workers + Chromium + built extension) on a
-  GitHub 16 GB runner: exceeded a 6144 MB trial ceiling at 6387 MB with tests
-  passing normally → 12288 MB. The CI E2E job prints `.guard/last-run.json`
-  after every run; tighten from real peaks there.
+  GitHub 16 GB runner: a 6144 MB trial ceiling killed a healthy run at
+  6387 MB; the first full green run measured peak 6864 MB across 56 processes
+  in 190 s → 12288 MB (~1.8× headroom). The CI E2E job prints
+  `.guard/last-run.json` after every run; tighten from real peaks there.
 
 The tickets' 1 GiB research floor was too tight: `tsc` alone peaks near it.
 Ratchet ceilings DOWN as measurements allow; only raise one when the guard
 kills a healthy suite (as with e2e above), never to make a leaking suite pass.
+
+## Focus stealing
+
+Multiple agents sharing one macOS desktop means agent-launched GUI apps grab
+window focus from the human. Repository-level mitigations:
+
+- E2E is headless by default (Playwright `channel: 'chromium'` new-headless
+  supports MV3 extensions); no window is created unless `--headed` is passed.
+- `test:e2e:ui` / `test:e2e:headed` are human-only: the Claude Code and Cursor
+  hooks deny them for agents with a focus-stealing explanation.
+- `npm run storybook` uses `--no-open`; it prints the URL instead of launching
+  a browser. `test:stories:ci` is fully headless and self-contained.
+- Anything an agent runs inside the devcontainer (below) has no macOS window
+  at all — that tier eliminates focus theft entirely.
+
+## Isolation tiers (VM question, evaluated)
+
+The guard is tier 1 — in-process-tree, soft (polling) enforcement. Escalation
+options, cheapest first:
+
+1. **Guard + hooks (this PR, active)** — no workflow change, agents stay on
+   the host. Soft cap: a pathological allocator can overshoot briefly; the
+   host is protected but shares total RAM.
+2. **Devcontainer (`.devcontainer/`, checked in)** — agent sessions run in a
+   Linux container with a kernel-enforced 12 GB memory cap, pid limit, and no
+   desktop presence (headless browsers only). Works with VS Code/Cursor
+   "Reopen in Container", Claude Code, and Codex cloud environments; the whole
+   suite including Chromium E2E runs on Linux (CI proves it). A runaway is
+   OOM-killed by the cgroup; the Mac cannot destabilize and no window can
+   steal focus. Cost: a container runtime (Docker Desktop/OrbStack), and
+   manual testing of the built extension in real Chrome stays on the host.
+3. **Separate macOS user session** — fast-user-switch a dedicated "agents"
+   account; GUI apps open in that session's window server, never over yours.
+   No memory wall (guard still the protection); cheap but macOS-quirky.
+4. **Full macOS VM (Tart/UTM/Lume)** — strongest wall and a native macOS GUI
+   for the agent, at the cost of reserved RAM/disk, Apple's two-VM licensing
+   ceiling on Apple Silicon, and toolchain duplication. Only worth it if
+   agents must drive a real macOS Chrome with the extension loaded — the one
+   workflow the devcontainer cannot host.
+
+Recommendation: stay on tier 1 for interactive pair-work; move autonomous /
+long-running agent sessions to tier 2 (the devcontainer). Revisit tier 4 only
+if agent-driven GUI testing of the extension becomes a requirement.
 
 ## Limitations (macOS)
 
