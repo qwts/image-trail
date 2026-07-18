@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.24.3
+
+### Patch Changes
+
+- eb6af00: Keep Recents available when the browser suspends and restarts the extension service worker.
+
 ## 0.24.2
 
 ### Patch Changes
