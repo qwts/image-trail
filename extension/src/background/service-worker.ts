@@ -80,6 +80,7 @@ import type { CreateBlobPreviewMessage } from './messages.js';
 import type { ImportEncryptedImageMessage } from './messages.js';
 import { ImageRequestManager } from './image-request-manager.js';
 import { extractOrigin, hasOriginPermission, requestOriginPermission } from './permissions.js';
+import { findDeletableOrphanBlobIds } from './orphaned-blobs.js';
 import { defineMessage, dispatchRequest, type MessageDef } from './message-dispatch.js';
 import * as requestSchemas from './message-schemas.js';
 import type { ExtensionRequest, ExtensionResponse } from './messages.js';
@@ -331,9 +332,8 @@ async function handleCleanupOrphanedBlobs(): Promise<import('./messages.js').Cle
   if (!db) return { deletedCount: 0, usage: { totalBytes: 0, blobCount: 0 } };
   const referenced = await referencedBlobIds();
   const blobs = new BlobsRepository(db);
-  const orphanedBlobIds = (await blobs.list()).filter((blob) => !referenced.has(blob.id)).map((blob) => blob.id);
+  const orphanedBlobIds = findDeletableOrphanBlobIds(await blobs.list(), referenced);
   const deletedCount = await blobs.deleteMany(orphanedBlobIds);
-
   return { deletedCount, usage: await handleStorageUsage() };
 }
 
@@ -519,7 +519,7 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
   return {
     totalBytes: usage.totalBytes + bookmarkUsage.totalBytes + pinUsage.totalBytes + thumbnailUsage.totalBytes,
     blobCount: usage.blobCount,
-    orphanedBlobCount: all.filter((blob) => !referenced.has(blob.id)).length,
+    orphanedBlobCount: findDeletableOrphanBlobIds(all, referenced).length,
     originals: { count: usage.blobCount, totalBytes: usage.totalBytes },
     queueRecords: { count: bookmarkUsage.blobCount + pinUsage.blobCount, totalBytes: queueMetadataBytes },
     thumbnails: combinedThumbnailUsage,
