@@ -419,13 +419,13 @@ async function handleProbeImageSource(
 async function handleFetchBufferedImageSource(
   message: FetchBufferedImageSourceMessage,
 ): Promise<import('./messages.js').FetchBufferedImageSourceResultMessage['payload']> {
-  return imageRequests.fetchBufferedImage(message.payload.url, {
+  return imageRequests.fetchThumbnail(message.payload.url, {
     intent: message.payload.intent,
     referrer: message.payload.referrer,
     contextKey: message.payload.contextKey,
+    sourceProfile: 'navigation',
   });
 }
-
 async function handleCheckImageRequestPolicy(
   message: CheckImageRequestPolicyMessage,
 ): Promise<import('./messages.js').CheckImageRequestPolicyResultMessage['payload']> {

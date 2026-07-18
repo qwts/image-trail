@@ -697,7 +697,7 @@ test('creates image request policy messages with compatibility payloads', () => 
   assert.equal(isExtensionRequest(buffered), true);
   const bufferedResult = createFetchBufferedImageSourceResultMessage({
     ok: true,
-    bytes: new ArrayBuffer(3),
+    dataUrl: 'data:image/png;base64,AQID',
     mimeType: 'image/png',
     byteLength: 3,
     sha256: 'b'.repeat(64),

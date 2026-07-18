@@ -33,6 +33,7 @@ import type {
 } from './layout-messages.js';
 import type { OriginalBlobRequest, OriginalBlobResponse } from './original-blob-messages.js';
 import type { RecentHistoryRequest, RecentHistoryResponse } from './recent-history-messages.js';
+import { fetchBufferedImageSourceResultPayloadSchema } from './message-schemas.js';
 export { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
 export * from './album-messages.js';
 export * from './blob-key-messages.js';
@@ -301,14 +302,13 @@ export interface FetchBufferedImageSourceResultMessage {
   readonly payload:
     | {
         readonly ok: true;
-        readonly bytes: ArrayBuffer;
+        readonly dataUrl: string;
         readonly mimeType: string;
         readonly byteLength: number;
         readonly sha256?: string | undefined;
       }
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }
-
 export interface CheckImageRequestPolicyMessage {
   readonly type: typeof MessageType.CheckImageRequestPolicy;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
@@ -1447,7 +1447,7 @@ export function isProbeImageSourceResultMessage(value: unknown): value is ProbeI
 
 export function isFetchBufferedImageSourceResultMessage(value: unknown): value is FetchBufferedImageSourceResultMessage {
   if (!hasVersionedObjectShape(value)) return false;
-  return value.type === MessageType.FetchBufferedImageSourceResult;
+  return value.type === MessageType.FetchBufferedImageSourceResult && v.is(fetchBufferedImageSourceResultPayloadSchema, value.payload);
 }
 
 export function isCheckImageRequestPolicyResultMessage(value: unknown): value is CheckImageRequestPolicyResultMessage {

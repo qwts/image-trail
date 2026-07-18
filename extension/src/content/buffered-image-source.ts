@@ -15,6 +15,21 @@ export type FetchDecodedBufferedImageResult =
   | { readonly ok: true; readonly blobUrl: string; readonly imgElement: HTMLImageElement; readonly sha256: string | null }
   | { readonly ok: false; readonly message: string };
 
+const BASE64_IMAGE_DATA_URL_PATTERN = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/]*={0,2})$/iu;
+
+export function imageBlobFromDataUrl(dataUrl: string, expectedMimeType: string): Blob | null {
+  const match = BASE64_IMAGE_DATA_URL_PATTERN.exec(dataUrl);
+  if (!match || match[1]?.toLowerCase() !== expectedMimeType.toLowerCase()) return null;
+  try {
+    const decoded = atob(match[2] ?? '');
+    const bytes = new Uint8Array(decoded.length);
+    for (let index = 0; index < decoded.length; index += 1) bytes[index] = decoded.charCodeAt(index);
+    return new Blob([bytes], { type: expectedMimeType });
+  } catch {
+    return null;
+  }
+}
+
 export async function probeBufferedImageSource(
   url: string,
   timeoutMs = 8000,
@@ -47,7 +62,9 @@ export async function fetchDecodedBufferedImageSource(
     const response = await sendRuntimeMessage(createFetchBufferedImageSourceMessage(url, document.location.href, options));
     if (!isFetchBufferedImageSourceResultMessage(response)) return { ok: false, message: 'Buffered image fetch failed.' };
     if (!response.payload.ok) return { ok: false, message: response.payload.message };
-    const blobUrl = URL.createObjectURL(new Blob([response.payload.bytes], { type: response.payload.mimeType }));
+    const blob = imageBlobFromDataUrl(response.payload.dataUrl, response.payload.mimeType);
+    if (!blob || blob.size !== response.payload.byteLength) return { ok: false, message: 'Buffered image fetch failed.' };
+    const blobUrl = URL.createObjectURL(blob);
     const imgElement = new Image();
     imgElement.src = blobUrl;
     try {

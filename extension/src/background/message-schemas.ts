@@ -243,6 +243,17 @@ export const fetchBufferedImageSourceRequestSchema = v.object({
   contextKey: v.optional(v.string()),
 });
 
+export const fetchBufferedImageSourceResultPayloadSchema = v.variant('ok', [
+  v.object({
+    ok: v.literal(true),
+    dataUrl: v.pipe(v.string(), v.regex(/^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/]*={0,2}$/iu)),
+    mimeType: v.pipe(v.string(), v.regex(/^image\/[a-z0-9.+-]+$/iu)),
+    byteLength: v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0)),
+    sha256: v.optional(v.string()),
+  }),
+  v.object({ ok: v.literal(false), reason: v.string(), message: v.string() }),
+]);
+
 export const checkImageRequestPolicyRequestSchema = v.object({
   url: v.string(),
   referrer: v.optional(v.string()),
