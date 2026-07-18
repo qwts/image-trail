@@ -99,7 +99,10 @@ containment; it does not cap memory.
 ### CI (`.github/workflows/ci.yml`)
 
 CI runs the same npm scripts, so every test step inherits the guard and its
-RSS/timeout budgets; `timeout-minutes` on the jobs is the outer backstop.
+RSS/timeout budgets; `timeout-minutes` on the jobs is the outer backstop,
+sized with headroom above the summed guard budgets plus setup so the guard —
+not a GitHub cancellation — is what kills a hung suite and records its
+diagnostic.
 A memory-runaway or hung suite now fails the build instead of passing on a
 16 GB runner.
 

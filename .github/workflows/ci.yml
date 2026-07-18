@@ -64,7 +64,7 @@ jobs:
     # Outer backstop only — the test steps themselves run under
     # scripts/run-guarded.mjs (aggregate-RSS ceiling + per-command timeout), so
     # a runaway suite fails on memory long before it hits this.
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       INTEROP_PHOTOS_ROOT: ${{ github.workspace }}/node_modules/.interop-photos
 
@@ -175,7 +175,7 @@ jobs:
     needs: changes
     if: ${{ github.event_name == 'push' || needs.changes.outputs.e2e == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
