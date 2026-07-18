@@ -1,4 +1,24 @@
 {
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm test)",
+      "Bash(npm test *)",
+      "Bash(npm ci)",
+      "Bash(npm install)",
+      "Bash(npx *)",
+      "Bash(node scripts/*)",
+      "Bash(git *)",
+      "Bash(gh *)"
+    ],
+    "ask": ["Bash(npm publish*)", "Bash(gh release *)", "Bash(npm run package:release*)"],
+    "deny": ["Bash(npm run test:e2e:ui*)", "Bash(npm run test:e2e:headed*)"]
+  },
+  "env": {
+    "BASH_MAX_TIMEOUT_MS": "1800000"
+  },
+  "cleanupPeriodDays": 14,
   "hooks": {
     "PreToolUse": [
       {
@@ -7,6 +27,17 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR\"/scripts/guard-agent-command.mjs --protocol=claude"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/scripts/guard-session-context.mjs",
+            "timeout": 10
           }
         ]
       }
