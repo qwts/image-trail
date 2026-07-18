@@ -16,6 +16,7 @@ interface GuardHookModule {
   evaluateHookInput(input: { command: unknown; cwd?: unknown }, projectDir: string): Verdict;
   resolveExecutionDir(cwd: unknown, command: unknown): string | null;
   stripInertText(command: string): string;
+  normalizeCommand(command: unknown): unknown;
 }
 
 const projectRoot = process.cwd();
@@ -165,4 +166,39 @@ void test('cursor protocol still answers allow/deny', () => {
     permission: string;
   };
   assert.equal(allowed.permission, 'allow');
+});
+
+void test('normalizeCommand joins Codex argv arrays for matching', () => {
+  const argv = ['bash', '-lc', 'node --import ./.test-dist/x.js ' + '--test y.test.js'];
+  const normalized = mod.normalizeCommand(argv);
+  assert.equal(typeof normalized, 'string');
+  assert.equal(mod.evaluateCommand(normalized as string).allow, false);
+});
+
+void test('normalizeCommand passes through strings and rejects junk shapes', () => {
+  assert.equal(mod.normalizeCommand('npm test'), 'npm test');
+  const mixed = mod.normalizeCommand(['npm', 42]);
+  assert.equal(mod.evaluateCommand(mixed).allow, true);
+  assert.equal(mod.evaluateCommand(undefined).allow, true);
+});
+
+void test('codex protocol denies argv-array runner commands with the claude wire', () => {
+  const run = (payload: object) =>
+    spawnSync(process.execPath, [scriptPath, '--protocol=codex'], {
+      input: JSON.stringify(payload),
+      encoding: 'utf8',
+      env: { ...process.env, CLAUDE_PROJECT_DIR: projectRoot },
+    });
+  const denied = run({
+    tool_input: { command: ['bash', '-lc', 'npx playwright test'] },
+    cwd: projectRoot,
+  });
+  assert.equal(denied.status, 0);
+  const parsed = JSON.parse(denied.stdout) as {
+    hookSpecificOutput: { permissionDecision: string };
+  };
+  assert.equal(parsed.hookSpecificOutput.permissionDecision, 'deny');
+  const allowed = run({ tool_input: { command: ['npm', 'test'] }, cwd: projectRoot });
+  assert.equal(allowed.status, 0);
+  assert.equal(allowed.stdout, '');
 });

@@ -1,15 +1,23 @@
 #!/usr/bin/env node
 
-// Agent command hook (#671 Claude Code, #673 Cursor): denies shell commands
-// that would run Image Trail test entrypoints WITHOUT the process-tree guard
-// (scripts/run-guarded.mjs). The guarded npm scripts are the allowed path.
+// Agent command hook (#670 Codex, #671 Claude Code, #673 Cursor): denies
+// shell commands that would run Image Trail test entrypoints WITHOUT the
+// process-tree guard (scripts/run-guarded.mjs). The guarded npm scripts are
+// the allowed path.
 //
-// Protocols (selected with --protocol=claude|cursor):
+// Protocols (selected with --protocol=claude|cursor|codex):
 //   claude — Claude Code PreToolUse hook. Reads the full hook payload
 //     ({cwd, tool_input:{command}}) on stdin; denies via
 //     hookSpecificOutput.permissionDecision.
 //   cursor — Cursor beforeShellExecution hook. Reads {command, cwd?} on
 //     stdin; replies {permission:"deny"|"allow", ...}.
+//   codex — Codex PreToolUse hook (.codex/hooks.json). Same payload and wire
+//     format as claude, but tool_input.command may be an argv array (Codex's
+//     shell tool takes ["bash","-lc","…"]); arrays are joined before
+//     matching. Codex's execpolicy rules (.codex/rules/) hard-forbid the
+//     clean argv prefixes; this hook closes the argument-order and
+//     shell-wrapped variants the prefix matcher cannot see
+//     (e.g. `node --import … --test`).
 //
 // Scoping: the hook only polices commands that execute inside a guarded
 // checkout — this repo (or worktree), or any directory whose ancestry
@@ -156,6 +164,14 @@ export function stripInertText(command) {
   return scanned + rest;
 }
 
+// Codex's shell tool submits argv arrays; the regexes match command text.
+export function normalizeCommand(command) {
+  if (Array.isArray(command) && command.every((part) => typeof part === 'string')) {
+    return command.join(' ');
+  }
+  return command;
+}
+
 export function evaluateCommand(command) {
   if (typeof command !== 'string' || command.length === 0) return { allow: true };
   const effective = stripInertText(command);
@@ -229,15 +245,19 @@ function respond(protocol, verdict) {
 }
 
 async function main() {
-  const protocol = process.argv.includes('--protocol=cursor') ? 'cursor' : 'claude';
+  const protocol = process.argv.includes('--protocol=cursor')
+    ? 'cursor'
+    : process.argv.includes('--protocol=codex')
+      ? 'codex'
+      : 'claude';
   // The script lives in the checkout it protects, so its own location is the
   // authoritative project dir (CLAUDE_PROJECT_DIR matches it for Claude Code;
-  // Cursor sets no equivalent).
+  // Cursor and Codex set no equivalent).
   const projectDir = process.env.CLAUDE_PROJECT_DIR ?? dirname(dirname(fileURLToPath(import.meta.url)));
   let verdict = { allow: true };
   try {
     const input = JSON.parse(await readStdin());
-    const command = protocol === 'cursor' ? input.command : input.tool_input?.command;
+    const command = protocol === 'cursor' ? input.command : normalizeCommand(input.tool_input?.command);
     verdict = evaluateHookInput({ command, cwd: input.cwd }, projectDir);
   } catch {
     // Fail open (see header).
