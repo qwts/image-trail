@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.24.4
+
+### Patch Changes
+
+- 9774786: Protect newly captured originals from orphan cleanup with a one-hour grace period and keep the displayed orphan count aligned with cleanup.
+
 ## 0.24.3
 
 ### Patch Changes
