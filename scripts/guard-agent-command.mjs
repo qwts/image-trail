@@ -12,11 +12,13 @@
 //     stdin; replies {permission:"deny"|"allow", ...}.
 //
 // Scoping: the hook only polices commands that execute inside a guarded
-// checkout — this repo (or worktree), or any other directory carrying the
-// guard marker (scripts/run-guarded.mjs). Commands whose working directory
-// is elsewhere (cross-repo work from the same session) are allowed
-// untouched, as are blocked-pattern mentions inside quoted strings or
-// heredocs (commit messages, PR bodies, grep patterns).
+// checkout — this repo (or worktree), or any directory whose ancestry
+// carries the guard marker (scripts/run-guarded.mjs). Commands whose
+// working directory is elsewhere (cross-repo work from the same session)
+// are allowed untouched, as are blocked-pattern mentions inside quoted
+// strings or heredocs (commit messages, PR bodies, grep patterns) — except
+// nested shell payloads (`bash -c "..."`), which are executable and are
+// unwrapped and scanned.
 //
 // Fail-open by design: a malformed payload allows the command rather than
 // bricking every shell call — the guard wrapper itself is the primary control;
@@ -120,14 +122,38 @@ export function resolveExecutionDir(cwd, command) {
 }
 
 // Blocked-pattern text inside quotes or heredocs is a mention, not an
-// invocation (commit messages, PR bodies, grep patterns). Strip those
-// segments before matching. Naive by design; a blocked command smuggled
-// through quoting falls through to the guard wrapper itself.
+// invocation (commit messages, PR bodies, grep patterns) — EXCEPT when the
+// quoted string is the payload of a nested shell (`bash -lc "..."`,
+// `sh -c '...'`), where it is executable. Quotes are processed left to
+// right: wrapper payloads are unwrapped so the blocked patterns can see
+// them (recursively — the unwrapped text rejoins the scan), ordinary quoted
+// text is blanked. Left-to-right matters: a commit message that merely
+// mentions `bash -c "node --test"` is blanked before its inner text is ever
+// inspected. Still naive by design for anything deeper (e.g. payloads built
+// via variables or `node -e` spawning children); those fall through to the
+// guard wrapper itself.
+const QUOTED = /'[^']*'|"(?:[^"\\]|\\.)*"/u;
+const SHELL_C_TAIL = /(?:^|[\s;&|(`{])(?:env\s+(?:\w+=\S*\s+)*)?(?:ba|da|z)?sh\s+(?:-\S+\s+)*-\S*c\s+$/u;
+
 export function stripInertText(command) {
-  return command
-    .replace(/<<-?\s*(["']?)([A-Za-z_][A-Za-z0-9_]*)\1[\s\S]*?(\n\2(?=\n|$)|$)/gu, ' ')
-    .replace(/'[^']*'/gu, "''")
-    .replace(/"(?:[^"\\]|\\.)*"/gu, '""');
+  let scanned = '';
+  let rest = command.replace(/<<-?\s*(["']?)([A-Za-z_][A-Za-z0-9_]*)\1[\s\S]*?(\n\2(?=\n|$)|$)/gu, ' ');
+  // Each iteration consumes at least the two quote characters, so this
+  // terminates; the cap is a backstop against pathological input.
+  for (let i = 0; i < 200; i += 1) {
+    const match = QUOTED.exec(rest);
+    if (!match) break;
+    const quoted = match[0];
+    scanned += rest.slice(0, match.index);
+    rest = rest.slice(match.index + quoted.length);
+    if (SHELL_C_TAIL.test(scanned)) {
+      const inner = quoted.startsWith("'") ? quoted.slice(1, -1) : quoted.slice(1, -1).replace(/\\(["\\$`])/gu, '$1');
+      rest = `${inner}${rest}`;
+    } else {
+      scanned += quoted.startsWith("'") ? "''" : '""';
+    }
+  }
+  return scanned + rest;
 }
 
 export function evaluateCommand(command) {
@@ -148,13 +174,25 @@ export function evaluateCommand(command) {
   return { allow: true };
 }
 
+// A directory is inside a guarded checkout when the marker exists there or
+// in ANY ancestor — commands routinely run from subdirectories of a checkout
+// or worktree, so an exact-directory check would reopen the bypass there.
+function inGuardedCheckout(dir) {
+  let current = tryRealpath(dir);
+  for (;;) {
+    if (existsSync(resolve(current, GUARD_MARKER))) return true;
+    const parent = dirname(current);
+    if (parent === current) return false;
+    current = parent;
+  }
+}
+
 // Full payload evaluation: scope to guarded checkouts, then pattern-match.
 export function evaluateHookInput({ command, cwd }, projectDir) {
   const executionDir = resolveExecutionDir(cwd, command);
   if (executionDir && projectDir) {
-    const inProject = isWithin(executionDir, projectDir);
-    const inGuardedCheckout = inProject || existsSync(resolve(tryRealpath(executionDir), GUARD_MARKER));
-    if (!inGuardedCheckout) return { allow: true };
+    const inScope = isWithin(executionDir, projectDir) || inGuardedCheckout(executionDir);
+    if (!inScope) return { allow: true };
   }
   return evaluateCommand(command);
 }
