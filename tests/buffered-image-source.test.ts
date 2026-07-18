@@ -27,6 +27,19 @@ test('buffered image runtime payloads survive JSON transport without ArrayBuffer
     }),
   );
   assert.equal(isFetchBufferedImageSourceResultMessage(lostArrayBufferResult), false);
+
+  const malformedSha256Result: unknown = {
+    type: MessageType.FetchBufferedImageSourceResult,
+    version: MESSAGE_PROTOCOL_VERSION,
+    payload: {
+      ok: true,
+      dataUrl: 'data:image/png;base64,AQID',
+      mimeType: 'image/png',
+      byteLength: 3,
+      sha256: 'not-a-sha256-digest',
+    },
+  };
+  assert.equal(isFetchBufferedImageSourceResultMessage(malformedSha256Result), false);
 });
 
 test('buffered image data URLs decode after a JSON-shaped runtime round trip', async () => {

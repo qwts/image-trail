@@ -249,7 +249,7 @@ export const fetchBufferedImageSourceResultPayloadSchema = v.variant('ok', [
     dataUrl: v.pipe(v.string(), v.regex(/^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/]*={0,2}$/iu)),
     mimeType: v.pipe(v.string(), v.regex(/^image\/[a-z0-9.+-]+$/iu)),
     byteLength: v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0)),
-    sha256: v.optional(v.string()),
+    sha256: v.optional(v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u))),
   }),
   v.object({ ok: v.literal(false), reason: v.string(), message: v.string() }),
 ]);
