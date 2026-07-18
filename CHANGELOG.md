@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.24.5
+
+### Patch Changes
+
+- 9632d9e: Restore thumbnails, readable filenames, and accurate image-type labels for captured Queue and Recent records.
+
 ## 0.24.4
 
 ### Patch Changes
