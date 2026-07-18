@@ -7,6 +7,7 @@ release/
 .env.*
 
 .test-dist/
+.guard/
 coverage/
 playwright-report/
 test-results/

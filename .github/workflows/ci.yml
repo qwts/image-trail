@@ -33,6 +33,7 @@ jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       # A version-branch dispatch always runs E2E; paths-filter has no PR base
       # for workflow_dispatch, and the version cut changes package artifacts.
@@ -60,6 +61,10 @@ jobs:
   ci:
     name: CI
     runs-on: ubuntu-latest
+    # Outer backstop only — the test steps themselves run under
+    # scripts/run-guarded.mjs (aggregate-RSS ceiling + per-command timeout), so
+    # a runaway suite fails on memory long before it hits this.
+    timeout-minutes: 45
     env:
       INTEROP_PHOTOS_ROOT: ${{ github.workspace }}/node_modules/.interop-photos
 
@@ -163,6 +168,7 @@ jobs:
     needs: changes
     if: ${{ github.event_name == 'push' || needs.changes.outputs.e2e == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -202,6 +208,7 @@ jobs:
     needs: [changes, e2e]
     if: ${{ always() }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Verify E2E result
         run: |
@@ -234,6 +241,7 @@ jobs:
     # PR-only (the stable URL is per-PR).
     if: ${{ !cancelled() && needs.e2e.result == 'failure' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
       # actions: write lets the verify step rerun GitHub's managed "pages build and deployment"

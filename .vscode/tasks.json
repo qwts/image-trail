@@ -1,0 +1,51 @@
+{
+  // All test tasks route through the repo process-tree guard because the npm
+  // scripts themselves are guarded (scripts/run-guarded.mjs). Do not add tasks
+  // that shell out to node --test / playwright test / test-storybook / c8
+  // directly — that bypasses the guard. See docs/agent-process-guard.md.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Test (guarded)",
+      "type": "npm",
+      "script": "test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: DOM (guarded)",
+      "type": "npm",
+      "script": "test:dom",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: unit (guarded)",
+      "type": "npm",
+      "script": "test:unit",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: coverage (guarded)",
+      "type": "npm",
+      "script": "test:cov",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: e2e (guarded)",
+      "type": "npm",
+      "script": "test:e2e",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Storybook stories (guarded)",
+      "type": "npm",
+      "script": "test:stories:ci",
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

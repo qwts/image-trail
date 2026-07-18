@@ -18,6 +18,6 @@
     "extension/src/ui/components/lock-view.ts"
   ],
   "ignoreExportsUsedInFile": true,
-  "ignoreBinaries": ["gh"],
+  "ignoreBinaries": ["gh", "ps"],
   "ignoreDependencies": ["@typescript-eslint/eslint-plugin", "@typescript-eslint/parser", "node-test-github-reporter"]
 }

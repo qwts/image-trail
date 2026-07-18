@@ -165,6 +165,24 @@ build` and paste **Built local** time plus commit, branch, and worktree when
 - After the first implementation stretch, provide a manual test run before the
   PR enters final review.
 
+## Process-Tree Guard
+
+- Every test entrypoint (`npm test`, `test:unit`, `test:dom`, `test:cov`,
+  `test:stories*`, `test:e2e*`) runs through `scripts/run-guarded.mjs`: an
+  aggregate RSS ceiling over the whole descendant tree, a per-process Node heap
+  cap, a wall-clock timeout, and one guarded run at a time per worktree.
+- Never invoke `node --test`, `.test-dist` output, `playwright test`,
+  `test-storybook`, or `c8` directly, and never call `:run`/`:inner` npm
+  scripts — use the guarded entrypoints. Claude Code and Cursor deny these
+  mechanically via checked-in hooks; Codex and raw terminals rely on this rule.
+- If a command returns while still running (live session/cell), poll or
+  terminate it before launching anything else. The guard refuses a second run
+  in the same worktree ("another guarded run is active") — treat that as a
+  stop, not a prompt to retry.
+- A run killed for `rss-limit`/`timeout` is a real failure: read
+  `.guard/last-run.json`, report it, and do not rerun with a higher limit to
+  make it pass. Knobs and details: `docs/agent-process-guard.md`.
+
 ## Tooling
 
 - Node version is pinned in `.nvmrc`; select it (`nvm use`, or an equivalent
