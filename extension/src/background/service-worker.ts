@@ -134,9 +134,8 @@ const albumStore = new IndexedDbAlbumStore();
 const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
 const urlReviewStatusStore = new IndexedDbUrlReviewStatusStore();
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
-const recentHistoryCache = new RecentHistoryCache();
+const recentHistoryCache = new RecentHistoryCache(chrome.storage?.session);
 const { notifyLibraryChange, notifySecureSessionChange } = createChangeNotifiers(chrome.runtime, chrome.tabs);
-
 /** Composition-root context handed to extracted handler modules; see {@link ServiceWorkerContext}. */
 const context: ServiceWorkerContext = {
   bookmarkStore,
@@ -200,6 +199,7 @@ function getDb(): Promise<IDBDatabase | null> {
 }
 async function referencedBlobIds(): Promise<Set<string>> {
   const referenced = new Set(await bookmarkStore.loadOriginalBlobIds());
+  await recentHistoryCache.ready();
   for (const history of recentHistoryCache.values()) {
     for (const item of history) {
       if (item.blobId) referenced.add(item.blobId);
@@ -329,9 +329,7 @@ async function handleDeleteBlob(message: DeleteBlobMessage): Promise<{ deleted: 
 async function handleCleanupOrphanedBlobs(): Promise<import('./messages.js').CleanupOrphanedBlobsResultMessage['payload']> {
   const db = await getDb();
   if (!db) return { deletedCount: 0, usage: { totalBytes: 0, blobCount: 0 } };
-
   const referenced = await referencedBlobIds();
-
   const blobs = new BlobsRepository(db);
   const orphanedBlobIds = (await blobs.list()).filter((blob) => !referenced.has(blob.id)).map((blob) => blob.id);
   const deletedCount = await blobs.deleteMany(orphanedBlobIds);
@@ -886,10 +884,12 @@ const messageRegistry = {
     requestSchema: requestSchemas.saveLocalSettingsRequestSchema,
     handle: async (message: SaveLocalSettingsMessage) => {
       let savedTimeout = DEFAULT_SESSION_INACTIVITY_TIMEOUT_MINUTES;
+      await recentHistoryCache.ready();
       const result = await handleSaveLocalSettings(message, chrome.storage.local, chrome.tabs, (settings) => {
         recentHistoryCache.pruneForSettings(settings);
         savedTimeout = settings.blobKeyInactivityTimeoutMinutes;
       });
+      await recentHistoryCache.flush();
       if (result.ok) await updateBlobKeyInactivityTimeout(savedTimeout);
       return result;
     },

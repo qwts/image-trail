@@ -22,7 +22,12 @@ interface Harness {
   patchState(patch: Partial<PanelState>): void;
 }
 
-function createHarness(options: { readonly findSelectedImage?: () => HTMLImageElement | null } = {}): Harness {
+function createHarness(
+  options: {
+    readonly findSelectedImage?: () => HTMLImageElement | null;
+    readonly updateRecentHistory?: RecentHistoryStore['update'];
+  } = {},
+): Harness {
   let state = createInitialPanelState(0);
   const log: string[] = [];
   const savedBookmarks: ImageDisplayRecord[] = [];
@@ -48,6 +53,7 @@ function createHarness(options: { readonly findSelectedImage?: () => HTMLImageEl
     },
     update: async (record: ImageDisplayRecord, pageUrl: string) => {
       historyUpdateLog.push({ record, pageUrl });
+      if (options.updateRecentHistory) return options.updateRecentHistory(record, pageUrl);
       historyRows = [record, ...historyRows.filter((row) => row.id !== record.id)];
       return historyRows;
     },
@@ -201,6 +207,26 @@ test('markRecentHistoryRowPinned updates the original transient row and prunes s
   assert.equal(harness.historyUpdateLog[0]?.record.pinnedRecordId, bookmark.id);
   assert.equal(harness.historyUpdateLog[0]?.pageUrl, 'https://images.example.test/gallery');
   assert.deepEqual(harness.getState().selectedHistoryIds, ['history-1']);
+});
+
+test('markRecentHistoryRowPinned does not apply an all-scope response after scope changes', async () => {
+  let resolveUpdate: ((rows: readonly ImageDisplayRecord[]) => void) | undefined;
+  const updateResult = new Promise<readonly ImageDisplayRecord[]>((resolve) => {
+    resolveUpdate = resolve;
+  });
+  const harness = createHarness({ updateRecentHistory: async () => updateResult });
+  const row = capturedHistoryRecord('history-1');
+  harness.patchState({ history: [row], recentHistoryScope: 'all' });
+  const bookmark = createDisplayRecord({ ...row, id: row.url, source: 'bookmark' });
+
+  const pendingPin = harness.controller.markRecentHistoryRowPinned('history-1', bookmark);
+  const siteOnlyRow = capturedHistoryRecord('site-only');
+  harness.patchState({ history: [siteOnlyRow], recentHistoryScope: 'site' });
+  resolveUpdate?.([{ ...row, pinnedRecordId: bookmark.id }, capturedHistoryRecord('off-site')]);
+  await pendingPin;
+
+  assert.equal(harness.getState().recentHistoryScope, 'site');
+  assert.deepEqual(harness.getState().history, [siteOnlyRow]);
 });
 
 test('deleteRecallBookmarks pages by the visible soft max and scopes to the current page URL', async () => {

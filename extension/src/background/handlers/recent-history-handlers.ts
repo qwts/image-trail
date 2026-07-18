@@ -34,6 +34,7 @@ export function createRecentHistoryMessageRegistry({
   loadLocalSettings,
 }: RecentHistoryMessageHandlerDeps): Record<RecentHistoryRequestType, MessageDef<ExtensionRequest, ExtensionResponse>> {
   async function handleLoadRecentHistory(message: LoadRecentHistoryMessage): Promise<LoadRecentHistoryResultMessage['payload']> {
+    await recentHistoryCache.ready();
     const settings = await loadLocalSettings();
     return {
       items: recentHistoryCache.load(message.payload.pageUrl, settings, message.payload.includeRetained ?? false, message.payload.scope),
@@ -41,18 +42,27 @@ export function createRecentHistoryMessageRegistry({
   }
 
   async function handleAddRecentHistory(message: AddRecentHistoryMessage): Promise<AddRecentHistoryResultMessage['payload']> {
+    await recentHistoryCache.ready();
     const settings = await loadLocalSettings();
-    return { items: recentHistoryCache.add(message.payload.pageUrl, message.payload.item, settings, message.payload.scope) };
+    const items = recentHistoryCache.add(message.payload.pageUrl, message.payload.item, settings, message.payload.scope);
+    await recentHistoryCache.flush();
+    return { items };
   }
 
   async function handleUpdateRecentHistory(message: UpdateRecentHistoryMessage): Promise<UpdateRecentHistoryResultMessage['payload']> {
+    await recentHistoryCache.ready();
     const settings = await loadLocalSettings();
-    return { items: recentHistoryCache.update(message.payload.pageUrl, message.payload.item, settings, message.payload.scope) };
+    const items = recentHistoryCache.update(message.payload.pageUrl, message.payload.item, settings, message.payload.scope);
+    await recentHistoryCache.flush();
+    return { items };
   }
 
   async function handleRemoveRecentHistory(message: RemoveRecentHistoryMessage): Promise<RemoveRecentHistoryResultMessage['payload']> {
+    await recentHistoryCache.ready();
     const settings = await loadLocalSettings();
-    return { items: recentHistoryCache.remove(message.payload.pageUrl, message.payload.id, settings, message.payload.scope) };
+    const items = recentHistoryCache.remove(message.payload.pageUrl, message.payload.id, settings, message.payload.scope);
+    await recentHistoryCache.flush();
+    return { items };
   }
 
   return {

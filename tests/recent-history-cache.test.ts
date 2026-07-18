@@ -1,11 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RecentHistoryCache, recentHistoryPageKey, recentHistorySiteKey } from '../extension/src/background/recent-history-cache.js';
+import {
+  RecentHistoryCache,
+  recentHistoryPageKey,
+  recentHistorySiteKey,
+  type RecentHistorySessionStorage,
+} from '../extension/src/background/recent-history-cache.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
 import type { ImageDisplayRecord } from '../extension/src/core/display-records.js';
 
 function record(id: string, url = `https://example.test/${id}.jpg`): ImageDisplayRecord {
   return { id, url, label: `${id}.jpg`, timestamp: '2026-01-01T00:00:00.000Z' };
+}
+
+class MemorySessionStorage implements RecentHistorySessionStorage {
+  readonly values: Record<string, unknown> = {};
+
+  async get(key: string): Promise<Record<string, unknown>> {
+    return key in this.values ? { [key]: this.values[key] } : {};
+  }
+
+  async set(items: Record<string, unknown>): Promise<void> {
+    Object.assign(this.values, items);
+  }
 }
 
 test('recent history keys use hostname for sites and origin/path for pages', () => {
@@ -194,4 +211,22 @@ test('RecentHistoryCache.values() exposes every cached site for cross-site sweep
     .map((item) => item.id)
     .sort();
   assert.deepEqual(allIds, ['1', '2']);
+});
+
+test('RecentHistoryCache restores recents and global order after a service-worker restart', async () => {
+  const storage = new MemorySessionStorage();
+  const firstWorker = new RecentHistoryCache(storage);
+
+  await firstWorker.ready();
+  firstWorker.add('https://a.test/gallery', record('1'), DEFAULT_LOCAL_SETTINGS);
+  firstWorker.add('https://b.test/gallery', record('2'), DEFAULT_LOCAL_SETTINGS);
+  await firstWorker.flush();
+
+  const restartedWorker = new RecentHistoryCache(storage);
+  await restartedWorker.ready();
+
+  assert.deepEqual(
+    restartedWorker.load('https://a.test/gallery', DEFAULT_LOCAL_SETTINGS, true, 'all').map((item) => item.id),
+    ['2', '1'],
+  );
 });
