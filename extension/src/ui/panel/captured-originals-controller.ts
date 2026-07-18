@@ -308,7 +308,7 @@ export class CapturedOriginalsController {
     let queueChanged = false;
     const bookmarkStore = this.deps.bookmarkStore();
     if (updatedBookmark && bookmarkStore) {
-      await bookmarkStore.save(updatedBookmark);
+      await bookmarkStore.save(updatedBookmark, { clearStoredOriginal: true });
       await this.deps.loadBookmarkPage(this.deps.getState().bookmarkOffset, { render: false });
       queueChanged = true;
     }

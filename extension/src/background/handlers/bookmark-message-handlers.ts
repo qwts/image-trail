@@ -73,7 +73,7 @@ export function createBookmarkMessageRegistry({
     [MessageType.SaveBookmark]: defineMessage({
       requestSchema: requestSchemas.saveBookmarkRequestSchema,
       handle: async (message: SaveBookmarkMessage) => {
-        const record = await bookmarkStore.save(message.payload.record);
+        const record = await bookmarkStore.save(message.payload.record, message.payload.options);
         notifyLibraryChange({ topic: 'bookmarks', reason: 'bookmark-saved', recordIds: [record.id] });
         return { ok: true as const, record };
       },

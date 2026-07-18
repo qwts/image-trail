@@ -22,6 +22,7 @@ import type { SessionInactivityTimeoutMinutes } from './secure-session-policy.js
 import type { SecureSessionPanelAction } from './secure-session-actions.js';
 
 export type { RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
+export type { BookmarkStore } from './bookmark-store.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
@@ -656,36 +657,3 @@ export type PanelAction =
       readonly message: string;
     }
   | { readonly name: 'storage/update'; readonly usage: StorageUsageSummary };
-
-export interface BookmarkStore {
-  readonly load: () => Promise<readonly ImageDisplayRecord[]>;
-  readonly getStorageUsage?: () => Promise<StorageUsageSummary>;
-  readonly loadOriginalBlobIds: () => Promise<ReadonlySet<string>>;
-  readonly loadPage: (input: {
-    readonly offset: number;
-    readonly limit: number;
-    readonly scope?: 'global' | 'site' | undefined;
-    readonly currentPageUrl?: string | undefined;
-    readonly displayOrder?: QueueDisplayOrder | undefined;
-  }) => Promise<{
-    readonly items: readonly ImageDisplayRecord[];
-    readonly offset: number;
-    readonly limit: number;
-    readonly total: number;
-    readonly hasOlder: boolean;
-    readonly hasNewer: boolean;
-  }>;
-  readonly loadByIds: (ids: readonly string[]) => Promise<readonly ImageDisplayRecord[]>;
-  readonly findByUrl: (url: string) => Promise<ImageDisplayRecord | null>;
-  readonly save: (record: ImageDisplayRecord) => Promise<ImageDisplayRecord>;
-  readonly saveResult?: (
-    record: ImageDisplayRecord,
-  ) => Promise<{ readonly ok: true; readonly record: ImageDisplayRecord } | { readonly ok: false; readonly message: string }>;
-  readonly remove: (record: ImageDisplayRecord) => Promise<void>;
-  readonly removeMany: (ids: readonly string[]) => Promise<{ readonly removedCount: number }>;
-  readonly removeRecallPage: (input: {
-    readonly offset: number;
-    readonly scope?: 'global' | 'site' | undefined;
-    readonly currentPageUrl?: string | undefined;
-  }) => Promise<{ readonly removedCount: number }>;
-}

@@ -15,6 +15,7 @@ import {
   isSaveBookmarkResultMessage,
 } from '../background/messages.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
+import type { BookmarkSaveOptions } from '../core/bookmark-save-options.js';
 import type { QueueDisplayOrder } from '../core/display-order.js';
 import type { BookmarkStore } from '../core/types.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../data/local-settings.js';
@@ -60,15 +61,16 @@ export class ExtensionBookmarkStore implements BookmarkStore {
     return { items: [], offset: input.offset, limit: input.limit, total: 0, hasOlder: false, hasNewer: false };
   }
 
-  async save(record: ImageDisplayRecord): Promise<ImageDisplayRecord> {
-    const result = await this.saveResult(record);
+  async save(record: ImageDisplayRecord, options?: BookmarkSaveOptions): Promise<ImageDisplayRecord> {
+    const result = await this.saveResult(record, options);
     return result.ok ? result.record : record;
   }
 
   async saveResult(
     record: ImageDisplayRecord,
+    options?: BookmarkSaveOptions,
   ): Promise<{ readonly ok: true; readonly record: ImageDisplayRecord } | { readonly ok: false; readonly message: string }> {
-    const response = await sendRuntimeMessage(createSaveBookmarkMessage(record));
+    const response = await sendRuntimeMessage(createSaveBookmarkMessage(record, options));
     if (isSaveBookmarkResultMessage(response)) return response.payload;
     return { ok: false, message: 'Bookmark save failed.' };
   }

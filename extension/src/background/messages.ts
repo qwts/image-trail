@@ -1,5 +1,7 @@
 import * as v from 'valibot';
 import { isBuildIdentity, type BuildIdentity } from '../core/build-info.js';
+import type { BookmarkSaveOptions } from '../core/bookmark-save-options.js';
+import type { ImageDisplayRecord } from '../core/display-records.js';
 import { storageUsageSummarySchema } from '../core/image/capture-result.schema.js';
 import type { ImageProbeMethod, ImageRequestIntent, ImageSourceProfile } from '../core/image/request-policy.js';
 import type { SaveLocalSettingsInput } from '../data/local-settings.js';
@@ -367,7 +369,7 @@ export interface LoadBookmarksResultMessage {
   readonly type: typeof MessageType.LoadBookmarksResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload: {
-    readonly items: readonly import('../core/display-records.js').ImageDisplayRecord[];
+    readonly items: readonly ImageDisplayRecord[];
     readonly offset: number;
     readonly limit: number;
     readonly total: number;
@@ -385,7 +387,7 @@ export interface LoadBookmarksByIdsMessage {
 export interface LoadBookmarksByIdsResultMessage {
   readonly type: typeof MessageType.LoadBookmarksByIdsResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly items: readonly import('../core/display-records.js').ImageDisplayRecord[] };
+  readonly payload: { readonly items: readonly ImageDisplayRecord[] };
 }
 
 export interface FindBookmarkByUrlMessage {
@@ -397,27 +399,25 @@ export interface FindBookmarkByUrlMessage {
 export interface FindBookmarkByUrlResultMessage {
   readonly type: typeof MessageType.FindBookmarkByUrlResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly record: import('../core/display-records.js').ImageDisplayRecord | null };
+  readonly payload: { readonly record: ImageDisplayRecord | null };
 }
 
 export interface SaveBookmarkMessage {
   readonly type: typeof MessageType.SaveBookmark;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly record: import('../core/display-records.js').ImageDisplayRecord };
+  readonly payload: { readonly record: ImageDisplayRecord; readonly options?: BookmarkSaveOptions | undefined };
 }
 
 export interface SaveBookmarkResultMessage {
   readonly type: typeof MessageType.SaveBookmarkResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload:
-    | { readonly ok: true; readonly record: import('../core/display-records.js').ImageDisplayRecord }
-    | { readonly ok: false; readonly message: string };
+  readonly payload: { readonly ok: true; readonly record: ImageDisplayRecord } | { readonly ok: false; readonly message: string };
 }
 
 export interface RemoveBookmarkMessage {
   readonly type: typeof MessageType.RemoveBookmark;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly record: import('../core/display-records.js').ImageDisplayRecord };
+  readonly payload: { readonly record: ImageDisplayRecord };
 }
 
 export interface RemoveBookmarkResultMessage {
@@ -493,7 +493,7 @@ export interface RecallRecordsResultMessage {
   readonly payload:
     | {
         readonly ok: true;
-        readonly records: readonly import('../core/display-records.js').ImageDisplayRecord[];
+        readonly records: readonly ImageDisplayRecord[];
         readonly failedCount: number;
         readonly message: string;
       }
@@ -1117,15 +1117,15 @@ export function createFindBookmarkByUrlResultMessage(payload: FindBookmarkByUrlR
   return { type: MessageType.FindBookmarkByUrlResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-export function createSaveBookmarkMessage(record: import('../core/display-records.js').ImageDisplayRecord): SaveBookmarkMessage {
-  return { type: MessageType.SaveBookmark, version: MESSAGE_PROTOCOL_VERSION, payload: { record } };
+export function createSaveBookmarkMessage(record: ImageDisplayRecord, options?: BookmarkSaveOptions): SaveBookmarkMessage {
+  return { type: MessageType.SaveBookmark, version: MESSAGE_PROTOCOL_VERSION, payload: { record, options } };
 }
 
 export function createSaveBookmarkResultMessage(payload: SaveBookmarkResultMessage['payload']): SaveBookmarkResultMessage {
   return { type: MessageType.SaveBookmarkResult, version: MESSAGE_PROTOCOL_VERSION, payload };
 }
 
-export function createRemoveBookmarkMessage(record: import('../core/display-records.js').ImageDisplayRecord): RemoveBookmarkMessage {
+export function createRemoveBookmarkMessage(record: ImageDisplayRecord): RemoveBookmarkMessage {
   return { type: MessageType.RemoveBookmark, version: MESSAGE_PROTOCOL_VERSION, payload: { record } };
 }
 
