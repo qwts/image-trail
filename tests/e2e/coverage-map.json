@@ -682,13 +682,13 @@
         },
         {
           "type": "playwright-e2e",
-          "path": "tests/e2e/recents-scope.spec.ts",
-          "notes": "Covers packaged-extension switching across two pages on one site and a second site, scoped row counts, labels, focus retention after rerender, and a 340px viewport regression pin that keeps the collapse header under 44px with scope context below it."
+          "paths": ["tests/e2e/recents-scope.spec.ts", "tests/e2e/recents-worker-session.spec.ts"],
+          "notes": "Covers packaged-extension switching across two pages on one site and a second site, scoped row counts, labels, focus retention after rerender, a 340px viewport regression pin that keeps the collapse header under 44px with scope context below it, and Recents restoration after the MV3 service worker is terminated and recreated within the same browser session."
         },
         {
           "type": "manual",
           "reason": "Service-worker lifecycle and privacy presentation require a packaged-extension smoke check.",
-          "notes": "Load images on two paths and two hostnames, verify Page/Site/All sites contents and private labels, then restart the extension service worker and verify Recents are empty while durable pins remain."
+          "notes": "Load images on two paths and two hostnames, verify Page/Site/All sites contents and private labels, then restart the extension service worker and verify Recents remain available while durable pins remain unchanged. Close the browser session and verify Recents clear while durable pins remain."
         }
       ]
     },
@@ -711,7 +711,7 @@
             "tests/dom/record-library-controller.test.ts",
             "tests/dom/captured-originals-controller.test.ts"
           ],
-          "notes": "Covers saved-row lookup messages, plain/protected URL lookup without queue-order mutation, original preservation during re-save/import, explicit original clearing, recent enrichment from off-page saved rows, duplicate pin prevention, capture skip/update behavior, post-capture blob cleanup on failed durable save, linked recent cleanup, and Delete original resolving non-visible durable rows."
+          "notes": "Covers saved-row lookup messages, plain/protected URL lookup without queue-order mutation, original preservation during re-save/import, explicit original clearing, recent enrichment from off-page saved rows, duplicate pin prevention, stale all-scope pin responses being discarded after a Recents scope change, capture skip/update behavior, post-capture blob cleanup on failed durable save, linked recent cleanup, and Delete original resolving non-visible durable rows."
         },
         {
           "type": "playwright-e2e",

@@ -1,6 +1,15 @@
+import * as v from 'valibot';
 import type { ImageDisplayRecord } from '../core/display-records.js';
+import { imageDisplayRecordSchema } from '../core/display-records.schema.js';
 import { DEFAULT_RECENT_HISTORY_SCOPE, type RecentHistoryScope } from '../core/recent-history-scope.js';
 import type { PlaintextLocalSettings } from '../data/local-settings.js';
+
+const RECENT_HISTORY_SESSION_KEY = 'imageTrail.recentHistory.v1';
+
+export interface RecentHistorySessionStorage {
+  get(key: string): Promise<Record<string, unknown>>;
+  set(items: Record<string, unknown>): Promise<void>;
+}
 
 export function recentHistorySiteKey(pageUrl: string): string {
   try {
@@ -25,6 +34,18 @@ interface RecentHistoryEntry {
   readonly sequence: number;
 }
 
+const recentHistoryEntrySchema = v.object({
+  item: imageDisplayRecordSchema,
+  pageKey: v.string(),
+  sequence: v.pipe(v.number(), v.integer(), v.minValue(0)),
+});
+
+const recentHistorySessionStateSchema = v.object({
+  version: v.literal(1),
+  sequence: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  bySite: v.record(v.string(), v.array(recentHistoryEntrySchema)),
+});
+
 function retainedRecentHistory(items: readonly ImageDisplayRecord[], settings: PlaintextLocalSettings): readonly ImageDisplayRecord[] {
   const limit =
     settings.recentHistoryOverflowBehavior === 'drop-oldest' ? settings.recentHistoryLimit : settings.recentHistoryRetainedLimit;
@@ -36,13 +57,27 @@ function visibleRecentHistory(items: readonly ImageDisplayRecord[], settings: Pl
 }
 
 /**
- * Per-site cache of recently viewed images, keyed by page hostname. Recents are transient session
- * state (AGENTS.md "Product Model") — this cache is intentionally an in-memory Map only. It must
- * never gain a durable browser-storage write path (tests/invariants.test.ts asserts this).
+ * Per-site cache of recently viewed images, keyed by page hostname. Recents are transient browser-
+ * session state (AGENTS.md "Product Model"). The session adapter survives MV3 worker suspension but
+ * must never be backed by durable browser storage (tests/invariants.test.ts asserts the composition).
  */
 export class RecentHistoryCache {
   private readonly bySite = new Map<string, readonly RecentHistoryEntry[]>();
   private sequence = 0;
+  private readonly hydration: Promise<void>;
+  private writes: Promise<void> = Promise.resolve();
+
+  constructor(private readonly storage?: RecentHistorySessionStorage) {
+    this.hydration = this.hydrate();
+  }
+
+  ready(): Promise<void> {
+    return this.hydration;
+  }
+
+  flush(): Promise<void> {
+    return this.writes;
+  }
 
   load(
     pageUrl: string,
@@ -68,6 +103,7 @@ export class RecentHistoryCache {
       ...(this.bySite.get(key) ?? []).filter((candidate) => candidate.item.url !== item.url && candidate.item.id !== item.id),
     ].slice(0, retainedLimit(settings));
     this.bySite.set(key, next);
+    this.persist();
     return this.load(pageUrl, settings, false, scope);
   }
 
@@ -84,6 +120,7 @@ export class RecentHistoryCache {
         key,
         entries.map((entry, entryIndex) => (entryIndex === index ? { ...entry, item } : entry)),
       );
+      this.persist();
       break;
     }
     return this.load(pageUrl, settings, false, scope);
@@ -115,6 +152,7 @@ export class RecentHistoryCache {
         }),
       );
     }
+    this.persist();
     return this.load(pageUrl, settings, false, scope);
   }
 
@@ -122,6 +160,7 @@ export class RecentHistoryCache {
     for (const [key, entries] of this.bySite) {
       this.bySite.set(key, entries.slice(0, retainedLimit(settings)));
     }
+    this.persist();
   }
 
   /** All cached items across every site, for consumers like blob-reference-counting sweeps. */
@@ -137,6 +176,34 @@ export class RecentHistoryCache {
       return siteEntries.filter((entry) => entry.pageKey === pageKey);
     }
     return uniqueEntries([...this.bySite.values()].flat().sort((left, right) => right.sequence - left.sequence));
+  }
+
+  private async hydrate(): Promise<void> {
+    if (!this.storage) return;
+    try {
+      const values = await this.storage.get(RECENT_HISTORY_SESSION_KEY);
+      const parsed = v.safeParse(recentHistorySessionStateSchema, values[RECENT_HISTORY_SESSION_KEY]);
+      if (!parsed.success) return;
+      this.sequence = parsed.output.sequence;
+      for (const [site, entries] of Object.entries(parsed.output.bySite)) this.bySite.set(site, entries);
+    } catch {
+      // Session storage is an availability aid; recents still work in memory if it is unavailable.
+    }
+  }
+
+  private persist(): void {
+    if (!this.storage) return;
+    const snapshot = {
+      version: 1 as const,
+      sequence: this.sequence,
+      bySite: Object.fromEntries(this.bySite),
+    };
+    this.writes = this.writes
+      .then(() => this.storage?.set({ [RECENT_HISTORY_SESSION_KEY]: snapshot }))
+      .then(
+        () => undefined,
+        () => undefined,
+      );
   }
 }
 

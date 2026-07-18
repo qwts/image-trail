@@ -1,6 +1,6 @@
 // Executable checks for the highest-stakes product invariants (issue #275). These encode, as
 // tests, the rules that otherwise live only as prose in AGENTS.md / .github/copilot-instructions.md:
-//   1. Recents are transient — the recents layer has no durable-storage write path.
+//   1. Recents are transient — session storage is allowed, but durable storage is not.
 //   2. Queue ordering is `queueUpdatedAt`, never the encrypted envelope's `updatedAt`.
 //   3. Recall pages the queue producer, never the encrypted blob store.
 // A fourth check proves the companion ESLint rule (envelope.updatedAt sort ban) actually fires.
@@ -67,10 +67,10 @@ function encryptedBookmarkRecord(input: {
 // Invariant 1 — recents are transient: no durable-storage write path
 // ---------------------------------------------------------------------------
 
-test('invariant: the recents layer exposes no durable IndexedDB write path', () => {
+test('invariant: the recents layer exposes no durable browser-storage write path', () => {
   // The recents store (content proxy), the runtime-history reducer, and the background cache that
   // actually owns and mutates the retained rows must never reach durable storage — recents are
-  // transient session state (AGENTS.md "Product Model"). Scanning only the proxy/reducer would miss
+  // transient browser-session state (AGENTS.md "Product Model"). Scanning only the proxy/reducer would miss
   // a regression at the real write owner, extension/src/background/recent-history-cache.ts.
   const recentsModules = [
     'extension/src/content/recent-history-store.ts',
@@ -79,7 +79,7 @@ test('invariant: the recents layer exposes no durable IndexedDB write path', () 
   ];
   const forbidden: readonly (readonly [RegExp, string])[] = [
     [/\bindexedDB\b/, 'indexedDB'],
-    [/chrome\.storage/, 'chrome.storage'],
+    [/chrome\.storage\.(?:local|sync|managed)/, 'durable chrome.storage'],
     [/openImageTrailDb/, 'openImageTrailDb'],
     [/from ['"][^'"]*\/repositories\//, 'a data repository import'],
     [/from ['"][^'"]*\/data\/db(\.js)?['"]/, 'the IndexedDB module'],
@@ -95,6 +95,13 @@ test('invariant: the recents layer exposes no durable IndexedDB write path', () 
       );
     }
   }
+
+  const compositionRoot = readFileSync(resolve(process.cwd(), 'extension/src/background/service-worker.ts'), 'utf8');
+  assert.match(
+    compositionRoot,
+    /new RecentHistoryCache\(chrome\.storage\?\.session\)/,
+    'the production recents cache must use browser-session storage so MV3 worker suspension does not clear it',
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -202,7 +202,6 @@ export class RecordLibraryController {
     void this.deps.refreshStorageUsage({ render: options.render !== false });
     return { ok: true, record: bookmark };
   }
-
   async markRecentHistoryRowPinned(id: string, bookmark: ImageDisplayRecord): Promise<void> {
     this.deps.setState(
       reducePanelAction(this.deps.getState(), {
@@ -221,9 +220,11 @@ export class RecordLibraryController {
       lastUpdatedAt: Date.now(),
     });
     const recentHistoryStore = this.deps.recentHistoryStore();
+    const scope = this.deps.getState().recentHistoryScope;
     const history = recentHistoryStore
-      ? await recentHistoryStore.update(linkedHistory, window.location.href, { scope: this.deps.getState().recentHistoryScope })
+      ? await recentHistoryStore.update(linkedHistory, window.location.href, { scope })
       : this.deps.getState().history;
+    if (this.deps.getState().recentHistoryScope !== scope) return;
     this.deps.setState({
       ...this.deps.getState(),
       history,
@@ -231,7 +232,6 @@ export class RecordLibraryController {
       lastUpdatedAt: Date.now(),
     });
   }
-
   private async resolveRecordThumbnail(
     sourceUrl: string,
     thumbnail: string | undefined,
