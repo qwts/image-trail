@@ -11,6 +11,7 @@ import { createKeyReference } from '../extension/src/data/crypto/key-reference.j
 import { openImageTrailDb } from '../extension/src/data/db.js';
 import { exportPlainBookmarks } from '../extension/src/data/import-export/bookmarks-export.js';
 import { importBookmarks } from '../extension/src/data/import-export/bookmarks-import.js';
+import { InteropRecordExportStore } from '../extension/src/data/interop/record-export.js';
 import { BlobsRepository } from '../extension/src/data/repositories/blobs-repository.js';
 import type { KeyReference } from '../extension/src/data/crypto/types.js';
 import { bookmarkPayloadToDisplayRecord } from '../extension/src/ui/panel/restore-import-preview.js';
@@ -50,6 +51,16 @@ async function assertOriginalBlobExists(): Promise<void> {
   assert.ok(opened.db);
   try {
     assert.notEqual(await new BlobsRepository(opened.db).get(ORIGINAL.blobId), undefined);
+  } finally {
+    opened.db.close();
+  }
+}
+
+async function assertOriginalBlobMissing(): Promise<void> {
+  const opened = await openImageTrailDb();
+  assert.ok(opened.db);
+  try {
+    assert.equal(await new BlobsRepository(opened.db).get(ORIGINAL.blobId), undefined);
   } finally {
     opened.db.close();
   }
@@ -172,6 +183,54 @@ test('explicit protected-original clearing still removes metadata and its relati
     active = null;
     lockBlobKey();
   }
+  await assertOriginalBlobMissing();
+});
+
+test('explicit plain-original clearing preserves interop custody and deletes the original blob', async () => {
+  await deleteImageTrailDb();
+  await putOriginalBlob(createKeyReference('blob', 'clear-plain-original-key'));
+  const store = new IndexedDbBookmarkStore();
+  const url = 'https://example.test/plain-cleared.jpg';
+  const firstInteropId = '11111111-1111-4111-8111-111111111111';
+  const replacementInteropId = '22222222-2222-4222-8222-222222222222';
+  try {
+    const saved = await store.save(
+      createDisplayRecord({
+        id: url,
+        url,
+        timestamp: '2026-07-18T00:00:01.000Z',
+        source: 'bookmark',
+        storedOriginal: ORIGINAL,
+      }),
+    );
+
+    const opened = await openImageTrailDb();
+    assert.ok(opened.db);
+    try {
+      const firstReview = await new InteropRecordExportStore(opened.db, { createId: () => firstInteropId }).review([saved.id]);
+      assert.equal(firstReview.records[0]?.record.identity.interopId, firstInteropId);
+    } finally {
+      opened.db.close();
+    }
+
+    const cleared = { ...saved, captureStatus: undefined, blobId: undefined, storedOriginal: undefined };
+    await store.save(cleared, { clearStoredOriginal: true });
+
+    const reviewed = await openImageTrailDb();
+    assert.ok(reviewed.db);
+    try {
+      const secondReview = await new InteropRecordExportStore(reviewed.db, { createId: () => replacementInteropId }).review([saved.id]);
+      assert.equal(secondReview.records[0]?.record.identity.interopId, firstInteropId);
+    } finally {
+      reviewed.db.close();
+    }
+
+    const reloaded = (await store.loadPage({ offset: 0, limit: 1 })).items[0];
+    assert.equal(reloaded?.storedOriginal, undefined);
+  } finally {
+    await store.close();
+  }
+  await assertOriginalBlobMissing();
 });
 
 test('bookmarks-only import over an existing bookmark preserves the local captured original', async () => {

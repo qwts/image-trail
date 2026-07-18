@@ -186,7 +186,9 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     }
     const indexUrl = existingPayload?.interop ? existing!.url : proposedIndexUrl;
     const uuid = existing?.uuid ?? crypto.randomUUID();
-    const payload = toBookmarkPayload(bookmark, options.clearStoredOriginal ? null : existingPayload);
+    const payload = toBookmarkPayload(bookmark, existingPayload, {
+      preserveExistingOriginal: !options.clearStoredOriginal,
+    });
     await context.repository.sealAndPut(
       uuid,
       payload,
@@ -739,7 +741,7 @@ async function removeReplacedOriginal(
   nextBlobId: string | undefined,
 ): Promise<void> {
   const previousBlobId = previous?.protectedPin?.storedOriginalBlobId ?? previous?.storedOriginal?.blobId;
-  if (!previousBlobId || !nextBlobId || previousBlobId === nextBlobId) return;
+  if (!previousBlobId || previousBlobId === nextBlobId) return;
   await context.blobs.remove(previousBlobId);
 }
 

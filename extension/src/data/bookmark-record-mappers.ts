@@ -1,7 +1,11 @@
 import { createDisplayRecord, type ImageDisplayRecord } from '../core/display-records.js';
 import type { DurableBookmarkPayloadV1, DurableEncryptedPinPayloadV1, ProtectedPinRelationshipV1 } from './types.js';
 
-export function toBookmarkPayload(record: ImageDisplayRecord, existing?: DurableBookmarkPayloadV1 | null): DurableBookmarkPayloadV1 {
+export function toBookmarkPayload(
+  record: ImageDisplayRecord,
+  existing?: DurableBookmarkPayloadV1 | null,
+  options: { readonly preserveExistingOriginal?: boolean } = {},
+): DurableBookmarkPayloadV1 {
   return {
     url: record.url,
     title: record.title,
@@ -13,7 +17,8 @@ export function toBookmarkPayload(record: ImageDisplayRecord, existing?: Durable
     downloadedAt: record.downloadedAt,
     capturedAt: record.capturedAt,
     sourceCompatibility: 'favorites',
-    storedOriginal: record.storedOriginal ?? (record.blobId ? undefined : existing?.storedOriginal),
+    storedOriginal:
+      record.storedOriginal ?? (record.blobId || options.preserveExistingOriginal === false ? undefined : existing?.storedOriginal),
     protectedPin: record.protectedPin
       ? protectedRelationship({
           plainPinId: record.protectedPin.plainPinId,
