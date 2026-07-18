@@ -111,7 +111,7 @@ test('Gallery uses the shared design system without mutating durable queue order
   await expect(page.locator('.image-trail-ds__input').first()).toBeVisible();
   await expect(page.locator('.image-trail-ds__card').first()).toBeVisible();
   await expect(page.locator('.image-trail-ds__status-pill')).toBeVisible();
-  await expect(cardLabels(page)).resolves.toEqual(['Alpine lake', 'Coastline study', 'Field notes']);
+  await expect(page.locator('.image-trail-gallery__card-title')).toHaveText(['Alpine lake', 'Coastline study', 'Field notes']);
   const queueBefore = await durableQueueLabels(page);
 
   const search = page.getByRole('searchbox', { name: 'Search gallery' });
@@ -218,8 +218,4 @@ async function durableQueueLabels(page: Page): Promise<readonly string[]> {
     });
   });
   return (response.payload.items as Array<{ label?: string }>).map((record) => record.label ?? '');
-}
-
-async function cardLabels(page: Page): Promise<readonly string[]> {
-  return page.locator('.image-trail-gallery__card-title').allTextContents();
 }
