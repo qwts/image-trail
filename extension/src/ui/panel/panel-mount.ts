@@ -27,6 +27,8 @@ export interface PanelMountEnvironment {
   resolveStyleUrl(path: string): string;
   /** Schedules the styles-ready fallback reveal (defaults to `window.setTimeout(..., 300)`). */
   scheduleStylesReadyFallback(reveal: () => void): void;
+  /** Test seam for asserting closed shadow root contents without exposing them to host pages. */
+  onShadowRootCreated?(shadow: ShadowRoot): void;
 }
 
 function defaultEnvironment(): PanelMountEnvironment {
@@ -51,6 +53,7 @@ export class PanelMount {
   private detachedRootEl: HTMLElement | null = null;
   private toastRootEl: HTMLElement | null = null;
   private stylesReady = false;
+  private shadowRoot: ShadowRoot | null = null;
   private stylesReadyPromise: Promise<void> | null = null;
   private subscriptionHandles: Array<() => void> = [];
 
@@ -99,7 +102,9 @@ export class PanelMount {
       pointerEvents: 'none',
       zIndex: '2147483647',
     });
-    const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
+    const shadow = host.shadowRoot ?? this.shadowRoot ?? host.attachShadow({ mode: 'closed' });
+    this.shadowRoot = shadow;
+    this.environment.onShadowRootCreated?.(shadow);
     const link = doc.createElement('link');
     link.rel = 'stylesheet';
     link.href = this.environment.resolveStyleUrl(STYLE_PATH);
@@ -156,6 +161,7 @@ export class PanelMount {
     this.toastRootEl = null;
     this.stylesReady = false;
     this.stylesReadyPromise = null;
+    this.shadowRoot = null;
   }
 
   /** Stores the page-adapter unsubscribe handles so teardown of the panel can release them. */

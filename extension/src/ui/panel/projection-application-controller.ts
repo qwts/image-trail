@@ -325,28 +325,27 @@ export class ProjectionApplicationController {
         return;
       }
 
-      if (await this.projectUrlToSelectedImage(retrieved.dataUrl, session)) {
-        if (!this.isCurrentProjectionSession(session)) return;
+      if (!this.canProjectToSelectedImage()) {
+        this.deps.projections().update(session, { status: 'failed' });
         const state = this.deps.getState();
         this.deps.setState({
           ...state,
-          message: `Projected encrypted original (${(retrieved.byteLength / 1024).toFixed(1)} KB).`,
+          message: 'Select a host image before previewing encrypted originals.',
+          status: 'error',
           lastUpdatedAt: Date.now(),
         });
         this.deps.render();
         return;
       }
-
-      if (!this.isCurrentProjectionSession(session)) return;
-      this.deps.projections().update(session, { status: 'failed' });
+      if (!this.applyProjectionToSelectedImage(session, url)) return;
       const state = this.deps.getState();
       this.deps.setState({
         ...state,
-        message: 'Select a host image before previewing encrypted originals.',
-        status: 'error',
+        message: `Encrypted original is available (${(retrieved.byteLength / 1024).toFixed(1)} KB); previewed the page URL to keep decrypted bytes out of the host page.`,
         lastUpdatedAt: Date.now(),
       });
       this.deps.render();
+      return;
     } finally {
       // Clear only when this call still owns the anchor (no newer preview took it over — the
       // delegated plain-URL path has no session to check) AND, where a blob session exists, it was
