@@ -117,7 +117,7 @@ function canonicalRecord(
   const revision = INITIAL_REVISION;
   return v.parse(interopRecordSchema, {
     schemaVersion: 1,
-    identity: { interopId, origin: { product: 'image-trail', localId }, contentHash: null },
+    identity: { interopId, origin: { product: 'image-trail', localId }, contentHash: original?.contentHash ?? null },
     revision,
     fieldRevisions: {
       title: revision,
@@ -160,7 +160,11 @@ function custody(
 ): DurableInteropRecordV1 | null {
   const existing = payload.interop;
   const record = existing
-    ? { ...existing.record, original: originalReference(payload, original) }
+    ? {
+        ...existing.record,
+        identity: original ? { ...existing.record.identity, contentHash: original.contentHash } : existing.record.identity,
+        original: originalReference(payload, original),
+      }
     : canonicalRecord(localId, payload, createId(), original);
   if (record === null) return null;
   return {
@@ -169,6 +173,10 @@ function custody(
     albums: existing?.albums ?? [],
     reviewCategory: payload.storedOriginal ? (original ? 'eligible' : 'metadata-only') : (existing?.reviewCategory ?? 'eligible'),
   };
+}
+
+function sameCustody(left: DurableInteropRecordV1 | undefined, right: DurableInteropRecordV1): boolean {
+  return left !== undefined && JSON.stringify(left) === JSON.stringify(right);
 }
 
 export class InteropRecordExportStore {
@@ -213,7 +221,7 @@ export class InteropRecordExportStore {
           continue;
         }
         if (protectedPin && activeBlobKey) {
-          if (!protectedPin.payload.interop || payload.interop) {
+          if (!sameCustody(protectedPin.payload.interop, interop) || payload.interop !== undefined) {
             await encryptedPins.sealAndPut({
               id: protectedPin.record.id,
               plainPinId: protectedPin.record.plainPinId,
@@ -236,7 +244,7 @@ export class InteropRecordExportStore {
               encrypted.queueUpdatedAt,
             );
           }
-        } else if (!payload.interop) {
+        } else if (!sameCustody(payload.interop, interop)) {
           await bookmarks.sealAndPut(
             encrypted.uuid,
             { ...payload, interop },

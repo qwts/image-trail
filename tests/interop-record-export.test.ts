@@ -199,7 +199,39 @@ test('ordinary encrypted pins gain stable canonical custody without changing que
   assert.deepEqual(second.records, first.records);
   assert.equal(first.records[0]?.reviewCategory, 'metadata-only');
   assert.equal(first.records[0]?.record.original.state, 'metadata-only');
+  assert.equal(first.records[0]?.record.identity.contentHash, null);
   assert.equal((await new BookmarksRepository(opened.db).getEncrypted('bookmark-1'))?.queueUpdatedAt, '2026-07-17T12:03:00.000Z');
+});
+
+test('a later verified original updates stable canonical identity custody', async (t) => {
+  const opened = await openImageTrailDb(new IDBFactory());
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+  await seedBookmark(opened.db);
+  const exporter = new InteropRecordExportStore(opened.db, {
+    now: () => '2026-07-17T12:04:00.000Z',
+    createId: () => INTEROP_ID,
+  });
+  const metadataOnly = await exporter.review(['bookmark-1']);
+  assert.equal(metadataOnly.records[0]?.record.identity.contentHash, null);
+
+  const { active, bytes } = await seedOriginalBlob(opened.db);
+  const verified = await exporter.review(['bookmark-1'], active);
+  const expectedHash = await sha256(bytes);
+  assert.equal(verified.records[0]?.record.identity.interopId, INTEROP_ID);
+  assert.equal(verified.records[0]?.record.identity.contentHash, expectedHash);
+  assert.equal(verified.records[0]?.record.original.state, 'available');
+  assert.equal(
+    verified.records[0]?.record.original.state === 'available' ? verified.records[0].record.original.contentHash : null,
+    expectedHash,
+  );
+
+  const encrypted = await new BookmarksRepository(opened.db).getEncrypted('bookmark-1');
+  assert.ok(encrypted);
+  const key = await ensureDurableBookmarkKey(new KeysRepository(opened.db));
+  const persisted = await new BookmarksRepository(opened.db).openRecord(encrypted, key.key);
+  assert.equal(persisted.interop?.record.identity.contentHash, expectedHash);
+  assert.equal(persisted.interop?.record.original.state, 'available');
 });
 
 test('record review zeroes decrypted original bytes when canonical review rejects the record', async (t) => {
@@ -279,6 +311,12 @@ test('unlocked captured originals queue an available record, blob message, and e
   const record = envelopes.find((envelope) => envelope.payload.kind === 'record');
   const blob = envelopes.find((envelope) => envelope.payload.kind === 'blob');
   assert.equal(record?.payload.kind === 'record' ? record.payload.record.original.state : null, 'available');
+  assert.equal(
+    record?.payload.kind === 'record' && record.payload.record.original.state === 'available'
+      ? record.payload.record.identity.contentHash === record.payload.record.original.contentHash
+      : false,
+    true,
+  );
   assert.equal(blob?.payload.kind === 'blob' ? blob.payload.encryptedPath : null, `blobs/${INTEROP_ID}/original.bin.aesgcm`);
   const binary = outbox.find((row) => row.path.endsWith('.bin.aesgcm'));
   assert.ok(binary);
