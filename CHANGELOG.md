@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.24.7
+
+### Patch Changes
+
+- 6e2a4dc: Align verified original identity hashes and sealed transport validation with the shared interop contract.
+
 ## 0.24.6
 
 ### Patch Changes
