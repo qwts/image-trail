@@ -67,7 +67,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: qwts/photos
-          ref: d75346749046ca9ac337e4d987d0e4ad7fed1c8e
+          ref: 760e23ba1abeaf15bf6d56e029ebdd47d521a7e7
           path: node_modules/.interop-photos
 
       - name: Run required validation

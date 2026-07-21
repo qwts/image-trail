@@ -75,7 +75,7 @@ async function assertDeterministicInteropKey(key: CryptoKey): Promise<void> {
 
 test('vendored interoperability artifacts match the pinned canonical Photos contract', () => {
   const output = execFileSync(process.execPath, ['scripts/check-interop-contract.mjs'], { encoding: 'utf8' });
-  assert.equal(output, 'Verified 10 canonical interop files from d75346749046ca9ac337e4d987d0e4ad7fed1c8e.\n');
+  assert.equal(output, 'Verified 15 canonical interop files from 760e23ba1abeaf15bf6d56e029ebdd47d521a7e7.\n');
 });
 
 test(

@@ -20,13 +20,14 @@ const canonicalBase64Schema = v.pipe(
     }
   }, 'Value must be canonical base64.'),
 );
+const ivSchema = v.pipe(canonicalBase64Schema, v.regex(/^[A-Za-z0-9+/]{16}$/u, 'AES-GCM IV must encode exactly 12 bytes.'));
 
 const sealedBlobHeaderSchema = v.strictObject({
   magic: v.literal(SEALED_BLOB_MAGIC),
   schemaVersion: v.literal(1),
   pairingId: interopUuidSchema,
   keyId: v.pipe(v.string(), v.regex(/^interop:[0-9a-f-]+$/iu)),
-  cipher: v.strictObject({ name: v.literal('AES-GCM'), iv: canonicalBase64Schema }),
+  cipher: v.strictObject({ name: v.literal('AES-GCM'), iv: ivSchema }),
 });
 
 const sealedBlobDescriptorSchema = v.strictObject({

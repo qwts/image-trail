@@ -2,4 +2,4 @@
 'image-trail': patch
 ---
 
-Align verified original identity hashes with the shared interop contract.
+Align verified original identity hashes and sealed transport validation with the shared interop contract.
