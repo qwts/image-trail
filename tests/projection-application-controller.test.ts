@@ -388,17 +388,19 @@ test('previewRecord blocks private placeholders when blob retrieval is unavailab
   assert.deepEqual(harness.log, ['render']);
 });
 
-test('previewRecord projects an encrypted original, reports its size, and clears the scroll anchor', async () => {
+test('previewRecord avoids projecting decrypted originals, reports their size, and clears the scroll anchor', async () => {
   const retrieveLog: string[] = [];
   const harness = createHarness({
     captureStore: makeCaptureStore(retrieveLog, { ok: true, dataUrl: 'data:image/png;base64,AAA', byteLength: 2048 }),
   });
   await harness.controller.previewRecord('https://example.test/original.jpg', 'blob-1', 'row-anchor');
-  assert.equal(harness.getState().message, 'Projected encrypted original (2.0 KB).');
+  assert.equal(
+    harness.getState().message,
+    'Encrypted original is available (2.0 KB); previewed the page URL to keep decrypted bytes out of the host page.',
+  );
   assert.deepEqual(retrieveLog, ['requestRetrieveBlob:blob-1']);
-  // The retrieved data URL is preloaded, then the session's source URL is applied with the preloaded display URL.
-  assert.ok(harness.log.some((entry) => entry.startsWith('preload:data:image/png;base64,AAA')));
-  assert.ok(harness.log.includes('applyUrlToSelected:https://example.test/original.jpg:blob:preloaded'));
+  assert.ok(!harness.log.some((entry) => entry.includes('data:image/png;base64,AAA')), 'decrypted originals never reach projection logs');
+  assert.ok(harness.log.includes('applyUrlToSelected:https://example.test/original.jpg:https://example.test/original.jpg'));
   assert.equal(harness.controller.previewScrollAnchorId, null);
 });
 
