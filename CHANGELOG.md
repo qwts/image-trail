@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.24.8
+
+### Patch Changes
+
+- 0b83a69: Harden the page-injected panel so encrypted-original passwords and decrypted bytes are not exposed to host pages.
+
 ## 0.24.7
 
 ### Patch Changes
