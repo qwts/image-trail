@@ -10,7 +10,13 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 // workers never race on `npm run build` — which begins by removing dist/ and would
 // otherwise let concurrent builds clobber each other's output.
 export default function globalSetup(): void {
-  execFileSync('npm', ['run', 'build'], { cwd: repoRoot, stdio: 'inherit', env: process.env });
+  // The shipped bundle always mounts a closed shadow root. Playwright locators cannot
+  // traverse one, so only this disposable test build opts into an open root.
+  execFileSync('npm', ['run', 'build'], {
+    cwd: repoRoot,
+    stdio: 'inherit',
+    env: { ...process.env, IMAGE_TRAIL_E2E_OPEN_SHADOW: '1' },
+  });
   const manifestPath = path.join(repoRoot, 'extension/dist/manifest.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
   // Production keeps both origins optional. The E2E build pre-grants only the

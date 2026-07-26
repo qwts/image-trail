@@ -3,6 +3,7 @@ import type { SessionInactivityTimeoutMinutes } from '../../core/secure-session-
 import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
 import { createBadge } from './primitives.js';
+import { addTrustedClickListener, isTrustedPanelEvent } from './trusted-events.js';
 
 let encryptedOriginalsOpen = false;
 
@@ -77,7 +78,7 @@ export function createEncryptionView(state: EncryptionViewState, dispatch: (acti
   cleanup.className = 'image-trail-panel__secondary-action';
   cleanup.classList.toggle('is-waiting', state.busy);
   cleanup.disabled = state.busy;
-  cleanup.addEventListener('click', () => dispatch({ name: 'capture/cleanup-orphans' }));
+  addTrustedClickListener(cleanup, () => dispatch({ name: 'capture/cleanup-orphans' }));
 
   if (state.unlocked) {
     if (state.abandonedOriginalCount > 0) {
@@ -119,7 +120,7 @@ export function createEncryptionView(state: EncryptionViewState, dispatch: (acti
   setup.className = 'image-trail-panel__secondary-action';
   setup.classList.toggle('is-waiting', state.busy);
   setup.disabled = state.busy;
-  setup.addEventListener('click', () => {
+  addTrustedClickListener(setup, () => {
     dispatch({ name: 'blob-key/setup', password: password.value });
     password.value = '';
   });
@@ -130,13 +131,12 @@ export function createEncryptionView(state: EncryptionViewState, dispatch: (acti
   unlock.className = 'image-trail-panel__primary-action';
   unlock.classList.toggle('is-waiting', state.busy);
   unlock.disabled = state.busy;
-  unlock.addEventListener('click', unlockWithPassword);
+  addTrustedClickListener(unlock, unlockWithPassword);
 
   password.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      unlockWithPassword();
-    }
+    if (event.key !== 'Enter' || !isTrustedPanelEvent(event)) return;
+    event.preventDefault();
+    unlockWithPassword();
   });
 
   body.append(
@@ -186,7 +186,7 @@ function createKeyBackupControls(
   exportKey.className = 'image-trail-panel__secondary-action';
   exportKey.classList.toggle('is-waiting', state.busy);
   exportKey.disabled = state.busy;
-  exportKey.addEventListener('click', () => {
+  addTrustedClickListener(exportKey, () => {
     dispatch({ name: 'blob-key/export', password: password.value });
     password.value = '';
   });
@@ -197,7 +197,7 @@ function createKeyBackupControls(
   importKey.className = 'image-trail-panel__secondary-action';
   importKey.classList.toggle('is-waiting', state.busy);
   importKey.disabled = state.busy;
-  importKey.addEventListener('click', () => {
+  addTrustedClickListener(importKey, () => {
     readFileInput(file, (fileContent) => {
       dispatch({ name: 'blob-key/import', fileContent, password: password.value });
       password.value = '';
@@ -220,7 +220,7 @@ function createSessionLockControls(state: { readonly busy: boolean }, dispatch: 
   lock.textContent = 'Lock now';
   lock.className = 'image-trail-panel__secondary-action';
   lock.disabled = state.busy;
-  lock.addEventListener('click', () => dispatch({ name: 'blob-key/lock' }));
+  addTrustedClickListener(lock, () => dispatch({ name: 'blob-key/lock' }));
   return createActionGroup('Session', [lock]);
 }
 
@@ -234,7 +234,7 @@ function createKeyRemovalControls(state: { readonly busy: boolean }, dispatch: (
   clear.className = 'image-trail-panel__secondary-action';
   clear.classList.toggle('is-waiting', state.busy);
   clear.disabled = state.busy;
-  clear.addEventListener('click', () => {
+  addTrustedClickListener(clear, () => {
     if (!confirming) {
       confirming = true;
       clear.textContent = 'Confirm clear key';

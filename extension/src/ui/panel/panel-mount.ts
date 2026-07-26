@@ -3,6 +3,11 @@ import { unmountReactSubtree } from '../react/react-subtree.js';
 const ROOT_ID = 'image-trail-panel-root';
 const STYLE_PATH = 'src/ui/styles/panel-entry.css';
 const STYLES_READY_FALLBACK_MS = 300;
+declare const __IMAGE_TRAIL_E2E_OPEN_SHADOW__: boolean | undefined;
+
+function panelShadowMode(): ShadowRootMode {
+  return typeof __IMAGE_TRAIL_E2E_OPEN_SHADOW__ === 'boolean' && __IMAGE_TRAIL_E2E_OPEN_SHADOW__ ? 'open' : 'closed';
+}
 
 /**
  * Panel-domain side effects the mount lifecycle needs to trigger. Kept as injected callbacks so
@@ -27,6 +32,8 @@ export interface PanelMountEnvironment {
   resolveStyleUrl(path: string): string;
   /** Schedules the styles-ready fallback reveal (defaults to `window.setTimeout(..., 300)`). */
   scheduleStylesReadyFallback(reveal: () => void): void;
+  /** Test seam for asserting closed shadow root contents without exposing them to host pages. */
+  onShadowRootCreated?(shadow: ShadowRoot): void;
 }
 
 function defaultEnvironment(): PanelMountEnvironment {
@@ -51,6 +58,7 @@ export class PanelMount {
   private detachedRootEl: HTMLElement | null = null;
   private toastRootEl: HTMLElement | null = null;
   private stylesReady = false;
+  private shadowRoot: ShadowRoot | null = null;
   private stylesReadyPromise: Promise<void> | null = null;
   private subscriptionHandles: Array<() => void> = [];
 
@@ -87,7 +95,10 @@ export class PanelMount {
   mount(): void {
     if (this.rootEl) return;
     const doc = this.environment.document;
-    const host = doc.getElementById(ROOT_ID) ?? doc.createElement('div');
+    // Never reuse a page-owned element: a hostile page can pre-create our id with an open
+    // shadow root and observe any sensitive controls mounted into it.
+    doc.getElementById(ROOT_ID)?.remove();
+    const host = doc.createElement('div');
     host.id = ROOT_ID;
     Object.assign(host.style, {
       position: 'fixed',
@@ -99,7 +110,9 @@ export class PanelMount {
       pointerEvents: 'none',
       zIndex: '2147483647',
     });
-    const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
+    const shadow = host.attachShadow({ mode: panelShadowMode() });
+    this.shadowRoot = shadow;
+    this.environment.onShadowRootCreated?.(shadow);
     const link = doc.createElement('link');
     link.rel = 'stylesheet';
     link.href = this.environment.resolveStyleUrl(STYLE_PATH);
@@ -156,6 +169,7 @@ export class PanelMount {
     this.toastRootEl = null;
     this.stylesReady = false;
     this.stylesReadyPromise = null;
+    this.shadowRoot = null;
   }
 
   /** Stores the page-adapter unsubscribe handles so teardown of the panel can release them. */
