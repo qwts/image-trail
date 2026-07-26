@@ -171,6 +171,8 @@ build` and paste **Built local** time plus commit, branch, and worktree when
   `test:stories*`, `test:e2e*`) runs through `scripts/run-guarded.mjs`: an
   aggregate RSS ceiling over the whole descendant tree, a per-process Node heap
   cap, a wall-clock timeout, and one guarded run at a time per worktree.
+  On GitHub Actions the wrapper deliberately passes through; hosted runner
+  isolation and workflow job timeouts are the CI backstops.
 - Never invoke `node --test`, `.test-dist` output, `playwright test`,
   `test-storybook`, or `c8` directly, and never call `:run`/`:inner` npm
   scripts — use the guarded entrypoints. Claude Code and Cursor deny these
