@@ -89,6 +89,31 @@ test('mount() creates the scoped host under document.body with the shadow-rooted
   }
 });
 
+test('mount() replaces a page-owned host instead of reusing its open shadow root', () => {
+  const foreignHost = document.createElement('div');
+  foreignHost.id = ROOT_ID;
+  const foreignShadow = foreignHost.attachShadow({ mode: 'open' });
+  const pageProbe = document.createElement('span');
+  pageProbe.textContent = 'page-owned';
+  foreignShadow.append(pageProbe);
+  document.body.append(foreignHost);
+
+  const { mount, shadowRoots } = createHarness();
+  try {
+    mount.mount();
+
+    const mounted = mountedHost();
+    assert.notEqual(mounted, foreignHost, 'the extension must replace a colliding page-owned host');
+    assert.equal(foreignHost.isConnected, false);
+    assert.equal(foreignShadow.textContent, 'page-owned', 'extension controls must never enter the foreign shadow root');
+    assert.equal(mounted.shadowRoot, null, 'the replacement host must keep its production shadow root closed');
+    assert.equal(shadowRoots.at(-1)?.children.length, 5);
+  } finally {
+    mount.teardown();
+    foreignHost.remove();
+  }
+});
+
 test('the stylesheet load event reveals the panel and fires onStylesReady exactly once', async () => {
   const { mount, stylesReadyCalls, fireFallback, shadowRoots } = createHarness();
   try {

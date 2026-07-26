@@ -95,7 +95,10 @@ export class PanelMount {
   mount(): void {
     if (this.rootEl) return;
     const doc = this.environment.document;
-    const host = doc.getElementById(ROOT_ID) ?? doc.createElement('div');
+    // Never reuse a page-owned element: a hostile page can pre-create our id with an open
+    // shadow root and observe any sensitive controls mounted into it.
+    doc.getElementById(ROOT_ID)?.remove();
+    const host = doc.createElement('div');
     host.id = ROOT_ID;
     Object.assign(host.style, {
       position: 'fixed',
@@ -107,7 +110,7 @@ export class PanelMount {
       pointerEvents: 'none',
       zIndex: '2147483647',
     });
-    const shadow = host.shadowRoot ?? this.shadowRoot ?? host.attachShadow({ mode: panelShadowMode() });
+    const shadow = host.attachShadow({ mode: panelShadowMode() });
     this.shadowRoot = shadow;
     this.environment.onShadowRootCreated?.(shadow);
     const link = doc.createElement('link');
