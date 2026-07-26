@@ -8,6 +8,10 @@ export function runForTrustedEvent(event: Event, handler: () => void): void {
   handler();
 }
 
+export function addTrustedClickListener(element: HTMLElement, handler: () => void): void {
+  element.addEventListener('click', (event) => runForTrustedEvent(event, handler));
+}
+
 export function isTrustedPanelEvent(event: Event): boolean {
   return event.isTrusted || isTestRuntime();
 }

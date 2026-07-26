@@ -19,8 +19,10 @@ type BuildPolicyModule = {
     format: string;
     jsx?: string | null;
     release?: boolean;
+    openPanelShadowForE2E?: boolean;
   }): Record<string, unknown>;
   isReleaseBuild(environment?: Record<string, string | undefined>): boolean;
+  opensPanelShadowForE2E(environment?: Record<string, string | undefined>): boolean;
   minificationImproved(unminifiedBytes: number, minifiedBytes: number): boolean;
 };
 
@@ -62,12 +64,25 @@ test('central release build policy minifies and removes development-only debuggi
   assert.equal(release['legalComments'], 'eof');
   assert.deepEqual(release['drop'], ['debugger']);
   assert.deepEqual(release['pure'], ['console.debug']);
-  assert.deepEqual(release['define'], { 'process.env.NODE_ENV': '"production"' });
+  assert.deepEqual(release['define'], {
+    'process.env.NODE_ENV': '"production"',
+    __IMAGE_TRAIL_E2E_OPEN_SHADOW__: 'false',
+  });
+
+  const e2e = builds.extensionBuildOptions({
+    entryPoint: 'source.ts',
+    outfile: 'output.js',
+    format: 'esm',
+    openPanelShadowForE2E: true,
+  });
+  assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_OPEN_SHADOW__'], 'true');
 });
 
 test('release-mode detection and minification regression threshold are explicit', () => {
   assert.equal(builds.isReleaseBuild({ IMAGE_TRAIL_RELEASE_BUILD: '1' }), true);
   assert.equal(builds.isReleaseBuild({ IMAGE_TRAIL_RELEASE_BUILD: '0' }), false);
+  assert.equal(builds.opensPanelShadowForE2E({ IMAGE_TRAIL_E2E_OPEN_SHADOW: '1' }), true);
+  assert.equal(builds.opensPanelShadowForE2E({ IMAGE_TRAIL_E2E_OPEN_SHADOW: '0' }), false);
   assert.equal(builds.minificationImproved(1_000, 1_000), true);
   assert.equal(builds.minificationImproved(10_000, 9_900), false);
   assert.equal(builds.minificationImproved(10_000, 8_000), true);

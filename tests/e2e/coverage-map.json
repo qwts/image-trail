@@ -473,7 +473,7 @@
           "notes": "Covers #429: a successful record preview clears a stale failed draftUrl so the URL editor and parsed fields rebuild from the projected URL."
         },
         {
-          "type": "unit",
+          "type": "unit-dom",
           "paths": ["tests/projection-application-controller.test.ts"],
           "notes": "Covers encrypted-original preview hardening: retrieved decrypted data URLs stay out of host-image projection while the selected host image receives only the durable page URL and the panel reports original availability."
         },

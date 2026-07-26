@@ -2,7 +2,8 @@ import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePrevie
 import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
 import { createBackupHistory, createCloudBackupMetadata, type CloudBackupHistoryViewRecord } from './cloud-backup-metadata.js';
-import { runForTrustedEvent } from './trusted-events.js';
+import { cloudConnectionLabel, createCloudBackupButton } from './cloud-backup-controls.js';
+import { addTrustedClickListener } from './trusted-events.js';
 
 type UrlReviewStatusClearScope = 'hostname' | 'page' | 'source' | 'all';
 
@@ -288,24 +289,22 @@ function createRestoreCandidateControls(
     row.className = 'image-trail-panel__cloud-restore-row';
     row.disabled = state.connectionState !== 'connected';
     row.title = candidate.fileName;
-    row.addEventListener('click', (event) => {
-      runForTrustedEvent(event, () => {
-        if (passwordInput.value.length < 4) {
-          hint.textContent = 'Enter the backup password before previewing this pCloud backup.';
-          hint.classList.add('image-trail-panel__error');
-          passwordInput.focus();
-          return;
-        }
-        dispatch({
-          name: 'cloud-backup/preview-restore',
-          provider: 'pcloud',
-          fileId: candidate.fileId,
-          fileName: candidate.fileName,
-          password: passwordInput.value,
-        });
-        passwordInput.value = '';
-        updatePreviewControls();
+    addTrustedClickListener(row, () => {
+      if (passwordInput.value.length < 4) {
+        hint.textContent = 'Enter the backup password before previewing this pCloud backup.';
+        hint.classList.add('image-trail-panel__error');
+        passwordInput.focus();
+        return;
+      }
+      dispatch({
+        name: 'cloud-backup/preview-restore',
+        provider: 'pcloud',
+        fileId: candidate.fileId,
+        fileName: candidate.fileName,
+        password: passwordInput.value,
       });
+      passwordInput.value = '';
+      updatePreviewControls();
     });
 
     const name = document.createElement('span');
@@ -408,12 +407,10 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   historyBtn.textContent = state.selectedHistoryCount > 0 ? `Export selected history (${state.selectedHistoryCount})` : 'Export history';
   historyBtn.classList.toggle('is-waiting', state.busy);
   historyBtn.disabled = state.busy;
-  historyBtn.addEventListener('click', (event) => {
-    runForTrustedEvent(event, () => {
-      dispatch({ name: 'export/history', password: passwordInput.value, plaintext: plaintext.input.checked });
-      passwordInput.value = '';
-      updateExportControls();
-    });
+  addTrustedClickListener(historyBtn, () => {
+    dispatch({ name: 'export/history', password: passwordInput.value, plaintext: plaintext.input.checked });
+    passwordInput.value = '';
+    updateExportControls();
   });
 
   const bookmarksBtn = document.createElement('button');
@@ -422,12 +419,10 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
     state.selectedBookmarkCount > 0 ? `Export selected bookmarks (${state.selectedBookmarkCount})` : 'Export bookmarks';
   bookmarksBtn.classList.toggle('is-waiting', state.busy);
   bookmarksBtn.disabled = state.busy;
-  bookmarksBtn.addEventListener('click', (event) => {
-    runForTrustedEvent(event, () => {
-      dispatch({ name: 'export/bookmarks', password: passwordInput.value, plaintext: plaintext.input.checked });
-      passwordInput.value = '';
-      updateExportControls();
-    });
+  addTrustedClickListener(bookmarksBtn, () => {
+    dispatch({ name: 'export/bookmarks', password: passwordInput.value, plaintext: plaintext.input.checked });
+    passwordInput.value = '';
+    updateExportControls();
   });
 
   const urlReviewStatusBtn = document.createElement('button');
@@ -600,12 +595,10 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   historyBtn.textContent = 'Import history';
   historyBtn.classList.toggle('is-waiting', state.busy);
   historyBtn.disabled = state.busy;
-  historyBtn.addEventListener('click', (event) => {
-    runForTrustedEvent(event, () => {
-      readFileInput(fileInput, (content, fileName) => {
-        dispatch({ name: 'import/history', fileContent: content, password: passwordInput.value, fileName });
-        passwordInput.value = '';
-      });
+  addTrustedClickListener(historyBtn, () => {
+    readFileInput(fileInput, (content, fileName) => {
+      dispatch({ name: 'import/history', fileContent: content, password: passwordInput.value, fileName });
+      passwordInput.value = '';
     });
   });
 
@@ -614,12 +607,10 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   bookmarksBtn.textContent = 'Import bookmarks';
   bookmarksBtn.classList.toggle('is-waiting', state.busy);
   bookmarksBtn.disabled = state.busy;
-  bookmarksBtn.addEventListener('click', (event) => {
-    runForTrustedEvent(event, () => {
-      readFileInput(fileInput, (content, fileName) => {
-        dispatch({ name: 'import/bookmarks', fileContent: content, password: passwordInput.value, fileName });
-        passwordInput.value = '';
-      });
+  addTrustedClickListener(bookmarksBtn, () => {
+    readFileInput(fileInput, (content, fileName) => {
+      dispatch({ name: 'import/bookmarks', fileContent: content, password: passwordInput.value, fileName });
+      passwordInput.value = '';
     });
   });
 
@@ -788,34 +779,6 @@ function createRestorePreviewMetadata(rows: ReadonlyArray<readonly [string, stri
     list.append(term, detail);
   }
   return list;
-}
-
-function createCloudBackupButton(label: string, state: CloudBackupProviderState, onClick: () => void): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = state.pendingOperation ? cloudPendingLabel(label, state.pendingOperation) : label;
-  button.classList.toggle('is-waiting', state.connectionState === 'busy');
-  button.disabled = state.connectionState === 'busy';
-  button.addEventListener('click', (event) => runForTrustedEvent(event, onClick));
-  return button;
-}
-
-function cloudConnectionLabel(state: CloudBackupProviderState): string {
-  if (state.connectionState === 'busy' && state.pendingOperation === 'connecting') return 'Connecting';
-  if (state.connectionState === 'busy' && state.pendingOperation === 'disconnecting') return 'Disconnecting';
-  if (state.connectionState === 'busy' && state.pendingOperation === 'backing-up') return 'Backing up';
-  if (state.connectionState === 'busy' && state.pendingOperation === 'restoring') return 'Checking restore';
-  if (state.connectionState === 'connected') return 'Connected';
-  if (state.connectionState === 'error') return 'Needs attention';
-  return 'Not connected';
-}
-
-function cloudPendingLabel(label: string, operation: NonNullable<CloudBackupProviderState['pendingOperation']>): string {
-  if (operation === 'connecting' && label === 'Connect pCloud') return 'Connecting...';
-  if (operation === 'disconnecting' && label === 'Disconnect') return 'Disconnecting...';
-  if (operation === 'backing-up' && label === 'Back up now') return 'Backing up...';
-  if (operation === 'restoring' && label === 'Choose restore file') return 'Checking restore...';
-  return label;
 }
 
 function cloudBackupMetadata(state: CloudBackupProviderState): ReadonlyArray<readonly [string, string]> {

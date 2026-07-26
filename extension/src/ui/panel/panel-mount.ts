@@ -3,6 +3,11 @@ import { unmountReactSubtree } from '../react/react-subtree.js';
 const ROOT_ID = 'image-trail-panel-root';
 const STYLE_PATH = 'src/ui/styles/panel-entry.css';
 const STYLES_READY_FALLBACK_MS = 300;
+declare const __IMAGE_TRAIL_E2E_OPEN_SHADOW__: boolean | undefined;
+
+function panelShadowMode(): ShadowRootMode {
+  return typeof __IMAGE_TRAIL_E2E_OPEN_SHADOW__ === 'boolean' && __IMAGE_TRAIL_E2E_OPEN_SHADOW__ ? 'open' : 'closed';
+}
 
 /**
  * Panel-domain side effects the mount lifecycle needs to trigger. Kept as injected callbacks so
@@ -102,7 +107,7 @@ export class PanelMount {
       pointerEvents: 'none',
       zIndex: '2147483647',
     });
-    const shadow = host.shadowRoot ?? this.shadowRoot ?? host.attachShadow({ mode: 'closed' });
+    const shadow = host.shadowRoot ?? this.shadowRoot ?? host.attachShadow({ mode: panelShadowMode() });
     this.shadowRoot = shadow;
     this.environment.onShadowRootCreated?.(shadow);
     const link = doc.createElement('link');

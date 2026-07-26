@@ -39,6 +39,10 @@ export function isReleaseBuild(environment = process.env) {
   return environment.IMAGE_TRAIL_RELEASE_BUILD === '1';
 }
 
+export function opensPanelShadowForE2E(environment = process.env) {
+  return environment.IMAGE_TRAIL_E2E_OPEN_SHADOW === '1';
+}
+
 export function extensionOutputPath(sourcePath, pathApi = path) {
   const sourceRoot = pathApi.join('extension', 'src');
   const relativePath = pathApi.relative(sourceRoot, sourcePath);
@@ -48,7 +52,14 @@ export function extensionOutputPath(sourcePath, pathApi = path) {
   return pathApi.join('extension', 'dist', 'src', relativePath);
 }
 
-export function extensionBuildOptions({ entryPoint, outfile, format, jsx = null, release = isReleaseBuild() }) {
+export function extensionBuildOptions({
+  entryPoint,
+  outfile,
+  format,
+  jsx = null,
+  release = isReleaseBuild(),
+  openPanelShadowForE2E = opensPanelShadowForE2E(),
+}) {
   return {
     entryPoints: [entryPoint],
     outfile,
@@ -59,6 +70,7 @@ export function extensionBuildOptions({ entryPoint, outfile, format, jsx = null,
     ...(jsx ? { jsx } : {}),
     define: {
       'process.env.NODE_ENV': '"production"',
+      __IMAGE_TRAIL_E2E_OPEN_SHADOW__: openPanelShadowForE2E ? 'true' : 'false',
     },
     minify: release,
     legalComments: release ? 'eof' : 'inline',
