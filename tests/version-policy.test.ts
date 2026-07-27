@@ -181,7 +181,7 @@ test('ignores tests, Storybook-only files, and repository tooling', () => {
 test('version-cut workflow refreshes a checked Changesets PR and tags only fresh version merges', () => {
   const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
 
-  assert.match(workflow, /uses: changesets\/action@v1/u);
+  assert.match(workflow, /uses: changesets\/action@/u);
   assert.match(workflow, /version: npm run changeset:version/u);
   assert.match(workflow, /pull-requests: write/u);
   assert.match(workflow, /actions: write/u);
@@ -209,7 +209,7 @@ test('required CI retains PR base history for consumed-changeset validation', ()
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
   const ciJob = workflow.slice(workflow.indexOf('\n  ci:'), workflow.indexOf('\n  e2e:'));
 
-  assert.ok(ciJob.includes('uses: actions/checkout@v7'));
+  assert.ok(ciJob.includes('uses: actions/checkout@'));
   assert.ok(ciJob.includes('fetch-depth: 0'));
 });
 

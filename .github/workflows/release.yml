@@ -43,7 +43,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Checkout release source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.release.outputs.tag }}
           fetch-depth: 0
@@ -54,7 +54,7 @@ jobs:
         run: git merge-base --is-ancestor "$(git rev-list -n 1 "$TAG_NAME")" origin/main
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -64,7 +64,7 @@ jobs:
 
       # npm ci replaces node_modules, so the pinned evidence checkout must follow it.
       - name: Checkout pinned Photos acceptance evidence
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: qwts/photos
           ref: 760e23ba1abeaf15bf6d56e029ebdd47d521a7e7
