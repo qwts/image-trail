@@ -13,8 +13,15 @@
       "Bash(git *)",
       "Bash(gh *)"
     ],
-    "ask": ["Bash(npm publish*)", "Bash(gh release *)", "Bash(npm run package:release*)"],
-    "deny": ["Bash(npm run test:e2e:ui*)", "Bash(npm run test:e2e:headed*)"]
+    "ask": [
+      "Bash(npm publish*)",
+      "Bash(gh release *)",
+      "Bash(npm run package:release*)"
+    ],
+    "deny": [
+      "Bash(npm run test:e2e:ui*)",
+      "Bash(npm run test:e2e:headed*)"
+    ]
   },
   "env": {
     "BASH_MAX_TIMEOUT_MS": "1800000"
