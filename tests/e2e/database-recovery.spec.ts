@@ -1,5 +1,9 @@
 import type { Page, Worker } from '@playwright/test';
-import { expect, test } from './fixtures.js';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+import { expect, launchPersistentExtensionSession, test } from './fixtures.js';
 
 interface BlobKeyStatusResponse {
   readonly type: string;
@@ -67,13 +71,15 @@ async function blobKeyStatus(page: Page): Promise<BlobKeyStatusResponse> {
   );
 }
 
-test('a blocked IndexedDB upgrade retries after the blocker closes without restarting the worker', async ({
-  extensionId,
-  page,
-  serviceWorker,
-}) => {
-  await seedBlockedUpgrade(serviceWorker);
+test('a blocked IndexedDB upgrade retries after the blocker closes without restarting the worker', async ({ headless }) => {
+  const userDataDir = await mkdtemp(path.join(tmpdir(), 'image-trail-database-recovery-'));
+  const { context, serviceWorker } = await launchPersistentExtensionSession(userDataDir, headless);
+  const page = await context.newPage();
+
   try {
+    const extensionId = /^chrome-extension:\/\/(?<id>[^/]+)/u.exec(serviceWorker.url())?.groups?.['id'];
+    if (!extensionId) throw new Error(`Could not resolve extension id from ${serviceWorker.url()}`);
+    await seedBlockedUpgrade(serviceWorker);
     await page.goto(`chrome-extension://${extensionId}/src/preview/preview.html`);
     await expect(page.locator('#status')).toHaveText('Preview token is missing.');
 
@@ -87,6 +93,14 @@ test('a blocked IndexedDB upgrade retries after the blocker closes without resta
       })
       .toBe(true);
   } finally {
-    await closeBlockedUpgrade(serviceWorker);
+    try {
+      await closeBlockedUpgrade(serviceWorker);
+    } finally {
+      try {
+        await context.close();
+      } finally {
+        await rm(userDataDir, { recursive: true, force: true });
+      }
+    }
   }
 });
