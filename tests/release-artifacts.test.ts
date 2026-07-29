@@ -9,6 +9,7 @@ type ArtifactPolicyModule = {
   validateArtifactPaths(files: string[], manifest: Record<string, unknown>): string[];
   validateReleaseArtifactText(file: string, content: string, rootDirectory: string): string[];
   validateReleaseBuildInfo(buildInfo: Record<string, unknown>): string[];
+  validateReleaseManifest(manifest: Record<string, unknown>): string[];
 };
 
 type BuildPolicyModule = {
@@ -19,15 +20,25 @@ type BuildPolicyModule = {
     format: string;
     jsx?: string | null;
     release?: boolean;
+    interopEnabled?: boolean;
     openPanelShadowForE2E?: boolean;
   }): Record<string, unknown>;
+  isInteropFeatureEnabled(environment?: Record<string, string | undefined>): boolean;
   isReleaseBuild(environment?: Record<string, string | undefined>): boolean;
   opensPanelShadowForE2E(environment?: Record<string, string | undefined>): boolean;
   minificationImproved(unminifiedBytes: number, minifiedBytes: number): boolean;
 };
 
+type ManifestPolicyModule = {
+  extensionManifestForBuild(
+    manifest: Record<string, unknown>,
+    options?: { interopEnabled?: boolean },
+  ): Record<string, unknown> & { permissions: string[] };
+};
+
 const artifacts = (await import(pathToFileURL(join(process.cwd(), 'scripts/extension-artifact-policy.mjs')).href)) as ArtifactPolicyModule;
 const builds = (await import(pathToFileURL(join(process.cwd(), 'scripts/extension-build-policy.mjs')).href)) as BuildPolicyModule;
+const manifests = (await import(pathToFileURL(join(process.cwd(), 'scripts/extension-manifest-policy.mjs')).href)) as ManifestPolicyModule;
 
 function manifestFixture() {
   return {
@@ -67,6 +78,7 @@ test('central release build policy minifies and removes development-only debuggi
   assert.deepEqual(release['define'], {
     'process.env.NODE_ENV': '"production"',
     __IMAGE_TRAIL_E2E_OPEN_SHADOW__: 'false',
+    __IMAGE_TRAIL_INTEROP_ENABLED__: 'false',
   });
 
   const e2e = builds.extensionBuildOptions({
@@ -76,16 +88,41 @@ test('central release build policy minifies and removes development-only debuggi
     openPanelShadowForE2E: true,
   });
   assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_OPEN_SHADOW__'], 'true');
+
+  const interop = builds.extensionBuildOptions({
+    entryPoint: 'source.ts',
+    outfile: 'output.js',
+    format: 'esm',
+    interopEnabled: true,
+  });
+  assert.equal((interop['define'] as Record<string, string>)['__IMAGE_TRAIL_INTEROP_ENABLED__'], 'true');
 });
 
 test('release-mode detection and minification regression threshold are explicit', () => {
   assert.equal(builds.isReleaseBuild({ IMAGE_TRAIL_RELEASE_BUILD: '1' }), true);
   assert.equal(builds.isReleaseBuild({ IMAGE_TRAIL_RELEASE_BUILD: '0' }), false);
+  assert.equal(builds.isInteropFeatureEnabled({ IMAGE_TRAIL_ENABLE_INTEROP: '1' }), true);
+  assert.equal(builds.isInteropFeatureEnabled({ IMAGE_TRAIL_ENABLE_INTEROP: '0' }), false);
   assert.equal(builds.opensPanelShadowForE2E({ IMAGE_TRAIL_E2E_OPEN_SHADOW: '1' }), true);
   assert.equal(builds.opensPanelShadowForE2E({ IMAGE_TRAIL_E2E_OPEN_SHADOW: '0' }), false);
   assert.equal(builds.minificationImproved(1_000, 1_000), true);
   assert.equal(builds.minificationImproved(10_000, 9_900), false);
   assert.equal(builds.minificationImproved(10_000, 8_000), true);
+});
+
+test('baseline manifests omit native messaging and experimental interop builds opt in', () => {
+  const source = {
+    name: 'Image Trail',
+    permissions: ['activeTab', 'nativeMessaging', 'storage'],
+  };
+
+  assert.deepEqual(manifests.extensionManifestForBuild(source, { interopEnabled: false }).permissions, ['activeTab', 'storage']);
+  assert.deepEqual(manifests.extensionManifestForBuild(source, { interopEnabled: true }).permissions, [
+    'activeTab',
+    'storage',
+    'nativeMessaging',
+  ]);
+  assert.deepEqual(source.permissions, ['activeTab', 'nativeMessaging', 'storage']);
 });
 
 test('artifact allowlist is derived from the manifest plus explicit application entrypoints', () => {
@@ -153,11 +190,18 @@ test('release build identity rejects extra metadata and local build markers', ()
   );
 });
 
+test('release manifests reject the feature-gated native messaging permission', () => {
+  assert.deepEqual(artifacts.validateReleaseManifest({ permissions: ['activeTab', 'storage'] }), []);
+  assert.match(artifacts.validateReleaseManifest({ permissions: ['nativeMessaging'] }).join(' '), /must not request nativeMessaging/u);
+});
+
 test('build pipeline typechecks without emitting source-shaped modules and audits every build', () => {
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
   assert.match(packageJson.scripts['build'] ?? '', /tsc --noEmit -p tsconfig\.json/u);
   assert.match(packageJson.scripts['build'] ?? '', /build-preview-page\.mjs/u);
   assert.match(packageJson.scripts['build'] ?? '', /npm run check:artifacts/u);
+  assert.match(packageJson.scripts['build:release'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=0/u);
   assert.match(packageJson.scripts['build:release'] ?? '', /audit-extension-artifacts\.mjs --require-release/u);
+  assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=0/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_RELEASE_BUILD=1 npm run test:e2e/u);
 });

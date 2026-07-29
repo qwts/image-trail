@@ -39,6 +39,10 @@ export function isReleaseBuild(environment = process.env) {
   return environment.IMAGE_TRAIL_RELEASE_BUILD === '1';
 }
 
+export function isInteropFeatureEnabled(environment = process.env) {
+  return environment.IMAGE_TRAIL_ENABLE_INTEROP === '1';
+}
+
 export function opensPanelShadowForE2E(environment = process.env) {
   return environment.IMAGE_TRAIL_E2E_OPEN_SHADOW === '1';
 }
@@ -58,6 +62,7 @@ export function extensionBuildOptions({
   format,
   jsx = null,
   release = isReleaseBuild(),
+  interopEnabled = isInteropFeatureEnabled(),
   openPanelShadowForE2E = opensPanelShadowForE2E(),
 }) {
   return {
@@ -71,6 +76,7 @@ export function extensionBuildOptions({
     define: {
       'process.env.NODE_ENV': '"production"',
       __IMAGE_TRAIL_E2E_OPEN_SHADOW__: openPanelShadowForE2E ? 'true' : 'false',
+      __IMAGE_TRAIL_INTEROP_ENABLED__: interopEnabled ? 'true' : 'false',
     },
     minify: release,
     legalComments: release ? 'eof' : 'inline',

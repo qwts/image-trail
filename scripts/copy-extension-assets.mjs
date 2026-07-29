@@ -1,10 +1,12 @@
-import { cp, mkdir, readdir } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import './write-extension-build-info.mjs';
 import { extensionOutputPath, writeStylesheet } from './extension-build-policy.mjs';
+import { extensionManifestForBuild } from './extension-manifest-policy.mjs';
 
 await mkdir('extension/dist', { recursive: true });
-await cp('extension/manifest.json', 'extension/dist/manifest.json');
+const sourceManifest = JSON.parse(await readFile('extension/manifest.json', 'utf8'));
+await writeFile('extension/dist/manifest.json', `${JSON.stringify(extensionManifestForBuild(sourceManifest), null, 2)}\n`);
 // Ship third-party attribution inside the packaged extension so shipped bundles
 // carry the notices for the code they include (react, react-dom, scheduler).
 await cp('THIRD-PARTY-LICENSES.txt', 'extension/dist/THIRD-PARTY-LICENSES.txt');
