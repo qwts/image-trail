@@ -2,10 +2,17 @@ import { interopMediaBlockFrom, interopMediaFileName, type InteropMediaBlock } f
 import type { InteropRecord } from '../../core/interop/records.js';
 import type { StoredOriginalReference } from '../types.js';
 
-export function enrichVerifiedOriginal(
+export function normalizeVerifiedOriginalCustody(
   record: InteropRecord,
+  verifiedThumbnailDataUrl: string | undefined,
   original: StoredOriginalReference | undefined,
 ): StoredOriginalReference | undefined {
+  const verifiedOriginal = enrichVerifiedOriginal(record, original);
+  assertVerifiedCustody(record, verifiedThumbnailDataUrl, verifiedOriginal);
+  return verifiedOriginal;
+}
+
+function enrichVerifiedOriginal(record: InteropRecord, original: StoredOriginalReference | undefined): StoredOriginalReference | undefined {
   if (!original) return undefined;
   const media = interopMediaBlockFrom(record.roundTripMetadata.overlook);
   if (!media || media.mimeType !== original.mimeType) return original;
@@ -57,5 +64,25 @@ function sourceFileName(sourceUrl: string | null): string | null {
     return name ? decodeURIComponent(name) : null;
   } catch {
     return null;
+  }
+}
+
+function assertVerifiedCustody(
+  record: InteropRecord,
+  verifiedThumbnailDataUrl: string | undefined,
+  verifiedOriginal: StoredOriginalReference | undefined,
+): void {
+  if (verifiedThumbnailDataUrl) {
+    if (record.thumbnail.state !== 'available' || !verifiedThumbnailDataUrl.startsWith('data:image/')) {
+      throw new Error('Verified thumbnail bytes do not match an available image thumbnail.');
+    }
+  }
+  if (
+    verifiedOriginal &&
+    (record.original.state !== 'available' ||
+      verifiedOriginal.mimeType !== record.original.mimeType ||
+      verifiedOriginal.byteLength !== record.original.byteLength)
+  ) {
+    throw new Error('Verified original custody does not match the canonical original metadata.');
   }
 }

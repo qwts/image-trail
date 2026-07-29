@@ -334,7 +334,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/gallery-design-system.spec.ts",
-          "notes": "Covers the packaged extension Gallery with real durable IndexedDB records, shared primitive adoption, canonical queue order, debounced search, source-host/image-type/record-kind filters with AND behavior, active-filter clear and no-match state, album creation and membership, native keyboard order with focus preserved through filter and background refresh renders, narrow overflow, and reduced-motion behavior; verifies browsing, search, filtering, and album membership do not reorder the durable queue."
+          "notes": "Covers the packaged extension Gallery with real durable IndexedDB records, shared primitive adoption, canonical queue order, one cached durable scan across debounced search and source-host/image-type/record-kind filter interactions with explicit reload invalidation (#632), active-filter clear and no-match state, album creation and membership, native keyboard order with focus preserved through filter and background refresh renders, narrow overflow, and reduced-motion behavior; verifies browsing, search, filtering, and album membership do not reorder the durable queue."
         },
         {
           "type": "manual",
