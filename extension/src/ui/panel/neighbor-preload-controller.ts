@@ -14,6 +14,7 @@ import { RequestGovernor } from '../../content/request-governor.js';
 export const NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT = 50;
 const NEIGHBOR_PRELOAD_MINIMUM_INTERVAL_MS = 250;
 const MAX_NEIGHBOR_PRELOAD_REQUESTS_PER_MINUTE = 20;
+const NEIGHBOR_PRELOAD_FAILURE_CACHE_LIMIT = NEIGHBOR_PRELOAD_FILL_SCAN_LIMIT;
 
 type NeighborPreloadCacheEntry =
   | { readonly status: 'loaded'; readonly displayUrl: string; readonly sha256: string | null }
@@ -137,11 +138,14 @@ export class NeighborPreloadController {
   }
 
   pruneCache(): void {
-    const limit = this.deps.getLocalSettings().neighborPreloadCacheLimit;
-    while (this.cache.size > limit) {
-      const oldest = this.cache.keys().next().value;
-      if (!oldest) break;
-      this.cache.delete(oldest);
+    const loadedLimit = Math.max(0, this.deps.getLocalSettings().neighborPreloadCacheLimit);
+    const counts: Record<NeighborPreloadCacheEntry['status'], number> = { loaded: 0, failed: 0 };
+    for (const entry of this.cache.values()) counts[entry.status] += 1;
+    for (const [url, entry] of this.cache) {
+      const limit = entry.status === 'loaded' ? loadedLimit : NEIGHBOR_PRELOAD_FAILURE_CACHE_LIMIT;
+      if (counts[entry.status] <= limit) continue;
+      this.cache.delete(url);
+      counts[entry.status] -= 1;
     }
   }
 

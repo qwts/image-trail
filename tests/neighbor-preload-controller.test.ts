@@ -104,9 +104,10 @@ test('preload() does not cache a failed fetch on its own -- repeat calls re-fetc
   assert.equal(fetchCalls.length, 2);
 });
 
-test('a neighbor-preload batch caches a failure so a later preload() call short-circuits', async () => {
+test('a neighbor-preload batch retains a failure sentinel when the runtime cache limit is 0', async () => {
   const pending = createDeferred<{ ok: false; reason: string; message: string }>();
   const { controller, fetchCalls } = createHarness({
+    getLocalSettings: () => ({ neighborPreloadEnabled: true, neighborPreloadRadius: 3, neighborPreloadCacheLimit: 0 }),
     fetchThumbnail: async (url) => {
       fetchCalls.push(url);
       return pending.promise;
@@ -125,7 +126,7 @@ test('a neighbor-preload batch caches a failure so a later preload() call short-
   const preloadResult = await controller.preload(failedUrl);
 
   assert.equal(preloadResult.ok, false);
-  assert.equal(fetchCalls.length, 1, 'the cached failure must short-circuit before calling fetchThumbnail again');
+  assert.equal(fetchCalls.length, 1, 'the failure sentinel must short-circuit before calling fetchThumbnail again');
 });
 
 test('preloadMore() returns null when neighbor preload is not active', () => {
