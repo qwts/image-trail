@@ -31,6 +31,7 @@ export const urlTemplateFieldSchema = v.object({
 export const urlTemplateRecordSchema = v.object({
   id: v.string(),
   schemaVersion: v.literal(1),
+  fieldIdVersion: v.optional(v.literal(2)),
   hostname: v.string(),
   templateUrl: v.string(),
   matchRules: urlTemplateMatchRulesSchema,

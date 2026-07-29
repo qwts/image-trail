@@ -98,7 +98,10 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
       SchemaIndex.BookmarksByUrl,
     ].sort(),
   );
-  assert.deepEqual(asArray(blobs.indexNames), [SchemaIndex.BlobsByCreatedAt, SchemaIndex.BlobsByKeyReference].sort());
+  assert.deepEqual(
+    asArray(blobs.indexNames),
+    [SchemaIndex.BlobsByCreatedAt, SchemaIndex.BlobsByEncryptedByteLength, SchemaIndex.BlobsByKeyReference].sort(),
+  );
   assert.deepEqual(asArray(originalBlobIndex.indexNames), []);
   assert.deepEqual(asArray(downloads.indexNames), [SchemaIndex.DownloadsByDownloadedAt, SchemaIndex.DownloadsByKeyReference].sort());
   assert.deepEqual(
@@ -254,6 +257,54 @@ test('IndexedDB v13 migration adds the pairing-key-sealed Sync inbox to an exist
   await transactionDone(transaction);
 });
 
+test('IndexedDB v14 migration adds the key-only blob byte-length index to existing records', async (t) => {
+  await deleteImageTrailDb();
+  const legacyDb = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(IMAGE_TRAIL_DB_NAME, 13);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(DataStore.Metadata, { keyPath: 'key' });
+      const blobs = request.result.createObjectStore(DataStore.Blobs, { keyPath: 'id' });
+      blobs.createIndex(SchemaIndex.BlobsByCreatedAt, 'createdAt', { unique: false });
+      blobs.createIndex(SchemaIndex.BlobsByKeyReference, 'key.reference', { unique: false });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  const write = legacyDb.transaction(DataStore.Blobs, 'readwrite');
+  write.objectStore(DataStore.Blobs).put({ id: 'small', encryptedByteLength: 300 });
+  write.objectStore(DataStore.Blobs).put({ id: 'large', encryptedByteLength: 500 });
+  await transactionDone(write);
+  legacyDb.close();
+
+  const opened = await openImageTrailDb();
+  assert.equal(opened.status.ok, true, opened.status.message);
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+  const transaction = opened.db.transaction(DataStore.Blobs, 'readonly');
+  const index = transaction.objectStore(DataStore.Blobs).index(SchemaIndex.BlobsByEncryptedByteLength);
+  assert.deepEqual(asArray(index.objectStore.indexNames), [
+    SchemaIndex.BlobsByCreatedAt,
+    SchemaIndex.BlobsByEncryptedByteLength,
+    SchemaIndex.BlobsByKeyReference,
+  ]);
+  const byteLengths: number[] = [];
+  const request = index.openKeyCursor();
+  await new Promise<void>((resolve, reject) => {
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve();
+        return;
+      }
+      if (typeof cursor.key === 'number') byteLengths.push(cursor.key);
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+  });
+  await transactionDone(transaction);
+  assert.deepEqual(byteLengths, [300, 500]);
+});
+
 test('IndexedDB v4 migration preserves existing blob records', async (t) => {
   await deleteImageTrailDb();
   const legacyDb = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -295,7 +346,10 @@ test('IndexedDB v4 migration preserves existing blob records', async (t) => {
 
   const read = db.db.transaction(DataStore.Blobs, 'readonly');
   const store = read.objectStore(DataStore.Blobs);
-  assert.deepEqual(asArray(store.indexNames), [SchemaIndex.BlobsByCreatedAt, SchemaIndex.BlobsByKeyReference].sort());
+  assert.deepEqual(
+    asArray(store.indexNames),
+    [SchemaIndex.BlobsByCreatedAt, SchemaIndex.BlobsByEncryptedByteLength, SchemaIndex.BlobsByKeyReference].sort(),
+  );
   const migrated = await requestToPromise(store.get('legacy-blob'));
   await transactionDone(read);
   assert.deepEqual(migrated, legacyBlob);

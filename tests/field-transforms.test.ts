@@ -51,7 +51,7 @@ test('reset-field transform resets a split child through its base token', () => 
   const currentBaseModel = parseUrl('https://example.test/image?date=99012001');
   const currentSplitModel = applyFieldSplitSpecs(currentBaseModel, [splitSpec]);
   const baselineBaseModel = parseUrl('https://example.test/image?date=01012001');
-  const splitChild = collectUrlFields(currentSplitModel).find((candidate) => candidate.id === 'q:0:1');
+  const splitChild = collectUrlFields(currentSplitModel).find((candidate) => candidate.id === 'q:0:0:s:1');
   assert.ok(splitChild);
 
   const result = applyResetFieldTransform(currentBaseModel, splitChild, baselineBaseModel);
@@ -212,6 +212,27 @@ test('digit-width transform can shrink a previous width override after projectio
   assert.equal(shrunk.ok, true);
   assert.deepEqual(shrunk.fieldDigitWidthSpecs, [{ fieldId: field.id, width: 3 }]);
   assert.equal(shrunk.url, 'https://example.test/images/image-123.jpg');
+});
+
+test('digit-width transform stays attached to a stable split-child id', () => {
+  const baseModel = parseUrl('https://example.test/image?date=01012001');
+  const baseField = collectUrlFields(baseModel).find((candidate) => candidate.label === 'query date');
+  assert.ok(baseField);
+  const split = applyFieldSplitTransform(baseField, '2-2-4');
+  assert.equal(split.ok, true);
+  const splitModel = applyFieldSplitSpecs(baseModel, [split.splitSpec]);
+  const year = collectUrlFields(splitModel).find((candidate) => candidate.id === 'q:0:0:s:2');
+  assert.ok(year);
+
+  const widened = applyFieldDigitWidthTransform(splitModel, year.id, '6', []);
+  assert.equal(widened.ok, true);
+  assert.deepEqual(widened.fieldDigitWidthSpecs, [{ fieldId: year.id, width: 6 }]);
+  assert.equal(widened.url, 'https://example.test/image?date=0101002001');
+
+  const cleared = applyFieldDigitWidthTransform(widened.model, year.id, '', widened.fieldDigitWidthSpecs);
+  assert.equal(cleared.ok, true);
+  assert.deepEqual(cleared.fieldDigitWidthSpecs, []);
+  assert.equal(cleared.url, 'https://example.test/image?date=01012001');
 });
 
 test('digit-width spec equality ignores storage order', () => {

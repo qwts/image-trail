@@ -1,6 +1,6 @@
 import type { BuildIdentity } from '../core/build-info.js';
 import type { ImageProbeMethod } from '../core/image/request-policy.js';
-import type { LoadFailureFeedback } from '../core/settings.js';
+import { NEIGHBOR_PRELOAD_CACHE_LIMITS, type LoadFailureFeedback } from '../core/settings.js';
 import type { ObjectFitMode } from '../core/preview-style.js';
 import { DOWN_ARROW_ACTION_OPTIONS, isDownArrowAction } from '../core/keyboard-shortcuts.js';
 import {
@@ -25,6 +25,10 @@ export function AutomationSettingsGroup({ settings, disabled, save }: SettingsGr
         disabled={disabled}
         onChange={(checked) => save({ ...settings, neighborPreloadEnabled: checked })}
       />
+      <SettingNote>
+        Cache holds {NEIGHBOR_PRELOAD_CACHE_LIMITS.min}–{NEIGHBOR_PRELOAD_CACHE_LIMITS.max} image responses per page session; lower values
+        cap memory more aggressively.
+      </SettingNote>
       <SettingToggle
         label="Clear site review status after export"
         checked={settings.clearUrlReviewStatusAfterExport}
@@ -137,8 +141,8 @@ function AutomationRequestFields({ settings }: Pick<SettingsGroupProps, 'setting
         <input
           name="neighborPreloadCacheLimit"
           type="number"
-          min="0"
-          max="500"
+          min={NEIGHBOR_PRELOAD_CACHE_LIMITS.min}
+          max={NEIGHBOR_PRELOAD_CACHE_LIMITS.max}
           defaultValue={settings.neighborPreloadCacheLimit}
           required
         />
