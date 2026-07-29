@@ -160,7 +160,13 @@ export class BufferedNavigationController {
   }
 
   getSnapshots(): BufferedNavigationSnapshots {
-    return toBufferedNavigationSnapshots(this.navigation, this.debugVisible, this.deps.getLocalSettings().loadFailureFeedback);
+    const settings = this.deps.getLocalSettings();
+    return toBufferedNavigationSnapshots(
+      this.navigation,
+      this.debugVisible,
+      settings.loadFailureFeedback,
+      settings.neighborPreloadEnabled && settings.neighborPreloadRadius > 0,
+    );
   }
 
   refreshPreloads(): void {

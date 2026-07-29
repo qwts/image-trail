@@ -94,4 +94,13 @@ test('neighbor status distinguishes warmed, failed, and traversed skipped candid
 
   await setLoadFailureFeedback(page, 'mute');
   await expect(neighborStatus).not.toContainText(/failed|skipped/u);
+
+  await openSettingsGroup(page, 'Automation');
+  const preload = page
+    .getByRole('heading', { name: 'Preload' })
+    .locator('xpath=ancestor::div[contains(@class, "image-trail-panel__settings-templates")][1]');
+  await preload.getByRole('checkbox', { name: 'Warm adjacent parsed-field images' }).uncheck();
+  await preload.getByRole('button', { name: 'Apply' }).click();
+  await closeSettings(page);
+  await expect(neighborStatus).toHaveCount(0);
 });

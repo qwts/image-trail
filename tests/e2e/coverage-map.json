@@ -1031,7 +1031,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/neighbor-status.spec.ts",
-          "notes": "Warms a bounded parsed-field window, surfaces a failed candidate, verifies it becomes skipped only after traversal, masks failure counts in Mute, and rejects URL/blob disclosure in the status copy."
+          "notes": "Warms a bounded parsed-field window, surfaces a failed candidate, verifies it becomes skipped only after traversal, masks failure counts in Mute, removes retained status when preloading is disabled, and rejects URL/blob disclosure in the status copy."
         },
         {
           "type": "deferred",

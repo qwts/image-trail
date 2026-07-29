@@ -206,6 +206,31 @@ test('status snapshot tells the view when Failure feedback is muted', async () =
   assert.equal(controller.getSnapshots().status?.failuresVisible, false);
 });
 
+test('status snapshot clears when current settings disable retained neighbor preloading', async () => {
+  let enabled = true;
+  let radius = 1;
+  const { controller } = createHarness({
+    getLocalSettings: () => ({
+      neighborPreloadEnabled: enabled,
+      neighborPreloadRadius: radius,
+      neighborPreloadProbeMethod: 'get',
+      loadFailureFeedback: 'alert',
+    }),
+  });
+
+  await controller.step(baseModel(), navigableFields(baseModel()), 1);
+  controller.toggleDebugVisible();
+  assert.ok(controller.getSnapshots().status);
+
+  enabled = false;
+  assert.equal(controller.getSnapshots().status, null);
+  assert.ok(controller.getSnapshots().debug, 'the independently toggled debug snapshot remains available');
+
+  enabled = true;
+  radius = 0;
+  assert.equal(controller.getSnapshots().status, null);
+});
+
 test('step() skips a failed neighbor (decoded GET) and lands on the next good one', async () => {
   let fetchCount = 0;
   const { controller, landed } = createHarness({
