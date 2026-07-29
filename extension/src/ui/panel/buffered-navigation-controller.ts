@@ -92,13 +92,7 @@ export class BufferedNavigationController {
   prime(): void {
     const settings = this.deps.getLocalSettings();
     if (!(settings.neighborPreloadEnabled && settings.neighborPreloadRadius > 0)) {
-      this.runId += 1;
-      this.navigation = null;
-      this.navigationKey = null;
-      this.baseModel = null;
-      this.fields = [];
-      this.clearQueues();
-      this.cancelInflight();
+      this.replaceNavigation();
       return;
     }
     if (!this.deps.hasSelectedTarget()) return;
@@ -175,15 +169,8 @@ export class BufferedNavigationController {
   }
 
   dispose(): void {
-    this.runId += 1;
-    this.clearQueues();
-    this.cancelInflight();
-    this.navigation = null;
-    this.navigationKey = null;
-    this.baseModel = null;
-    this.fields = [];
+    this.replaceNavigation();
   }
-
   private ensure(model: ParsedUrlModel, fields: readonly UrlField[]): void {
     if (this.reuseForCurrentUrl(fields)) return;
     const baseUrl = rebuildUrl(model);
@@ -206,13 +193,11 @@ export class BufferedNavigationController {
       sha256: this.deps.currentKnownImageFingerprint(),
     });
     navigation = reduceBufferedImageNavigation(navigation, { type: 'INIT_CURSOR', index: 0 });
-    this.runId += 1;
+    this.replaceNavigation();
     this.navigation = navigation;
     this.navigationKey = key;
     this.baseModel = model;
     this.fields = fields;
-    this.clearQueues();
-    this.cancelInflight();
     this.schedulePreloads();
   }
 
@@ -470,7 +455,10 @@ export class BufferedNavigationController {
         intent: 'field-active-navigation',
         contextKey: this.requestContextKey(index, queued.runId),
       });
-      if (!this.isCurrentRun(queued.runId)) return;
+      if (!this.isCurrentRun(queued.runId)) {
+        if (result.ok && result.blobUrl.startsWith('blob:')) this.deps.scheduleRevoke(result.blobUrl);
+        return;
+      }
       if (result.ok) {
         this.navigation = reduceBufferedImageNavigation(this.navigation!, {
           type: 'SET_IMAGE',
@@ -549,11 +537,23 @@ export class BufferedNavigationController {
     return status === 400 || status === 404 || status === 410;
   }
 
-  // The "Skipped a failed image candidate" toast is failure feedback, so only the Alert mode shows
-  // it; Display/Mute skip past silently (the skip itself is unaffected — it is driven by the
-  // request-policy cache, not this toast) (#450).
+  // Only Alert surfaces the failure toast; Display/Mute skip silently. The request-policy cache
+  // still drives the skip in every mode (#450).
   private emitSkipToast(): void {
     if (this.deps.getLocalSettings().loadFailureFeedback === 'alert') this.deps.onToast('Skipped a failed image candidate.');
+  }
+
+  private replaceNavigation(): void {
+    this.runId += 1;
+    for (const entry of this.navigation?.indices.values() ?? []) {
+      if (entry.blobUrl?.startsWith('blob:')) this.deps.scheduleRevoke(entry.blobUrl);
+    }
+    this.clearQueues();
+    this.cancelInflight();
+    this.navigation = null;
+    this.navigationKey = null;
+    this.baseModel = null;
+    this.fields = [];
   }
 
   private schedulePreloads(): void {
