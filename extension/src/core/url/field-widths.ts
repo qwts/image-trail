@@ -1,4 +1,5 @@
 import type { ParsedUrlModel, PathPart, QueryField, UrlFieldDigitWidthSpec, UrlToken } from './types.js';
+import { fieldIdForToken } from './field-ids.js';
 
 export function normalizeFieldDigitWidth(value: string): number | null | { readonly ok: false; readonly message: string } {
   const normalized = value.trim();
@@ -57,8 +58,13 @@ function applyPathDigitWidthSpecs(part: PathPart, partIndex: number, widthByFiel
   return {
     ...part,
     edited:
-      part.edited || part.tokens.some((token, tokenIndex) => hasDigitWidthSpec(widthByFieldId, `p:${partIndex}:${tokenIndex}`, token)),
-    tokens: part.tokens.map((token, tokenIndex) => applyTokenDigitWidth(token, widthByFieldId.get(`p:${partIndex}:${tokenIndex}`))),
+      part.edited ||
+      part.tokens.some((token, tokenIndex) =>
+        hasDigitWidthSpec(widthByFieldId, fieldIdForToken('path', partIndex, tokenIndex, token), token),
+      ),
+    tokens: part.tokens.map((token, tokenIndex) =>
+      applyTokenDigitWidth(token, widthByFieldId.get(fieldIdForToken('path', partIndex, tokenIndex, token))),
+    ),
   };
 }
 
@@ -66,7 +72,7 @@ function applyQueryDigitWidthSpecs(field: QueryField, widthByFieldId: ReadonlyMa
   return {
     ...field,
     valueTokens: field.valueTokens.map((token, tokenIndex) =>
-      applyTokenDigitWidth(token, widthByFieldId.get(`q:${field.index}:${tokenIndex}`)),
+      applyTokenDigitWidth(token, widthByFieldId.get(fieldIdForToken('query', field.index, tokenIndex, token))),
     ),
   };
 }
@@ -90,9 +96,12 @@ function clearPathDigitWidthSpec(part: PathPart, partIndex: number, fieldId: str
   return {
     ...part,
     edited:
-      part.edited || part.tokens.some((token, tokenIndex) => shouldClearTokenDigitWidth(token, `p:${partIndex}:${tokenIndex}`, fieldId)),
+      part.edited ||
+      part.tokens.some((token, tokenIndex) =>
+        shouldClearTokenDigitWidth(token, fieldIdForToken('path', partIndex, tokenIndex, token), fieldId),
+      ),
     tokens: part.tokens.map((token, tokenIndex) =>
-      `p:${partIndex}:${tokenIndex}` === fieldId ? clearTokenDigitWidth(token, sourceWidth) : token,
+      fieldIdForToken('path', partIndex, tokenIndex, token) === fieldId ? clearTokenDigitWidth(token, sourceWidth) : token,
     ),
   };
 }
@@ -101,7 +110,7 @@ function clearQueryDigitWidthSpec(field: QueryField, fieldId: string, sourceWidt
   return {
     ...field,
     valueTokens: field.valueTokens.map((token, tokenIndex) =>
-      `q:${field.index}:${tokenIndex}` === fieldId ? clearTokenDigitWidth(token, sourceWidth) : token,
+      fieldIdForToken('query', field.index, tokenIndex, token) === fieldId ? clearTokenDigitWidth(token, sourceWidth) : token,
     ),
   };
 }

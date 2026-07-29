@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { ImageDisplayRecord } from '../extension/src/core/display-records.js';
 import { galleryRecordMatchesSearch, gallerySearchText, normalizeGallerySearchQuery } from '../extension/src/gallery/gallery-search.js';
 import { EMPTY_GALLERY_FILTERS } from '../extension/src/gallery/gallery-filters.js';
-import { loadGallerySearchPage } from '../extension/src/gallery/gallery-search-loader.js';
+import { GallerySourceCache, loadGallerySearchPage } from '../extension/src/gallery/gallery-search-loader.js';
 
 const records: readonly ImageDisplayRecord[] = [
   {
@@ -177,6 +177,32 @@ test('gallery search collects large libraries through bounded durable pages', as
   assert.equal(page.total, 205);
   assert.equal(page.offset, 200);
   assert.equal(page.items.length, 5);
+});
+
+test('gallery source cache shares in-flight scans and retries after a failed scan', async () => {
+  let attempts = 0;
+  let releaseFirstScan!: () => void;
+  const firstScanBlocked = new Promise<void>((resolve) => {
+    releaseFirstScan = resolve;
+  });
+  const cache = new GallerySourceCache({
+    async loadPage() {
+      attempts += 1;
+      if (attempts === 1) {
+        await firstScanBlocked;
+        throw new Error('transient scan failure');
+      }
+      return { items: records, offset: 0, limit: 100, total: records.length, hasOlder: false, hasNewer: false };
+    },
+  });
+
+  const first = cache.load();
+  const shared = cache.load();
+  assert.equal(first, shared);
+  releaseFirstScan();
+  await assert.rejects(first, /transient scan failure/u);
+  assert.deepEqual(await cache.load(), records);
+  assert.equal(attempts, 2);
 });
 
 function pagedStore(

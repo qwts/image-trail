@@ -1,6 +1,14 @@
 import type { Page, TestInfo, Worker } from '@playwright/test';
 
-import { expect, expectPanelOpen, fixturePaths, openFixturePage, test, togglePanelFromExtensionAction } from './fixtures.js';
+import {
+  expect,
+  expectPanelOpen,
+  fixtureAssetPaths,
+  fixturePaths,
+  openFixturePage,
+  test,
+  togglePanelFromExtensionAction,
+} from './fixtures.js';
 
 const viewport = { width: 924, height: 540 };
 
@@ -39,6 +47,36 @@ async function storedOverride(serviceWorker: Worker): Promise<string | null> {
     const overrides = settings['pageContextOverrides'] as Record<string, { context?: string }> | undefined;
     return overrides?.['127.0.0.1']?.context ?? null;
   });
+}
+
+async function installImageRectReadCounter(page: Page, serviceWorker: Worker): Promise<void> {
+  const installed = await serviceWorker.evaluate(async (activeUrl) => {
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const tabId = tabs.find((candidate) => candidate.url === activeUrl)?.id;
+    if (typeof tabId !== 'number') return false;
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'ISOLATED',
+      func: () => {
+        const original = HTMLImageElement.prototype.getBoundingClientRect;
+        HTMLImageElement.prototype.getBoundingClientRect = function () {
+          const root = document.documentElement;
+          const count = Number(root.dataset['imageTrailTestRectReads'] ?? '0');
+          root.dataset['imageTrailTestRectReads'] = String(count + 1);
+          return original.call(this);
+        };
+        document.documentElement.dataset['imageTrailTestRectReads'] = '0';
+        return true;
+      },
+    });
+    return results[0]?.result === true;
+  }, page.url());
+  expect(installed).toBe(true);
+}
+
+async function imageRectReads(page: Page): Promise<number> {
+  const value = await page.locator('html').getAttribute('data-image-trail-test-rect-reads');
+  return Number(value ?? '0');
 }
 
 test.beforeEach(async ({ page, serviceWorker }) => {
@@ -83,4 +121,76 @@ test('detects feed context and persists only an explicit per-host override', asy
   await page.getByRole('button', { name: 'Use automatic' }).click();
   await expect.poll(() => storedOverride(serviceWorker)).toBeNull();
   await expect(page.locator('.image-trail-page-context__status')).toHaveText('Automatic · Feed');
+});
+
+test('avoids remeasuring unchanged feed images during unrelated host-page churn', async ({ page, serviceWorker }) => {
+  await openPanel(page, serviceWorker, fixturePaths.feed);
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Feed · 3 images');
+  await page.waitForTimeout(100);
+  await installImageRectReadCounter(page, serviceWorker);
+
+  await page.evaluate(() => {
+    const churn = document.createElement('div');
+    churn.id = 'unrelated-feed-churn';
+    for (let index = 0; index < 100; index += 1) {
+      const item = document.createElement('span');
+      item.textContent = `Unrelated update ${index}`;
+      churn.append(item);
+    }
+    document.querySelector('[role="feed"]')?.append(churn);
+  });
+  await page.waitForTimeout(100);
+  expect(await imageRectReads(page)).toBe(0);
+
+  await page.evaluate((src) => {
+    const article = document.createElement('article');
+    const image = document.createElement('img');
+    image.alt = 'New feed image';
+    image.width = 320;
+    image.height = 220;
+    image.src = src;
+    article.append(image);
+    document.querySelector('[role="feed"]')?.append(article);
+  }, fixtureAssetPaths.assetOne);
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Feed · 4 images');
+  expect(await imageRectReads(page)).toBe(1);
+});
+
+test('rechecks an image when a delayed load changes its live qualification', async ({ page, serviceWorker }) => {
+  let releaseResponse = (): void => {};
+  const responseGate = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  let markRequestStarted = (): void => {};
+  const requestStarted = new Promise<void>((resolve) => {
+    markRequestStarted = resolve;
+  });
+  await page.route('**/delayed-context-image.svg', async (route) => {
+    markRequestStarted();
+    await responseGate;
+    await route.fulfill({
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="220"><rect width="320" height="220"/></svg>',
+      contentType: 'image/svg+xml',
+      status: 200,
+    });
+  });
+
+  await openPanel(page, serviceWorker, fixturePaths.feed);
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Feed · 3 images');
+  await page.evaluate(() => {
+    const article = document.createElement('article');
+    const image = document.createElement('img');
+    image.alt = 'Delayed feed image';
+    image.style.width = '1px';
+    image.style.height = '1px';
+    image.src = new URL('/delayed-context-image.svg', window.location.href).href;
+    article.append(image);
+    document.querySelector('[role="feed"]')?.append(article);
+  });
+  await requestStarted;
+  await page.waitForTimeout(100);
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Feed · 3 images');
+
+  releaseResponse();
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Feed · 4 images');
 });
