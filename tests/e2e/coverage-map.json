@@ -1226,7 +1226,7 @@
     },
     {
       "id": "searchable-metadata-privacy-policy",
-      "acceptance": "User-controlled searchable metadata privacy policy (issue #451) \u2014 Slice 1: policy framework, settings surface, and opt-in URL-derived enforcement for new records",
+      "acceptance": "User-controlled searchable metadata privacy policy (issues #451 and #641) \u2014 policy framework, settings surface, bookmark URL indexes, and encrypted URL-derived workflow metadata",
       "repoPath": "docs/acceptance-tests/searchable-metadata-privacy-policy.md",
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Searchable-Metadata-Privacy-Policy",
       "coverage": [
@@ -1235,15 +1235,21 @@
           "paths": [
             "tests/searchable-metadata-policy.test.ts",
             "tests/searchable-metadata-store.test.ts",
+            "tests/url-metadata-privacy.test.ts",
             "tests/thumbnail-at-rest.test.ts",
             "tests/dom/settings-view.test.ts"
           ],
-          "notes": "Covers the policy model (compatible URL/album defaults, encrypted-only thumbnails, URL index-key derivation, guards, and legacy local-settings sanitize), storage inspection proving locked-session thumbnail bytes stay inside an AES-GCM bookmark envelope, the durable store keeping the raw URL index under the default while an opt-in encrypted policy hashes only NEW records yet stays findable/dedupable by real URL, dual-encoding lookup resolving a legacy plaintext row after switching to encrypted without rewriting existing records, and both Settings surfaces reporting the immutable encrypted thumbnail policy."
+          "notes": "Covers the policy model (compatible URL/album defaults, encrypted-only thumbnails, URL index-key derivation, guards, and legacy local-settings sanitize), storage inspection proving locked-session thumbnail bytes stay inside an AES-GCM bookmark envelope, the durable store keeping the raw URL index under the default while an opt-in encrypted policy hashes only NEW records yet stays findable/dedupable by real URL, dual-encoding bookmark lookup, AES-GCM parsed-field and URL-review rows with opaque host/URL keys, bidirectional legacy reconciliation, stale writes, retention, clear filters, malformed-row redaction, settings-race serialization, and both Settings surfaces reporting the immutable encrypted thumbnail policy."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/url-metadata-privacy.spec.ts",
+          "notes": "Exercises the packaged settings toggle against real Chromium IndexedDB: legacy plaintext parsed-field and review rows migrate to AES-GCM envelopes behind opaque keys, URL-bearing plaintext disappears, and a subsequent parsed-field step persists successfully under the encrypted policy."
         },
         {
           "type": "deferred",
           "issue": 451,
-          "notes": "Album-name encryption (Slice 2) remains follow-up scope. Thumbnail bytes are confirmed encrypted at rest in both durable storage paths by #573; Playwright coverage of the URL policy toggle is added when the setting surface is exercised end-to-end."
+          "notes": "Album-name encryption (Slice 2) remains follow-up scope. Thumbnail bytes are confirmed encrypted at rest in both durable storage paths by #573."
         }
       ]
     },

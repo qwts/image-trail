@@ -1,12 +1,18 @@
 import type { ParsedFieldStateRecord, ParsedFieldStateStore } from '../core/types.js';
 import { openImageTrailDb } from './db.js';
+import { ensureDurableMetadataKey } from './durable-metadata-key.js';
 import { ParsedFieldStateRepository } from './repositories/parsed-field-state-repository.js';
+import { KeysRepository } from './repositories/keys-repository.js';
+import type { SearchableMetadataPolicy } from '../core/metadata-policy.js';
+import type { UrlMetadataPrivacyOptions } from './url-metadata-privacy.js';
 
 export class IndexedDbParsedFieldStateStore implements ParsedFieldStateStore {
   private ready: Promise<{
     readonly db: IDBDatabase;
     readonly repository: ParsedFieldStateRepository;
   } | null> | null = null;
+
+  constructor(private readonly privacy: UrlMetadataPrivacyOptions = {}) {}
 
   async load(hostname: string, pageUrl: string): Promise<ParsedFieldStateRecord | null> {
     const context = await this.openContext();
@@ -29,6 +35,11 @@ export class IndexedDbParsedFieldStateStore implements ParsedFieldStateStore {
     this.ready = null;
   }
 
+  async reconcileSearchableMetadataPolicy(policy: SearchableMetadataPolicy): Promise<void> {
+    const context = await this.openContext();
+    await context?.repository.reconcilePolicy(policy);
+  }
+
   private openContext(): Promise<{
     readonly db: IDBDatabase;
     readonly repository: ParsedFieldStateRepository;
@@ -42,6 +53,18 @@ export class IndexedDbParsedFieldStateStore implements ParsedFieldStateStore {
     readonly repository: ParsedFieldStateRepository;
   } | null> {
     const result = await openImageTrailDb();
-    return result.db ? { db: result.db, repository: new ParsedFieldStateRepository(result.db) } : null;
+    const db = result.db;
+    if (!db) return null;
+    let localEncryptionKey: ReturnType<typeof ensureDurableMetadataKey> | null = null;
+    const getEncryptionKey =
+      this.privacy.getEncryptionKey ??
+      (() => {
+        localEncryptionKey ??= ensureDurableMetadataKey(new KeysRepository(db));
+        return localEncryptionKey;
+      });
+    return {
+      db,
+      repository: new ParsedFieldStateRepository(db, { ...this.privacy, getEncryptionKey }),
+    };
   }
 }
