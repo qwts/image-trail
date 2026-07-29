@@ -70,7 +70,7 @@ export function extensionBuildOptions({
     ...(jsx ? { jsx } : {}),
     define: {
       'process.env.NODE_ENV': '"production"',
-      __IMAGE_TRAIL_E2E_OPEN_SHADOW__: openPanelShadowForE2E ? 'true' : 'false',
+      __IMAGE_TRAIL_E2E_OPEN_SHADOW__: openPanelShadowForE2E && !release ? 'true' : 'false',
     },
     minify: release,
     legalComments: release ? 'eof' : 'inline',

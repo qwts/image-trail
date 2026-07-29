@@ -76,6 +76,15 @@ test('central release build policy minifies and removes development-only debuggi
     openPanelShadowForE2E: true,
   });
   assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_OPEN_SHADOW__'], 'true');
+
+  const releaseWithE2eEnvironment = builds.extensionBuildOptions({
+    entryPoint: 'source.ts',
+    outfile: 'output.js',
+    format: 'esm',
+    release: true,
+    openPanelShadowForE2E: true,
+  });
+  assert.equal((releaseWithE2eEnvironment['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_OPEN_SHADOW__'], 'false');
 });
 
 test('release-mode detection and minification regression threshold are explicit', () => {
