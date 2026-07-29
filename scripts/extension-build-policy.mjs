@@ -135,6 +135,30 @@ export async function writeStylesheet(sourcePath, outputPath, { release = isRele
   if (release) reportMinification(outputPath, Buffer.byteLength(source), Buffer.byteLength(output));
 }
 
+export async function bundleStylesheet(sourcePath, outputPath, { release = isReleaseBuild() } = {}) {
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  const options = {
+    entryPoints: [sourcePath],
+    outfile: outputPath,
+    bundle: true,
+    minify: release,
+    legalComments: release ? 'eof' : 'inline',
+    logLevel: 'info',
+  };
+  let unminifiedBytes = null;
+
+  if (release) {
+    const reference = await build({ ...options, minify: false, write: false, logLevel: 'silent' });
+    unminifiedBytes = reference.outputFiles.reduce((total, file) => total + file.contents.byteLength, 0);
+  }
+
+  const result = await build({ ...options, metafile: true });
+  if (unminifiedBytes !== null) {
+    const outputBytes = Object.values(result.metafile.outputs).reduce((total, output) => total + output.bytes, 0);
+    reportMinification(outputPath, unminifiedBytes, outputBytes);
+  }
+}
+
 export function minificationImproved(unminifiedBytes, minifiedBytes) {
   return unminifiedBytes < MINIFICATION_CHECK_BYTES || minifiedBytes < unminifiedBytes * MAX_UNIMPROVED_RATIO;
 }

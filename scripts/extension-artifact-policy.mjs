@@ -89,9 +89,16 @@ export function validateReleaseBuildInfo(buildInfo) {
 
 export function validateReleaseManifest(manifest) {
   const permissions = Array.isArray(manifest.permissions) ? manifest.permissions : [];
-  return permissions.includes('nativeMessaging')
-    ? ['release manifest must not request nativeMessaging while Transfer & Sync is feature-gated']
-    : [];
+  const errors = [];
+  if (permissions.includes('nativeMessaging')) {
+    errors.push('release manifest must not request nativeMessaging while Transfer & Sync is feature-gated');
+  }
+  for (const [index, resourceGroup] of (manifest.web_accessible_resources ?? []).entries()) {
+    if (resourceGroup.use_dynamic_url !== true) {
+      errors.push(`release manifest web-accessible-resource group ${index} must use a dynamic URL`);
+    }
+  }
+  return errors;
 }
 
 export async function collectArtifactFiles(directory, relativeDirectory = '') {
