@@ -1,13 +1,7 @@
-export {
-  DEFAULT_LOCAL_SETTINGS,
-  LocalSettingsRepository,
-  type LocalSettingsStore,
-  type PlaintextLocalSettings,
-} from '../data/local-settings.js';
+export { DEFAULT_LOCAL_SETTINGS, type LocalSettingsStore, type PlaintextLocalSettings } from '../data/local-settings.js';
 export { exportEncryptedBookmarks, exportPlainBookmarks } from '../data/import-export/bookmarks-export.js';
 export {
   exportEncryptedFullBackup,
-  storedBlobRecordFromPortable,
   type FullBackupBlobKeyBackup,
   type PortableStoredBlobRecord,
 } from '../data/import-export/full-backup.js';
