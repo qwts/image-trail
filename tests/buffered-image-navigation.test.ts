@@ -9,6 +9,7 @@ import {
   createBufferedImageNavigationState,
   probeKForBuffer,
   reduceBufferedImageNavigation,
+  summarizeBufferedImageWindow,
 } from '../extension/src/core/url/buffered-image-navigation.js';
 
 test('classifyBufferedImageIndex collapses manifest and image state into navigation buckets', () => {
@@ -63,6 +64,7 @@ test('ADVANCE skips failed indices without resting the cursor on them', () => {
   assert.equal(state.cursor, 2);
   assert.equal(state.seek, null);
   assert.equal(state.blockedOn, null);
+  assert.deepEqual([...state.skippedIndices], [1]);
 });
 
 test('ADVANCE skips failed GET indices while active navigation searches for a success', () => {
@@ -88,6 +90,7 @@ test('ADVANCE skips failed GET indices while active navigation searches for a su
   assert.equal(state.cursor, 0);
   assert.equal(state.blockedOn, 2);
   assert.deepEqual(state.seek, { dir: 1, remaining: 1 });
+  assert.deepEqual([...state.skippedIndices], [1]);
 
   state = reduceBufferedImageNavigation(state, { type: 'SET_MANIFEST', index: 2, status: ManifestStatus.PRESENT, url: '40' });
   state = reduceBufferedImageNavigation(state, {
@@ -123,6 +126,7 @@ test('preload state changes do not move the cursor without an active seek', () =
   assert.equal(state.blockedOn, null);
   assert.equal(state.seek, null);
   assert.equal(classifyBufferedImageIndex(state.indices.get(1)), NavigationBucket.SKIPPABLE);
+  assert.equal(state.skippedIndices.size, 0, 'a failed preload is not marked skipped until navigation traverses it');
 });
 
 test('FAILED_HEAD clears any decoded image data for that index', () => {
@@ -170,4 +174,44 @@ test('buffered preload window uses configured radius without probeK expansion', 
   assert.deepEqual(bufferedPreloadWindowIndices(0, 1), [-1, 1]);
   assert.deepEqual(bufferedPreloadWindowIndices(5, 2), [3, 4, 6, 7]);
   assert.equal(probeKForBuffer(1), 8);
+});
+
+test('summarizeBufferedImageWindow reports URL-free, mutually exclusive live neighbor outcomes', () => {
+  let state = createBufferedImageNavigationState(3);
+  state = reduceBufferedImageNavigation(state, { type: 'SET_MANIFEST', index: 0, status: ManifestStatus.PRESENT, url: 'private-0' });
+  state = reduceBufferedImageNavigation(state, {
+    type: 'SET_IMAGE',
+    index: 0,
+    status: ImageStatus.OK,
+    blobUrl: 'blob:0',
+    imgElement: {} as HTMLImageElement,
+  });
+  state = reduceBufferedImageNavigation(state, { type: 'INIT_CURSOR', index: 0 });
+  state = reduceBufferedImageNavigation(state, { type: 'SET_MANIFEST', index: -2, status: ManifestStatus.HEAD_PENDING, url: 'private--2' });
+  state = reduceBufferedImageNavigation(state, { type: 'SET_MANIFEST', index: -1, status: ManifestStatus.PRESENT, url: 'private--1' });
+  state = reduceBufferedImageNavigation(state, { type: 'SET_MANIFEST', index: 1, status: ManifestStatus.PRESENT, url: 'private-1' });
+  state = reduceBufferedImageNavigation(state, {
+    type: 'SET_IMAGE',
+    index: 1,
+    status: ImageStatus.OK,
+    blobUrl: 'blob:1',
+    imgElement: {} as HTMLImageElement,
+  });
+  state = reduceBufferedImageNavigation(state, { type: 'SET_MANIFEST', index: 2, status: ManifestStatus.FAILED_HEAD, url: 'private-2' });
+  state = reduceBufferedImageNavigation(state, { type: 'SEEK', dir: 1 });
+  state = reduceBufferedImageNavigation(state, { type: 'SEEK', dir: 1 });
+  state = reduceBufferedImageNavigation(state, { type: 'SET_MANIFEST', index: 3, status: ManifestStatus.PRESENT, url: 'private-3' });
+  state = reduceBufferedImageNavigation(state, { type: 'SET_IMAGE', index: 3, status: ImageStatus.FAILED_GET });
+
+  assert.deepEqual(summarizeBufferedImageWindow(state), {
+    total: 6,
+    warmed: 1,
+    warming: 2,
+    failed: 1,
+    skipped: 1,
+    unknown: 1,
+  });
+
+  state = reduceBufferedImageNavigation(state, { type: 'EVICT', index: 2 });
+  assert.equal(state.skippedIndices.has(2), false, 'eviction clears skipped history outside the live buffer');
 });

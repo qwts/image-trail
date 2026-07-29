@@ -994,16 +994,19 @@
         {
           "type": "unit-dom",
           "paths": [
+            "tests/buffered-image-navigation.test.ts",
             "tests/neighbor-preload-controller.test.ts",
             "tests/buffered-navigation-controller.test.ts",
             "tests/dom/buffered-navigation-controller.test.ts",
+            "tests/dom/neighbor-status-view.test.ts",
+            "tests/dom/panel-render-controller.test.ts",
             "tests/data-crypto.test.ts",
             "tests/panel-state-settings.test.ts",
             "tests/dom/automation-settings-view.test.ts",
             "tests/dom/extension-destination-surfaces.test.tsx",
             "tests/dom/parsed-field-navigation-controller.test.ts"
           ],
-          "notes": "Includes #631 cache bounds: supported settings are 1–500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Includes #627 decoded-image lifecycle coverage too: rebuild and disabled-preload paths revoke offscreen buffered blobs while transferring the still-selected display blob, final disposal revokes every retained blob, concurrent decodes that complete after disposal are revoked too, and the HTTP anchor remains untouched; DOM-backed image state is covered. Also covers the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts."
+          "notes": "Includes #631 cache bounds: supported settings are 1–500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Includes #627 decoded-image lifecycle coverage too: rebuild and disabled-preload paths revoke offscreen buffered blobs while transferring the still-selected display blob, final disposal revokes every retained blob, concurrent decodes that complete after disposal are revoked too, and the HTTP anchor remains untouched; DOM-backed image state is covered. Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts. Includes compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
         },
         {
           "type": "storybook",
@@ -1024,6 +1027,16 @@
           "type": "unit-dom",
           "paths": ["tests/buffered-navigation-controller.test.ts"],
           "notes": "Covers #450: the 'Skipped a failed image candidate.' toast is failure feedback, so it fires only in Alert mode; Display/Mute skip past the failed neighbor to the next good candidate silently (the skip is driven by the request-policy cache, not the toast)."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/neighbor-status-view.stories.ts",
+          "notes": "Covers mixed warmed, warming, failed, skipped, and unknown counts plus Mute-mode suppression in the compact panel treatment."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/neighbor-status.spec.ts",
+          "notes": "Warms a bounded parsed-field window, surfaces a failed candidate, verifies it becomes skipped only after traversal, masks failure counts in Mute, removes retained status when preloading is disabled, and rejects URL/blob disclosure in the status copy."
         },
         {
           "type": "deferred",
@@ -1377,12 +1390,13 @@
             "tests/action-dispatch.test.ts",
             "tests/panel-state-queue-recents.test.ts",
             "tests/panel-state-settings.test.ts",
+            "tests/recall-actions.test.ts",
             "tests/recall-destination-controller.test.ts",
             "tests/dom/destination-routing.test.ts",
             "tests/dom/recall-destination-controller.test.ts",
             "tests/dom/recall-destination-view.test.ts"
           ],
-          "notes": "Covers the typed four-route registry, real-tab eligibility for every destination, single activeDestination state, reselect/close/help/settings/minimize/panel-close transitions, preserved primary state, Recall selection continuity across routes plus cleanup on close, producer paging, plain/modifier dock actions, detached Settings single-mount behavior, focus/scroll restoration, and targeted Recall body refresh without replacing destination chrome."
+          "notes": "Covers the typed four-route registry, real-tab eligibility for every destination, single activeDestination state, reselect/close/help/settings/minimize/panel-close transitions, preserved primary state, Recall selection continuity across routes plus cleanup on close, Recall-local action rendering, producer paging, plain/modifier dock actions, detached Settings single-mount behavior, focus/scroll restoration, and targeted Recall body refresh without replacing destination chrome."
         },
         {
           "type": "storybook",
@@ -1395,9 +1409,10 @@
             "tests/e2e/destination-routing.spec.ts",
             "tests/e2e/extension-destination-pages.spec.ts",
             "tests/e2e/react-renderer-boundary.spec.ts",
+            "tests/e2e/recall-selection-render.spec.ts",
             "tests/e2e/recents-queue-recall.spec.ts"
           ],
-          "notes": "Covers packaged plain-click routing, keyboard activation and return focus, per-route scroll, minimize/expand, panel close/reopen, detached controller compatibility, durable Gallery loading without queue reorder, Recall paging and selection, explicit and modifier-key real destination tabs, source-tab return and teardown, narrow layout, and deterministic artifacts for handoff screenshots 02 and 04 through 07."
+          "notes": "Covers packaged plain-click routing, keyboard activation and return focus, per-route scroll, minimize/expand, panel close/reopen, detached controller compatibility, durable Gallery loading without queue reorder, Recall paging and selection, Recall-local selection without route-chrome replacement or list-scroll reset, explicit and modifier-key real destination tabs, source-tab return and teardown, narrow layout, and deterministic artifacts for handoff screenshots 02 and 04 through 07."
         },
         {
           "type": "manual",

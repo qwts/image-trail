@@ -15,10 +15,10 @@ export type RecallActionName =
 
 /** Recall drawer lifecycle and recall-row selection. Bodies moved verbatim from the panel dispatch chain. */
 export function buildRecallActionEntries(deps: PanelActionDeps): ActionEntries<RecallActionName> {
-  const reduceAndRender: AnyActionDef = {
+  const reduceAndRenderRecall: AnyActionDef = {
     handle(action) {
       deps.reduce(action);
-      deps.render();
+      deps.renderRecallOnly();
     },
   };
   return {
@@ -50,10 +50,10 @@ export function buildRecallActionEntries(deps: PanelActionDeps): ActionEntries<R
         deps.reloadRecallCandidates();
       },
     },
-    'recall-selection/toggle': reduceAndRender,
-    'recall-selection/select': reduceAndRender,
-    'recall-selection/clear': reduceAndRender,
-    'recall/clear-results': reduceAndRender,
+    'recall-selection/toggle': reduceAndRenderRecall,
+    'recall-selection/select': reduceAndRenderRecall,
+    'recall-selection/clear': reduceAndRenderRecall,
+    'recall/clear-results': reduceAndRenderRecall,
     'recall/load-more': {
       handle() {
         const { recall } = deps.getState();

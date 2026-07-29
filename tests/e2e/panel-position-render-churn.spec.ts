@@ -61,8 +61,10 @@ test('panel drag stays geometry-only and viewport bursts render once at resize e
   await expect(panel.locator('.image-trail-panel__bookmark-item')).toHaveCount(1);
   await keyboardSnapLeft(page, await detachHistory(page));
   await panel.getByRole('button', { name: 'Open Recall' }).click();
-  await expect(page.getByRole('dialog', { name: 'Recall' })).toBeVisible();
-  await page.waitForTimeout(350);
+  const recall = page.getByRole('dialog', { name: 'Recall' });
+  await expect(recall).toBeVisible();
+  await expect(recall.getByRole('button', { name: 'Reload' })).toBeEnabled();
+  await expect(recall).toContainText('Select records to bring back into the visible queue.');
   await installRenderCounters(page, serviceWorker);
 
   const title = panel.locator('.image-trail-panel__title');
@@ -73,7 +75,7 @@ test('panel drag stays geometry-only and viewport bursts render once at resize e
   await page.mouse.move(titleBox!.x + 120, titleBox!.y + 80, { steps: 12 });
   await page.mouse.up();
   expect(await renderCounters(page)).toEqual({ panel: 0, recall: 0 });
-  await expect(page.getByRole('dialog', { name: 'Recall' })).toBeVisible();
+  await expect(recall).toBeVisible();
 
   await resetRenderCounters(page);
   await page.evaluate(() => {
