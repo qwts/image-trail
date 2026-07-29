@@ -1,15 +1,13 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
 import { isBuildIdentity } from '../core/build-info.js';
-import { DEFAULT_SESSION_INACTIVITY_TIMEOUT_MINUTES } from '../core/secure-session-policy.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { IndexedDbAlbumStore } from '../data/albums-controller.js';
 import { IndexedDbPanelPositionStore } from '../data/panel-position-controller.js';
 import { IndexedDbWorkspaceLayoutStore } from '../data/workspace-layout-controller.js';
-import { IndexedDbParsedFieldStateStore } from '../data/parsed-field-state-controller.js';
 import { IndexedDbUrlTemplateStore } from '../data/url-template-controller.js';
-import { IndexedDbUrlReviewStatusStore } from '../data/url-review-status-controller.js';
+import { createUrlMetadataStores, reconcilePersistedUrlMetadataPolicy } from '../data/url-metadata-stores.js';
 import { RecentHistoryCache } from './recent-history-cache.js';
-import { configureBlobKeySessionStorage, restoreActiveBlobKey, updateBlobKeyInactivityTimeout } from '../data/crypto/blob-keyring.js';
+import { configureBlobKeySessionStorage, restoreActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
 import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFileHeader } from '../data/import-export/encrypted-image.js';
 import { openImageTrailDb } from '../data/db.js';
@@ -39,11 +37,9 @@ import {
   createImportUrlReviewStatusResultMessage,
   createLoadBuildIdentityResultMessage,
   createLoadParsedFieldStateResultMessage,
-  createLoadLocalSettingsResultMessage,
   createListUrlReviewStatusResultMessage,
   createSaveParsedFieldStateResultMessage,
   createSaveUrlReviewStatusResultMessage,
-  createSaveLocalSettingsResultMessage,
   createFetchBufferedImageSourceResultMessage,
   createPingMessage,
   createProbeImageSourceResultMessage,
@@ -69,7 +65,6 @@ import type {
   ListUrlReviewStatusMessage,
   SaveUrlReviewStatusMessage,
 } from './messages.js';
-import type { SaveLocalSettingsMessage } from './messages.js';
 import type {
   FetchBufferedImageSourceMessage,
   CheckImageRequestPolicyMessage,
@@ -89,7 +84,6 @@ import type {
   CleanupOrphanedBlobsMessage,
   CreateDataUrlPreviewMessage,
   LoadBuildIdentityMessage,
-  LoadLocalSettingsMessage,
   LoadParsedFieldStateBySourceMessage,
   StorageUsageRequestMessage,
 } from './messages.js';
@@ -103,7 +97,7 @@ import { createOriginalBlobMessageRegistry } from './handlers/original-blob-hand
 import { createDestinationMessageRegistry } from './handlers/destination-page-handler.js';
 import { createCloudMessageRegistry, createInteropSourceFinalizer } from './handlers/pcloud-handlers.js';
 import { createUrlTemplateMessageRegistry } from './handlers/url-template-handlers.js';
-import { handleLoadLocalSettings, handleSaveLocalSettings, loadLocalSettings } from './handlers/local-settings-handlers.js';
+import { createLocalSettingsMessageRegistry, loadLocalSettings } from './handlers/local-settings-handlers.js';
 import { normalizeHostname } from './handlers/hostname.js';
 import { createChangeNotifiers } from './change-notifiers.js';
 import type { ServiceWorkerContext } from './service-worker-context.js';
@@ -131,8 +125,10 @@ const bookmarkStore = new IndexedDbBookmarkStore({
   getSearchableMetadataPolicy: async () => (await loadLocalSettings()).searchableMetadataPolicy,
 });
 const albumStore = new IndexedDbAlbumStore();
-const parsedFieldStateStore = new IndexedDbParsedFieldStateStore();
-const urlReviewStatusStore = new IndexedDbUrlReviewStatusStore();
+const { parsedFieldStateStore, urlReviewStatusStore, reconcileSearchableMetadataPolicy } = createUrlMetadataStores({
+  getDb,
+  getSearchableMetadataPolicy: async () => (await loadLocalSettings()).searchableMetadataPolicy,
+});
 const urlTemplateStore = new IndexedDbUrlTemplateStore();
 const recentHistoryCache = new RecentHistoryCache(chrome.storage?.session);
 const { notifyLibraryChange, notifySecureSessionChange } = createChangeNotifiers(chrome.runtime, chrome.tabs);
@@ -197,6 +193,12 @@ function getDb(): Promise<IDBDatabase | null> {
   }
   return dbPromise;
 }
+void reconcilePersistedUrlMetadataPolicy({
+  loadPolicy: async () => (await loadLocalSettings()).searchableMetadataPolicy,
+  reconcilePolicy: reconcileSearchableMetadataPolicy,
+}).catch(() => {
+  console.warn('Image Trail could not reconcile URL metadata privacy policy at startup.');
+});
 async function referencedBlobIds(): Promise<Set<string>> {
   const referenced = new Set(await bookmarkStore.loadOriginalBlobIds());
   await recentHistoryCache.ready();
@@ -813,28 +815,7 @@ const messageRegistry = {
     fallback: () => createClearUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be cleared.' }),
   }),
   ...createUrlTemplateMessageRegistry(context),
-  [MessageType.LoadLocalSettings]: defineMessage({
-    requestSchema: requestSchemas.loadLocalSettingsRequestSchema,
-    handle: (_message: LoadLocalSettingsMessage) => handleLoadLocalSettings(),
-    respond: (result) => createLoadLocalSettingsResultMessage(result),
-    fallback: () => createLoadLocalSettingsResultMessage({ ok: false, message: 'Local settings could not be loaded.' }),
-  }),
-  [MessageType.SaveLocalSettings]: defineMessage({
-    requestSchema: requestSchemas.saveLocalSettingsRequestSchema,
-    handle: async (message: SaveLocalSettingsMessage) => {
-      let savedTimeout = DEFAULT_SESSION_INACTIVITY_TIMEOUT_MINUTES;
-      await recentHistoryCache.ready();
-      const result = await handleSaveLocalSettings(message, chrome.storage.local, chrome.tabs, (settings) => {
-        recentHistoryCache.pruneForSettings(settings);
-        savedTimeout = settings.blobKeyInactivityTimeoutMinutes;
-      });
-      await recentHistoryCache.flush();
-      if (result.ok) await updateBlobKeyInactivityTimeout(savedTimeout);
-      return result;
-    },
-    respond: (result) => createSaveLocalSettingsResultMessage(result),
-    fallback: () => createSaveLocalSettingsResultMessage({ ok: false }),
-  }),
+  ...createLocalSettingsMessageRegistry({ recentHistoryCache, reconcileSearchableMetadataPolicy }),
   ...createCloudMessageRegistry(getDb, createInteropSourceFinalizer(getDb, notifyLibraryChange)),
   [MessageType.DeleteBlob]: defineMessage({
     requestSchema: requestSchemas.deleteBlobRequestSchema,
