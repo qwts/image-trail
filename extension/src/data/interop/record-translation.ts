@@ -7,6 +7,7 @@ import { AlbumsRepository } from '../repositories/albums-repository.js';
 import { BookmarksRepository, type EncryptedBookmarkRecord } from '../repositories/bookmarks-repository.js';
 import { KeysRepository } from '../repositories/keys-repository.js';
 import type { DurableBookmarkPayloadV1, DurableInteropRecordV1, StoredOriginalReference } from '../types.js';
+import { normalizeVerifiedOriginalCustody } from './record-media-enrichment.js';
 
 const INTERNAL_RECORD_PREFIX = 'image-trail-interop:';
 const INTERNAL_ALBUM_PREFIX = 'image-trail-interop-album:';
@@ -171,29 +172,8 @@ function normalizeInput(input: InteropRecordTranslationInput): InteropRecordTran
   const albums = v.parse(v.pipe(v.array(interopAlbumSchema), v.readonly()), input.albums);
   const reviewCategory = v.parse(interopReviewCategorySchema, input.reviewCategory);
   const receivedAt = input.receivedAt ? v.parse(interopTimestampSchema, input.receivedAt) : undefined;
-  assertVerifiedCustody(record, input.verifiedThumbnailDataUrl, input.verifiedOriginal);
-  return { ...input, record, albums, reviewCategory, receivedAt };
-}
-
-function assertVerifiedCustody(
-  record: InteropRecord,
-  verifiedThumbnailDataUrl: string | undefined,
-  verifiedOriginal: StoredOriginalReference | undefined,
-): void {
-  if (verifiedThumbnailDataUrl) {
-    if (record.thumbnail.state !== 'available' || !verifiedThumbnailDataUrl.startsWith('data:image/')) {
-      throw new Error('Verified thumbnail bytes do not match an available image thumbnail.');
-    }
-  }
-  if (verifiedOriginal) {
-    if (
-      record.original.state !== 'available' ||
-      verifiedOriginal.mimeType !== record.original.mimeType ||
-      verifiedOriginal.byteLength !== record.original.byteLength
-    ) {
-      throw new Error('Verified original custody does not match the canonical original metadata.');
-    }
-  }
+  const verifiedOriginal = normalizeVerifiedOriginalCustody(record, input.verifiedThumbnailDataUrl, input.verifiedOriginal);
+  return { ...input, record, albums, reviewCategory, receivedAt, verifiedOriginal };
 }
 
 function previewNormalized(input: InteropRecordTranslationInput, stored: readonly StoredInteropPin[]): InteropRecordPreview {

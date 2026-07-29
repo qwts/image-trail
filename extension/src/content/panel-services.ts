@@ -9,9 +9,25 @@ export {
   exportEncryptedFullBackup,
   storedBlobRecordFromPortable,
   type FullBackupBlobKeyBackup,
+  type PortableStoredBlobRecord,
 } from '../data/import-export/full-backup.js';
 export type { AlbumBackupEntry } from '../data/albums-controller.js';
-export { importBookmarks } from '../data/import-export/bookmarks-import.js';
+export { createFullBackupImportResult, importBookmarks, type BookmarksImportResult } from '../data/import-export/bookmarks-import.js';
+export {
+  chunkCloudBackupBookmarks,
+  cloudBackupPartFileName,
+  createCloudBackupCryptoSession,
+  decryptCloudBackupManifest,
+  decryptCloudBackupPart,
+  encryptCloudBackupManifest,
+  encryptCloudBackupPart,
+  isChunkedCloudBackupManifest,
+  type CloudBackupCryptoSession,
+  type CloudBackupManifestV1,
+  type CloudBackupMetadataPartV1,
+  type CloudBackupPartPayload,
+  type CloudBackupPartReference,
+} from '../data/import-export/chunked-cloud-backup.js';
 export { exportEncryptedHistory, exportPlainHistory } from '../data/import-export/history-export.js';
 export { importEncryptedHistory } from '../data/import-export/history-import.js';
 export { exportUrlReviewStatus, importUrlReviewStatus } from '../data/import-export/url-review-status.js';

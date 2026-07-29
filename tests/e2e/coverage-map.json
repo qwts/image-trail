@@ -38,6 +38,39 @@
       ]
     },
     {
+      "id": "gif-webp-original-preservation",
+      "acceptance": "Static and animated GIF/WebP capture, poster, preview, export, backup, and Photos metadata preservation",
+      "repoPath": "tests/e2e/gif-webp-media.spec.ts",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-GIF-And-WebP-Media",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/gif-webp-media.test.ts",
+            "tests/data-url-image.test.ts",
+            "tests/fetch-image.test.ts",
+            "tests/encrypted-blobs.test.ts",
+            "tests/full-backup-originals.test.ts",
+            "tests/interop-media.test.ts",
+            "tests/interop-record-export.test.ts",
+            "tests/interop-record-translation.test.ts",
+            "tests/dom/animated-preview.test.ts"
+          ],
+          "notes": "Covers bounded signature/frame/loop/dimension inspection, malformed and hostile input rejection, MIME correction, exact encrypted-byte hashes, durable optional media metadata, original filenames, full-backup preservation, strict contract-v1 Photos metadata, inbound enrichment, and reduced-motion poster Play/Stop behavior."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/gif-webp-media.spec.ts",
+          "notes": "Captures checked-in animated GIF, animated WebP, and static WebP fixtures in the packaged extension; proves static queue posters, exact downloaded hashes and filenames, malformed-input atomicity, browser animation playback, reduced-motion poster hold, intentional Play/Stop, and static WebP rendering."
+        },
+        {
+          "type": "manual",
+          "reason": "Real operating-system reduced-motion startup, source timing perception, and live Photos transfer remain human/browser integration checks while Transfer and Sync stays experimental.",
+          "notes": "Start Chrome with reduced motion already enabled, open each captured original from Gallery, verify no animated frame appears before Play, compare visible frame timing and loop behavior to the source, then run an experimental Image Trail to Photos to Image Trail transfer and compare filename, MIME, dimensions, animation facts, and SHA-256."
+        }
+      ]
+    },
+    {
       "id": "design-system-foundation",
       "acceptance": "Shared design-system tokens and core primitive contracts",
       "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
@@ -940,12 +973,17 @@
           "type": "unit-dom",
           "paths": [
             "tests/backup-history-store.test.ts",
+            "tests/chunked-cloud-backup.test.ts",
+            "tests/pcloud-backup-export.test.ts",
+            "tests/pcloud-backup-restore.test.ts",
+            "tests/pcloud-part-cleanup.test.ts",
             "tests/pcloud-upload-provider.test.ts",
             "tests/pcloud-permissions.test.ts",
             "tests/panel-state-settings.test.ts",
+            "tests/dom/recall-export-controller.test.ts",
             "tests/dom/settings-section.test.ts"
           ],
-          "notes": "Covers provider operations, trusted and sanitized bounded backup-history persistence, disconnected-state hydration, verification-method rendering, plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
+          "notes": "Covers encrypted manifest-plus-parts schema and integrity, bounded one-original backup/restore messages, manifest-last history publication, allowlisted partial cleanup, cooperative cancel UI, provider operations, trusted bounded backup-history persistence, disconnected-state hydration, verification-method rendering, plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
         },
         {
           "type": "storybook",
@@ -959,7 +997,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/import-export-settings.spec.ts",
-          "notes": "Covers mocked pCloud connect, token-hiding UI boundary, manual encrypted backup upload metadata, persistent backup history across disconnect and Settings rerender, restore candidate listing, and restore preview without real pCloud secrets."
+          "notes": "Covers mocked pCloud connect, token-hiding UI boundary, sequential encrypted part uploads with a manifest published last, persistent manifest-only backup history across disconnect and Settings rerender, restore candidate listing, and bounded restore preview without real pCloud secrets."
         }
       ]
     },

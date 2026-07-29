@@ -22,8 +22,8 @@ export async function createTargetCaptureRecord(input: TargetCaptureRecordInput)
     url: input.url,
     timestamp: existing?.timestamp ?? capturedAt,
     thumbnail,
-    width: dimensions.width ?? existing?.width,
-    height: dimensions.height ?? existing?.height,
+    width: input.result.width ?? dimensions.width ?? existing?.width,
+    height: input.result.height ?? dimensions.height ?? existing?.height,
     source: 'bookmark',
     capturedAt,
     captureStatus: 'captured',
@@ -33,6 +33,10 @@ export async function createTargetCaptureRecord(input: TargetCaptureRecordInput)
       mimeType: input.result.mimeType,
       byteLength: input.result.byteLength,
       capturedAt,
+      ...(input.result.fileName ? { fileName: input.result.fileName } : {}),
+      ...(input.result.width ? { width: input.result.width } : {}),
+      ...(input.result.height ? { height: input.result.height } : {}),
+      ...(input.result.mediaInfo ? { mediaInfo: input.result.mediaInfo } : {}),
     },
   });
 }

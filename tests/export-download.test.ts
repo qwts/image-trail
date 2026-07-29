@@ -77,4 +77,19 @@ test('filenameForExportedImageRecord prefers the record label over the URL basen
     filenameForExportedImageRecord({ url: 'https://example.test/photos/raw-name.jpg', label: 'Pretty name', title: undefined }),
     'Pretty name.jpg',
   );
+  assert.equal(
+    filenameForExportedImageRecord({
+      url: 'https://example.test/photos/proxy.jpg',
+      label: 'Pretty name',
+      title: undefined,
+      storedOriginal: {
+        blobId: 'gif-1',
+        mimeType: 'image/gif',
+        byteLength: 255,
+        capturedAt: '2026-07-28T00:00:00.000Z',
+        fileName: 'source-animation.gif',
+      },
+    }),
+    'source-animation.gif',
+  );
 });

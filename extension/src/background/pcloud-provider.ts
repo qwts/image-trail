@@ -2,6 +2,10 @@ import {
   parsePCloudOAuthRedirect,
   type PCloudBackupDownloadInput,
   type PCloudBackupDownloadResult,
+  type PCloudBackupCleanupInput,
+  type PCloudBackupCleanupResult,
+  type PCloudBackupFileUploadInput,
+  type PCloudBackupFileUploadResult,
   type PCloudBackupListResult,
   type PCloudBackupRestoreCandidate,
   type PCloudBackupUploadInput,
@@ -9,8 +13,11 @@ import {
   type PCloudApiHost,
   type PCloudProviderResult,
   type PCloudProviderStatus,
+  PCLOUD_BACKUP_PART_SUFFIX,
 } from '../core/cloud/pcloud-provider.js';
 import { appendBackupHistory, loadBackupHistory } from './backup-history-store.js';
+import { assertPCloudBackupPartReference, cleanupPCloudBackupParts } from './pcloud-part-cleanup.js';
+import { arrayBufferFromBytes, bytesEqual, numberOrUndefined, recordOrNull, stringOrUndefined } from './pcloud-provider-utils.js';
 import {
   clearPCloudConnectionRecord,
   loadPCloudConnectionRecord,
@@ -38,19 +45,6 @@ function hasChromeIdentity(): boolean {
 function sanitizeError(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message.replace(/access_token=[^&#\s]+/giu, 'access_token=redacted');
   return 'pCloud request failed.';
-}
-
-function numberOrUndefined(value: unknown): number | undefined {
-  const numberValue = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN;
-  return Number.isFinite(numberValue) ? numberValue : undefined;
-}
-
-function stringOrUndefined(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value : undefined;
-}
-
-function recordOrNull(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 function launchWebAuthFlow(url: string): Promise<string> {
@@ -187,14 +181,10 @@ function sortRestoreCandidates(candidates: readonly PCloudBackupRestoreCandidate
   });
 }
 
-function arrayBufferFromBytes(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
 async function uploadBackupFile(
   record: PCloudConnectionRecord,
   folderId: number,
-  input: PCloudBackupUploadInput,
+  input: PCloudBackupFileUploadInput,
   bytes: Uint8Array,
 ): Promise<{ readonly fileId: number; readonly sizeBytes: number; readonly fileName: string }> {
   const form = new FormData();
@@ -349,14 +339,6 @@ async function verifyPCloudBackupBytes(
   return 'download';
 }
 
-function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.byteLength !== right.byteLength) return false;
-  for (let index = 0; index < left.byteLength; index += 1) {
-    if (left[index] !== right[index]) return false;
-  }
-  return true;
-}
-
 async function deletePCloudFile(record: PCloudConnectionRecord, fileId: number): Promise<void> {
   await fetchPCloudJson(record.apiHost, 'deletefile', record.accessToken, { fileid: String(fileId) });
 }
@@ -366,7 +348,7 @@ function failedUploadResult(
   reason: string,
   message: string,
   cleanup?: { readonly fileId: number; readonly needed: boolean },
-): PCloudBackupUploadResult {
+): PCloudBackupFileUploadResult {
   return {
     ok: false,
     status: { ...pcloudStatusFromRecord(record), message, messageIsError: true },
@@ -400,7 +382,7 @@ async function failVerifiedUpload(
   fileId: number,
   reason: string,
   message: string,
-): Promise<PCloudBackupUploadResult> {
+): Promise<PCloudBackupFileUploadResult> {
   try {
     await deletePCloudFile(record, fileId);
     return failedUploadResult(record, reason, `${message} The unverified pCloud file was deleted.`, { fileId, needed: false });
@@ -458,7 +440,15 @@ export async function disconnectPCloudProvider(): Promise<PCloudProviderResult> 
   return { ok: true, status, message: status.message };
 }
 
+export function uploadPCloudBackup(input: PCloudBackupFileUploadInput): Promise<PCloudBackupFileUploadResult>;
+export function uploadPCloudBackup(input: PCloudBackupCleanupInput): Promise<PCloudBackupCleanupResult>;
+export function uploadPCloudBackup(input: PCloudBackupUploadInput): Promise<PCloudBackupUploadResult>;
 export async function uploadPCloudBackup(input: PCloudBackupUploadInput): Promise<PCloudBackupUploadResult> {
+  if (input.operation === 'cleanup') return cleanupPCloudBackupParts(input);
+  return uploadPCloudBackupFile(input);
+}
+
+async function uploadPCloudBackupFile(input: PCloudBackupFileUploadInput): Promise<PCloudBackupFileUploadResult> {
   const fileName = input.fileName.trim();
   if (!fileName || !input.fileContent) {
     return failedUploadResult(null, 'invalid-input', 'A backup file name and encrypted file content are required.');
@@ -493,17 +483,20 @@ export async function uploadPCloudBackup(input: PCloudBackupUploadInput): Promis
       sha256,
       verificationMethod: verificationMethod === 'download' ? 'download-byte-match' : 'provider-checksum',
     } as const;
-    let historyPersisted = true;
-    try {
-      await appendBackupHistory(historyRecord);
-    } catch {
-      historyPersisted = false;
+    let historyPersisted = false;
+    if (input.recordHistory !== false) {
+      historyPersisted = true;
+      try {
+        await appendBackupHistory(historyRecord);
+      } catch {
+        historyPersisted = false;
+      }
     }
     let message =
       verificationMethod === 'download'
         ? `Uploaded and verified ${uploaded.fileName}.`
         : `Uploaded and verified ${uploaded.fileName} with pCloud checksum.`;
-    if (!historyPersisted) message += ' Backup history could not be saved.';
+    if (input.recordHistory !== false && !historyPersisted) message += ' Backup history could not be saved.';
     return {
       ok: true,
       status: pcloudStatusFromRecord(record, message),
@@ -559,7 +552,9 @@ export async function listPCloudBackups(): Promise<PCloudBackupListResult> {
 
 export async function downloadPCloudBackup(input: PCloudBackupDownloadInput): Promise<PCloudBackupDownloadResult> {
   const fileName = input.fileName.trim();
-  if (!fileName || !fileName.endsWith('.image-trail-encrypted.json')) {
+  const validFileName =
+    input.kind === 'part' ? fileName.endsWith(PCLOUD_BACKUP_PART_SUFFIX) : fileName.endsWith('.image-trail-encrypted.json');
+  if (!fileName || !validFileName) {
     return failedDownloadResult(null, 'invalid-input', 'Choose an Image Trail encrypted backup file before restoring.');
   }
   if (!Number.isFinite(input.fileId) || input.fileId <= 0) {
@@ -570,6 +565,7 @@ export async function downloadPCloudBackup(input: PCloudBackupDownloadInput): Pr
   if (!record) return failedDownloadResult(null, 'not-connected', 'Connect pCloud before restoring.');
 
   try {
+    if (input.kind === 'part') await assertPCloudBackupPartReference(record, input.fileId, fileName);
     const bytes = await downloadPCloudFile(record, input.fileId);
     const fileContent = new TextDecoder().decode(bytes);
     const sha256 = await digestHex('SHA-256', bytes);

@@ -1,9 +1,13 @@
-/* global chrome, document, location */
+/* global chrome, document, location, matchMedia */
+
+import { createPreviewMediaSurface } from './animated-preview.js';
 
 const token = decodeURIComponent(location.hash.slice(1));
-let previewDataUrl = null;
+let previewMedia = null;
 let previewLoading = false;
 let workspaceLocked = true;
+let previewRenderSequence = 0;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 function sendMessage(message) {
   return new Promise((resolve, reject) => {
@@ -80,21 +84,26 @@ function renderLock(message, phase = 'locked') {
 
 function renderPreview() {
   workspaceLocked = false;
-  if (!previewDataUrl) {
+  const renderSequence = ++previewRenderSequence;
+  if (!previewMedia) {
     const status = document.createElement('p');
     status.id = 'status';
     status.textContent = previewLoading ? 'Loading encrypted preview…' : 'Preview is unavailable.';
     document.body.replaceChildren(status);
     return;
   }
-  const image = document.createElement('img');
-  image.alt = 'Decrypted Image Trail original';
-  image.src = previewDataUrl;
-  document.body.replaceChildren(image);
+  const status = document.createElement('p');
+  status.id = 'status';
+  status.textContent = previewMedia.mediaInfo?.animated && reducedMotion.matches ? 'Preparing a reduced-motion poster…' : 'Loading preview…';
+  document.body.replaceChildren(status);
+  void createPreviewMediaSurface(document, previewMedia, { reducedMotion: reducedMotion.matches }).then((surface) => {
+    if (workspaceLocked || renderSequence !== previewRenderSequence) return;
+    document.body.replaceChildren(surface);
+  });
 }
 
 async function loadPreview() {
-  if (previewDataUrl || previewLoading) {
+  if (previewMedia || previewLoading) {
     if (!workspaceLocked) renderPreview();
     return;
   }
@@ -110,7 +119,7 @@ async function loadPreview() {
       if (!workspaceLocked) showError(response?.message ?? 'Preview could not be loaded.');
       return;
     }
-    previewDataUrl = response.dataUrl;
+    previewMedia = { dataUrl: response.dataUrl, mediaInfo: response.mediaInfo };
     if (!workspaceLocked) renderPreview();
   } catch {
     if (!workspaceLocked) showError('Preview could not be loaded.');
@@ -158,6 +167,10 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type !== 'imageTrail.secureSessionChanged' || message.version !== 1) return false;
   applySecureSessionStatus(message.payload);
   return false;
+});
+
+reducedMotion.addEventListener('change', () => {
+  if (!workspaceLocked && previewMedia) renderPreview();
 });
 
 renderLock(null, 'checking');

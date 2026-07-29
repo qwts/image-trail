@@ -185,7 +185,7 @@ export class ImageTrailPanel {
     loadPCloudProviderStatus: (...args) => loadPCloudProviderStatus(...args),
     connectPCloudProvider: (...args) => connectPCloudProvider(...args),
     disconnectPCloudProvider: (...args) => disconnectPCloudProvider(...args),
-    uploadPCloudBackup: (input) => uploadPCloudBackup(input),
+    uploadPCloudBackup,
   });
   private readonly recallRestore = new RecallRestoreController({
     getState: () => this.state,

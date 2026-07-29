@@ -25,7 +25,18 @@ export function updateRecordCapture(
           captureStatus: 'captured' as const,
           blobId: result.blobId,
           capturedAt,
-          storedOriginal: { blobId: result.blobId, mimeType: result.mimeType, byteLength: result.byteLength, capturedAt },
+          width: result.width ?? record.width,
+          height: result.height ?? record.height,
+          storedOriginal: {
+            blobId: result.blobId,
+            mimeType: result.mimeType,
+            byteLength: result.byteLength,
+            capturedAt,
+            ...(result.fileName ? { fileName: result.fileName } : {}),
+            ...(result.width ? { width: result.width } : {}),
+            ...(result.height ? { height: result.height } : {}),
+            ...(result.mediaInfo ? { mediaInfo: result.mediaInfo } : {}),
+          },
         }
       : record,
   );

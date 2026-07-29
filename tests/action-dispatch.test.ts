@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-
 import type { KeyboardRouter } from '../extension/src/content/keyboard.js';
 import type { PageAdapter, TargetSelectionSnapshot } from '../extension/src/content/page-adapter.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/content/panel-services.js';
@@ -343,6 +342,7 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'cloud-backup/connect': { name: 'cloud-backup/connect', provider: 'pcloud' },
   'cloud-backup/retry': { name: 'cloud-backup/retry', provider: 'pcloud' },
   'cloud-backup/disconnect': { name: 'cloud-backup/disconnect', provider: 'pcloud' },
+  'cloud-backup/cancel': { name: 'cloud-backup/cancel', provider: 'pcloud' },
   'cloud-backup/backup-now': { name: 'cloud-backup/backup-now', provider: 'pcloud', password: 'passphrase' },
   'cloud-backup/choose-restore': { name: 'cloud-backup/choose-restore', provider: 'pcloud' },
   'cloud-backup/preview-restore': {

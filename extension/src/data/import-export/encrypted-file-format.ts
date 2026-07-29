@@ -5,7 +5,7 @@ import { exportFileEnvelopeSchema, exportFileHeaderSchema } from './encrypted-fi
 export const EXPORT_FORMAT_MAGIC = 'IMAGE-TRAIL-EXPORT';
 export const EXPORT_FORMAT_VERSION = 1;
 
-export type ExportPayloadType = 'history' | 'bookmarks' | 'mixed' | 'keys' | 'image';
+export type ExportPayloadType = 'history' | 'bookmarks' | 'mixed' | 'keys' | 'image' | 'cloud-backup-manifest';
 
 export interface ExportFileHeader {
   readonly magic: typeof EXPORT_FORMAT_MAGIC;
