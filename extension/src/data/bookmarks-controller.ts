@@ -69,6 +69,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   private ready: Promise<BookmarkContext | null> | null = null;
   private mergedRecordsCache: MergedBookmarkRecordsCache | null = null;
   private mergedRecordsCacheGeneration = 0;
+  private debugMergedCallCounter = 0;
 
   constructor(private readonly options: ProtectedBookmarkOptions = {}) {}
 
@@ -110,6 +111,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const limit = Math.max(1, input.limit);
     if (!context) return { items: [], offset, limit, total: 0, hasOlder: false, hasNewer: false };
 
+    console.error('[DEBUG-LOADPAGE-START] ' + JSON.stringify({ offset, limit, hasActiveBlobKeyOption: !!this.options.getActiveBlobKey }));
     const loaded = this.options.getActiveBlobKey
       ? await this.loadMergedRecords(context)
       : await loadPlainBookmarkRecords(context.repository, context.bookmarkKey.key);
@@ -121,6 +123,8 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const clampedOffset = clampPageOffset(offset, limit, total);
     const pageItems = visible.slice(clampedOffset, clampedOffset + limit);
     const items = this.options.getActiveBlobKey ? await this.loadProtectedThumbnailsForRecords(context, pageItems) : pageItems;
+
+    console.error('[DEBUG-LOADPAGE-DONE] ' + JSON.stringify({ loadedCount: loaded.length, total, itemCount: items.length }));
     return {
       items,
       offset: clampedOffset,
@@ -132,6 +136,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   }
 
   async save(record: ImageDisplayRecord, options: BookmarkSaveOptions = {}): Promise<ImageDisplayRecord> {
+    console.error('[DEBUG-SAVE-START] ' + JSON.stringify({ url: record.url }));
     const context = await this.openContext();
     const importedDataUrl = record.url.startsWith('data:image/');
     const bookmark = createDisplayRecord({ ...record, id: importedDataUrl ? record.id : record.url, source: 'bookmark' });
@@ -198,6 +203,8 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     );
     await removeReplacedOriginal(context, existingPayload, payload.storedOriginal?.blobId ?? bookmark.blobId);
     this.invalidateMergedRecordsCache();
+
+    console.error('[DEBUG-SAVE-PLAIN-DONE] ' + JSON.stringify({ url: bookmark.url, uuid, generation: this.mergedRecordsCacheGeneration }));
     return { ...bookmark, id: uuid, pinSaveStorage };
   }
 
@@ -405,15 +412,37 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   }
 
   private async loadMergedRecords(context: BookmarkContext): Promise<readonly ImageDisplayRecord[]> {
+    const callId = (this.debugMergedCallCounter += 1);
     const activeBlobKey = (await this.options.getActiveBlobKey?.()) ?? null;
     const keyReference = activeBlobKey?.reference.reference ?? null;
-    if (this.mergedRecordsCache?.keyReference === keyReference) return this.mergedRecordsCache.records;
+    if (this.mergedRecordsCache?.keyReference === keyReference) {
+      console.error(
+        '[DEBUG-MERGED-CACHE-HIT] ' + JSON.stringify({ callId, keyReference, cachedCount: this.mergedRecordsCache.records.length }),
+      );
+      return this.mergedRecordsCache.records;
+    }
     const cacheGeneration = this.mergedRecordsCacheGeneration;
+
+    console.error(
+      '[DEBUG-MERGED-MISS-START] ' + JSON.stringify({ callId, keyReference, cacheGeneration, hasActiveBlobKey: !!activeBlobKey }),
+    );
     const plain = [...(await loadPlainBookmarkRecords(context.repository, context.bookmarkKey.key))];
+
+    console.error(
+      '[DEBUG-MERGED-PLAIN-LOADED] ' +
+        JSON.stringify({
+          callId,
+          plainCount: plain.length,
+          cacheGenerationAtStart: cacheGeneration,
+          cacheGenerationNow: this.mergedRecordsCacheGeneration,
+        }),
+    );
     if (!activeBlobKey) {
       if (this.mergedRecordsCacheGeneration === cacheGeneration) {
         this.mergedRecordsCache = { keyReference, records: plain };
       }
+
+      console.error('[DEBUG-MERGED-MISS-RETURN-PLAIN] ' + JSON.stringify({ callId, returnedCount: plain.length }));
       return plain;
     }
 
@@ -430,6 +459,17 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       }
     }
     const records = sortQueueRecords([...byId.values()], DEFAULT_QUEUE_DISPLAY_ORDER);
+
+    console.error(
+      '[DEBUG-MERGED-RETURN] ' +
+        JSON.stringify({
+          callId,
+          returnedCount: records.length,
+          cacheGenerationAtStart: cacheGeneration,
+          cacheGenerationNow: this.mergedRecordsCacheGeneration,
+          cached: this.mergedRecordsCacheGeneration === cacheGeneration,
+        }),
+    );
     if (this.mergedRecordsCacheGeneration === cacheGeneration) {
       this.mergedRecordsCache = { keyReference, records };
     }
@@ -530,6 +570,10 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       );
       await removeReplacedOriginal(context, existingPlainPayload, relationship.storedOriginalBlobId);
       this.invalidateMergedRecordsCache();
+
+      console.error(
+        '[DEBUG-SAVE-PROTECTED-DONE] ' + JSON.stringify({ url: bookmark.url, plainPinId, generation: this.mergedRecordsCacheGeneration }),
+      );
       return this.openProtectedDisplayRecord(context, protectedRecord, activeBlobKey);
     } catch (error) {
       const existingThumbnailId = existingPlainPayload?.protectedPin?.encryptedThumbnailId;
