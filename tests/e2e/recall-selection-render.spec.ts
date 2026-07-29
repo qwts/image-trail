@@ -54,6 +54,9 @@ async function setVisiblePinLimit(page: Page, limit: string): Promise<void> {
 }
 
 test('Recall selection preserves route chrome and deep list scroll (#628)', async ({ page, serviceWorker }) => {
+  page.on('console', (msg) => {
+    if (msg.text().includes('DEBUG-')) console.log('PAGE-CONSOLE:', msg.text());
+  });
   await openPanel(page, serviceWorker);
   await clearDurableQueue(page);
 

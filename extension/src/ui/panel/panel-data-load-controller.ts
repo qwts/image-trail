@@ -100,9 +100,26 @@ export class PanelDataLoadController {
       currentPageUrl: window.location.href,
       displayOrder: state.queueDisplayOrder,
     } as const;
+
+    console.error('[DEBUG-CALL] ' + JSON.stringify({ requestId, offset, options, stack: new Error().stack?.split('\n').slice(1, 5) }));
     const scopeKey = bookmarkQueueScopeKey(request.scope, request.currentPageUrl);
     const page = await bookmarkStore.loadPage(request);
-    if (!this.bookmarkPageRequestIsCurrent(requestId, request, scopeKey)) return;
+    if (!this.bookmarkPageRequestIsCurrent(requestId, request, scopeKey)) {
+      console.error(
+        '[DEBUG-STALE-DROP] ' +
+          JSON.stringify({
+            requestId,
+            currentId: this.bookmarkPageRequestId,
+            request,
+            scopeKey,
+            stateBookmarkLimit: this.deps.getState().bookmarkLimit,
+            stateScope: this.deps.getState().bookmarkVisibilityScope,
+            stateDisplayOrder: this.deps.getState().queueDisplayOrder,
+            href: window.location.href,
+          }),
+      );
+      return;
+    }
     this.deps.setState(
       reducePanelAction(this.deps.getState(), {
         name: 'bookmarks/page-loaded',
