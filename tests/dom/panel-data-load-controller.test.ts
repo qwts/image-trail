@@ -160,6 +160,79 @@ test('loadBookmarkPage ignores a response after queue scope or display order cha
   }
 });
 
+test('loadBookmarkPage accepts a global response after the host page URL changes', async (t) => {
+  const pending = deferred<Awaited<ReturnType<BookmarkStore['loadPage']>>>();
+  const globalRecord = createDisplayRecord({ id: 'global-page', url: 'https://other.test/global.jpg' });
+  const harness = createHarness({ bookmarkLoad: async () => pending.promise });
+  t.after(() => {
+    window.location.href = 'https://images.example.test/gallery';
+  });
+
+  const load = harness.controller.loadBookmarkPage(0);
+  window.location.href = 'https://images.example.test/next#selected';
+  pending.resolve({
+    items: [globalRecord],
+    offset: 0,
+    limit: 10,
+    total: 1,
+    hasOlder: false,
+    hasNewer: false,
+  });
+  await load;
+
+  assert.deepEqual(harness.getState().bookmarks, [globalRecord]);
+  assert.equal(harness.log.filter((entry) => entry === 'render').length, 1);
+});
+
+test('loadBookmarkPage accepts a site response after a same-host path or hash change', async (t) => {
+  const pending = deferred<Awaited<ReturnType<BookmarkStore['loadPage']>>>();
+  const siteRecord = createDisplayRecord({ id: 'site-page', url: 'https://images.example.test/site.jpg' });
+  const harness = createHarness({ bookmarkLoad: async () => pending.promise });
+  harness.patchState({ bookmarkVisibilityScope: 'site' });
+  t.after(() => {
+    window.location.href = 'https://images.example.test/gallery';
+  });
+
+  const load = harness.controller.loadBookmarkPage(0);
+  window.location.href = 'https://images.example.test/next#selected';
+  pending.resolve({
+    items: [siteRecord],
+    offset: 0,
+    limit: 10,
+    total: 1,
+    hasOlder: false,
+    hasNewer: false,
+  });
+  await load;
+
+  assert.deepEqual(harness.getState().bookmarks, [siteRecord]);
+  assert.equal(harness.log.filter((entry) => entry === 'render').length, 1);
+});
+
+test('loadBookmarkPage rejects a site response after a cross-host change', async (t) => {
+  const pending = deferred<Awaited<ReturnType<BookmarkStore['loadPage']>>>();
+  const harness = createHarness({ bookmarkLoad: async () => pending.promise });
+  harness.patchState({ bookmarkVisibilityScope: 'site' });
+  t.after(() => {
+    window.location.href = 'https://images.example.test/gallery';
+  });
+
+  const load = harness.controller.loadBookmarkPage(0);
+  window.location.href = 'https://other.test/next';
+  pending.resolve({
+    items: [createDisplayRecord({ url: 'https://images.example.test/stale.jpg' })],
+    offset: 0,
+    limit: 10,
+    total: 1,
+    hasOlder: false,
+    hasNewer: false,
+  });
+  await load;
+
+  assert.deepEqual(harness.getState().bookmarks, []);
+  assert.equal(harness.log.filter((entry) => entry === 'render').length, 0);
+});
+
 test('loadRecentHistory loads the recents for the current page and stamps lastUpdatedAt', async () => {
   const harness = createHarness();
   const before = harness.getState().lastUpdatedAt;

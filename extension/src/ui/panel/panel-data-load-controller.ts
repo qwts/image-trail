@@ -100,8 +100,9 @@ export class PanelDataLoadController {
       currentPageUrl: window.location.href,
       displayOrder: state.queueDisplayOrder,
     } as const;
+    const scopeKey = bookmarkQueueScopeKey(request.scope, request.currentPageUrl);
     const page = await bookmarkStore.loadPage(request);
-    if (!this.bookmarkPageRequestIsCurrent(requestId, request)) return;
+    if (!this.bookmarkPageRequestIsCurrent(requestId, request, scopeKey)) return;
     this.deps.setState(
       reducePanelAction(this.deps.getState(), {
         name: 'bookmarks/page-loaded',
@@ -121,16 +122,17 @@ export class PanelDataLoadController {
     request: {
       readonly limit: number;
       readonly scope: PanelState['bookmarkVisibilityScope'];
-      readonly currentPageUrl: string;
       readonly displayOrder: PanelState['queueDisplayOrder'];
     },
+    scopeKey: string | null,
   ): boolean {
     const state = this.deps.getState();
     return (
       requestId === this.bookmarkPageRequestId &&
       request.limit === (state.bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax) &&
       request.scope === state.bookmarkVisibilityScope &&
-      request.currentPageUrl === window.location.href &&
+      scopeKey !== null &&
+      scopeKey === bookmarkQueueScopeKey(state.bookmarkVisibilityScope, window.location.href) &&
       request.displayOrder === state.queueDisplayOrder
     );
   }
@@ -156,5 +158,15 @@ export class PanelDataLoadController {
 
   invalidateStorageUsageRequests(): void {
     this.storageUsageRequestId += 1;
+  }
+}
+
+function bookmarkQueueScopeKey(scope: PanelState['bookmarkVisibilityScope'], currentPageUrl: string): string | null {
+  if (scope === 'global') return 'global';
+  try {
+    const hostname = new URL(currentPageUrl).hostname.toLowerCase();
+    return hostname ? `site:${hostname}` : null;
+  } catch {
+    return null;
   }
 }
