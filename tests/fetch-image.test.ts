@@ -39,7 +39,7 @@ test('fetchImageBytes includes credentials only for same-origin page images', as
   }
 });
 
-test('fetchImageBytes classifies GIF bytes by signature and preserves a response filename', async () => {
+test('fetchImageBytes classifies GIF bytes by signature and corrects a mismatched response filename', async () => {
   const originalFetch = globalThis.fetch;
   const bytes = readFileSync('tests/e2e/pages/assets/animated/animated.gif');
   globalThis.fetch = async () =>
@@ -47,7 +47,7 @@ test('fetchImageBytes classifies GIF bytes by signature and preserves a response
       status: 200,
       headers: {
         'content-type': 'image/jpeg',
-        'content-disposition': "inline; filename*=UTF-8''party%20loop.GIF",
+        'content-disposition': "inline; filename*=UTF-8''party%20loop.jpg",
       },
     });
 
@@ -58,12 +58,29 @@ test('fetchImageBytes classifies GIF bytes by signature and preserves a response
       bytes: undefined,
       mimeType: 'image/gif',
       byteLength: 3723,
-      fileName: 'party loop.GIF',
+      fileName: 'party loop.gif',
       width: 40,
       height: 40,
       mediaInfo: { kind: 'gif', animated: true, frameCount: 3, loopCount: 0 },
     });
     assert.deepEqual(result.ok ? new Uint8Array(result.bytes) : null, new Uint8Array(bytes));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('fetchImageBytes corrects a mismatched URL extension from the verified media signature', async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = readFileSync('tests/e2e/pages/assets/animated/animated.gif');
+  globalThis.fetch = async () =>
+    new Response(bytes, {
+      status: 200,
+      headers: { 'content-type': 'image/gif' },
+    });
+
+  try {
+    const result = await fetchImageBytes('https://cdn.example.test/wrong-extension.jpg');
+    assert.equal(result.ok ? result.fileName : null, 'wrong-extension.gif');
   } finally {
     globalThis.fetch = originalFetch;
   }

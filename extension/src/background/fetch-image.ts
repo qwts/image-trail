@@ -147,7 +147,10 @@ function originalImageFileName(contentDisposition: string | null, url: string, f
   const dispositionName = fileNameFromContentDisposition(contentDisposition);
   const urlName = fileNameFromUrlPath(url);
   const sanitized = sanitizeOriginalFileName(dispositionName ?? urlName ?? 'image');
-  return /\.[a-z0-9]{1,10}$/iu.test(sanitized) ? sanitized : `${sanitized}.${fallbackExtension}`;
+  const extension = /\.([a-z0-9]{1,10})$/iu.exec(sanitized);
+  if (extension?.[1]?.toLowerCase() === fallbackExtension) return sanitized;
+  const stem = extension ? sanitized.slice(0, -extension[0].length) : sanitized;
+  return `${sanitizeFilename(stem, 'image', 240 - fallbackExtension.length - 1)}.${fallbackExtension}`;
 }
 
 function fileNameFromContentDisposition(value: string | null): string | null {
