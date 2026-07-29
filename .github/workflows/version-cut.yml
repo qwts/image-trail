@@ -45,14 +45,13 @@ jobs:
     # These scopes exist only for the `|| github.token` fallback below; a PAT
     # carries its own.
     permissions:
-      contents: write
-      pull-requests: write
+      contents: write # Required to force-push the rolling version branch.
+      pull-requests: write # Required to create or refresh the version PR.
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Credentials for the version-branch force-push below.
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -91,6 +90,7 @@ jobs:
           git commit -m 'chore: version Image Trail'
           # The branch is a disposable projection of main + the pending
           # changesets, rebuilt from the current tip on every main push.
+          gh auth setup-git
           git push --force origin "$BRANCH"
           {
             echo "Merging this PR cuts \`v$version\`: the tag and the release build follow automatically."
@@ -124,16 +124,14 @@ jobs:
     # Scopes for the `|| github.token` fallback only; `actions: write` covers the
     # stranded-tag recovery dispatch below.
     permissions:
-      contents: write
-      actions: write
+      contents: write # Required to push the signed release tag.
+      actions: write # Required only for stranded-tag recovery dispatch.
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          # The tag push has to start release.yml by itself, so it must carry the
-          # PAT's credentials rather than GITHUB_TOKEN's.
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          persist-credentials: false
 
       - name: Tag when the current version is a fresh cut
         env:
@@ -188,6 +186,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git tag -a "$version" -m "Image Trail $version"
+          gh auth setup-git
           git push origin "$version"
           echo "Tagged $version."
 

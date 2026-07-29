@@ -190,8 +190,9 @@ test('version-cut workflow refreshes a checked Changesets PR and tags only fresh
   // "Actor is not allowed to trigger Actions workflows". The version branch
   // therefore needs no `gh workflow run ci.yml` dispatch — which the bot could
   // not perform either.
-  assert.match(workflow, /token: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
   assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
+  assert.equal(workflow.match(/gh auth setup-git/gu)?.length, 2);
+  assert.doesNotMatch(workflow, /^\s+token:/mu);
   assert.doesNotMatch(workflow, /gh workflow run ci\.yml/u);
   assert.match(workflow, /Version unchanged \(\$cur\) — not a version-cut merge/u);
   assert.match(workflow, /Changesets pending — nothing to tag/u);
@@ -236,6 +237,42 @@ test('required CI retains PR base history for consumed-changeset validation', ()
 
   assert.ok(ciJob.includes('uses: actions/checkout@'));
   assert.ok(ciJob.includes('fetch-depth: 0'));
+});
+
+test('all workflow checkouts avoid persisting credentials', () => {
+  for (const file of ['ci.yml', 'close-linked-issues.yml', 'release.yml', 'version-cut.yml', 'zizmor.yml']) {
+    const workflow = readFileSync(`.github/workflows/${file}`, 'utf8');
+    const checkoutCount = workflow.match(/uses: actions\/checkout@/gu)?.length ?? 0;
+    const hardenedCheckoutCount = workflow.match(/persist-credentials: false/gu)?.length ?? 0;
+    assert.ok(checkoutCount > 0, `${file} should contain at least one checkout`);
+    assert.equal(hardenedCheckoutCount, checkoutCount, `${file} must harden every checkout`);
+  }
+});
+
+test('zizmor is pinned and enforces the governed action-ref policy', () => {
+  const workflow = readFileSync('.github/workflows/zizmor.yml', 'utf8');
+  const config = readFileSync('.github/zizmor.yml', 'utf8');
+  const dependabot = readFileSync('.github/dependabot.yml', 'utf8');
+
+  assert.match(workflow, /uses: zizmorcore\/zizmor-action@[0-9a-f]{40} # v0\.6\.1/u);
+  assert.match(workflow, /version: 1\.28\.0/u);
+  assert.match(workflow, /persona: auditor/u);
+  assert.match(workflow, /online-audits: true/u);
+  assert.match(workflow, /advanced-security: false/u);
+  assert.match(workflow, /annotations: true/u);
+  assert.match(config, /allow:\s*\n\s+- RELEASE_TOKEN/u);
+  assert.match(config, /['"]qwts\/playbook-software-engineering\/\*['"]: ref-pin/u);
+  assert.match(config, /['"]\*['"]: hash-pin/u);
+  assert.equal(dependabot.match(/default-days: 7/gu)?.length, 2);
+});
+
+test('release builds do not consume dependency caches or interpolate the tag in shell source', () => {
+  const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
+
+  assert.doesNotMatch(workflow, /^\s+cache: npm/mu);
+  assert.match(workflow, /package-manager-cache: false/u);
+  assert.match(workflow, /RELEASE_TAG: \$\{\{ steps\.release\.outputs\.tag \}\}/u);
+  assert.match(workflow, /npm run package:release -- --tag "\$RELEASE_TAG"/u);
 });
 
 test('release packaging requires an exact version tag and stable artifact names', () => {
