@@ -5,6 +5,7 @@
     "extension/src/content/content-script.ts",
     "extension/src/destinations/destination-page.tsx",
     "extension/src/gallery/gallery.ts",
+    "extension/src/interop-pairing/import.ts",
     "extension/src/ui/**/*.stories.{ts,tsx}",
     "tests/**/*.test.ts",
     "tests/dom/register.ts",

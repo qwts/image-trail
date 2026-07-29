@@ -73,6 +73,23 @@ test('disconnected pCloud exposes the separate interoperability authorization ac
   assert.equal(connects, 1);
 });
 
+test('provider setup keeps pairing secrets out of the page-mounted workflow', () => {
+  let imports = 0;
+  const view = createInteropWorkflowView(blockedInteropWorkflow('settings', 0), {
+    onClose: () => undefined,
+    onImportPairing: () => {
+      imports += 1;
+    },
+  });
+  assert.equal(view.querySelector('[aria-label="Overlook pairing key"]'), null);
+  assert.equal(view.querySelector('[aria-label="Pairing key password"]'), null);
+  assert.match(view.textContent ?? '', /extension-owned page/u);
+  const importButton = Array.from(view.querySelectorAll('button')).find((control) => control.textContent === 'Open secure pairing import');
+  assert.ok(importButton instanceof HTMLButtonElement);
+  importButton.click();
+  assert.equal(imports, 1);
+});
+
 test('conflict choice carries explicit apply-to-all intent', () => {
   const calls: unknown[] = [];
   const state = {

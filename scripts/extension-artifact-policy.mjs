@@ -19,6 +19,8 @@ const STATIC_APPLICATION_ARTIFACTS = [
   'src/destinations/destination-page.css',
   'src/destinations/destination-surfaces.css',
   'src/destinations/destination-page.js',
+  'src/interop-pairing/import.html',
+  'src/interop-pairing/import.js',
 ];
 const TEXT_ARTIFACT = /\.(?:css|html|js|json)$/u;
 const RELEASE_BUILD_INFO_KEYS = ['branch', 'builtAt', 'commit', 'mode', 'schemaVersion', 'timezone', 'version', 'worktree'];

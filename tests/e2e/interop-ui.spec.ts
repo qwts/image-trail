@@ -17,7 +17,10 @@ test('a Queue record opens the live transfer setup without reordering the Queue'
   await expect(dialog).toContainText('bookmark · Queued');
   await expect(dialog).toContainText('pCloud');
   await expect(dialog.getByLabel('Transfer provider')).toHaveValue('pcloud');
-  await expect(dialog.getByLabel('Overlook pairing key')).toBeVisible();
+  await expect(dialog.getByText('extension-owned page')).toBeVisible();
+  await expect(dialog.getByLabel('Overlook pairing key')).toHaveCount(0);
+  await expect(dialog.getByLabel('Pairing key password')).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Open secure pairing import' })).toBeVisible();
   await expect(dialog).toContainText('0 / 1 processed · 0 acknowledged · 0 finalized');
   await expect(dialog.getByRole('button', { name: 'Start move' })).toBeDisabled();
 

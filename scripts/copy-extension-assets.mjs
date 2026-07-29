@@ -15,6 +15,8 @@ await mkdir('extension/dist/src/gallery', { recursive: true });
 await cp('extension/src/gallery/gallery.html', 'extension/dist/src/gallery/gallery.html');
 await mkdir('extension/dist/src/destinations', { recursive: true });
 await cp('extension/src/destinations/view.html', 'extension/dist/src/destinations/view.html');
+await mkdir('extension/dist/src/interop-pairing', { recursive: true });
+await cp('extension/src/interop-pairing/import.html', 'extension/dist/src/interop-pairing/import.html');
 
 const stylesheets = [
   ...(await stylesheetFiles('extension/src/ui/styles')),

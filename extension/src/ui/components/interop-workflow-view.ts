@@ -15,7 +15,7 @@ export interface InteropWorkflowHandlers {
   readonly onOperationChange?: (operation: InteropOperation) => void;
   readonly onProviderChange?: (provider: InteropProviderId) => void;
   readonly onConnect?: () => void;
-  readonly onImportPairing?: (fileContent: string, password: string) => void;
+  readonly onImportPairing?: () => void;
   readonly onStart?: () => void;
   readonly onPause?: () => void;
   readonly onResume?: () => void;
@@ -104,21 +104,11 @@ function createProviderSetup(state: InteropVisibleWorkflow, handlers: InteropWor
   provider.addEventListener('change', () => handlers.onProviderChange?.(provider.value as InteropProviderId));
   const connectLabel = state.provider.state === 'reconnect-required' ? 'Reconnect provider' : 'Connect provider';
   const connect = button(connectLabel, handlers.onConnect, ['connected', 'unavailable'].includes(state.provider.state));
-  const file = document.createElement('input');
-  file.type = 'file';
-  file.accept = 'application/json,.json';
-  file.setAttribute('aria-label', 'Overlook pairing key');
-  const password = document.createElement('input');
-  password.type = 'password';
-  password.autocomplete = 'off';
-  password.placeholder = 'Pairing key password';
-  password.setAttribute('aria-label', 'Pairing key password');
-  const importButton = button('Import pairing key', () => {
-    const selected = file.files?.[0];
-    if (!selected || password.value === '') return;
-    void selected.text().then((fileContent) => handlers.onImportPairing?.(fileContent, password.value));
-  });
-  setup.append(legend, provider, connect, file, password, importButton);
+  const importHelp = document.createElement('p');
+  importHelp.className = 'image-trail-interop__pairing-help';
+  importHelp.textContent = 'Import pairing keys in an extension-owned page so the visited site cannot inspect the file or password.';
+  const importButton = button('Open secure pairing import', handlers.onImportPairing);
+  setup.append(legend, provider, connect, importHelp, importButton);
   return setup;
 }
 
@@ -275,7 +265,9 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
       void dispatch({ name: 'select-provider', provider });
     },
     onConnect: () => void dispatch({ name: 'connect', provider: selectedProvider }),
-    onImportPairing: (fileContent, password) => void dispatch({ name: 'import-pairing', fileContent, password }),
+    onImportPairing: () => {
+      window.open(chrome.runtime.getURL('src/interop-pairing/import.html'), '_blank', 'noopener,noreferrer');
+    },
     onStart: () => void dispatch({ name: 'start' }),
     onPause: () => void dispatch({ name: 'pause' }),
     onResume: () => void dispatch({ name: 'resume' }),
