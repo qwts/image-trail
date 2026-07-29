@@ -15,7 +15,8 @@ import { galleryAlbumSummaries, selectedGalleryAlbum } from './gallery-albums.js
 import { openActionForGalleryRecord } from './gallery-model.js';
 import { installGalleryLibraryRefreshHook } from './gallery-refresh.js';
 import { loadGalleryPageForSelection } from './gallery-page-loader.js';
-import { captureFocusedGalleryControl, restoreFocusedGalleryControl } from './gallery-focus.js';
+import { GallerySourceCache } from './gallery-search-loader.js';
+import { captureFocusedGalleryControl, focusGallerySearchInput, restoreFocusedGalleryControl } from './gallery-focus.js';
 import { EMPTY_GALLERY_FILTERS, EMPTY_GALLERY_FILTER_FACETS, privacySafeGalleryFilters, type GalleryFilters } from './gallery-filters.js';
 import { createGalleryView, type GalleryViewState } from './gallery-view.js';
 import { DestinationDomBody, DestinationFrame } from '../destinations/destination-frame.js';
@@ -23,6 +24,7 @@ import { renderReactSubtree } from '../ui/react/react-subtree.js';
 import { createElement } from 'react';
 
 const bookmarkStore = new ExtensionBookmarkStore();
+const gallerySourceCache = new GallerySourceCache(bookmarkStore);
 const albumStore = new ExtensionAlbumStore();
 const captureStore = new CaptureController();
 const SEARCH_DEBOUNCE_MS = 500;
@@ -101,13 +103,14 @@ function render(options: { readonly focusSearch?: boolean } = {}): void {
           void loadPage(offset);
         },
         reload: () => {
+          gallerySourceCache.invalidate();
           void loadPage(state.offset);
         },
       },
       { embedded: true },
     ),
   );
-  if (options.focusSearch) focusSearchInput();
+  if (options.focusSearch) focusGallerySearchInput(container);
   else if (focusedControl) restoreFocusedGalleryControl(container, focusedControl);
 }
 
@@ -135,6 +138,7 @@ async function loadPage(
     const selectedAlbum = selectedGalleryAlbum(albums, selectedAlbumId);
     const pageResult = await loadGalleryPageForSelection({
       store: bookmarkStore,
+      sourceCache: gallerySourceCache,
       album: selectedAlbum,
       query: searchQuery,
       filters,
@@ -384,16 +388,9 @@ document.addEventListener('DOMContentLoaded', () => {
     runtime: typeof chrome === 'undefined' ? undefined : chrome.runtime,
     window,
     debounceMs: LIBRARY_REFRESH_DEBOUNCE_MS,
+    invalidate: () => gallerySourceCache.invalidate(),
     refresh: () => loadPage(state.offset, { silent: true }),
   });
   render();
   void loadPage(0);
 });
-
-function focusSearchInput(): void {
-  const input = root().querySelector<HTMLInputElement>('input[type="search"]');
-  if (!input) return;
-  input.focus();
-  const position = input.value.length;
-  input.setSelectionRange(position, position);
-}
