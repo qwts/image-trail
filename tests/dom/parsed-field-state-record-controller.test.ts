@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 
 import { createInitialPanelState } from '../../extension/src/core/state.js';
 import type { PanelState } from '../../extension/src/core/types.js';
+import { applyFieldSplitSpecs } from '../../extension/src/core/url/field-splits.js';
+import { applyFieldDigitWidthSpecs } from '../../extension/src/core/url/field-widths.js';
+import { parseUrl } from '../../extension/src/core/url/parse-url.js';
+import { rebuildUrl } from '../../extension/src/core/url/rebuild-url.js';
 import {
   ParsedFieldStateRecordController,
   type ParsedFieldStateRecordControllerDeps,
@@ -66,6 +70,7 @@ test('createParsedFieldStateRecord snapshots the current field state keyed to th
   const record = harness.controller.createParsedFieldStateRecord();
   assert.ok(record);
   assert.equal(record.hostname, 'images.example.test');
+  assert.equal(record.fieldIdVersion, 2);
   assert.equal(record.sourceUrl, 'https://images.example.test/a/1.jpg');
   assert.equal(record.pageUrl, 'https://images.example.test/gallery');
   assert.equal(record.selectedHandleId, 'h1');
@@ -159,4 +164,91 @@ test('applyRestoredParsedFieldState adopts the record baseline when no session b
     built.sourceUrl,
     'a fresh restore seeds the baseline from the record',
   );
+});
+
+test('applyRestoredParsedFieldState keeps a later field bound across an earlier split (#642)', async () => {
+  const harness = createHarness();
+  const sourceUrl = 'https://images.example.test/gallery/2024-456-789/photo.jpg';
+  harness.currentRawUrl = sourceUrl;
+  const splitSpec = {
+    baseFieldId: 'p:3:0',
+    location: 'path' as const,
+    partIndex: 3,
+    tokenIndex: 0,
+    lengths: [1, 1, 2],
+    pattern: '1-1-2',
+  };
+  const record = {
+    schemaVersion: 1 as const,
+    hostname: 'images.example.test',
+    pageUrl: 'https://images.example.test/gallery',
+    sourceUrl,
+    selectedUrl: sourceUrl,
+    selectedHandleId: 'target-642',
+    activeFieldId: 'p:3:4',
+    failedFieldId: null,
+    successfulFieldIds: ['p:3:4'],
+    unchangedFieldIds: [],
+    unlockedFieldIds: ['p:3:4'],
+    manuallyExcludedFieldIds: [],
+    fieldSplitSpecs: [splitSpec],
+    fieldDigitWidthSpecs: [{ fieldId: 'p:3:4', width: 6 }],
+    activeUrlTemplateId: null,
+    updatedAt: '2026-07-29T00:00:00.000Z',
+  };
+
+  await harness.controller.applyRestoredParsedFieldState(record, { sameSource: true, projectSavedSource: false });
+
+  const restored = harness.getState();
+  assert.equal(restored.activeFieldId, 'p:3:4');
+  assert.deepEqual(restored.successfulFieldIds, ['p:3:4']);
+  assert.deepEqual(restored.unlockedFieldIds, ['p:3:4']);
+  assert.deepEqual(restored.fieldDigitWidthSpecs, [{ fieldId: 'p:3:4', width: 6 }]);
+  assert.equal(
+    rebuildUrl(
+      applyFieldDigitWidthSpecs(applyFieldSplitSpecs(parseUrl(sourceUrl), restored.fieldSplitSpecs), restored.fieldDigitWidthSpecs),
+    ),
+    'https://images.example.test/gallery/2024-456-000789/photo.jpg',
+  );
+});
+
+test('applyRestoredParsedFieldState upgrades legacy split-child ids before filtering (#642)', async () => {
+  const harness = createHarness();
+  const sourceUrl = 'https://images.example.test/image?date=01012001';
+  harness.currentRawUrl = sourceUrl;
+  const record = {
+    schemaVersion: 1 as const,
+    hostname: 'images.example.test',
+    pageUrl: 'https://images.example.test/image',
+    sourceUrl,
+    selectedUrl: sourceUrl,
+    selectedHandleId: 'legacy-split-target',
+    activeFieldId: 'q:0:1',
+    failedFieldId: null,
+    successfulFieldIds: ['q:0:1'],
+    unchangedFieldIds: [],
+    unlockedFieldIds: ['q:0:1'],
+    manuallyExcludedFieldIds: [],
+    fieldSplitSpecs: [
+      {
+        baseFieldId: 'q:0:0',
+        location: 'query' as const,
+        queryIndex: 0,
+        tokenIndex: 0,
+        lengths: [2, 2, 4],
+        pattern: '2-2-4',
+      },
+    ],
+    fieldDigitWidthSpecs: [{ fieldId: 'q:0:2', width: 6 }],
+    activeUrlTemplateId: null,
+    updatedAt: '2026-07-29T00:00:00.000Z',
+  };
+
+  await harness.controller.applyRestoredParsedFieldState(record, { sameSource: true, projectSavedSource: false });
+
+  const restored = harness.getState();
+  assert.equal(restored.activeFieldId, 'q:0:0:s:1');
+  assert.deepEqual(restored.successfulFieldIds, ['q:0:0:s:1']);
+  assert.deepEqual(restored.unlockedFieldIds, ['q:0:0:s:1']);
+  assert.deepEqual(restored.fieldDigitWidthSpecs, [{ fieldId: 'q:0:0:s:2', width: 6 }]);
 });

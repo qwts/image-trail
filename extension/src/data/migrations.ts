@@ -193,6 +193,13 @@ export function migrateImageTrailDb(db: IDBDatabase, oldVersion: number, transac
     secureSyncInbox.createIndex(SchemaIndex.SecureSyncInboxBySessionId, 'sessionId', { unique: false });
   }
 
+  if (oldVersion < 14 && db.objectStoreNames.contains(DataStore.Blobs)) {
+    const blobs = requireUpgradeTransaction(transaction).objectStore(DataStore.Blobs);
+    if (!blobs.indexNames.contains(SchemaIndex.BlobsByEncryptedByteLength)) {
+      blobs.createIndex(SchemaIndex.BlobsByEncryptedByteLength, 'encryptedByteLength', { unique: false });
+    }
+  }
+
   const metadata = transaction?.objectStore(DataStore.Metadata);
   metadata?.put({
     key: 'schema',

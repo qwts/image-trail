@@ -328,7 +328,7 @@ async function handleCleanupOrphanedBlobs(): Promise<import('./messages.js').Cle
   if (!db) return { deletedCount: 0, usage: { totalBytes: 0, blobCount: 0 } };
   const referenced = await referencedBlobIds();
   const blobs = new BlobsRepository(db);
-  const deletableOrphanBlobIds = findDeletableOrphanBlobIds(await blobs.list(), referenced);
+  const deletableOrphanBlobIds = findDeletableOrphanBlobIds(await blobs.listOriginalCleanupCandidates(), referenced);
   const deletedCount = await blobs.deleteMany(deletableOrphanBlobIds);
   return { deletedCount, usage: await handleStorageUsage() };
 }
@@ -445,7 +445,7 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
     thumbnails.getStorageUsage(),
     referencedBlobIds(),
   ]);
-  const all = await blobs.list();
+  const cleanupCandidates = await blobs.listOriginalCleanupCandidates();
   const inlineThumbnailUsage = bookmarkUsage.thumbnails ?? { count: 0, totalBytes: 0 };
   const combinedThumbnailUsage = {
     count: inlineThumbnailUsage.count + thumbnailUsage.blobCount,
@@ -455,7 +455,7 @@ async function handleStorageUsage(): Promise<StorageUsageSummary> {
   return {
     totalBytes: usage.totalBytes + bookmarkUsage.totalBytes + pinUsage.totalBytes + thumbnailUsage.totalBytes,
     blobCount: usage.blobCount,
-    orphanedBlobCount: findDeletableOrphanBlobIds(all, referenced).length,
+    orphanedBlobCount: findDeletableOrphanBlobIds(cleanupCandidates, referenced).length,
     originals: { count: usage.blobCount, totalBytes: usage.totalBytes },
     queueRecords: { count: bookmarkUsage.blobCount + pinUsage.blobCount, totalBytes: queueMetadataBytes },
     thumbnails: combinedThumbnailUsage,

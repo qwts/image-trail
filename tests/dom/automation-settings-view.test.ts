@@ -62,6 +62,39 @@ test('preload immediate controls preserve fallback values and dispatch once', ()
   assert.equal(actions[1]?.name, 'settings/update-neighbor-preload');
 });
 
+test('preload cache exposes and enforces the bounded page-session contract', () => {
+  const actions: PanelAction[] = [];
+  const view = createNeighborPreloadSettingsView(
+    { enabled: true, radius: 3, cacheLimit: 24, probeMethod: 'get', feedback: 'mute' },
+    (action) => actions.push(action),
+  );
+  const numbers = view.querySelectorAll<HTMLInputElement>('input[type="number"]');
+  const cache = numbers[1];
+  const form = view.querySelector('form');
+  assert.ok(cache);
+  assert.ok(form);
+  assert.equal(cache.min, '1');
+  assert.equal(cache.max, '500');
+  assert.match(view.textContent ?? '', /Cache holds 1–500 image responses per page session/u);
+
+  cache.value = '0';
+  form.dispatchEvent(new Event('submit', { cancelable: true }));
+  assert.deepEqual(actions, []);
+
+  cache.value = '1';
+  form.dispatchEvent(new Event('submit', { cancelable: true }));
+  assert.deepEqual(actions, [
+    {
+      name: 'settings/update-neighbor-preload',
+      enabled: true,
+      radius: 3,
+      cacheLimit: 1,
+      probeMethod: 'get',
+      loadFailureFeedback: 'mute',
+    },
+  ]);
+});
+
 test('preload more commits settings before the manual command', () => {
   const actions: PanelAction[] = [];
   const view = createNeighborPreloadSettingsView(

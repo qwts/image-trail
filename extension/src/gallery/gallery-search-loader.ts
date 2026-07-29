@@ -32,8 +32,29 @@ export interface GallerySearchStore {
   }): Promise<GallerySourcePage>;
 }
 
+export class GallerySourceCache {
+  private snapshot: Promise<readonly ImageDisplayRecord[]> | null = null;
+
+  constructor(private readonly store: GallerySearchStore) {}
+
+  load(): Promise<readonly ImageDisplayRecord[]> {
+    if (this.snapshot) return this.snapshot;
+    const pending = loadGallerySourceItems(this.store);
+    this.snapshot = pending;
+    void pending.catch(() => {
+      if (this.snapshot === pending) this.snapshot = null;
+    });
+    return pending;
+  }
+
+  invalidate(): void {
+    this.snapshot = null;
+  }
+}
+
 export async function loadGallerySearchPage(input: {
   readonly store: GallerySearchStore;
+  readonly sourceItems?: readonly ImageDisplayRecord[] | undefined;
   readonly query: string;
   readonly filters: GalleryFilters;
   readonly offset: number;
@@ -43,7 +64,7 @@ export async function loadGallerySearchPage(input: {
   const limit = normalizeGalleryLimit(input.limit);
   const requestedOffset = limit === 0 ? 0 : Math.max(0, input.offset);
   const query = normalizeGallerySearchQuery(input.query);
-  const sourceItems = await loadGallerySourceItems(input.store);
+  const sourceItems = input.sourceItems ?? (await loadGallerySourceItems(input.store));
   const filters = privacySafeGalleryFilters(input.filters, input.privacyMode);
   const matches = sourceItems.filter(
     (record) =>
