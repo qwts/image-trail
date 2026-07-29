@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createKeyReference } from '../extension/src/data/crypto/key-reference.js';
+import { probeTransportStream } from '../extension/src/core/media/mpeg-ts.js';
 import { importBookmarks } from '../extension/src/data/import-export/bookmarks-import.js';
 import { parseExportFile } from '../extension/src/data/import-export/encrypted-file-format.js';
 import {
@@ -95,4 +97,55 @@ test('full-backup: preserves animated-media metadata with encrypted original blo
   assert.equal(restored.key.reference, 'blob:full-backup-key');
   assert.equal(restored.ciphertext.byteLength, ciphertext.byteLength);
   assert.deepEqual(Array.from(new Uint8Array(restored.ciphertext).slice(0, 4)), [0, 1, 2, 3]);
+});
+
+test('full-backup: restores MPEG-TS custody metadata and encrypted bytes without hash drift', async () => {
+  const keyReference = createKeyReference('blob', 'transport-stream-backup-key');
+  const ciphertext = Uint8Array.from({ length: 1_024 }, (_, index) => (index * 17) % 251);
+  const blobRecord: StoredBlobRecord = {
+    id: 'blob-transport-stream',
+    kind: 'original',
+    schemaVersion: 1,
+    algorithm: 'AES-GCM',
+    iv: 'transport-stream-iv',
+    ciphertext: ciphertext.buffer,
+    encryptedByteLength: ciphertext.byteLength,
+    createdAt: '2026-07-29T00:00:00.000Z',
+    key: keyReference,
+    referenceCount: 1,
+  };
+  const fixture = new Uint8Array(readFileSync('tests/fixtures/mpeg-ts/supported-h264-aac.mpegts'));
+  const mediaInfo = probeTransportStream(fixture);
+  const storedOriginal = {
+    blobId: blobRecord.id,
+    mimeType: 'video/mp2t',
+    byteLength: fixture.byteLength,
+    capturedAt: '2026-07-29T00:00:00.000Z',
+    fileName: 'camera.m2ts',
+    sha256: 'a327f9d90565a7672ce85ac341066e0da7ea89caf9b053c32352ece756dfd754',
+    mediaInfo,
+  } as const;
+  const exported = await exportEncryptedFullBackup({
+    bookmarks: [
+      {
+        uuid: 'bookmark-transport-stream',
+        payload: {
+          url: 'image-trail://local-media/a327/camera.m2ts',
+          bookmarkedAt: '2026-07-29T00:00:00.000Z',
+          storedOriginal,
+        },
+      },
+    ],
+    albums: [],
+    originalBlobs: [blobRecord],
+    blobKeyBackups: [],
+    password: 'backup-password',
+    now: '2026-07-29T00:00:00.000Z',
+  });
+
+  assert.ok(exported.status.ok, exported.status.message);
+  const imported = await importBookmarks(exported.fileContent!, 'backup-password');
+  assert.ok(imported.status.ok, imported.status.message);
+  assert.deepEqual(imported.entries[0]?.payload.storedOriginal, storedOriginal);
+  assert.deepEqual(new Uint8Array(storedBlobRecordFromPortable(imported.originalBlobs[0]!).ciphertext), ciphertext);
 });

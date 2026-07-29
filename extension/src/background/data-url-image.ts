@@ -1,11 +1,13 @@
 import { DEFAULT_MAX_ORIGINAL_BYTES } from '../core/image/capture-result.js';
 import { sanitizeFilename } from '../core/image/downloads.js';
-import { inspectGifWebpMedia } from '../core/image/gif-webp-media.js';
+import { inspectSpecializedMedia } from '../core/media/inspect-media.js';
+import type { StoredMediaInfo } from '../core/media/media-info.js';
 import type { BlobPayloadMetadata } from '../data/crypto/binary-envelope.js';
 import type { FetchImageResult } from './fetch-image.js';
 
-const MAX_ENCODED_IMAGE_DATA_URL_LENGTH = 4 * Math.ceil(DEFAULT_MAX_ORIGINAL_BYTES / 3) + 128;
+const MAX_ENCODED_MEDIA_DATA_URL_LENGTH = 4 * Math.ceil(DEFAULT_MAX_ORIGINAL_BYTES / 3) + 128;
 const IMAGE_MIME_TYPE = /^image\/[a-z0-9.+-]+$/u;
+const DATA_URL_MIME_TYPE = /^(?:image\/[a-z0-9.+-]+|video\/mp2t)$/u;
 
 export type OpenedImageDataResult =
   | {
@@ -15,18 +17,20 @@ export type OpenedImageDataResult =
       readonly byteLength: number;
       readonly capturedAt: string;
       readonly fileName?: string | undefined;
+      readonly sha256?: string | undefined;
       readonly width?: number | undefined;
       readonly height?: number | undefined;
-      readonly mediaInfo?: import('../core/image/gif-webp-media.js').GifWebpMediaInfo | undefined;
+      readonly mediaInfo?: StoredMediaInfo | undefined;
     }
   | { readonly ok: false; readonly reason: 'corrupt-original'; readonly message: string };
 
-export function dataUrlToImageBytes(dataUrl: string): FetchImageResult {
-  if (dataUrl.length > MAX_ENCODED_IMAGE_DATA_URL_LENGTH) return oversizedDataUrl();
-  const match = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/iu.exec(dataUrl);
+export function dataUrlToImageBytes(dataUrl: string, fileName = ''): FetchImageResult {
+  if (dataUrl.length > MAX_ENCODED_MEDIA_DATA_URL_LENGTH) return oversizedDataUrl();
+  const match = /^data:((?:image\/[a-z0-9.+-]+)|(?:video\/mp2t));base64,([a-z0-9+/=\s]+)$/iu.exec(dataUrl);
   if (!match) return invalidDataUrl();
 
   const mimeType = match[1]!.toLowerCase();
+  if (!DATA_URL_MIME_TYPE.test(mimeType)) return invalidDataUrl();
   const base64 = match[2]!.replace(/\s/gu, '');
   if (Math.floor((base64.length * 3) / 4) > DEFAULT_MAX_ORIGINAL_BYTES) return oversizedDataUrl();
 
@@ -35,11 +39,11 @@ export function dataUrlToImageBytes(dataUrl: string): FetchImageResult {
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
     if (bytes.byteLength > DEFAULT_MAX_ORIGINAL_BYTES) return oversizedDataUrl();
 
-    const media = inspectGifWebpMedia(bytes, mimeType);
+    const media = inspectSpecializedMedia(bytes, mimeType, fileName);
     if (media.status === 'invalid') {
       return {
         ok: false,
-        reason: media.reason === 'probe-limit' ? 'too-large' : 'not-image',
+        reason: media.reason === 'probe-limit' ? 'too-large' : mimeType === 'video/mp2t' ? 'not-media' : 'not-image',
         message: media.message,
       };
     }
@@ -52,6 +56,7 @@ export function dataUrlToImageBytes(dataUrl: string): FetchImageResult {
           width: media.width,
           height: media.height,
           mediaInfo: media.mediaInfo,
+          ...(fileName ? { fileName: sanitizeFilename(fileName, media.mediaInfo.kind === 'mpeg-ts' ? 'media.ts' : 'image', 240) } : {}),
         }
       : { ok: true, bytes: bytes.buffer, mimeType, byteLength: bytes.byteLength };
   } catch {
@@ -63,9 +68,9 @@ export function openedImageDataFromPayload(bytes: ArrayBuffer, metadata: BlobPay
   if (bytes.byteLength !== metadata.byteLength) {
     return { ok: false, reason: 'corrupt-original', message: 'Encrypted original byte length does not match its authenticated metadata.' };
   }
-  const media = inspectGifWebpMedia(bytes, metadata.mimeType);
+  const media = inspectSpecializedMedia(bytes, metadata.mimeType, metadata.fileName ?? metadata.sourceUrl);
   if (media.status === 'invalid') return { ok: false, reason: 'corrupt-original', message: media.message };
-  if (media.status === 'not-gif-webp' && !IMAGE_MIME_TYPE.test(metadata.mimeType)) {
+  if (media.status === 'unclassified' && !IMAGE_MIME_TYPE.test(metadata.mimeType)) {
     return { ok: false, reason: 'corrupt-original', message: 'Encrypted original MIME type is invalid.' };
   }
 
@@ -78,7 +83,8 @@ export function openedImageDataFromPayload(bytes: ArrayBuffer, metadata: BlobPay
     mimeType,
     byteLength: bytes.byteLength,
     capturedAt: metadata.capturedAt,
-    ...(metadata.fileName ? { fileName: sanitizeFilename(metadata.fileName, 'image', 240) } : {}),
+    ...(metadata.fileName ? { fileName: sanitizeFilename(metadata.fileName, 'media', 240) } : {}),
+    ...(metadata.sha256 ? { sha256: metadata.sha256 } : {}),
     ...(width ? { width } : {}),
     ...(height ? { height } : {}),
     ...(media.status === 'supported' ? { mediaInfo: media.mediaInfo } : {}),
@@ -99,13 +105,13 @@ function positiveInteger(value: number | undefined): number | undefined {
 }
 
 function invalidDataUrl(): FetchImageResult {
-  return { ok: false, reason: 'not-image', message: 'Imported image data could not be decoded.' };
+  return { ok: false, reason: 'not-media', message: 'Imported media data could not be decoded.' };
 }
 
 function oversizedDataUrl(): FetchImageResult {
   return {
     ok: false,
     reason: 'too-large',
-    message: `Image exceeds the ${DEFAULT_MAX_ORIGINAL_BYTES / (1024 * 1024)} MB size limit.`,
+    message: `Media exceeds the ${DEFAULT_MAX_ORIGINAL_BYTES / (1024 * 1024)} MB size limit.`,
   };
 }

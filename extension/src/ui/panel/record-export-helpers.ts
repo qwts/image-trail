@@ -69,6 +69,10 @@ export function isLockedPrivatePin(record: ImageDisplayRecord): boolean {
   return record.privacyStatus === 'locked' || record.url.startsWith('image-trail-private:');
 }
 
+export function isEncryptedImageExportRecord(record: ImageDisplayRecord): boolean {
+  return record.storedOriginal?.mimeType === undefined || record.storedOriginal.mimeType.startsWith('image/');
+}
+
 export function pcloudBackupFileName(isoTimestamp: string): string {
   const timestamp = isoTimestamp.replaceAll(':', '-').replace(/\.\d{3}Z$/u, 'Z');
   return `image-trail-pcloud-backup-${timestamp}.image-trail-encrypted.json`;

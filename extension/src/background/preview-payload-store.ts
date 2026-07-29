@@ -1,5 +1,5 @@
 import { DEFAULT_MAX_ORIGINAL_BYTES } from '../core/image/capture-result.js';
-import type { GifWebpMediaInfo } from '../core/image/gif-webp-media.js';
+import type { StoredMediaInfo } from '../core/media/media-info.js';
 
 const PREVIEW_TTL_MS = 60_000;
 const MAX_PENDING_PREVIEW_COUNT = 4;
@@ -8,7 +8,7 @@ const MAX_PENDING_PREVIEW_BYTES = DEFAULT_MAX_ORIGINAL_BYTES * 2;
 export interface PreviewPayload {
   readonly dataUrl: string;
   readonly byteLength: number;
-  readonly mediaInfo?: GifWebpMediaInfo | undefined;
+  readonly mediaInfo?: StoredMediaInfo | undefined;
 }
 
 interface StoredPreviewPayload extends PreviewPayload {

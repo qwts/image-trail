@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 
 import type { InteropReviewCategory, InteropRevisionVector } from '../../core/interop/contract.js';
-import { interopGifWebpMediaBlockForOriginal, withInteropGifWebpMediaBlock } from '../../core/interop/media.js';
+import { interopMediaBlockForOriginal, withInteropMediaBlock } from '../../core/interop/media.js';
 import { interopRecordSchema, type InteropBlobReference, type InteropRecord } from '../../core/interop/records.js';
 import { sha256 } from '../../core/interop/transport.js';
 import { openBlobPayload } from '../crypto/binary-envelope.js';
@@ -109,8 +109,8 @@ function thumbnailReference(payload: ExportPayload): InteropBlobReference {
 
 function roundTripMetadata(payload: ExportPayload, existing?: InteropRecord['roundTripMetadata']): InteropRecord['roundTripMetadata'] {
   const base = existing ?? { imageTrail: {}, overlook: {} };
-  const media = interopGifWebpMediaBlockForOriginal(payload.storedOriginal);
-  return media ? { ...base, overlook: withInteropGifWebpMediaBlock(base.overlook, media) } : base;
+  const media = interopMediaBlockForOriginal(payload.storedOriginal);
+  return media ? { ...base, overlook: withInteropMediaBlock(base.overlook, media) } : base;
 }
 
 function canonicalRecord(

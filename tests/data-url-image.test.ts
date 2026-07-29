@@ -69,3 +69,47 @@ test('encrypted retrieval rejects authenticated metadata drift and malformed dec
     },
   );
 });
+
+test('MPEG-TS data URLs preserve exact bytes, stream facts, filename, and content identity', () => {
+  const fixture = new Uint8Array(readFileSync('tests/fixtures/mpeg-ts/supported-h264-aac.mpegts'));
+  const dataUrl = imageDataUrlFromBytes(fixture, 'video/mp2t');
+  const parsed = dataUrlToImageBytes(dataUrl, 'camera.M2TS');
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.equal(parsed.mimeType, 'video/mp2t');
+  assert.equal(parsed.byteLength, fixture.byteLength);
+  assert.equal(parsed.fileName, 'camera.M2TS');
+  assert.deepEqual([parsed.width, parsed.height], [64, 64]);
+  assert.equal(parsed.mediaInfo?.kind, 'mpeg-ts');
+  assert.deepEqual(parsed.mediaInfo?.kind === 'mpeg-ts' ? parsed.mediaInfo.streams.map((stream) => stream.codec).sort() : [], [
+    'AAC',
+    'H.264',
+  ]);
+  assert.deepEqual(new Uint8Array(parsed.bytes), fixture);
+
+  const opened = openedImageDataFromPayload(fixture.buffer, {
+    mimeType: 'video/mp2t',
+    byteLength: fixture.byteLength,
+    sourceUrl: 'image-trail://local-import',
+    capturedAt: '2026-07-29T00:00:00.000Z',
+    fileName: 'camera.M2TS',
+    sha256: 'a327f9d90565a7672ce85ac341066e0da7ea89caf9b053c32352ece756dfd754',
+    mediaInfo: parsed.mediaInfo,
+  });
+  assert.equal(opened.ok, true);
+  if (!opened.ok) return;
+  assert.equal(opened.mimeType, 'video/mp2t');
+  assert.equal(opened.sha256, 'a327f9d90565a7672ce85ac341066e0da7ea89caf9b053c32352ece756dfd754');
+  assert.equal(opened.dataUrl, dataUrl);
+  assert.deepEqual([opened.width, opened.height], [64, 64]);
+  assert.equal(opened.mediaInfo?.kind, 'mpeg-ts');
+});
+
+test('malformed and truncated declared transport streams never produce capture bytes', () => {
+  const truncated = new Uint8Array(readFileSync('tests/fixtures/mpeg-ts/truncated-h264-aac.mpegts'));
+  const result = dataUrlToImageBytes(imageDataUrlFromBytes(truncated, 'video/mp2t'), 'broken.ts');
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, 'not-media');
+  assert.match(result.message, /truncated|malformed|probe/iu);
+});

@@ -76,8 +76,8 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
-    "c8": "^12.0.0",
     "@vitest/browser-playwright": "^4.1.10",
+    "c8": "^12.0.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.7.0",
     "fake-indexeddb": "^6.2.5",
@@ -111,6 +111,8 @@
     ]
   },
   "dependencies": {
+    "events": "3.3.0",
+    "mpegts.js": "1.8.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   }

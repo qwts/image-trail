@@ -48,6 +48,7 @@
           "paths": [
             "tests/gif-webp-media.test.ts",
             "tests/data-url-image.test.ts",
+            "tests/encrypted-image-media-type.test.ts",
             "tests/fetch-image.test.ts",
             "tests/encrypted-blobs.test.ts",
             "tests/full-backup-originals.test.ts",
@@ -67,6 +68,41 @@
           "type": "manual",
           "reason": "Real operating-system reduced-motion startup, source timing perception, and live Photos transfer remain human/browser integration checks while Transfer and Sync stays experimental.",
           "notes": "Start Chrome with reduced motion already enabled, open each captured original from Gallery, verify no animated frame appears before Play, compare visible frame timing and loop behavior to the source, then run an experimental Image Trail to Photos to Image Trail transfer and compare filename, MIME, dimensions, animation facts, and SHA-256."
+        }
+      ]
+    },
+    {
+      "id": "mpeg-ts-original-preservation",
+      "acceptance": "MPEG-TS signature validation, encrypted custody, playable and preserved-only tiers, preview, export, backup, and Photos metadata preservation",
+      "repoPath": "tests/e2e/mpeg-ts-media.spec.ts",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-MPEG-TS-Media",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/mpeg-ts-media.test.ts",
+            "tests/data-url-image.test.ts",
+            "tests/fetch-image.test.ts",
+            "tests/capture-messages.test.ts",
+            "tests/imported-media-batch.test.ts",
+            "tests/imported-media-record.test.ts",
+            "tests/full-backup-originals.test.ts",
+            "tests/interop-media.test.ts",
+            "tests/interop-record-export.test.ts",
+            "tests/interop-record-translation.test.ts",
+            "tests/dom/media-import-controls.test.ts"
+          ],
+          "notes": "Covers bounded 188-byte TS and true 192-byte M2TS packet handling, PAT/PMT CRC and cross-packet reconstruction, sustained unhinted signature cadence, PCR probing, and bounded elementary-stream metadata; known hashes; exact dimensions, frame rate, codec profiles, and duration; the approved H.264 Baseline/Main/High plus AAC LC matrix with unknown or unsupported profiles preserved-only; malformed and truncated rejection; exact encrypted custody while image-only encrypted export stays disabled for video records; optional request context; transaction rollback; durable metadata without duplicated data URLs; deterministic inactive queue posters; direct URL validation; backup restoration; and Photos-compatible metadata without persisted playability."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/mpeg-ts-media.spec.ts",
+          "notes": "Imports checked-in playable and preserved-only transport streams from local files and a direct URL through the packaged extension; proves encrypted-original indicators, static posters, authenticated dimensions and stream facts, exact downloaded hashes and filenames, malformed-input atomicity, no autoplay, native focusable controls, remux playback, first-frame poster capture, and explicit preserved-only status."
+        },
+        {
+          "type": "manual",
+          "reason": "System codec availability and live Photos transfer remain browser and owner integration checks while Transfer and Sync stays experimental.",
+          "notes": "Load the packaged extension, import representative .ts, .mts, and .m2ts files, and verify no list autoplay, first-frame poster stability, keyboard play pause seek mute and volume, duration and error copy, exact original download, encrypted backup restore, bounded failure for malformed and oversized files, and an experimental Image Trail to Photos to Image Trail transfer with identical SHA-256, MIME, extension, and stream facts."
         }
       ]
     },
