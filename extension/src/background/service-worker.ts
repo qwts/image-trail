@@ -5,7 +5,7 @@ import { IndexedDbAlbumStore } from '../data/albums-controller.js';
 import { IndexedDbPanelPositionStore } from '../data/panel-position-controller.js';
 import { IndexedDbWorkspaceLayoutStore } from '../data/workspace-layout-controller.js';
 import { IndexedDbUrlTemplateStore } from '../data/url-template-controller.js';
-import { createUrlMetadataStores } from '../data/url-metadata-stores.js';
+import { createUrlMetadataStores, reconcilePersistedUrlMetadataPolicy } from '../data/url-metadata-stores.js';
 import { RecentHistoryCache } from './recent-history-cache.js';
 import { configureBlobKeySessionStorage, restoreActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
@@ -193,6 +193,12 @@ function getDb(): Promise<IDBDatabase | null> {
   }
   return dbPromise;
 }
+void reconcilePersistedUrlMetadataPolicy({
+  loadPolicy: async () => (await loadLocalSettings()).searchableMetadataPolicy,
+  reconcilePolicy: reconcileSearchableMetadataPolicy,
+}).catch(() => {
+  console.warn('Image Trail could not reconcile URL metadata privacy policy at startup.');
+});
 async function referencedBlobIds(): Promise<Set<string>> {
   const referenced = new Set(await bookmarkStore.loadOriginalBlobIds());
   await recentHistoryCache.ready();

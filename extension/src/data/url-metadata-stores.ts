@@ -4,6 +4,13 @@ import { IndexedDbParsedFieldStateStore } from './parsed-field-state-controller.
 import { KeysRepository } from './repositories/keys-repository.js';
 import { IndexedDbUrlReviewStatusStore } from './url-review-status-controller.js';
 
+export async function reconcilePersistedUrlMetadataPolicy(options: {
+  readonly loadPolicy: () => SearchableMetadataPolicy | Promise<SearchableMetadataPolicy>;
+  readonly reconcilePolicy: (policy: SearchableMetadataPolicy) => Promise<void>;
+}): Promise<void> {
+  await options.reconcilePolicy(await options.loadPolicy());
+}
+
 export function createUrlMetadataStores(options: {
   readonly getDb: () => Promise<IDBDatabase | null>;
   readonly getSearchableMetadataPolicy: () => SearchableMetadataPolicy | Promise<SearchableMetadataPolicy>;

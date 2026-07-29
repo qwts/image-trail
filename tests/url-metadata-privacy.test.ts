@@ -6,6 +6,7 @@ import type { SearchableMetadataMode, SearchableMetadataPolicy } from '../extens
 import type { ParsedFieldStateRecord, UrlReviewStatusRecord } from '../extension/src/core/types.js';
 import { createSessionKey } from '../extension/src/data/crypto/keyring.js';
 import { ensureDurableMetadataKey } from '../extension/src/data/durable-metadata-key.js';
+import { reconcilePersistedUrlMetadataPolicy } from '../extension/src/data/url-metadata-stores.js';
 import { ParsedFieldStateRepository } from '../extension/src/data/repositories/parsed-field-state-repository.js';
 import { KeysRepository } from '../extension/src/data/repositories/keys-repository.js';
 import { UrlReviewStatusRepository } from '../extension/src/data/repositories/url-review-status-repository.js';
@@ -48,7 +49,7 @@ test('encrypted URL metadata rows round-trip without plaintext host, page, or im
   );
 });
 
-test('policy reconciliation redacts legacy plaintext rows and can restore the selected plaintext representation', async (t) => {
+test('startup reconciliation redacts legacy plaintext rows and can restore the selected plaintext representation', async (t) => {
   const db = await openFreshImageTrailDb();
   t.after(() => db.close());
   let activePolicy = policy('plaintext');
@@ -66,7 +67,12 @@ test('policy reconciliation redacts legacy plaintext rows and can restore the se
   assert.match(JSON.stringify(await metadataRecords(db)), /private\.example/iu);
 
   activePolicy = policy('encrypted');
-  await Promise.all([parsed.reconcilePolicy(activePolicy), reviews.reconcilePolicy(activePolicy)]);
+  await reconcilePersistedUrlMetadataPolicy({
+    loadPolicy: () => activePolicy,
+    reconcilePolicy: async (persisted) => {
+      await Promise.all([parsed.reconcilePolicy(persisted), reviews.reconcilePolicy(persisted)]);
+    },
+  });
 
   let records = await metadataRecords(db);
   assert.doesNotMatch(JSON.stringify(records), /private\.example|gallery-secret|image-secret|token-secret/iu);
