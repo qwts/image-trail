@@ -1,5 +1,9 @@
 import { bookmarkSearchIndexKey, hashSearchableUrl, type SearchableMetadataPolicy } from '../core/metadata-policy.js';
+import { privatePinUrl } from './bookmark-record-mappers.js';
 import type { BookmarksRepository, EncryptedBookmarkRecord } from './repositories/bookmarks-repository.js';
+
+const INTEROP_BOOKMARK_INDEX_PREFIX = 'image-trail-interop:';
+const PRIVATE_PIN_INDEX_PREFIX = privatePinUrl('');
 
 // Existing rows are never rewritten when searchable metadata policy changes, so
 // lookup checks both index encodings before opening opaque interop-indexed rows.
@@ -22,13 +26,34 @@ export async function findInteropBookmarkBySourceUrl(
   key: CryptoKey,
   url: string,
 ): Promise<EncryptedBookmarkRecord | undefined> {
+  const knownPresence = await repository.getInteropCustodyPresence();
+  if (knownPresence === false) return undefined;
+  if (
+    knownPresence === undefined &&
+    !(await repository.hasEncryptedUrlPrefix(INTEROP_BOOKMARK_INDEX_PREFIX)) &&
+    !(await repository.hasEncryptedUrlPrefix(PRIVATE_PIN_INDEX_PREFIX))
+  ) {
+    await repository.setInteropCustodyPresence(false);
+    return undefined;
+  }
+
+  let sawInteropCustody = false;
+  let sawUnreadableRecord = false;
   for (const encrypted of await repository.listEncrypted()) {
     try {
       const payload = await repository.openRecord(encrypted, key);
-      if (payload.interop?.record.sourceUrl === url) return encrypted;
+      if (!payload.interop) continue;
+      sawInteropCustody = true;
+      if (payload.interop.record.sourceUrl === url) {
+        if (knownPresence !== true) await repository.setInteropCustodyPresence(true);
+        return encrypted;
+      }
     } catch {
+      sawUnreadableRecord = true;
       // Unreadable rows cannot participate in encrypted source URL matching.
     }
   }
+  const nextPresence = sawInteropCustody || sawUnreadableRecord;
+  if (knownPresence === undefined) await repository.setInteropCustodyPresence(nextPresence);
   return undefined;
 }
