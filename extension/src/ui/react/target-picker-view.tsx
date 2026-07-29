@@ -81,7 +81,13 @@ function TargetButton({ target, dispatch }: Pick<TargetPickerProps, 'target' | '
 
 function TargetControls({ target, dispatch }: Pick<TargetPickerProps, 'target' | 'dispatch'>) {
   const onFitChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    if (isObjectFitMode(event.target.value)) dispatch({ name: 'target/set-object-fit', mode: event.target.value });
+    const select = event.currentTarget;
+    const root = select.getRootNode();
+    const activeElement = root instanceof ShadowRoot ? root.activeElement : select.ownerDocument.activeElement;
+    const restoreFocus = activeElement === select;
+    if (!isObjectFitMode(select.value)) return;
+    dispatch({ name: 'target/set-object-fit', mode: select.value });
+    if (restoreFocus) reapplyFitSelectFocusAfterNativeChange(root, select.ownerDocument);
   };
   return (
     <details
@@ -126,6 +132,26 @@ function TargetControls({ target, dispatch }: Pick<TargetPickerProps, 'target' |
       </span>
     </details>
   );
+}
+
+function reapplyFitSelectFocusAfterNativeChange(root: Node, ownerDocument: Document): void {
+  window.setTimeout(() => {
+    const queryRoot = root instanceof ShadowRoot || root instanceof Document ? root : ownerDocument;
+    const replacement = queryRoot.querySelector<HTMLSelectElement>('.image-trail-panel__target-fit-select');
+    if (!replacement?.isConnected) return;
+    const activeElement = root instanceof ShadowRoot ? root.activeElement : ownerDocument.activeElement;
+    if (activeElement === replacement) return;
+
+    // Chromium clears focus after dispatching a native select change when that dispatch replaces
+    // the React subtree. Reapply only when focus fell back to the shadow host/body; a deliberate
+    // move to another control always wins.
+    const documentActiveElement = ownerDocument.activeElement;
+    const focusWasCleared =
+      root instanceof ShadowRoot
+        ? activeElement === null && (documentActiveElement === root.host || documentActiveElement === ownerDocument.body)
+        : documentActiveElement === ownerDocument.body;
+    if (focusWasCleared) replacement.focus({ preventScroll: true });
+  }, 0);
 }
 
 function TargetPickerContent({ target, pageContext, dispatch, privacyMode }: TargetPickerProps) {
