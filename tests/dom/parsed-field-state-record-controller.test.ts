@@ -70,6 +70,7 @@ test('createParsedFieldStateRecord snapshots the current field state keyed to th
   const record = harness.controller.createParsedFieldStateRecord();
   assert.ok(record);
   assert.equal(record.hostname, 'images.example.test');
+  assert.equal(record.fieldIdVersion, 2);
   assert.equal(record.sourceUrl, 'https://images.example.test/a/1.jpg');
   assert.equal(record.pageUrl, 'https://images.example.test/gallery');
   assert.equal(record.selectedHandleId, 'h1');
@@ -209,4 +210,45 @@ test('applyRestoredParsedFieldState keeps a later field bound across an earlier 
     ),
     'https://images.example.test/gallery/2024-456-000789/photo.jpg',
   );
+});
+
+test('applyRestoredParsedFieldState upgrades legacy split-child ids before filtering (#642)', async () => {
+  const harness = createHarness();
+  const sourceUrl = 'https://images.example.test/image?date=01012001';
+  harness.currentRawUrl = sourceUrl;
+  const record = {
+    schemaVersion: 1 as const,
+    hostname: 'images.example.test',
+    pageUrl: 'https://images.example.test/image',
+    sourceUrl,
+    selectedUrl: sourceUrl,
+    selectedHandleId: 'legacy-split-target',
+    activeFieldId: 'q:0:1',
+    failedFieldId: null,
+    successfulFieldIds: ['q:0:1'],
+    unchangedFieldIds: [],
+    unlockedFieldIds: ['q:0:1'],
+    manuallyExcludedFieldIds: [],
+    fieldSplitSpecs: [
+      {
+        baseFieldId: 'q:0:0',
+        location: 'query' as const,
+        queryIndex: 0,
+        tokenIndex: 0,
+        lengths: [2, 2, 4],
+        pattern: '2-2-4',
+      },
+    ],
+    fieldDigitWidthSpecs: [{ fieldId: 'q:0:2', width: 6 }],
+    activeUrlTemplateId: null,
+    updatedAt: '2026-07-29T00:00:00.000Z',
+  };
+
+  await harness.controller.applyRestoredParsedFieldState(record, { sameSource: true, projectSavedSource: false });
+
+  const restored = harness.getState();
+  assert.equal(restored.activeFieldId, 'q:0:0:s:1');
+  assert.deepEqual(restored.successfulFieldIds, ['q:0:0:s:1']);
+  assert.deepEqual(restored.unlockedFieldIds, ['q:0:0:s:1']);
+  assert.deepEqual(restored.fieldDigitWidthSpecs, [{ fieldId: 'q:0:0:s:2', width: 6 }]);
 });
