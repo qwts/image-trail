@@ -95,9 +95,9 @@ export default tseslint.config(
     },
     rules: {
       'no-undef': 'off',
-      // Size/complexity tripwires. The panel decomposition (#265) landed, so these guard against
-      // regrowth; the remaining oversized modules (background/messages.ts, service-worker.ts, a few
-      // ui/components views) keep these at `warn` until each is split. no-explicit-any and
+      // Size/complexity tripwires. The panel decomposition (#265) and message-domain split (#361)
+      // landed, so these guard against regrowth; the remaining oversized modules (service-worker.ts
+      // and a few ui/components views) keep these at `warn` until each is split. no-explicit-any and
       // consistent-type-imports are already clean, so they are hard errors.
       'max-lines': ['warn', { max: 800, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['warn', { max: 80, skipBlankLines: true, skipComments: true }],
@@ -123,15 +123,6 @@ export default tseslint.config(
     },
   },
   ...layerBoundaryConfigs,
-  {
-    // #356 split protocol constants out of messages.ts and ratcheted the physical line ceiling from
-    // the pre-split 2210-line baseline down to 1970. Count comments/blank lines for this file so the
-    // lint guard matches the documented `wc -l` acceptance check.
-    files: ['extension/src/background/messages.ts'],
-    rules: {
-      'max-lines': ['error', { max: 1970, skipBlankLines: false, skipComments: false }],
-    },
-  },
   {
     // Size tripwire for the panel orchestrator and its decomposed collaborators so they can never
     // regrow toward the 5k-line ImageTrailPanel god object they were extracted from (epics #265,

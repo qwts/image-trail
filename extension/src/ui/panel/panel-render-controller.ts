@@ -3,9 +3,11 @@ import type { PanelAction, PanelState } from '../../core/types.js';
 import type { WorkspaceRailEdge } from '../../core/workspace-layout.js';
 import { renderPanel, renderRecallDestination, type PanelLayoutState } from '../render.js';
 import { createKbd, createToast } from '../components/primitives.js';
+import { syncNeighborStatusView } from '../components/neighbor-status-view.js';
 import { renderPanelToast } from '../components/panel-shell-view.js';
 import { isFocusablePanelControl } from './export-download.js';
-import type { BufferedNavigationDebugSnapshot } from './buffered-navigation-controller.js';
+import type { BufferedNavigationSnapshots } from './buffered-navigation-status.js';
+import { syncBufferedDebugOverlay } from './buffered-navigation-view.js';
 import { secureSessionRequiresUnlock } from '../../core/secure-session-state.js';
 
 const FINITE_CAPTURE_ERROR_MS = 2400;
@@ -28,8 +30,7 @@ export interface PanelRenderControllerDeps {
   handlePanelDragStart(event: PointerEvent): void;
   queuePanelPositionRestore(): void;
   applyRestoredPanelPosition(): void;
-  // The buffered-navigation debug overlay reads a snapshot of the skip-buffer window.
-  bufferedNavDebugSnapshot(): BufferedNavigationDebugSnapshot | null;
+  bufferedNavSnapshots(): BufferedNavigationSnapshots;
   // Queue refresh after a panel-only render so Recall can use its targeted body refresh.
   refreshRecallIfOpen(): void;
   onWorkspaceLayoutChanged(): void;
@@ -155,36 +156,35 @@ export class PanelRenderController {
         this.deps.queuePanelPositionRestore();
         this.deps.applyRestoredPanelPosition();
       }
-      if (workspaceLocked) root.querySelector('.image-trail-panel__buffer-debug')?.remove();
-      else this.renderBufferedDebugOverlay();
+      this.renderBufferedNavigationFeedback();
     }
+  }
+
+  renderBufferedNavigationFeedback(): void {
+    const root = this.deps.root();
+    if (!root) return;
+    const state = this.deps.getState();
+    if (secureSessionRequiresUnlock({ unlocked: state.blobKeyUnlocked, hasKey: state.blobKeyAvailable })) {
+      root.querySelector('.image-trail-panel__buffer-debug')?.remove();
+      root.querySelector('.image-trail-panel__neighbor-status')?.remove();
+      return;
+    }
+    this.renderBufferedNavigationStatus();
+    this.renderBufferedDebugOverlay();
+  }
+
+  renderBufferedNavigationStatus(): void {
+    const root = this.deps.root();
+    if (!root) return;
+    const state = this.deps.getState();
+    const visible = !state.minimized && !secureSessionRequiresUnlock({ unlocked: state.blobKeyUnlocked, hasKey: state.blobKeyAvailable });
+    syncNeighborStatusView(root, this.deps.bufferedNavSnapshots().status, visible);
   }
 
   renderBufferedDebugOverlay(): void {
     const root = this.deps.root();
     if (!root) return;
-    const existing = root.querySelector('.image-trail-panel__buffer-debug');
-    const snapshot = this.deps.bufferedNavDebugSnapshot();
-    if (!snapshot) {
-      existing?.remove();
-      return;
-    }
-    const overlay = existing instanceof HTMLElement ? existing : document.createElement('div');
-    overlay.className = 'image-trail-panel__buffer-debug';
-    const { cursor, bufferN, indices } = snapshot;
-    const cells: HTMLElement[] = [];
-    for (let index = cursor - bufferN; index <= cursor + bufferN; index += 1) {
-      const entry = indices.get(index);
-      const cell = document.createElement('span');
-      cell.className = 'image-trail-panel__buffer-debug-cell';
-      cell.dataset['status'] = entry ? `${entry.manifest}:${entry.image}` : 'UNKNOWN';
-      if (index === cursor) cell.classList.add('is-current');
-      cell.title = `${index}: ${entry?.manifest ?? 'UNKNOWN'} / ${entry?.image ?? 'UNKNOWN'}`;
-      cell.textContent = String(index);
-      cells.push(cell);
-    }
-    overlay.replaceChildren(...cells);
-    if (!existing) root.append(overlay);
+    syncBufferedDebugOverlay(root, this.deps.bufferedNavSnapshots().debug);
   }
 
   showBufferedNavigationToast(message: string): void {

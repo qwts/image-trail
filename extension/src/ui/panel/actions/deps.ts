@@ -37,6 +37,7 @@ export interface PanelActionDeps {
   // Render variants — these are distinct on purpose (see ui/AGENTS.md: no full panel rerenders for
   // recall-only updates); each handler must keep calling exactly the variant the if-chain used.
   render(): void;
+  renderRecallOnly(): void;
   renderPanelAndRefreshRecall(): void;
   refreshRecallIfOpen(): void;
   clearRecallMessageTimer(): void;
