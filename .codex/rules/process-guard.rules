@@ -111,12 +111,6 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["npm", "run", "test:stories:ci:inner"],
-    decision = "forbidden",
-    justification = "Inner npm script skips the guard; use the guarded entrypoint.",
-)
-
-prefix_rule(
     pattern = ["npm", "run", "test:e2e:inner"],
     decision = "forbidden",
     justification = "Inner npm script skips the guard; use the guarded entrypoint.",

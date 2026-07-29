@@ -133,9 +133,9 @@ can carry a stale copy until rebased or restarted from the main repo.
 - `npm test` includes the happy-dom suite (`npm run test:dom`, files under
   `tests/dom/`), which runs `node:test` with a real DOM registered via
   `tests/dom/register.ts`. Storybook interaction (`play`) tests run with
-  `npm run test:stories` against a dev server on port 6006, or standalone with
-  `npm run test:stories:ci` (builds and serves a static Storybook); CI runs the
-  latter.
+  `npm run test:stories` in Vitest watch mode, or once headlessly with
+  `npm run test:stories:ci`; CI runs the latter. Both use Vitest browser mode
+  with Playwright Chromium and do not require a separately served Storybook.
 - CI enforces a coverage gate: `npm run test:cov` runs the unit + DOM suites under
   `c8` and fails below the ratcheting thresholds in `.c8rc.json` (currently lines 71 /
   branches 80), writing `coverage/lcov.info` (uploaded as a CI artifact). Raise the
@@ -185,7 +185,7 @@ build` and paste **Built local** time plus commit, branch, and worktree when
   On GitHub Actions the wrapper deliberately passes through; hosted runner
   isolation and workflow job timeouts are the CI backstops.
 - Never invoke `node --test`, `.test-dist` output, `playwright test`,
-  `test-storybook`, or `c8` directly, and never call `:run`/`:inner` npm
+  `test-storybook`, `vitest`, or `c8` directly, and never call `:run`/`:inner` npm
   scripts — use the guarded entrypoints. Claude Code and Cursor deny these
   mechanically via checked-in hooks (scoped to guarded checkouts; quoted
   mentions in commit messages/PR bodies are fine); Codex denies them via

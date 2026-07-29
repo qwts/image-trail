@@ -65,7 +65,7 @@ evaluation, isolation surfaces, and the reproducible bootstrap).
 
 `.claude/settings.json` registers a `PreToolUse` hook on `Bash`
 (`scripts/guard-agent-command.mjs --protocol=claude`) that denies direct
-`node --test`, `.test-dist` execution, `playwright test`, `test-storybook`,
+`node --test`, `.test-dist` execution, `playwright test`, `test-storybook`, `vitest`,
 `c8`, `:run`/`:inner` scripts, and agent use of `IMAGE_TRAIL_GUARD_DISABLE`,
 steering the agent to the guarded entrypoints. The hook is scoped: it only
 polices commands executing inside a guarded checkout (cwd-aware, leading-`cd`
@@ -113,7 +113,7 @@ three mechanical layers plus the written rules:
 
 1. **execpolicy rules** — `.codex/rules/process-guard.rules` hard-forbids the
    clean argv prefixes (`node --test`, `npx playwright test`, `c8`,
-   `test-storybook`, every `:run`/`:inner` script, headed e2e) with
+   `test-storybook`, `vitest`, every `:run`/`:inner` script, headed e2e) with
    `decision = "forbidden"`; the most restrictive decision wins, so a
    user-side "always allow" cannot override it. It also auto-allows the
    guarded entrypoints and bounded gates so approval friction never tempts a

@@ -44,9 +44,8 @@
     "test:cov": "node scripts/run-guarded.mjs --label test:cov -- npm run test:cov:inner",
     "test:cov:inner": "npm run typecheck && npm run test:compile && c8 --clean=true --check-coverage=false --reporter=none npm run test:unit:run && c8 --clean=false npm run test:dom:run",
     "coverage:summary": "node scripts/report-coverage-summary.mjs",
-    "test:stories": "node scripts/run-guarded.mjs --label test:stories --timeout-s 1200 -- test-storybook",
-    "test:stories:ci": "node scripts/run-guarded.mjs --label test:stories:ci --timeout-s 1800 -- npm run test:stories:ci:inner",
-    "test:stories:ci:inner": "npm run build:storybook && concurrently -k -s first -n SB,TEST \"http-server storybook-static --port 6006 --silent\" \"wait-on tcp:127.0.0.1:6006 && test-storybook --url http://127.0.0.1:6006 --maxWorkers=2\"",
+    "test:stories": "node scripts/run-guarded.mjs --label test:stories --timeout-s 1200 -- vitest --project=storybook",
+    "test:stories:ci": "node scripts/run-guarded.mjs --label test:stories:ci --timeout-s 1800 -- vitest run --project=storybook",
     "test:e2e:coverage": "node scripts/check-e2e-coverage-map.mjs && node scripts/check-visual-acceptance-manifest.mjs",
     "check:acceptance-coverage": "node scripts/check-acceptance-coverage-diff.mjs",
     "test:e2e": "node scripts/run-guarded.mjs --label test:e2e --rss-mb 12288 --timeout-s 1800 -- npm run test:e2e:inner",
@@ -56,6 +55,7 @@
     "test:e2e:ui:inner": "npm run test:e2e:coverage && playwright test --ui",
     "test:e2e:headed": "node scripts/run-guarded.mjs --label test:e2e:headed --rss-mb 12288 --timeout-s 0 -- npm run test:e2e:headed:inner",
     "test:e2e:headed:inner": "npm run test:e2e:coverage && playwright test --headed",
+    "serve:e2e": "http-server tests/e2e/pages --host 127.0.0.1 --port 4173 --silent",
     "test": "node scripts/run-guarded.mjs --label test -- npm run test:inner",
     "test:inner": "npm run typecheck && npm run test:compile && npm run test:run",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md,css,yml,yaml}\" \".prettierrc.json\"",
@@ -67,8 +67,8 @@
     "@eslint/js": "^10.0.1",
     "@happy-dom/global-registrator": "^20.11.1",
     "@playwright/test": "^1.61.1",
+    "@storybook/addon-vitest": "^10.5.3",
     "@storybook/html-vite": "^10.5.3",
-    "@storybook/test-runner": "^0.24.4",
     "@types/chrome": "^0.2.2",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
@@ -76,7 +76,7 @@
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
     "c8": "^12.0.0",
-    "concurrently": "^10.0.3",
+    "@vitest/browser-playwright": "^4.1.10",
     "esbuild": "^0.28.1",
     "eslint": "^10.7.0",
     "fake-indexeddb": "^6.2.5",
@@ -93,10 +93,9 @@
     "typescript-eslint": "^8.65.0",
     "valibot": "^1.4.2",
     "vite": "^8.1.5",
-    "wait-on": "^9.1.0"
+    "vitest": "^4.1.10"
   },
   "overrides": {
-    "uuid": "^11.1.1",
     "madge": {
       "typescript": "$typescript"
     }
