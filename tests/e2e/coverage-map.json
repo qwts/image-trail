@@ -1370,6 +1370,33 @@
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Tests"
     },
     {
+      "id": "content-script-layout-hot-paths",
+      "acceptance": "Bounded host-page layout work for context detection, target recovery, and Grab preview (issue #633)",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Testing-Strategy",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom-observer.test.ts",
+            "tests/dom/page-context-detection.test.ts",
+            "tests/dom/target-recovery-controller.test.ts",
+            "tests/dom/page-adapter-grab-preview.test.ts"
+          ],
+          "notes": "Covers mutation filtering and trailing-edge debounce, one qualification pass per image, short-lived positive qualification caching, immediate rechecks for initially unloaded/hidden images, targeted and stylesheet-wide invalidation, image-bearing recovery batches, a finite failed-recovery budget that resets after success or reselection, and one-entry Grab pointer preview memoization."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": ["tests/e2e/page-context.spec.ts", "tests/e2e/target-recovery.spec.ts"],
+          "notes": "The packaged extension proves unrelated infinite-feed churn causes no image geometry reads, adding one feed image measures only that image, a delayed image load refreshes live qualification without a DOM replacement, and redraw recovery still preserves projection ownership and host restoration."
+        },
+        {
+          "type": "manual",
+          "reason": "Browser performance tooling is required to inspect layout events and long tasks on real redraw-heavy and infinite-feed hosts.",
+          "notes": "Profile the packaged extension on an infinite feed while appending unrelated nodes, moving across repeated Grab targets, and repeatedly redrawing a selected target. Verify context counts update for new images, pointer affordances track target changes, recovery stops after sustained unmatched churn, no continuous image-layout scan appears, and release restores host-owned state."
+        }
+      ]
+    },
+    {
       "id": "page-context-detection-and-override",
       "acceptance": "Automatic Single image, Gallery page, and Feed detection with capability-aware per-host override (issue #517)",
       "wiki": "https://github.com/qwts/image-trail/wiki/Page-Context-Capability-Matrix",
