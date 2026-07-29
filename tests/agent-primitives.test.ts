@@ -11,6 +11,7 @@ interface AgentPrimitiveCheck {
 
 interface AgentPrimitiveModule {
   findBroadAllows(settings: unknown): string[];
+  findMissingSourceCheckGates(skillText: string): string[];
   findOutwardAllows(settings: unknown): string[];
   validateAgentPrimitives(root?: string): {
     ok: boolean;
@@ -56,6 +57,20 @@ void test('least-privilege check catches outward writes in allow', () => {
     'Bash(gh pr merge*)',
     'Bash(npm publish*)',
   ]);
+});
+
+void test('source-command check cannot silently drop acceptance coverage', () => {
+  const incompleteSkill = [
+    'npm run lint',
+    'npm run format:check',
+    'npm test',
+    'npm run build',
+    'npm run test:e2e',
+    'npm run test:cov',
+    'npm run test:stories:ci',
+  ].join('\n');
+
+  assert.deepEqual(primitives.findMissingSourceCheckGates(incompleteSkill), ['npm run check:acceptance-coverage']);
 });
 
 void test('golden-task schema requires representative evidence fields', () => {

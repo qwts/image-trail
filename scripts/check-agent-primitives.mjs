@@ -39,6 +39,16 @@ const REQUIRED_ASK_PREFIXES = [
   'Bash(gh release ',
   'Bash(gh workflow run',
 ];
+const REQUIRED_SOURCE_CHECK_GATES = [
+  'npm run lint',
+  'npm run format:check',
+  'npm run check:acceptance-coverage',
+  'npm test',
+  'npm run build',
+  'npm run test:e2e',
+  'npm run test:cov',
+  'npm run test:stories:ci',
+];
 const SECRET_PATTERNS = [
   /-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----/u,
   /\bgh[pousr]_[A-Za-z0-9]{20,}\b/u,
@@ -82,6 +92,16 @@ export function findBroadAllows(settings) {
 export function findOutwardAllows(settings) {
   const allow = Array.isArray(settings?.permissions?.allow) ? settings.permissions.allow : [];
   return allow.filter((rule) => typeof rule === 'string' && OUTWARD_ALLOW_PATTERNS.some((pattern) => pattern.test(rule)));
+}
+
+export function findMissingSourceCheckGates(skillText) {
+  const declaredCommands = new Set(
+    skillText
+      .split(/\r?\n/u)
+      .map((line) => line.replace(/\s+#.*$/u, '').trim())
+      .filter((line) => line.length > 0),
+  );
+  return REQUIRED_SOURCE_CHECK_GATES.filter((command) => !declaredCommands.has(command));
 }
 
 function validateCriteria(task, key, label) {
@@ -217,6 +237,16 @@ export function validateAgentPrimitives(root = process.cwd()) {
   add(
     'check command delegates to the canonical source-command skill',
     checkCommand.includes('.agents/skills/source-command-check/SKILL.md'),
+  );
+
+  const sourceCheckSkillPath = '.agents/skills/source-command-check/SKILL.md';
+  const sourceCheckSkill = readFileSync(path.join(root, sourceCheckSkillPath), 'utf8');
+  scannedFiles.add(sourceCheckSkillPath);
+  const missingSourceCheckGates = findMissingSourceCheckGates(sourceCheckSkill);
+  add(
+    'source-command check retains every required validation gate',
+    missingSourceCheckGates.length === 0,
+    missingSourceCheckGates.join(', '),
   );
 
   const releaseCommand = readFileSync(path.join(root, '.claude/commands/release.md'), 'utf8');
