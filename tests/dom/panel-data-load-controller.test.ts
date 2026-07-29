@@ -19,23 +19,30 @@ interface Harness {
   patchState(patch: Partial<PanelState>): void;
 }
 
-function createHarness(options: { readonly recentLoad?: RecentHistoryStore['load'] } = {}): Harness {
+interface HarnessOptions {
+  readonly bookmarkLoad?: BookmarkStore['loadPage'];
+  readonly recentLoad?: RecentHistoryStore['load'];
+}
+
+function createHarness(options: HarnessOptions = {}): Harness {
   let state = createInitialPanelState(0);
   const log: string[] = [];
   const loadPageInputs: { offset: number; currentPageUrl?: string | undefined }[] = [];
   const recentLoadInputs: unknown[] = [];
   const bookmarkStore: BookmarkStore = {
-    loadPage: async (input: { offset: number; limit: number; scope?: 'global' | 'site'; currentPageUrl?: string }) => {
-      loadPageInputs.push({ offset: input.offset, currentPageUrl: input.currentPageUrl });
-      return {
-        items: [createDisplayRecord({ url: 'https://images.example.test/a/1.jpg' })],
-        offset: input.offset,
-        limit: input.limit,
-        total: 1,
-        hasOlder: false,
-        hasNewer: false,
-      };
-    },
+    loadPage:
+      options.bookmarkLoad ??
+      (async (input: { offset: number; limit: number; scope?: 'global' | 'site'; currentPageUrl?: string }) => {
+        loadPageInputs.push({ offset: input.offset, currentPageUrl: input.currentPageUrl });
+        return {
+          items: [createDisplayRecord({ url: 'https://images.example.test/a/1.jpg' })],
+          offset: input.offset,
+          limit: input.limit,
+          total: 1,
+          hasOlder: false,
+          hasNewer: false,
+        };
+      }),
   } as unknown as BookmarkStore;
   const recentHistoryStore: RecentHistoryStore = {
     load:
@@ -95,6 +102,62 @@ test('loadBookmarkPage honors render:false', async () => {
   await harness.controller.loadBookmarkPage(0, { render: false });
   assert.ok(!harness.log.includes('render'));
   assert.equal(harness.getState().bookmarks.length, 1);
+});
+
+test('loadBookmarkPage ignores an older response after a newer offset wins', async () => {
+  const older = deferred<Awaited<ReturnType<BookmarkStore['loadPage']>>>();
+  const newer = deferred<Awaited<ReturnType<BookmarkStore['loadPage']>>>();
+  const olderRecord = createDisplayRecord({ id: 'older-page', url: 'https://images.example.test/a/10.jpg' });
+  const newerRecord = createDisplayRecord({ id: 'newer-page', url: 'https://images.example.test/a/1.jpg' });
+  const harness = createHarness({
+    bookmarkLoad: async (input) => (input.offset === 10 ? older.promise : newer.promise),
+  });
+
+  const first = harness.controller.loadBookmarkPage(10);
+  const second = harness.controller.loadBookmarkPage(0);
+  newer.resolve({
+    items: [newerRecord],
+    offset: 0,
+    limit: 10,
+    total: 20,
+    hasOlder: true,
+    hasNewer: false,
+  });
+  await second;
+  older.resolve({
+    items: [olderRecord],
+    offset: 10,
+    limit: 10,
+    total: 20,
+    hasOlder: false,
+    hasNewer: true,
+  });
+  await first;
+
+  assert.deepEqual(harness.getState().bookmarks, [newerRecord]);
+  assert.equal(harness.getState().bookmarkOffset, 0);
+  assert.equal(harness.log.filter((entry) => entry === 'render').length, 1);
+});
+
+test('loadBookmarkPage ignores a response after queue scope or display order changes', async () => {
+  for (const patch of [{ bookmarkVisibilityScope: 'site' as const }, { queueDisplayOrder: 'back-first' as const }]) {
+    const pending = deferred<Awaited<ReturnType<BookmarkStore['loadPage']>>>();
+    const harness = createHarness({ bookmarkLoad: async () => pending.promise });
+    const load = harness.controller.loadBookmarkPage(0);
+    harness.patchState(patch);
+    pending.resolve({
+      items: [createDisplayRecord({ url: 'https://images.example.test/stale.jpg' })],
+      offset: 0,
+      limit: 10,
+      total: 1,
+      hasOlder: false,
+      hasNewer: false,
+    });
+    await load;
+
+    assert.deepEqual(harness.getState().bookmarks, []);
+    assert.equal(harness.log.filter((entry) => entry === 'render').length, 0);
+  }
 });
 
 test('loadRecentHistory loads the recents for the current page and stamps lastUpdatedAt', async () => {

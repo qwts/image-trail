@@ -28,6 +28,7 @@ export interface PanelDataLoadControllerDeps {
  * single-flight `storageUsageRequestId` guard so a stale response never overwrites a newer one.
  */
 export class PanelDataLoadController {
+  private bookmarkPageRequestId = 0;
   private storageUsageRequestId = 0;
   private recentHistoryRequestId = 0;
 
@@ -91,13 +92,16 @@ export class PanelDataLoadController {
     const bookmarkStore = this.deps.bookmarkStore();
     if (!bookmarkStore) return;
     const state = this.deps.getState();
-    const page = await bookmarkStore.loadPage({
+    const requestId = (this.bookmarkPageRequestId += 1);
+    const request = {
       offset,
       limit: state.bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax,
       scope: state.bookmarkVisibilityScope,
       currentPageUrl: window.location.href,
       displayOrder: state.queueDisplayOrder,
-    });
+    } as const;
+    const page = await bookmarkStore.loadPage(request);
+    if (!this.bookmarkPageRequestIsCurrent(requestId, request)) return;
     this.deps.setState(
       reducePanelAction(this.deps.getState(), {
         name: 'bookmarks/page-loaded',
@@ -111,6 +115,25 @@ export class PanelDataLoadController {
     );
     if (options.render !== false) this.deps.render();
   };
+
+  private bookmarkPageRequestIsCurrent(
+    requestId: number,
+    request: {
+      readonly limit: number;
+      readonly scope: PanelState['bookmarkVisibilityScope'];
+      readonly currentPageUrl: string;
+      readonly displayOrder: PanelState['queueDisplayOrder'];
+    },
+  ): boolean {
+    const state = this.deps.getState();
+    return (
+      requestId === this.bookmarkPageRequestId &&
+      request.limit === (state.bookmarkLimit || DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax) &&
+      request.scope === state.bookmarkVisibilityScope &&
+      request.currentPageUrl === window.location.href &&
+      request.displayOrder === state.queueDisplayOrder
+    );
+  }
 
   async refreshStorageUsage(options: { readonly render?: boolean | undefined } = {}): Promise<void> {
     const captureStore = this.deps.captureStore();
