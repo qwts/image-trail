@@ -38,9 +38,11 @@ function createHarness(overrides: Partial<BufferedNavigationControllerDeps> = {}
   readonly controller: BufferedNavigationController;
   readonly landed: LandedCall[];
   readonly toasts: string[];
+  readonly revoked: string[];
 } {
   const landed: LandedCall[] = [];
   const toasts: string[] = [];
+  const revoked: string[] = [];
   let fetchCount = 0;
 
   const deps: BufferedNavigationControllerDeps = {
@@ -61,7 +63,7 @@ function createHarness(overrides: Partial<BufferedNavigationControllerDeps> = {}
       return true;
     },
     createPlaceholderImage: () => ({}) as unknown as HTMLImageElement,
-    scheduleRevoke: () => undefined,
+    scheduleRevoke: (blobUrl) => revoked.push(blobUrl),
     onToast: (message) => toasts.push(message),
     onSkipCapReached: (message) => toasts.push(message),
     onDebugChanged: () => undefined,
@@ -79,7 +81,17 @@ function createHarness(overrides: Partial<BufferedNavigationControllerDeps> = {}
     ...overrides,
   };
 
-  return { controller: new BufferedNavigationController(deps), landed, toasts };
+  return { controller: new BufferedNavigationController(deps), landed, toasts, revoked };
+}
+
+async function currentBufferedBlobUrls(controller: BufferedNavigationController): Promise<readonly string[]> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  controller.toggleDebugVisible();
+  const snapshot = controller.getSnapshots().debug;
+  assert.ok(snapshot);
+  return [
+    ...new Set([...snapshot.indices.values()].map((entry) => entry.blobUrl).filter((url): url is string => !!url?.startsWith('blob:'))),
+  ];
 }
 
 test('step() lands on the next candidate and reports it through applyLandedUrl', async () => {
@@ -259,6 +271,128 @@ test('dispose() settles an in-flight step() instead of leaving it hanging foreve
   assert.equal(landed.length, 0);
 
   assert.doesNotThrow(() => controller.dispose());
+});
+
+test('a navigation-window rebuild transfers the selected blob and revokes every offscreen blob', async () => {
+  let radius = 2;
+  let currentUrl = BASE_URL;
+  let activeBlobUrl = '';
+  const { controller, revoked } = createHarness({
+    getLocalSettings: () => ({
+      neighborPreloadEnabled: true,
+      neighborPreloadRadius: radius,
+      neighborPreloadProbeMethod: 'get',
+      loadFailureFeedback: 'alert',
+    }),
+    currentNavigationBaseRawUrl: () => currentUrl,
+    currentNavigationBaseModel: () => parseUrl(currentUrl),
+    applyLandedUrl: async (nextUrl, displayUrl) => {
+      currentUrl = nextUrl;
+      activeBlobUrl = displayUrl;
+      return true;
+    },
+  });
+  const model = baseModel();
+  await controller.step(model, navigableFields(model), 1);
+  const oldBlobUrls = await currentBufferedBlobUrls(controller);
+  assert.ok(oldBlobUrls.length > 0);
+  const priorRevokeCount = revoked.length;
+
+  radius = 3;
+  controller.prime();
+
+  const rebuiltWindowRevokes = revoked.slice(priorRevokeCount);
+  assert.deepEqual(new Set(rebuiltWindowRevokes), new Set(oldBlobUrls.filter((blobUrl) => blobUrl !== activeBlobUrl)));
+  assert.equal(rebuiltWindowRevokes.includes(activeBlobUrl), false);
+  assert.equal(rebuiltWindowRevokes.includes(BASE_URL), false);
+  assert.equal(controller.getSnapshots().debug?.indices.get(0)?.blobUrl, activeBlobUrl);
+});
+
+test('disabling buffered navigation retains the selected blob until final disposal', async () => {
+  let enabled = true;
+  let currentUrl = BASE_URL;
+  let activeBlobUrl = '';
+  const { controller, revoked } = createHarness({
+    getLocalSettings: () => ({
+      neighborPreloadEnabled: enabled,
+      neighborPreloadRadius: 2,
+      neighborPreloadProbeMethod: 'get',
+      loadFailureFeedback: 'alert',
+    }),
+    currentNavigationBaseRawUrl: () => currentUrl,
+    currentNavigationBaseModel: () => parseUrl(currentUrl),
+    applyLandedUrl: async (nextUrl, displayUrl) => {
+      currentUrl = nextUrl;
+      activeBlobUrl = displayUrl;
+      return true;
+    },
+  });
+  const model = baseModel();
+  await controller.step(model, navigableFields(model), 1);
+  const oldBlobUrls = await currentBufferedBlobUrls(controller);
+  const priorRevokeCount = revoked.length;
+
+  enabled = false;
+  controller.prime();
+
+  assert.deepEqual(new Set(revoked.slice(priorRevokeCount)), new Set(oldBlobUrls.filter((blobUrl) => blobUrl !== activeBlobUrl)));
+  assert.equal(revoked.includes(activeBlobUrl), false);
+  assert.equal(controller.getSnapshots().debug, null);
+
+  controller.dispose();
+  assert.equal(revoked.filter((blobUrl) => blobUrl === activeBlobUrl).length, 1);
+});
+
+test('dispose revokes every decoded blob URL once and remains idempotent', async () => {
+  const { controller, revoked } = createHarness();
+  const model = baseModel();
+  await controller.step(model, navigableFields(model), 1);
+  const oldBlobUrls = await currentBufferedBlobUrls(controller);
+  const priorRevokeCount = revoked.length;
+
+  controller.dispose();
+  controller.dispose();
+
+  const disposalRevokes = revoked.slice(priorRevokeCount);
+  assert.deepEqual(new Set(disposalRevokes), new Set(oldBlobUrls));
+  assert.equal(disposalRevokes.length, oldBlobUrls.length);
+});
+
+test('decoded blobs that finish after disposal are still revoked', async () => {
+  const pendingDecode = createDeferred<{
+    ok: true;
+    blobUrl: string;
+    imgElement: HTMLImageElement;
+    sha256: string;
+  }>();
+  let fetchStarted = false;
+  const lateBlobUrls: string[] = [];
+  const { controller, revoked } = createHarness({
+    fetchDecodedImage: () => {
+      fetchStarted = true;
+      const blobUrl = `blob:late-after-disposal-${lateBlobUrls.length + 1}`;
+      lateBlobUrls.push(blobUrl);
+      return pendingDecode.promise.then((result) => ({ ...result, blobUrl }));
+    },
+  });
+  const model = baseModel();
+  const stepPromise = controller.step(model, navigableFields(model), 1);
+  const deadline = Date.now() + 2000;
+  while (!fetchStarted && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(fetchStarted, true);
+
+  controller.dispose();
+  assert.equal(await stepPromise, 'blocked');
+  pendingDecode.resolve({
+    ok: true,
+    blobUrl: 'blob:late-after-disposal',
+    imgElement: {} as unknown as HTMLImageElement,
+    sha256: 'sha-late',
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(new Set(revoked), new Set(lateBlobUrls));
+  assert.equal(revoked.length, lateBlobUrls.length);
 });
 
 test('a blocked seek probes the frontier concurrently and lands past a failed run in one step (#373)', async () => {

@@ -36,8 +36,10 @@ interface LandedCall {
 function createHarness(overrides: Partial<BufferedNavigationControllerDeps> = {}): {
   readonly controller: BufferedNavigationController;
   readonly landed: LandedCall[];
+  readonly revoked: string[];
 } {
   const landed: LandedCall[] = [];
+  const revoked: string[] = [];
   let fetchCount = 0;
   // Track the URL the panel last landed on, the way ImageTrailPanel's applyLandedUrl updates the
   // selected URL, so sequential step() calls walk forward instead of re-anchoring on the base URL.
@@ -62,7 +64,7 @@ function createHarness(overrides: Partial<BufferedNavigationControllerDeps> = {}
       return true;
     },
     createPlaceholderImage: () => document.createElement('img'),
-    scheduleRevoke: () => undefined,
+    scheduleRevoke: (blobUrl) => revoked.push(blobUrl),
     onToast: () => undefined,
     onSkipCapReached: () => undefined,
     onDebugChanged: () => undefined,
@@ -80,7 +82,7 @@ function createHarness(overrides: Partial<BufferedNavigationControllerDeps> = {}
     ...overrides,
   };
 
-  return { controller: new BufferedNavigationController(deps), landed };
+  return { controller: new BufferedNavigationController(deps), landed, revoked };
 }
 
 test('sequential steps land candidates in queue order and re-land a buffered neighbor from cache', async () => {
@@ -181,4 +183,25 @@ test('dispose() cancels an in-flight step() so it settles blocked without landin
   assert.equal(landed.length, 0);
 
   assert.doesNotThrow(() => controller.dispose());
+});
+
+test('dispose schedules buffered blob URLs for revocation while preserving the real anchor image URL', async () => {
+  const { controller, revoked } = createHarness();
+  const model = baseModel();
+  await controller.step(model, navigableFields(model), 1);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  controller.toggleDebugVisible();
+  const snapshot = controller.getSnapshots().debug;
+  assert.ok(snapshot);
+  const blobUrls = [
+    ...new Set([...snapshot.indices.values()].map((entry) => entry.blobUrl).filter((url): url is string => !!url?.startsWith('blob:'))),
+  ];
+  const priorRevokeCount = revoked.length;
+
+  controller.dispose();
+
+  const disposalRevokes = revoked.slice(priorRevokeCount);
+  assert.ok(blobUrls.length > 0);
+  assert.deepEqual(new Set(disposalRevokes), new Set(blobUrls));
+  assert.equal(disposalRevokes.includes(BASE_URL), false);
 });

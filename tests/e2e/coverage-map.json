@@ -146,14 +146,15 @@
             "tests/e2e/workspace-accessibility.spec.ts",
             "tests/e2e/workspace-reload-persistence.spec.ts",
             "tests/e2e/workspace-visual-states.spec.ts",
-            "tests/e2e/detached-auto-grow.spec.ts"
+            "tests/e2e/detached-auto-grow.spec.ts",
+            "tests/e2e/panel-position-render-churn.spec.ts"
           ],
-          "notes": "Covers packaged four-edge snapping, pointer and keyboard previews, shade versus attached collapse, button and threshold-drag unsnap with cancel, rail order, Recents and Queue auto-growth until manual resize, stable user-owned height with further rows, continued resize access, reattach reset, extension-surface panel collision resolution, responsive rail fallback and clamping, focus handoff, deterministic floating/shaded/railed/restored artifacts, private persisted restore and reset across extension restart, local build-overlay stacking, and the overlay-only boundary across responsive, fixed/sticky, feed, nested-scroll, RTL, iframe, transformed-root, SPA, navigation, fullscreen, zoom-equivalent, narrow, reduced-motion, coarse-pointer, interrupted-drag, and exact host-baseline cases."
+          "notes": "Covers packaged four-edge snapping, pointer and keyboard previews, shade versus attached collapse, button and threshold-drag unsnap with cancel, rail order, Recents and Queue auto-growth until manual resize, stable user-owned height with further rows, continued resize access, reattach reset, extension-surface panel collision resolution, panel dragging without Recall rebuilds, one resize-end panel rebuild after a viewport-event burst, responsive rail fallback and clamping, focus handoff, deterministic floating/shaded/railed/restored artifacts, private persisted restore and reset across extension restart, local build-overlay stacking, and the overlay-only boundary across responsive, fixed/sticky, feed, nested-scroll, RTL, iframe, transformed-root, SPA, navigation, fullscreen, zoom-equivalent, narrow, reduced-motion, coarse-pointer, interrupted-drag, and exact host-baseline cases."
         },
         {
           "type": "manual",
           "reason": "The arbitrary-host overlay, browser zoom clamp, and final handoff visual fidelity need packaged-extension inspection.",
-          "notes": "Follow the canonical Workspace Rails Cross-Site Safety wiki script at 1440x900 and 200% zoom. Confirm rail width 344px, top and bottom height 240px, supported overlay and fallback behavior, exact host cleanup, keyboard and pointer escape paths, private persistence/reset, Recall remaining panel-relative, and chrome matching handoff screenshot 11."
+          "notes": "Follow the canonical Workspace Rails Cross-Site Safety wiki script at 1440x900 and 200% zoom. Confirm rail width 344px, top and bottom height 240px, supported overlay and fallback behavior, exact host cleanup, keyboard and pointer escape paths, private persistence/reset, Recall remaining panel-relative without flicker while dragging, smooth live viewport resize with one final reflow, and chrome matching handoff screenshot 11."
         }
       ]
     },
@@ -266,7 +267,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/gallery-design-system.spec.ts",
-          "notes": "Covers the packaged extension Gallery with real durable IndexedDB records, shared primitive adoption, canonical queue order, debounced search, source-host/image-type/record-kind filters with AND behavior, active-filter clear and no-match state, album creation and membership, native keyboard order with focus preserved through filter and background refresh renders, narrow overflow, and reduced-motion behavior; verifies browsing, search, filtering, and album membership do not reorder the durable queue."
+          "notes": "Covers the packaged extension Gallery with real durable IndexedDB records, shared primitive adoption, canonical queue order, one cached durable scan across debounced search and source-host/image-type/record-kind filter interactions with explicit reload invalidation (#632), active-filter clear and no-match state, album creation and membership, native keyboard order with focus preserved through filter and background refresh renders, narrow overflow, and reduced-motion behavior; verifies browsing, search, filtering, and album membership do not reorder the durable queue."
         },
         {
           "type": "manual",
@@ -580,6 +581,7 @@
             "tests/field-editor-controller.test.ts",
             "tests/field-editor-view-model.test.ts",
             "tests/panel-state-parsed-fields.test.ts",
+            "tests/dom/parsed-field-state-record-controller.test.ts",
             "tests/dom/controls-view.test.ts",
             "tests/dom/field-row.test.ts",
             "tests/dom/fields-view.test.ts",
@@ -594,7 +596,7 @@
             "tests/url-stepping-presets.test.ts",
             "tests/url-template-settings-controller.test.ts"
           ],
-          "notes": "Covers parsed-field state sync plus the serializable Field Editor view model and typed design-system FieldRow: active position/count and collapsed hierarchy, native control semantics and keyboard order, state priority, previous/next field selection, status flags/chips, navigation eligibility, transform/reset availability, template-filtered and invalid-URL empty states, muted failure visibility, JSON serialization, split-child routing, commit-before-command ordering, numeric display modes, baseline restoration, privacy masking without label/value/title leakage, the user-facing Field Editor section name (#248), bounded saved stepping presets whose exact unsplit numeric fields are reviewable before persistence through the existing URL template store (#207), and #622 buffered image runtime responses surviving JSON-shaped transport as validated data URLs that decode back to exact image bytes."
+          "notes": "Covers parsed-field state sync plus the serializable Field Editor view model and typed design-system FieldRow: active position/count and collapsed hierarchy, native control semantics and keyboard order, state priority, previous/next field selection, status flags/chips, navigation eligibility, transform/reset availability, template-filtered and invalid-URL empty states, muted failure visibility, JSON serialization, split-child routing, commit-before-command ordering, numeric display modes, baseline restoration, privacy masking without label/value/title leakage, #642 stable original-token and split-child identities preserving unrelated digit-width/marker state across split apply, clear, multiple splits, restore, and legacy parsed-state/template migration, the user-facing Field Editor section name (#248), bounded saved stepping presets whose exact unsplit numeric fields are reviewable before persistence through the existing URL template store (#207), and #622 buffered image runtime responses surviving JSON-shaped transport as validated data URLs that decode back to exact image bytes."
         },
         {
           "type": "storybook",
@@ -692,7 +694,7 @@
             "tests/dom/history-view.test.ts",
             "tests/dom/panel-data-load-controller.test.ts"
           ],
-          "notes": "Covers origin-and-path page identity, hostname site identity, global insertion order, URL and id deduplication, scope-aware removal, provenance-preserving metadata updates, stale scope-load rejection, site defaulting, selection cleanup, privacy-safe labels, message validation, the dedicated scope row outside the collapse header, and the invariant that Recents have no durable-storage write path."
+          "notes": "Covers origin-and-path page identity, hostname site identity, global insertion order, URL and id deduplication, scope-aware removal, provenance-preserving metadata updates, stale scope-load rejection, #630 Queue paging generations rejecting older offsets and responses invalidated by scope/order/hostname changes while accepting global and same-host site responses across page URL updates, site defaulting, selection cleanup, privacy-safe labels, message validation, the dedicated scope row outside the collapse header, and the invariant that Recents have no durable-storage write path."
         },
         {
           "type": "storybook",
@@ -721,8 +723,11 @@
           "type": "unit-dom",
           "paths": [
             "tests/messages.test.ts",
+            "tests/bookmark-storage-usage.test.ts",
             "tests/bookmark-original-preservation.test.ts",
+            "tests/indexeddb-bookmark-cache.test.ts",
             "tests/indexeddb-bookmark-store.test.ts",
+            "tests/indexeddb-repositories.test.ts",
             "tests/indexeddb-recall-queue.test.ts",
             "tests/indexeddb-protected-pins.test.ts",
             "tests/record-library-controller.test.ts",
@@ -730,7 +735,7 @@
             "tests/dom/record-library-controller.test.ts",
             "tests/dom/captured-originals-controller.test.ts"
           ],
-          "notes": "Covers saved-row lookup messages, plain/protected URL lookup without queue-order mutation, original and thumbnail preservation during re-save/import, target-capture DOM thumbnail creation with URL-fetch fallback and permission-retry completion, explicit original clearing, recent enrichment from off-page saved rows, duplicate pin prevention, stale all-scope pin responses being discarded after a Recents scope change, capture skip/update behavior, post-capture blob cleanup on failed durable save, linked recent cleanup, and Delete original resolving non-visible durable rows (#661)."
+          "notes": "Covers saved-row lookup messages, plain/protected URL lookup without queue-order mutation, original and thumbnail preservation during re-save/import, target-capture DOM thumbnail creation with URL-fetch fallback and permission-retry completion, explicit original clearing, recent enrichment from off-page saved rows, duplicate pin prevention, stale all-scope pin responses being discarded after a Recents scope change, capture skip/update behavior, post-capture blob cleanup on failed durable save, linked recent cleanup, Delete original resolving non-visible durable rows (#661), and #639 preventing repeated decrypt-all work after one-time legacy interoperability and storage-metric scans, preserving ordinary-index interoperability custody during protected conversion, and caching active/locked Queue pages."
         },
         {
           "type": "playwright-e2e",
@@ -797,17 +802,18 @@
             "tests/indexeddb-protected-pins.test.ts",
             "tests/encrypted-blobs.test.ts",
             "tests/blobs-repository.test.ts",
+            "tests/orphaned-blobs.test.ts",
             "tests/background-original-blob-handlers.test.ts",
             "tests/captured-originals-controller.test.ts",
             "tests/missing-original-repair-controller.test.ts",
             "tests/dom/bookmarks-view.test.ts"
           ],
-          "notes": "Covers selected durable-pin repair: existing encrypted blob references are verified through key-only IndexedDB reads without hydrating encrypted bytes, missing or metadata-only originals are re-captured through the existing capture path, private rows without a source URL are rejected, permission-needed capture pauses the batch, and queue timestamps remain unchanged."
+          "notes": "Covers selected durable-pin repair plus storage-health cleanup: existing encrypted blob references and orphan candidates are verified through key-only IndexedDB reads without hydrating encrypted bytes; missing or metadata-only originals are re-captured through the existing capture path; private rows without a source URL are rejected; permission-needed capture pauses the batch; and queue timestamps remain unchanged."
         },
         {
           "type": "playwright-e2e",
-          "path": "tests/e2e/image-utilities.spec.ts",
-          "notes": "Covers encrypted original setup, capture from a queue row, stored-original indicator, and selected-record export preferring stored original bytes when unlocked."
+          "paths": ["tests/e2e/image-utilities.spec.ts", "tests/e2e/storage-orphan-scan.spec.ts"],
+          "notes": "Covers encrypted original setup, capture from a queue row, stored-original indicator, selected-record export preferring stored original bytes when unlocked, and isolated packaged storage-health and cleanup requests that preserve byte/count/deletion behavior while rejecting blob-store getAll and value-cursor reads."
         }
       ]
     },
@@ -986,11 +992,26 @@
             "tests/buffered-image-navigation.test.ts",
             "tests/neighbor-preload-controller.test.ts",
             "tests/buffered-navigation-controller.test.ts",
+            "tests/dom/buffered-navigation-controller.test.ts",
             "tests/dom/neighbor-status-view.test.ts",
             "tests/dom/panel-render-controller.test.ts",
+            "tests/data-crypto.test.ts",
+            "tests/panel-state-settings.test.ts",
+            "tests/dom/automation-settings-view.test.ts",
+            "tests/dom/extension-destination-surfaces.test.tsx",
             "tests/dom/parsed-field-navigation-controller.test.ts"
           ],
-          "notes": "Includes the parsed-field navigation consecutive-miss short-circuit (#287) and compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
+          "notes": "Includes #631 cache bounds: supported settings are 1–500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Includes #627 decoded-image lifecycle coverage too: rebuild and disabled-preload paths revoke offscreen buffered blobs while transferring the still-selected display blob, final disposal revokes every retained blob, concurrent decodes that complete after disposal are revoked too, and the HTTP anchor remains untouched; DOM-backed image state is covered. Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts. Includes compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/automation-settings-view.stories.ts",
+          "notes": "Covers #631 through the rendered Cache min/max attributes and bounded-memory copy."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/automation-governance.spec.ts",
+          "notes": "Covers #631 in the packaged panel: Cache exposes the 1–500 range and explains the per-page-session memory bound."
         },
         {
           "type": "unit-dom",
@@ -1293,6 +1314,33 @@
         }
       ],
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Tests"
+    },
+    {
+      "id": "content-script-layout-hot-paths",
+      "acceptance": "Bounded host-page layout work for context detection, target recovery, and Grab preview (issue #633)",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Testing-Strategy",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom-observer.test.ts",
+            "tests/dom/page-context-detection.test.ts",
+            "tests/dom/target-recovery-controller.test.ts",
+            "tests/dom/page-adapter-grab-preview.test.ts"
+          ],
+          "notes": "Covers mutation filtering and trailing-edge debounce, one qualification pass per image, short-lived positive qualification caching, immediate rechecks for initially unloaded/hidden images, targeted and stylesheet-wide invalidation, image-bearing recovery batches, a finite failed-recovery budget that resets after success or reselection, and one-entry Grab pointer preview memoization."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": ["tests/e2e/page-context.spec.ts", "tests/e2e/target-recovery.spec.ts"],
+          "notes": "The packaged extension proves unrelated infinite-feed churn causes no image geometry reads, adding one feed image measures only that image, a delayed image load refreshes live qualification without a DOM replacement, and redraw recovery still preserves projection ownership and host restoration."
+        },
+        {
+          "type": "manual",
+          "reason": "Browser performance tooling is required to inspect layout events and long tasks on real redraw-heavy and infinite-feed hosts.",
+          "notes": "Profile the packaged extension on an infinite feed while appending unrelated nodes, moving across repeated Grab targets, and repeatedly redrawing a selected target. Verify context counts update for new images, pointer affordances track target changes, recovery stops after sustained unmatched churn, no continuous image-layout scan appears, and release restores host-owned state."
+        }
+      ]
     },
     {
       "id": "page-context-detection-and-override",

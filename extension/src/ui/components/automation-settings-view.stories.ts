@@ -25,6 +25,13 @@ type Story = StoryObj<typeof meta>;
 export const ControlsDispatch: Story = {
   play: async ({ canvasElement }) => {
     dispatchSpy.mockClear();
+    const cache = Array.from(canvasElement.querySelectorAll('label'))
+      .find((label) => label.textContent?.includes('Cache'))
+      ?.querySelector('input');
+    if (!cache) throw new Error('expected Cache control');
+    await expect(cache).toHaveAttribute('min', '1');
+    await expect(cache).toHaveAttribute('max', '500');
+    await expect(canvasElement).toHaveTextContent(/Cache holds 1–500 image responses per page session/u);
     const feedback = Array.from(canvasElement.querySelectorAll('label')).find((label) => label.textContent?.includes('Failure feedback'));
     const select = feedback?.querySelector('select');
     if (!select) throw new Error('expected Failure feedback control');
