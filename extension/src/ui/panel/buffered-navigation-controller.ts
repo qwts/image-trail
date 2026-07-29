@@ -17,6 +17,7 @@ import type { NeighborPreloadDirection } from '../../core/url/preload-neighbors.
 import { bumpUrlField, rebuildUrl } from '../../core/url/rebuild-url.js';
 import { collectUrlFields } from '../../core/url/tokenize-fields.js';
 import type { ParsedUrlModel, UrlField } from '../../core/url/types.js';
+import { BufferedDisplayBlobLifecycle } from './buffered-display-blob-lifecycle.js';
 
 const MAX_BUFFERED_HEAD_CONCURRENCY = 10;
 const MAX_BUFFERED_GET_CONCURRENCY = 4;
@@ -86,19 +87,16 @@ export class BufferedNavigationController {
   private headQueued = new Map<number, BufferedNavigationRequest>();
   private getQueued = new Map<number, BufferedNavigationRequest>();
   private debugVisible = false;
+  private readonly displayBlobs: BufferedDisplayBlobLifecycle;
 
-  constructor(private readonly deps: BufferedNavigationControllerDeps) {}
+  constructor(private readonly deps: BufferedNavigationControllerDeps) {
+    this.displayBlobs = new BufferedDisplayBlobLifecycle(deps.scheduleRevoke);
+  }
 
   prime(): void {
     const settings = this.deps.getLocalSettings();
     if (!(settings.neighborPreloadEnabled && settings.neighborPreloadRadius > 0)) {
-      this.runId += 1;
-      this.navigation = null;
-      this.navigationKey = null;
-      this.baseModel = null;
-      this.fields = [];
-      this.clearQueues();
-      this.cancelInflight();
+      this.replaceNavigation({ preserveActiveDisplay: true });
       return;
     }
     if (!this.deps.hasSelectedTarget()) return;
@@ -123,12 +121,14 @@ export class BufferedNavigationController {
       if (this.navigation.cursor !== previousCursor) {
         const landed = this.navigation.indices.get(this.navigation.cursor);
         if (landed?.image === ImageStatus.OK && landed.url && landed.blobUrl) {
-          const loaded = await this.deps.applyLandedUrl(
-            landed.url,
-            landed.blobUrl,
-            landed.sha256,
-            fields.map((field) => field.id),
-          );
+          const apply = () =>
+            this.deps.applyLandedUrl(
+              landed.url!,
+              landed.blobUrl!,
+              landed.sha256,
+              fields.map((field) => field.id),
+            );
+          const loaded = await this.displayBlobs.applyLanding(landed.url, landed.blobUrl, apply);
           this.schedulePreloads();
           return loaded ? 'loaded' : 'blocked';
         }
@@ -175,20 +175,14 @@ export class BufferedNavigationController {
   }
 
   dispose(): void {
-    this.runId += 1;
-    this.clearQueues();
-    this.cancelInflight();
-    this.navigation = null;
-    this.navigationKey = null;
-    this.baseModel = null;
-    this.fields = [];
+    this.replaceNavigation();
   }
-
   private ensure(model: ParsedUrlModel, fields: readonly UrlField[]): void {
     if (this.reuseForCurrentUrl(fields)) return;
     const baseUrl = rebuildUrl(model);
     const key = `${baseUrl}|${fields.map((field) => field.id).join(',')}|${this.deps.getLocalSettings().neighborPreloadRadius}`;
     if (this.navigationKey === key && this.navigation) return;
+    const preserveActiveDisplay = this.displayBlobs.matches(baseUrl, this.deps.currentPageHref());
     const bufferN = this.radius();
     let navigation = createBufferedImageNavigationState(bufferN);
     navigation = reduceBufferedImageNavigation(navigation, {
@@ -201,18 +195,16 @@ export class BufferedNavigationController {
       type: 'SET_IMAGE',
       index: 0,
       status: ImageStatus.OK,
-      blobUrl: baseUrl,
+      blobUrl: preserveActiveDisplay ? this.displayBlobs.activeBlobUrl! : baseUrl,
       imgElement: this.deps.createPlaceholderImage(),
       sha256: this.deps.currentKnownImageFingerprint(),
     });
     navigation = reduceBufferedImageNavigation(navigation, { type: 'INIT_CURSOR', index: 0 });
-    this.runId += 1;
+    this.replaceNavigation({ preserveActiveDisplay });
     this.navigation = navigation;
     this.navigationKey = key;
     this.baseModel = model;
     this.fields = fields;
-    this.clearQueues();
-    this.cancelInflight();
     this.schedulePreloads();
   }
 
@@ -470,7 +462,10 @@ export class BufferedNavigationController {
         intent: 'field-active-navigation',
         contextKey: this.requestContextKey(index, queued.runId),
       });
-      if (!this.isCurrentRun(queued.runId)) return;
+      if (!this.isCurrentRun(queued.runId)) {
+        if (result.ok && result.blobUrl.startsWith('blob:')) this.deps.scheduleRevoke(result.blobUrl);
+        return;
+      }
       if (result.ok) {
         this.navigation = reduceBufferedImageNavigation(this.navigation!, {
           type: 'SET_IMAGE',
@@ -549,11 +544,21 @@ export class BufferedNavigationController {
     return status === 400 || status === 404 || status === 410;
   }
 
-  // The "Skipped a failed image candidate" toast is failure feedback, so only the Alert mode shows
-  // it; Display/Mute skip past silently (the skip itself is unaffected — it is driven by the
-  // request-policy cache, not this toast) (#450).
+  // Only Alert surfaces the failure toast; Display/Mute skip silently. The request-policy cache
+  // still drives the skip in every mode (#450).
   private emitSkipToast(): void {
     if (this.deps.getLocalSettings().loadFailureFeedback === 'alert') this.deps.onToast('Skipped a failed image candidate.');
+  }
+
+  private replaceNavigation(options: { readonly preserveActiveDisplay?: boolean } = {}): void {
+    this.runId += 1;
+    this.displayBlobs.replaceWindow(this.navigation, options.preserveActiveDisplay === true);
+    this.clearQueues();
+    this.cancelInflight();
+    this.navigation = null;
+    this.navigationKey = null;
+    this.baseModel = null;
+    this.fields = [];
   }
 
   private schedulePreloads(): void {
@@ -561,13 +566,7 @@ export class BufferedNavigationController {
     const { cursor, settings } = this.navigation;
     const preloadIndices = bufferedPreloadWindowIndices(cursor, settings.bufferN);
     const liveIndices = new Set([cursor, ...preloadIndices]);
-    for (const [index, entry] of this.navigation.indices) {
-      if (liveIndices.has(index)) continue;
-      if (entry.blobUrl && entry.blobUrl.startsWith('blob:')) {
-        this.deps.scheduleRevoke(entry.blobUrl);
-      }
-      this.navigation = reduceBufferedImageNavigation(this.navigation, { type: 'EVICT', index });
-    }
+    this.navigation = this.displayBlobs.evictOutsideWindow(this.navigation, liveIndices);
     for (const index of preloadIndices) {
       void this.resolveIndex(index, { advanceOnResolve: false });
     }

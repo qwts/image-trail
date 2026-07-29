@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { ORPHANED_BLOB_GRACE_PERIOD_MS, findDeletableOrphanBlobIds } from '../extension/src/background/orphaned-blobs.js';
 
 const now = Date.parse('2026-07-18T16:00:00.000Z');
@@ -25,4 +27,19 @@ test('orphan cleanup fails safe for invalid or future creation times', () => {
   ];
 
   assert.deepEqual(findDeletableOrphanBlobIds(blobs, new Set(), now), []);
+});
+
+test('storage usage and orphan cleanup use key-only blob candidates', () => {
+  const serviceWorker = readFileSync(resolve(process.cwd(), 'extension/src/background/service-worker.ts'), 'utf8');
+
+  assert.equal(
+    serviceWorker.match(/blobs\.listOriginalCleanupCandidates\(\)/gu)?.length,
+    2,
+    'both orphan-selection paths must use the key-only repository query',
+  );
+  assert.doesNotMatch(
+    serviceWorker,
+    /blobs\.list\(\)/u,
+    'the service worker must not hydrate every encrypted blob for storage usage or orphan cleanup',
+  );
 });

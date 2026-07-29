@@ -10,6 +10,7 @@ export const panelPositionSchema = v.object({
 
 export const parsedFieldStateRecordSchema = v.object({
   schemaVersion: v.literal(1),
+  fieldIdVersion: v.optional(v.literal(2)),
   hostname: v.string(),
   pageUrl: v.string(),
   sourceUrl: v.string(),

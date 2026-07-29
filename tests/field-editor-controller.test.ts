@@ -252,13 +252,23 @@ test('split-child set-value accepts a valid replacement and rejects invalidation
   };
   const valid = createHarness({ rawUrl, currentUrlModel: () => applyFieldSplitSpecs(parseUrl(rawUrl), [splitSpec]) });
   valid.patchState({ fieldSplitSpecs: [splitSpec] });
-  valid.controller.enqueueFieldTransform({ name: 'field/transform', fieldId: 'q:0:1', transformId: 'set-value', value: '02' });
+  valid.controller.enqueueFieldTransform({
+    name: 'field/transform',
+    fieldId: 'q:0:0:s:1',
+    transformId: 'set-value',
+    value: '02',
+  });
   await valid.settle();
   assert.equal(valid.applyCalls[0]?.url, 'https://example.test/image?date=0102');
 
   const invalid = createHarness({ rawUrl, currentUrlModel: () => applyFieldSplitSpecs(parseUrl(rawUrl), [splitSpec]) });
   invalid.patchState({ fieldSplitSpecs: [splitSpec] });
-  invalid.controller.enqueueFieldTransform({ name: 'field/transform', fieldId: 'q:0:1', transformId: 'set-value', value: '' });
+  invalid.controller.enqueueFieldTransform({
+    name: 'field/transform',
+    fieldId: 'q:0:0:s:1',
+    transformId: 'set-value',
+    value: '',
+  });
   await invalid.settle();
   assert.deepEqual(invalid.applyCalls, []);
   assert.equal(invalid.getState().status, 'error');

@@ -1,5 +1,6 @@
 import type { ParsedUrlModel, PathPart, QueryField, UrlField, UrlFieldSplitSpec, UrlToken } from './types.js';
 import { detectNumericType, tokenValue } from './tokenize-fields.js';
+import { baseFieldIdForField, baseFieldIdForSplitSpec } from './field-ids.js';
 
 export type FieldSplitPatternResult =
   | { readonly ok: true; readonly lengths: readonly number[]; readonly normalizedPattern: string }
@@ -40,7 +41,7 @@ export function parseFieldSplitPattern(pattern: string, valueLength: number): Fi
 export function createFieldSplitSpec(field: UrlField, pattern: string): FieldSplitSpecResult {
   const parsed = parseFieldSplitPattern(pattern, field.value.length);
   if (!parsed.ok) return parsed;
-  const baseFieldId = field.splitBaseId ?? field.id;
+  const baseFieldId = field.splitBaseId ?? baseFieldIdForField(field);
 
   return {
     baseFieldId,
@@ -117,7 +118,7 @@ function splitToken(token: UrlToken, spec: UrlFieldSplitSpec, originalTokenIndex
     return {
       ...createSplitToken(value),
       originalTokenIndex,
-      splitBaseId: spec.baseFieldId,
+      splitBaseId: baseFieldIdForSplitSpec(spec),
       splitPartIndex,
       splitPartCount: spec.lengths.length,
     };

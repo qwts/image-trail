@@ -1,5 +1,6 @@
 import type { PanelState } from '../types.js';
 import { validFieldSplitSpecsForModel } from '../url/field-splits.js';
+import { baseFieldIdForSplitSpec, splitFieldId } from '../url/field-ids.js';
 import { updateGrabSourcePatternSettings, updateTemplateSettings } from '../url/templates.js';
 import type { ParsedUrlModel, UrlFieldSplitSpec } from '../url/types.js';
 import { assertNeverAction } from './routing.js';
@@ -26,12 +27,12 @@ function removeItems(items: readonly string[], removals: readonly string[]): rea
 }
 
 function splitFieldIds(spec: UrlFieldSplitSpec): readonly string[] {
-  const prefix = spec.location === 'path' ? `p:${spec.partIndex}` : `q:${spec.queryIndex}`;
-  return spec.lengths.map((_, index) => `${prefix}:${spec.tokenIndex + index}`);
+  const baseFieldId = baseFieldIdForSplitSpec(spec);
+  return spec.lengths.map((_, index) => splitFieldId(baseFieldId, index));
 }
 
 function affectedSplitFieldIds(specs: readonly UrlFieldSplitSpec[]): readonly string[] {
-  return [...new Set(specs.flatMap((spec) => [spec.baseFieldId, ...splitFieldIds(spec)]))];
+  return [...new Set(specs.flatMap((spec) => [baseFieldIdForSplitSpec(spec), ...splitFieldIds(spec)]))];
 }
 
 function clearFieldMarkers(state: PanelState, fieldIds: readonly string[]): PanelState {
@@ -49,25 +50,29 @@ function clearFieldMarkers(state: PanelState, fieldIds: readonly string[]): Pane
 }
 
 export function applyFieldSplitSpecToState(state: PanelState, spec: UrlFieldSplitSpec): PanelState {
-  const existing = state.fieldSplitSpecs.find((candidate) => candidate.baseFieldId === spec.baseFieldId);
-  if (existing && fieldSplitSpecsEqual(existing, spec)) return state;
-  const marked = clearFieldMarkers(state, affectedSplitFieldIds(existing ? [existing, spec] : [spec]));
+  const normalizedSpec = { ...spec, baseFieldId: baseFieldIdForSplitSpec(spec) };
+  const existing = state.fieldSplitSpecs.find((candidate) => splitSpecsTargetSameField(candidate, normalizedSpec));
+  if (existing && fieldSplitSpecsEqual(existing, normalizedSpec)) return state;
+  const marked = clearFieldMarkers(state, affectedSplitFieldIds(existing ? [existing, normalizedSpec] : [normalizedSpec]));
   return {
     ...marked,
-    fieldSplitSpecs: [...state.fieldSplitSpecs.filter((candidate) => candidate.baseFieldId !== spec.baseFieldId), spec],
-    message: `Split pattern ${spec.pattern} applied.`,
+    fieldSplitSpecs: [
+      ...state.fieldSplitSpecs.filter((candidate) => !splitSpecsTargetSameField(candidate, normalizedSpec)),
+      normalizedSpec,
+    ],
+    message: `Split pattern ${normalizedSpec.pattern} applied.`,
     status: 'ready',
     lastUpdatedAt: Date.now(),
   };
 }
 
 export function clearFieldSplitSpecFromState(state: PanelState, baseFieldId: string): PanelState {
-  const existing = state.fieldSplitSpecs.find((spec) => spec.baseFieldId === baseFieldId);
+  const existing = state.fieldSplitSpecs.find((spec) => spec.baseFieldId === baseFieldId || baseFieldIdForSplitSpec(spec) === baseFieldId);
   if (!existing) return state;
   const marked = clearFieldMarkers(state, affectedSplitFieldIds([existing]));
   return {
     ...marked,
-    fieldSplitSpecs: state.fieldSplitSpecs.filter((spec) => spec.baseFieldId !== baseFieldId),
+    fieldSplitSpecs: state.fieldSplitSpecs.filter((spec) => !splitSpecsTargetSameField(spec, existing)),
     message: 'Split pattern cleared.',
     status: 'ready',
     lastUpdatedAt: Date.now(),
@@ -76,22 +81,26 @@ export function clearFieldSplitSpecFromState(state: PanelState, baseFieldId: str
 
 function fieldSplitSpecsEqual(left: UrlFieldSplitSpec, right: UrlFieldSplitSpec): boolean {
   return (
-    left.baseFieldId === right.baseFieldId &&
-    left.location === right.location &&
-    left.partIndex === right.partIndex &&
-    left.queryIndex === right.queryIndex &&
-    left.tokenIndex === right.tokenIndex &&
+    splitSpecsTargetSameField(left, right) &&
     left.pattern === right.pattern &&
     left.lengths.length === right.lengths.length &&
     left.lengths.every((length, index) => length === right.lengths[index])
   );
 }
 
+function splitSpecsTargetSameField(left: UrlFieldSplitSpec, right: UrlFieldSplitSpec): boolean {
+  return (
+    left.location === right.location &&
+    left.partIndex === right.partIndex &&
+    left.queryIndex === right.queryIndex &&
+    left.tokenIndex === right.tokenIndex
+  );
+}
+
 export function pruneInvalidFieldSplitSpecsFromState(state: PanelState, model: ParsedUrlModel): PanelState {
   const validSpecs = validFieldSplitSpecsForModel(model, state.fieldSplitSpecs);
   if (validSpecs.length === state.fieldSplitSpecs.length) return state;
-  const validBaseIds = new Set(validSpecs.map((spec) => spec.baseFieldId));
-  const removedSpecs = state.fieldSplitSpecs.filter((spec) => !validBaseIds.has(spec.baseFieldId));
+  const removedSpecs = state.fieldSplitSpecs.filter((spec) => !validSpecs.some((candidate) => splitSpecsTargetSameField(candidate, spec)));
   const marked = clearFieldMarkers(state, affectedSplitFieldIds(removedSpecs));
   return {
     ...marked,

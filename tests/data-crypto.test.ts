@@ -9,7 +9,7 @@ import { DATA_STORE_NAMES, IMAGE_TRAIL_DB_NAME, IMAGE_TRAIL_DB_VERSION } from '.
 
 test('defines a versioned IndexedDB schema with durable encrypted stores', () => {
   assert.equal(IMAGE_TRAIL_DB_NAME, 'image-trail');
-  assert.equal(IMAGE_TRAIL_DB_VERSION, 13);
+  assert.equal(IMAGE_TRAIL_DB_VERSION, 14);
   assert.deepEqual(DATA_STORE_NAMES, [
     'metadata',
     'keys',
@@ -495,12 +495,16 @@ test('migrates neighbor preload settings safely', () => {
     getItem: () => JSON.stringify({ neighborPreloadEnabled: true, neighborPreloadRadius: -1, neighborPreloadCacheLimit: -1 }),
     setItem: () => {},
   });
+  const legacyZero = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ neighborPreloadEnabled: true, neighborPreloadRadius: 3, neighborPreloadCacheLimit: 0 }),
+    setItem: () => {},
+  });
   const valid = new LocalSettingsRepository({
     getItem: () =>
       JSON.stringify({
         neighborPreloadEnabled: true,
         neighborPreloadRadius: 3,
-        neighborPreloadCacheLimit: 0,
+        neighborPreloadCacheLimit: 24,
         neighborPreloadProbeMethod: 'head',
       }),
     setItem: () => {},
@@ -514,9 +518,10 @@ test('migrates neighbor preload settings safely', () => {
   assert.equal(high.load().neighborPreloadCacheLimit, DEFAULT_LOCAL_SETTINGS.neighborPreloadCacheLimit);
   assert.equal(low.load().neighborPreloadRadius, DEFAULT_LOCAL_SETTINGS.neighborPreloadRadius);
   assert.equal(low.load().neighborPreloadCacheLimit, DEFAULT_LOCAL_SETTINGS.neighborPreloadCacheLimit);
+  assert.equal(legacyZero.load().neighborPreloadCacheLimit, DEFAULT_LOCAL_SETTINGS.neighborPreloadCacheLimit);
   assert.equal(valid.load().neighborPreloadEnabled, true);
   assert.equal(valid.load().neighborPreloadRadius, 3);
-  assert.equal(valid.load().neighborPreloadCacheLimit, 0);
+  assert.equal(valid.load().neighborPreloadCacheLimit, 24);
   assert.equal(valid.load().neighborPreloadProbeMethod, 'head');
   assert.equal(invalidEnabled.load().neighborPreloadEnabled, false);
   assert.equal(invalidEnabled.load().neighborPreloadProbeMethod, DEFAULT_LOCAL_SETTINGS.neighborPreloadProbeMethod);

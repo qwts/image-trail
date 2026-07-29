@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { captureFocusedGalleryControl, restoreFocusedGalleryControl } from '../../extension/src/gallery/gallery-focus.js';
+import {
+  captureFocusedGalleryControl,
+  focusGallerySearchInput,
+  restoreFocusedGalleryControl,
+} from '../../extension/src/gallery/gallery-focus.js';
 
 test('Gallery input focus and selection survive a root render', () => {
   const container = document.createElement('main');
@@ -69,5 +73,21 @@ test('Gallery select focus survives a filter render', () => {
 
   assert.equal(document.activeElement, replacement);
   assert.equal(replacement.value, 'PNG');
+  container.remove();
+});
+
+test('Gallery search focus moves the caret to the end', () => {
+  const container = document.createElement('main');
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.value = 'coast';
+  container.append(search);
+  document.body.append(container);
+
+  focusGallerySearchInput(container);
+
+  assert.equal(document.activeElement, search);
+  assert.equal(search.selectionStart, search.value.length);
+  assert.equal(search.selectionEnd, search.value.length);
   container.remove();
 });
