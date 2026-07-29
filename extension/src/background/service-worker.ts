@@ -18,7 +18,7 @@ import { EncryptedPinThumbnailsRepository } from '../data/repositories/encrypted
 import type { StoredBlobRecord } from '../data/types.js';
 import type { UrlReviewStatusClearFilter } from '../core/types.js';
 import { BROWSER_COMMAND_SHORTCUTS } from '../core/keyboard-shortcuts.js';
-import { fetchImageBytes } from './fetch-image.js';
+import { fetchImageBytes, preferredCaptureFileName } from './fetch-image.js';
 import { dataUrlToImageBytes, imageDataUrlFromBytes, openedImageDataFromPayload } from './data-url-image.js';
 import { openPreviewPayload, takePreviewPayload } from './preview-payload-store.js';
 import { fetchLinkedPage } from './fetch-linked-page.js';
@@ -244,7 +244,7 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const sha256 = await computeSha256(bytesResult.bytes);
-  const fileName = message.payload.fileName ?? bytesResult.fileName;
+  const fileName = preferredCaptureFileName(bytesResult, message.payload.fileName);
   const aad = {
     id,
     kind: 'original' as const,

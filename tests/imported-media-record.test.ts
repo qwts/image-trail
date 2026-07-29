@@ -12,8 +12,8 @@ const mediaInfo: MpegTsMediaInfo = {
   loopCount: null,
   container: 'MPEG-TS',
   streams: [
-    { type: 'video', codec: 'H.264', profile: null },
-    { type: 'audio', codec: 'AAC', profile: null },
+    { type: 'video', codec: 'H.264', profile: 'High' },
+    { type: 'audio', codec: 'AAC', profile: 'LC' },
   ],
   durationSeconds: 1.25,
   codedWidth: null,
@@ -81,5 +81,17 @@ test('the MPEG-TS queue poster is deterministic and contains no active content',
   const decoded = atob(first.slice(first.indexOf(',') + 1));
   assert.match(decoded, /MPEG-TS/u);
   assert.match(decoded, /H\.264 \+ AAC/u);
+  assert.match(decoded, /Ready to preview/u);
   assert.equal(/<script|onload=/iu.test(decoded), false);
+});
+
+test('the MPEG-TS queue poster never labels preserved-only profiles ready to preview', () => {
+  const poster = transportStreamPosterDataUrl({
+    ...mediaInfo,
+    streams: [{ type: 'video', codec: 'H.264', profile: 'High 10' }],
+  });
+  const decoded = atob(poster.slice(poster.indexOf(',') + 1));
+
+  assert.match(decoded, /Preserved only/u);
+  assert.doesNotMatch(decoded, /Ready to preview/u);
 });

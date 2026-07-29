@@ -1,5 +1,6 @@
 import { createDisplayRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import type { CaptureResult, StoredOriginalReference } from '../../core/image/capture-result.js';
+import { isRemuxableMpegTsInfo } from '../../core/media/mpeg-ts-playback-tier.js';
 import type { ImportedImageFile } from '../../core/types.js';
 
 export type CapturedImportedMedia = Extract<CaptureResult, { readonly status: 'captured' }>;
@@ -59,7 +60,7 @@ function importedMediaPresentation(
 export function transportStreamPosterDataUrl(mediaInfo: Extract<CapturedImportedMedia['mediaInfo'], { readonly kind: 'mpeg-ts' }>): string {
   const codecs = mediaInfo.streams.map((stream) => stream.codec ?? 'Unknown').join(' + ') || 'Unknown codecs';
   const duration = formatDuration(mediaInfo.durationSeconds);
-  const tier = mediaInfo.streams.some((stream) => stream.codec === 'H.264') ? 'Ready to preview' : 'Preserved only';
+  const tier = isRemuxableMpegTsInfo(mediaInfo) ? 'Ready to preview' : 'Preserved only';
   const svg = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">',
     '<rect width="640" height="360" fill="#07110f"/>',

@@ -42,6 +42,10 @@ export interface FetchImageOptions {
 
 type BoundedBodyResult = { readonly ok: true; readonly bytes: ArrayBuffer } | FetchImageFailure;
 
+export function preferredCaptureFileName(result: Pick<FetchImageSuccess, 'fileName'>, requestedFileName?: string): string | undefined {
+  return result.fileName ?? requestedFileName;
+}
+
 export async function fetchImageBytes(
   url: string,
   maxBytes: number = DEFAULT_MAX_ORIGINAL_BYTES,
