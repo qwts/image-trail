@@ -106,3 +106,26 @@ test('an authoritative empty backup history removes stale backup metadata', () =
   assert.doesNotMatch(text, /stale-backup\.json/u);
   assert.doesNotMatch(text, /Last backup|Encrypted originals|Original bytes|Missing originals|SHA-256/u);
 });
+
+test('an in-progress chunked backup exposes a cooperative cancel action', () => {
+  const initial = createInitialPanelState(0);
+  const actions: unknown[] = [];
+  const section = build(
+    {
+      ...initial,
+      pcloudBackup: {
+        ...initial.pcloudBackup,
+        connectionState: 'busy',
+        pendingOperation: 'backing-up',
+        message: 'Uploading and verifying records part 2...',
+      },
+    },
+    actions,
+  );
+  const cancel = [...section.querySelectorAll('button')].find((button) => button.textContent === 'Cancel current operation');
+
+  assert.ok(cancel);
+  assert.equal(cancel.disabled, false);
+  cancel.click();
+  assert.deepEqual(actions, [{ name: 'cloud-backup/cancel', provider: 'pcloud' }]);
+});

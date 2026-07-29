@@ -40,7 +40,7 @@ export type CloudBackupAction =
       readonly password: string;
     }
   | { readonly name: 'cloud-backup/retry'; readonly provider: 'pcloud' }
-  | { readonly name: 'cloud-backup/disconnect'; readonly provider: 'pcloud' }
+  | { readonly name: 'cloud-backup/disconnect' | 'cloud-backup/cancel'; readonly provider: 'pcloud' }
   | { readonly name: 'import/confirm-restore-preview' }
   | { readonly name: 'import/cancel-restore-preview' };
 
@@ -170,7 +170,6 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
   description.className = 'image-trail-panel__meta';
   description.textContent = 'Manual encrypted backups use Image Trail export files stored in pCloud.';
   group.append(description);
-
   if (state.message) {
     const message = document.createElement('p');
     message.className = state.messageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
@@ -178,9 +177,7 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
     message.textContent = state.message;
     group.append(message);
   }
-
   appendCloudBackupMetadata(group, state);
-
   if (state.restorePreview) {
     group.append(
       createRestorePreview(state.restorePreview, { ...emptyImportExportState(), busy: state.connectionState === 'busy' }, dispatch),
@@ -214,8 +211,11 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
 
   const restoreCandidateControls = createRestoreCandidateControls(state, dispatch, passwordInput);
 
-  const retryBtn = createCloudBackupButton('Retry pCloud', state, () => dispatch({ name: 'cloud-backup/retry', provider: 'pcloud' }));
-  retryBtn.disabled = state.connectionState !== 'error';
+  const cancelable = state.connectionState === 'busy' && ['backing-up', 'restoring'].includes(state.pendingOperation ?? '');
+  const retryBtn = createCloudBackupButton(cancelable ? 'Cancel current operation' : 'Retry pCloud', state, () =>
+    dispatch(cancelable ? { name: 'cloud-backup/cancel', provider: 'pcloud' } : { name: 'cloud-backup/retry', provider: 'pcloud' }),
+  );
+  retryBtn.disabled = state.connectionState !== 'error' && !cancelable;
 
   const disconnectBtn = createCloudBackupButton('Disconnect', state, () =>
     dispatch({ name: 'cloud-backup/disconnect', provider: 'pcloud' }),

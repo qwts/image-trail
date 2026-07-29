@@ -2,6 +2,7 @@ export type PCloudApiHost = 'api.pcloud.com' | 'eapi.pcloud.com';
 
 export type BackupHistoryVerificationMethod = 'download-byte-match' | 'provider-checksum';
 export const BACKUP_HISTORY_LIMIT = 20;
+export const PCLOUD_BACKUP_PART_SUFFIX = '.image-trail-part.json';
 
 export interface BackupHistoryRecord {
   readonly schemaVersion: 1;
@@ -59,10 +60,19 @@ export interface PCloudProviderResult {
   readonly message: string;
 }
 
-export interface PCloudBackupUploadInput {
+export interface PCloudBackupFileUploadInput {
+  readonly operation?: 'upload' | undefined;
   readonly fileName: string;
   readonly fileContent: string;
+  readonly recordHistory?: boolean | undefined;
 }
+
+export interface PCloudBackupCleanupInput {
+  readonly operation: 'cleanup';
+  readonly fileIds: readonly number[];
+}
+
+export type PCloudBackupUploadInput = PCloudBackupFileUploadInput | PCloudBackupCleanupInput;
 
 export interface PCloudBackupRestoreCandidate {
   readonly fileId: number;
@@ -75,9 +85,10 @@ export interface PCloudBackupRestoreCandidate {
 export interface PCloudBackupDownloadInput {
   readonly fileId: number;
   readonly fileName: string;
+  readonly kind?: 'manifest' | 'part' | undefined;
 }
 
-export type PCloudBackupUploadResult =
+export type PCloudBackupFileUploadResult =
   | {
       readonly ok: true;
       readonly status: PCloudProviderStatus;
@@ -101,6 +112,24 @@ export type PCloudBackupUploadResult =
       readonly cleanupFileId?: number | undefined;
       readonly cleanupNeeded?: boolean | undefined;
     };
+
+export type PCloudBackupCleanupResult =
+  | {
+      readonly ok: true;
+      readonly status: PCloudProviderStatus;
+      readonly deletedFileIds: readonly number[];
+      readonly message: string;
+    }
+  | {
+      readonly ok: false;
+      readonly status: PCloudProviderStatus;
+      readonly reason: string;
+      readonly deletedFileIds: readonly number[];
+      readonly failedFileIds: readonly number[];
+      readonly message: string;
+    };
+
+export type PCloudBackupUploadResult = PCloudBackupFileUploadResult | PCloudBackupCleanupResult;
 
 export type PCloudBackupListResult =
   | {

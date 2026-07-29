@@ -934,12 +934,17 @@
           "type": "unit-dom",
           "paths": [
             "tests/backup-history-store.test.ts",
+            "tests/chunked-cloud-backup.test.ts",
+            "tests/pcloud-backup-export.test.ts",
+            "tests/pcloud-backup-restore.test.ts",
+            "tests/pcloud-part-cleanup.test.ts",
             "tests/pcloud-upload-provider.test.ts",
             "tests/pcloud-permissions.test.ts",
             "tests/panel-state-settings.test.ts",
+            "tests/dom/recall-export-controller.test.ts",
             "tests/dom/settings-section.test.ts"
           ],
-          "notes": "Covers provider operations, trusted and sanitized bounded backup-history persistence, disconnected-state hydration, verification-method rendering, plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
+          "notes": "Covers encrypted manifest-plus-parts schema and integrity, bounded one-original backup/restore messages, manifest-last history publication, allowlisted partial cleanup, cooperative cancel UI, provider operations, trusted bounded backup-history persistence, disconnected-state hydration, verification-method rendering, plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
         },
         {
           "type": "storybook",
@@ -953,7 +958,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/import-export-settings.spec.ts",
-          "notes": "Covers mocked pCloud connect, token-hiding UI boundary, manual encrypted backup upload metadata, persistent backup history across disconnect and Settings rerender, restore candidate listing, and restore preview without real pCloud secrets."
+          "notes": "Covers mocked pCloud connect, token-hiding UI boundary, sequential encrypted part uploads with a manifest published last, persistent manifest-only backup history across disconnect and Settings rerender, restore candidate listing, and bounded restore preview without real pCloud secrets."
         }
       ]
     },

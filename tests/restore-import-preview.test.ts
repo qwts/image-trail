@@ -79,6 +79,7 @@ function bookmarkResult(overrides: Partial<BookmarkImportResult> = {}): Bookmark
     externalOriginalCount: 0,
     fullBackup: false,
     originalBlobs: [],
+    backedOriginalBlobIds: [],
     blobKeyBackups: [],
     missingOriginalBlobIds: [],
     albums: [],
@@ -170,6 +171,7 @@ test('createBookmarksRestorePreview reports missing original backups for full ba
     ],
     fullBackup: true,
     originalBlobs: [{ id: 'blob-1' } as never],
+    backedOriginalBlobIds: ['blob-1'],
     externalOriginalCount: 2,
   });
 
