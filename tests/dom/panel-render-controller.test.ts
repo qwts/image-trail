@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import { createInitialPanelState } from '../../extension/src/core/state.js';
 import type { PanelState } from '../../extension/src/core/types.js';
 import { emptyBufferedImageIndex } from '../../extension/src/core/url/buffered-image-navigation.js';
-import type { BufferedNavigationDebugSnapshot } from '../../extension/src/ui/panel/buffered-navigation-controller.js';
+import type {
+  BufferedNavigationDebugSnapshot,
+  BufferedNavigationStatusSnapshot,
+} from '../../extension/src/ui/panel/buffered-navigation-status.js';
 import { PanelRenderController, type PanelRenderControllerDeps } from '../../extension/src/ui/panel/panel-render-controller.js';
 
 // This suite runs under happy-dom (tests/dom/register.ts preload) to exercise the real render/toast/
@@ -20,6 +23,7 @@ interface Harness {
   getState(): PanelState;
   patchState(patch: Partial<PanelState>): void;
   debugSnapshot: BufferedNavigationDebugSnapshot | null;
+  statusSnapshot: BufferedNavigationStatusSnapshot | null;
 }
 
 function createHarness(): Harness {
@@ -40,6 +44,7 @@ function createHarness(): Harness {
       state = { ...state, ...patch };
     },
     debugSnapshot: null,
+    statusSnapshot: null,
   };
   const deps: PanelRenderControllerDeps = {
     getState: () => state,
@@ -62,7 +67,7 @@ function createHarness(): Harness {
     applyRestoredPanelPosition: () => {
       log.push('applyRestoredPanelPosition');
     },
-    bufferedNavDebugSnapshot: () => harness.debugSnapshot,
+    bufferedNavSnapshots: () => ({ debug: harness.debugSnapshot, status: harness.statusSnapshot }),
     refreshRecallIfOpen: () => {
       log.push('refreshRecallIfOpen');
     },
@@ -290,6 +295,47 @@ test('renderRecallOnly is a no-op while the opaque workspace lock is mounted', (
     lock,
     'Recall cannot recursively replace the lock surface',
   );
+});
+
+test('neighbor status refreshes in place, hides muted failures, and removes stale output', () => {
+  const harness = createHarness();
+  harness.patchState({ visible: true });
+  harness.statusSnapshot = {
+    total: 6,
+    warmed: 2,
+    warming: 1,
+    failed: 1,
+    skipped: 1,
+    unknown: 1,
+    failuresVisible: true,
+  };
+  harness.controller.render();
+
+  const initial = harness.root.querySelector<HTMLElement>('.image-trail-panel__neighbor-status');
+  assert.ok(initial);
+  assert.equal(initial.previousElementSibling?.classList.contains('image-trail-panel__header'), true);
+  assert.match(initial.textContent ?? '', /2 warmed · 1 warming · 1 failed · 1 skipped · 1 unknown/u);
+  assert.equal(initial.querySelector('.image-trail-ds__status-pill')?.getAttribute('aria-busy'), 'true');
+
+  harness.statusSnapshot = {
+    total: 6,
+    warmed: 4,
+    warming: 0,
+    failed: 1,
+    skipped: 1,
+    unknown: 0,
+    failuresVisible: false,
+  };
+  harness.controller.renderBufferedNavigationStatus();
+
+  const refreshed = harness.root.querySelector<HTMLElement>('.image-trail-panel__neighbor-status');
+  assert.equal(refreshed, initial, 'the status section survives the targeted refresh');
+  assert.equal(refreshed?.textContent, 'Neighbors: 4 warmed');
+  assert.doesNotMatch(refreshed?.textContent ?? '', /failed|skipped/u);
+
+  harness.statusSnapshot = null;
+  harness.controller.renderBufferedNavigationStatus();
+  assert.equal(harness.root.querySelector('.image-trail-panel__neighbor-status'), null);
 });
 
 test('renderBufferedDebugOverlay renders one cell per buffer index and marks the cursor', () => {
