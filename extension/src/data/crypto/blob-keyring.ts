@@ -1,5 +1,5 @@
 import { createKeyReference } from './key-reference.js';
-import { PBKDF2_ITERATIONS, unwrapKeyWithPassword, wrapKeyWithPassword } from './password-wrap.js';
+import { unwrapKeyWithPassword, wrapKeyWithPassword } from './password-wrap.js';
 import type { KeyReference, StoredKeyRecord } from './types.js';
 import { generateAesGcmKey } from './webcrypto.js';
 import { BlobKeySession, type BlobKeySessionStorage } from './blob-key-session.js';
@@ -125,5 +125,3 @@ export async function activateWrappedBlobKey(
   );
   return blobKeySession.unlock(metadata, extractableKey, undefined, timeoutMinutes);
 }
-
-export { PBKDF2_ITERATIONS };
