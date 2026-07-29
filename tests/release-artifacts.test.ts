@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, win32 } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -13,7 +14,9 @@ type ArtifactPolicyModule = {
 };
 
 type BuildPolicyModule = {
+  bundleStylesheet(sourcePath: string, outputPath: string, options?: { release?: boolean }): Promise<void>;
   extensionOutputPath(sourcePath: string, pathApi?: typeof win32): string;
+  isInjectedStylesheet(sourcePath: string, pathApi?: typeof win32): boolean;
   extensionBuildOptions(input: {
     entryPoint: string;
     outfile: string;
@@ -181,6 +184,32 @@ test('extension stylesheet output paths remain inside dist on Windows', () => {
   assert.throws(() => builds.extensionOutputPath(win32.join('extension', 'outside.css'), win32), /must be inside/u);
 });
 
+test('injected stylesheet detection accepts native Windows separators', () => {
+  assert.equal(builds.isInjectedStylesheet('extension/src/ui/styles/panel-entry.css'), true);
+  assert.equal(builds.isInjectedStylesheet(win32.join('extension', 'src', 'ui', 'styles', 'panel-entry.css'), win32), true);
+  assert.equal(builds.isInjectedStylesheet(win32.join('extension', 'src', 'ui', 'styles', 'panel.css'), win32), false);
+});
+
+test('dynamic injected stylesheet packaging flattens relative imports into one resource', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'image-trail-css-bundle-'));
+  const sourceDirectory = join(directory, 'source');
+  const entry = join(sourceDirectory, 'entry.css');
+  const output = join(directory, 'dist', 'entry.css');
+  mkdirSync(sourceDirectory);
+  writeFileSync(join(sourceDirectory, 'tokens.css'), ':root { --accent: #abc; }\n');
+  writeFileSync(entry, "@import './tokens.css';\n.panel { color: var(--accent); }\n");
+
+  try {
+    await builds.bundleStylesheet(entry, output, { release: false });
+    const bundled = readFileSync(output, 'utf8');
+    assert.doesNotMatch(bundled, /@import/u);
+    assert.match(bundled, /--accent:\s*#abc/u);
+    assert.match(bundled, /\.panel\s*\{/u);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('release build identity rejects extra metadata and local build markers', () => {
   assert.deepEqual(artifacts.validateReleaseBuildInfo(releaseBuildInfo()), []);
   assert.match(artifacts.validateReleaseBuildInfo(releaseBuildInfo({ sourceRoot: '/tmp/repo' })).join(' '), /keys must be exactly/u);
@@ -193,6 +222,20 @@ test('release build identity rejects extra metadata and local build markers', ()
 test('release manifests reject the feature-gated native messaging permission', () => {
   assert.deepEqual(artifacts.validateReleaseManifest({ permissions: ['activeTab', 'storage'] }), []);
   assert.match(artifacts.validateReleaseManifest({ permissions: ['nativeMessaging'] }).join(' '), /must not request nativeMessaging/u);
+});
+
+test('release manifests require dynamic URLs for every web-accessible-resource group', () => {
+  const resources = ['src/ui/styles/panel-entry.css'];
+  assert.deepEqual(
+    artifacts.validateReleaseManifest({
+      web_accessible_resources: [{ resources, matches: ['https://*/*'], use_dynamic_url: true }],
+    }),
+    [],
+  );
+  assert.match(
+    artifacts.validateReleaseManifest({ web_accessible_resources: [{ resources, matches: ['https://*/*'] }] }).join(' '),
+    /group 0 must use a dynamic URL/u,
+  );
 });
 
 test('build pipeline typechecks without emitting source-shaped modules and audits every build', () => {

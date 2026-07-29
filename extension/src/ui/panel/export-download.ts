@@ -136,8 +136,8 @@ export function filenameForExportedImage(url: string): string {
   return `image-trail-image.${normalized && /^[a-z0-9]+$/u.test(normalized) ? normalized : 'png'}`;
 }
 
-export function filenameForExportedImageRecord(record: Pick<ImageDisplayRecord, 'url' | 'title' | 'label'>): string {
-  return filenameFromImageRecord(record);
+export function filenameForExportedImageRecord(record: Pick<ImageDisplayRecord, 'url' | 'title' | 'label' | 'storedOriginal'>): string {
+  return filenameFromImageRecord({ ...record, originalFileName: record.storedOriginal?.fileName });
 }
 
 export function downloadUrl(url: string, fileName: string): void {

@@ -17,6 +17,7 @@ result. Do not skip a step; if a gate fails, stop and surface the failure verbat
 ```sh
 npm run lint          # includes lint:package (no "latest" pins) + eslint (incl. the envelope.updatedAt sort rule)
 npm run format:check
+npm run check:acceptance-coverage
 npm test              # typecheck + compile + unit + DOM suites (includes tests/invariants.test.ts)
 npm run build
 npm run test:e2e      # validates tests/e2e/coverage-map.json, then runs the Playwright extension smoke gate
@@ -43,8 +44,8 @@ already runs them; call out each one by name so a regression is impossible to mi
 
 State, explicitly:
 
-- ✅/❌ per gate (lint, format:check, test, build, test:e2e, test:cov, test:stories:ci), with the
-  failing output if any.
+- ✅/❌ per gate (lint, format:check, acceptance coverage, test, build, test:e2e, test:cov,
+  test:stories:ci), with the failing output if any.
 - ✅/❌ per invariant above. If `tests/invariants.test.ts` failed, name which invariant regressed and
   quote the assertion message.
 - Any `no-restricted-syntax` violation reported by `eslint` (the envelope.updatedAt sort footgun).

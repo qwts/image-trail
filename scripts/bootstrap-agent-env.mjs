@@ -64,24 +64,66 @@ const INVARIANT_SETTINGS = {
   },
 };
 
-// Default permission posture for a fresh repo (a PARAMETER: repos tune the
-// lists, but the shape — broad allows, narrow deny/ask — is the design).
+// Default permission posture for a fresh repo. Repos tune the exact paved-road
+// commands, but command-family wildcards stay out: unlisted operations prompt.
 const DEFAULT_PERMISSIONS = {
   defaultMode: 'acceptEdits',
   allow: [
-    'Bash(npm run *)',
     'Bash(npm test)',
-    'Bash(npm test *)',
     'Bash(npm ci)',
-    'Bash(npm install)',
-    'Bash(npx *)',
-    'Bash(node scripts/*)',
-    'Bash(git *)',
-    'Bash(gh *)',
+    'Bash(npm run lint)',
+    'Bash(npm run format:check)',
+    'Bash(npm run build)',
+    'Bash(npm run typecheck)',
+    'Bash(git status*)',
+    'Bash(git diff*)',
+    'Bash(git log*)',
+    'Bash(git show*)',
+    'Bash(git rev-parse*)',
+    'Bash(git branch --show-current)',
+    'Bash(gh auth status*)',
+    'Bash(gh issue list*)',
+    'Bash(gh issue view*)',
+    'Bash(gh pr list*)',
+    'Bash(gh pr view*)',
+    'Bash(gh pr checks*)',
+    'Bash(gh run list*)',
+    'Bash(gh run view*)',
   ],
-  ask: ['Bash(npm publish*)', 'Bash(gh release *)'],
-  deny: [],
+  ask: [
+    'Bash(npm publish*)',
+    'Bash(npm run package:release*)',
+    'Bash(git push*)',
+    'Bash(gh issue comment*)',
+    'Bash(gh issue create*)',
+    'Bash(gh issue edit*)',
+    'Bash(gh pr comment*)',
+    'Bash(gh pr create*)',
+    'Bash(gh pr merge*)',
+    'Bash(gh pr review*)',
+    'Bash(gh release *)',
+    'Bash(gh workflow run*)',
+  ],
+  deny: [
+    'Bash(npm run test:e2e:ui*)',
+    'Bash(npm run test:e2e:headed*)',
+  ],
 };
+
+const BROAD_COMMAND_ALLOW = [
+  /^Bash\(npm run \*\)$/u,
+  /^Bash\(npm test \*\)$/u,
+  /^Bash\(npm install\*?\)$/u,
+  /^Bash\(npx \*\)$/u,
+  /^Bash\(node (?:scripts\/)?\*\)$/u,
+  /^Bash\(git \*\)$/u,
+  /^Bash\(gh \*\)$/u,
+];
+
+function findBroadAllows(settings) {
+  const allow = Array.isArray(settings.permissions?.allow) ? settings.permissions.allow : [];
+  return allow.filter((rule) => BROAD_COMMAND_ALLOW.some((pattern) => pattern.test(rule)));
+}
 
 function parseArgs(argv) {
   const args = { target: SOURCE_ROOT, check: false, wrap: [], exempt: [] };
@@ -242,9 +284,14 @@ function checkSettings(target, report) {
   const settings = readJson(settingsPath);
   const pre = hookCommands(settings.hooks?.PreToolUse).join(' ');
   const start = hookCommands(settings.hooks?.SessionStart).join(' ');
+  const broadAllows = findBroadAllows(settings);
   report('PreToolUse hook registered', pre.includes('guard-agent-command.mjs'));
   report('SessionStart hook registered', start.includes('guard-session-context.mjs'));
   report(`permissions.defaultMode=${settings.permissions?.defaultMode}`, Boolean(settings.permissions?.defaultMode));
+  report(
+    broadAllows.length === 0 ? 'permissions avoid command-family wildcard allows' : `broad permission allows: ${broadAllows.join(', ')}`,
+    broadAllows.length === 0,
+  );
 }
 
 function checkHookVerdicts(target, report) {

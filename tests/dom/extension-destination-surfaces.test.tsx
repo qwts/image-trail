@@ -194,6 +194,10 @@ test('Settings renders all groups and persists through the extension-owned servi
     assert.equal(thumbnailPolicy?.value, 'encrypted');
     assert.equal(thumbnailPolicy?.disabled, true);
     assert.equal(thumbnailPolicy?.options.length, 1);
+    const preloadCache = root.querySelector<HTMLInputElement>('input[name="neighborPreloadCacheLimit"]');
+    assert.equal(preloadCache?.min, '1');
+    assert.equal(preloadCache?.max, '500');
+    assert.match(root.textContent ?? '', /Cache holds 1–500 image responses per page session/u);
   } finally {
     await cleanup(root);
   }

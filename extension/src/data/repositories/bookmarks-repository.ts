@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { openJsonEnvelope, openValidatedJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
+import { openValidatedJsonEnvelope, sealJsonEnvelope } from '../crypto/envelope.js';
 import type { EncryptedEnvelope } from '../crypto/types.js';
 import { encryptedEnvelopeSchema } from '../crypto/types.schema.js';
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
@@ -13,6 +13,8 @@ export interface EncryptedBookmarkRecord {
   readonly uuid: string;
   readonly url: string;
   readonly queueUpdatedAt: string;
+  readonly encryptedByteLength?: number | undefined;
+  readonly inlineThumbnailByteLength?: number | undefined;
   readonly envelope: EncryptedEnvelope<{ readonly recordType: 'bookmark' }>;
 }
 
@@ -20,8 +22,13 @@ const encryptedBookmarkRecordSchema = v.object({
   uuid: v.string(),
   url: v.string(),
   queueUpdatedAt: v.string(),
+  encryptedByteLength: v.optional(v.pipe(v.number(), v.safeInteger(), v.minValue(0))),
+  inlineThumbnailByteLength: v.optional(v.pipe(v.number(), v.safeInteger(), v.minValue(0))),
   envelope: encryptedEnvelopeSchema('bookmark'),
 }) as v.GenericSchema<unknown, EncryptedBookmarkRecord>;
+
+const textEncoder = new TextEncoder();
+const INTEROP_CUSTODY_PRESENCE_KEY = 'bookmarkInteropCustodyPresence:v1';
 
 export class BookmarksRepository {
   constructor(private readonly db: IDBDatabase) {}
@@ -58,7 +65,9 @@ export class BookmarksRepository {
     const request = transaction.objectStore(DataStore.Bookmarks).openCursor();
     let totalBytes = 0;
     let blobCount = 0;
-    const envelopes: Array<EncryptedBookmarkRecord['envelope']> = [];
+    let thumbnailCount = 0;
+    let thumbnailBytes = 0;
+    const legacyRecords: EncryptedBookmarkRecord[] = [];
 
     await new Promise<void>((resolve, reject) => {
       request.onsuccess = () => {
@@ -68,31 +77,64 @@ export class BookmarksRepository {
           return;
         }
         const record = cursor.value as EncryptedBookmarkRecord;
-        totalBytes += new TextEncoder().encode(JSON.stringify(record.envelope)).byteLength;
+        totalBytes += record.encryptedByteLength ?? encryptedEnvelopeByteLength(record.envelope);
         blobCount += 1;
-        if (key) envelopes.push(record.envelope);
+        if (record.inlineThumbnailByteLength === undefined) {
+          if (key) legacyRecords.push(record);
+        } else if (record.inlineThumbnailByteLength > 0) {
+          thumbnailCount += 1;
+          thumbnailBytes += record.inlineThumbnailByteLength;
+        }
         cursor.continue();
       };
       request.onerror = () => reject(request.error);
     });
 
     await transactionDone(transaction);
-    let thumbnailCount = 0;
-    let thumbnailBytes = 0;
-    if (key) {
-      for (const envelope of envelopes) {
-        try {
-          const payload = await openJsonEnvelope<DurableBookmarkPayloadV1>(envelope, key);
-          if (payload.thumbnail) {
-            thumbnailCount += 1;
-            thumbnailBytes += new TextEncoder().encode(payload.thumbnail).byteLength;
-          }
-        } catch {
-          // Unreadable rows still count as queue metadata, but their inline thumbnail size is unknown.
+    if (!key) return { totalBytes, blobCount, thumbnails: { count: thumbnailCount, totalBytes: thumbnailBytes } };
+    const backfills: BookmarkStorageUsageBackfill[] = [];
+    for (const record of legacyRecords) {
+      try {
+        const payload = await this.openRecord(record, key);
+        const inlineThumbnailByteLength = thumbnailByteLength(payload);
+        if (inlineThumbnailByteLength > 0) {
+          thumbnailCount += 1;
+          thumbnailBytes += inlineThumbnailByteLength;
         }
+        backfills.push({
+          uuid: record.uuid,
+          envelopeIv: record.envelope.iv,
+          envelopeCiphertext: record.envelope.ciphertext,
+          encryptedByteLength: record.encryptedByteLength ?? encryptedEnvelopeByteLength(record.envelope),
+          inlineThumbnailByteLength,
+        });
+      } catch {
+        // Unreadable rows still count as queue metadata, but their inline thumbnail size is unknown.
       }
     }
+    if (backfills.length > 0) await this.backfillStorageUsageMetadata(backfills);
     return { totalBytes, blobCount, thumbnails: { count: thumbnailCount, totalBytes: thumbnailBytes } };
+  }
+
+  async getInteropCustodyPresence(): Promise<boolean | undefined> {
+    const transaction = this.db.transaction(DataStore.Metadata, 'readonly');
+    const raw = await requestToPromise<unknown>(transaction.objectStore(DataStore.Metadata).get(INTEROP_CUSTODY_PRESENCE_KEY));
+    await transactionDone(transaction);
+    return isInteropCustodyPresenceRecord(raw) ? raw.present : undefined;
+  }
+
+  async setInteropCustodyPresence(present: boolean): Promise<void> {
+    const transaction = this.db.transaction(DataStore.Metadata, 'readwrite');
+    const store = transaction.objectStore(DataStore.Metadata);
+    if (!present) {
+      const current = await requestToPromise<unknown>(store.get(INTEROP_CUSTODY_PRESENCE_KEY));
+      if (isInteropCustodyPresenceRecord(current) && current.present) {
+        await transactionDone(transaction);
+        return;
+      }
+    }
+    store.put({ key: INTEROP_CUSTODY_PRESENCE_KEY, present });
+    await transactionDone(transaction);
   }
 
   async listEncryptedPage(input: { readonly offset: number; readonly limit: number }): Promise<readonly EncryptedBookmarkRecord[]> {
@@ -206,8 +248,22 @@ export class BookmarksRepository {
       authenticatedMetadata: { recordType: 'bookmark' as const },
       now,
     });
-    const record = { uuid, url: indexUrl, queueUpdatedAt, envelope };
-    await this.putEncrypted(record);
+    const record = {
+      uuid,
+      url: indexUrl,
+      queueUpdatedAt,
+      encryptedByteLength: encryptedEnvelopeByteLength(envelope),
+      inlineThumbnailByteLength: thumbnailByteLength(payload),
+      envelope,
+    };
+    if (payload.interop) {
+      const transaction = this.db.transaction([DataStore.Bookmarks, DataStore.Metadata], 'readwrite');
+      transaction.objectStore(DataStore.Bookmarks).put(record);
+      transaction.objectStore(DataStore.Metadata).put({ key: INTEROP_CUSTODY_PRESENCE_KEY, present: true });
+      await transactionDone(transaction);
+    } else {
+      await this.putEncrypted(record);
+    }
     return record;
   }
 
@@ -219,4 +275,54 @@ export class BookmarksRepository {
   async openRecord(record: EncryptedBookmarkRecord, key: CryptoKey): Promise<DurableBookmarkPayloadV1> {
     return openValidatedJsonEnvelope(record.envelope, key, durableBookmarkPayloadSchema);
   }
+
+  private async backfillStorageUsageMetadata(backfills: readonly BookmarkStorageUsageBackfill[]): Promise<void> {
+    const transaction = this.db.transaction(DataStore.Bookmarks, 'readwrite');
+    const store = transaction.objectStore(DataStore.Bookmarks);
+    for (const backfill of backfills) {
+      const raw = await requestToPromise<unknown>(store.get(backfill.uuid));
+      const current = hydrateRecord(DataStore.Bookmarks, encryptedBookmarkRecordSchema, raw);
+      if (
+        !current ||
+        current.envelope.iv !== backfill.envelopeIv ||
+        current.envelope.ciphertext !== backfill.envelopeCiphertext ||
+        current.inlineThumbnailByteLength !== undefined
+      ) {
+        continue;
+      }
+      store.put({
+        ...(raw as Record<string, unknown>),
+        encryptedByteLength: backfill.encryptedByteLength,
+        inlineThumbnailByteLength: backfill.inlineThumbnailByteLength,
+      });
+    }
+    await transactionDone(transaction);
+  }
+}
+
+interface BookmarkStorageUsageBackfill {
+  readonly uuid: string;
+  readonly envelopeIv: string;
+  readonly envelopeCiphertext: string;
+  readonly encryptedByteLength: number;
+  readonly inlineThumbnailByteLength: number;
+}
+
+function encryptedEnvelopeByteLength(envelope: EncryptedBookmarkRecord['envelope']): number {
+  return textEncoder.encode(JSON.stringify(envelope)).byteLength;
+}
+
+function thumbnailByteLength(payload: DurableBookmarkPayloadV1): number {
+  return payload.thumbnail ? textEncoder.encode(payload.thumbnail).byteLength : 0;
+}
+
+function isInteropCustodyPresenceRecord(value: unknown): value is { readonly key: string; readonly present: boolean } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'key' in value &&
+    value.key === INTEROP_CUSTODY_PRESENCE_KEY &&
+    'present' in value &&
+    typeof value.present === 'boolean'
+  );
 }

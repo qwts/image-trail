@@ -21,10 +21,10 @@ import {
   findQualifyingImages,
   getImageRejectionReason,
   isQualifyingImage,
-  recoverTargetImage,
   type TargetImageLocator,
   type TargetImageInfo,
 } from './target-image.js';
+import { TargetRecoveryController } from './target-recovery-controller.js';
 import {
   markGrabPreviewTarget,
   markHoveredTarget,
@@ -40,6 +40,7 @@ import { createFetchLinkedPageMessage, isFetchLinkedPageResultMessage } from '..
 import { sendRuntimeMessage } from './runtime-message.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT, type ObjectFitMode } from '../core/preview-style.js';
 import type { ProjectionReason } from '../core/projection-session.js';
+import { safeHttpUrl } from './http-url.js';
 
 export type TargetSelectionMode = 'auto' | 'manual' | 'none';
 
@@ -123,7 +124,6 @@ export class PageAdapter {
   private selected: HTMLImageElement | null = null;
   private selectedHandleId: string | null = null;
   private selectedLocator: TargetImageLocator | null = null;
-  private targetObserver: MutationObserver | null = null;
   private hovered: HTMLImageElement | null = null;
   private candidates = new Set<HTMLImageElement>();
   private detectedCandidateCount = 0;
@@ -144,6 +144,10 @@ export class PageAdapter {
   private selectedObjectFit: ObjectFitMode = DEFAULT_PREVIEW_OBJECT_FIT;
   private lastSnapshot: TargetSelectionSnapshot = this.createSnapshot('No target selected.');
   private readonly observer = new DomObserver(() => this.refreshPickCandidates());
+  private readonly targetRecovery = new TargetRecoveryController({
+    shouldRecover: () => !this.selected?.isConnected,
+    onRecovered: (replacement) => this.applyRecoveredTarget(replacement),
+  });
   private readonly listeners = new Set<TargetSelectionListener>();
   private readonly loadListeners = new Set<TargetLoadListener>();
   private readonly bookmarkRequestListeners = new Set<TargetBookmarkRequestListener>();
@@ -154,6 +158,7 @@ export class PageAdapter {
   private activeTemplateGrabStrategy: UrlTemplateGrabStrategy | undefined;
   private suppressBookmarkShortcutClickTarget: EventTarget | null = null;
   private grabPreview: { readonly element: HTMLElement; readonly state: 'valid' | 'invalid' } | null = null;
+  private grabPreviewPointer: { target: Element; resolution: GrabPreviewResolution } | null = null;
   private preparedStandaloneBackdrop: HTMLImageElement | null = null;
   private readonly grabStrategies: readonly GrabStrategy[] = [
     {
@@ -277,11 +282,13 @@ export class PageAdapter {
   }
 
   setUrlTemplates(templates: readonly UrlTemplateRecord[], activeTemplateId: string | null): void {
+    this.clearGrabPreview();
     const template = templates.find((candidate) => candidate.id === activeTemplateId) ?? null;
     this.activeTemplateGrabStrategy = normalizeGrabStrategy(template?.grabStrategy);
   }
 
   setGrabSourcePatterns(patterns: readonly GrabSourcePattern[]): void {
+    this.clearGrabPreview();
     this.grabSourcePatterns = patterns;
   }
 
@@ -301,7 +308,7 @@ export class PageAdapter {
     this.clearGrabPreview();
     this.stopPickMode();
     this.restoreSelectedTargetStyles();
-    this.stopTargetRecovery();
+    this.targetRecovery.stop();
     this.selectedLocator = null;
     this.mode = 'none';
   }
@@ -459,7 +466,7 @@ export class PageAdapter {
       this.clearGrabPreview();
       return;
     }
-    this.applyGrabPreview(this.resolveGrabPreview(target));
+    this.applyGrabPreview(this.resolveGrabPreviewForPointer(target));
   };
 
   private onGrabPreviewPointerOut = (event: PointerEvent): void => {
@@ -523,16 +530,25 @@ export class PageAdapter {
     return { state: 'valid', element: image, strategy };
   }
 
+  private resolveGrabPreviewForPointer(target: Element): GrabPreviewResolution {
+    if (target === this.grabPreviewPointer?.target) {
+      return this.grabPreviewPointer.resolution;
+    }
+    const resolution = this.resolveGrabPreview(target);
+    this.grabPreviewPointer = { target, resolution };
+    return resolution;
+  }
+
   private applyGrabPreview(preview: GrabPreviewResolution): void {
     if (this.grabPreview?.element === preview.element && this.grabPreview.state === preview.state) return;
-    this.clearGrabPreview();
+    if (this.grabPreview) restoreGrabPreviewTarget(this.grabPreview.element);
     markGrabPreviewTarget(preview.element, preview.state);
     this.grabPreview = { element: preview.element, state: preview.state };
   }
 
   private clearGrabPreview(): void {
-    if (!this.grabPreview) return;
-    restoreGrabPreviewTarget(this.grabPreview.element);
+    this.grabPreviewPointer = null;
+    if (this.grabPreview) restoreGrabPreviewTarget(this.grabPreview.element);
     this.grabPreview = null;
   }
 
@@ -668,7 +684,7 @@ export class PageAdapter {
     if (handleId) image.setAttribute('data-image-trail-handle', handleId);
     markSelectedTarget(image, { lockBox: this.selectedFillScreen, objectFit: this.selectedObjectFit });
     this.watchSelectedLoad(image);
-    this.startTargetRecovery();
+    this.targetRecovery.start(this.selectedLocator);
   }
 
   private restoreSelectedTarget(): void {
@@ -684,7 +700,7 @@ export class PageAdapter {
     }
     if (this.preparedStandaloneBackdrop === this.selected) this.preparedStandaloneBackdrop = null;
     this.clearPendingLoadTarget();
-    this.stopTargetRecovery();
+    this.targetRecovery.stop();
     this.selected = null;
     this.selectedHandleId = null;
     this.selectedLocator = null;
@@ -696,23 +712,7 @@ export class PageAdapter {
     this.selectedProjectionReason = null;
   }
 
-  private startTargetRecovery(): void {
-    this.stopTargetRecovery();
-    if (!this.selectedLocator || typeof MutationObserver === 'undefined') return;
-    this.targetObserver = new MutationObserver(() => this.recoverSelectedTarget());
-    this.targetObserver.observe(document.documentElement, { childList: true, subtree: true });
-  }
-
-  private stopTargetRecovery(): void {
-    this.targetObserver?.disconnect();
-    this.targetObserver = null;
-  }
-
-  private recoverSelectedTarget(): void {
-    if (this.selected?.isConnected || !this.selectedLocator) return;
-    const replacement = recoverTargetImage(this.selectedLocator);
-    if (!replacement) return;
-
+  private applyRecoveredTarget(replacement: HTMLImageElement): void {
     this.clearPendingLoadTarget();
     this.selected = replacement;
     this.selectedOriginalSnapshot = captureImageNavigationSnapshot(replacement);
@@ -917,14 +917,4 @@ async function fetchLinkedPageText(
     if (error instanceof Error) throw error;
   }
   throw new Error('Linked page fetch failed.');
-}
-
-function safeHttpUrl(value: string | null | undefined, baseUrl: string): URL | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value, baseUrl);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null;
-  } catch {
-    return null;
-  }
 }

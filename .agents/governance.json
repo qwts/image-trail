@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "canonicalInstructions": "AGENTS.md",
+  "directoryInstructions": ["extension/src/data/AGENTS.md", "extension/src/ui/AGENTS.md"],
+  "vendorAdapters": [
+    {
+      "vendor": "claude-code",
+      "path": "CLAUDE.md"
+    },
+    {
+      "vendor": "github-copilot",
+      "path": ".github/copilot-instructions.md"
+    },
+    {
+      "vendor": "cursor",
+      "path": ".cursor/rules/process-guard.mdc"
+    }
+  ],
+  "repoOwnedSkills": [
+    {
+      "name": "source-command-check",
+      "path": ".agents/skills/source-command-check/SKILL.md"
+    }
+  ],
+  "slashCommands": [
+    {
+      "name": "check",
+      "path": ".claude/commands/check.md",
+      "canonicalProcedure": ".agents/skills/source-command-check/SKILL.md"
+    },
+    {
+      "name": "release",
+      "path": ".claude/commands/release.md",
+      "canonicalProcedure": "https://github.com/qwts/image-trail/wiki/Versioning-and-Releases"
+    }
+  ],
+  "supplyChain": {
+    "externalMcpServers": [],
+    "thirdPartySkills": []
+  },
+  "evaluationSet": ".agents/evals/golden-tasks.json"
+}

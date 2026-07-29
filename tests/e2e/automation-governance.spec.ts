@@ -110,3 +110,15 @@ test('request-governor status surfaces bounded automation recovery', async ({ pa
   // so the deliberate one-request cap cannot leak into unrelated navigation checks.
   await setRequestThrottle(page, { minimumIntervalMs: '250', maxRequests: '60', windowMs: '60000' });
 });
+
+test('neighbor preload exposes a bounded page-session cache contract', async ({ page, serviceWorker }) => {
+  await openPanel(page, serviceWorker);
+  await openSettingsGroup(page, 'Automation');
+  const preload = page
+    .getByRole('heading', { name: 'Preload' })
+    .locator('xpath=ancestor::div[contains(@class, "image-trail-panel__settings-templates")][1]');
+  const cache = preload.getByLabel('Cache');
+  await expect(cache).toHaveAttribute('min', '1');
+  await expect(cache).toHaveAttribute('max', '500');
+  await expect(preload).toContainText('Cache holds 1–500 image responses per page session');
+});

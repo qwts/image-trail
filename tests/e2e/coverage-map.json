@@ -38,6 +38,39 @@
       ]
     },
     {
+      "id": "gif-webp-original-preservation",
+      "acceptance": "Static and animated GIF/WebP capture, poster, preview, export, backup, and Photos metadata preservation",
+      "repoPath": "tests/e2e/gif-webp-media.spec.ts",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-GIF-And-WebP-Media",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/gif-webp-media.test.ts",
+            "tests/data-url-image.test.ts",
+            "tests/fetch-image.test.ts",
+            "tests/encrypted-blobs.test.ts",
+            "tests/full-backup-originals.test.ts",
+            "tests/interop-media.test.ts",
+            "tests/interop-record-export.test.ts",
+            "tests/interop-record-translation.test.ts",
+            "tests/dom/animated-preview.test.ts"
+          ],
+          "notes": "Covers bounded signature/frame/loop/dimension inspection, malformed and hostile input rejection, MIME correction, exact encrypted-byte hashes, durable optional media metadata, original filenames, full-backup preservation, strict contract-v1 Photos metadata, inbound enrichment, and reduced-motion poster Play/Stop behavior."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/gif-webp-media.spec.ts",
+          "notes": "Captures checked-in animated GIF, animated WebP, and static WebP fixtures in the packaged extension; proves static queue posters, exact downloaded hashes and filenames, malformed-input atomicity, browser animation playback, reduced-motion poster hold, intentional Play/Stop, and static WebP rendering."
+        },
+        {
+          "type": "manual",
+          "reason": "Real operating-system reduced-motion startup, source timing perception, and live Photos transfer remain human/browser integration checks while Transfer and Sync stays experimental.",
+          "notes": "Start Chrome with reduced motion already enabled, open each captured original from Gallery, verify no animated frame appears before Play, compare visible frame timing and loop behavior to the source, then run an experimental Image Trail to Photos to Image Trail transfer and compare filename, MIME, dimensions, animation facts, and SHA-256."
+        }
+      ]
+    },
+    {
       "id": "design-system-foundation",
       "acceptance": "Shared design-system tokens and core primitive contracts",
       "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
@@ -146,14 +179,15 @@
             "tests/e2e/workspace-accessibility.spec.ts",
             "tests/e2e/workspace-reload-persistence.spec.ts",
             "tests/e2e/workspace-visual-states.spec.ts",
-            "tests/e2e/detached-auto-grow.spec.ts"
+            "tests/e2e/detached-auto-grow.spec.ts",
+            "tests/e2e/panel-position-render-churn.spec.ts"
           ],
-          "notes": "Covers packaged four-edge snapping, pointer and keyboard previews, shade versus attached collapse, button and threshold-drag unsnap with cancel, rail order, Recents and Queue auto-growth until manual resize, stable user-owned height with further rows, continued resize access, reattach reset, extension-surface panel collision resolution, responsive rail fallback and clamping, focus handoff, deterministic floating/shaded/railed/restored artifacts, private persisted restore and reset across extension restart, local build-overlay stacking, and the overlay-only boundary across responsive, fixed/sticky, feed, nested-scroll, RTL, iframe, transformed-root, SPA, navigation, fullscreen, zoom-equivalent, narrow, reduced-motion, coarse-pointer, interrupted-drag, and exact host-baseline cases."
+          "notes": "Covers packaged four-edge snapping, pointer and keyboard previews, shade versus attached collapse, button and threshold-drag unsnap with cancel, rail order, Recents and Queue auto-growth until manual resize, stable user-owned height with further rows, continued resize access, reattach reset, extension-surface panel collision resolution, panel dragging without Recall rebuilds, one resize-end panel rebuild after a viewport-event burst, responsive rail fallback and clamping, focus handoff, deterministic floating/shaded/railed/restored artifacts, private persisted restore and reset across extension restart, local build-overlay stacking, and the overlay-only boundary across responsive, fixed/sticky, feed, nested-scroll, RTL, iframe, transformed-root, SPA, navigation, fullscreen, zoom-equivalent, narrow, reduced-motion, coarse-pointer, interrupted-drag, and exact host-baseline cases."
         },
         {
           "type": "manual",
           "reason": "The arbitrary-host overlay, browser zoom clamp, and final handoff visual fidelity need packaged-extension inspection.",
-          "notes": "Follow the canonical Workspace Rails Cross-Site Safety wiki script at 1440x900 and 200% zoom. Confirm rail width 344px, top and bottom height 240px, supported overlay and fallback behavior, exact host cleanup, keyboard and pointer escape paths, private persistence/reset, Recall remaining panel-relative, and chrome matching handoff screenshot 11."
+          "notes": "Follow the canonical Workspace Rails Cross-Site Safety wiki script at 1440x900 and 200% zoom. Confirm rail width 344px, top and bottom height 240px, supported overlay and fallback behavior, exact host cleanup, keyboard and pointer escape paths, private persistence/reset, Recall remaining panel-relative without flicker while dragging, smooth live viewport resize with one final reflow, and chrome matching handoff screenshot 11."
         }
       ]
     },
@@ -266,7 +300,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/gallery-design-system.spec.ts",
-          "notes": "Covers the packaged extension Gallery with real durable IndexedDB records, shared primitive adoption, canonical queue order, debounced search, source-host/image-type/record-kind filters with AND behavior, active-filter clear and no-match state, album creation and membership, native keyboard order with focus preserved through filter and background refresh renders, narrow overflow, and reduced-motion behavior; verifies browsing, search, filtering, and album membership do not reorder the durable queue."
+          "notes": "Covers the packaged extension Gallery with real durable IndexedDB records, shared primitive adoption, canonical queue order, one cached durable scan across debounced search and source-host/image-type/record-kind filter interactions with explicit reload invalidation (#632), active-filter clear and no-match state, album creation and membership, native keyboard order with focus preserved through filter and background refresh renders, narrow overflow, and reduced-motion behavior; verifies browsing, search, filtering, and album membership do not reorder the durable queue."
         },
         {
           "type": "manual",
@@ -349,7 +383,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
-          "notes": "Covers service-worker/id resolution, programmatic injection with a test-build grant limited to the local fixture origin, panel open/close, single-image auto-select, multi-image target picking, minimize/expand/close/reopen lifecycle, duplicate-DOM prevention, and close cleanup. The production activeTab toolbar gesture and optional prompt remain manual browser checks."
+          "notes": "Covers service-worker/id resolution; session-scoped web-accessible stylesheet URLs that load while the stable extension-ID path cannot be fetched from the host page; programmatic injection with a test-build grant limited to the local fixture origin; panel open/close; single-image auto-select; multi-image target picking; minimize/expand/close/reopen lifecycle; duplicate-DOM prevention; and close cleanup. The production activeTab toolbar gesture and optional prompt remain manual browser checks."
         },
         {
           "type": "unit-dom",
@@ -359,7 +393,7 @@
             "tests/fetch-linked-page.test.ts",
             "tests/messages.test.ts"
           ],
-          "notes": "Covers removal of static all-sites injection and required host access, retention of activeTab plus scripting, optional http/https declarations, exact per-origin permission requests, linked-page permission preflight, and same-origin-only credential inclusion across the validated runtime-message boundary."
+          "notes": "Covers removal of static all-sites injection and required host access, retention of activeTab plus scripting, optional http/https declarations, session-scoped web-accessible resources, exact per-origin permission requests, linked-page permission preflight, and same-origin-only credential inclusion across the validated runtime-message boundary."
         }
       ]
     },
@@ -558,6 +592,11 @@
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
           "notes": "Covers multi-image target picking and the visible selected-target indicator on only the chosen host image."
+        },
+        {
+          "type": "unit-dom",
+          "path": "tests/target-image.test.ts",
+          "notes": "Covers target URL precedence and link-source trust boundaries: only the real trusted search-page origin can unwrap a trusted search link, page-authored base URLs cannot spoof that origin, and wrapper parameters plus direct linked-image URLs reject file:, javascript:, and data: schemes."
         }
       ]
     },
@@ -575,6 +614,7 @@
             "tests/field-editor-controller.test.ts",
             "tests/field-editor-view-model.test.ts",
             "tests/panel-state-parsed-fields.test.ts",
+            "tests/dom/parsed-field-state-record-controller.test.ts",
             "tests/dom/controls-view.test.ts",
             "tests/dom/field-row.test.ts",
             "tests/dom/fields-view.test.ts",
@@ -589,7 +629,7 @@
             "tests/url-stepping-presets.test.ts",
             "tests/url-template-settings-controller.test.ts"
           ],
-          "notes": "Covers parsed-field state sync plus the serializable Field Editor view model and typed design-system FieldRow: active position/count and collapsed hierarchy, native control semantics and keyboard order, state priority, previous/next field selection, status flags/chips, navigation eligibility, transform/reset availability, template-filtered and invalid-URL empty states, muted failure visibility, JSON serialization, split-child routing, commit-before-command ordering, numeric display modes, baseline restoration, privacy masking without label/value/title leakage, the user-facing Field Editor section name (#248), bounded saved stepping presets whose exact unsplit numeric fields are reviewable before persistence through the existing URL template store (#207), and #622 buffered image runtime responses surviving JSON-shaped transport as validated data URLs that decode back to exact image bytes."
+          "notes": "Covers parsed-field state sync plus the serializable Field Editor view model and typed design-system FieldRow: active position/count and collapsed hierarchy, native control semantics and keyboard order, state priority, previous/next field selection, status flags/chips, navigation eligibility, transform/reset availability, template-filtered and invalid-URL empty states, muted failure visibility, JSON serialization, split-child routing, commit-before-command ordering, numeric display modes, baseline restoration, privacy masking without label/value/title leakage, #642 stable original-token and split-child identities preserving unrelated digit-width/marker state across split apply, clear, multiple splits, restore, and legacy parsed-state/template migration, the user-facing Field Editor section name (#248), bounded saved stepping presets whose exact unsplit numeric fields are reviewable before persistence through the existing URL template store (#207), and #622 buffered image runtime responses surviving JSON-shaped transport as validated data URLs that decode back to exact image bytes."
         },
         {
           "type": "storybook",
@@ -687,7 +727,7 @@
             "tests/dom/history-view.test.ts",
             "tests/dom/panel-data-load-controller.test.ts"
           ],
-          "notes": "Covers origin-and-path page identity, hostname site identity, global insertion order, URL and id deduplication, scope-aware removal, provenance-preserving metadata updates, stale scope-load rejection, site defaulting, selection cleanup, privacy-safe labels, message validation, the dedicated scope row outside the collapse header, and the invariant that Recents have no durable-storage write path."
+          "notes": "Covers origin-and-path page identity, hostname site identity, global insertion order, URL and id deduplication, scope-aware removal, provenance-preserving metadata updates, stale scope-load rejection, #630 Queue paging generations rejecting older offsets and responses invalidated by scope/order/hostname changes while accepting global and same-host site responses across page URL updates, site defaulting, selection cleanup, privacy-safe labels, message validation, the dedicated scope row outside the collapse header, and the invariant that Recents have no durable-storage write path."
         },
         {
           "type": "storybook",
@@ -716,8 +756,11 @@
           "type": "unit-dom",
           "paths": [
             "tests/messages.test.ts",
+            "tests/bookmark-storage-usage.test.ts",
             "tests/bookmark-original-preservation.test.ts",
+            "tests/indexeddb-bookmark-cache.test.ts",
             "tests/indexeddb-bookmark-store.test.ts",
+            "tests/indexeddb-repositories.test.ts",
             "tests/indexeddb-recall-queue.test.ts",
             "tests/indexeddb-protected-pins.test.ts",
             "tests/record-library-controller.test.ts",
@@ -725,7 +768,7 @@
             "tests/dom/record-library-controller.test.ts",
             "tests/dom/captured-originals-controller.test.ts"
           ],
-          "notes": "Covers saved-row lookup messages, plain/protected URL lookup without queue-order mutation, original and thumbnail preservation during re-save/import, target-capture DOM thumbnail creation with URL-fetch fallback and permission-retry completion, explicit original clearing, recent enrichment from off-page saved rows, duplicate pin prevention, stale all-scope pin responses being discarded after a Recents scope change, capture skip/update behavior, post-capture blob cleanup on failed durable save, linked recent cleanup, and Delete original resolving non-visible durable rows (#661)."
+          "notes": "Covers saved-row lookup messages, plain/protected URL lookup without queue-order mutation, original and thumbnail preservation during re-save/import, target-capture DOM thumbnail creation with URL-fetch fallback and permission-retry completion, explicit original clearing, recent enrichment from off-page saved rows, duplicate pin prevention, stale all-scope pin responses being discarded after a Recents scope change, capture skip/update behavior, post-capture blob cleanup on failed durable save, linked recent cleanup, Delete original resolving non-visible durable rows (#661), and #639 preventing repeated decrypt-all work after one-time legacy interoperability and storage-metric scans, preserving ordinary-index interoperability custody during protected conversion, and caching active/locked Queue pages."
         },
         {
           "type": "playwright-e2e",
@@ -792,17 +835,18 @@
             "tests/indexeddb-protected-pins.test.ts",
             "tests/encrypted-blobs.test.ts",
             "tests/blobs-repository.test.ts",
+            "tests/orphaned-blobs.test.ts",
             "tests/background-original-blob-handlers.test.ts",
             "tests/captured-originals-controller.test.ts",
             "tests/missing-original-repair-controller.test.ts",
             "tests/dom/bookmarks-view.test.ts"
           ],
-          "notes": "Covers selected durable-pin repair: existing encrypted blob references are verified through key-only IndexedDB reads without hydrating encrypted bytes, missing or metadata-only originals are re-captured through the existing capture path, private rows without a source URL are rejected, permission-needed capture pauses the batch, and queue timestamps remain unchanged."
+          "notes": "Covers selected durable-pin repair plus storage-health cleanup: existing encrypted blob references and orphan candidates are verified through key-only IndexedDB reads without hydrating encrypted bytes; missing or metadata-only originals are re-captured through the existing capture path; private rows without a source URL are rejected; permission-needed capture pauses the batch; and queue timestamps remain unchanged."
         },
         {
           "type": "playwright-e2e",
-          "path": "tests/e2e/image-utilities.spec.ts",
-          "notes": "Covers encrypted original setup, capture from a queue row, stored-original indicator, and selected-record export preferring stored original bytes when unlocked."
+          "paths": ["tests/e2e/image-utilities.spec.ts", "tests/e2e/storage-orphan-scan.spec.ts"],
+          "notes": "Covers encrypted original setup, capture from a queue row, stored-original indicator, selected-record export preferring stored original bytes when unlocked, and isolated packaged storage-health and cleanup requests that preserve byte/count/deletion behavior while rejecting blob-store getAll and value-cursor reads."
         }
       ]
     },
@@ -929,12 +973,17 @@
           "type": "unit-dom",
           "paths": [
             "tests/backup-history-store.test.ts",
+            "tests/chunked-cloud-backup.test.ts",
+            "tests/pcloud-backup-export.test.ts",
+            "tests/pcloud-backup-restore.test.ts",
+            "tests/pcloud-part-cleanup.test.ts",
             "tests/pcloud-upload-provider.test.ts",
             "tests/pcloud-permissions.test.ts",
             "tests/panel-state-settings.test.ts",
+            "tests/dom/recall-export-controller.test.ts",
             "tests/dom/settings-section.test.ts"
           ],
-          "notes": "Covers provider operations, trusted and sanitized bounded backup-history persistence, disconnected-state hydration, verification-method rendering, plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
+          "notes": "Covers encrypted manifest-plus-parts schema and integrity, bounded one-original backup/restore messages, manifest-last history publication, allowlisted partial cleanup, cooperative cancel UI, provider operations, trusted bounded backup-history persistence, disconnected-state hydration, verification-method rendering, plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
         },
         {
           "type": "storybook",
@@ -948,7 +997,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/import-export-settings.spec.ts",
-          "notes": "Covers mocked pCloud connect, token-hiding UI boundary, manual encrypted backup upload metadata, persistent backup history across disconnect and Settings rerender, restore candidate listing, and restore preview without real pCloud secrets."
+          "notes": "Covers mocked pCloud connect, token-hiding UI boundary, sequential encrypted part uploads with a manifest published last, persistent manifest-only backup history across disconnect and Settings rerender, restore candidate listing, and bounded restore preview without real pCloud secrets."
         }
       ]
     },
@@ -978,11 +1027,29 @@
         {
           "type": "unit-dom",
           "paths": [
+            "tests/buffered-image-navigation.test.ts",
             "tests/neighbor-preload-controller.test.ts",
             "tests/buffered-navigation-controller.test.ts",
+            "tests/dom/buffered-navigation-controller.test.ts",
+            "tests/dom/neighbor-status-view.test.ts",
+            "tests/dom/panel-render-controller.test.ts",
+            "tests/data-crypto.test.ts",
+            "tests/panel-state-settings.test.ts",
+            "tests/dom/automation-settings-view.test.ts",
+            "tests/dom/extension-destination-surfaces.test.tsx",
             "tests/dom/parsed-field-navigation-controller.test.ts"
           ],
-          "notes": "Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts."
+          "notes": "Includes #631 cache bounds: supported settings are 1–500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Includes #627 decoded-image lifecycle coverage too: rebuild and disabled-preload paths revoke offscreen buffered blobs while transferring the still-selected display blob, final disposal revokes every retained blob, concurrent decodes that complete after disposal are revoked too, and the HTTP anchor remains untouched; DOM-backed image state is covered. Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts. Includes compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/automation-settings-view.stories.ts",
+          "notes": "Covers #631 through the rendered Cache min/max attributes and bounded-memory copy."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/automation-governance.spec.ts",
+          "notes": "Covers #631 in the packaged panel: Cache exposes the 1–500 range and explains the per-page-session memory bound."
         },
         {
           "type": "unit-dom",
@@ -993,6 +1060,16 @@
           "type": "unit-dom",
           "paths": ["tests/buffered-navigation-controller.test.ts"],
           "notes": "Covers #450: the 'Skipped a failed image candidate.' toast is failure feedback, so it fires only in Alert mode; Display/Mute skip past the failed neighbor to the next good candidate silently (the skip is driven by the request-policy cache, not the toast)."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/neighbor-status-view.stories.ts",
+          "notes": "Covers mixed warmed, warming, failed, skipped, and unknown counts plus Mute-mode suppression in the compact panel treatment."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/neighbor-status.spec.ts",
+          "notes": "Warms a bounded parsed-field window, surfaces a failed candidate, verifies it becomes skipped only after traversal, masks failure counts in Mute, removes retained status when preloading is disabled, and rejects URL/blob disclosure in the status copy."
         },
         {
           "type": "deferred",
@@ -1226,7 +1303,7 @@
     },
     {
       "id": "searchable-metadata-privacy-policy",
-      "acceptance": "User-controlled searchable metadata privacy policy (issue #451) \u2014 Slice 1: policy framework, settings surface, and opt-in URL-derived enforcement for new records",
+      "acceptance": "User-controlled searchable metadata privacy policy (issues #451 and #641) \u2014 policy framework, settings surface, bookmark URL indexes, and encrypted URL-derived workflow metadata",
       "repoPath": "docs/acceptance-tests/searchable-metadata-privacy-policy.md",
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Searchable-Metadata-Privacy-Policy",
       "coverage": [
@@ -1235,15 +1312,21 @@
           "paths": [
             "tests/searchable-metadata-policy.test.ts",
             "tests/searchable-metadata-store.test.ts",
+            "tests/url-metadata-privacy.test.ts",
             "tests/thumbnail-at-rest.test.ts",
             "tests/dom/settings-view.test.ts"
           ],
-          "notes": "Covers the policy model (compatible URL/album defaults, encrypted-only thumbnails, URL index-key derivation, guards, and legacy local-settings sanitize), storage inspection proving locked-session thumbnail bytes stay inside an AES-GCM bookmark envelope, the durable store keeping the raw URL index under the default while an opt-in encrypted policy hashes only NEW records yet stays findable/dedupable by real URL, dual-encoding lookup resolving a legacy plaintext row after switching to encrypted without rewriting existing records, and both Settings surfaces reporting the immutable encrypted thumbnail policy."
+          "notes": "Covers the policy model (compatible URL/album defaults, encrypted-only thumbnails, URL index-key derivation, guards, and legacy local-settings sanitize), storage inspection proving locked-session thumbnail bytes stay inside an AES-GCM bookmark envelope, the durable store keeping the raw URL index under the default while an opt-in encrypted policy hashes only NEW records yet stays findable/dedupable by real URL, dual-encoding bookmark lookup, AES-GCM parsed-field and URL-review rows with opaque host/URL keys, bidirectional legacy reconciliation, stale writes, retention, clear filters, malformed-row redaction, settings-race serialization, and both Settings surfaces reporting the immutable encrypted thumbnail policy."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/url-metadata-privacy.spec.ts",
+          "notes": "Exercises the packaged settings toggle against real Chromium IndexedDB: legacy plaintext parsed-field and review rows migrate to AES-GCM envelopes behind opaque keys, URL-bearing plaintext disappears, and a subsequent parsed-field step persists successfully under the encrypted policy."
         },
         {
           "type": "deferred",
           "issue": 451,
-          "notes": "Album-name encryption (Slice 2) remains follow-up scope. Thumbnail bytes are confirmed encrypted at rest in both durable storage paths by #573; Playwright coverage of the URL policy toggle is added when the setting surface is exercised end-to-end."
+          "notes": "Album-name encryption (Slice 2) remains follow-up scope. Thumbnail bytes are confirmed encrypted at rest in both durable storage paths by #573."
         }
       ]
     },
@@ -1269,6 +1352,33 @@
         }
       ],
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Tests"
+    },
+    {
+      "id": "content-script-layout-hot-paths",
+      "acceptance": "Bounded host-page layout work for context detection, target recovery, and Grab preview (issue #633)",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Testing-Strategy",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom-observer.test.ts",
+            "tests/dom/page-context-detection.test.ts",
+            "tests/dom/target-recovery-controller.test.ts",
+            "tests/dom/page-adapter-grab-preview.test.ts"
+          ],
+          "notes": "Covers mutation filtering and trailing-edge debounce, one qualification pass per image, short-lived positive qualification caching, immediate rechecks for initially unloaded/hidden images, targeted and stylesheet-wide invalidation, image-bearing recovery batches, a finite failed-recovery budget that resets after success or reselection, and one-entry Grab pointer preview memoization."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": ["tests/e2e/page-context.spec.ts", "tests/e2e/target-recovery.spec.ts"],
+          "notes": "The packaged extension proves unrelated infinite-feed churn causes no image geometry reads, adding one feed image measures only that image, a delayed image load refreshes live qualification without a DOM replacement, and redraw recovery still preserves projection ownership and host restoration."
+        },
+        {
+          "type": "manual",
+          "reason": "Browser performance tooling is required to inspect layout events and long tasks on real redraw-heavy and infinite-feed hosts.",
+          "notes": "Profile the packaged extension on an infinite feed while appending unrelated nodes, moving across repeated Grab targets, and repeatedly redrawing a selected target. Verify context counts update for new images, pointer affordances track target changes, recovery stops after sustained unmatched churn, no continuous image-layout scan appears, and release restores host-owned state."
+        }
+      ]
     },
     {
       "id": "page-context-detection-and-override",
@@ -1313,12 +1423,13 @@
             "tests/action-dispatch.test.ts",
             "tests/panel-state-queue-recents.test.ts",
             "tests/panel-state-settings.test.ts",
+            "tests/recall-actions.test.ts",
             "tests/recall-destination-controller.test.ts",
             "tests/dom/destination-routing.test.ts",
             "tests/dom/recall-destination-controller.test.ts",
             "tests/dom/recall-destination-view.test.ts"
           ],
-          "notes": "Covers the typed four-route registry, real-tab eligibility for every destination, single activeDestination state, reselect/close/help/settings/minimize/panel-close transitions, preserved primary state, Recall selection continuity across routes plus cleanup on close, producer paging, plain/modifier dock actions, detached Settings single-mount behavior, focus/scroll restoration, and targeted Recall body refresh without replacing destination chrome."
+          "notes": "Covers the typed four-route registry, real-tab eligibility for every destination, single activeDestination state, reselect/close/help/settings/minimize/panel-close transitions, preserved primary state, Recall selection continuity across routes plus cleanup on close, Recall-local action rendering, producer paging, plain/modifier dock actions, detached Settings single-mount behavior, focus/scroll restoration, and targeted Recall body refresh without replacing destination chrome."
         },
         {
           "type": "storybook",
@@ -1331,9 +1442,10 @@
             "tests/e2e/destination-routing.spec.ts",
             "tests/e2e/extension-destination-pages.spec.ts",
             "tests/e2e/react-renderer-boundary.spec.ts",
+            "tests/e2e/recall-selection-render.spec.ts",
             "tests/e2e/recents-queue-recall.spec.ts"
           ],
-          "notes": "Covers packaged plain-click routing, keyboard activation and return focus, per-route scroll, minimize/expand, panel close/reopen, detached controller compatibility, durable Gallery loading without queue reorder, Recall paging and selection, explicit and modifier-key real destination tabs, source-tab return and teardown, narrow layout, and deterministic artifacts for handoff screenshots 02 and 04 through 07."
+          "notes": "Covers packaged plain-click routing, keyboard activation and return focus, per-route scroll, minimize/expand, panel close/reopen, detached controller compatibility, durable Gallery loading without queue reorder, Recall paging and selection, Recall-local selection without route-chrome replacement or list-scroll reset, explicit and modifier-key real destination tabs, source-tab return and teardown, narrow layout, and deterministic artifacts for handoff screenshots 02 and 04 through 07."
         },
         {
           "type": "manual",
@@ -1385,6 +1497,28 @@
           "type": "unit-dom",
           "paths": ["tests/dom/page-style.test.ts"],
           "notes": "Covers neutralizing the selected image's transition while it is darkened so Chrome's standalone image-viewer grey->black background-color transition cannot animate/flash the backdrop (worst in fit/letterboxed mode), and restoring the original transition last on release so it cannot flash on close either. Page/element restore stays verbatim (tests/page-style.test.ts)."
+        }
+      ]
+    },
+    {
+      "id": "indexeddb-open-recovery",
+      "acceptance": "Blocked or failed IndexedDB opens recover on a later request without restarting the extension worker (issue #637)",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Testing-Strategy",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "path": "tests/db-open-lifecycle.test.ts",
+          "notes": "Covers concurrent-open deduplication, failed-result retry, rejected-attempt retry, successful connection caching, and closing a success handle delivered after the open already settled as blocked."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/database-recovery.spec.ts",
+          "notes": "Seeds a packaged extension profile at schema v12 with a durable blob-key record, holds the old connection through a blocked v13 upgrade, verifies the unavailable response, closes the blocker, and proves the next request finds the durable key without restarting the service worker."
+        },
+        {
+          "type": "manual",
+          "reason": "Chrome owns the real unpacked-extension update and long-lived page lifecycle.",
+          "notes": "Keep an older Gallery or preview page open across a database-version update, trigger a storage-backed action and confirm its bounded unavailable state, close the old page, then retry the action without reloading or terminating the service worker. Verify the existing durable key and queue remain intact and no repeated Database unavailable state persists."
         }
       ]
     }
