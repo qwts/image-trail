@@ -34,24 +34,25 @@ anywhere. Placement policy for this repo:
 ## Permissions design
 
 The posture: agents here are trusted and fairly unrestricted; permission
-rules are backstops and prompt-eliminators, not gates on normal work. Encoded
-in `.claude/settings.json` as broad allows plus narrow deny/ask carve-outs
+rules are backstops and prompt-eliminators for local workspace work, not gates
+on normal work. Encoded in `.claude/settings.json` as broad workspace allows
+plus narrow deny/ask carve-outs
 (evaluation order is deny → ask → allow, so the carve-outs win):
 
 - **`defaultMode: "acceptEdits"`** — edits and workspace commands proceed
   without per-action prompts.
 - **allow** — the paved road, so approvals do not accumulate ad hoc:
   `npm run *`, `npm test`, `npm ci` / `npm install`, `npx *`,
-  `node scripts/*`, `git *`, `gh *`. Anything else still prompts once and can
-  be promoted deliberately.
+  `node scripts/*`, `git *`. Anything else still prompts once and can be
+  promoted deliberately.
 - **deny** — `npm run test:e2e:ui*` / `test:e2e:headed*`: human-only,
   focus-stealing entry points. Layered with the PreToolUse hook (same
   verdict, richer explanation); the permission rule holds even if hooks are
   stripped.
-- **ask** — outward-facing, rare, hard to reverse: `npm publish*`,
-  `gh release *`, `npm run package:release*`. A single confirmation on a rare
-  operation is a checkpoint, not a gate. Routine force-pushes after a rebase
-  are deliberately NOT gated (AGENTS.md documents that flow).
+- **ask** — outward-facing, rare, hard to reverse, or credential-bearing:
+  `npm publish*`, `gh *`, `npm run package:release*`. A single confirmation on
+  an external operation is a checkpoint, not a gate. Routine force-pushes after
+  a rebase are deliberately NOT gated (AGENTS.md documents that flow).
 
 Not used: `bypassPermissions` (reserved for container-isolated sessions) and
 broad `deny` lists of destructive shell (`rm -rf` theater) — Claude Code's own
@@ -185,7 +186,7 @@ machine, outermost first:
 
 Image Trail is the pilot; the rollout is scripted. **Invariants** (identical
 everywhere): the three guard scripts, the two hook registrations, the
-settings shape (`acceptEdits` + broad-allow/narrow-carve-out permissions,
+settings shape (`acceptEdits` + broad workspace allow/sensitive-command ask permissions,
 `BASH_MAX_TIMEOUT_MS`, `cleanupPeriodDays`), `.guard/` gitignored, and a CI
 drift check. **Parameters** (decided per repo): which npm scripts are test
 entrypoints (wrap them), per-script RSS/timeout ceilings (measure baselines

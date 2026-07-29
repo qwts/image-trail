@@ -65,7 +65,8 @@ const INVARIANT_SETTINGS = {
 };
 
 // Default permission posture for a fresh repo (a PARAMETER: repos tune the
-// lists, but the shape — broad allows, narrow deny/ask — is the design).
+// lists, but the shape — broad workspace allows with sensitive outward-facing
+// commands behind ask — is the design).
 const DEFAULT_PERMISSIONS = {
   defaultMode: 'acceptEdits',
   allow: [
@@ -77,9 +78,8 @@ const DEFAULT_PERMISSIONS = {
     'Bash(npx *)',
     'Bash(node scripts/*)',
     'Bash(git *)',
-    'Bash(gh *)',
   ],
-  ask: ['Bash(npm publish*)', 'Bash(gh release *)'],
+  ask: ['Bash(npm publish*)', 'Bash(gh *)'],
   deny: [],
 };
 

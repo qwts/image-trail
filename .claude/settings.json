@@ -9,10 +9,9 @@
       "Bash(npm install)",
       "Bash(npx *)",
       "Bash(node scripts/*)",
-      "Bash(git *)",
-      "Bash(gh *)"
+      "Bash(git *)"
     ],
-    "ask": ["Bash(npm publish*)", "Bash(gh release *)", "Bash(npm run package:release*)"],
+    "ask": ["Bash(npm publish*)", "Bash(gh *)", "Bash(npm run package:release*)"],
     "deny": ["Bash(npm run test:e2e:ui*)", "Bash(npm run test:e2e:headed*)"]
   },
   "env": {
