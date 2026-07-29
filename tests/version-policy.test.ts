@@ -235,10 +235,23 @@ test('version-cut keeps dependency code off the clean token-bearing runner', () 
 
   assert.match(publishJob, /needs: prepare-version-pr/u);
   assert.match(publishJob, /actions\/download-artifact@[0-9a-f]{40} # v8\.0\.1/u);
-  assert.match(publishJob, /node scripts\/validate-version-cut\.mjs/u);
+  assert.match(publishJob, /node "\$trusted_validator"/u);
   assert.match(publishJob, /git -c core\.hooksPath=\/dev\/null -c commit\.gpgsign=false commit/u);
   assert.match(publishJob, /git -c core\.hooksPath=\/dev\/null push/u);
   assert.doesNotMatch(publishJob, /npm ci|npm run changeset:version/u);
+});
+
+test('version-cut preserves its trusted validator before an artifact can replace repository code', () => {
+  const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
+  const publishJob = workflow.slice(workflow.indexOf('\n  publish-version-pr:'), workflow.indexOf('\n  tag:'));
+  const preserveValidator = publishJob.indexOf('cp scripts/validate-version-cut.mjs "$trusted_validator"');
+  const applyArtifact = publishJob.indexOf('git apply --index "$RUNNER_TEMP/version-cut/version.patch"');
+  const runValidator = publishJob.indexOf('node "$trusted_validator"');
+
+  assert.ok(preserveValidator >= 0, 'trusted validator must be copied out of the worktree');
+  assert.ok(applyArtifact > preserveValidator, 'untrusted patch must be applied only after preserving the validator');
+  assert.ok(runValidator > applyArtifact, 'the preserved validator must inspect the applied patch');
+  assert.doesNotMatch(publishJob, /node scripts\/validate-version-cut\.mjs/u);
 });
 
 test('version-cut validator accepts only synchronized version artifacts and consumed changesets', () => {
@@ -358,17 +371,19 @@ test('all workflow checkouts avoid persisting credentials', () => {
   }
 });
 
-test('zizmor is pinned and enforces the governed action-ref policy', () => {
+test('zizmor is digest-pinned without a disallowed wrapper action and enforces the governed action-ref policy', () => {
   const workflow = readFileSync('.github/workflows/zizmor.yml', 'utf8');
   const config = readFileSync('.github/zizmor.yml', 'utf8');
   const dependabot = readFileSync('.github/dependabot.yml', 'utf8');
 
-  assert.match(workflow, /uses: zizmorcore\/zizmor-action@[0-9a-f]{40} # v0\.6\.1/u);
-  assert.match(workflow, /version: 1\.28\.0/u);
-  assert.match(workflow, /persona: auditor/u);
-  assert.match(workflow, /online-audits: true/u);
-  assert.match(workflow, /advanced-security: false/u);
-  assert.match(workflow, /annotations: true/u);
+  assert.doesNotMatch(workflow, /uses: zizmorcore\/zizmor-action@/u);
+  assert.match(workflow, /releases\/download\/v1\.28\.0\/zizmor-x86_64-unknown-linux-gnu\.tar\.gz/u);
+  assert.match(workflow, /ZIZMOR_SHA256: e87b67160194884e375a46a12c57ccc904f762b53845f254fab7f17d98809c09/u);
+  assert.match(workflow, /sha256sum --check --strict/u);
+  assert.match(workflow, /test "\$\("\$RUNNER_TEMP\/zizmor" --version\)" = 'zizmor 1\.28\.0'/u);
+  assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
+  assert.match(workflow, /--persona auditor --format github/u);
+  assert.match(workflow, /--config \.github\/zizmor\.yml \./u);
   assert.match(config, /allow:\s*\n\s+- RELEASE_TOKEN/u);
   assert.match(config, /['"]qwts\/playbook-software-engineering\/\*['"]: ref-pin/u);
   assert.match(config, /['"]\*['"]: hash-pin/u);

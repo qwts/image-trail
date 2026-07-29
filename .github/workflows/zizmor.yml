@@ -28,12 +28,24 @@ jobs:
         with:
           persist-credentials: false
 
+      # The repository Actions allowlist rejects zizmor's wrapper action before
+      # a job starts. Install the official release archive directly and verify
+      # its GitHub-published digest before executing it.
+      - name: Install zizmor
+        env:
+          ZIZMOR_SHA256: e87b67160194884e375a46a12c57ccc904f762b53845f254fab7f17d98809c09
+          ZIZMOR_URL: https://github.com/zizmorcore/zizmor/releases/download/v1.28.0/zizmor-x86_64-unknown-linux-gnu.tar.gz
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/zizmor.tar.gz"
+          curl --fail --location --proto '=https' --tlsv1.2 "$ZIZMOR_URL" --output "$archive"
+          printf '%s  %s\n' "$ZIZMOR_SHA256" "$archive" | sha256sum --check --strict
+          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP"
+          test "$("$RUNNER_TEMP/zizmor" --version)" = 'zizmor 1.28.0'
+
       - name: Audit GitHub Actions
-        uses: zizmorcore/zizmor-action@6fc4b006235f201fdab3722e17240ab420d580e5 # v0.6.1
-        with:
-          version: 1.28.0
-          persona: auditor
-          online-audits: true
-          advanced-security: false
-          annotations: true
-          config: .github/zizmor.yml
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          "$RUNNER_TEMP/zizmor" --persona auditor --format github \
+            --config .github/zizmor.yml .

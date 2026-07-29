@@ -121,9 +121,11 @@ jobs:
           BRANCH: changeset-release/main
         run: |
           set -euo pipefail
+          trusted_validator="$RUNNER_TEMP/trusted-validate-version-cut.mjs"
+          cp scripts/validate-version-cut.mjs "$trusted_validator"
           git checkout -B "$BRANCH"
           git apply --index "$RUNNER_TEMP/version-cut/version.patch"
-          node scripts/validate-version-cut.mjs
+          node "$trusted_validator"
           git diff --cached --check
           version="$(node -p "require('./package.json').version")"
           git config user.name 'github-actions[bot]'
