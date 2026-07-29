@@ -5,6 +5,7 @@ import { packageDirFromModulePath } from './license-policy.mjs';
 
 const MINIFICATION_CHECK_BYTES = 1_024;
 const MAX_UNIMPROVED_RATIO = 0.98;
+const INJECTED_STYLESHEET = 'extension/src/ui/styles/panel-entry.css';
 
 // Single source of truth for the bundled extension entry points. The per-entry
 // build scripts and the license scan both read this so a new bundle can never
@@ -54,6 +55,10 @@ export function extensionOutputPath(sourcePath, pathApi = path) {
     throw new Error(`Extension source path must be inside ${sourceRoot}: ${sourcePath}`);
   }
   return pathApi.join('extension', 'dist', 'src', relativePath);
+}
+
+export function isInjectedStylesheet(sourcePath, pathApi = path) {
+  return sourcePath.split(pathApi.sep).join('/') === INJECTED_STYLESHEET;
 }
 
 export function extensionBuildOptions({

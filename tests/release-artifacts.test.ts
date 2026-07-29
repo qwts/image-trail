@@ -16,6 +16,7 @@ type ArtifactPolicyModule = {
 type BuildPolicyModule = {
   bundleStylesheet(sourcePath: string, outputPath: string, options?: { release?: boolean }): Promise<void>;
   extensionOutputPath(sourcePath: string, pathApi?: typeof win32): string;
+  isInjectedStylesheet(sourcePath: string, pathApi?: typeof win32): boolean;
   extensionBuildOptions(input: {
     entryPoint: string;
     outfile: string;
@@ -181,6 +182,12 @@ test('extension stylesheet output paths remain inside dist on Windows', () => {
   const source = win32.join('extension', 'src', 'ui', 'styles', 'panel.css');
   assert.equal(builds.extensionOutputPath(source, win32), win32.join('extension', 'dist', 'src', 'ui', 'styles', 'panel.css'));
   assert.throws(() => builds.extensionOutputPath(win32.join('extension', 'outside.css'), win32), /must be inside/u);
+});
+
+test('injected stylesheet detection accepts native Windows separators', () => {
+  assert.equal(builds.isInjectedStylesheet('extension/src/ui/styles/panel-entry.css'), true);
+  assert.equal(builds.isInjectedStylesheet(win32.join('extension', 'src', 'ui', 'styles', 'panel-entry.css'), win32), true);
+  assert.equal(builds.isInjectedStylesheet(win32.join('extension', 'src', 'ui', 'styles', 'panel.css'), win32), false);
 });
 
 test('dynamic injected stylesheet packaging flattens relative imports into one resource', async () => {

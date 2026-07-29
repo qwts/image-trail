@@ -1,10 +1,8 @@
 import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import './write-extension-build-info.mjs';
-import { bundleStylesheet, extensionOutputPath, writeStylesheet } from './extension-build-policy.mjs';
+import { bundleStylesheet, extensionOutputPath, isInjectedStylesheet, writeStylesheet } from './extension-build-policy.mjs';
 import { extensionManifestForBuild } from './extension-manifest-policy.mjs';
-
-const INJECTED_STYLESHEET = 'extension/src/ui/styles/panel-entry.css';
 
 await mkdir('extension/dist', { recursive: true });
 const sourceManifest = JSON.parse(await readFile('extension/manifest.json', 'utf8'));
@@ -33,7 +31,7 @@ const stylesheets = [
 
 for (const sourcePath of stylesheets) {
   const outputPath = extensionOutputPath(sourcePath);
-  if (sourcePath === INJECTED_STYLESHEET) await bundleStylesheet(sourcePath, outputPath);
+  if (isInjectedStylesheet(sourcePath)) await bundleStylesheet(sourcePath, outputPath);
   else await writeStylesheet(sourcePath, outputPath);
 }
 
