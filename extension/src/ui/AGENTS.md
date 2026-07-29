@@ -1,9 +1,9 @@
-# ui/ — Claude Code context
+# UI-layer context
 
 Presentation layer: `panel/`, `components/`, `styles/`, `stories/`. Read
-`AGENTS.md` → "UI Rules" for the product invariants; this stub records the two
-traps that recur. `ui/` must not import `data/` or `background/` directly —
-route through `content/` controllers (ESLint-enforced).
+[`../../../AGENTS.md`](../../../AGENTS.md) first. This file adds recurring
+implementation traps specific to `extension/src/ui/`. Route data and background
+work through content controllers; ESLint enforces the import boundary.
 
 - **Avoid full panel rerenders.** The recall drawer has its own DOM root and
   render path. Use `renderRecallOnly()`, `render({ includeRecall: false })`, or
@@ -32,5 +32,3 @@ route through `content/` controllers (ESLint-enforced).
   pre-threshold moves at the window level and capture only once the drag engages
   (`beginDragOut`'s `deferCaptureUntilEngaged` in `components/detachable-section.ts`). When
   touching shared input plumbing, e2e-test the neighboring click behaviors first.
-- **Panel files are size-capped.** `ui/panel/**` files trip an ESLint
-  `max-lines` error at 800 lines; split rather than grow them.

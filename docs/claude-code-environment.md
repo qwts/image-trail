@@ -33,25 +33,25 @@ anywhere. Placement policy for this repo:
 
 ## Permissions design
 
-The posture: agents here are trusted and fairly unrestricted; permission
-rules are backstops and prompt-eliminators, not gates on normal work. Encoded
-in `.claude/settings.json` as broad allows plus narrow deny/ask carve-outs
-(evaluation order is deny → ask → allow, so the carve-outs win):
+The posture follows least privilege: exact, routine read/validate/edit commands
+are pre-approved; unlisted commands prompt; outward or history-changing
+operations are explicit `ask` rules. Evaluation order is deny → ask → allow, so
+the checkpoints win if a future allow overlaps them:
 
 - **`defaultMode: "acceptEdits"`** — edits and workspace commands proceed
   without per-action prompts.
-- **allow** — the paved road, so approvals do not accumulate ad hoc:
-  `npm run *`, `npm test`, `npm ci` / `npm install`, `npx *`,
-  `node scripts/*`, `git *`, `gh *`. Anything else still prompts once and can
-  be promoted deliberately.
+- **allow** — named validation/build commands; `npm ci`; `npx changeset`;
+  read-only `git`/`gh` commands; and local `git add`/`commit`. There are no
+  `npm run *`, `npx *`, `node scripts/*`, `git *`, or `gh *` command-family
+  grants. Anything absent prompts and should be promoted only after a concrete,
+  recurring need.
 - **deny** — `npm run test:e2e:ui*` / `test:e2e:headed*`: human-only,
   focus-stealing entry points. Layered with the PreToolUse hook (same
   verdict, richer explanation); the permission rule holds even if hooks are
   stripped.
-- **ask** — outward-facing, rare, hard to reverse: `npm publish*`,
-  `gh release *`, `npm run package:release*`. A single confirmation on a rare
-  operation is a checkpoint, not a gate. Routine force-pushes after a rebase
-  are deliberately NOT gated (AGENTS.md documents that flow).
+- **ask** — package/release publication, pushes and rebases, worktree removal,
+  GitHub issue/PR writes, workflow dispatch/reruns, and releases. These are
+  outward-facing or harder to reverse and retain a human-visible checkpoint.
 
 Not used: `bypassPermissions` (reserved for container-isolated sessions) and
 broad `deny` lists of destructive shell (`rm -rf` theater) — Claude Code's own
@@ -59,18 +59,19 @@ protections plus trust cover those.
 
 ## Hooks
 
-Hook lifecycle evaluated for mechanical controls; two hooks are wired, the
-rest deliberately skipped:
+Hook lifecycle evaluated for mechanical controls; three hooks are wired:
 
 | Event                                     | Decision                                                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PreToolUse` (Bash)                       | **Wired** — `scripts/guard-agent-command.mjs --protocol=claude` denies unguarded test entrypoints (see below).                                                                                                                                                                                                                                                                   |
 | `SessionStart`                            | **Wired** — `scripts/guard-session-context.mjs` injects guard state into a new/resumed/compacted session: an ACTIVE guarded run (poll it, don't relaunch) or a previous run KILLED for rss-limit/timeout (real failure; don't rerun with higher limits). This closes the incident's compounding loop — a fresh context no longer discovers a live run by crashing into the lock. |
+| `WorktreeCreate`                          | **Wired for this repo** — delegates to the governed playbook `agent-bot` worktree helper so a new worktree receives its bot identity. It fails closed with setup guidance when the helper is absent. This identity hook is repo/fleet-specific and is not copied by the generic bootstrap.                                                                                       |
 | `PostToolUse`, `Stop`, `UserPromptSubmit` | Skipped — nothing to enforce mechanically that the guard/lock does not already own; they'd be gates on normal work.                                                                                                                                                                                                                                                              |
-| `SessionEnd`, `WorktreeCreate/Remove`     | Skipped — the guard's lock is stale-safe and Claude Code terminates Bash child trees on exit (SIGTERM, exit 143), so there is nothing left to sweep.                                                                                                                                                                                                                             |
+| `SessionEnd`, `WorktreeRemove`            | Skipped — the guard's lock is stale-safe and Claude Code terminates Bash child trees on exit (SIGTERM, exit 143), so there is nothing left to sweep.                                                                                                                                                                                                                             |
 
-Both hooks fail open by design: the guard wrapper is the primary control; the
-hooks close the direct-entrypoint bypass and add context.
+The two process hooks fail open by design: the guard wrapper is the primary
+control; they close the direct-entrypoint bypass and add context. The
+identity-sensitive `WorktreeCreate` hook fails closed.
 
 ### Hook scoping (defect fix)
 
@@ -184,13 +185,14 @@ machine, outermost first:
 ## Reproducing this environment in another repo
 
 Image Trail is the pilot; the rollout is scripted. **Invariants** (identical
-everywhere): the three guard scripts, the two hook registrations, the
-settings shape (`acceptEdits` + broad-allow/narrow-carve-out permissions,
-`BASH_MAX_TIMEOUT_MS`, `cleanupPeriodDays`), `.guard/` gitignored, and a CI
-drift check. **Parameters** (decided per repo): which npm scripts are test
-entrypoints (wrap them), per-script RSS/timeout ceilings (measure baselines
-first — `.guard/history.jsonl`), repo-specific allow/ask/deny rules,
-repo-specific blocked patterns, and the devcontainer memory cap.
+everywhere): the three guard scripts, the two process-hook registrations,
+least-privilege permission defaults, `BASH_MAX_TIMEOUT_MS`,
+`cleanupPeriodDays`, `.guard/` gitignored, and a CI drift check.
+**Parameters** (decided per repo): which npm scripts are test entrypoints (wrap
+them), per-script RSS/timeout ceilings (measure baselines first —
+`.guard/history.jsonl`), the exact repo-specific allow/ask/deny commands,
+identity/worktree hooks, repo-specific blocked patterns, and the devcontainer
+memory cap.
 
 ```sh
 # apply to a repo (copies invariants, merges settings, wraps entrypoints):

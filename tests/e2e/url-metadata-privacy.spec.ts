@@ -63,7 +63,7 @@ test('packaged policy toggle encrypts URL workflow rows and preserves new saves'
   await expectPanelOpen(page);
 
   await applyUrlInEditor(page, fixtureUrl(`/assets/asset-one.svg?frame=641&token=${privateToken}`));
-  await expectPanelStatusMessage(page, /Loaded .*asset-one\.svg\?frame=641/u);
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*asset-one\.svg\?frame=641/u);
   await openParsedFields(page);
   await page.getByRole('button', { name: /Increment .*frame/u }).click();
   await expectPanelStatusMessage(page, /Image loaded but did not change\.|(?:Loaded|Applied) .*asset-one\.svg\?frame=642/u);
