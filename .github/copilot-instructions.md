@@ -1,60 +1,26 @@
-# Copilot Review Instructions
+# Copilot review adapter
 
-Review Image Trail changes against the product model and repo workflow, not only
-general TypeScript style.
+Read [`AGENTS.md`](../AGENTS.md) first. It is the canonical source for Image
+Trail product boundaries and repository workflow; do not restate them here.
 
-## Product Model
+## Review focus
 
-- Recents are transient session state. Do not treat them as durable memory unless
-  the user explicitly pins/bookmarks.
-- Pins are durable queue records and should persist when they enter the queue.
-- Bookmarks are pins with an associated captured original photo.
-- Original-photo bytes live in the encrypted blob/original store. They are
-  separate from pin/bookmark metadata and encrypted thumbnail storage.
-- Recall pages durable pins/bookmarks from the queue producer. It must not page
-  encrypted blobs directly or clone visible queue state.
-- Queue order is `queueUpdatedAt`. Do not reseal encrypted metadata only to
-  reorder records.
+Prioritize findings that can cause:
 
-## Review Priorities
+- privacy leaks from plaintext URL, title, thumbnail, dimension, or generated
+  metadata;
+- state corruption, queue reordering, or original-photo loss;
+- destructive behavior that bypasses relationship and reference-count rules;
+- UI ambiguity between selection, pin, and stored-original states;
+- inaccessible pointer-only, hover-only, focus-breaking, or color-only
+  interactions;
+- broad permissions, untrusted network behavior, or weakened release gates;
+- missing regression or acceptance evidence for changed behavior.
 
-- Flag privacy leaks where URL, title, thumbnail, dimensions, generated metadata,
-  or other sensitive pin data moves into plaintext storage without an explicit
-  setting or documented exception.
-- Flag destructive storage paths that delete original-photo blobs without going
-  through the existing relationship/reference-count rules.
-- Flag UI changes that blur selected state with stored/captured-original state.
-  A stored original should be an indicator, not a selected-row background.
-- Flag broad rewrites, unrelated refactors, or formatting churn in narrow PRs.
-- Prefer comments that identify user-visible bugs, state corruption, storage
-  loss, privacy regressions, or missing tests.
+Prefer a small number of actionable, line-specific findings over style
+commentary. Flag unrelated refactors and formatting churn in narrow PRs.
 
-## Clear And Delete Language
-
-- `Clear` means undoable or presentation-only removal.
-- `Delete` means destructive removal.
-- Delete recents is destructive because recents are transient and unrecoverable.
-- Queue and Recall clear actions must not delete durable pins/bookmarks or
-  original blobs.
-- Bulk destructive queue and Recall delete actions belong in Settings.
-
-## GitHub And Branch Workflow
-
-- Development is trunk-based on `main`: cut short-lived branches from latest
-  `main` and merge back via PR. There is no separate `dev` integration branch.
-- Tracked work should link the pull request to its issue and include an explicit
-  closing reference such as `Closes #123` when the PR completes the issue.
-- Branch linkage is only a claim signal. The PR relationship and closing
-  reference are still required.
-- When a PR changes behavior, storage, security, CI, automation, or workflow
-  expectations, expect a matching repo doc, ADR, acceptance test, or wiki update.
-
-## Expected Validation
-
-Before a PR is called ready, expect these checks unless the PR clearly explains
-why one could not run:
-
-- `npm run lint`
-- `npm run format:check`
-- `npm test`
-- `npm run build`
+For behavior, storage, security, CI, automation, or workflow changes, verify
+that the PR names the relevant wiki, acceptance, or ADR update and gives exact
+validation evidence. Apply the clear/delete language and accessibility
+contracts from [`DESIGN.md`](../DESIGN.md) without duplicating them here.
