@@ -985,9 +985,23 @@
           "paths": [
             "tests/neighbor-preload-controller.test.ts",
             "tests/buffered-navigation-controller.test.ts",
+            "tests/data-crypto.test.ts",
+            "tests/panel-state-settings.test.ts",
+            "tests/dom/automation-settings-view.test.ts",
+            "tests/dom/extension-destination-surfaces.test.tsx",
             "tests/dom/parsed-field-navigation-controller.test.ts"
           ],
-          "notes": "Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts."
+          "notes": "Includes #631 cache bounds: supported settings are 1–500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts rather than retaining page-session data URLs. Also covers the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/automation-settings-view.stories.ts",
+          "notes": "Covers #631 through the rendered Cache min/max attributes and bounded-memory copy."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/automation-governance.spec.ts",
+          "notes": "Covers #631 in the packaged panel: Cache exposes the 1–500 range and explains the per-page-session memory bound."
         },
         {
           "type": "unit-dom",

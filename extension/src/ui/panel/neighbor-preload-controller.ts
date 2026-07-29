@@ -138,7 +138,6 @@ export class NeighborPreloadController {
 
   pruneCache(): void {
     const limit = this.deps.getLocalSettings().neighborPreloadCacheLimit;
-    if (limit === 0) return;
     while (this.cache.size > limit) {
       const oldest = this.cache.keys().next().value;
       if (!oldest) break;

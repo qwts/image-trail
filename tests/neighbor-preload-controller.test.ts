@@ -211,7 +211,7 @@ test('the cache evicts its oldest entry once the configured limit is exceeded', 
   assert.notEqual(controller.getCachedFingerprint('https://example.test/b.jpg'), null);
 });
 
-test('a cache limit of 0 means unlimited', async () => {
+test('an unexpected legacy cache limit of 0 evicts entries instead of growing without bound', async () => {
   const { controller } = createHarness({
     getLocalSettings: () => ({ neighborPreloadEnabled: true, neighborPreloadRadius: 3, neighborPreloadCacheLimit: 0 }),
   });
@@ -219,6 +219,6 @@ test('a cache limit of 0 means unlimited', async () => {
   await controller.preload('https://example.test/a.jpg');
   await controller.preload('https://example.test/b.jpg');
 
-  assert.notEqual(controller.getCachedFingerprint('https://example.test/a.jpg'), null);
-  assert.notEqual(controller.getCachedFingerprint('https://example.test/b.jpg'), null);
+  assert.equal(controller.getCachedFingerprint('https://example.test/a.jpg'), null);
+  assert.equal(controller.getCachedFingerprint('https://example.test/b.jpg'), null);
 });
