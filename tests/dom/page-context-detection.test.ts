@@ -113,6 +113,35 @@ test('caches unchanged image qualification and invalidates only affected images'
   assert.deepEqual([firstReads(), secondReads(), thirdReads()], [2, 1, 1]);
 });
 
+test('rechecks initially unqualified images and expires cached positive layout results', () => {
+  let now = 0;
+  const detector = new PageContextDetector({ cacheTtlMs: 100, now: () => now });
+  const image = appendQualifyingImage(document.body, 1);
+  const reads = trackRectReads(image);
+  Object.defineProperties(image, {
+    naturalWidth: { configurable: true, value: 20 },
+    naturalHeight: { configurable: true, value: 20 },
+  });
+
+  assert.equal(detector.detect().imageCount, 0);
+  Object.defineProperties(image, {
+    naturalWidth: { configurable: true, value: 320 },
+    naturalHeight: { configurable: true, value: 240 },
+  });
+  assert.equal(detector.detect().imageCount, 1);
+  assert.equal(reads(), 2);
+
+  Object.defineProperties(image, {
+    naturalWidth: { configurable: true, value: 20 },
+    naturalHeight: { configurable: true, value: 20 },
+  });
+  now = 99;
+  assert.equal(detector.detect().imageCount, 1);
+  now = 100;
+  assert.equal(detector.detect().imageCount, 0);
+  assert.equal(reads(), 3);
+});
+
 test('filters unrelated host mutations before scheduling another detection pass', () => {
   const text = document.createElement('span');
   const wrapper = document.createElement('article');
@@ -135,7 +164,11 @@ test('filters unrelated host mutations before scheduling another detection pass'
   assert.equal(pageContextMutationAffectsDetection([attributeRecord(image, 'src')]), true);
   assert.equal(pageContextMutationAffectsDetection([attributeRecord(image, 'data-src')]), true);
   assert.equal(pageContextMutationAffectsDetection([attributeRecord(wrapper, 'role')]), true);
-  assert.equal(pageContextMutationAffectsDetection([attributeRecord(wrapper, 'class')]), false);
+  assert.equal(pageContextMutationAffectsDetection([attributeRecord(wrapper, 'class')]), true);
+  assert.equal(pageContextMutationAffectsDetection([attributeRecord(text, 'class')]), false);
+
+  const style = document.createElement('style');
+  assert.equal(pageContextMutationAffectsDetection([childRecord(style)]), true);
 });
 
 test('ignores tiny images and exposes no override capabilities without a qualifying image', () => {

@@ -1294,12 +1294,12 @@
             "tests/dom/target-recovery-controller.test.ts",
             "tests/dom/page-adapter-grab-preview.test.ts"
           ],
-          "notes": "Covers mutation filtering and trailing-edge debounce, one qualification pass per image, cached unchanged-image qualification with targeted invalidation, image-bearing recovery batches, a finite failed-recovery budget that resets after success or reselection, and one-entry Grab pointer preview memoization."
+          "notes": "Covers mutation filtering and trailing-edge debounce, one qualification pass per image, short-lived positive qualification caching, immediate rechecks for initially unloaded/hidden images, targeted and stylesheet-wide invalidation, image-bearing recovery batches, a finite failed-recovery budget that resets after success or reselection, and one-entry Grab pointer preview memoization."
         },
         {
           "type": "playwright-e2e",
           "paths": ["tests/e2e/page-context.spec.ts", "tests/e2e/target-recovery.spec.ts"],
-          "notes": "The packaged extension proves unrelated infinite-feed churn causes no image geometry reads, adding one feed image measures only that image, and redraw recovery still preserves projection ownership and host restoration."
+          "notes": "The packaged extension proves unrelated infinite-feed churn causes no image geometry reads, adding one feed image measures only that image, a delayed image load refreshes live qualification without a DOM replacement, and redraw recovery still preserves projection ownership and host restoration."
         },
         {
           "type": "manual",

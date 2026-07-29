@@ -42,6 +42,11 @@ export class DomObserver {
     }
   }
 
+  requestRefresh(): void {
+    if (!this.observer) return;
+    this.scheduleRefresh();
+  }
+
   private scheduleRefresh(): void {
     const debounceMs = this.options.debounceMs ?? 50;
     if (debounceMs <= 0) {

@@ -155,3 +155,42 @@ test('avoids remeasuring unchanged feed images during unrelated host-page churn'
   await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Feed · 4 images');
   expect(await imageRectReads(page)).toBe(1);
 });
+
+test('rechecks an image when a delayed load changes its live qualification', async ({ page, serviceWorker }) => {
+  let releaseResponse = (): void => {};
+  const responseGate = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  let markRequestStarted = (): void => {};
+  const requestStarted = new Promise<void>((resolve) => {
+    markRequestStarted = resolve;
+  });
+  await page.route('**/delayed-context-image.svg', async (route) => {
+    markRequestStarted();
+    await responseGate;
+    await route.fulfill({
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="220"><rect width="320" height="220"/></svg>',
+      contentType: 'image/svg+xml',
+      status: 200,
+    });
+  });
+
+  await openPanel(page, serviceWorker, fixturePaths.feed);
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Feed · 3 images');
+  await page.evaluate(() => {
+    const article = document.createElement('article');
+    const image = document.createElement('img');
+    image.alt = 'Delayed feed image';
+    image.style.width = '1px';
+    image.style.height = '1px';
+    image.src = new URL('/delayed-context-image.svg', window.location.href).href;
+    article.append(image);
+    document.querySelector('[role="feed"]')?.append(article);
+  });
+  await requestStarted;
+  await page.waitForTimeout(100);
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Feed · 3 images');
+
+  releaseResponse();
+  await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Feed · 4 images');
+});
