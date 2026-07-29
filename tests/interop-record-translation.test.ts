@@ -180,6 +180,11 @@ test('a duplicate canonical record can attach later verified bytes without movin
   try {
     const imported = await translator.importRecord(fixture);
     const before = await bookmarks.loadPage({ offset: 0, limit: 10 });
+    const movedAt = '2026-07-16T10:00:00.000Z';
+    const db = await openImageTrailDb();
+    assert.ok(db.db);
+    await new BookmarksRepository(db.db).updateQueueUpdatedAt([{ uuid: imported.pinId!, queueUpdatedAt: movedAt }]);
+    db.db.close();
     const verifiedThumbnailDataUrl = 'data:image/jpeg;base64,bGF0ZXItY3VzdG9keQ==';
     const enriched = await translator.importRecord({ ...fixture, verifiedThumbnailDataUrl });
     const after = await bookmarks.loadPage({ offset: 0, limit: 10 });
@@ -188,7 +193,8 @@ test('a duplicate canonical record can attach later verified bytes without movin
     assert.equal(enriched.persisted, true);
     assert.equal(enriched.pinId, imported.pinId);
     assert.equal(after.items[0]?.thumbnail, verifiedThumbnailDataUrl);
-    assert.equal(after.items[0]?.queueUpdatedAt, before.items[0]?.queueUpdatedAt);
+    assert.notEqual(movedAt, before.items[0]?.queueUpdatedAt);
+    assert.equal(after.items[0]?.queueUpdatedAt, movedAt);
   } finally {
     await translator.close();
     await bookmarks.close();

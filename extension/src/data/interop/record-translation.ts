@@ -73,15 +73,22 @@ export class InteropRecordTranslationStore {
       return { ...preview, persisted: false, pinId: null };
     }
 
-    const stored = await this.listStoredInteropPins(context);
-    const preview = previewNormalized(normalized, stored);
-    const enrichment = duplicateCustodyEnrichment(normalized, preview, stored);
+    let stored = await this.listStoredInteropPins(context);
+    let preview = previewNormalized(normalized, stored);
+    let enrichment = duplicateCustodyEnrichment(normalized, preview, stored);
+    if (enrichment) {
+      stored = await this.refreshStoredInteropPin(context, enrichment.encrypted.uuid);
+      preview = previewNormalized(normalized, stored);
+      enrichment = duplicateCustodyEnrichment(normalized, preview, stored);
+    }
     if (!isPersistable(preview.category) && !enrichment) {
       return { ...preview, persisted: false, pinId: preview.existingPinId };
     }
 
     const localOrigin = enrichment?.encrypted ?? (await localOriginTarget(context, normalized.record));
-    const previous = localOrigin ? await context.bookmarks.openRecord(localOrigin, context.bookmarkKey.key).catch(() => null) : null;
+    const previous =
+      enrichment?.payload ??
+      (localOrigin ? await context.bookmarks.openRecord(localOrigin, context.bookmarkKey.key).catch(() => null) : null);
     const pinId = localOrigin?.uuid ?? crypto.randomUUID();
     const displayUrl = interopDisplayUrl(normalized.record);
     const now = normalized.receivedAt ?? canonicalQueueTime(normalized.record);
@@ -146,6 +153,16 @@ export class InteropRecordTranslationStore {
     const current = this.listStoredInteropPins(context);
     this.storedInteropPins = current.then((stored) => upsertStoredInteropPin(stored, pin));
     return this.storedInteropPins;
+  }
+
+  private refreshStoredInteropPin(context: TranslationContext, pinId: string): Promise<readonly StoredInteropPin[]> {
+    return (this.storedInteropPins = this.listStoredInteropPins(context).then(async (stored) => {
+      const encrypted = await context.bookmarks.getEncrypted(pinId);
+      if (!encrypted) return stored.filter((item) => item.encrypted.uuid !== pinId);
+      const payload = await context.bookmarks.openRecord(encrypted, context.bookmarkKey.key).catch(() => null);
+      if (!payload?.interop) return stored.filter((item) => item.encrypted.uuid !== pinId);
+      return upsertStoredInteropPin(stored, { encrypted, payload, custody: payload.interop });
+    }));
   }
 }
 
