@@ -106,18 +106,16 @@ export class BlobsRepository {
   async getStorageUsage(): Promise<StorageUsageSummary> {
     const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
     const store = transaction.objectStore(DataStore.Blobs);
-    const request = store.openCursor();
-
+    const done = transactionDone(transaction);
+    const count = requestToPromise<number>(store.count());
+    const request = store.index(SchemaIndex.BlobsByEncryptedByteLength).openKeyCursor();
     let totalBytes = 0;
-    let blobCount = 0;
 
     await new Promise<void>((resolve, reject) => {
       request.onsuccess = () => {
         const cursor = request.result;
         if (cursor) {
-          const record = cursor.value as StoredBlobRecord;
-          totalBytes += record.encryptedByteLength;
-          blobCount += 1;
+          if (typeof cursor.key === 'number' && Number.isFinite(cursor.key) && cursor.key >= 0) totalBytes += cursor.key;
           cursor.continue();
         } else {
           resolve();
@@ -126,7 +124,8 @@ export class BlobsRepository {
       request.onerror = () => reject(request.error);
     });
 
-    await transactionDone(transaction);
+    const blobCount = await count;
+    await done;
     return { totalBytes, blobCount };
   }
 }

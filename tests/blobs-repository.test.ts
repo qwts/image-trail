@@ -195,6 +195,18 @@ test('BlobsRepository reports storage usage across all records', async (t) => {
   const db = await openFreshDb();
   t.after(() => db.close());
   const repo = new BlobsRepository(db);
+  const originalObjectStoreOpenCursor = IDBObjectStore.prototype.openCursor;
+  const originalIndexOpenCursor = IDBIndex.prototype.openCursor;
+  IDBObjectStore.prototype.openCursor = function () {
+    throw new Error('storage usage must not open an object-store value cursor');
+  };
+  IDBIndex.prototype.openCursor = function () {
+    throw new Error('storage usage must not open an index value cursor');
+  };
+  t.after(() => {
+    IDBObjectStore.prototype.openCursor = originalObjectStoreOpenCursor;
+    IDBIndex.prototype.openCursor = originalIndexOpenCursor;
+  });
 
   const emptyUsage = await repo.getStorageUsage();
   assert.equal(emptyUsage.blobCount, 0);

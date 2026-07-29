@@ -808,7 +808,7 @@
         {
           "type": "playwright-e2e",
           "paths": ["tests/e2e/image-utilities.spec.ts", "tests/e2e/storage-orphan-scan.spec.ts"],
-          "notes": "Covers encrypted original setup, capture from a queue row, stored-original indicator, selected-record export preferring stored original bytes when unlocked, and isolated packaged storage-health and cleanup requests that preserve count/deletion behavior while rejecting any full blob-store getAll read."
+          "notes": "Covers encrypted original setup, capture from a queue row, stored-original indicator, selected-record export preferring stored original bytes when unlocked, and isolated packaged storage-health and cleanup requests that preserve byte/count/deletion behavior while rejecting blob-store getAll and value-cursor reads."
         }
       ]
     },

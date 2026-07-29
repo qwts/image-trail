@@ -24,6 +24,13 @@ interface CleanupOrphanedBlobsResponse {
   };
 }
 
+type BlobValueReadGuardScope = typeof globalThis & {
+  __imageTrailBlobValueReadCalls?: number;
+  __imageTrailOriginalGetAll?: typeof IDBObjectStore.prototype.getAll;
+  __imageTrailOriginalObjectStoreOpenCursor?: typeof IDBObjectStore.prototype.openCursor;
+  __imageTrailOriginalIndexOpenCursor?: typeof IDBIndex.prototype.openCursor;
+};
+
 async function sendRequest<Response>(page: Page, type: string): Promise<Response> {
   return page.evaluate((messageType) => chrome.runtime.sendMessage({ type: messageType, version: 1, payload: {} }), type);
 }
@@ -62,37 +69,54 @@ async function seedOldUnreferencedOriginal(serviceWorker: Worker): Promise<void>
   });
 }
 
-async function rejectBlobGetAll(serviceWorker: Worker): Promise<void> {
+async function rejectBlobValueReads(serviceWorker: Worker): Promise<void> {
   await serviceWorker.evaluate(() => {
-    const scope = globalThis as typeof globalThis & {
-      __imageTrailBlobGetAllCalls?: number;
-      __imageTrailOriginalGetAll?: typeof IDBObjectStore.prototype.getAll;
-    };
+    const scope = globalThis as BlobValueReadGuardScope;
     const originalGetAll = IDBObjectStore.prototype.getAll;
-    scope.__imageTrailBlobGetAllCalls = 0;
+    const originalObjectStoreOpenCursor = IDBObjectStore.prototype.openCursor;
+    const originalIndexOpenCursor = IDBIndex.prototype.openCursor;
+    const rejectValueRead = (): never => {
+      scope.__imageTrailBlobValueReadCalls = (scope.__imageTrailBlobValueReadCalls ?? 0) + 1;
+      throw new Error('The storage-health path attempted to hydrate the encrypted blob store.');
+    };
+    scope.__imageTrailBlobValueReadCalls = 0;
     scope.__imageTrailOriginalGetAll = originalGetAll;
+    scope.__imageTrailOriginalObjectStoreOpenCursor = originalObjectStoreOpenCursor;
+    scope.__imageTrailOriginalIndexOpenCursor = originalIndexOpenCursor;
     IDBObjectStore.prototype.getAll = new Proxy(originalGetAll, {
       apply(target, thisArg, args) {
-        if ((thisArg as IDBObjectStore).name === 'blobs') {
-          scope.__imageTrailBlobGetAllCalls = (scope.__imageTrailBlobGetAllCalls ?? 0) + 1;
-          throw new Error('The orphan scan attempted to hydrate the encrypted blob store.');
-        }
+        if ((thisArg as IDBObjectStore).name === 'blobs') return rejectValueRead();
         return Reflect.apply(target, thisArg, args) as IDBRequest<unknown[]>;
+      },
+    });
+    IDBObjectStore.prototype.openCursor = new Proxy(originalObjectStoreOpenCursor, {
+      apply(target, thisArg, args) {
+        if ((thisArg as IDBObjectStore).name === 'blobs') return rejectValueRead();
+        return Reflect.apply(target, thisArg, args) as IDBRequest<IDBCursorWithValue | null>;
+      },
+    });
+    IDBIndex.prototype.openCursor = new Proxy(originalIndexOpenCursor, {
+      apply(target, thisArg, args) {
+        if ((thisArg as IDBIndex).objectStore.name === 'blobs') return rejectValueRead();
+        return Reflect.apply(target, thisArg, args) as IDBRequest<IDBCursorWithValue | null>;
       },
     });
   });
 }
 
-async function restoreBlobGetAll(serviceWorker: Worker): Promise<number> {
+async function restoreBlobValueReads(serviceWorker: Worker): Promise<number> {
   return serviceWorker.evaluate(() => {
-    const scope = globalThis as typeof globalThis & {
-      __imageTrailBlobGetAllCalls?: number;
-      __imageTrailOriginalGetAll?: typeof IDBObjectStore.prototype.getAll;
-    };
-    const calls = scope.__imageTrailBlobGetAllCalls ?? 0;
+    const scope = globalThis as BlobValueReadGuardScope;
+    const calls = scope.__imageTrailBlobValueReadCalls ?? 0;
     if (scope.__imageTrailOriginalGetAll) IDBObjectStore.prototype.getAll = scope.__imageTrailOriginalGetAll;
-    delete scope.__imageTrailBlobGetAllCalls;
+    if (scope.__imageTrailOriginalObjectStoreOpenCursor) {
+      IDBObjectStore.prototype.openCursor = scope.__imageTrailOriginalObjectStoreOpenCursor;
+    }
+    if (scope.__imageTrailOriginalIndexOpenCursor) IDBIndex.prototype.openCursor = scope.__imageTrailOriginalIndexOpenCursor;
+    delete scope.__imageTrailBlobValueReadCalls;
     delete scope.__imageTrailOriginalGetAll;
+    delete scope.__imageTrailOriginalObjectStoreOpenCursor;
+    delete scope.__imageTrailOriginalIndexOpenCursor;
     return calls;
   });
 }
@@ -101,7 +125,7 @@ test('storage usage and orphan cleanup never materialize encrypted blob values',
   const userDataDir = await mkdtemp(path.join(tmpdir(), 'image-trail-storage-orphan-scan-'));
   const { context, serviceWorker } = await launchPersistentExtensionSession(userDataDir, headless);
   const page = await context.newPage();
-  let blobGetAllCalls: number | undefined;
+  let blobValueReadCalls: number | undefined;
 
   try {
     const extensionId = /^chrome-extension:\/\/(?<id>[^/]+)/u.exec(serviceWorker.url())?.groups?.['id'];
@@ -109,7 +133,7 @@ test('storage usage and orphan cleanup never materialize encrypted blob values',
     await page.goto(`chrome-extension://${extensionId}/src/preview/preview.html`);
     await sendRequest<StorageUsageResponse>(page, 'imageTrail.storageUsageRequest');
     await seedOldUnreferencedOriginal(serviceWorker);
-    await rejectBlobGetAll(serviceWorker);
+    await rejectBlobValueReads(serviceWorker);
 
     const usage = await sendRequest<StorageUsageResponse>(page, 'imageTrail.storageUsageRequest');
     expect(usage).toMatchObject({
@@ -127,7 +151,7 @@ test('storage usage and orphan cleanup never materialize encrypted blob values',
     });
   } finally {
     try {
-      blobGetAllCalls = await restoreBlobGetAll(serviceWorker);
+      blobValueReadCalls = await restoreBlobValueReads(serviceWorker);
     } finally {
       try {
         await context.close();
@@ -137,5 +161,5 @@ test('storage usage and orphan cleanup never materialize encrypted blob values',
     }
   }
 
-  expect(blobGetAllCalls).toBe(0);
+  expect(blobValueReadCalls).toBe(0);
 });
