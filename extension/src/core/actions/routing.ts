@@ -128,6 +128,7 @@ export const PANEL_ACTION_DOMAINS = {
   'cloud-backup/choose-restore': 'settings',
   'cloud-backup/retry': 'settings',
   'cloud-backup/disconnect': 'settings',
+  'cloud-backup/cancel': 'settings',
   'cloud-backup/preview-restore': 'settings',
   'export/history': 'settings',
   'export/bookmarks': 'settings',

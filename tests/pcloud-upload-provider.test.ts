@@ -170,6 +170,44 @@ test('uploadPCloudBackup creates folders, uploads, retries listfolder, and verif
   }
 });
 
+test('verified part uploads skip persistent backup history until a manifest is published', async () => {
+  const storage: Record<string, unknown> = {};
+  const restoreChrome = installPCloudConnection({ storage });
+  const originalFetch = globalThis.fetch;
+  const partContent = '{"part":true}';
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith('/createfolderifnotexists')) {
+      return jsonResponse({ result: 0, metadata: { isfolder: true, folderid: mockedFolderId(init) } });
+    }
+    if (url.endsWith('/uploadfile')) {
+      return jsonResponse({ result: 0, metadata: [{ fileid: 350, size: partContent.length, name: 'part.image-trail-part.json' }] });
+    }
+    if (url.endsWith('/listfolder')) return jsonResponse({ result: 0, metadata: { contents: [{ fileid: 350 }] } });
+    if (url.endsWith('/getfilelink')) {
+      return jsonResponse({ result: 0, hosts: ['c123.pcloud.com'], path: '/verified-part' });
+    }
+    if (url === 'https://c123.pcloud.com/verified-part') return new Response(partContent);
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+
+  try {
+    const result = await uploadPCloudBackup({
+      operation: 'upload',
+      fileName: 'part.image-trail-part.json',
+      fileContent: partContent,
+      recordHistory: false,
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.historyPersisted, false);
+    assert.equal(storage[BACKUP_HISTORY_STORAGE_KEY], undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreChrome();
+  }
+});
+
 test('uploadPCloudBackup deletes unverified files after verification mismatch', async () => {
   const restoreChrome = installPCloudConnection();
   const originalFetch = globalThis.fetch;
@@ -483,6 +521,49 @@ test('downloadPCloudBackup retries alternate pCloud hosts after direct-link refe
     const ruleIds = addedDnrRuleIds(dnrCalls);
     assert.equal(ruleIds.length, 3);
     assert.equal(new Set(ruleIds).size, ruleIds.length);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreChrome();
+  }
+});
+
+test('part downloads require an exact file id and manifest filename in the Image Trail backup folder', async () => {
+  const restoreChrome = installPCloudConnection();
+  const originalFetch = globalThis.fetch;
+  const fileName = 'image-trail-cloud-00000000-0000-4000-8000-000000000223-000000-metadata.image-trail-part.json';
+  const fileContent = '{"part":true}';
+  const calls: string[] = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.endsWith('/createfolderifnotexists')) {
+      return jsonResponse({ result: 0, metadata: { isfolder: true, folderid: mockedFolderId(init) } });
+    }
+    if (url.endsWith('/listfolder')) {
+      return jsonResponse({ result: 0, metadata: { contents: [{ fileid: 402, name: fileName }] } });
+    }
+    if (url.endsWith('/getfilelink')) {
+      return jsonResponse({ result: 0, hosts: ['c123.pcloud.com'], path: '/verified-part' });
+    }
+    if (url === 'https://c123.pcloud.com/verified-part') return new Response(fileContent);
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+
+  try {
+    const unrelated = await downloadPCloudBackup({ fileId: 403, fileName, kind: 'part' });
+    assert.equal(unrelated.ok, false);
+    assert.match(unrelated.message, /exact manifest filename/u);
+    assert.equal(
+      calls.some((url) => url.endsWith('/getfilelink')),
+      false,
+    );
+
+    const verified = await downloadPCloudBackup({ fileId: 402, fileName, kind: 'part' });
+    assert.equal(verified.ok, true);
+    if (verified.ok) assert.equal(verified.fileContent, fileContent);
+    assert.equal(calls.filter((url) => url.endsWith('/listfolder')).length, 1);
+    assert.equal(calls.filter((url) => url.endsWith('/getfilelink')).length, 1);
   } finally {
     globalThis.fetch = originalFetch;
     restoreChrome();

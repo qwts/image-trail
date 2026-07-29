@@ -3,6 +3,8 @@ import type { WorkspaceRailEdge } from '../../core/workspace-layout.js';
 import { clampPanelPositionWithinInsets, hostnameFromLocation } from '../panel-position.js';
 import { workspacePanelInsets } from '../workspace/workspace-geometry.js';
 
+const VIEWPORT_RENDER_DEBOUNCE_MS = 120;
+
 export interface PanelPositionControllerDeps {
   getState(): PanelState;
   setState(state: PanelState): void;
@@ -29,6 +31,7 @@ export class PanelPositionController {
   private workspaceEdges = new Set<WorkspaceRailEdge>();
   private observingViewport = false;
   private cancelPanelDrag: (() => void) | null = null;
+  private viewportRenderTimer: number | null = null;
 
   constructor(private readonly deps: PanelPositionControllerDeps) {}
 
@@ -107,7 +110,6 @@ export class PanelPositionController {
       });
       this.applyPanelPosition(latest);
       this.restoredPanelPosition = latest;
-      this.deps.renderRecallOnly();
     };
 
     const cleanup = (): void => {
@@ -198,15 +200,34 @@ export class PanelPositionController {
   }
 
   private readonly handleViewportChange = (): void => {
-    this.deps.render();
+    const root = this.deps.root();
+    if (!root) return;
+    this.applyWorkspacePanelHeight(root);
+    this.applyRestoredPanelPosition();
+    this.scheduleViewportRender();
   };
 
   private updateViewportObservation(active: boolean): void {
+    if (!active) this.cancelViewportRender();
     if (active === this.observingViewport) return;
     this.observingViewport = active;
     const method = active ? 'addEventListener' : 'removeEventListener';
     window[method]('resize', this.handleViewportChange);
     window.visualViewport?.[method]('resize', this.handleViewportChange);
+  }
+
+  private scheduleViewportRender(): void {
+    this.cancelViewportRender();
+    this.viewportRenderTimer = window.setTimeout(() => {
+      this.viewportRenderTimer = null;
+      if (this.observingViewport && this.deps.root()) this.deps.render();
+    }, VIEWPORT_RENDER_DEBOUNCE_MS);
+  }
+
+  private cancelViewportRender(): void {
+    if (this.viewportRenderTimer === null) return;
+    window.clearTimeout(this.viewportRenderTimer);
+    this.viewportRenderTimer = null;
   }
 
   private async savePanelPosition(position: PanelPosition): Promise<void> {

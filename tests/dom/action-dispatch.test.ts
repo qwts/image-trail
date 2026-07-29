@@ -65,6 +65,7 @@ function createHarness(): Harness {
     applyPanelState: () => false,
     syncTargetState: noop,
     render: () => record('render'),
+    renderRecallOnly: noop,
     renderPanelAndRefreshRecall: noop,
     refreshRecallIfOpen: noop,
     clearRecallMessageTimer: noop,

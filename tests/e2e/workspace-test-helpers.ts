@@ -104,7 +104,6 @@ export async function openWorkspacePanel(page: Page, serviceWorker: Worker): Pro
 
 export async function detachHistory(page: Page): Promise<Locator> {
   const detach = page.getByRole('button', { name: detachedHistoryName });
-  await detach.scrollIntoViewIfNeeded();
   await detach.click();
   const floating = page.locator('[data-image-trail-detached-window="history"][data-workspace-mode="floating"]');
   await expect(floating).toBeVisible();
