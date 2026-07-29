@@ -323,6 +323,7 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
     case 'cloud-backup/preview-restore':
     case 'cloud-backup/retry':
     case 'cloud-backup/disconnect':
+    case 'cloud-backup/cancel':
     case 'export/history':
     case 'export/bookmarks':
     case 'export/image':

@@ -20,6 +20,7 @@ type CloudExportActionName =
   | 'cloud-backup/connect'
   | 'cloud-backup/retry'
   | 'cloud-backup/disconnect'
+  | 'cloud-backup/cancel'
   | 'cloud-backup/backup-now'
   | 'cloud-backup/choose-restore'
   | 'cloud-backup/preview-restore'
@@ -143,6 +144,12 @@ function buildCloudExportActionEntries(deps: PanelActionDeps): ActionEntries<Clo
     'cloud-backup/disconnect': {
       handle() {
         void deps.recallExport().disconnectPCloudBackup();
+      },
+    },
+    'cloud-backup/cancel': {
+      handle() {
+        if (deps.getState().pcloudBackup.pendingOperation === 'backing-up') deps.recallExport().cancelPCloudBackup();
+        if (deps.getState().pcloudBackup.pendingOperation === 'restoring') deps.recallRestore().cancelPCloudRestore();
       },
     },
     'cloud-backup/backup-now': {

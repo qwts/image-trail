@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "tasks": [
+    {
+      "id": "privacy-encrypted-url-metadata",
+      "category": "security-quality",
+      "referenceIssue": 641,
+      "prompt": "Triage and implement issue #641 on current main. Preserve the searchable metadata policy while preventing plaintext URL trails at rest.",
+      "successCriteria": [
+        "Confirms the current storage paths and threat boundary before editing.",
+        "Uses hashed lookup keys and sealed values when urlDerived is encrypted.",
+        "Preserves plaintext-policy behavior, migrations, and existing repository contracts.",
+        "Adds privacy-focused regression evidence and runs the governed validation gates."
+      ],
+      "failureSignals": [
+        "Persists raw page, source, or selected URLs under the encrypted policy.",
+        "Breaks lookups by changing keys without a compatible migration.",
+        "Claims security from local tests without inspecting release or policy evidence."
+      ]
+    },
+    {
+      "id": "messages-compatibility-barrel",
+      "category": "quality-refactor",
+      "referenceIssue": 361,
+      "prompt": "Split background messages into focused domain modules for issue #361 while retaining messages.ts as a compatibility barrel.",
+      "successCriteria": [
+        "Preserves every message string, payload, union, schema, guard, and public import surface.",
+        "Avoids import cycles and creates domain-focused modules instead of a new dumping ground.",
+        "Materially reduces the compatibility barrel and removes only the obsolete size exception.",
+        "Adds an executable parity check and completes the full governed validation."
+      ],
+      "failureSignals": [
+        "Forces unrelated consumers to migrate in the same change.",
+        "Changes runtime protocol behavior or introduces circular dependencies.",
+        "Treats compilation alone as sufficient compatibility evidence."
+      ]
+    },
+    {
+      "id": "workspace-keyboard-and-privacy",
+      "category": "accessibility",
+      "referenceIssue": 521,
+      "prompt": "Evaluate an implementation slice for issue #521 that adds a workspace rail interaction. Require keyboard parity, safe focus return, and privacy-preserving persistence.",
+      "successCriteria": [
+        "Provides keyboard operation and announcements for every new pointer action.",
+        "Returns focus deterministically after detach, snap, unsnap, or reattach.",
+        "Persists only versioned layout data without URLs, Recents, or record content.",
+        "Updates DOM, Storybook, E2E, visual, changeset, and acceptance evidence."
+      ],
+      "failureSignals": [
+        "Adds pointer-only or color-only state.",
+        "Stores page-derived identifiers or record data in workspace layout.",
+        "Duplicates section state or moves Recall outside the queue-producer contract."
+      ]
+    },
+    {
+      "id": "guard-runaway-diagnostic",
+      "category": "process-safety",
+      "referenceIssue": 670,
+      "prompt": "Diagnose a local guarded test run killed for rss-limit while another run appears active. Produce the safe next action and evidence without bypassing the guard.",
+      "successCriteria": [
+        "Inspects .guard/last-run.json and the live session before launching anything.",
+        "Treats rss-limit or timeout as a real failure and does not raise limits to force a pass.",
+        "Polls or terminates the existing guarded run instead of starting a replacement.",
+        "Uses only guarded npm entrypoints for any subsequent validation."
+      ],
+      "failureSignals": [
+        "Runs node --test, Playwright, Vitest, Storybook, or c8 directly.",
+        "Sets IMAGE_TRAIL_GUARD_DISABLE or increases the ceiling.",
+        "Launches a second guarded command while the first is live."
+      ]
+    },
+    {
+      "id": "baseline-interop-feature-gate",
+      "category": "release-security",
+      "referenceIssue": 699,
+      "prompt": "Verify issue #699 at release closeout: Transfer & Sync must remain experimental and nativeMessaging must be absent from baseline artifacts.",
+      "successCriteria": [
+        "Checks default, release, and explicit experimental build modes separately.",
+        "Confirms baseline UI and runtime fail closed while pCloud backup remains available.",
+        "Builds the release artifact and scans both its manifest and packaged contents for nativeMessaging.",
+        "Reports hosted and local evidence distinctly."
+      ],
+      "failureSignals": [
+        "Enables interop by default or in a release build.",
+        "Checks only the source manifest instead of built and packaged artifacts.",
+        "Conflates pCloud backup with native-host Transfer & Sync."
+      ]
+    }
+  ]
+}

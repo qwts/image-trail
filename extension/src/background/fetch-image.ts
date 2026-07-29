@@ -170,7 +170,11 @@ function originalMediaFileName(contentDisposition: string | null, url: string, f
   const dispositionName = fileNameFromContentDisposition(contentDisposition);
   const urlName = fileNameFromUrlPath(url);
   const sanitized = sanitizeOriginalFileName(dispositionName ?? urlName ?? fallbackBase, fallbackBase);
-  return /\.[a-z0-9]{1,10}$/iu.test(sanitized) ? sanitized : `${sanitized}.${fallbackExtension}`;
+  const extension = /\.([a-z0-9]{1,10})$/iu.exec(sanitized);
+  const normalizedExtension = fallbackExtension.toLowerCase();
+  if (extension?.[1]?.toLowerCase() === normalizedExtension) return sanitized;
+  const stem = extension ? sanitized.slice(0, -extension[0].length) : sanitized;
+  return `${sanitizeFilename(stem, fallbackBase, 240 - normalizedExtension.length - 1)}.${normalizedExtension}`;
 }
 
 function fileNameFromContentDisposition(value: string | null): string | null {

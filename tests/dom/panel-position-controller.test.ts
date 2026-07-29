@@ -76,7 +76,7 @@ test('dragging moves the panel by pointer deltas, clamps to the viewport, and sa
   assert.equal(harness.root.style.left, '140px');
   assert.equal(harness.root.style.top, '60px');
   assert.equal(harness.root.style.right, 'auto');
-  assert.deepEqual(harness.log, ['renderRecallOnly']);
+  assert.deepEqual(harness.log, []);
 
   // Dragging far past the right edge clamps to viewport - panel - padding: 1024 - 300 - 12.
   document.dispatchEvent(pointerEvent('pointermove', { clientX: 2000, clientY: 120 }));
@@ -90,6 +90,7 @@ test('dragging moves the panel by pointer deltas, clamps to the viewport, and sa
   document.dispatchEvent(pointerEvent('pointermove', { clientX: 300, clientY: 300 }));
   assert.equal(harness.root.style.left, '712px');
   assert.equal(harness.saved.length, 1);
+  assert.deepEqual(harness.log, []);
 });
 
 test('a non-primary-button press does not start a drag', () => {
@@ -149,16 +150,35 @@ test('floating-only initialization leaves stylesheet placement authoritative', (
   assert.deepEqual(harness.controller.currentPanelPosition(), { left: 100, top: 80 });
 });
 
-test('viewport observation reclamps floating-only workspaces and stops when minimized', () => {
+test('viewport bursts update rail geometry immediately and render once at resize end', async (context) => {
+  const harness = createHarness();
+  const originalInnerHeight = window.innerHeight;
+  context.after(() => {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalInnerHeight });
+  });
+  harness.controller.setWorkspaceRailEdges(new Set(['left', 'top']), true);
+  harness.log.length = 0;
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 640 });
+  window.dispatchEvent(new Event('resize'));
+  window.dispatchEvent(new Event('resize'));
+  window.dispatchEvent(new Event('resize'));
+  assert.equal(harness.root.style.maxHeight, '364px');
+  assert.deepEqual(harness.log, []);
+
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.deepEqual(harness.log, []);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.deepEqual(harness.log, ['render']);
+});
+
+test('stopping viewport observation cancels its queued resize-end render', async () => {
   const harness = createHarness();
   harness.controller.setWorkspaceRailEdges(new Set(), true);
   harness.log.length = 0;
   window.dispatchEvent(new Event('resize'));
-  assert.deepEqual(harness.log, ['render']);
-
   harness.controller.setWorkspaceRailEdges(new Set(), false);
   harness.log.length = 0;
-  window.dispatchEvent(new Event('resize'));
+  await new Promise((resolve) => setTimeout(resolve, 160));
   assert.deepEqual(harness.log, []);
 });
 

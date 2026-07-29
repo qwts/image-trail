@@ -138,7 +138,7 @@ export class ImageTrailPanel {
       this.render();
       this.panelRender.showBufferedNavigationToast(message);
     },
-    onDebugChanged: () => this.panelRender.renderBufferedDebugOverlay(),
+    onDebugChanged: () => this.panelRender.renderBufferedNavigationFeedback(),
     checkRequestPolicy: (url, options) => checkImageRequestPolicy(url, options),
     probeImage: (url, timeoutMs, options) => probeBufferedImageSource(url, timeoutMs, options),
     fetchDecodedImage: (url, options) => fetchDecodedBufferedImageSource(url, options),
@@ -185,7 +185,7 @@ export class ImageTrailPanel {
     loadPCloudProviderStatus: (...args) => loadPCloudProviderStatus(...args),
     connectPCloudProvider: (...args) => connectPCloudProvider(...args),
     disconnectPCloudProvider: (...args) => disconnectPCloudProvider(...args),
-    uploadPCloudBackup: (input) => uploadPCloudBackup(input),
+    uploadPCloudBackup,
   });
   private readonly recallRestore = new RecallRestoreController({
     getState: () => this.state,
@@ -280,7 +280,7 @@ export class ImageTrailPanel {
     getState: () => this.state,
     setState: this.replaceState,
     render: () => this.render(),
-    renderRecallOnly: () => this.renderRecallOnly(),
+    renderRecallOnly: () => this.panelRender.renderRecallOnly(),
     whenStylesReady: () => this.panelMount.whenStylesReady(),
     root: () => this.panelMount.root,
     panelPositionStore: () => this.panelPositionStore,
@@ -301,7 +301,7 @@ export class ImageTrailPanel {
     getState: () => this.state,
     setState: this.replaceState,
     render: () => this.render(),
-    renderRecallOnly: () => this.renderRecallOnly(),
+    renderRecallOnly: () => this.panelRender.renderRecallOnly(),
     renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     ensurePanelPositionRestored: () => this.panelPosition.ensurePanelPositionRestored(),
@@ -386,7 +386,7 @@ export class ImageTrailPanel {
     handlePanelDragStart: (event) => this.panelPosition.handlePanelDragStart(event),
     queuePanelPositionRestore: () => this.panelPosition.queuePanelPositionRestore(),
     applyRestoredPanelPosition: () => this.panelPosition.applyRestoredPanelPosition(),
-    bufferedNavDebugSnapshot: () => this.bufferedNav.getDebugSnapshot(),
+    bufferedNavSnapshots: () => this.bufferedNav.getSnapshots(),
     refreshRecallIfOpen: () => this.recallDestination.refreshRecallIfOpen(),
     onWorkspaceLayoutChanged: () => this.workspaceLayout.handleWorkspaceLayoutChanged(),
     onWorkspaceEdgesChanged: (edges, observeViewport) => this.panelPosition.setWorkspaceRailEdges(edges, observeViewport),
@@ -548,6 +548,7 @@ export class ImageTrailPanel {
         this.state = setTargetState(this.state, toTargetState(snapshot));
       },
       render: () => this.render(),
+      renderRecallOnly: () => this.panelRender.renderRecallOnly(),
       renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
       refreshRecallIfOpen: () => this.recallDestination.refreshRecallIfOpen(),
       clearRecallMessageTimer: () => this.recallDestination.clearRecallMessageTimer(),
@@ -740,9 +741,5 @@ export class ImageTrailPanel {
 
   private render(): void {
     this.panelRender.render();
-  }
-
-  private renderRecallOnly(): void {
-    this.panelRender.renderRecallOnly();
   }
 }

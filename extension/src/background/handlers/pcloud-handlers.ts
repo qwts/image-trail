@@ -83,13 +83,18 @@ export function createPCloudMessageRegistry(): Record<PCloudRequestType, Message
       requestSchema: requestSchemas.uploadPCloudBackupRequestSchema,
       handle: (message: UploadPCloudBackupMessage) => uploadPCloudBackup(message.payload),
       respond: (result) => createUploadPCloudBackupResultMessage(result),
-      fallback: () =>
-        createUploadPCloudBackupResultMessage({
-          ok: false,
-          status: { connected: false, message: 'pCloud backup upload failed.', messageIsError: true },
+      fallback: (message) => {
+        const operationMessage = message.payload.operation === 'cleanup' ? 'pCloud backup cleanup failed.' : 'pCloud backup upload failed.';
+        const base = {
+          ok: false as const,
+          status: { connected: false, message: operationMessage, messageIsError: true },
           reason: 'upload-failed',
-          message: 'pCloud backup upload failed.',
-        }),
+          message: operationMessage,
+        };
+        return createUploadPCloudBackupResultMessage(
+          message.payload.operation === 'cleanup' ? { ...base, deletedFileIds: [], failedFileIds: message.payload.fileIds } : base,
+        );
+      },
     }),
     [MessageType.ListPCloudBackups]: defineMessage({
       requestSchema: requestSchemas.emptyPayloadSchema,

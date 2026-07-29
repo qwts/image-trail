@@ -213,7 +213,7 @@ export function createBookmarksRestorePreview(
 
 function fullBackupMissingOriginalReferenceCount(result: BookmarkImportResult): number {
   if (!result.fullBackup) return result.externalOriginalCount;
-  const backedBlobIds = new Set(result.originalBlobs.map((record) => record.id));
+  const backedBlobIds = new Set(result.backedOriginalBlobIds);
   const missingBlobIds = new Set(result.missingOriginalBlobIds.filter((blobId) => !backedBlobIds.has(blobId)));
   for (const entry of result.entries) {
     const blobId = entry.payload.storedOriginal?.blobId ?? entry.payload.protectedPin?.storedOriginalBlobId;
