@@ -1,5 +1,5 @@
 import { DomObserver } from '../../content/dom-observer.js';
-import { detectPageContext } from '../../content/page-context-detection.js';
+import { PageContextDetector, pageContextMutationAffectsDetection } from '../../content/page-context-detection.js';
 import type { PlaintextLocalSettings } from '../../content/panel-services.js';
 import {
   normalizePageContextScope,
@@ -31,10 +31,35 @@ export interface PageContextControllerDeps {
 }
 
 function defaultEnvironment(): PageContextControllerEnvironment {
+  const detector = new PageContextDetector();
   return {
-    detect: () => detectPageContext(),
+    detect: () => detector.detect(),
     hostname: () => window.location.hostname,
-    createObserver: (onRefresh) => new DomObserver(onRefresh),
+    createObserver: (onRefresh) =>
+      new DomObserver(onRefresh, {
+        mutationFilter: pageContextMutationAffectsDetection,
+        onMutations: (records) => detector.invalidate(records),
+        observe: {
+          attributes: true,
+          attributeFilter: [
+            'data-full-src',
+            'data-image-url',
+            'data-media-url',
+            'data-original',
+            'data-src',
+            'data-zoom-src',
+            'height',
+            'hidden',
+            'role',
+            'sizes',
+            'src',
+            'srcset',
+            'width',
+          ],
+          childList: true,
+          subtree: true,
+        },
+      }),
   };
 }
 
