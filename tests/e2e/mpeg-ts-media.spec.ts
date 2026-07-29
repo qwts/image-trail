@@ -16,12 +16,19 @@ import {
   openFixturePage,
   openSettingsGroup,
   readDownloadRequestLog,
+  resetExtensionLibrary,
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
 
 const supportedHash = 'da3d70e6479b8ce82d73ffa6b31b930a1555cb1c6e4d523854076ed2fab092d9';
 const preservedHash = '095b7bfb8cfb4f4eaaa37bc7600a5870b3d3a8561769bcbdaa17e6603fb4a756';
+const importedFileNames: readonly string[] = ['supported.m2ts', 'preserved.mts'];
+const fixturePageUrl = fixtureUrl(fixturePaths.singleImage);
+
+test.afterEach(async ({ extensionId, page }) => {
+  await resetExtensionLibrary(page, extensionId, { recentPageUrl: fixturePageUrl, recordLabels: importedFileNames });
+});
 
 test('MPEG-TS import preserves exact bytes, rejects partial state, and provides honest previews', async ({
   extensionId,
@@ -47,18 +54,42 @@ test('MPEG-TS import preserves exact bytes, rejects partial state, and provides 
   await page.getByRole('button', { name: 'Capture URL' }).click();
   await expectPanelStatusMessage(page, 'Imported 1 media item into bookmarks and recent history.');
 
-  const supportedRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'supported.m2ts' });
-  const preservedRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'preserved.mts' });
-  for (const row of [supportedRow, preservedRow]) {
-    await expect(row).toBeVisible();
-    await expect(row.locator('.image-trail-panel__stored-original-dot')).toHaveAttribute('title', 'Original stored');
-    await expect(row.locator('.image-trail-ds__record-thumbnail')).toHaveAttribute('src', /^data:image\/svg\+xml;base64,/u);
-  }
-  await expect(supportedRow).toContainText('M2TS');
-  await expect(preservedRow).toContainText('MTS');
-
   const validationPage = await page.context().newPage();
   await validationPage.goto(`chrome-extension://${extensionId}/src/gallery/gallery.html`);
+  const importedRecords = await validationPage.evaluate(async (fileNames) => {
+    const response = await chrome.runtime.sendMessage({
+      type: 'imageTrail.loadBookmarks',
+      version: 1,
+      payload: { offset: 0, limit: 500, scope: 'global' },
+    });
+    return (
+      (response?.payload?.items ?? []) as Array<{
+        captureStatus?: string;
+        label?: string;
+        storedOriginal?: { fileName?: string };
+        thumbnail?: string;
+      }>
+    )
+      .filter((item) => item.label && fileNames.includes(item.label))
+      .map((item) => ({
+        captureStatus: item.captureStatus,
+        fileName: item.storedOriginal?.fileName,
+        hasPoster: item.thumbnail?.startsWith('data:image/svg+xml;base64,') ?? false,
+        label: item.label,
+      }))
+      .sort((left, right) => (left.label ?? '').localeCompare(right.label ?? ''));
+  }, importedFileNames);
+  expect(importedRecords).toEqual([
+    { captureStatus: 'captured', fileName: 'preserved.mts', hasPoster: true, label: 'preserved.mts' },
+    { captureStatus: 'captured', fileName: 'supported.m2ts', hasPoster: true, label: 'supported.m2ts' },
+  ]);
+
+  const supportedRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'supported.m2ts' });
+  await expect(supportedRow).toBeVisible();
+  await expect(supportedRow.locator('.image-trail-panel__stored-original-dot')).toHaveAttribute('title', 'Original stored');
+  await expect(supportedRow.locator('.image-trail-ds__record-thumbnail')).toHaveAttribute('src', /^data:image\/svg\+xml;base64,/u);
+  await expect(supportedRow).toContainText('M2TS');
+
   const malformed = await captureDataUrlAtomically(
     validationPage,
     `data:video/mp2t;base64,${truncated.toString('base64')}`,
