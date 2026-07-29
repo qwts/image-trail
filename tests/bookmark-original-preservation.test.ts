@@ -13,9 +13,12 @@ import { exportPlainBookmarks } from '../extension/src/data/import-export/bookma
 import { importBookmarks } from '../extension/src/data/import-export/bookmarks-import.js';
 import { InteropRecordExportStore } from '../extension/src/data/interop/record-export.js';
 import { BlobsRepository } from '../extension/src/data/repositories/blobs-repository.js';
+import { BookmarksRepository } from '../extension/src/data/repositories/bookmarks-repository.js';
+import { EncryptedPinsRepository } from '../extension/src/data/repositories/encrypted-pins-repository.js';
+import { DataStore } from '../extension/src/data/schema.js';
 import type { KeyReference } from '../extension/src/data/crypto/types.js';
 import { bookmarkPayloadToDisplayRecord } from '../extension/src/ui/panel/restore-import-preview.js';
-import { deleteImageTrailDb } from './indexeddb-test-helpers.js';
+import { deleteImageTrailDb, transactionDone } from './indexeddb-test-helpers.js';
 import * as v from 'valibot';
 
 const ORIGINAL = {
@@ -231,6 +234,72 @@ test('explicit plain-original clearing preserves interop custody and deletes the
     await store.close();
   }
   await assertOriginalBlobMissing();
+});
+
+test('legacy ordinary-index interop custody survives conversion to a protected pin', async () => {
+  await deleteImageTrailDb();
+  const url = 'https://example.test/legacy-interop.jpg';
+  const interopId = '11111111-2222-4333-8444-555555555555';
+  const plainStore = new IndexedDbBookmarkStore();
+  const legacy = await plainStore.save(
+    createDisplayRecord({
+      id: url,
+      url,
+      label: 'legacy-interop.jpg',
+      timestamp: '2026-07-18T00:00:01.000Z',
+      source: 'bookmark',
+    }),
+  );
+  await plainStore.close();
+
+  const prepared = await openImageTrailDb();
+  assert.ok(prepared.db);
+  try {
+    const review = await new InteropRecordExportStore(prepared.db, { createId: () => interopId }).review([legacy.id]);
+    assert.equal(review.records[0]?.record.identity.interopId, interopId);
+    const transaction = prepared.db.transaction(DataStore.Metadata, 'readwrite');
+    transaction.objectStore(DataStore.Metadata).delete('bookmarkInteropCustodyPresence:v1');
+    await transactionDone(transaction);
+    assert.equal(await new BookmarksRepository(prepared.db).getInteropCustodyPresence(), undefined);
+  } finally {
+    prepared.db.close();
+  }
+
+  const { active } = await createAndActivateWrappedBlobKey({
+    password: 'legacy-interop-password',
+    uuid: 'legacy-interop-key',
+    now: '2026-07-18T00:00:02.000Z',
+  });
+  const protectedStore = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  try {
+    const converted = await protectedStore.save(
+      createDisplayRecord({
+        id: url,
+        url,
+        label: 'legacy-interop-protected.jpg',
+        timestamp: '2026-07-18T00:00:03.000Z',
+        source: 'bookmark',
+      }),
+    );
+    assert.equal(converted.id, legacy.id);
+    assert.ok(converted.protectedPin?.encryptedPinId);
+
+    const verified = await openImageTrailDb();
+    assert.ok(verified.db);
+    try {
+      const encryptedPin = await new EncryptedPinsRepository(verified.db).get(converted.protectedPin.encryptedPinId);
+      assert.ok(encryptedPin);
+      const payload = await new EncryptedPinsRepository(verified.db).openRecord(encryptedPin, active.key);
+      assert.equal(payload.interop?.record.identity.interopId, interopId);
+      assert.equal(await new BookmarksRepository(verified.db).countEncrypted(), 1);
+      assert.equal(await new BookmarksRepository(verified.db).getInteropCustodyPresence(), true);
+    } finally {
+      verified.db.close();
+    }
+  } finally {
+    await protectedStore.close();
+    lockBlobKey();
+  }
 });
 
 test('bookmarks-only import over an existing bookmark preserves the local captured original', async () => {
