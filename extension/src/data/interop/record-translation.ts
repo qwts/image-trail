@@ -56,11 +56,12 @@ interface StoredInteropPin {
 
 export class InteropRecordTranslationStore {
   private ready: Promise<TranslationContext | null> | null = null;
+  private storedInteropPins: Promise<readonly StoredInteropPin[]> | null = null;
 
   async preview(input: InteropRecordTranslationInput): Promise<InteropRecordPreview> {
     const normalized = normalizeInput(input);
     const context = await this.openContext();
-    const stored = context ? await listStoredInteropPins(context) : [];
+    const stored = context ? await this.listStoredInteropPins(context) : [];
     return previewNormalized(normalized, stored);
   }
 
@@ -72,7 +73,7 @@ export class InteropRecordTranslationStore {
       return { ...preview, persisted: false, pinId: null };
     }
 
-    const stored = await listStoredInteropPins(context);
+    const stored = await this.listStoredInteropPins(context);
     const preview = previewNormalized(normalized, stored);
     const enrichment = duplicateCustodyEnrichment(normalized, preview, stored);
     if (!isPersistable(preview.category) && !enrichment) {
@@ -87,7 +88,7 @@ export class InteropRecordTranslationStore {
     const payload = translatePayload(normalized, displayUrl, previous);
     const indexUrl = previous?.protectedPin ? localOrigin!.url : `${INTERNAL_RECORD_PREFIX}${normalized.record.identity.interopId}`;
 
-    await context.bookmarks.sealAndPut(
+    const persisted = await context.bookmarks.sealAndPut(
       pinId,
       payload,
       context.bookmarkKey.key,
@@ -96,14 +97,17 @@ export class InteropRecordTranslationStore {
       indexUrl,
       localOrigin?.queueUpdatedAt ?? now,
     );
-    await syncCanonicalAlbums(context, normalized.albums, now);
+    const custody = payload.interop;
+    if (!custody) throw new Error('Translated interoperability payload is missing canonical custody.');
+    const updatedStored = await this.rememberStoredInteropPin(context, { encrypted: persisted, payload, custody });
+    await syncCanonicalAlbums(context, normalized.albums, now, updatedStored);
     return { ...preview, existingPinId: localOrigin?.uuid ?? null, persisted: true, pinId };
   }
 
   async exportRecord(interopId: string): Promise<InteropRecordExport | null> {
     const context = await this.openContext();
     if (!context) return null;
-    const stored = (await listStoredInteropPins(context)).find((item) => item.custody.record.identity.interopId === interopId);
+    const stored = (await this.listStoredInteropPins(context)).find((item) => item.custody.record.identity.interopId === interopId);
     if (!stored) return null;
     return {
       record: stored.custody.record,
@@ -116,6 +120,7 @@ export class InteropRecordTranslationStore {
     const context = await this.ready;
     context?.db.close();
     this.ready = null;
+    this.storedInteropPins = null;
   }
 
   private async openContext(): Promise<TranslationContext | null> {
@@ -130,6 +135,17 @@ export class InteropRecordTranslationStore {
       };
     })();
     return this.ready;
+  }
+
+  private listStoredInteropPins(context: TranslationContext): Promise<readonly StoredInteropPin[]> {
+    this.storedInteropPins ??= loadStoredInteropPins(context);
+    return this.storedInteropPins;
+  }
+
+  private rememberStoredInteropPin(context: TranslationContext, pin: StoredInteropPin): Promise<readonly StoredInteropPin[]> {
+    const current = this.listStoredInteropPins(context);
+    this.storedInteropPins = current.then((stored) => upsertStoredInteropPin(stored, pin));
+    return this.storedInteropPins;
   }
 }
 
@@ -289,7 +305,7 @@ async function localOriginTarget(context: TranslationContext, record: InteropRec
   return payload ? encrypted : null;
 }
 
-async function listStoredInteropPins(context: TranslationContext): Promise<readonly StoredInteropPin[]> {
+async function loadStoredInteropPins(context: TranslationContext): Promise<readonly StoredInteropPin[]> {
   const result: StoredInteropPin[] = [];
   for (const encrypted of await context.bookmarks.listEncrypted()) {
     try {
@@ -302,9 +318,19 @@ async function listStoredInteropPins(context: TranslationContext): Promise<reado
   return result;
 }
 
-async function syncCanonicalAlbums(context: TranslationContext, albums: readonly InteropAlbum[], now: string): Promise<void> {
+function upsertStoredInteropPin(stored: readonly StoredInteropPin[], pin: StoredInteropPin): readonly StoredInteropPin[] {
+  const index = stored.findIndex((item) => item.encrypted.uuid === pin.encrypted.uuid);
+  if (index === -1) return [...stored, pin];
+  return stored.map((item, itemIndex) => (itemIndex === index ? pin : item));
+}
+
+async function syncCanonicalAlbums(
+  context: TranslationContext,
+  albums: readonly InteropAlbum[],
+  now: string,
+  stored: readonly StoredInteropPin[],
+): Promise<void> {
   if (albums.length === 0) return;
-  const stored = await listStoredInteropPins(context);
   const pinIdByInteropId = new Map(stored.map((item) => [item.custody.record.identity.interopId, item.encrypted.uuid]));
   for (const album of albums) {
     if (album.deletedAt) continue;
