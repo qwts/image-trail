@@ -35,7 +35,8 @@ async function clearDurableQueue(page: Page): Promise<void> {
 
 async function pinUrl(page: Page, url: string, expectedVisibleCount: number): Promise<void> {
   await applyUrlInEditor(page, url);
-  await expectPanelStatusMessage(page, /(Loaded|Applied|Image loaded but did not change)/u);
+  const escaped = url.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  await expectPanelStatusMessage(page, new RegExp(`(Loaded|Applied|Image loaded but did not change).*${escaped}`, 'u'));
   await page.getByRole('button', { name: 'Pin current' }).click();
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(expectedVisibleCount);
 }
