@@ -16,6 +16,7 @@ import type {
   ExportBlobKeyBackupResultMessage,
   ImportBlobKeyBackupResultMessage,
 } from './blob-key-messages.js';
+import type { CaptureImageMessage, GrantPermissionAndCaptureMessage } from './capture-messages.js';
 import type { DestinationRequest, DestinationResponse } from './destination-messages.js';
 import type {
   DeletePanelPositionMessage,
@@ -37,6 +38,7 @@ import { fetchBufferedImageSourceResultPayloadSchema } from './message-schemas.j
 export { MESSAGE_DIRECTION, MESSAGE_PROTOCOL_VERSION, MessageType } from './message-protocol.js';
 export * from './album-messages.js';
 export * from './blob-key-messages.js';
+export * from './capture-messages.js';
 export * from './layout-messages.js';
 export * from './original-blob-messages.js';
 export * from './recent-history-messages.js';
@@ -86,18 +88,6 @@ export interface UnknownMessageResponse {
   readonly type: typeof MessageType.Unknown;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload: { readonly reason: string };
-}
-
-export type CaptureSourceType = 'target' | 'history' | 'bookmark';
-
-export interface CaptureImageMessage {
-  readonly type: typeof MessageType.CaptureImage;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: {
-    readonly url: string;
-    readonly sourceRecordId?: string | undefined;
-    readonly sourceType: CaptureSourceType;
-  };
 }
 
 export interface CaptureResultMessage {
@@ -334,16 +324,6 @@ export interface FetchLinkedPageResultMessage {
   readonly payload:
     | { readonly ok: true; readonly text: string; readonly byteLength: number; readonly finalUrl: string }
     | { readonly ok: false; readonly reason: string; readonly message: string; readonly origin?: string };
-}
-
-export interface GrantPermissionAndCaptureMessage {
-  readonly type: typeof MessageType.GrantPermissionAndCapture;
-  readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: {
-    readonly url: string;
-    readonly sourceType: CaptureSourceType;
-    readonly sourceRecordId?: string | undefined;
-  };
 }
 
 export interface LoadBookmarksMessage {
@@ -922,10 +902,6 @@ export function createUnknownMessageResponse(reason: string): UnknownMessageResp
   return { type: MessageType.Unknown, version: MESSAGE_PROTOCOL_VERSION, payload: { reason } };
 }
 
-export function createCaptureImageMessage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): CaptureImageMessage {
-  return { type: MessageType.CaptureImage, version: MESSAGE_PROTOCOL_VERSION, payload: { url, sourceType, sourceRecordId } };
-}
-
 export function createCaptureResultMessage(result: import('../core/image/capture-result.js').CaptureResult): CaptureResultMessage {
   return { type: MessageType.CaptureResult, version: MESSAGE_PROTOCOL_VERSION, payload: result };
 }
@@ -1061,14 +1037,6 @@ export function createCheckImageRequestPolicyResultMessage(
 
 export function createFetchLinkedPageResultMessage(payload: FetchLinkedPageResultMessage['payload']): FetchLinkedPageResultMessage {
   return { type: MessageType.FetchLinkedPageResult, version: MESSAGE_PROTOCOL_VERSION, payload };
-}
-
-export function createGrantPermissionAndCaptureMessage(
-  url: string,
-  sourceType: CaptureSourceType,
-  sourceRecordId?: string,
-): GrantPermissionAndCaptureMessage {
-  return { type: MessageType.GrantPermissionAndCapture, version: MESSAGE_PROTOCOL_VERSION, payload: { url, sourceType, sourceRecordId } };
 }
 
 export function createDeleteBlobResultMessage(

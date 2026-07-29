@@ -8,8 +8,13 @@ import {
   interopGifWebpMediaBlockFrom,
   interopGifWebpMediaBlockSchema,
   interopMediaFileName,
+  interopMediaBlockForOriginal,
+  interopMediaBlockFrom,
+  interopMpegTsMediaBlockSchema,
+  withInteropMediaBlock,
   withInteropGifWebpMediaBlock,
 } from '../extension/src/core/interop/media.js';
+import { probeTransportStream } from '../extension/src/core/media/mpeg-ts.js';
 import { interopRecordSchema } from '../extension/src/core/interop/records.js';
 
 const block = {
@@ -105,4 +110,29 @@ test('incoherent and unbounded media claims fail closed', () => {
 test('inbound media filenames are bounded and strip display-control spoofing', () => {
   assert.equal(interopMediaFileName('party\u202egnp.exe', 'gif'), 'party_gnp.exe.gif');
   assert.equal(interopMediaFileName(`${'x'.repeat(260)}.webp`, 'webp'), `${'x'.repeat(240)}.webp`);
+});
+
+test('MPEG-TS media facts use the Photos-compatible video block without persisting playability', () => {
+  const bytes = new Uint8Array(readFileSync('tests/fixtures/mpeg-ts/supported-h264-aac.mpegts'));
+  const mediaInfo = probeTransportStream(bytes);
+  const block = interopMediaBlockForOriginal({
+    blobId: 'blob-ts',
+    mimeType: 'video/mp2t',
+    byteLength: bytes.byteLength,
+    capturedAt: '2026-07-29T00:00:00.000Z',
+    fileName: 'camera.M2TS',
+    sha256: 'a327f9d90565a7672ce85ac341066e0da7ea89caf9b053c32352ece756dfd754',
+    mediaInfo,
+  });
+  assert.equal(block?.kind, 'video');
+  if (!block || block.kind !== 'video') return;
+  assert.equal(block.mimeType, 'video/mp2t');
+  assert.equal(block.extension, 'm2ts');
+  assert.equal(block.mediaInfo?.container, 'MPEG-TS');
+  assert.deepEqual(block.mediaInfo?.streams.map((stream) => stream.codec).sort(), ['AAC', 'H.264']);
+  assert.equal('playable' in block, false);
+  const overlook = withInteropMediaBlock({ retained: true }, block);
+  assert.deepEqual(interopMediaBlockFrom(overlook), block);
+  assert.equal(overlook['retained'], true);
+  assert.deepEqual(v.parse(interopMpegTsMediaBlockSchema, block), block);
 });

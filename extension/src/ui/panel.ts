@@ -195,7 +195,7 @@ export class ImageTrailPanel {
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     loadRecentHistory: (options) => this.panelDataLoad.loadRecentHistory(options),
     refreshStorageUsage: (options) => this.panelDataLoad.refreshStorageUsage(options),
-    addImportedImage: (file) => this.recordLibrary.addImportedImage(file),
+    addImportedImage: (file, captured) => this.recordLibrary.addImportedImage(file, captured),
     getLocalSettings: () => this.localSettings,
     bookmarkStore: () => this.bookmarkStore,
     albumStore: () => this.albumStore,

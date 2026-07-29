@@ -1,9 +1,10 @@
 import type { CaptureFailureReason } from '../core/image/capture-result.js';
 import { DEFAULT_MAX_ORIGINAL_BYTES } from '../core/image/capture-result.js';
 import { sanitizeFilename } from '../core/image/downloads.js';
-import { inspectGifWebpMedia, type GifWebpMediaInfo } from '../core/image/gif-webp-media.js';
+import { inspectSpecializedMedia } from '../core/media/inspect-media.js';
+import type { StoredMediaInfo } from '../core/media/media-info.js';
 
-const ALLOWED_IMAGE_TYPES = new Set([
+const ALLOWED_MEDIA_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/gif',
@@ -13,6 +14,7 @@ const ALLOWED_IMAGE_TYPES = new Set([
   'image/bmp',
   'image/x-icon',
   'image/vnd.microsoft.icon',
+  'video/mp2t',
 ]);
 
 export interface FetchImageSuccess {
@@ -23,7 +25,7 @@ export interface FetchImageSuccess {
   readonly fileName?: string | undefined;
   readonly width?: number | undefined;
   readonly height?: number | undefined;
-  readonly mediaInfo?: GifWebpMediaInfo | undefined;
+  readonly mediaInfo?: StoredMediaInfo | undefined;
 }
 
 export interface FetchImageFailure {
@@ -37,6 +39,8 @@ export type FetchImageResult = FetchImageSuccess | FetchImageFailure;
 export interface FetchImageOptions {
   readonly referrer?: string | undefined;
 }
+
+type BoundedBodyResult = { readonly ok: true; readonly bytes: ArrayBuffer } | FetchImageFailure;
 
 export async function fetchImageBytes(
   url: string,
@@ -52,19 +56,14 @@ export async function fetchImageBytes(
     return { ok: false, reason: 'network-error', message: 'Network request failed.' };
   }
 
-  if (response.status === 401) {
-    return { ok: false, reason: 'auth-required', message: 'Authentication required.' };
-  }
-  if (response.status === 403) {
-    return { ok: false, reason: 'fetch-forbidden', message: 'Access forbidden by server.' };
-  }
-  if (!response.ok) {
-    return { ok: false, reason: 'network-error', message: `HTTP ${response.status} ${response.statusText}` };
-  }
+  const statusFailure = responseStatusFailure(response);
+  if (statusFailure) return statusFailure;
 
   const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ?? '';
-  if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
-    return { ok: false, reason: 'not-image', message: `Response content-type "${contentType}" is not an image.` };
+  const responseUrl = response.url || url;
+  const transportStreamHint = isTransportStreamName(responseUrl);
+  if (!ALLOWED_MEDIA_TYPES.has(contentType) && !transportStreamHint) {
+    return { ok: false, reason: 'not-image', message: `Response content-type "${contentType}" is not supported media.` };
   }
 
   const declaredLength = response.headers.get('content-length');
@@ -72,60 +71,84 @@ export async function fetchImageBytes(
     return { ok: false, reason: 'too-large', message: `Declared size ${declaredLength} bytes exceeds limit.` };
   }
 
-  let bytes: ArrayBuffer;
+  const body = await readBoundedResponseBody(response, maxBytes);
+  if (!body.ok) return body;
+  return classifyFetchedMedia(response, responseUrl, body.bytes, contentType, transportStreamHint);
+}
+
+function responseStatusFailure(response: Response): FetchImageFailure | null {
+  if (response.status === 401) return { ok: false, reason: 'auth-required', message: 'Authentication required.' };
+  if (response.status === 403) return { ok: false, reason: 'fetch-forbidden', message: 'Access forbidden by server.' };
+  return response.ok ? null : { ok: false, reason: 'network-error', message: `HTTP ${response.status} ${response.statusText}` };
+}
+
+async function readBoundedResponseBody(response: Response, maxBytes: number): Promise<BoundedBodyResult> {
   try {
     if (!response.body) {
       // Fallback for environments where ReadableStream is unavailable.
-      bytes = await response.arrayBuffer();
-    } else {
-      const reader = response.body.getReader();
-      const chunks: Uint8Array[] = [];
-      let totalBytes = 0;
-
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        totalBytes += value.byteLength;
-        if (totalBytes > maxBytes) {
-          await reader.cancel();
-          return { ok: false, reason: 'too-large', message: `Actual size exceeds limit of ${maxBytes} bytes.` };
-        }
-        chunks.push(value);
-      }
-
-      // Concatenate chunks into a single ArrayBuffer.
-      const merged = new Uint8Array(totalBytes);
-      let offset = 0;
-      for (const chunk of chunks) {
-        merged.set(chunk, offset);
-        offset += chunk.byteLength;
-      }
-      bytes = merged.buffer;
+      const bytes = await response.arrayBuffer();
+      return bytes.byteLength > maxBytes
+        ? { ok: false, reason: 'too-large', message: `Actual size ${bytes.byteLength} bytes exceeds limit.` }
+        : { ok: true, bytes };
     }
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        return { ok: false, reason: 'too-large', message: `Actual size exceeds limit of ${maxBytes} bytes.` };
+      }
+      chunks.push(value);
+    }
+    return { ok: true, bytes: mergeChunks(chunks, totalBytes) };
   } catch {
     return { ok: false, reason: 'network-error', message: 'Failed to read response body.' };
   }
+}
 
-  if (bytes.byteLength > maxBytes) {
-    return { ok: false, reason: 'too-large', message: `Actual size ${bytes.byteLength} bytes exceeds limit.` };
+function mergeChunks(chunks: readonly Uint8Array[], totalBytes: number): ArrayBuffer {
+  const merged = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
   }
+  return merged.buffer;
+}
 
-  const media = inspectGifWebpMedia(bytes, contentType);
+function classifyFetchedMedia(
+  response: Response,
+  responseUrl: string,
+  bytes: ArrayBuffer,
+  contentType: string,
+  transportStreamHint: boolean,
+): FetchImageResult {
+  const media = inspectSpecializedMedia(bytes, contentType, responseUrl);
   if (media.status === 'invalid') {
     return {
       ok: false,
-      reason: media.reason === 'probe-limit' ? 'too-large' : 'not-image',
+      reason:
+        media.reason === 'probe-limit' ? 'too-large' : transportStreamHint || contentType === 'video/mp2t' ? 'not-media' : 'not-image',
       message: media.message,
     };
   }
   if (media.status === 'supported') {
+    const fallbackExtension = media.mediaInfo.kind === 'mpeg-ts' ? (media.extension ?? 'ts') : media.mediaInfo.kind;
     return {
       ok: true,
       bytes,
       mimeType: media.mimeType,
       byteLength: bytes.byteLength,
-      fileName: originalImageFileName(response.headers.get('content-disposition'), response.url || url, media.mediaInfo.kind),
+      fileName: originalMediaFileName(
+        response.headers.get('content-disposition'),
+        responseUrl,
+        fallbackExtension,
+        media.mediaInfo.kind === 'mpeg-ts' ? 'media' : 'image',
+      ),
       width: media.width,
       height: media.height,
       mediaInfo: media.mediaInfo,
@@ -143,10 +166,10 @@ export function credentialsForImageRequest(url: string, referrer: string | undef
   }
 }
 
-function originalImageFileName(contentDisposition: string | null, url: string, fallbackExtension: 'gif' | 'webp'): string {
+function originalMediaFileName(contentDisposition: string | null, url: string, fallbackExtension: string, fallbackBase: string): string {
   const dispositionName = fileNameFromContentDisposition(contentDisposition);
   const urlName = fileNameFromUrlPath(url);
-  const sanitized = sanitizeOriginalFileName(dispositionName ?? urlName ?? 'image');
+  const sanitized = sanitizeOriginalFileName(dispositionName ?? urlName ?? fallbackBase, fallbackBase);
   return /\.[a-z0-9]{1,10}$/iu.test(sanitized) ? sanitized : `${sanitized}.${fallbackExtension}`;
 }
 
@@ -178,11 +201,19 @@ function fileNameFromUrlPath(value: string): string | null {
   }
 }
 
-function sanitizeOriginalFileName(value: string): string {
-  const leaf = value.split(/[\\/]/u).at(-1) ?? 'image';
-  return sanitizeFilename(leaf, 'image', 240);
+function sanitizeOriginalFileName(value: string, fallback: string): string {
+  const leaf = value.split(/[\\/]/u).at(-1) ?? fallback;
+  return sanitizeFilename(leaf, fallback, 240);
 }
 
 function stripHeaderQuotes(value: string): string {
   return value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1) : value;
+}
+
+function isTransportStreamName(value: string): boolean {
+  try {
+    return /\.(?:ts|mts|m2ts)$/iu.test(new URL(value).pathname);
+  } catch {
+    return /\.(?:ts|mts|m2ts)$/iu.test(value);
+  }
 }

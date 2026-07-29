@@ -3,6 +3,7 @@ import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
 import { createBackupHistory, createCloudBackupMetadata, type CloudBackupHistoryViewRecord } from './cloud-backup-metadata.js';
 import { cloudConnectionLabel, createCloudBackupButton } from './cloud-backup-controls.js';
+import { createDirectMediaUrlControl, readMediaFiles } from './media-import-controls.js';
 import { addTrustedClickListener } from './trusted-events.js';
 
 type UrlReviewStatusClearScope = 'hostname' | 'page' | 'source' | 'all';
@@ -483,11 +484,11 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   group.className = 'image-trail-panel__subsection';
 
   const imageControl = createFilePickerField({
-    label: 'Image files',
-    description: 'Choose one or more local image files to import into the active session.',
-    buttonText: 'Choose images',
+    label: 'Media files',
+    description: 'Choose local images or MPEG-TS files (.ts, .mts, .m2ts). Transport streams are signature-checked and encrypted.',
+    buttonText: 'Choose media',
     noFileText: 'No file selected',
-    accept: 'image/*',
+    accept: 'image/*,video/mp2t,.ts,.mts,.m2ts',
     multiple: true,
     disabled: state.busy,
   });
@@ -506,7 +507,10 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
 
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__control-stack';
-  controls.append(imageControl.field, encryptedImageControl.field);
+  const mediaUrlControl = createDirectMediaUrlControl(state.busy || !state.blobKeyUnlocked, (file) => {
+    dispatch({ name: 'import/image', files: [file] });
+  });
+  controls.append(imageControl.field, mediaUrlControl.field, encryptedImageControl.field);
 
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
@@ -514,7 +518,7 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   importBtn.classList.toggle('is-waiting', state.busy);
   importBtn.disabled = state.busy;
   importBtn.addEventListener('click', () => {
-    readImageFiles(imageInput, (files) => dispatch({ name: 'import/image', files }));
+    readMediaFiles(imageInput, (files) => dispatch({ name: 'import/image', files }));
   });
 
   const importEncryptedBtn = document.createElement('button');
@@ -555,7 +559,7 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__action-groups';
   actions.append(
-    createActionGroup('Import files', [importBtn, importEncryptedBtn]),
+    createActionGroup('Import files', [importBtn, mediaUrlControl.button, importEncryptedBtn]),
     createActionGroup('Image downloads', [selectEverythingBtn, exportBtn, exportEncryptedBtn]),
   );
 
@@ -814,28 +818,6 @@ function createToggle(text: string): { readonly label: HTMLLabelElement; readonl
   copy.textContent = text;
   label.append(input, copy);
   return { label, input };
-}
-
-function readImageFiles(input: HTMLInputElement, onRead: (files: readonly ImportedImageFile[]) => void): void {
-  const files = Array.from(input.files ?? []).filter((file) => file.type.startsWith('image/'));
-  if (files.length === 0) return;
-  let remaining = files.length;
-  const results: ImportedImageFile[] = [];
-  for (const file of files) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string' && reader.result.startsWith('data:image/')) {
-        results.push({ name: file.name, dataUrl: reader.result });
-      }
-      remaining -= 1;
-      if (remaining === 0) onRead(results);
-    };
-    reader.onerror = () => {
-      remaining -= 1;
-      if (remaining === 0) onRead(results);
-    };
-    reader.readAsDataURL(file);
-  }
 }
 
 function readEncryptedImageFiles(input: HTMLInputElement, onRead: (files: readonly ImportedEncryptedImageFile[]) => void): void {

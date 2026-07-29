@@ -1,6 +1,6 @@
 /* global chrome, document, location, matchMedia */
 
-import { createPreviewMediaSurface } from './animated-preview.js';
+import { createMediaPreviewSurface } from './media-preview.js';
 
 const token = decodeURIComponent(location.hash.slice(1));
 let previewMedia = null;
@@ -96,7 +96,7 @@ function renderPreview() {
   status.id = 'status';
   status.textContent = previewMedia.mediaInfo?.animated && reducedMotion.matches ? 'Preparing a reduced-motion poster…' : 'Loading preview…';
   document.body.replaceChildren(status);
-  void createPreviewMediaSurface(document, previewMedia, { reducedMotion: reducedMotion.matches }).then((surface) => {
+  void createMediaPreviewSurface(document, previewMedia, { reducedMotion: reducedMotion.matches }).then((surface) => {
     if (workspaceLocked || renderSequence !== previewRenderSequence) return;
     document.body.replaceChildren(surface);
   });

@@ -1,4 +1,5 @@
 import type { StorageUsageSummary } from '../core/image/capture-result.js';
+import { computeSha256 } from '../core/image/fingerprints.js';
 import { isBuildIdentity } from '../core/build-info.js';
 import { IndexedDbBookmarkStore } from '../data/bookmarks-controller.js';
 import { IndexedDbAlbumStore } from '../data/albums-controller.js';
@@ -215,18 +216,19 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
     return {
       status: 'failed',
       reason: 'encryption-locked',
-      message: 'Encrypted blob storage must be unlocked before original image capture.',
+      message: 'Encrypted blob storage must be unlocked before original media capture.',
     };
   }
-  const bytesResult = url.startsWith('data:image/')
-    ? dataUrlToImageBytes(url)
-    : await (async () => {
-        const origin = extractOrigin(url);
-        if (origin && !(await hasOriginPermission(origin))) {
-          return { ok: false as const, reason: 'permission-needed' as const, message: `Permission needed for ${origin}.`, origin };
-        }
-        return fetchImageBytes(url);
-      })();
+  const bytesResult =
+    url.startsWith('data:image/') || url.startsWith('data:video/mp2t')
+      ? dataUrlToImageBytes(url, message.payload.fileName)
+      : await (async () => {
+          const origin = extractOrigin(url);
+          if (origin && !(await hasOriginPermission(origin))) {
+            return { ok: false as const, reason: 'permission-needed' as const, message: `Permission needed for ${origin}.`, origin };
+          }
+          return fetchImageBytes(url);
+        })();
   if (!bytesResult.ok) {
     return 'reason' in bytesResult &&
       bytesResult.reason === 'permission-needed' &&
@@ -242,6 +244,8 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
   const blobs = new BlobsRepository(db);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
+  const sha256 = await computeSha256(bytesResult.bytes);
+  const fileName = message.payload.fileName ?? bytesResult.fileName;
   const aad = {
     id,
     kind: 'original' as const,
@@ -256,9 +260,10 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
     metadata: {
       mimeType: bytesResult.mimeType,
       byteLength: bytesResult.byteLength,
-      sourceUrl: url,
+      sourceUrl: url.startsWith('data:') ? 'image-trail://local-import' : url,
       capturedAt: now,
-      fileName: bytesResult.fileName,
+      fileName,
+      sha256,
       width: bytesResult.width,
       height: bytesResult.height,
       mediaInfo: bytesResult.mediaInfo,
@@ -284,7 +289,8 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
     blobId: record.id,
     mimeType: bytesResult.mimeType,
     byteLength: bytesResult.byteLength,
-    ...(bytesResult.fileName ? { fileName: bytesResult.fileName } : {}),
+    ...(fileName ? { fileName } : {}),
+    sha256,
     ...(bytesResult.width ? { width: bytesResult.width } : {}),
     ...(bytesResult.height ? { height: bytesResult.height } : {}),
     ...(bytesResult.mediaInfo ? { mediaInfo: bytesResult.mediaInfo } : {}),
@@ -505,7 +511,7 @@ function normalizeUrlReviewStatusClearFilter(filter: UrlReviewStatusClearFilter)
 async function handleGrantPermissionAndCapture(
   message: GrantPermissionAndCaptureMessage,
 ): Promise<import('../core/image/capture-result.js').CaptureResult> {
-  const { sourceType, sourceRecordId } = message.payload;
+  const { sourceType, sourceRecordId, fileName } = message.payload;
   const url = message.payload.url;
   const origin = extractOrigin(url);
 
@@ -518,7 +524,7 @@ async function handleGrantPermissionAndCapture(
     return { status: 'failed', reason: 'permission-needed', message: `Permission was not granted for ${origin}.`, origin };
   }
 
-  return handleCaptureImage(createCaptureImageMessage(url, sourceType, sourceRecordId));
+  return handleCaptureImage(createCaptureImageMessage(url, sourceType, sourceRecordId, fileName));
 }
 
 async function handleDownloadImage(message: DownloadImageMessage): Promise<import('./messages.js').DownloadImageResultMessage['payload']> {

@@ -45,7 +45,12 @@ import type {
 import { sendRuntimeMessage } from './runtime-message.js';
 
 export interface CaptureStore {
-  readonly requestCapture: (url: string, sourceType: CaptureSourceType, sourceRecordId?: string) => Promise<CaptureResult>;
+  readonly requestCapture: (
+    url: string,
+    sourceType: CaptureSourceType,
+    sourceRecordId?: string,
+    fileName?: string,
+  ) => Promise<CaptureResult>;
   readonly requestDeleteBlob: (blobId: string) => Promise<{ deleted: boolean; usage: StorageUsageSummary }>;
   readonly requestCleanupOrphanedBlobs: () => Promise<{ deletedCount: number; usage: StorageUsageSummary }>;
   readonly requestRetrieveBlob: (blobId: string) => Promise<RetrieveBlobResultMessage['payload']>;
@@ -59,7 +64,12 @@ export interface CaptureStore {
   readonly requestBlobPreview: (blobId: string) => Promise<CreateBlobPreviewResultMessage['payload']>;
   readonly requestDataUrlPreview: (dataUrl: string) => Promise<CreateBlobPreviewResultMessage['payload']>;
   readonly requestStorageUsage: () => Promise<StorageUsageSummary>;
-  readonly requestPermissionAndRetry: (url: string, sourceType: CaptureSourceType, sourceRecordId?: string) => Promise<CaptureResult>;
+  readonly requestPermissionAndRetry: (
+    url: string,
+    sourceType: CaptureSourceType,
+    sourceRecordId?: string,
+    fileName?: string,
+  ) => Promise<CaptureResult>;
   readonly requestBlobKeyStatus: () => Promise<BlobKeyStatusResultMessage['payload']>;
   readonly setupBlobKey: (password: string) => Promise<BlobKeyResultMessage['payload']>;
   readonly unlockBlobKey: (password: string, keyReference?: string) => Promise<BlobKeyResultMessage['payload']>;
@@ -70,16 +80,21 @@ export interface CaptureStore {
 }
 
 export class CaptureController implements CaptureStore {
-  async requestCapture(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<CaptureResult> {
-    const response = await sendRuntimeMessage(createCaptureImageMessage(url, sourceType, sourceRecordId));
+  async requestCapture(url: string, sourceType: CaptureSourceType, sourceRecordId?: string, fileName?: string): Promise<CaptureResult> {
+    const response = await sendRuntimeMessage(createCaptureImageMessage(url, sourceType, sourceRecordId, fileName));
     if (isCaptureResultMessage(response)) {
       return response.payload;
     }
     return { status: 'failed', reason: 'unknown', message: 'Invalid response from background.' };
   }
 
-  async requestPermissionAndRetry(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<CaptureResult> {
-    const response = await sendRuntimeMessage(createGrantPermissionAndCaptureMessage(url, sourceType, sourceRecordId));
+  async requestPermissionAndRetry(
+    url: string,
+    sourceType: CaptureSourceType,
+    sourceRecordId?: string,
+    fileName?: string,
+  ): Promise<CaptureResult> {
+    const response = await sendRuntimeMessage(createGrantPermissionAndCaptureMessage(url, sourceType, sourceRecordId, fileName));
     if (isCaptureResultMessage(response)) {
       return response.payload;
     }

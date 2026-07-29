@@ -4,6 +4,8 @@ import type { CaptureStore } from '../../content/capture-controller.js';
 import type { RecentHistoryStore } from '../../content/recent-history-store.js';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
 import { requestEncryptedImageImport } from '../../content/download-controller.js';
+import type { CapturedImportedMedia } from './imported-media-record.js';
+import { importMediaFiles } from './imported-media-batch.js';
 import type { downloadPCloudBackup, listPCloudBackups } from '../../content/pcloud-provider-client.js';
 import {
   importBookmarks as importBookmarkRecords,
@@ -43,14 +45,8 @@ export type PendingRestoreImport =
   | { readonly kind: 'url-review-status'; readonly result: UrlReviewStatusImportResult };
 
 /**
- * Collaborator that owns the file/pCloud restore-preview flows, the `pendingRestoreImport`
- * preview → confirm → import state machine, and image imports extracted from ImageTrailPanel (epic
- * #290). The pure builders it calls live in restore-import-preview.ts; this controller orchestrates the
- * stores, the panel state reducer, and the pCloud provider client (injected for testability).
- *
- * Two callbacks reach the sibling RecallExportController: `loadAllBookmarks` (dedup source for a
- * bookmarks preview) and `refreshBlobKeyStatus` (after a full-backup original restore). Both are wired
- * as lazy arrow closures over the panel's `this`, so the cross-controller cycle is safe at runtime.
+ * Owns file and pCloud restore previews, confirmation, imports, and sibling
+ * export-controller callbacks injected as lazy closures.
  */
 export interface RecallRestoreControllerDeps {
   getState(): PanelState;
@@ -60,7 +56,7 @@ export interface RecallRestoreControllerDeps {
   loadBookmarkPage(offset: number, options?: { readonly render?: boolean }): Promise<void>;
   loadRecentHistory(options?: { readonly render?: boolean }): Promise<void>;
   refreshStorageUsage(options?: { readonly render?: boolean }): Promise<void>;
-  addImportedImage(file: ImportedImageFile): Promise<boolean>;
+  addImportedImage(file: ImportedImageFile, captured?: CapturedImportedMedia): Promise<boolean>;
   getLocalSettings(): PlaintextLocalSettings;
   bookmarkStore(): BookmarkStore | null;
   albumStore(): {
@@ -185,20 +181,20 @@ export class RecallRestoreController {
 
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/start' }));
     this.deps.render();
-    let imported = 0;
-    for (const file of files) {
-      if (await this.deps.addImportedImage(file)) imported += 1;
-    }
+    const { imported, failed, firstFailureMessage } = await importMediaFiles(files, this.deps);
 
     if (imported === 0) {
       this.deps.setState(
-        reducePanelAction(this.deps.getState(), { name: 'import-export/error', message: 'No selected image files could be imported.' }),
+        reducePanelAction(this.deps.getState(), {
+          name: 'import-export/error',
+          message: firstFailureMessage ?? 'No selected media could be imported.',
+        }),
       );
     } else {
       this.deps.setState(
         reducePanelAction(this.deps.getState(), {
           name: 'import-export/complete',
-          message: `Imported ${imported} image${imported === 1 ? '' : 's'} into bookmarks and recent history.`,
+          message: `Imported ${imported} media item${imported === 1 ? '' : 's'} into bookmarks and recent history.${failed > 0 ? ` ${failed} failed.` : ''}`,
         }),
       );
     }

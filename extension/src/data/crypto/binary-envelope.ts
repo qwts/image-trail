@@ -1,7 +1,7 @@
 import type { KeyReference } from './types.js';
 import { assertKeyReference } from './key-reference.js';
 import { createAesGcmIv, decryptAesGcm, encryptAesGcm } from './webcrypto.js';
-import type { GifWebpMediaInfo } from '../../core/image/gif-webp-media.js';
+import type { StoredMediaInfo } from '../../core/media/media-info.js';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -12,9 +12,10 @@ export interface BlobPayloadMetadata {
   readonly sourceUrl: string;
   readonly capturedAt: string;
   readonly fileName?: string | undefined;
+  readonly sha256?: string | undefined;
   readonly width?: number | undefined;
   readonly height?: number | undefined;
-  readonly mediaInfo?: GifWebpMediaInfo | undefined;
+  readonly mediaInfo?: StoredMediaInfo | undefined;
 }
 
 export interface BlobAadMetadata {

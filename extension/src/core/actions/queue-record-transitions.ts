@@ -33,6 +33,7 @@ export function updateRecordCapture(
             byteLength: result.byteLength,
             capturedAt,
             ...(result.fileName ? { fileName: result.fileName } : {}),
+            ...(result.sha256 ? { sha256: result.sha256 } : {}),
             ...(result.width ? { width: result.width } : {}),
             ...(result.height ? { height: result.height } : {}),
             ...(result.mediaInfo ? { mediaInfo: result.mediaInfo } : {}),

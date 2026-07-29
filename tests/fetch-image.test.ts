@@ -87,3 +87,44 @@ test('fetchImageBytes rejects malformed declared GIF/WebP before returning captu
     globalThis.fetch = originalFetch;
   }
 });
+
+test('fetchImageBytes recognizes direct MPEG-TS by signature and preserves the original filename', async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = readFileSync('tests/fixtures/mpeg-ts/supported-h264-aac.mpegts');
+  globalThis.fetch = async () =>
+    new Response(bytes, {
+      status: 200,
+      headers: {
+        'content-type': 'application/octet-stream',
+        'content-disposition': 'attachment; filename="camera.M2TS"',
+      },
+    });
+
+  try {
+    const result = await fetchImageBytes('https://cdn.example.test/camera.m2ts');
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.mimeType, 'video/mp2t');
+    assert.equal(result.fileName, 'camera.M2TS');
+    assert.deepEqual([result.width, result.height], [64, 64]);
+    assert.equal(result.mediaInfo?.kind, 'mpeg-ts');
+    assert.deepEqual(new Uint8Array(result.bytes), new Uint8Array(bytes));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('fetchImageBytes rejects truncated MPEG-TS before custody begins', async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = readFileSync('tests/fixtures/mpeg-ts/truncated-h264-aac.mpegts');
+  globalThis.fetch = async () => new Response(bytes, { status: 200, headers: { 'content-type': 'video/mp2t' } });
+
+  try {
+    const result = await fetchImageBytes('https://cdn.example.test/broken.ts');
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.reason, 'not-media');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
