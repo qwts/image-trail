@@ -235,8 +235,10 @@ test('dispose() settles an in-flight step() instead of leaving it hanging foreve
   assert.doesNotThrow(() => controller.dispose());
 });
 
-test('a navigation-window rebuild revokes every decoded blob URL without revoking the HTTP anchor', async () => {
+test('a navigation-window rebuild transfers the selected blob and revokes every offscreen blob', async () => {
   let radius = 2;
+  let currentUrl = BASE_URL;
+  let activeBlobUrl = '';
   const { controller, revoked } = createHarness({
     getLocalSettings: () => ({
       neighborPreloadEnabled: true,
@@ -244,6 +246,13 @@ test('a navigation-window rebuild revokes every decoded blob URL without revokin
       neighborPreloadProbeMethod: 'get',
       loadFailureFeedback: 'alert',
     }),
+    currentNavigationBaseRawUrl: () => currentUrl,
+    currentNavigationBaseModel: () => parseUrl(currentUrl),
+    applyLandedUrl: async (nextUrl, displayUrl) => {
+      currentUrl = nextUrl;
+      activeBlobUrl = displayUrl;
+      return true;
+    },
   });
   const model = baseModel();
   await controller.step(model, navigableFields(model), 1);
@@ -255,12 +264,16 @@ test('a navigation-window rebuild revokes every decoded blob URL without revokin
   controller.prime();
 
   const rebuiltWindowRevokes = revoked.slice(priorRevokeCount);
-  assert.deepEqual(new Set(rebuiltWindowRevokes), new Set(oldBlobUrls));
+  assert.deepEqual(new Set(rebuiltWindowRevokes), new Set(oldBlobUrls.filter((blobUrl) => blobUrl !== activeBlobUrl)));
+  assert.equal(rebuiltWindowRevokes.includes(activeBlobUrl), false);
   assert.equal(rebuiltWindowRevokes.includes(BASE_URL), false);
+  assert.equal(controller.getDebugSnapshot()?.indices.get(0)?.blobUrl, activeBlobUrl);
 });
 
-test('disabling buffered navigation revokes every decoded blob URL before clearing the window', async () => {
+test('disabling buffered navigation retains the selected blob until final disposal', async () => {
   let enabled = true;
+  let currentUrl = BASE_URL;
+  let activeBlobUrl = '';
   const { controller, revoked } = createHarness({
     getLocalSettings: () => ({
       neighborPreloadEnabled: enabled,
@@ -268,6 +281,13 @@ test('disabling buffered navigation revokes every decoded blob URL before cleari
       neighborPreloadProbeMethod: 'get',
       loadFailureFeedback: 'alert',
     }),
+    currentNavigationBaseRawUrl: () => currentUrl,
+    currentNavigationBaseModel: () => parseUrl(currentUrl),
+    applyLandedUrl: async (nextUrl, displayUrl) => {
+      currentUrl = nextUrl;
+      activeBlobUrl = displayUrl;
+      return true;
+    },
   });
   const model = baseModel();
   await controller.step(model, navigableFields(model), 1);
@@ -277,8 +297,12 @@ test('disabling buffered navigation revokes every decoded blob URL before cleari
   enabled = false;
   controller.prime();
 
-  assert.deepEqual(new Set(revoked.slice(priorRevokeCount)), new Set(oldBlobUrls));
+  assert.deepEqual(new Set(revoked.slice(priorRevokeCount)), new Set(oldBlobUrls.filter((blobUrl) => blobUrl !== activeBlobUrl)));
+  assert.equal(revoked.includes(activeBlobUrl), false);
   assert.equal(controller.getDebugSnapshot(), null);
+
+  controller.dispose();
+  assert.equal(revoked.filter((blobUrl) => blobUrl === activeBlobUrl).length, 1);
 });
 
 test('dispose revokes every decoded blob URL once and remains idempotent', async () => {
