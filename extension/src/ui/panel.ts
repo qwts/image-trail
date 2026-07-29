@@ -280,7 +280,7 @@ export class ImageTrailPanel {
     getState: () => this.state,
     setState: this.replaceState,
     render: () => this.render(),
-    renderRecallOnly: () => this.renderRecallOnly(),
+    renderRecallOnly: () => this.panelRender.renderRecallOnly(),
     whenStylesReady: () => this.panelMount.whenStylesReady(),
     root: () => this.panelMount.root,
     panelPositionStore: () => this.panelPositionStore,
@@ -301,7 +301,7 @@ export class ImageTrailPanel {
     getState: () => this.state,
     setState: this.replaceState,
     render: () => this.render(),
-    renderRecallOnly: () => this.renderRecallOnly(),
+    renderRecallOnly: () => this.panelRender.renderRecallOnly(),
     renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
     ensurePanelPositionRestored: () => this.panelPosition.ensurePanelPositionRestored(),
@@ -548,6 +548,7 @@ export class ImageTrailPanel {
         this.state = setTargetState(this.state, toTargetState(snapshot));
       },
       render: () => this.render(),
+      renderRecallOnly: () => this.panelRender.renderRecallOnly(),
       renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
       refreshRecallIfOpen: () => this.recallDestination.refreshRecallIfOpen(),
       clearRecallMessageTimer: () => this.recallDestination.clearRecallMessageTimer(),
@@ -740,9 +741,5 @@ export class ImageTrailPanel {
 
   private render(): void {
     this.panelRender.render();
-  }
-
-  private renderRecallOnly(): void {
-    this.panelRender.renderRecallOnly();
   }
 }

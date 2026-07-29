@@ -136,7 +136,7 @@ test('detached Settings renders once, with a route placeholder and one authorita
   }
 });
 
-test('Recall targeted refresh preserves the route chrome and list scroll', async () => {
+test('Recall targeted and fallback full refresh preserve route chrome and list scroll', async () => {
   const target = createTarget(() => {});
   try {
     const initial = {
@@ -173,6 +173,14 @@ test('Recall targeted refresh preserves the route chrome and list scroll', async
     assert.equal(target.root.querySelector('.image-trail-panel__destination-header'), header);
     assert.equal(target.root.querySelectorAll('.image-trail-panel__recall-list > li').length, 3);
     assert.equal(target.root.querySelector<HTMLElement>('.image-trail-panel__recall-list')?.scrollTop, 38);
+
+    const updatedList = target.root.querySelector<HTMLElement>('.image-trail-panel__recall-list');
+    assert.ok(updatedList);
+    updatedList.scrollTop = 44;
+    renderPanel(target, reducePanelAction(updated, { name: 'recall-selection/select', ids: ['pin-3'] }));
+    await Promise.resolve();
+
+    assert.equal(target.root.querySelector<HTMLElement>('.image-trail-panel__recall-list')?.scrollTop, 44);
   } finally {
     cleanupTarget(target);
   }

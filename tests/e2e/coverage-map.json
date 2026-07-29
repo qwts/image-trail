@@ -1385,12 +1385,13 @@
             "tests/action-dispatch.test.ts",
             "tests/panel-state-queue-recents.test.ts",
             "tests/panel-state-settings.test.ts",
+            "tests/recall-actions.test.ts",
             "tests/recall-destination-controller.test.ts",
             "tests/dom/destination-routing.test.ts",
             "tests/dom/recall-destination-controller.test.ts",
             "tests/dom/recall-destination-view.test.ts"
           ],
-          "notes": "Covers the typed four-route registry, real-tab eligibility for every destination, single activeDestination state, reselect/close/help/settings/minimize/panel-close transitions, preserved primary state, Recall selection continuity across routes plus cleanup on close, producer paging, plain/modifier dock actions, detached Settings single-mount behavior, focus/scroll restoration, and targeted Recall body refresh without replacing destination chrome."
+          "notes": "Covers the typed four-route registry, real-tab eligibility for every destination, single activeDestination state, reselect/close/help/settings/minimize/panel-close transitions, preserved primary state, Recall selection continuity across routes plus cleanup on close, Recall-local action rendering, producer paging, plain/modifier dock actions, detached Settings single-mount behavior, focus/scroll restoration, and targeted Recall body refresh without replacing destination chrome."
         },
         {
           "type": "storybook",
@@ -1403,9 +1404,10 @@
             "tests/e2e/destination-routing.spec.ts",
             "tests/e2e/extension-destination-pages.spec.ts",
             "tests/e2e/react-renderer-boundary.spec.ts",
+            "tests/e2e/recall-selection-render.spec.ts",
             "tests/e2e/recents-queue-recall.spec.ts"
           ],
-          "notes": "Covers packaged plain-click routing, keyboard activation and return focus, per-route scroll, minimize/expand, panel close/reopen, detached controller compatibility, durable Gallery loading without queue reorder, Recall paging and selection, explicit and modifier-key real destination tabs, source-tab return and teardown, narrow layout, and deterministic artifacts for handoff screenshots 02 and 04 through 07."
+          "notes": "Covers packaged plain-click routing, keyboard activation and return focus, per-route scroll, minimize/expand, panel close/reopen, detached controller compatibility, durable Gallery loading without queue reorder, Recall paging and selection, Recall-local selection without route-chrome replacement or list-scroll reset, explicit and modifier-key real destination tabs, source-tab return and teardown, narrow layout, and deterministic artifacts for handoff screenshots 02 and 04 through 07."
         },
         {
           "type": "manual",
