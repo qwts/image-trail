@@ -102,6 +102,7 @@ import { normalizeHostname } from './handlers/hostname.js';
 import { createChangeNotifiers } from './change-notifiers.js';
 import type { ServiceWorkerContext } from './service-worker-context.js';
 import { createShortcutActionMessage } from './shortcut-action-message.js';
+import { createRetryingDbProvider } from './db-provider.js';
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const TOGGLE_BUILD_IDENTITY_COMMAND = 'toggle-build-info-overlay';
 const BROWSER_COMMAND_ACTIONS = new Map(BROWSER_COMMAND_SHORTCUTS.map((shortcut) => [shortcut.command, shortcut.action]));
@@ -125,6 +126,7 @@ const bookmarkStore = new IndexedDbBookmarkStore({
   getSearchableMetadataPolicy: async () => (await loadLocalSettings()).searchableMetadataPolicy,
 });
 const albumStore = new IndexedDbAlbumStore();
+const getDb = createRetryingDbProvider(openImageTrailDb);
 const { parsedFieldStateStore, urlReviewStatusStore, reconcileSearchableMetadataPolicy } = createUrlMetadataStores({
   getDb,
   getSearchableMetadataPolicy: async () => (await loadLocalSettings()).searchableMetadataPolicy,
@@ -185,13 +187,6 @@ async function sendShortcutAction(tabId: number, action: string): Promise<void> 
 function supportedTabId(tab: chrome.tabs.Tab): number | null {
   if (typeof tab.id === 'number' && tab.url && SUPPORTED_PAGE_PATTERN.test(tab.url)) return tab.id;
   return null;
-}
-let dbPromise: Promise<IDBDatabase | null> | null = null;
-function getDb(): Promise<IDBDatabase | null> {
-  if (!dbPromise) {
-    dbPromise = openImageTrailDb().then((result) => (result.status.ok ? result.db : null));
-  }
-  return dbPromise;
 }
 void reconcilePersistedUrlMetadataPolicy({
   loadPolicy: async () => (await loadLocalSettings()).searchableMetadataPolicy,
