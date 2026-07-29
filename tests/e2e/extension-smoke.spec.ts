@@ -73,6 +73,38 @@ test('resolves the extension service worker and id', async ({ extensionId, page,
   expect(serviceWorker.url()).toBe(`chrome-extension://${extensionId}/src/background/service-worker.js`);
 });
 
+test('serves injected styles from a session-scoped URL and blocks stable-origin probes', async ({ extensionId, page, serviceWorker }) => {
+  await openFixturePage(page, fixturePaths.singleImage);
+  await togglePanelFromExtensionAction(page, serviceWorker);
+  await expectPanelOpen(page);
+
+  const stylesheetHref = await page.locator('#image-trail-panel-root').locator('link[rel="stylesheet"]').getAttribute('href');
+  if (!stylesheetHref) throw new Error('Injected panel stylesheet URL was not available.');
+
+  const stylesheetUrl = new URL(stylesheetHref);
+  expect(stylesheetUrl.protocol).toBe('chrome-extension:');
+  expect(stylesheetUrl.hostname).not.toBe(extensionId);
+  expect(stylesheetUrl.pathname).toBe('/src/ui/styles/panel-entry.css');
+
+  const probe = async (url: string): Promise<{ readonly ok: boolean; readonly status: number }> => {
+    return page.evaluate(async (target) => {
+      try {
+        const response = await fetch(target, { cache: 'no-store' });
+        return { ok: response.ok, status: response.status };
+      } catch {
+        return { ok: false, status: 0 };
+      }
+    }, url);
+  };
+
+  expect(await probe(stylesheetHref)).toEqual({ ok: true, status: 200 });
+  expect(await probe(`chrome-extension://${extensionId}/src/ui/styles/panel-entry.css`)).toEqual({
+    ok: false,
+    status: 0,
+  });
+  await expect(page.getByRole('dialog', { name: 'Image Trail panel' })).toHaveCSS('position', 'fixed');
+});
+
 test('registers the build-info keyboard command for Chromium shortcut settings', async ({ serviceWorker }) => {
   const command = await serviceWorker.evaluate(async () => {
     return (await chrome.commands.getAll()).find((candidate) => candidate.name === 'toggle-build-info-overlay') ?? null;
