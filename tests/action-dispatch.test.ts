@@ -128,6 +128,7 @@ function createHarness(
     },
     syncTargetState: () => record('syncTargetState'),
     render: () => record('render'),
+    renderRecallOnly: () => record('renderRecallOnly'),
     renderPanelAndRefreshRecall: () => record('renderPanelAndRefreshRecall'),
     refreshRecallIfOpen: () => record('refreshRecallIfOpen'),
     clearRecallMessageTimer: () => record('clearRecallMessageTimer'),
@@ -443,7 +444,6 @@ test('capture/permission-retry routes the retained request context', async () =>
 
   assert.deepEqual(harness.log, ['retryCaptureWithPermission']);
 });
-
 test('reducer-only selection actions reduce then render, without touching the recall pipeline', () => {
   const harness = createHarness();
   const registry = buildPanelActionRegistry(harness.deps);

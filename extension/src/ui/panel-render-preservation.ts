@@ -27,6 +27,7 @@ const SCROLL_SNAPSHOT_SELECTORS = [
   '.image-trail-panel__settings-section',
   '.image-trail-panel__help-section',
   '.image-trail-panel__history-section .image-trail-panel__record-list',
+  '.image-trail-panel__recall-list',
 ] as const;
 
 const COLLAPSIBLE_LIST_SELECTORS = [
