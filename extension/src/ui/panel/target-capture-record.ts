@@ -34,6 +34,7 @@ export async function createTargetCaptureRecord(input: TargetCaptureRecordInput)
       byteLength: input.result.byteLength,
       capturedAt,
       ...(input.result.fileName ? { fileName: input.result.fileName } : {}),
+      ...(input.result.sha256 ? { sha256: input.result.sha256 } : {}),
       ...(input.result.width ? { width: input.result.width } : {}),
       ...(input.result.height ? { height: input.result.height } : {}),
       ...(input.result.mediaInfo ? { mediaInfo: input.result.mediaInfo } : {}),
