@@ -29,11 +29,16 @@ function wait(ms: number): Promise<void> {
 test('gallery library refresh hook debounces durable change notifications', async () => {
   const runtime = new FakeRuntime();
   let refreshCount = 0;
+  const lifecycle: string[] = [];
   const cleanup = installGalleryLibraryRefreshHook({
     runtime,
     window,
     debounceMs: 5,
+    invalidate: () => {
+      lifecycle.push('invalidate');
+    },
     refresh: () => {
+      lifecycle.push('refresh');
       refreshCount += 1;
     },
   });
@@ -44,6 +49,7 @@ test('gallery library refresh hook debounces durable change notifications', asyn
   await wait(20);
 
   assert.equal(refreshCount, 1);
+  assert.deepEqual(lifecycle, ['invalidate', 'refresh']);
   cleanup();
   runtime.emit(createLibraryChangeMessage({ topic: 'bookmarks', reason: 'bookmark-removed', recordIds: ['pin-1'] }));
   await wait(10);

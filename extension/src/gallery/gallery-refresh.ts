@@ -19,15 +19,23 @@ export interface GalleryRefreshWindow {
 export interface GalleryRefreshHookOptions {
   readonly runtime: GalleryRefreshRuntime | undefined;
   readonly window: GalleryRefreshWindow;
+  readonly invalidate: () => void;
   readonly refresh: () => void | Promise<void>;
   readonly debounceMs: number;
 }
 
-export function installGalleryLibraryRefreshHook({ runtime, window, refresh, debounceMs }: GalleryRefreshHookOptions): () => void {
+export function installGalleryLibraryRefreshHook({
+  runtime,
+  window,
+  invalidate,
+  refresh,
+  debounceMs,
+}: GalleryRefreshHookOptions): () => void {
   let refreshTimer: number | null = null;
 
   const runRefresh = () => {
     refreshTimer = null;
+    invalidate();
     void refresh();
   };
 
