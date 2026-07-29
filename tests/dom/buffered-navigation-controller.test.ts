@@ -110,7 +110,7 @@ test('the buffered state holds real image elements created through the DOM docum
 
   await controller.step(model, fields, 1);
   controller.toggleDebugVisible();
-  const snapshot = controller.getDebugSnapshot();
+  const snapshot = controller.getSnapshots().debug;
 
   assert.ok(snapshot, 'debug snapshot must be available once toggled on');
   assert.equal(snapshot.cursor, 1);
@@ -173,7 +173,7 @@ test('dispose() cancels an in-flight step() so it settles blocked without landin
   const stepPromise = controller.step(model, fields, 1);
 
   assert.doesNotThrow(() => controller.dispose());
-  assert.equal(controller.getDebugSnapshot(), null);
+  assert.equal(controller.getSnapshots().debug, null);
 
   const result = await stepPromise;
 

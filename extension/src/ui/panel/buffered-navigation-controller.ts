@@ -10,13 +10,13 @@ import {
   classifyBufferedImageIndex,
   createBufferedImageNavigationState,
   reduceBufferedImageNavigation,
-  type BufferedImageIndexState,
   type BufferedImageNavigationState,
 } from '../../core/url/buffered-image-navigation.js';
 import type { NeighborPreloadDirection } from '../../core/url/preload-neighbors.js';
 import { bumpUrlField, rebuildUrl } from '../../core/url/rebuild-url.js';
 import { collectUrlFields } from '../../core/url/tokenize-fields.js';
 import type { ParsedUrlModel, UrlField } from '../../core/url/types.js';
+import { toBufferedNavigationSnapshots, type BufferedNavigationSnapshots } from './buffered-navigation-status.js';
 
 const MAX_BUFFERED_HEAD_CONCURRENCY = 10;
 const MAX_BUFFERED_GET_CONCURRENCY = 4;
@@ -34,12 +34,6 @@ export interface BufferedNavigationLocalSettings {
   readonly neighborPreloadRadius: number;
   readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly loadFailureFeedback: LoadFailureFeedback;
-}
-
-export interface BufferedNavigationDebugSnapshot {
-  readonly cursor: number;
-  readonly bufferN: number;
-  readonly indices: ReadonlyMap<number, BufferedImageIndexState>;
 }
 
 type CheckRequestPolicyResult = Awaited<ReturnType<typeof checkImageRequestPolicy>>;
@@ -165,9 +159,8 @@ export class BufferedNavigationController {
     this.deps.onDebugChanged();
   }
 
-  getDebugSnapshot(): BufferedNavigationDebugSnapshot | null {
-    if (!this.debugVisible || !this.navigation) return null;
-    return { cursor: this.navigation.cursor, bufferN: this.navigation.settings.bufferN, indices: this.navigation.indices };
+  getSnapshots(): BufferedNavigationSnapshots {
+    return toBufferedNavigationSnapshots(this.navigation, this.debugVisible, this.deps.getLocalSettings().loadFailureFeedback);
   }
 
   refreshPreloads(): void {
@@ -388,6 +381,7 @@ export class BufferedNavigationController {
         status: ManifestStatus.HEAD_PENDING,
         url,
       });
+      this.deps.onDebugChanged();
       const probeMethod = this.deps.getLocalSettings().neighborPreloadProbeMethod;
       const result = await this.deps.probeImage(url, 8000, { contextKey, probeMethod });
       if (!this.isCurrentRun(queued.runId)) return;

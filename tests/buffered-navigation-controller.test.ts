@@ -156,6 +156,44 @@ test('step() skips a failed neighbor (probe) and lands on the next good one', as
   assert.match(landed[0]!.nextUrl, /image=12$/);
 });
 
+test('status snapshot counts a traversed failure as skipped without exposing candidate URLs', async () => {
+  let statusChanges = 0;
+  const { controller } = createHarness({
+    onDebugChanged: () => {
+      statusChanges += 1;
+    },
+    probeImage: async (url) => {
+      if (url.endsWith('image=11')) return { ok: false, status: 404, message: 'not found' };
+      return { ok: true, status: 200, finalUrl: url };
+    },
+  });
+
+  assert.equal(await controller.step(baseModel(), navigableFields(baseModel()), 1), 'loaded');
+  const snapshot = controller.getSnapshots().status;
+
+  assert.ok(snapshot);
+  assert.equal(snapshot.total, 6);
+  assert.equal(snapshot.skipped, 1);
+  assert.equal(snapshot.failuresVisible, true);
+  assert.ok(statusChanges > 0, 'buffer transitions request targeted status refreshes');
+  assert.doesNotMatch(JSON.stringify(snapshot), /example\.test|image=/u);
+});
+
+test('status snapshot tells the view when Failure feedback is muted', async () => {
+  const { controller } = createHarness({
+    getLocalSettings: () => ({
+      neighborPreloadEnabled: true,
+      neighborPreloadRadius: 1,
+      neighborPreloadProbeMethod: 'get',
+      loadFailureFeedback: 'mute',
+    }),
+  });
+
+  await controller.step(baseModel(), navigableFields(baseModel()), 1);
+
+  assert.equal(controller.getSnapshots().status?.failuresVisible, false);
+});
+
 test('step() skips a failed neighbor (decoded GET) and lands on the next good one', async () => {
   let fetchCount = 0;
   const { controller, landed } = createHarness({
@@ -213,7 +251,7 @@ test('dispose() settles an in-flight step() instead of leaving it hanging foreve
   const stepPromise = controller.step(model, fields, 1);
 
   assert.doesNotThrow(() => controller.dispose());
-  assert.equal(controller.getDebugSnapshot(), null);
+  assert.equal(controller.getSnapshots().debug, null);
 
   const result = await stepPromise;
 

@@ -983,11 +983,14 @@
         {
           "type": "unit-dom",
           "paths": [
+            "tests/buffered-image-navigation.test.ts",
             "tests/neighbor-preload-controller.test.ts",
             "tests/buffered-navigation-controller.test.ts",
+            "tests/dom/neighbor-status-view.test.ts",
+            "tests/dom/panel-render-controller.test.ts",
             "tests/dom/parsed-field-navigation-controller.test.ts"
           ],
-          "notes": "Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts."
+          "notes": "Includes the parsed-field navigation consecutive-miss short-circuit (#287) and compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
         },
         {
           "type": "unit-dom",
@@ -998,6 +1001,16 @@
           "type": "unit-dom",
           "paths": ["tests/buffered-navigation-controller.test.ts"],
           "notes": "Covers #450: the 'Skipped a failed image candidate.' toast is failure feedback, so it fires only in Alert mode; Display/Mute skip past the failed neighbor to the next good candidate silently (the skip is driven by the request-policy cache, not the toast)."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/neighbor-status-view.stories.ts",
+          "notes": "Covers mixed warmed, warming, failed, skipped, and unknown counts plus Mute-mode suppression in the compact panel treatment."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/neighbor-status.spec.ts",
+          "notes": "Warms a bounded parsed-field window, surfaces a failed candidate, verifies it becomes skipped only after traversal, masks failure counts in Mute, and rejects URL/blob disclosure in the status copy."
         },
         {
           "type": "deferred",
