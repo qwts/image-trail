@@ -1,12 +1,16 @@
 import type { Page, Worker } from '@playwright/test';
 
-import { expect, fixturePaths, openFixturePage, test } from './fixtures.js';
+import { expect, fixturePaths, openFixturePage, resetExtensionLibrary, test } from './fixtures.js';
 import { detachHistory, keyboardSnapLeft, openWorkspacePanel, workspaceViewport } from './workspace-test-helpers.js';
 
 interface RenderCounters {
   readonly panel: number;
   readonly recall: number;
 }
+
+test.afterEach(async ({ extensionId, page }) => {
+  await resetExtensionLibrary(page, extensionId);
+});
 
 async function installRenderCounters(page: Page, serviceWorker: Worker): Promise<void> {
   const installed = await serviceWorker.evaluate(async (activeUrl) => {
@@ -52,8 +56,9 @@ async function renderCounters(page: Page): Promise<RenderCounters> {
   }));
 }
 
-test('panel drag stays geometry-only and viewport bursts render once at resize end', async ({ page, serviceWorker }) => {
+test('panel drag stays geometry-only and viewport bursts render once at resize end', async ({ extensionId, page, serviceWorker }) => {
   test.setTimeout(60_000);
+  await resetExtensionLibrary(page, extensionId);
   await page.setViewportSize(workspaceViewport);
   await openFixturePage(page, fixturePaths.singleImage);
   const panel = await openWorkspacePanel(page, serviceWorker);

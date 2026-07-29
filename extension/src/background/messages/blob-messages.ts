@@ -1,6 +1,7 @@
+import type { CaptureSourceType } from '../../core/image/capture-result.js';
 import { MESSAGE_PROTOCOL_VERSION, MessageType } from '../message-protocol.js';
 
-export type CaptureSourceType = 'target' | 'history' | 'bookmark';
+export type { CaptureSourceType } from '../../core/image/capture-result.js';
 
 export interface CaptureImageMessage {
   readonly type: typeof MessageType.CaptureImage;
@@ -9,6 +10,7 @@ export interface CaptureImageMessage {
     readonly url: string;
     readonly sourceRecordId?: string | undefined;
     readonly sourceType: CaptureSourceType;
+    readonly fileName?: string | undefined;
   };
 }
 
@@ -151,11 +153,21 @@ export interface GrantPermissionAndCaptureMessage {
     readonly url: string;
     readonly sourceType: CaptureSourceType;
     readonly sourceRecordId?: string | undefined;
+    readonly fileName?: string | undefined;
   };
 }
 
-export function createCaptureImageMessage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): CaptureImageMessage {
-  return { type: MessageType.CaptureImage, version: MESSAGE_PROTOCOL_VERSION, payload: { url, sourceType, sourceRecordId } };
+export function createCaptureImageMessage(
+  url: string,
+  sourceType: CaptureSourceType,
+  sourceRecordId?: string,
+  fileName?: string,
+): CaptureImageMessage {
+  return {
+    type: MessageType.CaptureImage,
+    version: MESSAGE_PROTOCOL_VERSION,
+    payload: { url, sourceType, ...(sourceRecordId ? { sourceRecordId } : {}), ...(fileName ? { fileName } : {}) },
+  };
 }
 
 export function createCaptureResultMessage(result: import('../../core/image/capture-result.js').CaptureResult): CaptureResultMessage {
@@ -232,8 +244,13 @@ export function createGrantPermissionAndCaptureMessage(
   url: string,
   sourceType: CaptureSourceType,
   sourceRecordId?: string,
+  fileName?: string,
 ): GrantPermissionAndCaptureMessage {
-  return { type: MessageType.GrantPermissionAndCapture, version: MESSAGE_PROTOCOL_VERSION, payload: { url, sourceType, sourceRecordId } };
+  return {
+    type: MessageType.GrantPermissionAndCapture,
+    version: MESSAGE_PROTOCOL_VERSION,
+    payload: { url, sourceType, ...(sourceRecordId ? { sourceRecordId } : {}), ...(fileName ? { fileName } : {}) },
+  };
 }
 
 export function createDeleteBlobResultMessage(

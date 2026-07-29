@@ -1,6 +1,6 @@
 import { normalizeDisplayLabel, sourceImageUrlFrom } from '../display-records.js';
 
-const SAFE_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp']);
+const SAFE_MEDIA_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'ts', 'mts', 'm2ts']);
 const UNSAFE_FILENAME_FORMAT_CHARACTER = /\p{Cf}/u;
 
 export interface DownloadDuplicateCandidate {
@@ -59,16 +59,18 @@ function isUnsafeFilenameCharacter(character: string): boolean {
 }
 
 export function extensionFromUrl(url: string): string {
+  const dataTransportStream = /^data:video\/mp2t[;,]/iu.test(url);
+  if (dataTransportStream) return 'ts';
   const dataImageType = /^data:image\/([a-z0-9.+-]+)[;,]/iu.exec(url)?.[1]?.toLowerCase();
   if (dataImageType) {
     const normalized = dataImageType === 'jpeg' ? 'jpg' : dataImageType;
-    return SAFE_IMAGE_EXTENSIONS.has(normalized) ? normalized : 'jpg';
+    return SAFE_MEDIA_EXTENSIONS.has(normalized) ? normalized : 'jpg';
   }
   try {
     const parsed = new URL(url);
     const filename = parsed.pathname.split('/').filter(Boolean).at(-1) ?? '';
     const extension = filename.match(/\.([a-z0-9]+)$/iu)?.[1]?.toLowerCase();
-    return extension && SAFE_IMAGE_EXTENSIONS.has(extension) ? extension : 'jpg';
+    return extension && SAFE_MEDIA_EXTENSIONS.has(extension) ? extension : 'jpg';
   } catch {
     return 'jpg';
   }

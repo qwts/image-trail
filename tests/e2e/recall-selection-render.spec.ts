@@ -11,6 +11,7 @@ import {
   fixtureUrl,
   openFixturePage,
   openSettingsGroup,
+  resetExtensionLibrary,
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
@@ -20,17 +21,6 @@ async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
-}
-
-async function clearDurableQueue(page: Page): Promise<void> {
-  await openSettingsGroup(page, 'System');
-  for (const name of ['current queue', 'Recall items']) {
-    const button = page.getByRole('button', { name: new RegExp(`^Delete ${name} \\(\\d+\\)$`, 'u') });
-    if ((await button.count()) === 0 || (await button.isDisabled())) continue;
-    await button.click();
-    await page.getByRole('button', { name: new RegExp(`^Confirm Delete ${name} \\(\\d+\\)$`, 'u') }).click();
-  }
-  await closeSettings(page);
 }
 
 async function pinUrl(page: Page, url: string, expectedVisibleCount: number): Promise<void> {
@@ -52,9 +42,13 @@ async function setVisiblePinLimit(page: Page, limit: string): Promise<void> {
   await closeSettings(page);
 }
 
-test('Recall selection preserves route chrome and deep list scroll (#628)', async ({ page, serviceWorker }) => {
+test.afterEach(async ({ extensionId, page }) => {
+  await resetExtensionLibrary(page, extensionId);
+});
+
+test('Recall selection preserves route chrome and deep list scroll (#628)', async ({ extensionId, page, serviceWorker }) => {
+  await resetExtensionLibrary(page, extensionId);
   await openPanel(page, serviceWorker);
-  await clearDurableQueue(page);
   await setVisiblePinLimit(page, '6');
 
   try {

@@ -1,4 +1,4 @@
-import { interopGifWebpMediaBlockFrom, interopMediaFileName } from '../../core/interop/media.js';
+import { interopMediaBlockFrom, interopMediaFileName, type InteropMediaBlock } from '../../core/interop/media.js';
 import type { InteropRecord } from '../../core/interop/records.js';
 import type { StoredOriginalReference } from '../types.js';
 
@@ -14,11 +14,12 @@ export function normalizeVerifiedOriginalCustody(
 
 function enrichVerifiedOriginal(record: InteropRecord, original: StoredOriginalReference | undefined): StoredOriginalReference | undefined {
   if (!original) return undefined;
-  const media = interopGifWebpMediaBlockFrom(record.roundTripMetadata.overlook);
+  const media = interopMediaBlockFrom(record.roundTripMetadata.overlook);
   if (!media || media.mimeType !== original.mimeType) return original;
+  if (media.kind === 'video') return enrichVideoOriginal(record, original, media);
   return {
     ...original,
-    fileName: original.fileName ?? interopOriginalFileName(record, media.extension, media.kind),
+    fileName: original.fileName ?? interopOriginalFileName(record, media),
     width: original.width ?? record.dimensions?.width,
     height: original.height ?? record.dimensions?.height,
     mediaInfo: {
@@ -30,11 +31,26 @@ function enrichVerifiedOriginal(record: InteropRecord, original: StoredOriginalR
   };
 }
 
-function interopOriginalFileName(record: InteropRecord, extension: 'gif' | 'webp' | null, kind: 'gif' | 'webp'): string {
+function enrichVideoOriginal(
+  record: InteropRecord,
+  original: StoredOriginalReference,
+  media: Extract<InteropMediaBlock, { readonly kind: 'video' }>,
+): StoredOriginalReference {
+  const mediaInfo = media.mediaInfo;
+  return {
+    ...original,
+    fileName: original.fileName ?? interopOriginalFileName(record, media),
+    width: original.width ?? mediaInfo?.displayWidth ?? mediaInfo?.codedWidth ?? record.dimensions?.width,
+    height: original.height ?? mediaInfo?.displayHeight ?? mediaInfo?.codedHeight ?? record.dimensions?.height,
+    ...(mediaInfo ? { mediaInfo: { kind: 'mpeg-ts' as const, ...mediaInfo } } : {}),
+  };
+}
+
+function interopOriginalFileName(record: InteropRecord, media: InteropMediaBlock): string {
   const candidates = [record.label, record.title, sourceFileName(record.sourceUrl)].filter(
     (value): value is string => typeof value === 'string' && value.trim() !== '',
   );
-  const expectedExtension = extension ?? kind;
+  const expectedExtension = media.extension ?? (media.kind === 'video' ? 'ts' : media.kind);
   return interopMediaFileName(
     candidates.find((candidate) => candidate.toLowerCase().endsWith(`.${expectedExtension.toLowerCase()}`)) ?? `image.${expectedExtension}`,
     expectedExtension,

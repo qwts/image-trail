@@ -19,6 +19,7 @@ import type { ImageDisplayRecord } from '../../core/display-records.js';
 import type { ProjectionReason } from '../../core/projection-session.js';
 import type { BookmarkStore, ImportedImageFile, PanelState } from '../../core/types.js';
 import { bookmarkSaveMessage, withoutRecentPinState } from './record-export-helpers.js';
+import { createImportedMediaRecords, type CapturedImportedMedia } from './imported-media-record.js';
 import type { RecordAddOptions, ValidatedRecordUrl } from './record-library-types.js';
 
 export type { RecordAddOptions } from './record-library-types.js';
@@ -92,21 +93,12 @@ export class RecordLibraryController {
     return true;
   }
 
-  async addImportedImage(file: ImportedImageFile): Promise<boolean> {
-    if (!file.dataUrl.startsWith('data:image/')) return false;
-    const timestamp = new Date().toISOString();
-    const draft = createDisplayRecord({
-      id: `${timestamp}:${file.name}`,
-      url: file.dataUrl,
-      title: file.name,
-      label: file.name,
-      thumbnail: file.dataUrl,
-      timestamp,
-      source: 'bookmark',
-    });
+  async addImportedImage(file: ImportedImageFile, captured?: CapturedImportedMedia): Promise<boolean> {
+    const records = createImportedMediaRecords(file, captured);
+    if (!records) return false;
     const bookmarkStore = this.deps.bookmarkStore();
-    const bookmark = bookmarkStore ? await bookmarkStore.save(draft) : draft;
-    const historyItem = createDisplayRecord({ ...draft, id: `${timestamp}:history:${file.name}`, source: 'history' });
+    const bookmark = bookmarkStore ? await bookmarkStore.save(records.bookmark) : records.bookmark;
+    const historyItem = { ...records.history, pinnedRecordId: bookmark.id, pinnedAt: bookmark.queueUpdatedAt ?? bookmark.timestamp };
     const recentHistoryStore = this.deps.recentHistoryStore();
     const history = recentHistoryStore
       ? await recentHistoryStore.add(historyItem, window.location.href, { scope: this.deps.getState().recentHistoryScope })

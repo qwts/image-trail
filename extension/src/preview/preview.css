@@ -45,6 +45,29 @@ p {
   max-height: calc(100vh - 48px);
 }
 
+.image-trail-preview-media__video {
+  display: block;
+  width: min(100%, 1600px);
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 120px);
+  background: #000;
+}
+
+.image-trail-preview-media__video-status {
+  position: fixed;
+  inset-block-end: 20px;
+  inset-inline-start: 50%;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 40px);
+  padding: 10px 12px;
+  border: 1px solid rgb(124 255 168 / 38%);
+  border-radius: 10px;
+  background: rgb(5 10 9 / 92%);
+  text-align: center;
+  translate: -50% 0;
+}
+
 .image-trail-preview-media__placeholder {
   margin: 0;
   color: #cbd5d1;
