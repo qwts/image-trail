@@ -1,4 +1,5 @@
 import { isLibraryChangeMessage } from '../background/library-change-messages.js';
+import { isSecureSessionChangeMessage } from '../background/secure-session-change-message.js';
 
 type RuntimeMessageListener = (message: unknown) => boolean;
 
@@ -39,13 +40,19 @@ export function installGalleryLibraryRefreshHook({
     void refresh();
   };
 
+  const refreshImmediately = () => {
+    if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+    runRefresh();
+  };
+
   const scheduleRefresh = () => {
     if (refreshTimer !== null) window.clearTimeout(refreshTimer);
     refreshTimer = window.setTimeout(runRefresh, debounceMs);
   };
 
   const listener: RuntimeMessageListener = (message) => {
-    if (isLibraryChangeMessage(message)) scheduleRefresh();
+    if (isSecureSessionChangeMessage(message)) refreshImmediately();
+    else if (isLibraryChangeMessage(message)) scheduleRefresh();
     return false;
   };
 
