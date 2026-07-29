@@ -138,7 +138,7 @@ export class ImageTrailPanel {
       this.render();
       this.panelRender.showBufferedNavigationToast(message);
     },
-    onDebugChanged: () => this.panelRender.renderBufferedDebugOverlay(),
+    onDebugChanged: () => this.panelRender.renderBufferedNavigationFeedback(),
     checkRequestPolicy: (url, options) => checkImageRequestPolicy(url, options),
     probeImage: (url, timeoutMs, options) => probeBufferedImageSource(url, timeoutMs, options),
     fetchDecodedImage: (url, options) => fetchDecodedBufferedImageSource(url, options),
@@ -386,7 +386,7 @@ export class ImageTrailPanel {
     handlePanelDragStart: (event) => this.panelPosition.handlePanelDragStart(event),
     queuePanelPositionRestore: () => this.panelPosition.queuePanelPositionRestore(),
     applyRestoredPanelPosition: () => this.panelPosition.applyRestoredPanelPosition(),
-    bufferedNavDebugSnapshot: () => this.bufferedNav.getDebugSnapshot(),
+    bufferedNavSnapshots: () => this.bufferedNav.getSnapshots(),
     refreshRecallIfOpen: () => this.recallDestination.refreshRecallIfOpen(),
     onWorkspaceLayoutChanged: () => this.workspaceLayout.handleWorkspaceLayoutChanged(),
     onWorkspaceEdgesChanged: (edges, observeViewport) => this.panelPosition.setWorkspaceRailEdges(edges, observeViewport),
