@@ -22,13 +22,26 @@ export async function findInteropBookmarkBySourceUrl(
   key: CryptoKey,
   url: string,
 ): Promise<EncryptedBookmarkRecord | undefined> {
+  const knownPresence = await repository.getInteropCustodyPresence();
+  if (knownPresence === false) return undefined;
+
+  let sawInteropCustody = false;
+  let sawUnreadableRecord = false;
   for (const encrypted of await repository.listEncrypted()) {
     try {
       const payload = await repository.openRecord(encrypted, key);
-      if (payload.interop?.record.sourceUrl === url) return encrypted;
+      if (!payload.interop) continue;
+      sawInteropCustody = true;
+      if (payload.interop.record.sourceUrl === url) {
+        if (knownPresence !== true) await repository.setInteropCustodyPresence(true);
+        return encrypted;
+      }
     } catch {
+      sawUnreadableRecord = true;
       // Unreadable rows cannot participate in encrypted source URL matching.
     }
   }
+  const nextPresence = sawInteropCustody || sawUnreadableRecord;
+  if (knownPresence === undefined) await repository.setInteropCustodyPresence(nextPresence);
   return undefined;
 }

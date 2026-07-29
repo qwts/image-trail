@@ -11,6 +11,7 @@ import { IndexedDbBookmarkStore } from '../extension/src/data/bookmarks-controll
 import { createAndActivateWrappedBlobKey, lockBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
 import { openImageTrailDb } from '../extension/src/data/db.js';
 import { InteropRecordTranslationStore } from '../extension/src/data/interop/record-translation.js';
+import { BookmarksRepository } from '../extension/src/data/repositories/bookmarks-repository.js';
 import { DataStore } from '../extension/src/data/schema.js';
 import { deleteImageTrailDb, requestToPromise, transactionDone } from './indexeddb-test-helpers.js';
 
@@ -179,6 +180,11 @@ test('a duplicate canonical record can attach later verified bytes without movin
   try {
     const imported = await translator.importRecord(fixture);
     const before = await bookmarks.loadPage({ offset: 0, limit: 10 });
+    const movedAt = '2026-07-16T10:00:00.000Z';
+    const db = await openImageTrailDb();
+    assert.ok(db.db);
+    await new BookmarksRepository(db.db).updateQueueUpdatedAt([{ uuid: imported.pinId!, queueUpdatedAt: movedAt }]);
+    db.db.close();
     const verifiedThumbnailDataUrl = 'data:image/jpeg;base64,bGF0ZXItY3VzdG9keQ==';
     const enriched = await translator.importRecord({ ...fixture, verifiedThumbnailDataUrl });
     const after = await bookmarks.loadPage({ offset: 0, limit: 10 });
@@ -187,7 +193,8 @@ test('a duplicate canonical record can attach later verified bytes without movin
     assert.equal(enriched.persisted, true);
     assert.equal(enriched.pinId, imported.pinId);
     assert.equal(after.items[0]?.thumbnail, verifiedThumbnailDataUrl);
-    assert.equal(after.items[0]?.queueUpdatedAt, before.items[0]?.queueUpdatedAt);
+    assert.notEqual(movedAt, before.items[0]?.queueUpdatedAt);
+    assert.equal(after.items[0]?.queueUpdatedAt, movedAt);
   } finally {
     await translator.close();
     await bookmarks.close();
@@ -305,8 +312,18 @@ test('interop previews deterministically distinguish duplicate, conflict, unsupp
   }
 });
 
-test('canonical queue timestamps remain ordered and native album membership follows canonical positions', async () => {
+test('a translation session scans stored interop pins once while canonical queue timestamps remain ordered and native album membership follows canonical positions', async (t) => {
   await deleteImageTrailDb();
+  const originalListEncrypted = BookmarksRepository.prototype.listEncrypted;
+  let fullStoreScans = 0;
+  BookmarksRepository.prototype.listEncrypted = async function listEncryptedWithCount() {
+    fullStoreScans += 1;
+    return originalListEncrypted.call(this);
+  };
+  t.after(() => {
+    BookmarksRepository.prototype.listEncrypted = originalListEncrypted;
+  });
+
   const fixture = recordFixture('valid-record-message.json');
   const secondId = 'b38e3e15-b80c-4207-b37d-d2b65a811eea';
   const album = fixture.albums[0]!;
@@ -326,6 +343,7 @@ test('canonical queue timestamps remain ordered and native album membership foll
   const bookmarks = new IndexedDbBookmarkStore();
   const albums = new IndexedDbAlbumStore();
   try {
+    assert.equal((await translator.preview({ ...fixture, albums: [orderedAlbum] })).category, 'metadata-only');
     const first = await translator.importRecord({ ...fixture, albums: [orderedAlbum] });
     const second = await translator.importRecord({ ...fixture, record: secondRecord, albums: [orderedAlbum] });
     const queue = await bookmarks.loadPage({ offset: 0, limit: 10 });
@@ -339,6 +357,8 @@ test('canonical queue timestamps remain ordered and native album membership foll
       snapshot.memberships.map((membership) => membership.recordId),
       [second.pinId, first.pinId],
     );
+    assert.ok(await translator.exportRecord(fixture.record.identity.interopId));
+    assert.equal(fullStoreScans, 1);
   } finally {
     await translator.close();
     await bookmarks.close();

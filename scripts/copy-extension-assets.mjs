@@ -1,7 +1,7 @@
 import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import './write-extension-build-info.mjs';
-import { extensionOutputPath, writeStylesheet } from './extension-build-policy.mjs';
+import { bundleStylesheet, extensionOutputPath, isInjectedStylesheet, writeStylesheet } from './extension-build-policy.mjs';
 import { extensionManifestForBuild } from './extension-manifest-policy.mjs';
 
 await mkdir('extension/dist', { recursive: true });
@@ -30,7 +30,9 @@ const stylesheets = [
 ];
 
 for (const sourcePath of stylesheets) {
-  await writeStylesheet(sourcePath, extensionOutputPath(sourcePath));
+  const outputPath = extensionOutputPath(sourcePath);
+  if (isInjectedStylesheet(sourcePath)) await bundleStylesheet(sourcePath, outputPath);
+  else await writeStylesheet(sourcePath, outputPath);
 }
 
 async function stylesheetFiles(directory) {

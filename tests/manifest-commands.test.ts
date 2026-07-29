@@ -26,6 +26,8 @@ interface ExtensionCommandManifest {
   >;
   readonly web_accessible_resources?: readonly {
     readonly resources?: readonly string[];
+    readonly matches?: readonly string[];
+    readonly use_dynamic_url?: boolean;
   }[];
 }
 
@@ -109,8 +111,13 @@ test('manifest exposes assignable Image Trail action commands in Chromium keyboa
   }
 });
 
-test('manifest exposes panel stylesheet imports to content pages', () => {
-  const resources = loadManifest().web_accessible_resources?.flatMap((entry) => entry.resources ?? []) ?? [];
+test('manifest exposes panel stylesheet imports only through session-scoped URLs', () => {
+  const resourceGroups = loadManifest().web_accessible_resources ?? [];
+  assert.equal(resourceGroups.length, 1);
+  assert.deepEqual(resourceGroups[0]?.matches, ['http://*/*', 'https://*/*']);
+  assert.equal(resourceGroups[0]?.use_dynamic_url, true);
+
+  const resources = resourceGroups.flatMap((entry) => entry.resources ?? []);
 
   for (const stylesheet of stylesheetDependencyClosure('src/ui/styles/panel-entry.css')) {
     assert.ok(resources.includes(stylesheet), `${stylesheet} should be web-accessible`);
