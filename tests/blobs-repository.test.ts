@@ -101,6 +101,54 @@ test('BlobsRepository finds missing original ids without hydrating encrypted rec
   assert.deepEqual(await repo.findMissingOriginalIds([]), []);
 });
 
+test('BlobsRepository lists original cleanup candidates through key-only indexes', async (t) => {
+  const db = await openFreshDb();
+  t.after(() => db.close());
+  const repo = new BlobsRepository(db);
+
+  await repo.put(
+    makeBlobRecord({
+      id: 'indexed-original',
+      ciphertext: new ArrayBuffer(1_000_000),
+      createdAt: '2026-07-13T00:00:00.000Z',
+    }),
+  );
+  await repo.put(makeBlobRecord({ id: 'indexed-thumbnail', kind: 'thumbnail', createdAt: '2026-07-12T00:00:00.000Z' }));
+  const driftWrite = db.transaction([DataStore.Blobs, DataStore.OriginalBlobIndex], 'readwrite');
+  driftWrite.objectStore(DataStore.Blobs).put(
+    makeBlobRecord({
+      id: 'unindexed-original',
+      ciphertext: new ArrayBuffer(1_000_000),
+      createdAt: '2026-07-11T00:00:00.000Z',
+    }),
+  );
+  driftWrite.objectStore(DataStore.OriginalBlobIndex).put({ id: 'stale-index-entry' });
+  await new Promise<void>((resolve, reject) => {
+    driftWrite.oncomplete = () => resolve();
+    driftWrite.onerror = () => reject(driftWrite.error);
+  });
+
+  const originalGetAll = IDBObjectStore.prototype.getAll;
+  const originalObjectStoreOpenCursor = IDBObjectStore.prototype.openCursor;
+  const originalIndexOpenCursor = IDBIndex.prototype.openCursor;
+  IDBObjectStore.prototype.getAll = function () {
+    throw new Error('cleanup candidates must not materialize object-store values');
+  };
+  IDBObjectStore.prototype.openCursor = function () {
+    throw new Error('cleanup candidates must not open a value cursor');
+  };
+  IDBIndex.prototype.openCursor = function () {
+    throw new Error('cleanup candidates must not open an index value cursor');
+  };
+  t.after(() => {
+    IDBObjectStore.prototype.getAll = originalGetAll;
+    IDBObjectStore.prototype.openCursor = originalObjectStoreOpenCursor;
+    IDBIndex.prototype.openCursor = originalIndexOpenCursor;
+  });
+
+  assert.deepEqual(await repo.listOriginalCleanupCandidates(), [{ id: 'indexed-original', createdAt: '2026-07-13T00:00:00.000Z' }]);
+});
+
 test('BlobsRepository decrements reference count and deletes at zero', async (t) => {
   const db = await openFreshDb();
   t.after(() => db.close());
