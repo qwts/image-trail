@@ -1,5 +1,12 @@
 # image-trail
 
+## 0.24.9
+
+### Patch Changes
+
+- 6d877cc: Keep detached Host target controls focused after preview-fit rerenders.
+- c6d04ea: Hide unfinished Transfer and Sync behind an explicit experimental build flag and remove native messaging from baseline releases.
+
 ## 0.24.8
 
 ### Patch Changes
