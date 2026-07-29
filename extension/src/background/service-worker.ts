@@ -20,6 +20,7 @@ import type { StoredBlobRecord } from '../data/types.js';
 import type { UrlReviewStatusClearFilter } from '../core/types.js';
 import { BROWSER_COMMAND_SHORTCUTS } from '../core/keyboard-shortcuts.js';
 import { fetchImageBytes } from './fetch-image.js';
+import { fetchLinkedPage } from './fetch-linked-page.js';
 import {
   MessageType,
   createCaptureImageMessage,
@@ -112,8 +113,6 @@ const TOGGLE_BUILD_IDENTITY_COMMAND = 'toggle-build-info-overlay';
 const BROWSER_COMMAND_ACTIONS = new Map(BROWSER_COMMAND_SHORTCUTS.map((shortcut) => [shortcut.command, shortcut.action]));
 const SUPPORTED_PAGE_PATTERN = /^https?:\/\//u;
 const PREVIEW_TTL_MS = 60_000;
-const MAX_LINKED_PAGE_BYTES = 2 * 1024 * 1024;
-const MAX_LINKED_PAGE_TIMEOUT_MS = 15_000;
 interface PreviewPayload {
   readonly dataUrl: string;
   readonly byteLength: number;
@@ -434,66 +433,6 @@ async function handleCheckImageRequestPolicy(
     referrer: message.payload.referrer,
     contextKey: message.payload.contextKey,
   });
-}
-
-async function handleFetchLinkedPage(
-  message: FetchLinkedPageMessage,
-): Promise<import('./messages.js').FetchLinkedPageResultMessage['payload']> {
-  const maxBytes = Math.min(MAX_LINKED_PAGE_BYTES, Math.max(32_768, message.payload.maxBytes));
-  const timeoutMs = Math.min(MAX_LINKED_PAGE_TIMEOUT_MS, Math.max(1000, message.payload.timeoutMs));
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const url = new URL(message.payload.url);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      return { ok: false, reason: 'unsupported-url', message: 'Linked page URL must use HTTP or HTTPS.' };
-    }
-
-    const response = await fetch(url.href, { credentials: 'include', signal: controller.signal });
-    if (!response.ok) return { ok: false, reason: 'http-error', message: `Linked page returned ${response.status}.` };
-    const contentLength = Number(response.headers.get('content-length') ?? 0);
-    if (contentLength > maxBytes) {
-      return { ok: false, reason: 'too-large', message: 'Linked page is larger than the strategy limit.' };
-    }
-
-    const result = await readLimitedText(response, maxBytes);
-    return { ok: true, text: result.text, byteLength: result.byteLength, finalUrl: response.url };
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      return { ok: false, reason: 'timeout', message: 'Linked page fetch timed out.' };
-    }
-    if (error instanceof Error && error.message === 'too-large') {
-      return { ok: false, reason: 'too-large', message: 'Linked page is larger than the strategy limit.' };
-    }
-    return { ok: false, reason: 'network-error', message: 'Linked page fetch failed.' };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function readLimitedText(response: Response, maxBytes: number): Promise<{ readonly text: string; readonly byteLength: number }> {
-  if (!response.body) {
-    const text = await response.text();
-    const byteLength = new TextEncoder().encode(text).byteLength;
-    if (byteLength > maxBytes) throw new Error('too-large');
-    return { text, byteLength };
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let byteLength = 0;
-  let text = '';
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    byteLength += value.byteLength;
-    if (byteLength > maxBytes) {
-      await reader.cancel();
-      throw new Error('too-large');
-    }
-    text += decoder.decode(value, { stream: true });
-  }
-  return { text: text + decoder.decode(), byteLength };
 }
 
 async function handleStorageUsage(): Promise<StorageUsageSummary> {
@@ -954,7 +893,7 @@ const messageRegistry = {
   }),
   [MessageType.FetchLinkedPage]: defineMessage({
     requestSchema: requestSchemas.fetchLinkedPageRequestSchema,
-    handle: (message: FetchLinkedPageMessage) => handleFetchLinkedPage(message),
+    handle: (message: FetchLinkedPageMessage) => fetchLinkedPage(message),
     respond: (result) => createFetchLinkedPageResultMessage(result),
     fallback: () => createFetchLinkedPageResultMessage({ ok: false, reason: 'unknown', message: 'Linked page fetch failed.' }),
   }),

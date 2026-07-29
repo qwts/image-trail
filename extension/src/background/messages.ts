@@ -332,7 +332,7 @@ export interface CheckImageRequestPolicyResultMessage {
 export interface FetchLinkedPageMessage {
   readonly type: typeof MessageType.FetchLinkedPage;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly url: string; readonly maxBytes: number; readonly timeoutMs: number };
+  readonly payload: { readonly url: string; readonly referrer: string; readonly maxBytes: number; readonly timeoutMs: number };
 }
 
 export interface FetchLinkedPageResultMessage {
@@ -340,7 +340,7 @@ export interface FetchLinkedPageResultMessage {
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload:
     | { readonly ok: true; readonly text: string; readonly byteLength: number; readonly finalUrl: string }
-    | { readonly ok: false; readonly reason: string; readonly message: string };
+    | { readonly ok: false; readonly reason: string; readonly message: string; readonly origin?: string };
 }
 
 export interface GrantPermissionAndCaptureMessage {
@@ -1032,8 +1032,8 @@ export function createCheckImageRequestPolicyMessage(
   return { type: MessageType.CheckImageRequestPolicy, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer, ...options } };
 }
 
-export function createFetchLinkedPageMessage(url: string, maxBytes: number, timeoutMs: number): FetchLinkedPageMessage {
-  return { type: MessageType.FetchLinkedPage, version: MESSAGE_PROTOCOL_VERSION, payload: { url, maxBytes, timeoutMs } };
+export function createFetchLinkedPageMessage(url: string, referrer: string, maxBytes: number, timeoutMs: number): FetchLinkedPageMessage {
+  return { type: MessageType.FetchLinkedPage, version: MESSAGE_PROTOCOL_VERSION, payload: { url, referrer, maxBytes, timeoutMs } };
 }
 
 export function createRetrieveBlobResultMessage(payload: RetrieveBlobResultMessage['payload']): RetrieveBlobResultMessage {

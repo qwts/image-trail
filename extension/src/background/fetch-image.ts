@@ -108,7 +108,7 @@ export async function fetchImageBytes(
   return { ok: true, bytes, mimeType: contentType, byteLength: bytes.byteLength };
 }
 
-function credentialsForImageRequest(url: string, referrer: string | undefined): RequestCredentials {
+export function credentialsForImageRequest(url: string, referrer: string | undefined): RequestCredentials {
   if (!referrer) return 'omit';
   try {
     return new URL(url).origin === new URL(referrer).origin ? 'include' : 'omit';
