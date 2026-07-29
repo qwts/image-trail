@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 type ArtifactPolicyModule = {
   expectedExtensionArtifacts(manifest: Record<string, unknown>): string[];
   validateArtifactPaths(files: string[], manifest: Record<string, unknown>): string[];
-  validateReleaseArtifactText(file: string, content: string, rootDirectory: string): string[];
+  validateReleaseArtifactText(file: string, content: string, rootDirectory: string, options?: { allowE2ETestBuild?: boolean }): string[];
   validateReleaseBuildInfo(buildInfo: Record<string, unknown>): string[];
   validateReleaseManifest(manifest: Record<string, unknown>): string[];
 };
@@ -24,11 +24,11 @@ type BuildPolicyModule = {
     jsx?: string | null;
     release?: boolean;
     interopEnabled?: boolean;
-    openPanelShadowForE2E?: boolean;
+    e2eTestBuild?: boolean;
   }): Record<string, unknown>;
   isInteropFeatureEnabled(environment?: Record<string, string | undefined>): boolean;
   isReleaseBuild(environment?: Record<string, string | undefined>): boolean;
-  opensPanelShadowForE2E(environment?: Record<string, string | undefined>): boolean;
+  isE2ETestBuild(environment?: Record<string, string | undefined>): boolean;
   minificationImproved(unminifiedBytes: number, minifiedBytes: number): boolean;
 };
 
@@ -80,7 +80,8 @@ test('central release build policy minifies and removes development-only debuggi
   assert.deepEqual(release['pure'], ['console.debug']);
   assert.deepEqual(release['define'], {
     'process.env.NODE_ENV': '"production"',
-    __IMAGE_TRAIL_E2E_OPEN_SHADOW__: 'false',
+    __IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__: 'undefined',
+    __IMAGE_TRAIL_E2E_TEST_BUILD__: 'false',
     __IMAGE_TRAIL_INTEROP_ENABLED__: 'false',
   });
 
@@ -88,9 +89,23 @@ test('central release build policy minifies and removes development-only debuggi
     entryPoint: 'source.ts',
     outfile: 'output.js',
     format: 'esm',
-    openPanelShadowForE2E: true,
+    e2eTestBuild: true,
   });
-  assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_OPEN_SHADOW__'], 'true');
+  assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_TEST_BUILD__'], 'true');
+  assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__'], '"data-image-trail-e2e-test-build"');
+
+  const releaseE2E = builds.extensionBuildOptions({
+    entryPoint: 'source.ts',
+    outfile: 'output.js',
+    format: 'esm',
+    release: true,
+    e2eTestBuild: true,
+  });
+  assert.equal((releaseE2E['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_TEST_BUILD__'], 'true');
+  assert.equal(
+    (releaseE2E['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__'],
+    '"data-image-trail-e2e-test-build"',
+  );
 
   const interop = builds.extensionBuildOptions({
     entryPoint: 'source.ts',
@@ -106,8 +121,8 @@ test('release-mode detection and minification regression threshold are explicit'
   assert.equal(builds.isReleaseBuild({ IMAGE_TRAIL_RELEASE_BUILD: '0' }), false);
   assert.equal(builds.isInteropFeatureEnabled({ IMAGE_TRAIL_ENABLE_INTEROP: '1' }), true);
   assert.equal(builds.isInteropFeatureEnabled({ IMAGE_TRAIL_ENABLE_INTEROP: '0' }), false);
-  assert.equal(builds.opensPanelShadowForE2E({ IMAGE_TRAIL_E2E_OPEN_SHADOW: '1' }), true);
-  assert.equal(builds.opensPanelShadowForE2E({ IMAGE_TRAIL_E2E_OPEN_SHADOW: '0' }), false);
+  assert.equal(builds.isE2ETestBuild({ IMAGE_TRAIL_E2E_TEST_BUILD: '1' }), true);
+  assert.equal(builds.isE2ETestBuild({ IMAGE_TRAIL_E2E_TEST_BUILD: '0' }), false);
   assert.equal(builds.minificationImproved(1_000, 1_000), true);
   assert.equal(builds.minificationImproved(10_000, 9_900), false);
   assert.equal(builds.minificationImproved(10_000, 8_000), true);
@@ -174,6 +189,16 @@ test('release text audit rejects debug metadata, secrets, and build-machine path
   }
   assert.deepEqual(
     artifacts.validateReleaseArtifactText('bundle.js', 'console.warn("bounded failure");console.error("fatal failure")', '/workspace'),
+    [],
+  );
+  assert.match(
+    artifacts.validateReleaseArtifactText('bundle.js', 'data-image-trail-e2e-test-build', '/workspace').join(' '),
+    /disposable E2E open-shadow marker/u,
+  );
+  assert.deepEqual(
+    artifacts.validateReleaseArtifactText('bundle.js', 'data-image-trail-e2e-test-build', '/workspace', {
+      allowE2ETestBuild: true,
+    }),
     [],
   );
 });
@@ -244,7 +269,9 @@ test('build pipeline typechecks without emitting source-shaped modules and audit
   assert.match(packageJson.scripts['build'] ?? '', /build-preview-page\.mjs/u);
   assert.match(packageJson.scripts['build'] ?? '', /npm run check:artifacts/u);
   assert.match(packageJson.scripts['build:release'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=0/u);
+  assert.match(packageJson.scripts['build:release'] ?? '', /IMAGE_TRAIL_E2E_TEST_BUILD=0/u);
   assert.match(packageJson.scripts['build:release'] ?? '', /audit-extension-artifacts\.mjs --require-release/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=0/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_RELEASE_BUILD=1 npm run test:e2e/u);
+  assert.match(readFileSync('tests/e2e/global-setup.ts', 'utf8'), /IMAGE_TRAIL_E2E_TEST_BUILD: '1'/u);
 });

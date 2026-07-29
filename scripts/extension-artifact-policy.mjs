@@ -21,6 +21,7 @@ const STATIC_APPLICATION_ARTIFACTS = [
   'src/destinations/destination-page.js',
 ];
 const TEXT_ARTIFACT = /\.(?:css|html|js|json)$/u;
+const E2E_TEST_BUILD_MARKER = 'data-image-trail-e2e-test-build';
 const RELEASE_BUILD_INFO_KEYS = ['branch', 'builtAt', 'commit', 'mode', 'schemaVersion', 'timezone', 'version', 'worktree'];
 const FORBIDDEN_RELEASE_TEXT = [
   { pattern: /(?:\/\/|\/\*)#\s*source(?:Mapping)?URL=/u, message: 'contains source mapping metadata' },
@@ -63,7 +64,7 @@ export function validateArtifactPaths(files, manifest) {
   return errors;
 }
 
-export function validateReleaseArtifactText(file, content, rootDirectory) {
+export function validateReleaseArtifactText(file, content, rootDirectory, { allowE2ETestBuild = false } = {}) {
   if (!TEXT_ARTIFACT.test(file)) return [];
   const errors = [];
   const normalizedRoot = path.resolve(rootDirectory);
@@ -72,6 +73,9 @@ export function validateReleaseArtifactText(file, content, rootDirectory) {
   }
   for (const rule of FORBIDDEN_RELEASE_TEXT) {
     if (rule.pattern.test(content)) errors.push(`${file} ${rule.message}`);
+  }
+  if (!allowE2ETestBuild && content.includes(E2E_TEST_BUILD_MARKER)) {
+    errors.push(`${file} contains the disposable E2E open-shadow marker`);
   }
   return errors;
 }
@@ -113,7 +117,7 @@ export async function collectArtifactFiles(directory, relativeDirectory = '') {
   return files.sort();
 }
 
-export async function auditExtensionArtifacts({ directory, rootDirectory, requireRelease = false }) {
+export async function auditExtensionArtifacts({ directory, rootDirectory, requireRelease = false, allowE2ETestBuild = false }) {
   const files = await collectArtifactFiles(directory);
   const manifest = JSON.parse(await readFile(path.join(directory, 'manifest.json'), 'utf8'));
   const buildInfo = JSON.parse(await readFile(path.join(directory, 'build-info.json'), 'utf8'));
@@ -126,7 +130,11 @@ export async function auditExtensionArtifacts({ directory, rootDirectory, requir
     for (const file of files) {
       if (!TEXT_ARTIFACT.test(file)) continue;
       const content = await readFile(path.join(directory, file), 'utf8');
-      errors.push(...validateReleaseArtifactText(file, content, rootDirectory));
+      errors.push(
+        ...validateReleaseArtifactText(file, content, rootDirectory, {
+          allowE2ETestBuild: allowE2ETestBuild && !requireRelease,
+        }),
+      );
     }
   }
   return { buildInfo, errors, files, manifest };

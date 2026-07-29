@@ -3,10 +3,15 @@ import { unmountReactSubtree } from '../react/react-subtree.js';
 const ROOT_ID = 'image-trail-panel-root';
 const STYLE_PATH = 'src/ui/styles/panel-entry.css';
 const STYLES_READY_FALLBACK_MS = 300;
-declare const __IMAGE_TRAIL_E2E_OPEN_SHADOW__: boolean | undefined;
+declare const __IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__: string | undefined;
+declare const __IMAGE_TRAIL_E2E_TEST_BUILD__: boolean | undefined;
+
+function isE2ETestBuild(): boolean {
+  return typeof __IMAGE_TRAIL_E2E_TEST_BUILD__ === 'boolean' && __IMAGE_TRAIL_E2E_TEST_BUILD__;
+}
 
 function panelShadowMode(): ShadowRootMode {
-  return typeof __IMAGE_TRAIL_E2E_OPEN_SHADOW__ === 'boolean' && __IMAGE_TRAIL_E2E_OPEN_SHADOW__ ? 'open' : 'closed';
+  return isE2ETestBuild() ? 'open' : 'closed';
 }
 
 /**
@@ -100,6 +105,9 @@ export class PanelMount {
     doc.getElementById(ROOT_ID)?.remove();
     const host = doc.createElement('div');
     host.id = ROOT_ID;
+    if (typeof __IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__ === 'string') {
+      host.setAttribute(__IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__, 'open-shadow');
+    }
     Object.assign(host.style, {
       position: 'fixed',
       top: '0',
