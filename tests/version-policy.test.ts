@@ -181,8 +181,11 @@ test('ignores tests, Storybook-only files, and repository tooling', () => {
 test('version-cut workflow refreshes a checked Changesets PR and tags only fresh version merges', () => {
   const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
 
-  assert.match(workflow, /uses: changesets\/action@v1/u);
+  assert.match(workflow, /uses: changesets\/action@[0-9a-f]{40} # v1/u);
   assert.match(workflow, /version: npm run changeset:version/u);
+  assert.match(workflow, /persist-credentials: false/u);
+  assert.match(workflow, /run: npm ci --ignore-scripts/u);
+  assert.match(workflow, /commitMode: github-api/u);
   assert.match(workflow, /pull-requests: write/u);
   assert.match(workflow, /actions: write/u);
   assert.match(workflow, /gh workflow run ci\.yml --ref changeset-release\/main/u);
