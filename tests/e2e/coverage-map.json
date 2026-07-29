@@ -558,6 +558,11 @@
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
           "notes": "Covers multi-image target picking and the visible selected-target indicator on only the chosen host image."
+        },
+        {
+          "type": "unit-dom",
+          "path": "tests/target-image.test.ts",
+          "notes": "Covers target URL precedence and link-source trust boundaries: only the real trusted search-page origin can unwrap a trusted search link, page-authored base URLs cannot spoof that origin, and wrapper parameters plus direct linked-image URLs reject file:, javascript:, and data: schemes."
         }
       ]
     },

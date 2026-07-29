@@ -1,3 +1,5 @@
+import { safeHttpUrl } from './http-url.js';
+
 export interface TargetImageInfo {
   readonly handleId: string;
   readonly url: string;
@@ -147,23 +149,15 @@ function selectorSegment(element: Element): string {
 function sourceUrlFromLink(image: HTMLImageElement): string | null {
   const href = image.closest('a[href]')?.getAttribute('href')?.trim();
   if (!href) return null;
-  try {
-    const link = new URL(href, document.baseURI);
-    if (isTrustedImageSearchHost(link.hostname)) {
-      for (const key of ['mediaurl', 'imgurl', 'murl', 'u', 'url']) {
-        const sourceUrl = link.searchParams.get(key)?.trim();
-        if (!sourceUrl) continue;
-        try {
-          return new URL(sourceUrl, link.href).href;
-        } catch {
-          // Keep looking if a wrapper parameter is not URL-like.
-        }
-      }
+  const link = safeHttpUrl(href, document.baseURI);
+  if (!link) return null;
+  if (isTrustedImageSearchHost(location.hostname) && isTrustedImageSearchHost(link.hostname)) {
+    for (const key of ['mediaurl', 'imgurl', 'murl', 'u', 'url']) {
+      const sourceUrl = safeHttpUrl(link.searchParams.get(key)?.trim(), link.href);
+      if (sourceUrl) return sourceUrl.href;
     }
-    return isLikelyImageUrl(link.href) ? link.href : null;
-  } catch {
-    return null;
   }
+  return isLikelyImageUrl(link.href) ? link.href : null;
 }
 
 function isTrustedImageSearchHost(hostname: string): boolean {
