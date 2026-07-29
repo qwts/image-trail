@@ -88,6 +88,17 @@ can carry a stale copy until rebased or restarted from the main repo.
   for separate approval. Keep every operation scoped to the requested work and
   leave unrelated project state unchanged.
 - When a PR merges or issue work is abandoned, clean up the task worktree from the main checkout (`git worktree remove` then `git worktree prune`); see wiki [Contributing](https://github.com/qwts/image-trail/wiki/Contributing).
+- **Anything that must start another workflow run authenticates with
+  `RELEASE_TOKEN`** (branch/tag pushes, bot-opened PRs, `gh workflow run`).
+  `GITHUB_TOKEN` events trigger no downstream workflows, and this account's
+  Actions policy authorizes actors explicitly — `github-actions[bot]` is not one
+  of them, so its runs die at startup with "Actor is not allowed to trigger
+  Actions workflows". **The PAT may reach only `actions/*` steps and our own
+  `run:` blocks — never a third-party action**, whose future versions nobody
+  here controls. When a third-party action stands between the PAT and the run
+  you need, replace it or drop it: versioning is a script in `version-cut.yml`
+  rather than `changesets/action` for exactly this reason, and the E2E-report
+  Pages publish was deleted rather than handed the token.
 - If a push seems to not trigger CI, or a PR shows a stale failing check from an
   older commit: check `gh pr view <n> --json mergeable` FIRST. GitHub silently
   creates no `pull_request` workflow runs for a CONFLICTING PR (no merge ref
