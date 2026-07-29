@@ -64,14 +64,15 @@ test('zoom-equivalent and narrow CSS viewports fall back to reachable floating g
   expect(zoomBox!.x + zoomBox!.width).toBeLessThanOrEqual(708);
 
   await page.setViewportSize({ width: 360, height: 740 });
-  const narrowPanel = await panel.boundingBox();
-  const narrowWindow = await floating.boundingBox();
-  expect(narrowPanel).not.toBeNull();
-  expect(narrowWindow).not.toBeNull();
-  expect(narrowPanel!.width).toBeLessThanOrEqual(336);
-  expect(narrowWindow!.width).toBeLessThanOrEqual(336);
-  expect(narrowWindow!.x).toBeGreaterThanOrEqual(12);
-  expect(narrowWindow!.x + narrowWindow!.width).toBeLessThanOrEqual(348);
+  await expect.poll(async () => (await panel.boundingBox())?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(336);
+  await expect.poll(async () => (await floating.boundingBox())?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(336);
+  await expect.poll(async () => (await floating.boundingBox())?.x ?? Number.NEGATIVE_INFINITY).toBeGreaterThanOrEqual(12);
+  await expect
+    .poll(async () => {
+      const box = await floating.boundingBox();
+      return box ? box.x + box.width : Number.POSITIVE_INFINITY;
+    })
+    .toBeLessThanOrEqual(348);
 });
 
 test('host fullscreen hides and restores the injected overlay without leaving host mutations', async ({ page, serviceWorker }) => {

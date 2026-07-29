@@ -171,8 +171,7 @@ export function createNeighborPreloadSettingsView(
 
   const meta = document.createElement('p');
   meta.className = 'image-trail-panel__settings-empty';
-  meta.textContent =
-    'Warms this many parsed-field URLs ahead and behind. Speculative loads stay in this page session only and never add Recents, URL review records, panel messages, pins, or Recall entries. Cache 0 keeps all entries without eviction.';
+  meta.textContent = `Warms this many parsed-field URLs ahead and behind. Speculative loads stay in this page session only and never add Recents, URL review records, panel messages, pins, or Recall entries. Cache holds ${NEIGHBOR_PRELOAD_CACHE_LIMITS.min}–${NEIGHBOR_PRELOAD_CACHE_LIMITS.max} image responses per page session; lower values cap memory more aggressively.`;
   form.append(
     enabledLabel,
     radius.label,

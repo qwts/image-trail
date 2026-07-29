@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import { requestToPromise, transactionDone } from '../idb-helpers.js';
-import { DataStore } from '../schema.js';
+import { DataStore, SchemaIndex } from '../schema.js';
 import type { StoredBlobRecord } from '../types.js';
 import { storedBlobRecordSchema } from '../types.schema.js';
 import { hydrateRecord, hydrateRecords } from './hydration.js';
@@ -45,6 +45,33 @@ export class BlobsRepository {
     return hydrateRecords(DataStore.Blobs, storedBlobRecordSchema, result);
   }
 
+  async listOriginalCleanupCandidates(): Promise<readonly { readonly id: string; readonly createdAt: string }[]> {
+    const transaction = this.db.transaction([DataStore.Blobs, DataStore.OriginalBlobIndex], 'readonly');
+    const done = transactionDone(transaction);
+    const originalKeys = requestToPromise<IDBValidKey[]>(transaction.objectStore(DataStore.OriginalBlobIndex).getAllKeys());
+    const createdAtKeys = new Promise<readonly { readonly id: string; readonly createdAt: string }[]>((resolve, reject) => {
+      const candidates: { id: string; createdAt: string }[] = [];
+      const request = transaction.objectStore(DataStore.Blobs).index(SchemaIndex.BlobsByCreatedAt).openKeyCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) {
+          resolve(candidates);
+          return;
+        }
+        if (typeof cursor.primaryKey === 'string' && typeof cursor.key === 'string') {
+          candidates.push({ id: cursor.primaryKey, createdAt: cursor.key });
+        }
+        cursor.continue();
+      };
+      request.onerror = () => reject(request.error);
+    });
+
+    const [keys, candidates] = await Promise.all([originalKeys, createdAtKeys]);
+    await done;
+    const originalIds = new Set(keys.filter((key): key is string => typeof key === 'string'));
+    return candidates.filter((candidate) => originalIds.has(candidate.id));
+  }
+
   async remove(id: string): Promise<void> {
     const existing = await this.get(id);
     if (!existing) return;
@@ -79,18 +106,16 @@ export class BlobsRepository {
   async getStorageUsage(): Promise<StorageUsageSummary> {
     const transaction = this.db.transaction(DataStore.Blobs, 'readonly');
     const store = transaction.objectStore(DataStore.Blobs);
-    const request = store.openCursor();
-
+    const done = transactionDone(transaction);
+    const count = requestToPromise<number>(store.count());
+    const request = store.index(SchemaIndex.BlobsByEncryptedByteLength).openKeyCursor();
     let totalBytes = 0;
-    let blobCount = 0;
 
     await new Promise<void>((resolve, reject) => {
       request.onsuccess = () => {
         const cursor = request.result;
         if (cursor) {
-          const record = cursor.value as StoredBlobRecord;
-          totalBytes += record.encryptedByteLength;
-          blobCount += 1;
+          if (typeof cursor.key === 'number' && Number.isFinite(cursor.key) && cursor.key >= 0) totalBytes += cursor.key;
           cursor.continue();
         } else {
           resolve();
@@ -99,7 +124,8 @@ export class BlobsRepository {
       request.onerror = () => reject(request.error);
     });
 
-    await transactionDone(transaction);
+    const blobCount = await count;
+    await done;
     return { totalBytes, blobCount };
   }
 }

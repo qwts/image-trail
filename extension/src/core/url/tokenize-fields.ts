@@ -1,4 +1,5 @@
 import type { ParsedUrlModel, UrlField, UrlToken } from './types.js';
+import { fieldIdForToken } from './field-ids.js';
 
 const TOKEN_PATTERN = /(?:0[xX][0-9a-fA-F]+|[0-9a-fA-F]*\d[0-9a-fA-F]*)/gu;
 
@@ -32,7 +33,7 @@ export function collectUrlFields(model: ParsedUrlModel): UrlField[] {
     part.tokens.forEach((token, tokenIndex) => {
       const splitLabel = splitLabelSuffix(token);
       fields.push({
-        id: `p:${partIndex}:${tokenIndex}`,
+        id: fieldIdForToken('path', partIndex, tokenIndex, token),
         location: 'path',
         label: `${labelBase === 'file' ? `file ${tokenIndex}` : `${labelBase}.${tokenIndex}`}${splitLabel}`,
         value: tokenValue(token),
@@ -52,7 +53,7 @@ export function collectUrlFields(model: ParsedUrlModel): UrlField[] {
     field.valueTokens.forEach((token, tokenIndex) => {
       const splitLabel = splitLabelSuffix(token);
       fields.push({
-        id: `q:${field.index}:${tokenIndex}`,
+        id: fieldIdForToken('query', field.index, tokenIndex, token),
         location: 'query',
         label: `query ${field.key}${splitLabel}`,
         value: tokenValue(token),

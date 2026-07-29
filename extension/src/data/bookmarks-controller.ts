@@ -9,6 +9,7 @@ import {
   type SearchableMetadataPolicy,
 } from '../core/metadata-policy.js';
 import type { BookmarkStore, PinSaveStoragePreference } from '../core/types.js';
+import { loadPlainBookmarkRecords, type MergedBookmarkRecordsCache } from './bookmark-record-loader.js';
 import { findInteropBookmarkBySourceUrl, findStoredBookmarkByUrl } from './bookmark-record-lookup.js';
 import {
   privatePinUrl,
@@ -45,11 +46,6 @@ type BookmarkContext = {
   readonly blobs: BlobsRepository;
 };
 
-interface MergedRecordsCache {
-  readonly keyReference: string;
-  readonly records: readonly ImageDisplayRecord[];
-}
-
 export interface BookmarkPage {
   readonly items: readonly ImageDisplayRecord[];
   readonly offset: number;
@@ -71,7 +67,7 @@ export interface BookmarkRecallPage {
 
 export class IndexedDbBookmarkStore implements BookmarkStore {
   private ready: Promise<BookmarkContext | null> | null = null;
-  private mergedRecordsCache: MergedRecordsCache | null = null;
+  private mergedRecordsCache: MergedBookmarkRecordsCache | null = null;
   private mergedRecordsCacheGeneration = 0;
 
   constructor(private readonly options: ProtectedBookmarkOptions = {}) {}
@@ -114,7 +110,9 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const limit = Math.max(1, input.limit);
     if (!context) return { items: [], offset, limit, total: 0, hasOlder: false, hasNewer: false };
 
-    const loaded = this.options.getActiveBlobKey ? await this.loadMergedRecords(context) : await this.loadPlainRecords(context);
+    const loaded = this.options.getActiveBlobKey
+      ? await this.loadMergedRecords(context)
+      : await loadPlainBookmarkRecords(context.repository, context.bookmarkKey.key);
     const visible = sortQueueRecords(
       filterByVisibilityScope(loaded, input.scope ?? 'global', input.currentPageUrl),
       input.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER,
@@ -373,7 +371,9 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   }): Promise<{ readonly removedCount: number }> {
     const context = await this.openContext();
     if (!context) return { removedCount: 0 };
-    const records = this.options.getActiveBlobKey ? await this.loadMergedRecords(context) : await this.loadPlainRecords(context);
+    const records = this.options.getActiveBlobKey
+      ? await this.loadMergedRecords(context)
+      : await loadPlainBookmarkRecords(context.repository, context.bookmarkKey.key);
     const visible = filterByVisibilityScope(records, input.scope ?? 'global', input.currentPageUrl);
     const ids = visible.slice(Math.max(0, input.offset)).map((record) => record.id);
     return this.removeMany(ids);
@@ -404,27 +404,18 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     };
   }
 
-  private async loadPlainRecords(context: BookmarkContext): Promise<readonly ImageDisplayRecord[]> {
-    const records = await context.repository.listEncryptedNewestFirst();
-    const loaded: ImageDisplayRecord[] = [];
-    for (const record of records) {
-      try {
-        const payload = await context.repository.openRecord(record, context.bookmarkKey.key);
-        if (payload) loaded.push(toDisplayRecord(record.uuid, payload, record.queueUpdatedAt));
-      } catch {
-        // Bookmarks encrypted with unavailable legacy keys stay durable but hidden.
-      }
-    }
-    return loaded;
-  }
-
   private async loadMergedRecords(context: BookmarkContext): Promise<readonly ImageDisplayRecord[]> {
     const activeBlobKey = (await this.options.getActiveBlobKey?.()) ?? null;
-    const plain = [...(await this.loadPlainRecords(context))];
-    if (!activeBlobKey) return plain;
-    const keyReference = activeBlobKey.reference.reference;
+    const keyReference = activeBlobKey?.reference.reference ?? null;
     if (this.mergedRecordsCache?.keyReference === keyReference) return this.mergedRecordsCache.records;
     const cacheGeneration = this.mergedRecordsCacheGeneration;
+    const plain = [...(await loadPlainBookmarkRecords(context.repository, context.bookmarkKey.key))];
+    if (!activeBlobKey) {
+      if (this.mergedRecordsCacheGeneration === cacheGeneration) {
+        this.mergedRecordsCache = { keyReference, records: plain };
+      }
+      return plain;
+    }
 
     const byId = new Map(plain.map((record) => [record.id, record]));
     const urlToId = new Map(plain.filter((record) => record.privacyStatus !== 'locked').map((record) => [record.url, record.id]));
