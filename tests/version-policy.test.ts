@@ -190,14 +190,20 @@ test('version-cut workflow refreshes a checked Changesets PR and tags only fresh
   // "Actor is not allowed to trigger Actions workflows". The version branch
   // therefore needs no `gh workflow run ci.yml` dispatch — which the bot could
   // not perform either.
-  assert.match(workflow, /token: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
+  assert.doesNotMatch(workflow, /token: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
+  assert.equal(workflow.match(/persist-credentials: false/gu)?.length, 2);
   assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
+  const changesetStep = workflow.slice(
+    workflow.indexOf('- name: Prepare the ready version PR'),
+    workflow.indexOf('- name: Push and create'),
+  );
+  assert.doesNotMatch(changesetStep, /RELEASE_TOKEN|GH_TOKEN/u);
   assert.doesNotMatch(workflow, /gh workflow run ci\.yml/u);
   assert.match(workflow, /Version unchanged \(\$cur\) — not a version-cut merge/u);
   assert.match(workflow, /Changesets pending — nothing to tag/u);
   assert.match(workflow, /package, manifest, and lockfile versions are not synchronized/u);
   assert.match(workflow, /git tag -a "\$version"/u);
-  assert.match(workflow, /git push origin "\$version"/u);
+  assert.match(workflow, /git push origin "\$FRESH_TAG"/u);
   // The only surviving dispatch is stranded-tag recovery: an already-existing
   // tag has no push event left to replay. The fresh tag's own push starts
   // release.yml directly.

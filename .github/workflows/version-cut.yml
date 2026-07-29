@@ -51,8 +51,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Credentials for the version-branch force-push below.
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          # Dependency and Changesets code must never inherit the release PAT.
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -63,14 +63,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Done in-repo rather than by changesets/action: the step has to run under
-      # RELEASE_TOKEN (see the header), and the PAT never goes to a third-party
-      # action whose future versions nobody here controls. `changeset:version` is
-      # the same script the action was configured to shell out to, so manifest
-      # and lockfile stay synchronized with package.json exactly as before.
-      - name: Create or refresh the ready version PR
+      # Done in-repo rather than by changesets/action, before RELEASE_TOKEN is
+      # exposed to any step. `changeset:version` is the same script the action
+      # was configured to shell out to, so manifest and lockfile stay
+      # synchronized with package.json exactly as before.
+      - name: Prepare the ready version PR
+        id: version
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           BRANCH: changeset-release/main
         run: |
           set -euo pipefail
@@ -89,9 +88,6 @@ jobs:
             exit 0
           fi
           git commit -m 'chore: version Image Trail'
-          # The branch is a disposable projection of main + the pending
-          # changesets, rebuilt from the current tip on every main push.
-          git push --force origin "$BRANCH"
           {
             echo "Merging this PR cuts \`v$version\`: the tag and the release build follow automatically."
             echo
@@ -105,6 +101,23 @@ jobs:
               grab { print }
             ' CHANGELOG.md
           } > "$RUNNER_TEMP/pr-body.md"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+
+      # Keep the PAT out of checkout config, dependency lifecycle scripts, and
+      # Changesets. This step contains only first-party git/GitHub operations.
+      - name: Push and create or refresh the ready version PR
+        if: steps.version.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          BRANCH: changeset-release/main
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The branch is a disposable projection of main + the pending
+          # changesets, rebuilt from the current tip on every main push.
+          gh auth setup-git
+          git push --force origin "$BRANCH"
           open=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
           if [ -n "$open" ]; then
             # The rolling PR outlives the changesets it was opened for. Its body
@@ -112,7 +125,7 @@ jobs:
             # keeps advertising the version and changelog from whenever it was
             # first opened while the branch underneath moves on (PR #704 review).
             gh pr edit "$open" --body-file "$RUNNER_TEMP/pr-body.md"
-            echo "Version PR #$open refreshed for v$version."
+            echo "Version PR #$open refreshed for v$VERSION."
             exit 0
           fi
           gh pr create --base main --head "$BRANCH" --title 'chore: version Image Trail' \
@@ -131,13 +144,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          # The tag push has to start release.yml by itself, so it must carry the
-          # PAT's credentials rather than GITHUB_TOKEN's.
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          persist-credentials: false
 
-      - name: Tag when the current version is a fresh cut
+      - name: Prepare a tag when the current version is a fresh cut
+        id: tag
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           # A normal main push is a release cut only when package.json changed.
@@ -175,24 +186,41 @@ jobs:
 
           if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
             echo "$version already tagged."
-            # The one dispatch that survives: an already-existing tag has no push
-            # event left to replay. Runs under the PAT — a github-actions[bot]
-            # dispatch is refused by the Actions actor policy.
-            if ! gh release view "$version" >/dev/null 2>&1; then
-              echo "$version has no release — dispatching recovery."
-              gh workflow run release.yml --ref main -f tag="$version"
-            fi
+            echo "existing=$version" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git tag -a "$version" -m "Image Trail $version"
-          git push origin "$version"
-          echo "Tagged $version."
+          echo "fresh=$version" >> "$GITHUB_OUTPUT"
 
-          # No dispatch: pushed under the PAT, this tag fires release.yml's
-          # on:push:tags trigger directly. Without RELEASE_TOKEN the push is a
-          # GITHUB_TOKEN push and starts nothing — re-run this workflow via
-          # workflow_dispatch once the secret is present and the already-tagged
-          # recovery path above picks the tag up.
+      # The tag push has to start release.yml by itself, so authenticate only
+      # this first-party git/GitHub step with the PAT.
+      - name: Push tag or dispatch recovery
+        if: steps.tag.outputs.fresh != '' || steps.tag.outputs.existing != ''
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          FRESH_TAG: ${{ steps.tag.outputs.fresh }}
+          EXISTING_TAG: ${{ steps.tag.outputs.existing }}
+        run: |
+          set -euo pipefail
+          if [ -n "$FRESH_TAG" ]; then
+            gh auth setup-git
+            git push origin "$FRESH_TAG"
+            echo "Tagged $FRESH_TAG."
+            # No dispatch: pushed under the PAT, this tag fires release.yml's
+            # on:push:tags trigger directly. Without RELEASE_TOKEN the push is a
+            # GITHUB_TOKEN push and starts nothing — re-run this workflow via
+            # workflow_dispatch once the secret is present and the
+            # already-tagged recovery path above picks the tag up.
+            exit 0
+          fi
+
+          # The one dispatch that survives: an already-existing tag has no push
+          # event left to replay. Runs under the PAT — a github-actions[bot]
+          # dispatch is refused by the Actions actor policy.
+          if ! gh release view "$EXISTING_TAG" >/dev/null 2>&1; then
+            echo "$EXISTING_TAG has no release — dispatching recovery."
+            gh workflow run release.yml --ref main -f tag="$EXISTING_TAG"
+          fi
