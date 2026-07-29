@@ -276,7 +276,7 @@
             "tests/dom/maintenance-settings-view.test.ts",
             "tests/primitives-css.test.ts"
           ],
-          "notes": "Covers grouped Settings composition, native control preservation, primitive variants, input/select/toggle treatment, encryption badges, provider status, file pickers, danger actions, Help keycaps, privacy-inert copy, narrow reflow, focus, disabled, waiting, error, and reduced-motion contracts."
+          "notes": "Covers grouped Settings composition through direct component imports, native control preservation, primitive variants, input/select/toggle treatment, encryption badges, provider status, file pickers, danger actions, Help keycaps, privacy-inert copy, narrow reflow, focus, disabled, waiting, error, and reduced-motion contracts."
         },
         {
           "type": "storybook",
