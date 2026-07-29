@@ -908,7 +908,7 @@ async function fetchLinkedPageText(
   strategy: Pick<LinkedPageImageGrabStrategy, 'maxBytes' | 'timeoutMs'>,
 ): Promise<{ readonly text: string; readonly finalUrl: string }> {
   try {
-    const response = await sendRuntimeMessage(createFetchLinkedPageMessage(pageUrl, strategy.maxBytes, strategy.timeoutMs));
+    const response = await sendRuntimeMessage(createFetchLinkedPageMessage(pageUrl, location.href, strategy.maxBytes, strategy.timeoutMs));
     if (isFetchLinkedPageResultMessage(response)) {
       if (response.payload.ok) return { text: response.payload.text, finalUrl: response.payload.finalUrl };
       throw new Error(response.payload.message);

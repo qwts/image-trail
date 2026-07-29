@@ -457,7 +457,7 @@ test('recognizes capture-related messages as extension requests', () => {
   assert.equal(isExtensionRequest(createDeleteBlobMessage('blob-1')), true);
   assert.equal(isExtensionRequest(createRetrieveBlobMessage('blob-1')), true);
   assert.equal(isExtensionRequest(createFetchThumbnailSourceMessage('https://example.com/a.jpg')), true);
-  assert.equal(isExtensionRequest(createFetchLinkedPageMessage('https://example.com/page', 1024, 2000)), true);
+  assert.equal(isExtensionRequest(createFetchLinkedPageMessage('https://e.test/p', 'https://e.test/g', 1024, 2000)), true);
   assert.equal(isExtensionRequest(createDownloadImageMessage('https://example.com/a.jpg', 'a.jpg', false)), true);
 });
 
@@ -725,13 +725,13 @@ test('creates image request policy messages with compatibility payloads', () => 
 });
 
 test('creates linked-page fetch messages', () => {
-  const request = createFetchLinkedPageMessage('https://example.test/page', 1024, 2000);
+  const request = createFetchLinkedPageMessage('https://target.test/p', 'https://source.test/g', 1024, 2000);
   assert.equal(request.type, MessageType.FetchLinkedPage);
-  assert.equal(request.payload.url, 'https://example.test/page');
+  assert.equal(request.payload.url, 'https://target.test/p');
+  assert.equal(request.payload.referrer, 'https://source.test/g');
   assert.equal(request.payload.maxBytes, 1024);
   assert.equal(request.payload.timeoutMs, 2000);
   assert.equal(isExtensionRequest(request), true);
-
   const success = createFetchLinkedPageResultMessage({
     ok: true,
     text: '<img src="a.jpg">',

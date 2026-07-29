@@ -263,6 +263,7 @@ export const checkImageRequestPolicyRequestSchema = v.object({
 
 export const fetchLinkedPageRequestSchema = v.object({
   url: v.string(),
+  referrer: v.string(),
   maxBytes: v.number(),
   timeoutMs: v.number(),
 });

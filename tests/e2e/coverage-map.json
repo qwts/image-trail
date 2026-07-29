@@ -353,8 +353,13 @@
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/manifest-commands.test.ts", "tests/permissions.test.ts"],
-          "notes": "Covers removal of static all-sites injection and required host access, retention of activeTab plus scripting, optional http/https declarations, and exact per-origin permission requests."
+          "paths": [
+            "tests/manifest-commands.test.ts",
+            "tests/permissions.test.ts",
+            "tests/fetch-linked-page.test.ts",
+            "tests/messages.test.ts"
+          ],
+          "notes": "Covers removal of static all-sites injection and required host access, retention of activeTab plus scripting, optional http/https declarations, exact per-origin permission requests, linked-page permission preflight, and same-origin-only credential inclusion across the validated runtime-message boundary."
         }
       ]
     },

@@ -14,6 +14,7 @@ import {
 import type { SaveBookmarkMessage, SaveBookmarkResultMessage } from '../extension/src/background/messages.js';
 import {
   emptyPayloadSchema,
+  fetchLinkedPageRequestSchema,
   saveBookmarkRequestSchema,
   saveLocalSettingsRequestSchema,
 } from '../extension/src/background/message-schemas.js';
@@ -44,6 +45,19 @@ import { createKeyReference } from '../extension/src/data/crypto/key-reference.j
 const flushMicrotasks = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const validDisplayRecord = { id: 'rec-1', url: 'https://example.test/a.jpg', timestamp: '2026-06-30T00:00:00.000Z' };
+
+test('linked-page requests require the source-page referrer used by the credential policy', () => {
+  const payload = {
+    url: 'https://target.example.test/page',
+    referrer: 'https://source.example.test/gallery',
+    maxBytes: 1024,
+    timeoutMs: 2000,
+  };
+
+  assert.equal(v.is(fetchLinkedPageRequestSchema, payload), true);
+  const { referrer: _referrer, ...withoutReferrer } = payload;
+  assert.equal(v.is(fetchLinkedPageRequestSchema, withoutReferrer), false);
+});
 
 // ---------------------------------------------------------------------------
 // Message boundary — dispatcher validates payloads before running the handler
