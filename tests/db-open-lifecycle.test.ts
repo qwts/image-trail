@@ -50,6 +50,36 @@ test('retrying database provider clears a rejected attempt', async () => {
   assert.equal(openCount, 2);
 });
 
+test('retrying database provider closes and invalidates a cached handle on version change', async () => {
+  let closeCount = 0;
+  let openCount = 0;
+  const firstDb = { close: () => (closeCount += 1) } as unknown as IDBDatabase;
+  const secondDb = {} as IDBDatabase;
+  const getDb = createRetryingDbProvider(async () => {
+    openCount += 1;
+    return successfulOpen(openCount === 1 ? firstDb : secondDb);
+  });
+
+  assert.equal(await getDb(), firstDb);
+  firstDb.onversionchange?.({} as IDBVersionChangeEvent);
+  assert.equal(closeCount, 1);
+  assert.equal(await getDb(), secondDb);
+  assert.equal(openCount, 2);
+});
+
+test('openImageTrailDb closes a live handle when another context requests a version change', async () => {
+  let closeCount = 0;
+  const db = { close: () => (closeCount += 1) } as unknown as IDBDatabase;
+  const request = { result: db, transaction: null, error: null } as unknown as IDBOpenDBRequest;
+  const indexedDb = { open: () => request } as unknown as IDBFactory;
+
+  const resultPromise = openImageTrailDb(indexedDb);
+  request.onsuccess?.({} as Event);
+  assert.equal((await resultPromise).db, db);
+  db.onversionchange?.({} as IDBVersionChangeEvent);
+  assert.equal(closeCount, 1);
+});
+
 test('openImageTrailDb closes a success handle that arrives after a blocked result', async () => {
   let closeCount = 0;
   const db = { close: () => (closeCount += 1) } as unknown as IDBDatabase;

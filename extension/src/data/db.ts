@@ -30,7 +30,11 @@ export function openImageTrailDb(indexedDb: IDBFactory = globalThis.indexedDB): 
     };
     request.onsuccess = () => {
       const db = request.result;
-      if (!settle({ db, status: { ok: true, code: 'ok', message: 'Image Trail storage opened.' } })) db.close();
+      if (!settle({ db, status: { ok: true, code: 'ok', message: 'Image Trail storage opened.' } })) {
+        db.close();
+        return;
+      }
+      db.onversionchange = () => db.close();
     };
     request.onerror = () =>
       settle({

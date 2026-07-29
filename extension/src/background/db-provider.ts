@@ -8,9 +8,18 @@ export function createRetryingDbProvider(openDb: OpenDb): () => Promise<IDBDatab
   return () => {
     if (dbPromise) return dbPromise;
 
-    const attempt = Promise.resolve()
+    const attempt: Promise<IDBDatabase | null> = Promise.resolve()
       .then(openDb)
-      .then((result) => (result.status.ok ? result.db : null));
+      .then((result) => {
+        const db = result.status.ok ? result.db : null;
+        if (db) {
+          db.onversionchange = () => {
+            db.close();
+            if (dbPromise === attempt) dbPromise = null;
+          };
+        }
+        return db;
+      });
     dbPromise = attempt;
 
     void attempt.then(
