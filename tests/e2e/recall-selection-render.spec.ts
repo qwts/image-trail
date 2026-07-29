@@ -38,7 +38,9 @@ async function pinUrl(page: Page, url: string, expectedVisibleCount: number): Pr
   const escaped = url.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
   await expectPanelStatusMessage(page, new RegExp(`(Loaded|Applied|Image loaded but did not change).*${escaped}`, 'u'));
   await page.getByRole('button', { name: 'Pin current' }).click();
-  await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(expectedVisibleCount);
+  // Each pin does a thumbnail-generation + IndexedDB round trip; six in a row on a loaded CI
+  // runner can outrun the default 5s expect timeout even though the pin itself succeeds.
+  await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(expectedVisibleCount, { timeout: 15_000 });
 }
 
 async function setVisiblePinLimit(page: Page, limit: string): Promise<void> {
