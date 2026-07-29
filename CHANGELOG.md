@@ -1,5 +1,28 @@
 # image-trail
 
+## 0.25.0
+
+### Minor Changes
+
+- 6061085: Preserve original GIF and WebP animation metadata through capture, encrypted backup, interoperability, downloads, and accessible reduced-motion previews.
+
+### Patch Changes
+
+- 982f387: Back up pCloud data as independently verified encrypted parts with a manifest published last, bounded original transfer, cancelable progress, safe partial cleanup, and backward-compatible restore.
+- da8d1bb: Reuse one durable-library snapshot across Gallery search, filter, facet, and paging interactions.
+- 9596956: Reuse one decrypted interoperability-pin snapshot across each experimental transfer translation session.
+- 891bbbf: Revoke discarded buffered-navigation image URLs while retaining the selected display blob until replacement or disposal.
+- 107f86f: Keep panel dragging and active viewport resizing free of repeated panel and Recall rebuilds.
+- d5a36e4: Avoid repeated full-library bookmark decrypts during ordinary URL lookup, Queue paging, and storage-health refreshes while retaining a one-time scan for legacy interoperability custody.
+- 4524c42: Show compact, privacy-safe warmed, warming, failed, skipped, and unknown counts for parsed-field neighbors.
+- f14a6b0: Keep storage-health and unused-original cleanup scans lightweight by reading only blob IDs, creation times, and encrypted byte-length indexes instead of materializing encrypted image bytes.
+- e987300: Reduce host-page layout work during context detection, target recovery, and Grab Mode previews.
+- c6b98d6: Split background message contracts and creators into focused domain modules behind the existing compatibility barrel.
+- e2ec8aa: Keep digit widths, field status, and saved template choices attached to the intended parsed URL token when an earlier token is split or recombined.
+- e91cf68: Keep the Queue on the newest requested page when IndexedDB responses resolve out of order, without discarding the latest response after a same-scope page URL update.
+- 0883c0f: Keep Recall selection updates scoped to the Recall destination so the panel and list scroll remain stable.
+- e5f1366: Bound neighbor-preload caching to 1–500 page-session entries and migrate the former unlimited setting to the safe default.
+
 ## 0.24.10
 
 ### Patch Changes
