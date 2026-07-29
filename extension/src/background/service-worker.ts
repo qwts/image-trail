@@ -241,7 +241,6 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
   if (!db) {
     return { status: 'failed', reason: 'unknown', message: 'Database unavailable.' };
   }
-  const blobs = new BlobsRepository(db);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const sha256 = await computeSha256(bytesResult.bytes);
@@ -272,18 +271,13 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
   });
 
   const record: StoredBlobRecord = {
-    id,
-    kind: 'original',
-    schemaVersion: 1,
-    algorithm: 'AES-GCM',
+    ...aad,
     iv: sealed.iv,
     ciphertext: sealed.ciphertext,
     encryptedByteLength: sealed.encryptedByteLength,
-    createdAt: now,
-    key: activeBlobKey.reference,
     referenceCount: 1,
   };
-  await blobs.put(record);
+  await new BlobsRepository(db).put(record);
   return {
     status: 'captured',
     blobId: record.id,
