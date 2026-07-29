@@ -64,3 +64,91 @@ test('preserves the zero-image target count before a qualifying image exists', (
   assert.equal(root.querySelector('.image-trail-panel__target-count')?.textContent, '0 on page');
   unmountReactSubtree(root);
 });
+
+test('restores Host fit focus after a native change replaces the React subtree', async () => {
+  const host = document.createElement('div');
+  const shadow = host.attachShadow({ mode: 'open' });
+  document.body.append(host);
+  const views: HTMLElement[] = [];
+  let target: TargetState = {
+    mode: 'auto',
+    picking: false,
+    grabModeActive: false,
+    candidateCount: 1,
+    selectedUrl: 'https://images.example.test/a/1.jpg',
+    selectedHandleId: 'target-1',
+    selectedDimensions: '1200 × 800',
+    fillScreen: false,
+    objectFit: 'contain',
+    message: '',
+  };
+  const dispatch = (action: PanelAction): void => {
+    if (action.name !== 'target/set-object-fit') return;
+    target = { ...target, objectFit: action.mode };
+    const replacement = createTargetPickerView(target, dispatch);
+    views.push(replacement);
+    shadow.replaceChildren(replacement);
+  };
+  const initial = createTargetPickerView(target, dispatch);
+  views.push(initial);
+  shadow.append(initial);
+  const select = shadow.querySelector<HTMLSelectElement>('.image-trail-panel__target-fit-select');
+  assert.ok(select);
+  select.focus();
+  select.value = 'cover';
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+
+  document.body.tabIndex = -1;
+  document.body.focus();
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+
+  const replacement = shadow.querySelector<HTMLSelectElement>('.image-trail-panel__target-fit-select');
+  assert.ok(replacement);
+  assert.equal(shadow.activeElement, replacement);
+  for (const view of views) unmountReactSubtree(view);
+  host.remove();
+  document.body.removeAttribute('tabindex');
+});
+
+test('Host fit focus recovery does not steal a deliberate newer focus target', async () => {
+  const host = document.createElement('div');
+  const shadow = host.attachShadow({ mode: 'open' });
+  document.body.append(host);
+  const views: HTMLElement[] = [];
+  let target: TargetState = {
+    mode: 'auto',
+    picking: false,
+    grabModeActive: false,
+    candidateCount: 1,
+    selectedUrl: 'https://images.example.test/a/1.jpg',
+    selectedHandleId: 'target-1',
+    selectedDimensions: '1200 × 800',
+    fillScreen: false,
+    objectFit: 'contain',
+    message: '',
+  };
+  const dispatch = (action: PanelAction): void => {
+    if (action.name !== 'target/set-object-fit') return;
+    target = { ...target, objectFit: action.mode };
+    const replacement = createTargetPickerView(target, dispatch);
+    views.push(replacement);
+    shadow.replaceChildren(replacement);
+  };
+  const initial = createTargetPickerView(target, dispatch);
+  views.push(initial);
+  shadow.append(initial);
+  const select = shadow.querySelector<HTMLSelectElement>('.image-trail-panel__target-fit-select');
+  assert.ok(select);
+  select.focus();
+  select.value = 'cover';
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+
+  const release = shadow.querySelector<HTMLButtonElement>('button');
+  assert.ok(release);
+  release.focus();
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+
+  assert.equal(shadow.activeElement, release);
+  for (const view of views) unmountReactSubtree(view);
+  host.remove();
+});
