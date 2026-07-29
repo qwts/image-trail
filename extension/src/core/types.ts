@@ -28,7 +28,7 @@ export type { ParsedFieldResetBaseline, ParsedFieldStateRecord } from './parsed-
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
-
+type CloudBackupControlActionName = 'cloud-backup/disconnect' | 'cloud-backup/cancel';
 export interface TargetState {
   readonly mode: 'auto' | 'manual' | 'none';
   readonly picking: boolean;
@@ -299,7 +299,7 @@ export type PanelActionName =
   | 'cloud-backup/backup-now'
   | 'cloud-backup/choose-restore'
   | 'cloud-backup/retry'
-  | 'cloud-backup/disconnect'
+  | CloudBackupControlActionName
   | 'export/history'
   | 'export/bookmarks'
   | 'export/image'
@@ -414,7 +414,7 @@ export type PanelAction =
         | 'cloud-backup/backup-now'
         | 'cloud-backup/choose-restore'
         | 'cloud-backup/retry'
-        | 'cloud-backup/disconnect'
+        | CloudBackupControlActionName
         | 'export/history'
         | 'export/bookmarks'
         | 'export/image'
@@ -590,7 +590,7 @@ export type PanelAction =
       readonly password: string;
     }
   | { readonly name: 'cloud-backup/retry'; readonly provider: 'pcloud' }
-  | { readonly name: 'cloud-backup/disconnect'; readonly provider: 'pcloud' }
+  | { readonly name: CloudBackupControlActionName; readonly provider: 'pcloud' }
   | { readonly name: 'export/history' | 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/url-review-status' }
   | { readonly name: 'clear/url-review-status'; readonly scope?: 'hostname' | 'page' | 'source' | 'all' }

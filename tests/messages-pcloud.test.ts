@@ -48,18 +48,18 @@ test('creates pCloud provider messages without token fields', () => {
     status: { connected: false, message: 'pCloud disconnected.' },
     message: 'pCloud disconnected.',
   });
-  const upload = createUploadPCloudBackupMessage({
-    fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
-    fileContent: '{"encrypted":true}',
-  });
+  const uploadFileName = 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json';
+  const uploadFileContent = '{"encrypted":true}';
+  const upload = createUploadPCloudBackupMessage({ fileName: uploadFileName, fileContent: uploadFileContent });
+  const cleanup = createUploadPCloudBackupMessage({ operation: 'cleanup', fileIds: [41, 42] });
   const uploadResult = createUploadPCloudBackupResultMessage({
     ok: true,
     status: statusResult.payload,
     apiHost: 'api.pcloud.com',
     fileId: 42,
-    fileName: upload.payload.fileName,
+    fileName: uploadFileName,
     folderPath: '/Image Trail/backups',
-    sizeBytes: upload.payload.fileContent.length,
+    sizeBytes: uploadFileContent.length,
     sha256: 'a'.repeat(64),
     uploadedAt: '2026-06-27T00:00:00.000Z',
     verificationMethod: 'download-byte-match',
@@ -67,9 +67,9 @@ test('creates pCloud provider messages without token fields', () => {
       schemaVersion: 1,
       provider: 'pcloud',
       destination: '/Image Trail/backups',
-      fileName: upload.payload.fileName,
+      fileName: uploadFileName,
       completedAt: '2026-06-27T00:00:00.000Z',
-      sizeBytes: upload.payload.fileContent.length,
+      sizeBytes: uploadFileContent.length,
       sha256: 'a'.repeat(64),
       verificationMethod: 'download-byte-match',
     },
@@ -126,6 +126,8 @@ test('creates pCloud provider messages without token fields', () => {
   assert.equal(isDisconnectPCloudProviderResultMessage(disconnectResult), true);
   assert.equal(upload.type, MessageType.UploadPCloudBackup);
   assert.equal(isExtensionRequest(upload), true);
+  assert.equal(isExtensionRequest(cleanup), true);
+  assert.deepEqual(cleanup.payload, { operation: 'cleanup', fileIds: [41, 42] });
   assert.equal(isExtensionResponse(uploadResult), true);
   assert.equal(isUploadPCloudBackupResultMessage(uploadResult), true);
   assert.equal(JSON.stringify(upload).includes('accessToken'), false);

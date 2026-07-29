@@ -29,6 +29,7 @@ export interface BookmarksImportResult {
   readonly externalOriginalCount: number;
   readonly fullBackup: boolean;
   readonly originalBlobs: readonly PortableStoredBlobRecord[];
+  readonly backedOriginalBlobIds: readonly string[];
   readonly blobKeyBackups: readonly FullBackupBlobKeyBackup[];
   readonly missingOriginalBlobIds: readonly string[];
   readonly albums: readonly AlbumBackupEntry[];
@@ -52,6 +53,7 @@ export async function importBookmarks(fileContent: string, password: string): Pr
     externalOriginalCount: 0,
     fullBackup: false,
     originalBlobs: [],
+    backedOriginalBlobIds: [],
     blobKeyBackups: [],
     missingOriginalBlobIds: [],
     albums: [],
@@ -77,19 +79,15 @@ export async function importBookmarks(fileContent: string, password: string): Pr
     const parsed = JSON.parse(new TextDecoder().decode(plaintext)) as unknown;
     const fullBackup = fullBackupPayloadFromUnknown(parsed);
     if (fullBackup) {
-      const backedOriginalBlobIds = new Set(fullBackup.originalBlobs.map((record) => record.id));
-      const parsedBookmarks = parseBookmarkEntries(fullBackup.bookmarks, { preserveOriginalReferences: true });
-      const entries = parsedBookmarks.entries.map((entry) => stripMissingFullBackupOriginalReference(entry, backedOriginalBlobIds));
       return {
-        ...parsedBookmarks,
-        entries,
-        externalOriginalCount: bookmarkEntriesOriginalReferenceCount(entries),
-        plaintext: false,
-        fullBackup: true,
+        ...createFullBackupImportResult({
+          bookmarks: fullBackup.bookmarks,
+          backedOriginalBlobIds: fullBackup.originalBlobs.map((record) => record.id),
+          blobKeyBackups: fullBackup.blobKeyBackups,
+          missingOriginalBlobIds: fullBackup.missingOriginalBlobIds,
+          albums: fullBackup.albums,
+        }),
         originalBlobs: fullBackup.originalBlobs,
-        blobKeyBackups: fullBackup.blobKeyBackups,
-        missingOriginalBlobIds: fullBackup.missingOriginalBlobIds,
-        albums: fullBackup.albums,
       };
     }
     return {
@@ -97,6 +95,7 @@ export async function importBookmarks(fileContent: string, password: string): Pr
       plaintext: false,
       fullBackup: false,
       originalBlobs: [],
+      backedOriginalBlobIds: [],
       blobKeyBackups: [],
       missingOriginalBlobIds: [],
       albums: [],
@@ -114,6 +113,7 @@ function tryImportPlainBookmarks(fileContent: string): Omit<BookmarksImportResul
       ...parseBookmarkEntries(envelope.entries, { preserveOriginalReferences: false }),
       fullBackup: false,
       originalBlobs: [],
+      backedOriginalBlobIds: [],
       blobKeyBackups: [],
       missingOriginalBlobIds: [],
       albums: [],
@@ -121,6 +121,30 @@ function tryImportPlainBookmarks(fileContent: string): Omit<BookmarksImportResul
   } catch {
     return null;
   }
+}
+
+export function createFullBackupImportResult(input: {
+  readonly bookmarks: readonly unknown[];
+  readonly backedOriginalBlobIds: readonly string[];
+  readonly blobKeyBackups: readonly FullBackupBlobKeyBackup[];
+  readonly missingOriginalBlobIds: readonly string[];
+  readonly albums: readonly AlbumBackupEntry[];
+}): BookmarksImportResult {
+  const backedOriginalBlobIds = new Set(input.backedOriginalBlobIds);
+  const parsedBookmarks = parseBookmarkEntries(input.bookmarks, { preserveOriginalReferences: true });
+  const entries = parsedBookmarks.entries.map((entry) => stripMissingFullBackupOriginalReference(entry, backedOriginalBlobIds));
+  return {
+    ...parsedBookmarks,
+    entries,
+    plaintext: false,
+    externalOriginalCount: bookmarkEntriesOriginalReferenceCount(entries),
+    fullBackup: true,
+    originalBlobs: [],
+    backedOriginalBlobIds: [...backedOriginalBlobIds],
+    blobKeyBackups: input.blobKeyBackups,
+    missingOriginalBlobIds: input.missingOriginalBlobIds,
+    albums: input.albums,
+  };
 }
 
 function parseBookmarkEntries(parsed: unknown, options: { readonly preserveOriginalReferences: boolean }): BasicBookmarksImportResult {
