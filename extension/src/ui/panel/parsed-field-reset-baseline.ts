@@ -1,6 +1,7 @@
 import type { PanelState, ParsedFieldResetBaseline, ParsedFieldStateRecord } from '../../core/types.js';
 import { imageResourceUrlsEqual } from '../../core/image/image-navigation.js';
 import { applyFieldSplitSpecs, validFieldSplitSpecsForModel } from '../../core/url/field-splits.js';
+import { baseFieldIdForSplitSpec, splitFieldId } from '../../core/url/field-ids.js';
 import { applyFieldDigitWidthSpecs, fieldDigitWidthSpecsEqual } from '../../core/url/field-widths.js';
 import { parseUrl } from '../../core/url/parse-url.js';
 import { collectUrlFields } from '../../core/url/tokenize-fields.js';
@@ -215,8 +216,8 @@ function affectedFieldIdsForBase(
 function splitFieldIds(specs: readonly UrlFieldSplitSpec[], baseFieldId: string): readonly string[] {
   const spec = fieldSplitSpecForBase(specs, baseFieldId);
   if (!spec) return [];
-  const prefix = spec.location === 'path' ? `p:${spec.partIndex}` : `q:${spec.queryIndex}`;
-  return spec.lengths.map((_, index) => `${prefix}:${spec.tokenIndex + index}`);
+  const stableBaseId = baseFieldIdForSplitSpec(spec);
+  return spec.lengths.map((_, index) => splitFieldId(stableBaseId, index));
 }
 
 function resetFieldMarker(current: string | null, baseline: string | null, affected: ReadonlySet<string>): string | null {
@@ -247,7 +248,7 @@ function resetDigitWidthSpecs(
 }
 
 function fieldSplitSpecForBase(specs: readonly UrlFieldSplitSpec[], baseFieldId: string): UrlFieldSplitSpec | undefined {
-  return specs.find((spec) => spec.baseFieldId === baseFieldId);
+  return specs.find((spec) => spec.baseFieldId === baseFieldId || baseFieldIdForSplitSpec(spec) === baseFieldId);
 }
 
 function fieldDigitWidthDiffers(
