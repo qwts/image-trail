@@ -1398,6 +1398,28 @@
           "notes": "Covers neutralizing the selected image's transition while it is darkened so Chrome's standalone image-viewer grey->black background-color transition cannot animate/flash the backdrop (worst in fit/letterboxed mode), and restoring the original transition last on release so it cannot flash on close either. Page/element restore stays verbatim (tests/page-style.test.ts)."
         }
       ]
+    },
+    {
+      "id": "indexeddb-open-recovery",
+      "acceptance": "Blocked or failed IndexedDB opens recover on a later request without restarting the extension worker (issue #637)",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Testing-Strategy",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "path": "tests/db-open-lifecycle.test.ts",
+          "notes": "Covers concurrent-open deduplication, failed-result retry, rejected-attempt retry, successful connection caching, and closing a success handle delivered after the open already settled as blocked."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/database-recovery.spec.ts",
+          "notes": "Seeds a packaged extension profile at schema v12 with a durable blob-key record, holds the old connection through a blocked v13 upgrade, verifies the unavailable response, closes the blocker, and proves the next request finds the durable key without restarting the service worker."
+        },
+        {
+          "type": "manual",
+          "reason": "Chrome owns the real unpacked-extension update and long-lived page lifecycle.",
+          "notes": "Keep an older Gallery or preview page open across a database-version update, trigger a storage-backed action and confirm its bounded unavailable state, close the old page, then retry the action without reloading or terminating the service worker. Verify the existing durable key and queue remain intact and no repeated Database unavailable state persists."
+        }
+      ]
     }
   ]
 }
