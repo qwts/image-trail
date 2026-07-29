@@ -294,7 +294,6 @@ export class RecallExportController {
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/complete', message }));
     this.deps.render();
   }
-
   private selectedImageDownloadRecords(): readonly ImageDisplayRecord[] {
     return [
       ...(this.deps.getState().selectedHistoryIds.length > 0
@@ -360,7 +359,7 @@ export class RecallExportController {
       this.deps.setState(
         reducePanelAction(this.deps.getState(), {
           name: 'import-export/error',
-          message: 'Select an image before exporting encrypted images.',
+          message: 'Select an image record before exporting encrypted images.',
         }),
       );
       this.deps.render();
@@ -380,7 +379,6 @@ export class RecallExportController {
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/complete', message }));
     this.deps.render();
   }
-
   private encryptedImageExportTargets(): readonly {
     readonly url: string;
     readonly fileName: string;
@@ -388,11 +386,13 @@ export class RecallExportController {
   }[] {
     const selected = this.selectedImageDownloadRecords();
     if (selected.length > 0) {
-      return selected.map((record) => ({
-        url: record.url,
-        fileName: filenameForExportedImageRecord(record),
-        blobId: encryptedBlobIdForRecord(record),
-      }));
+      return selected
+        .filter((record) => record.storedOriginal?.mimeType?.startsWith('image/') !== false)
+        .map((record) => ({
+          url: record.url,
+          fileName: filenameForExportedImageRecord(record),
+          blobId: encryptedBlobIdForRecord(record),
+        }));
     }
     const urls = selectImageDownloadUrls({
       history: this.deps.getState().history,

@@ -74,6 +74,7 @@ describe('MPEG-TS signature and bounded probe', () => {
     const fake = new Uint8Array(200);
     fake[0] = 0x47;
     assert.equal(detectTsLayout(fake), null);
+    assert.deepEqual(detectTsLayout(fake.subarray(0, 188), true), { packetSize: 188, syncOffset: 0 });
   });
 
   test('records H.264 + AAC as playable and derives duration', () => {
@@ -171,12 +172,15 @@ describe('MPEG-TS signature and bounded probe', () => {
       ...packet(0x100, true, pmt.slice(0, firstCapacity)),
       ...packet(0x100, false, pmt.slice(firstCapacity)),
     ]);
-    const info = probeTransportStream(stream);
+    const info = probeTransportStream(stream, { packetSize: 188, syncOffset: 0 });
     assert.equal(info.probeIncomplete, false);
     assert.deepEqual(info.streams.map((entry) => entry.codec).sort(), ['AAC', 'H.264']);
+    const m2tsInfo = probeTransportStream(toM2ts(stream), { packetSize: 192, syncOffset: 4 });
+    assert.equal(m2tsInfo.probeIncomplete, false);
+    assert.deepEqual(m2tsInfo.streams.map((entry) => entry.codec).sort(), ['AAC', 'H.264']);
 
     const corrupted = stream.slice();
     corrupted[20] = (corrupted[20] ?? 0) ^ 1;
-    assert.equal(probeTransportStream(corrupted).probeIncomplete, true);
+    assert.equal(probeTransportStream(corrupted, { packetSize: 188, syncOffset: 0 }).probeIncomplete, true);
   });
 });

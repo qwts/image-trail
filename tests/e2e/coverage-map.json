@@ -48,6 +48,7 @@
           "paths": [
             "tests/gif-webp-media.test.ts",
             "tests/data-url-image.test.ts",
+            "tests/encrypted-image-media-type.test.ts",
             "tests/fetch-image.test.ts",
             "tests/encrypted-blobs.test.ts",
             "tests/full-backup-originals.test.ts",
@@ -91,7 +92,7 @@
             "tests/interop-record-translation.test.ts",
             "tests/dom/media-import-controls.test.ts"
           ],
-          "notes": "Covers bounded 188-byte TS and true 192-byte M2TS packet handling, PAT/PMT CRC and cross-packet reconstruction, PCR probing, and bounded elementary-stream metadata; known hashes; exact dimensions, frame rate, codec profiles, and duration; the approved H.264 Baseline/Main/High plus AAC LC matrix with unknown or unsupported profiles preserved-only; malformed and truncated rejection; exact encrypted custody; optional request context; transaction rollback; durable metadata without duplicated data URLs; deterministic inactive queue posters; direct URL validation; backup restoration; and Photos-compatible metadata without persisted playability."
+          "notes": "Covers bounded 188-byte TS and true 192-byte M2TS packet handling, PAT/PMT CRC and cross-packet reconstruction, sustained unhinted signature cadence, PCR probing, and bounded elementary-stream metadata; known hashes; exact dimensions, frame rate, codec profiles, and duration; the approved H.264 Baseline/Main/High plus AAC LC matrix with unknown or unsupported profiles preserved-only; malformed and truncated rejection; exact encrypted custody while image-only encrypted export stays disabled for video records; optional request context; transaction rollback; durable metadata without duplicated data URLs; deterministic inactive queue posters; direct URL validation; backup restoration; and Photos-compatible metadata without persisted playability."
         },
         {
           "type": "playwright-e2e",

@@ -84,6 +84,7 @@ export interface ImportExportViewState {
   readonly selectedHistoryCount: number;
   readonly selectedBookmarkCount: number;
   readonly selectedImageDownloadCount: number;
+  readonly selectedEncryptedImageExportCount: number;
   readonly visibleImageSelectionCount: number;
   readonly imageDownloadAvailable: boolean;
   readonly encryptedImageTransferAvailable: boolean;
@@ -252,6 +253,7 @@ function emptyImportExportState(): ImportExportViewState {
     selectedHistoryCount: 0,
     selectedBookmarkCount: 0,
     selectedImageDownloadCount: 0,
+    selectedEncryptedImageExportCount: 0,
     visibleImageSelectionCount: 0,
     imageDownloadAvailable: false,
     encryptedImageTransferAvailable: false,
@@ -549,7 +551,7 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const exportEncryptedBtn = document.createElement('button');
   exportEncryptedBtn.type = 'button';
   exportEncryptedBtn.textContent =
-    state.selectedImageDownloadCount > 0 ? `Export encrypted (${state.selectedImageDownloadCount})` : 'Export encrypted';
+    state.selectedEncryptedImageExportCount > 0 ? `Export encrypted (${state.selectedEncryptedImageExportCount})` : 'Export encrypted';
   exportEncryptedBtn.classList.toggle('is-waiting', state.busy);
   exportEncryptedBtn.disabled = state.busy || !state.encryptedImageTransferAvailable;
   exportEncryptedBtn.addEventListener('click', () => {

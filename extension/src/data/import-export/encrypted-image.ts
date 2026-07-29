@@ -53,6 +53,7 @@ interface EncryptedImagePayload {
 }
 
 export async function createEncryptedImageFile(input: EncryptedImageExportInput): Promise<EncryptedImageExportResult> {
+  if (!input.mimeType.startsWith('image/')) throw new Error('Encrypted image export supports image originals only.');
   const now = input.now ?? new Date().toISOString();
   const iv = createAesGcmIv();
   const payload: EncryptedImagePayload = {

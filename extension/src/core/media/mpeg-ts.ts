@@ -96,7 +96,7 @@ export function inspectMpegTsMedia(
   fileNameOrUrl = '',
 ): MpegTsInspectionResult {
   const bytes = bytesInput instanceof Uint8Array ? bytesInput : new Uint8Array(bytesInput);
-  const layout = detectTsLayout(bytes);
+  const layout = detectTsLayout(bytes, hasMpegTsHint(declaredMimeType, fileNameOrUrl));
   if (layout === null) {
     return hasMpegTsHint(declaredMimeType, fileNameOrUrl)
       ? {
@@ -130,7 +130,7 @@ export function inspectMpegTsMedia(
   };
 }
 
-export function detectTsLayout(bytes: Uint8Array): TsLayout | null {
+export function detectTsLayout(bytes: Uint8Array, allowShortHintedLayout = false): TsLayout | null {
   const candidates: readonly TsLayout[] = [
     { packetSize: 188, syncOffset: 0 },
     { packetSize: 192, syncOffset: 4 },
@@ -150,7 +150,9 @@ export function detectTsLayout(bytes: Uint8Array): TsLayout | null {
       confirmed += 1;
     }
     if (confirmed === MIN_SYNC_PACKETS) return layout;
-    if (confirmed === ran && ran >= 1 && bytes.length >= layout.syncOffset + TRANSPORT_PACKET_BYTES) return layout;
+    if (allowShortHintedLayout && confirmed === ran && ran >= 1 && bytes.length >= layout.syncOffset + TRANSPORT_PACKET_BYTES) {
+      return layout;
+    }
   }
   return null;
 }
@@ -284,7 +286,7 @@ function readSection(bytes: Uint8Array, layout: TsLayout, pid: number, headEnd: 
     const chunks: Uint8Array[] = [bytes.subarray(sectionStart, packetEnd)];
     let collected = packetEnd - sectionStart;
     for (
-      let continuation = packetEnd;
+      let continuation = start + layout.packetSize;
       collected < total && continuation + TRANSPORT_PACKET_BYTES <= headEnd;
       continuation += layout.packetSize
     ) {
