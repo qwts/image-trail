@@ -90,7 +90,8 @@
         "src/ui/styles/backup-history.css",
         "src/ui/styles/tokens.css"
       ],
-      "matches": ["http://*/*", "https://*/*"]
+      "matches": ["http://*/*", "https://*/*"],
+      "use_dynamic_url": true
     }
   ]
 }

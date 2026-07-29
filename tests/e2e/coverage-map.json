@@ -349,7 +349,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
-          "notes": "Covers service-worker/id resolution, programmatic injection with a test-build grant limited to the local fixture origin, panel open/close, single-image auto-select, multi-image target picking, minimize/expand/close/reopen lifecycle, duplicate-DOM prevention, and close cleanup. The production activeTab toolbar gesture and optional prompt remain manual browser checks."
+          "notes": "Covers service-worker/id resolution; session-scoped web-accessible stylesheet URLs that load while the stable extension-ID path cannot be fetched from the host page; programmatic injection with a test-build grant limited to the local fixture origin; panel open/close; single-image auto-select; multi-image target picking; minimize/expand/close/reopen lifecycle; duplicate-DOM prevention; and close cleanup. The production activeTab toolbar gesture and optional prompt remain manual browser checks."
         },
         {
           "type": "unit-dom",
@@ -359,7 +359,7 @@
             "tests/fetch-linked-page.test.ts",
             "tests/messages.test.ts"
           ],
-          "notes": "Covers removal of static all-sites injection and required host access, retention of activeTab plus scripting, optional http/https declarations, exact per-origin permission requests, linked-page permission preflight, and same-origin-only credential inclusion across the validated runtime-message boundary."
+          "notes": "Covers removal of static all-sites injection and required host access, retention of activeTab plus scripting, optional http/https declarations, session-scoped web-accessible resources, exact per-origin permission requests, linked-page permission preflight, and same-origin-only credential inclusion across the validated runtime-message boundary."
         }
       ]
     },
