@@ -349,7 +349,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
-          "notes": "Covers service-worker/id resolution, programmatic injection with a test-build grant limited to the local fixture origin, panel open/close, single-image auto-select, multi-image target picking, minimize/expand/close/reopen lifecycle, duplicate-DOM prevention, and close cleanup. The production activeTab toolbar gesture and optional prompt remain manual browser checks."
+          "notes": "Covers service-worker/id resolution; session-scoped web-accessible stylesheet URLs that load while the stable extension-ID path cannot be fetched from the host page; programmatic injection with a test-build grant limited to the local fixture origin; panel open/close; single-image auto-select; multi-image target picking; minimize/expand/close/reopen lifecycle; duplicate-DOM prevention; and close cleanup. The production activeTab toolbar gesture and optional prompt remain manual browser checks."
         },
         {
           "type": "unit-dom",
@@ -359,7 +359,7 @@
             "tests/fetch-linked-page.test.ts",
             "tests/messages.test.ts"
           ],
-          "notes": "Covers removal of static all-sites injection and required host access, retention of activeTab plus scripting, optional http/https declarations, exact per-origin permission requests, linked-page permission preflight, and same-origin-only credential inclusion across the validated runtime-message boundary."
+          "notes": "Covers removal of static all-sites injection and required host access, retention of activeTab plus scripting, optional http/https declarations, session-scoped web-accessible resources, exact per-origin permission requests, linked-page permission preflight, and same-origin-only credential inclusion across the validated runtime-message boundary."
         }
       ]
     },
@@ -986,9 +986,23 @@
           "paths": [
             "tests/neighbor-preload-controller.test.ts",
             "tests/buffered-navigation-controller.test.ts",
+            "tests/data-crypto.test.ts",
+            "tests/panel-state-settings.test.ts",
+            "tests/dom/automation-settings-view.test.ts",
+            "tests/dom/extension-destination-surfaces.test.tsx",
             "tests/dom/parsed-field-navigation-controller.test.ts"
           ],
-          "notes": "Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts."
+          "notes": "Includes #631 cache bounds: supported settings are 1–500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Also covers the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/automation-settings-view.stories.ts",
+          "notes": "Covers #631 through the rendered Cache min/max attributes and bounded-memory copy."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/automation-governance.spec.ts",
+          "notes": "Covers #631 in the packaged panel: Cache exposes the 1–500 range and explains the per-page-session memory bound."
         },
         {
           "type": "unit-dom",
@@ -1397,6 +1411,28 @@
           "type": "unit-dom",
           "paths": ["tests/dom/page-style.test.ts"],
           "notes": "Covers neutralizing the selected image's transition while it is darkened so Chrome's standalone image-viewer grey->black background-color transition cannot animate/flash the backdrop (worst in fit/letterboxed mode), and restoring the original transition last on release so it cannot flash on close either. Page/element restore stays verbatim (tests/page-style.test.ts)."
+        }
+      ]
+    },
+    {
+      "id": "indexeddb-open-recovery",
+      "acceptance": "Blocked or failed IndexedDB opens recover on a later request without restarting the extension worker (issue #637)",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Testing-Strategy",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "path": "tests/db-open-lifecycle.test.ts",
+          "notes": "Covers concurrent-open deduplication, failed-result retry, rejected-attempt retry, successful connection caching, and closing a success handle delivered after the open already settled as blocked."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/database-recovery.spec.ts",
+          "notes": "Seeds a packaged extension profile at schema v12 with a durable blob-key record, holds the old connection through a blocked v13 upgrade, verifies the unavailable response, closes the blocker, and proves the next request finds the durable key without restarting the service worker."
+        },
+        {
+          "type": "manual",
+          "reason": "Chrome owns the real unpacked-extension update and long-lived page lifecycle.",
+          "notes": "Keep an older Gallery or preview page open across a database-version update, trigger a storage-backed action and confirm its bounded unavailable state, close the old page, then retry the action without reloading or terminating the service worker. Verify the existing durable key and queue remain intact and no repeated Database unavailable state persists."
         }
       ]
     }
