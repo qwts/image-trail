@@ -9,6 +9,9 @@ import { panelDestination } from '../destination-registry.js';
 import { destinationDockSelector } from './destination-dock.js';
 import { renderReactSubtree } from './react-subtree.js';
 
+declare const __IMAGE_TRAIL_INTEROP_ENABLED__: boolean | undefined;
+const transferSyncEnabled = typeof __IMAGE_TRAIL_INTEROP_ENABLED__ === 'boolean' && __IMAGE_TRAIL_INTEROP_ENABLED__;
+
 interface DestinationSurfaceProps {
   readonly state: PanelState;
   readonly dispatch: (action: PanelAction) => void;
@@ -133,19 +136,21 @@ function GalleryBody({ state, dispatch }: { readonly state: PanelState; readonly
       <p className="image-trail-panel__destination-note">
         Pinned &amp; captured images · activate a tile to load it without changing queue order.
       </p>
-      <button
-        type="button"
-        disabled={state.bookmarks.length === 0}
-        onClick={() =>
-          openInteropWorkflow(
-            'gallery',
-            state.bookmarks.map((bookmark) => bookmark.id),
-            !state.blobKeyUnlocked && state.blobKeyAvailable,
-          )
-        }
-      >
-        Transfer &amp; Sync
-      </button>
+      {transferSyncEnabled ? (
+        <button
+          type="button"
+          disabled={state.bookmarks.length === 0}
+          onClick={() =>
+            openInteropWorkflow(
+              'gallery',
+              state.bookmarks.map((bookmark) => bookmark.id),
+              !state.blobKeyUnlocked && state.blobKeyAvailable,
+            )
+          }
+        >
+          Transfer &amp; Sync
+        </button>
+      ) : null}
       {state.bookmarks.length > 0 ? (
         <div className="image-trail-panel__gallery-grid">
           {state.bookmarks.map((record) => (

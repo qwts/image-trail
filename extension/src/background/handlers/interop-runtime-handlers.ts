@@ -1,12 +1,23 @@
-import { createChromeInteropRuntime } from '../interop-runtime-chrome.js';
 import type { InteropRuntime } from '../interop-runtime.js';
 import { defineMessage, type MessageDef } from '../message-dispatch.js';
 import * as requestSchemas from '../message-schemas.js';
-import { MessageType, type ExtensionRequest, type ExtensionResponse } from '../messages.js';
+import { createUnknownMessageResponse, MessageType, type ExtensionRequest, type ExtensionResponse } from '../messages.js';
 import { createInteropRuntimeResultMessage, type InteropRuntimeMessage } from '../interop-runtime-messages.js';
 import type { InteropRuntimeAction, InteropRuntimeResult } from '../../core/interop/runtime-state.js';
 
 type Registry = Record<typeof MessageType.InteropRuntime, MessageDef<ExtensionRequest, ExtensionResponse>>;
+const FEATURE_DISABLED_REASON = 'Transfer & Sync is not enabled in this build.';
+
+export function createDisabledInteropRuntimeMessageRegistry(): Registry {
+  return {
+    [MessageType.InteropRuntime]: defineMessage({
+      requestSchema: requestSchemas.interopRuntimeRequestSchema,
+      handle: () => Promise.reject(new Error(FEATURE_DISABLED_REASON)),
+      respond: () => createUnknownMessageResponse(FEATURE_DISABLED_REASON),
+      fallback: () => createUnknownMessageResponse(FEATURE_DISABLED_REASON),
+    }),
+  };
+}
 
 export function createInteropRuntimeMessageRegistry(
   runtime: InteropRuntime,
@@ -22,5 +33,3 @@ export function createInteropRuntimeMessageRegistry(
     }),
   };
 }
-
-export { createChromeInteropRuntime };

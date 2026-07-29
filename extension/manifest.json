@@ -58,7 +58,7 @@
     "service_worker": "src/background/service-worker.js",
     "type": "module"
   },
-  "permissions": ["activeTab", "scripting", "downloads", "identity", "nativeMessaging", "storage", "declarativeNetRequestWithHostAccess"],
+  "permissions": ["activeTab", "scripting", "downloads", "identity", "storage", "declarativeNetRequestWithHostAccess"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "web_accessible_resources": [
     {

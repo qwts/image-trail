@@ -25,6 +25,7 @@ import {
 } from '../extension/src/background/interop-runtime-messages.js';
 import { interopRuntimeRequestSchema } from '../extension/src/background/message-schemas.js';
 import { createInteropRuntimeMessageRegistry } from '../extension/src/background/handlers/interop-runtime-handlers.js';
+import { createCloudMessageRegistry } from '../extension/src/background/handlers/pcloud-handlers.js';
 import { dispatchRequest } from '../extension/src/background/message-dispatch.js';
 import { openImageTrailDb } from '../extension/src/data/db.js';
 import { ensureDurableBookmarkKey } from '../extension/src/data/durable-bookmark-key.js';
@@ -173,6 +174,19 @@ test('provider permission preflight starts in the synchronous message-listener s
   assert.equal(dispatched, true);
   assert.equal(preflightStarted, true);
   await response;
+});
+
+test('the baseline cloud registry fails interop closed without initializing a provider runtime', async () => {
+  const registry = createCloudMessageRegistry(() => Promise.resolve(null));
+  const response = new Promise<unknown>((resolve) => {
+    assert.equal(dispatchRequest(registry, createInteropRuntimeMessage(context, { name: 'status' }), resolve), true);
+  });
+
+  assert.deepEqual(await response, {
+    type: 'imageTrail.unknown',
+    version: 1,
+    payload: { reason: 'Transfer & Sync is not enabled in this build.' },
+  });
 });
 
 test('Google Drive is enabled only for a non-empty drive.file OAuth manifest', () => {

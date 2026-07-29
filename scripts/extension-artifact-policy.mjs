@@ -87,6 +87,13 @@ export function validateReleaseBuildInfo(buildInfo) {
   return errors;
 }
 
+export function validateReleaseManifest(manifest) {
+  const permissions = Array.isArray(manifest.permissions) ? manifest.permissions : [];
+  return permissions.includes('nativeMessaging')
+    ? ['release manifest must not request nativeMessaging while Transfer & Sync is feature-gated']
+    : [];
+}
+
 export async function collectArtifactFiles(directory, relativeDirectory = '') {
   const files = [];
   const entries = await readdir(path.join(directory, relativeDirectory), { withFileTypes: true });
@@ -108,6 +115,7 @@ export async function auditExtensionArtifacts({ directory, rootDirectory, requir
 
   if (requireRelease || release) {
     errors.push(...validateReleaseBuildInfo(buildInfo));
+    errors.push(...validateReleaseManifest(manifest));
     for (const file of files) {
       if (!TEXT_ARTIFACT.test(file)) continue;
       const content = await readFile(path.join(directory, file), 'utf8');

@@ -31,6 +31,9 @@ import {
   restorePanelScrollTop,
 } from './panel-render-preservation.js';
 
+declare const __IMAGE_TRAIL_INTEROP_ENABLED__: boolean | undefined;
+const transferSyncEnabled = typeof __IMAGE_TRAIL_INTEROP_ENABLED__ === 'boolean' && __IMAGE_TRAIL_INTEROP_ENABLED__;
+
 export type { PanelLayoutState, PanelRenderTarget } from './panel-render-types.js';
 
 // PanelState is immutable per render, so the URL parse/tokenization is shared between the main
@@ -256,7 +259,9 @@ function createBookmarksSection(target: PanelRenderTarget, state: PanelState): H
     },
     target.dispatch,
   );
-  return addInteropBookmarkActions(section, state.bookmarks, state.selectedBookmarkIds, !state.blobKeyUnlocked && state.blobKeyAvailable);
+  return transferSyncEnabled
+    ? addInteropBookmarkActions(section, state.bookmarks, state.selectedBookmarkIds, !state.blobKeyUnlocked && state.blobKeyAvailable)
+    : section;
 }
 
 export function renderRecallDestination(target: PanelRenderTarget, state: PanelState): void {

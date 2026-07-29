@@ -34,6 +34,7 @@ test('manifest uses activeTab injection and optional per-origin host grants', ()
 
   assert.ok(manifest.permissions?.includes('activeTab'));
   assert.ok(manifest.permissions?.includes('scripting'));
+  assert.equal(manifest.permissions?.includes('nativeMessaging'), false);
   assert.deepEqual(manifest.host_permissions ?? [], []);
   assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*']);
   assert.deepEqual(manifest.content_scripts ?? [], []);
