@@ -115,3 +115,59 @@ test('cancel waits for the current provider request, removes verified parts, and
   assert.equal(state.pcloudBackup.connectionState, 'connected');
   assert.match(state.pcloudBackup.message ?? '', /Backup canceled.*Cleaned up 1 partial backup part/u);
 });
+
+test('cancel during local part encryption never starts a provider upload', async () => {
+  let state: PanelState = {
+    ...createInitialPanelState(0),
+    pcloudBackup: { connectionState: 'connected', apiHost: 'api.pcloud.com' },
+  };
+  const encryptionStarted = deferred<void>();
+  const encryptionResult = deferred<string>();
+  const uploadedNames: string[] = [];
+  const cleanupRequests: number[][] = [];
+  const deps: PCloudBackupExportDeps = {
+    getState: () => state,
+    setState: (next) => {
+      state = next;
+    },
+    render: () => {},
+    captureStore: () => null,
+    albumStore: () => ({ listBackupEntries: async () => [] }),
+    loadAllBookmarks: async () => [
+      createDisplayRecord({
+        id: 'bookmark-1',
+        url: 'https://example.test/one.jpg',
+        source: 'bookmark',
+        timestamp: '2026-07-28T12:00:00.000Z',
+      }),
+    ],
+    uploadPCloudBackup: (async (input: PCloudBackupUploadInput) => {
+      if (input.operation === 'cleanup') {
+        cleanupRequests.push([...input.fileIds]);
+        return {
+          ok: true as const,
+          status: { connected: true as const, apiHost: 'api.pcloud.com' as const },
+          deletedFileIds: input.fileIds,
+          message: `Cleaned up ${input.fileIds.length} partial backup part(s).`,
+        };
+      }
+      uploadedNames.push(input.fileName);
+      throw new Error('Cancellation should prevent the provider upload.');
+    }) as PCloudBackupExportDeps['uploadPCloudBackup'],
+  };
+  const coordinator = new PCloudBackupExportCoordinator(deps, async () => {
+    encryptionStarted.resolve();
+    return encryptionResult.promise;
+  });
+
+  const running = coordinator.backup('backup-password');
+  await encryptionStarted.promise;
+  coordinator.cancel();
+  encryptionResult.resolve('encrypted-part');
+  await running;
+
+  assert.deepEqual(uploadedNames, []);
+  assert.deepEqual(cleanupRequests, [[]]);
+  assert.equal(state.pcloudBackup.connectionState, 'connected');
+  assert.match(state.pcloudBackup.message ?? '', /Backup canceled.*Cleaned up 0 partial backup part/u);
+});

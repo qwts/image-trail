@@ -65,7 +65,10 @@ class CloudBackupCancelledError extends Error {}
 export class PCloudBackupExportCoordinator {
   private active: ActiveBackup | null = null;
 
-  constructor(private readonly deps: PCloudBackupExportDeps) {}
+  constructor(
+    private readonly deps: PCloudBackupExportDeps,
+    private readonly encryptPart: typeof encryptCloudBackupPart = encryptCloudBackupPart,
+  ) {}
 
   cancel(): void {
     if (!this.active) return;
@@ -74,7 +77,7 @@ export class PCloudBackupExportCoordinator {
       return;
     }
     this.active.cancelled = true;
-    this.progress('Cancel requested. Finishing the current provider request, then cleaning up uploaded parts...');
+    this.progress('Cancel requested. Finishing the current step, then cleaning up uploaded parts...');
   }
 
   async backup(password: string): Promise<void> {
@@ -217,7 +220,8 @@ export class PCloudBackupExportCoordinator {
   ): Promise<CloudBackupPartReference> {
     this.assertNotCancelled(active);
     this.progress(`Uploading and verifying ${payload.kind} part ${restoreOrder + 1}...`);
-    const fileContent = await encryptCloudBackupPart(session, payload);
+    const fileContent = await this.encryptPart(session, payload);
+    this.assertNotCancelled(active);
     const upload = await this.deps.uploadPCloudBackup({
       operation: 'upload',
       fileName: cloudBackupPartFileName(session.backupId, restoreOrder, payload.kind),
