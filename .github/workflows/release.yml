@@ -15,9 +15,11 @@ concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
-# Normally dispatched by version-cut.yml after it creates the version tag. The tag trigger also
-# covers tags pushed by humans; workflow_dispatch is the recovery path for GITHUB_TOKEN tags,
-# whose pushes do not trigger another workflow. Every build checks out the tag, never main.
+# Normally started by the tag trigger: version-cut.yml pushes the version tag under
+# RELEASE_TOKEN, so the push emits this run on its own (a GITHUB_TOKEN push would emit nothing,
+# and a bot dispatch is refused by the Actions actor policy). The same trigger covers tags pushed
+# by humans; workflow_dispatch remains the recovery path for a tag whose release run never
+# happened. Every build checks out the tag, never main.
 # This workflow packages and publishes GitHub Release assets only. It does not merge version
 # PRs or submit to the Chrome Web Store.
 permissions:

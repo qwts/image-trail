@@ -181,20 +181,45 @@ test('ignores tests, Storybook-only files, and repository tooling', () => {
 test('version-cut workflow refreshes a checked Changesets PR and tags only fresh version merges', () => {
   const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
 
-  assert.match(workflow, /uses: changesets\/action@/u);
-  assert.match(workflow, /version: npm run changeset:version/u);
+  assert.match(workflow, /npm run changeset:version/u);
   assert.match(workflow, /pull-requests: write/u);
   assert.match(workflow, /actions: write/u);
-  assert.match(workflow, /gh workflow run ci\.yml --ref changeset-release\/main/u);
+  // The version PR and the version tag are produced under RELEASE_TOKEN: a
+  // GITHUB_TOKEN event triggers no downstream workflow, and github-actions[bot]
+  // is not an authorized Actions actor here, so its runs fail at startup with
+  // "Actor is not allowed to trigger Actions workflows". The version branch
+  // therefore needs no `gh workflow run ci.yml` dispatch — which the bot could
+  // not perform either.
+  assert.match(workflow, /token: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
+  assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
+  assert.doesNotMatch(workflow, /gh workflow run ci\.yml/u);
   assert.match(workflow, /Version unchanged \(\$cur\) — not a version-cut merge/u);
   assert.match(workflow, /Changesets pending — nothing to tag/u);
   assert.match(workflow, /package, manifest, and lockfile versions are not synchronized/u);
   assert.match(workflow, /git tag -a "\$version"/u);
   assert.match(workflow, /git push origin "\$version"/u);
-  assert.match(workflow, /gh workflow run release\.yml --ref main -f tag="\$version"/u);
+  // The only surviving dispatch is stranded-tag recovery: an already-existing
+  // tag has no push event left to replay. The fresh tag's own push starts
+  // release.yml directly.
+  assert.deepEqual(workflow.match(/gh workflow run \S+/gu), ['gh workflow run release.yml']);
   assert.doesNotMatch(workflow, /^\s+publish:/mu);
   assert.doesNotMatch(workflow, /^\s+prDraft:/mu);
   assert.doesNotMatch(workflow, /gh pr merge|auto-merge/u);
+});
+
+test('no workflow that carries RELEASE_TOKEN can reach a third-party action', () => {
+  // A repo-scoped PAT must stay inside actions/* steps and our own run: blocks —
+  // never inside an action whose future versions nobody here controls. This is
+  // why `changeset:version` is invoked as a script rather than through
+  // changesets/action (AGENTS.md → Branch And GitHub Hygiene).
+  for (const file of ['version-cut.yml', 'release.yml']) {
+    const workflow = readFileSync(`.github/workflows/${file}`, 'utf8');
+    if (!workflow.includes('RELEASE_TOKEN')) continue;
+    const foreign = [...workflow.matchAll(/^\s*uses: (?<action>[^@\s]+)/gmu)]
+      .map((match) => match.groups?.['action'] ?? '')
+      .filter((action) => !action.startsWith('actions/'));
+    assert.deepEqual(foreign, [], `${file} passes a third-party action into a PAT-bearing workflow`);
+  }
 });
 
 test('required CI runs the version-policy gate', () => {
