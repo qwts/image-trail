@@ -1,3 +1,5 @@
+import type { GifWebpMediaInfo } from './gif-webp-media.js';
+
 export type CaptureFailureReason =
   | 'permission-needed'
   | 'fetch-forbidden'
@@ -25,6 +27,10 @@ export type CaptureResult =
       readonly blobId: string;
       readonly mimeType: string;
       readonly byteLength: number;
+      readonly fileName?: string | undefined;
+      readonly width?: number | undefined;
+      readonly height?: number | undefined;
+      readonly mediaInfo?: GifWebpMediaInfo | undefined;
     }
   | {
       readonly status: 'remote-only';
@@ -39,6 +45,10 @@ export interface StoredOriginalReference {
   readonly mimeType: string;
   readonly byteLength: number;
   readonly capturedAt: string;
+  readonly fileName?: string | undefined;
+  readonly width?: number | undefined;
+  readonly height?: number | undefined;
+  readonly mediaInfo?: GifWebpMediaInfo | undefined;
 }
 
 export interface StorageUsageBucketSummary {

@@ -1,6 +1,7 @@
 import { normalizeDisplayLabel, sourceImageUrlFrom } from '../display-records.js';
 
 const SAFE_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp']);
+const UNSAFE_FILENAME_FORMAT_CHARACTER = /\p{Cf}/u;
 
 export interface DownloadDuplicateCandidate {
   readonly sourceUrl: string;
@@ -21,6 +22,7 @@ export interface ImageDownloadNameRecord {
   readonly url: string;
   readonly title?: string | undefined;
   readonly label?: string | undefined;
+  readonly originalFileName?: string | undefined;
 }
 
 export interface SelectImageDownloadUrlsInput {
@@ -33,15 +35,27 @@ export interface SelectImageDownloadUrlsInput {
 
 export type DownloadDuplicateMatch = 'fingerprint' | 'url';
 
-export function sanitizeFilename(input: string, fallback = 'image'): string {
-  const withoutControlCharacters = Array.from(input, (character) => ((character.codePointAt(0) ?? 0) < 32 ? '_' : character)).join('');
+export function sanitizeFilename(input: string, fallback = 'image', maxCodePoints?: number): string {
+  const withoutControlCharacters = Array.from(input, (character) => (isUnsafeFilenameCharacter(character) ? '_' : character)).join('');
   const sanitized = withoutControlCharacters
     .replace(/[<>:"/\\|?*]/gu, '_')
     .replace(/\s+/gu, ' ')
     .replace(/[._ -]+$/gu, '')
     .replace(/^[._ -]+/gu, '')
     .trim();
-  return sanitized || fallback;
+  if (!sanitized) return fallback;
+  if (maxCodePoints === undefined) return sanitized;
+  const bounded = Array.from(sanitized)
+    .slice(0, Math.max(1, Math.floor(maxCodePoints)))
+    .join('')
+    .replace(/[._ -]+$/gu, '')
+    .trim();
+  return bounded || fallback;
+}
+
+function isUnsafeFilenameCharacter(character: string): boolean {
+  const codePoint = character.codePointAt(0) ?? 0;
+  return codePoint < 32 || (codePoint >= 0x7f && codePoint <= 0x9f) || UNSAFE_FILENAME_FORMAT_CHARACTER.test(character);
 }
 
 export function extensionFromUrl(url: string): string {
@@ -77,7 +91,7 @@ export function filenameFromUrl(url: string): string {
 
 export function filenameFromImageRecord(record: ImageDownloadNameRecord): string {
   const sourceUrl = sourceImageUrlFrom(record.url).href;
-  return ensureFilenameExtension(normalizeDisplayLabel(record), sourceUrl);
+  return ensureFilenameExtension(record.originalFileName ?? normalizeDisplayLabel(record), sourceUrl);
 }
 
 export function normalizeAbsoluteUrl(url: string, baseUrl?: string): string {

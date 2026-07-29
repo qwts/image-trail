@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
   createAndActivateWrappedBlobKey,
   lockBlobKey,
@@ -121,5 +123,40 @@ test('encrypted blob payload rejects authenticated metadata tampering', async ()
       ciphertext: sealed.ciphertext,
       aad: { ...aad, key: createKeyReference('blob', 'other-key') },
     }),
+  );
+});
+
+test('animated original encryption preserves exact bytes and media facts', async () => {
+  const wrapped = await createAndActivateWrappedBlobKey({
+    password: 'animated-capture-password',
+    uuid: 'animated-payload-key',
+    now: '2026-07-28T00:00:00.000Z',
+  });
+  const fixture = readFileSync('tests/e2e/pages/assets/animated/animated.webp');
+  const aad = {
+    id: 'animated-blob',
+    kind: 'original' as const,
+    schemaVersion: 1 as const,
+    algorithm: 'AES-GCM' as const,
+    createdAt: '2026-07-28T00:00:01.000Z',
+    key: wrapped.active.reference,
+  };
+  const metadata = {
+    mimeType: 'image/webp',
+    byteLength: fixture.byteLength,
+    sourceUrl: 'https://example.test/media/party.webp',
+    capturedAt: '2026-07-28T00:00:02.000Z',
+    fileName: 'party.webp',
+    width: 40,
+    height: 40,
+    mediaInfo: { kind: 'webp' as const, animated: true, frameCount: 3, loopCount: 0 },
+  };
+  const sealed = await sealBlobPayload({ key: wrapped.active.key, aad, metadata, bytes: Uint8Array.from(fixture).buffer });
+  const opened = await openBlobPayload({ key: wrapped.active.key, iv: sealed.iv, ciphertext: sealed.ciphertext, aad });
+
+  assert.deepEqual(opened.metadata, metadata);
+  assert.equal(
+    createHash('sha256').update(new Uint8Array(opened.bytes)).digest('hex'),
+    'b0a4e06afd321fbcefdf834e165224734e99f0df811ab532c5bd3e94518f9b18',
   );
 });

@@ -208,14 +208,7 @@ export interface RetrieveBlobResultMessage {
   readonly type: typeof MessageType.RetrieveBlobResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload:
-    | {
-        readonly ok: true;
-        readonly blobId: string;
-        readonly dataUrl: string;
-        readonly mimeType: string;
-        readonly byteLength: number;
-        readonly capturedAt: string;
-      }
+    | ({ readonly ok: true; readonly dataUrl: string } & import('../core/image/capture-result.js').StoredOriginalReference)
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }
 

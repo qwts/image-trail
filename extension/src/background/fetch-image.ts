@@ -1,5 +1,7 @@
 import type { CaptureFailureReason } from '../core/image/capture-result.js';
 import { DEFAULT_MAX_ORIGINAL_BYTES } from '../core/image/capture-result.js';
+import { sanitizeFilename } from '../core/image/downloads.js';
+import { inspectGifWebpMedia, type GifWebpMediaInfo } from '../core/image/gif-webp-media.js';
 
 const ALLOWED_IMAGE_TYPES = new Set([
   'image/jpeg',
@@ -18,6 +20,10 @@ export interface FetchImageSuccess {
   readonly bytes: ArrayBuffer;
   readonly mimeType: string;
   readonly byteLength: number;
+  readonly fileName?: string | undefined;
+  readonly width?: number | undefined;
+  readonly height?: number | undefined;
+  readonly mediaInfo?: GifWebpMediaInfo | undefined;
 }
 
 export interface FetchImageFailure {
@@ -105,6 +111,26 @@ export async function fetchImageBytes(
     return { ok: false, reason: 'too-large', message: `Actual size ${bytes.byteLength} bytes exceeds limit.` };
   }
 
+  const media = inspectGifWebpMedia(bytes, contentType);
+  if (media.status === 'invalid') {
+    return {
+      ok: false,
+      reason: media.reason === 'probe-limit' ? 'too-large' : 'not-image',
+      message: media.message,
+    };
+  }
+  if (media.status === 'supported') {
+    return {
+      ok: true,
+      bytes,
+      mimeType: media.mimeType,
+      byteLength: bytes.byteLength,
+      fileName: originalImageFileName(response.headers.get('content-disposition'), response.url || url, media.mediaInfo.kind),
+      width: media.width,
+      height: media.height,
+      mediaInfo: media.mediaInfo,
+    };
+  }
   return { ok: true, bytes, mimeType: contentType, byteLength: bytes.byteLength };
 }
 
@@ -115,4 +141,48 @@ export function credentialsForImageRequest(url: string, referrer: string | undef
   } catch {
     return 'omit';
   }
+}
+
+function originalImageFileName(contentDisposition: string | null, url: string, fallbackExtension: 'gif' | 'webp'): string {
+  const dispositionName = fileNameFromContentDisposition(contentDisposition);
+  const urlName = fileNameFromUrlPath(url);
+  const sanitized = sanitizeOriginalFileName(dispositionName ?? urlName ?? 'image');
+  return /\.[a-z0-9]{1,10}$/iu.test(sanitized) ? sanitized : `${sanitized}.${fallbackExtension}`;
+}
+
+function fileNameFromContentDisposition(value: string | null): string | null {
+  if (!value) return null;
+  const encoded = /(?:^|;)\s*filename\*\s*=\s*UTF-8''([^;]+)/iu.exec(value)?.[1]?.trim();
+  if (encoded) {
+    try {
+      return decodeURIComponent(stripHeaderQuotes(encoded));
+    } catch {
+      // Fall back to the plain filename parameter or URL path.
+    }
+  }
+  const plain = /(?:^|;)\s*filename\s*=\s*(?:"([^"]*)"|([^;]*))/iu.exec(value);
+  return plain ? (plain[1] ?? plain[2] ?? '').trim() || null : null;
+}
+
+function fileNameFromUrlPath(value: string): string | null {
+  try {
+    const segment = new URL(value).pathname.split('/').filter(Boolean).at(-1);
+    if (!segment) return null;
+    try {
+      return decodeURIComponent(segment);
+    } catch {
+      return segment;
+    }
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeOriginalFileName(value: string): string {
+  const leaf = value.split(/[\\/]/u).at(-1) ?? 'image';
+  return sanitizeFilename(leaf, 'image', 240);
+}
+
+function stripHeaderQuotes(value: string): string {
+  return value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1) : value;
 }

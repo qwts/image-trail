@@ -4,6 +4,7 @@ import test from 'node:test';
 import 'fake-indexeddb/auto';
 import { createDisplayRecord } from '../extension/src/core/display-records.js';
 import type { InteropReviewCategory } from '../extension/src/core/interop/contract.js';
+import { withInteropGifWebpMediaBlock } from '../extension/src/core/interop/media.js';
 import { parseInteropEnvelope } from '../extension/src/core/interop/messages.js';
 import type { InteropAlbum, InteropRecord } from '../extension/src/core/interop/records.js';
 import { IndexedDbAlbumStore } from '../extension/src/data/albums-controller.js';
@@ -388,5 +389,62 @@ test('translation rejects malformed records and mismatched byte custody claims b
     }
   } finally {
     await translator.close();
+  }
+});
+
+test('verified Photos GIF/WebP custody enriches the durable original from contract-v1 media metadata', async () => {
+  await deleteImageTrailDb();
+  const fixture = recordFixture('valid-record-message.json');
+  const record: InteropRecord = {
+    ...fixture.record,
+    label: 'party.gif',
+    dimensions: { width: 8, height: 8 },
+    original: {
+      state: 'available',
+      blobId: 'photos-original',
+      mimeType: 'image/gif',
+      byteLength: 255,
+      contentHash: 'a'.repeat(64),
+    },
+    roundTripMetadata: {
+      ...fixture.record.roundTripMetadata,
+      overlook: withInteropGifWebpMediaBlock(fixture.record.roundTripMetadata.overlook, {
+        schemaVersion: 1,
+        kind: 'gif',
+        mimeType: 'image/gif',
+        extension: 'gif',
+        mediaInfo: { animated: true, frameCount: 3, loopCount: 0 },
+      }),
+    },
+  };
+  const translator = new InteropRecordTranslationStore();
+  const bookmarks = new IndexedDbBookmarkStore();
+  try {
+    const imported = await translator.importRecord({
+      ...fixture,
+      record,
+      reviewCategory: 'eligible',
+      verifiedOriginal: {
+        blobId: 'local-original',
+        mimeType: 'image/gif',
+        byteLength: 255,
+        capturedAt: '2026-07-16T09:00:00.000Z',
+      },
+    });
+    assert.equal(imported.persisted, true);
+    const stored = (await bookmarks.loadPage({ offset: 0, limit: 10 })).items[0]?.storedOriginal;
+    assert.deepEqual(stored, {
+      blobId: 'local-original',
+      mimeType: 'image/gif',
+      byteLength: 255,
+      capturedAt: '2026-07-16T09:00:00.000Z',
+      fileName: 'party.gif',
+      width: 8,
+      height: 8,
+      mediaInfo: { kind: 'gif', animated: true, frameCount: 3, loopCount: 0 },
+    });
+  } finally {
+    await translator.close();
+    await bookmarks.close();
   }
 });
