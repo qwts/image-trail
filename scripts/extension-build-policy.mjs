@@ -5,6 +5,7 @@ import { packageDirFromModulePath } from './license-policy.mjs';
 
 const MINIFICATION_CHECK_BYTES = 1_024;
 const MAX_UNIMPROVED_RATIO = 0.98;
+const INJECTED_STYLESHEET = 'extension/src/ui/styles/panel-entry.css';
 
 // Single source of truth for the bundled extension entry points. The per-entry
 // build scripts and the license scan both read this so a new bundle can never
@@ -54,6 +55,10 @@ export function extensionOutputPath(sourcePath, pathApi = path) {
     throw new Error(`Extension source path must be inside ${sourceRoot}: ${sourcePath}`);
   }
   return pathApi.join('extension', 'dist', 'src', relativePath);
+}
+
+export function isInjectedStylesheet(sourcePath, pathApi = path) {
+  return sourcePath.split(pathApi.sep).join('/') === INJECTED_STYLESHEET;
 }
 
 export function extensionBuildOptions({
@@ -133,6 +138,30 @@ export async function writeStylesheet(sourcePath, outputPath, { release = isRele
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, output);
   if (release) reportMinification(outputPath, Buffer.byteLength(source), Buffer.byteLength(output));
+}
+
+export async function bundleStylesheet(sourcePath, outputPath, { release = isReleaseBuild() } = {}) {
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  const options = {
+    entryPoints: [sourcePath],
+    outfile: outputPath,
+    bundle: true,
+    minify: release,
+    legalComments: release ? 'eof' : 'inline',
+    logLevel: 'info',
+  };
+  let unminifiedBytes = null;
+
+  if (release) {
+    const reference = await build({ ...options, minify: false, write: false, logLevel: 'silent' });
+    unminifiedBytes = reference.outputFiles.reduce((total, file) => total + file.contents.byteLength, 0);
+  }
+
+  const result = await build({ ...options, metafile: true });
+  if (unminifiedBytes !== null) {
+    const outputBytes = Object.values(result.metafile.outputs).reduce((total, output) => total + output.bytes, 0);
+    reportMinification(outputPath, unminifiedBytes, outputBytes);
+  }
 }
 
 export function minificationImproved(unminifiedBytes, minifiedBytes) {
