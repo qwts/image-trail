@@ -87,8 +87,8 @@ a blocked script inside a string). The hook is now scoped:
   subdirectories), and unrelated repos are out of scope.
 - **Mentions are not invocations — but nested shell payloads are.** Quoted
   strings and heredoc bodies are stripped before matching, so commit
-  messages, PR bodies, and grep patterns that mention `node --test` or
-  `test-storybook` pass. The exception: a quoted string that is the payload
+  messages, PR bodies, and grep patterns that mention `node --test`,
+  `test-storybook`, or `vitest` pass. The exception: a quoted string that is the payload
   of a nested shell (`bash -lc "…"`, `sh -c '…'`) is executable, so it is
   unwrapped and scanned instead of stripped, recursively. Anything deeper
   (payloads assembled from variables, `node -e` spawning children) falls

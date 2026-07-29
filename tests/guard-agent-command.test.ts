@@ -44,6 +44,8 @@ void test('denies unguarded test entrypoints', () => {
     'node --import ./.test-dist/tests/dom/register.js --test',
     'npx playwright test tests/e2e',
     'test-storybook --url http://127.0.0.1:6006',
+    'vitest run --project=storybook',
+    'npx vitest --project=storybook',
     'npx c8 npm run test:dom:run',
     'npm run test:unit:run',
     'npm run test:dom:inner',
@@ -93,6 +95,7 @@ void test('nested shell -c payloads are executable, not mentions', () => {
     "sh -c 'npm run test:unit:run'",
     'zsh -c "npx playwright test"',
     'env CI=1 bash -c "test-storybook --url http://127.0.0.1:6006"',
+    'bash -c "vitest run --project=storybook"',
     // Nested one level deeper: the unwrapped payload rejoins the scan.
     'bash -c \'sh -c "node --test x.js"\'',
   ];
