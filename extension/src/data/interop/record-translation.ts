@@ -1,6 +1,5 @@
 import * as v from 'valibot';
 import { interopReviewCategorySchema, interopTimestampSchema, type InteropReviewCategory } from '../../core/interop/contract.js';
-import { interopGifWebpMediaBlockFrom, interopMediaFileName } from '../../core/interop/media.js';
 import { interopAlbumSchema, interopRecordSchema, type InteropAlbum, type InteropRecord } from '../../core/interop/records.js';
 import { openImageTrailDb } from '../db.js';
 import { ensureDurableBookmarkKey, type DurableBookmarkKeyContext } from '../durable-bookmark-key.js';
@@ -8,6 +7,7 @@ import { AlbumsRepository } from '../repositories/albums-repository.js';
 import { BookmarksRepository, type EncryptedBookmarkRecord } from '../repositories/bookmarks-repository.js';
 import { KeysRepository } from '../repositories/keys-repository.js';
 import type { DurableBookmarkPayloadV1, DurableInteropRecordV1, StoredOriginalReference } from '../types.js';
+import { normalizeVerifiedOriginalCustody } from './record-media-enrichment.js';
 
 const INTERNAL_RECORD_PREFIX = 'image-trail-interop:';
 const INTERNAL_ALBUM_PREFIX = 'image-trail-interop-album:';
@@ -172,69 +172,8 @@ function normalizeInput(input: InteropRecordTranslationInput): InteropRecordTran
   const albums = v.parse(v.pipe(v.array(interopAlbumSchema), v.readonly()), input.albums);
   const reviewCategory = v.parse(interopReviewCategorySchema, input.reviewCategory);
   const receivedAt = input.receivedAt ? v.parse(interopTimestampSchema, input.receivedAt) : undefined;
-  const verifiedOriginal = enrichVerifiedOriginal(record, input.verifiedOriginal);
-  assertVerifiedCustody(record, input.verifiedThumbnailDataUrl, verifiedOriginal);
+  const verifiedOriginal = normalizeVerifiedOriginalCustody(record, input.verifiedThumbnailDataUrl, input.verifiedOriginal);
   return { ...input, record, albums, reviewCategory, receivedAt, verifiedOriginal };
-}
-
-function enrichVerifiedOriginal(record: InteropRecord, original: StoredOriginalReference | undefined): StoredOriginalReference | undefined {
-  if (!original) return undefined;
-  const media = interopGifWebpMediaBlockFrom(record.roundTripMetadata.overlook);
-  if (!media || media.mimeType !== original.mimeType) return original;
-  return {
-    ...original,
-    fileName: original.fileName ?? interopOriginalFileName(record, media.extension, media.kind),
-    width: original.width ?? record.dimensions?.width,
-    height: original.height ?? record.dimensions?.height,
-    mediaInfo: {
-      kind: media.kind,
-      animated: media.mediaInfo.animated,
-      frameCount: media.mediaInfo.frameCount,
-      loopCount: media.mediaInfo.loopCount,
-    },
-  };
-}
-
-function interopOriginalFileName(record: InteropRecord, extension: 'gif' | 'webp' | null, kind: 'gif' | 'webp'): string {
-  const candidates = [record.label, record.title, sourceFileName(record.sourceUrl)].filter(
-    (value): value is string => typeof value === 'string' && value.trim() !== '',
-  );
-  const expectedExtension = extension ?? kind;
-  return interopMediaFileName(
-    candidates.find((candidate) => candidate.toLowerCase().endsWith(`.${expectedExtension.toLowerCase()}`)) ?? `image.${expectedExtension}`,
-    expectedExtension,
-  );
-}
-
-function sourceFileName(sourceUrl: string | null): string | null {
-  if (!sourceUrl) return null;
-  try {
-    const name = new URL(sourceUrl).pathname.split('/').filter(Boolean).at(-1);
-    return name ? decodeURIComponent(name) : null;
-  } catch {
-    return null;
-  }
-}
-
-function assertVerifiedCustody(
-  record: InteropRecord,
-  verifiedThumbnailDataUrl: string | undefined,
-  verifiedOriginal: StoredOriginalReference | undefined,
-): void {
-  if (verifiedThumbnailDataUrl) {
-    if (record.thumbnail.state !== 'available' || !verifiedThumbnailDataUrl.startsWith('data:image/')) {
-      throw new Error('Verified thumbnail bytes do not match an available image thumbnail.');
-    }
-  }
-  if (verifiedOriginal) {
-    if (
-      record.original.state !== 'available' ||
-      verifiedOriginal.mimeType !== record.original.mimeType ||
-      verifiedOriginal.byteLength !== record.original.byteLength
-    ) {
-      throw new Error('Verified original custody does not match the canonical original metadata.');
-    }
-  }
 }
 
 function previewNormalized(input: InteropRecordTranslationInput, stored: readonly StoredInteropPin[]): InteropRecordPreview {
