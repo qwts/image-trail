@@ -40,6 +40,7 @@ import { createFetchLinkedPageMessage, isFetchLinkedPageResultMessage } from '..
 import { sendRuntimeMessage } from './runtime-message.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT, type ObjectFitMode } from '../core/preview-style.js';
 import type { ProjectionReason } from '../core/projection-session.js';
+import { safeHttpUrl } from './http-url.js';
 
 export type TargetSelectionMode = 'auto' | 'manual' | 'none';
 
@@ -917,14 +918,4 @@ async function fetchLinkedPageText(
     if (error instanceof Error) throw error;
   }
   throw new Error('Linked page fetch failed.');
-}
-
-function safeHttpUrl(value: string | null | undefined, baseUrl: string): URL | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value, baseUrl);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null;
-  } catch {
-    return null;
-  }
 }

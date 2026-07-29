@@ -74,6 +74,18 @@ globalThis.document = {
   baseURI: 'https://example.test/page',
 } as Document;
 
+globalThis.location = new URL('https://example.test/page') as unknown as Location;
+
+function withPageLocation<T>(url: string, run: () => T): T {
+  const previous = globalThis.location;
+  globalThis.location = new URL(url) as unknown as Location;
+  try {
+    return run();
+  } finally {
+    globalThis.location = previous;
+  }
+}
+
 test('uses bookmarklet-compatible URL precedence for target images', () => {
   assert.deepEqual(
     getImageUrl(fakeImage({ currentSrc: 'https://example.test/current.jpg', srcAttribute: 'https://example.test/attr.jpg' })),
@@ -100,20 +112,55 @@ test('uses linked source URL when visible image is a Bing thumbnail', () => {
   const thumbnail = 'https://thf.bing.com/th/id/OIP.ybpkfTltBcXM_pn_a8r2zAHaE3?cb=thfc1falcon2&pid=Api';
   const link = `https://www.bing.com/images/search?view=detailV2&mediaurl=${encodeURIComponent(source)}`;
 
-  assert.deepEqual(getImageUrl(fakeImage({ currentSrc: thumbnail, parentHref: link })), {
-    source: 'linkSource',
-    url: source,
+  withPageLocation('https://www.bing.com/images/search', () => {
+    assert.deepEqual(getImageUrl(fakeImage({ currentSrc: thumbnail, parentHref: link })), {
+      source: 'linkSource',
+      url: source,
+    });
   });
 });
 
-test('ignores wrapper source parameters on untrusted hosts', () => {
+test('ignores trusted wrapper hrefs on untrusted page origins', () => {
   const source = 'https://evil.example.test/fake.jpg';
   const thumbnail = 'https://thf.bing.com/th/id/OIP.ybpkfTltBcXM_pn_a8r2zAHaE3?cb=thfc1falcon2&pid=Api';
-  const link = `https://attacker.example.test/gallery?url=${encodeURIComponent(source)}`;
+  const link = `https://www.bing.com/images/search?mediaurl=${encodeURIComponent(source)}`;
 
   assert.deepEqual(getImageUrl(fakeImage({ currentSrc: thumbnail, parentHref: link })), {
     source: 'currentSrc',
     url: thumbnail,
+  });
+});
+
+test('does not treat a page-authored base URL as the search-page origin', () => {
+  const source = 'https://evil.example.test/fake.jpg';
+  const thumbnail = 'https://thf.bing.com/th/id/OIP.ybpkfTltBcXM_pn_a8r2zAHaE3?cb=thfc1falcon2&pid=Api';
+  const pageDocument = document as unknown as { baseURI: string };
+  const previousBaseUri = pageDocument.baseURI;
+  pageDocument.baseURI = 'https://www.bing.com/images/search';
+  try {
+    assert.deepEqual(getImageUrl(fakeImage({ currentSrc: thumbnail, parentHref: `/?mediaurl=${encodeURIComponent(source)}` })), {
+      source: 'currentSrc',
+      url: thumbnail,
+    });
+  } finally {
+    pageDocument.baseURI = previousBaseUri;
+  }
+});
+
+test('rejects non-HTTP wrapper parameters and direct linked-image URLs', () => {
+  const thumbnail = 'https://thf.bing.com/th/id/OIP.ybpkfTltBcXM_pn_a8r2zAHaE3?cb=thfc1falcon2&pid=Api';
+  withPageLocation('https://www.bing.com/images/search', () => {
+    for (const source of ['file:///etc/passwd.jpg', 'javascript:alert(1)', 'data:image/png;base64,AAAA']) {
+      const link = `https://www.bing.com/images/search?mediaurl=${encodeURIComponent(source)}`;
+      assert.deepEqual(getImageUrl(fakeImage({ currentSrc: thumbnail, parentHref: link })), {
+        source: 'currentSrc',
+        url: thumbnail,
+      });
+    }
+    assert.deepEqual(getImageUrl(fakeImage({ currentSrc: thumbnail, parentHref: 'file:///etc/passwd.jpg' })), {
+      source: 'currentSrc',
+      url: thumbnail,
+    });
   });
 });
 
