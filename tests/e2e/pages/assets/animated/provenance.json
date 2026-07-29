@@ -1,0 +1,32 @@
+{
+  "license": "CC0-1.0",
+  "source": "Deterministically generated in-repo by generate-fixtures.mjs",
+  "fixtures": [
+    {
+      "file": "animated.gif",
+      "sha256": "e91380db853442ee77466f0f4a4b85f86c07b1607597efce84f1985ed38267f0",
+      "dimensions": "40x40",
+      "frames": 3,
+      "loopCount": 0
+    },
+    {
+      "file": "animated.webp",
+      "sha256": "b0a4e06afd321fbcefdf834e165224734e99f0df811ab532c5bd3e94518f9b18",
+      "dimensions": "40x40",
+      "frames": 3,
+      "loopCount": 0
+    },
+    {
+      "file": "static.webp",
+      "sha256": "786ba2cc8b977a04ec253aae1b5807485716d62927faecea9a364fcbbe601065",
+      "dimensions": "40x40",
+      "frames": 1,
+      "loopCount": null
+    },
+    {
+      "file": "truncated.gif",
+      "sha256": "3998c7ebb859d3c189db6986b19b2fa582709333ce6da9fce09bb5b6cc8f93b9",
+      "expected": "rejected as malformed with no durable blob"
+    }
+  ]
+}

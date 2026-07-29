@@ -39,12 +39,17 @@ const fixturePaths = {
   redrawImage: '/redraw-image.html',
   thirdPartyCdn: '/third-party-cdn.html',
   workspaceHostMatrix: '/workspace-host-matrix.html',
+  animatedMedia: '/animated-media.html',
 } as const;
 const fixtureAssetPaths = {
   assetOne: '/assets/asset-one.svg',
   assetTwo: '/assets/asset-two.svg',
   assetThree: '/assets/asset-three.svg',
   missingImage: '/missing-image.png',
+  animatedGif: '/assets/animated/animated.gif',
+  animatedWebp: '/assets/animated/animated.webp',
+  staticWebp: '/assets/animated/static.webp',
+  truncatedGif: '/assets/animated/truncated.gif',
 } as const;
 
 async function waitForServiceWorker(context: BrowserContext): Promise<Worker> {

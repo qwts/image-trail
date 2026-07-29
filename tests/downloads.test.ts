@@ -16,6 +16,10 @@ const HASH_B = 'b'.repeat(64);
 
 test('sanitizeFilename removes unsafe filesystem characters', () => {
   assert.equal(sanitizeFilename(' ../bad:name?.jpg '), 'bad_name_.jpg');
+  assert.equal(sanitizeFilename('safe\u202egnp.exe'), 'safe_gnp.exe');
+  assert.equal(sanitizeFilename('safe\u200bname.gif'), 'safe_name.gif');
+  assert.equal(sanitizeFilename(`safe${String.fromCharCode(0x85)}name.gif`), 'safe_name.gif');
+  assert.equal(sanitizeFilename(`${'x'.repeat(239)}😀.gif`, 'image', 240), `${'x'.repeat(239)}😀`);
   assert.equal(sanitizeFilename('***'), 'image');
 });
 
@@ -37,6 +41,10 @@ test('download filenames use image names instead of proxy URL fragments', () => 
   assert.equal(filenameFromImageRecord({ url: source, label: 'Korn live at Woodstock' }), 'Korn live at Woodstock.jpg');
   assert.equal(filenameFromImageRecord({ url: pngProxy, label: 'Korn live at Woodstock' }), 'Korn live at Woodstock.png');
   assert.equal(filenameFromImageRecord({ url: 'data:image/png;base64,abc', title: 'local capture' }), 'local capture.png');
+  assert.equal(
+    filenameFromImageRecord({ url: 'https://example.test/proxy?id=1', label: 'Renamed', originalFileName: 'source-animation.GIF' }),
+    'source-animation.GIF',
+  );
 });
 
 test('normalizeAbsoluteUrl resolves relative URLs only when a base is supplied', () => {

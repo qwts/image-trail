@@ -38,6 +38,39 @@
       ]
     },
     {
+      "id": "gif-webp-original-preservation",
+      "acceptance": "Static and animated GIF/WebP capture, poster, preview, export, backup, and Photos metadata preservation",
+      "repoPath": "tests/e2e/gif-webp-media.spec.ts",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-GIF-And-WebP-Media",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/gif-webp-media.test.ts",
+            "tests/data-url-image.test.ts",
+            "tests/fetch-image.test.ts",
+            "tests/encrypted-blobs.test.ts",
+            "tests/full-backup-originals.test.ts",
+            "tests/interop-media.test.ts",
+            "tests/interop-record-export.test.ts",
+            "tests/interop-record-translation.test.ts",
+            "tests/dom/animated-preview.test.ts"
+          ],
+          "notes": "Covers bounded signature/frame/loop/dimension inspection, malformed and hostile input rejection, MIME correction, exact encrypted-byte hashes, durable optional media metadata, original filenames, full-backup preservation, strict contract-v1 Photos metadata, inbound enrichment, and reduced-motion poster Play/Stop behavior."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/gif-webp-media.spec.ts",
+          "notes": "Captures checked-in animated GIF, animated WebP, and static WebP fixtures in the packaged extension; proves static queue posters, exact downloaded hashes and filenames, malformed-input atomicity, browser animation playback, reduced-motion poster hold, intentional Play/Stop, and static WebP rendering."
+        },
+        {
+          "type": "manual",
+          "reason": "Real operating-system reduced-motion startup, source timing perception, and live Photos transfer remain human/browser integration checks while Transfer and Sync stays experimental.",
+          "notes": "Start Chrome with reduced motion already enabled, open each captured original from Gallery, verify no animated frame appears before Play, compare visible frame timing and loop behavior to the source, then run an experimental Image Trail to Photos to Image Trail transfer and compare filename, MIME, dimensions, animation facts, and SHA-256."
+        }
+      ]
+    },
+    {
       "id": "design-system-foundation",
       "acceptance": "Shared design-system tokens and core primitive contracts",
       "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
