@@ -4,6 +4,8 @@ import type { CaptureStore } from '../../content/capture-controller.js';
 import type { RecentHistoryStore } from '../../content/recent-history-store.js';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
 import { requestEncryptedImageImport } from '../../content/download-controller.js';
+import type { CapturedImportedMedia } from './imported-media-record.js';
+import { importMediaFiles } from './imported-media-batch.js';
 import type { downloadPCloudBackup, listPCloudBackups } from '../../content/pcloud-provider-client.js';
 import {
   importBookmarks as importBookmarkRecords,
@@ -26,6 +28,7 @@ import {
   type HistoryImportResult,
   type UrlReviewStatusImportResult,
 } from './restore-import-preview.js';
+import { PCloudBackupRestoreCoordinator, type ChunkedCloudRestoreContext } from './pcloud-backup-restore.js';
 
 /**
  * Tagged union of a decrypted, deduped import awaiting user confirmation. Owned by
@@ -39,18 +42,13 @@ export type PendingRestoreImport =
       readonly duplicateCount: number;
       readonly duplicateRecordIdsByUuid: ReadonlyMap<string, string>;
       readonly password: string;
+      readonly chunkedCloudRestore?: ChunkedCloudRestoreContext | undefined;
     }
   | { readonly kind: 'url-review-status'; readonly result: UrlReviewStatusImportResult };
 
 /**
- * Collaborator that owns the file/pCloud restore-preview flows, the `pendingRestoreImport`
- * preview → confirm → import state machine, and image imports extracted from ImageTrailPanel (epic
- * #290). The pure builders it calls live in restore-import-preview.ts; this controller orchestrates the
- * stores, the panel state reducer, and the pCloud provider client (injected for testability).
- *
- * Two callbacks reach the sibling RecallExportController: `loadAllBookmarks` (dedup source for a
- * bookmarks preview) and `refreshBlobKeyStatus` (after a full-backup original restore). Both are wired
- * as lazy arrow closures over the panel's `this`, so the cross-controller cycle is safe at runtime.
+ * Owns file and pCloud restore previews, confirmation, imports, and sibling
+ * export-controller callbacks injected as lazy closures.
  */
 export interface RecallRestoreControllerDeps {
   getState(): PanelState;
@@ -60,7 +58,7 @@ export interface RecallRestoreControllerDeps {
   loadBookmarkPage(offset: number, options?: { readonly render?: boolean }): Promise<void>;
   loadRecentHistory(options?: { readonly render?: boolean }): Promise<void>;
   refreshStorageUsage(options?: { readonly render?: boolean }): Promise<void>;
-  addImportedImage(file: ImportedImageFile): Promise<boolean>;
+  addImportedImage(file: ImportedImageFile, captured?: CapturedImportedMedia): Promise<boolean>;
   getLocalSettings(): PlaintextLocalSettings;
   bookmarkStore(): BookmarkStore | null;
   albumStore(): {
@@ -84,94 +82,29 @@ export interface RecallRestoreControllerDeps {
 
 export class RecallRestoreController {
   private pendingRestoreImport: PendingRestoreImport | null = null;
+  private readonly pcloudRestore: PCloudBackupRestoreCoordinator;
 
-  constructor(private readonly deps: RecallRestoreControllerDeps) {}
+  constructor(private readonly deps: RecallRestoreControllerDeps) {
+    this.pcloudRestore = new PCloudBackupRestoreCoordinator(deps);
+  }
 
   async choosePCloudRestoreFile(): Promise<void> {
-    if (this.deps.getState().pcloudBackup.connectionState === 'busy') return;
-    this.deps.setState(
-      reducePanelAction(this.deps.getState(), {
-        name: 'pcloud-backup/busy',
-        pendingOperation: 'restoring',
-        message: 'Checking pCloud backups...',
-      }),
-    );
-    this.deps.render();
-
-    const result = await this.deps.listPCloudBackups();
-    if (!result.ok) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), {
-          name: 'pcloud-backup/restore-error',
-          message: result.message,
-          status: result.status,
-        }),
-      );
-      this.deps.render();
-      return;
-    }
-
-    this.deps.setState(
-      reducePanelAction(this.deps.getState(), {
-        name: 'pcloud-backup/restore-candidates-loaded',
-        candidates: result.candidates,
-        folderPath: result.folderPath,
-        apiHost: result.apiHost,
-        message: result.message,
-      }),
-    );
-    this.deps.render();
+    return this.pcloudRestore.chooseRestoreFile();
   }
 
   async previewPCloudRestoreFile(fileId: number, fileName: string, password: string): Promise<void> {
-    if (this.deps.getState().pcloudBackup.connectionState === 'busy') return;
-    if (password.length < 4) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), {
-          name: 'pcloud-backup/restore-error',
-          message: 'Enter the cloud backup password before previewing this restore file.',
-        }),
-      );
-      this.deps.render();
-      return;
-    }
-
-    this.deps.setState(
-      reducePanelAction(this.deps.getState(), {
-        name: 'pcloud-backup/busy',
-        pendingOperation: 'restoring',
-        message: 'Downloading encrypted pCloud backup...',
-      }),
+    return this.pcloudRestore.previewRestoreFile(
+      fileId,
+      fileName,
+      password,
+      (fileContent, legacyPassword, legacyFileName) => this.previewBookmarksImport(fileContent, legacyPassword, legacyFileName),
+      (result, context, chunkedPassword, chunkedFileName) =>
+        this.prepareBookmarksPreview(result, chunkedPassword, chunkedFileName, context),
     );
-    this.deps.render();
+  }
 
-    const result = await this.deps.downloadPCloudBackup({ fileId, fileName });
-    if (!result.ok) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), {
-          name: 'pcloud-backup/restore-error',
-          message: result.message,
-          status: result.status,
-        }),
-      );
-      this.deps.render();
-      return;
-    }
-
-    this.deps.setState(
-      reducePanelAction(this.deps.getState(), {
-        name: 'pcloud-backup/restore-downloaded',
-        fileName: result.fileName,
-        folderPath: result.folderPath,
-        apiHost: result.apiHost,
-        sizeBytes: result.sizeBytes,
-        sha256: result.sha256,
-        downloadedAt: result.downloadedAt,
-        message: result.message,
-      }),
-    );
-    await this.previewBookmarksImport(result.fileContent, password, result.fileName);
-    this.deps.render();
+  cancelPCloudRestore(): void {
+    this.pcloudRestore.cancel();
   }
 
   async importImages(files: readonly ImportedImageFile[]): Promise<void> {
@@ -185,20 +118,20 @@ export class RecallRestoreController {
 
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/start' }));
     this.deps.render();
-    let imported = 0;
-    for (const file of files) {
-      if (await this.deps.addImportedImage(file)) imported += 1;
-    }
+    const { imported, failed, firstFailureMessage } = await importMediaFiles(files, this.deps);
 
     if (imported === 0) {
       this.deps.setState(
-        reducePanelAction(this.deps.getState(), { name: 'import-export/error', message: 'No selected image files could be imported.' }),
+        reducePanelAction(this.deps.getState(), {
+          name: 'import-export/error',
+          message: firstFailureMessage ?? 'No selected media could be imported.',
+        }),
       );
     } else {
       this.deps.setState(
         reducePanelAction(this.deps.getState(), {
           name: 'import-export/complete',
-          message: `Imported ${imported} image${imported === 1 ? '' : 's'} into bookmarks and recent history.`,
+          message: `Imported ${imported} media item${imported === 1 ? '' : 's'} into bookmarks and recent history.${failed > 0 ? ` ${failed} failed.` : ''}`,
         }),
       );
     }
@@ -332,6 +265,15 @@ export class RecallRestoreController {
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/start' }));
     this.deps.render();
     const result = await importBookmarkRecords(fileContent, password);
+    await this.prepareBookmarksPreview(result, password, fileName);
+  }
+
+  private async prepareBookmarksPreview(
+    result: BookmarkImportResult,
+    password: string,
+    fileName?: string,
+    chunkedCloudRestore?: ChunkedCloudRestoreContext,
+  ): Promise<void> {
     if (!result.status.ok) {
       this.pendingRestoreImport = null;
       this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/error', message: result.status.message }));
@@ -349,6 +291,7 @@ export class RecallRestoreController {
       duplicateCount: duplicateSummary.duplicateCount,
       duplicateRecordIdsByUuid: duplicateSummary.duplicateRecordIdsByUuid,
       password,
+      ...(chunkedCloudRestore ? { chunkedCloudRestore } : {}),
     };
     this.deps.setState(
       reducePanelAction(this.deps.getState(), {
@@ -364,7 +307,8 @@ export class RecallRestoreController {
     duplicateCount: number,
     password: string,
     duplicateRecordIdsByUuid: ReadonlyMap<string, string>,
-  ): Promise<void> {
+    chunkedCloudRestore?: ChunkedCloudRestoreContext,
+  ): Promise<boolean> {
     const bookmarkStore = this.deps.bookmarkStore();
     if (!bookmarkStore) {
       this.deps.setState(
@@ -374,15 +318,15 @@ export class RecallRestoreController {
         }),
       );
       this.deps.render();
-      return;
+      return false;
     }
-    const fullBackupOriginalRestore = await this.restoreFullBackupOriginals(result, password);
+    const fullBackupOriginalRestore = await this.restoreFullBackupOriginals(result, password, chunkedCloudRestore);
     if (!fullBackupOriginalRestore.ok) {
       this.deps.setState(
         reducePanelAction(this.deps.getState(), { name: 'import-export/error', message: fullBackupOriginalRestore.message }),
       );
       this.deps.render();
-      return;
+      return false;
     }
     let importedCount = 0;
     const recordIdMap = new Map(duplicateRecordIdsByUuid);
@@ -410,6 +354,7 @@ export class RecallRestoreController {
       }),
     );
     this.deps.renderPanelAndRefreshRecall();
+    return true;
   }
 
   private async restoreFullBackupAlbums(
@@ -437,8 +382,13 @@ export class RecallRestoreController {
   private async restoreFullBackupOriginals(
     result: BookmarkImportResult,
     password: string,
+    chunkedCloudRestore?: ChunkedCloudRestoreContext,
   ): Promise<{ readonly ok: true; readonly importedOriginalCount: number } | { readonly ok: false; readonly message: string }> {
-    if (!result.fullBackup || result.externalOriginalCount === 0) return { ok: true, importedOriginalCount: 0 };
+    if (!result.fullBackup) return { ok: true, importedOriginalCount: 0 };
+    if (chunkedCloudRestore && chunkedCloudRestore.manifest.originalCount > 0) {
+      return this.pcloudRestore.restoreOriginals(chunkedCloudRestore, password);
+    }
+    if (result.externalOriginalCount === 0) return { ok: true, importedOriginalCount: 0 };
     const captureStore = this.deps.captureStore();
     if (!captureStore) {
       return { ok: false, message: 'Encrypted original storage is unavailable; no bookmarks were imported.' };
@@ -501,18 +451,25 @@ export class RecallRestoreController {
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/start' }));
     this.deps.render();
 
+    let completed = true;
     switch (pending.kind) {
       case 'history':
         await this.importHistory(pending.result, pending.duplicateCount);
         break;
       case 'bookmarks':
-        await this.importBookmarks(pending.result, pending.duplicateCount, pending.password, pending.duplicateRecordIdsByUuid);
+        completed = await this.importBookmarks(
+          pending.result,
+          pending.duplicateCount,
+          pending.password,
+          pending.duplicateRecordIdsByUuid,
+          pending.chunkedCloudRestore,
+        );
         break;
       case 'url-review-status':
         await this.importUrlReviewStatus(pending.result);
         break;
     }
-    this.pendingRestoreImport = null;
+    if (completed) this.pendingRestoreImport = null;
   }
 
   cancelRestorePreview(): void {

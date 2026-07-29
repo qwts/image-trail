@@ -4,6 +4,7 @@ import test from 'node:test';
 import 'fake-indexeddb/auto';
 import { createDisplayRecord } from '../extension/src/core/display-records.js';
 import type { InteropReviewCategory } from '../extension/src/core/interop/contract.js';
+import { withInteropGifWebpMediaBlock } from '../extension/src/core/interop/media.js';
 import { parseInteropEnvelope } from '../extension/src/core/interop/messages.js';
 import type { InteropAlbum, InteropRecord } from '../extension/src/core/interop/records.js';
 import { IndexedDbAlbumStore } from '../extension/src/data/albums-controller.js';
@@ -11,6 +12,7 @@ import { IndexedDbBookmarkStore } from '../extension/src/data/bookmarks-controll
 import { createAndActivateWrappedBlobKey, lockBlobKey } from '../extension/src/data/crypto/blob-keyring.js';
 import { openImageTrailDb } from '../extension/src/data/db.js';
 import { InteropRecordTranslationStore } from '../extension/src/data/interop/record-translation.js';
+import { BookmarksRepository } from '../extension/src/data/repositories/bookmarks-repository.js';
 import { DataStore } from '../extension/src/data/schema.js';
 import { deleteImageTrailDb, requestToPromise, transactionDone } from './indexeddb-test-helpers.js';
 
@@ -179,6 +181,11 @@ test('a duplicate canonical record can attach later verified bytes without movin
   try {
     const imported = await translator.importRecord(fixture);
     const before = await bookmarks.loadPage({ offset: 0, limit: 10 });
+    const movedAt = '2026-07-16T10:00:00.000Z';
+    const db = await openImageTrailDb();
+    assert.ok(db.db);
+    await new BookmarksRepository(db.db).updateQueueUpdatedAt([{ uuid: imported.pinId!, queueUpdatedAt: movedAt }]);
+    db.db.close();
     const verifiedThumbnailDataUrl = 'data:image/jpeg;base64,bGF0ZXItY3VzdG9keQ==';
     const enriched = await translator.importRecord({ ...fixture, verifiedThumbnailDataUrl });
     const after = await bookmarks.loadPage({ offset: 0, limit: 10 });
@@ -187,7 +194,8 @@ test('a duplicate canonical record can attach later verified bytes without movin
     assert.equal(enriched.persisted, true);
     assert.equal(enriched.pinId, imported.pinId);
     assert.equal(after.items[0]?.thumbnail, verifiedThumbnailDataUrl);
-    assert.equal(after.items[0]?.queueUpdatedAt, before.items[0]?.queueUpdatedAt);
+    assert.notEqual(movedAt, before.items[0]?.queueUpdatedAt);
+    assert.equal(after.items[0]?.queueUpdatedAt, movedAt);
   } finally {
     await translator.close();
     await bookmarks.close();
@@ -305,8 +313,18 @@ test('interop previews deterministically distinguish duplicate, conflict, unsupp
   }
 });
 
-test('canonical queue timestamps remain ordered and native album membership follows canonical positions', async () => {
+test('a translation session scans stored interop pins once while canonical queue timestamps remain ordered and native album membership follows canonical positions', async (t) => {
   await deleteImageTrailDb();
+  const originalListEncrypted = BookmarksRepository.prototype.listEncrypted;
+  let fullStoreScans = 0;
+  BookmarksRepository.prototype.listEncrypted = async function listEncryptedWithCount() {
+    fullStoreScans += 1;
+    return originalListEncrypted.call(this);
+  };
+  t.after(() => {
+    BookmarksRepository.prototype.listEncrypted = originalListEncrypted;
+  });
+
   const fixture = recordFixture('valid-record-message.json');
   const secondId = 'b38e3e15-b80c-4207-b37d-d2b65a811eea';
   const album = fixture.albums[0]!;
@@ -326,6 +344,7 @@ test('canonical queue timestamps remain ordered and native album membership foll
   const bookmarks = new IndexedDbBookmarkStore();
   const albums = new IndexedDbAlbumStore();
   try {
+    assert.equal((await translator.preview({ ...fixture, albums: [orderedAlbum] })).category, 'metadata-only');
     const first = await translator.importRecord({ ...fixture, albums: [orderedAlbum] });
     const second = await translator.importRecord({ ...fixture, record: secondRecord, albums: [orderedAlbum] });
     const queue = await bookmarks.loadPage({ offset: 0, limit: 10 });
@@ -339,6 +358,8 @@ test('canonical queue timestamps remain ordered and native album membership foll
       snapshot.memberships.map((membership) => membership.recordId),
       [second.pinId, first.pinId],
     );
+    assert.ok(await translator.exportRecord(fixture.record.identity.interopId));
+    assert.equal(fullStoreScans, 1);
   } finally {
     await translator.close();
     await bookmarks.close();
@@ -388,5 +409,62 @@ test('translation rejects malformed records and mismatched byte custody claims b
     }
   } finally {
     await translator.close();
+  }
+});
+
+test('verified Photos GIF/WebP custody enriches the durable original from contract-v1 media metadata', async () => {
+  await deleteImageTrailDb();
+  const fixture = recordFixture('valid-record-message.json');
+  const record: InteropRecord = {
+    ...fixture.record,
+    label: 'party.gif',
+    dimensions: { width: 8, height: 8 },
+    original: {
+      state: 'available',
+      blobId: 'photos-original',
+      mimeType: 'image/gif',
+      byteLength: 255,
+      contentHash: 'a'.repeat(64),
+    },
+    roundTripMetadata: {
+      ...fixture.record.roundTripMetadata,
+      overlook: withInteropGifWebpMediaBlock(fixture.record.roundTripMetadata.overlook, {
+        schemaVersion: 1,
+        kind: 'gif',
+        mimeType: 'image/gif',
+        extension: 'gif',
+        mediaInfo: { animated: true, frameCount: 3, loopCount: 0 },
+      }),
+    },
+  };
+  const translator = new InteropRecordTranslationStore();
+  const bookmarks = new IndexedDbBookmarkStore();
+  try {
+    const imported = await translator.importRecord({
+      ...fixture,
+      record,
+      reviewCategory: 'eligible',
+      verifiedOriginal: {
+        blobId: 'local-original',
+        mimeType: 'image/gif',
+        byteLength: 255,
+        capturedAt: '2026-07-16T09:00:00.000Z',
+      },
+    });
+    assert.equal(imported.persisted, true);
+    const stored = (await bookmarks.loadPage({ offset: 0, limit: 10 })).items[0]?.storedOriginal;
+    assert.deepEqual(stored, {
+      blobId: 'local-original',
+      mimeType: 'image/gif',
+      byteLength: 255,
+      capturedAt: '2026-07-16T09:00:00.000Z',
+      fileName: 'party.gif',
+      width: 8,
+      height: 8,
+      mediaInfo: { kind: 'gif', animated: true, frameCount: 3, loopCount: 0 },
+    });
+  } finally {
+    await translator.close();
+    await bookmarks.close();
   }
 });

@@ -2,6 +2,12 @@ import { reducePanelAction } from '../../core/actions.js';
 import type { ProjectionReason } from '../../core/projection-session.js';
 import type { ParsedFieldStateRecord, PanelState } from '../../core/types.js';
 import { imageResourceUrlsEqual } from '../../core/image/image-navigation.js';
+import {
+  createLegacyFieldIdMigration,
+  migrateParsedFieldStateRecord,
+  migrateUrlTemplatesForParsedFieldRecord,
+  STABLE_FIELD_ID_VERSION,
+} from '../../core/url/field-id-migration.js';
 import { applyFieldSplitSpecs } from '../../core/url/field-splits.js';
 import { applyFieldDigitWidthSpecs } from '../../core/url/field-widths.js';
 import { parseUrl } from '../../core/url/parse-url.js';
@@ -44,6 +50,7 @@ export class ParsedFieldStateRecordController {
     if (!state.target.selectedUrl && !state.draftUrl) return null;
     return {
       schemaVersion: 1,
+      fieldIdVersion: STABLE_FIELD_ID_VERSION,
       hostname,
       pageUrl: this.deps.fieldStatePageUrl(),
       sourceUrl: this.deps.currentRawUrl(),
@@ -71,22 +78,29 @@ export class ParsedFieldStateRecordController {
       if (!projected && !imageResourceUrlsEqual(record.sourceUrl, this.deps.currentRawUrl(), window.location.href)) return;
     }
     const filtered = this.filterParsedFieldStateForCurrentUrl(record);
-    const restored = reducePanelAction(this.deps.getState(), {
-      name: 'parsed-field-state/restore',
-      record: filtered,
-    });
+    const currentState = this.deps.getState();
+    const restored = reducePanelAction(
+      {
+        ...currentState,
+        urlTemplates: migrateUrlTemplatesForParsedFieldRecord(currentState.urlTemplates, filtered),
+      },
+      {
+        name: 'parsed-field-state/restore',
+        record: filtered,
+      },
+    );
     this.deps.setState({
       ...restored,
       // A record's draft belongs to the source it was saved against. Restoring onto a DIFFERENT
       // selected image — e.g. the snapshot-subscription restore that fires right after the user
       // projects a record — must not resurrect that draft over the projection (#429).
-      draftUrl: ctx.sameSource ? restored.draftUrl : this.deps.getState().draftUrl,
+      draftUrl: ctx.sameSource ? restored.draftUrl : currentState.draftUrl,
       // The reset baseline is EDIT-SESSION state: once captured (first field edit), it survives
       // loads and restores until Reset all or a target change clears it. The snapshot-subscription
       // restore runs after every successful load, and adopting the record's baseline here stomped
       // the live one — Reset all flickered and vanished on success (stale records made it stick
       // permanently instead). Adopt the record's baseline only when no session baseline exists.
-      parsedFieldResetBaseline: this.deps.getState().parsedFieldResetBaseline ?? parsedFieldResetBaselineFromRecord(filtered),
+      parsedFieldResetBaseline: currentState.parsedFieldResetBaseline ?? parsedFieldResetBaselineFromRecord(filtered),
     });
     this.deps.syncGrabSettings();
     void this.deps.saveFieldState();
@@ -99,21 +113,23 @@ export class ParsedFieldStateRecordController {
 
   private filterParsedFieldStateForCurrentUrl(record: ParsedFieldStateRecord): ParsedFieldStateRecord {
     try {
+      const migration = createLegacyFieldIdMigration(record.sourceUrl, record.fieldSplitSpecs);
+      const normalized = migrateParsedFieldStateRecord(record, migration);
       const model = applyFieldDigitWidthSpecs(
-        applyFieldSplitSpecs(parseUrl(record.sourceUrl), record.fieldSplitSpecs),
-        record.fieldDigitWidthSpecs ?? [],
+        applyFieldSplitSpecs(parseUrl(normalized.sourceUrl), normalized.fieldSplitSpecs),
+        normalized.fieldDigitWidthSpecs ?? [],
       );
       const fieldIds = new Set(collectUrlFields(model).map((field) => field.id));
       const keep = (ids: readonly string[]): readonly string[] => ids.filter((id) => fieldIds.has(id));
       return {
-        ...record,
-        activeFieldId: record.activeFieldId && fieldIds.has(record.activeFieldId) ? record.activeFieldId : null,
-        failedFieldId: record.failedFieldId && fieldIds.has(record.failedFieldId) ? record.failedFieldId : null,
-        successfulFieldIds: keep(record.successfulFieldIds),
-        unchangedFieldIds: keep(record.unchangedFieldIds),
-        unlockedFieldIds: keep(record.unlockedFieldIds),
-        manuallyExcludedFieldIds: keep(record.manuallyExcludedFieldIds),
-        fieldDigitWidthSpecs: (record.fieldDigitWidthSpecs ?? []).filter((spec) => fieldIds.has(spec.fieldId)),
+        ...normalized,
+        activeFieldId: normalized.activeFieldId && fieldIds.has(normalized.activeFieldId) ? normalized.activeFieldId : null,
+        failedFieldId: normalized.failedFieldId && fieldIds.has(normalized.failedFieldId) ? normalized.failedFieldId : null,
+        successfulFieldIds: keep(normalized.successfulFieldIds),
+        unchangedFieldIds: keep(normalized.unchangedFieldIds),
+        unlockedFieldIds: keep(normalized.unlockedFieldIds),
+        manuallyExcludedFieldIds: keep(normalized.manuallyExcludedFieldIds),
+        fieldDigitWidthSpecs: (normalized.fieldDigitWidthSpecs ?? []).filter((spec) => fieldIds.has(spec.fieldId)),
       };
     } catch {
       return { ...record, activeFieldId: null, failedFieldId: null };

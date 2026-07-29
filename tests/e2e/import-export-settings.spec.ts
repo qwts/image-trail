@@ -224,15 +224,14 @@ async function installPCloudMock(serviceWorker: Worker): Promise<void> {
   await serviceWorker.evaluate(() => {
     const scope = globalThis as typeof globalThis & {
       __imageTrailPCloudMock?: {
-        fileContent: string | null;
-        fileName: string | null;
+        files: Record<number, { fileContent: string; fileName: string }>;
         uploadCount: number;
         requestedUrls: string[];
       };
       __imageTrailOriginalFetch?: typeof fetch;
       __imageTrailOriginalLaunchWebAuthFlow?: typeof chrome.identity.launchWebAuthFlow;
     };
-    scope.__imageTrailPCloudMock = { fileContent: null, fileName: null, uploadCount: 0, requestedUrls: [] };
+    scope.__imageTrailPCloudMock = { files: {}, uploadCount: 0, requestedUrls: [] };
 
     const json = (body: Record<string, unknown>): Response =>
       new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -257,7 +256,8 @@ async function installPCloudMock(serviceWorker: Worker): Promise<void> {
       const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
       scope.__imageTrailPCloudMock?.requestedUrls.push(url.href);
       if (url.hostname === 'e2e.pcloud.com') {
-        return new Response(scope.__imageTrailPCloudMock?.fileContent ?? '', { status: 200 });
+        const fileId = Number(url.pathname.match(/backup-(\d+)\.json$/u)?.[1]);
+        return new Response(scope.__imageTrailPCloudMock?.files[fileId]?.fileContent ?? '', { status: 200 });
       }
       if (url.hostname !== 'api.pcloud.com') return scope.__imageTrailOriginalFetch!(input, init);
 
@@ -270,36 +270,41 @@ async function installPCloudMock(serviceWorker: Worker): Promise<void> {
       if (method === 'uploadfile' && init?.body instanceof FormData) {
         const file = init.body.get('file');
         scope.__imageTrailPCloudMock!.uploadCount += 1;
-        scope.__imageTrailPCloudMock!.fileName = file instanceof File ? file.name : 'image-trail-e2e.image-trail-encrypted.json';
-        scope.__imageTrailPCloudMock!.fileContent = file instanceof File ? await file.text() : '';
+        const fileId = 308 + scope.__imageTrailPCloudMock!.uploadCount;
+        const fileName = file instanceof File ? file.name : 'image-trail-e2e.image-trail-encrypted.json';
+        const fileContent = file instanceof File ? await file.text() : '';
+        scope.__imageTrailPCloudMock!.files[fileId] = { fileName, fileContent };
         return json({
           result: 0,
-          metadata: [{ fileid: 309, name: scope.__imageTrailPCloudMock!.fileName, size: scope.__imageTrailPCloudMock!.fileContent.length }],
+          metadata: [{ fileid: fileId, name: fileName, size: fileContent.length }],
         });
       }
       if (method === 'listfolder') {
         const params = parametersFromBody(init?.body);
-        const includeFile = params.get('folderid') === '42' && scope.__imageTrailPCloudMock?.fileContent;
+        const files = params.get('folderid') === '42' ? Object.entries(scope.__imageTrailPCloudMock?.files ?? {}) : [];
         return json({
           result: 0,
           metadata: {
-            contents: includeFile
-              ? [
-                  {
-                    id: 'f309',
-                    fileid: 309,
-                    name: scope.__imageTrailPCloudMock!.fileName,
-                    size: scope.__imageTrailPCloudMock!.fileContent!.length,
-                    modified: '2026-07-04T04:00:00Z',
-                  },
-                ]
-              : [],
+            contents: files.map(([fileId, file]) => ({
+              id: `f${fileId}`,
+              fileid: Number(fileId),
+              name: file.fileName,
+              size: file.fileContent.length,
+              modified: '2026-07-04T04:00:00Z',
+            })),
           },
         });
       }
       if (method === 'checksumfile') return json({ result: 0, sha1: 'fake-sha1' });
-      if (method === 'getfilelink') return json({ result: 0, hosts: ['e2e.pcloud.com'], path: '/backup.json' });
-      if (method === 'deletefile') return json({ result: 0 });
+      if (method === 'getfilelink') {
+        const params = parametersFromBody(init?.body);
+        return json({ result: 0, hosts: ['e2e.pcloud.com'], path: `/backup-${params.get('fileid') ?? '0'}.json` });
+      }
+      if (method === 'deletefile') {
+        const params = parametersFromBody(init?.body);
+        delete scope.__imageTrailPCloudMock!.files[Number(params.get('fileid'))];
+        return json({ result: 0 });
+      }
       return json({ result: 2000, error: `Unhandled mocked pCloud method: ${method ?? 'unknown'}` });
     }) as typeof fetch;
   });
@@ -441,6 +446,17 @@ test('settings utilities persist through rerenders and pCloud remains a mocked m
     await page.getByRole('button', { name: 'Back up now' }).click();
     const cloudProvider = page.locator('.image-trail-panel__cloud-provider');
     await expect(cloudProvider).toContainText(/Uploaded and verified .*\.image-trail-encrypted\.json/u);
+    const uploadedNames = await serviceWorker.evaluate(() =>
+      Object.values(
+        (
+          globalThis as typeof globalThis & {
+            __imageTrailPCloudMock?: { files: Record<number, { fileName: string }> };
+          }
+        ).__imageTrailPCloudMock?.files ?? {},
+      ).map((file) => file.fileName),
+    );
+    expect(uploadedNames.slice(0, -1).every((fileName) => fileName.endsWith('.image-trail-part.json'))).toBe(true);
+    expect(uploadedNames.at(-1)).toMatch(/\.image-trail-encrypted\.json$/u);
     await expect(cloudProvider).toContainText('/Image Trail/backups');
     await expect(cloudProvider.getByRole('heading', { name: 'Backup history (1)' })).toBeVisible();
     await expect(cloudProvider.locator('.image-trail-panel__backup-history-item')).toContainText('Image Trail SHA-256');

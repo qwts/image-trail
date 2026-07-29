@@ -1,6 +1,6 @@
 {
   "name": "image-trail",
-  "version": "0.24.9",
+  "version": "0.25.0",
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
@@ -17,7 +17,8 @@
     "check:interop-contract": "node scripts/check-interop-contract.mjs",
     "check:interop-acceptance": "node scripts/check-interop-acceptance.mjs",
     "check:interop-closeout": "node scripts/check-interop-acceptance.mjs --require-manual",
-    "check:agent-env": "node scripts/bootstrap-agent-env.mjs --check --exempt test:compile,test:e2e:coverage",
+    "check:agent-primitives": "node scripts/check-agent-primitives.mjs",
+    "check:agent-env": "node scripts/bootstrap-agent-env.mjs --check --exempt test:compile,test:e2e:coverage && npm run check:agent-primitives",
     "clean": "rm -rf dist extension/dist",
     "lint:package": "node scripts/check-package-pins.mjs",
     "lint:size": "node scripts/check-file-size-ratchet.mjs && node scripts/check-function-size-ratchet.mjs",
@@ -75,8 +76,8 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
-    "c8": "^12.0.0",
     "@vitest/browser-playwright": "^4.1.10",
+    "c8": "^12.0.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.7.0",
     "fake-indexeddb": "^6.2.5",
@@ -110,6 +111,8 @@
     ]
   },
   "dependencies": {
+    "events": "3.3.0",
+    "mpegts.js": "1.8.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   }

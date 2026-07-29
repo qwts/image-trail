@@ -41,10 +41,20 @@ export interface BufferedImageSettings {
 
 export interface BufferedImageNavigationState {
   readonly indices: Map<number, BufferedImageIndexState>;
+  readonly skippedIndices: ReadonlySet<number>;
   readonly cursor: number;
   readonly seek: BufferedImageSeek | null;
   readonly blockedOn: number | null;
   readonly settings: BufferedImageSettings;
+}
+
+export interface BufferedImageStatusSummary {
+  readonly total: number;
+  readonly warmed: number;
+  readonly warming: number;
+  readonly failed: number;
+  readonly skipped: number;
+  readonly unknown: number;
 }
 
 export type BufferedImageNavigationAction =
@@ -76,6 +86,7 @@ export function classifyBufferedImageIndex(s: BufferedImageIndexState | undefine
 export function createBufferedImageNavigationState(bufferN = 3): BufferedImageNavigationState {
   return {
     indices: new Map(),
+    skippedIndices: new Set(),
     cursor: 0,
     seek: null,
     blockedOn: null,
@@ -105,6 +116,43 @@ export function emptyBufferedImageIndex(): BufferedImageIndexState {
     imgElement: null,
     sha256: null,
   };
+}
+
+type BufferedImageCandidateOutcome = 'warmed' | 'warming' | 'failed' | 'skipped' | 'unknown';
+
+function bufferedImageCandidateOutcome(state: BufferedImageNavigationState, index: number): BufferedImageCandidateOutcome {
+  const entry = state.indices.get(index);
+  if (state.skippedIndices.has(index)) return 'skipped';
+  if (entry?.image === ImageStatus.OK) return 'warmed';
+  if (
+    entry?.manifest === ManifestStatus.HEAD_PENDING ||
+    entry?.image === ImageStatus.GET_PENDING ||
+    (entry?.manifest === ManifestStatus.PRESENT && entry.image === ImageStatus.UNKNOWN)
+  ) {
+    return 'warming';
+  }
+  if (entry?.manifest === ManifestStatus.FAILED_HEAD || entry?.image === ImageStatus.FAILED_GET) return 'failed';
+  return 'unknown';
+}
+
+/**
+ * URL-free outcome counts for the live preload window. The current cursor is the selected image,
+ * not a neighbor candidate, so it is intentionally excluded.
+ */
+export function summarizeBufferedImageWindow(state: BufferedImageNavigationState): BufferedImageStatusSummary {
+  const summary = {
+    total: 0,
+    warmed: 0,
+    warming: 0,
+    failed: 0,
+    skipped: 0,
+    unknown: 0,
+  };
+  for (const index of bufferedPreloadWindowIndices(state.cursor, state.settings.bufferN)) {
+    summary.total += 1;
+    summary[bufferedImageCandidateOutcome(state, index)] += 1;
+  }
+  return summary;
 }
 
 export function reduceBufferedImageNavigation(
@@ -153,7 +201,9 @@ export function reduceBufferedImageNavigation(
     case 'EVICT': {
       const indices = new Map(state.indices);
       indices.delete(action.index);
-      return { ...state, indices };
+      const skippedIndices = new Set(state.skippedIndices);
+      skippedIndices.delete(action.index);
+      return { ...state, indices, skippedIndices };
     }
   }
 }
@@ -175,6 +225,7 @@ function advanceBufferedImageNavigation(state: BufferedImageNavigationState): Bu
   let seek: BufferedImageSeek | null = state.seek;
   let blockedOn: number | null = null;
   let skipCount = 0;
+  let skippedIndices: ReadonlySet<number> = state.skippedIndices;
   while (seek && seek.remaining > 0) {
     const next = position + seek.dir;
     const bucket = classifyBufferedImageIndex(state.indices.get(next));
@@ -191,6 +242,7 @@ function advanceBufferedImageNavigation(state: BufferedImageNavigationState): Bu
       continue;
     }
     if (bucket === NavigationBucket.SKIPPABLE) {
+      if (!skippedIndices.has(next)) skippedIndices = new Set([...skippedIndices, next]);
       skipCount += 1;
       if (skipCount >= state.settings.probeK) {
         seek = null;
@@ -207,5 +259,5 @@ function advanceBufferedImageNavigation(state: BufferedImageNavigationState): Bu
     seek = null;
     blockedOn = null;
   }
-  return { ...state, cursor, seek, blockedOn };
+  return { ...state, skippedIndices, cursor, seek, blockedOn };
 }

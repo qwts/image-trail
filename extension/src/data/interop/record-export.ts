@@ -1,6 +1,7 @@
 import * as v from 'valibot';
 
 import type { InteropReviewCategory, InteropRevisionVector } from '../../core/interop/contract.js';
+import { interopMediaBlockForOriginal, withInteropMediaBlock } from '../../core/interop/media.js';
 import { interopRecordSchema, type InteropBlobReference, type InteropRecord } from '../../core/interop/records.js';
 import { sha256 } from '../../core/interop/transport.js';
 import { openBlobPayload } from '../crypto/binary-envelope.js';
@@ -106,6 +107,12 @@ function thumbnailReference(payload: ExportPayload): InteropBlobReference {
   };
 }
 
+function roundTripMetadata(payload: ExportPayload, existing?: InteropRecord['roundTripMetadata']): InteropRecord['roundTripMetadata'] {
+  const base = existing ?? { imageTrail: {}, overlook: {} };
+  const media = interopMediaBlockForOriginal(payload.storedOriginal);
+  return media ? { ...base, overlook: withInteropMediaBlock(base.overlook, media) } : base;
+}
+
 function canonicalRecord(
   localId: string,
   payload: ExportPayload,
@@ -147,7 +154,7 @@ function canonicalRecord(
     original: originalReference(payload, original),
     thumbnail: thumbnailReference(payload),
     albumIds: [],
-    roundTripMetadata: { imageTrail: {}, overlook: {} },
+    roundTripMetadata: roundTripMetadata(payload),
     deletedAt: null,
   });
 }
@@ -164,6 +171,7 @@ function custody(
         ...existing.record,
         identity: original ? { ...existing.record.identity, contentHash: original.contentHash } : existing.record.identity,
         original: originalReference(payload, original),
+        roundTripMetadata: roundTripMetadata(payload, existing.record.roundTripMetadata),
       }
     : canonicalRecord(localId, payload, createId(), original);
   if (record === null) return null;

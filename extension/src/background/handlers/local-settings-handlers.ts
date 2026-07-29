@@ -4,7 +4,20 @@ import {
   migrateLocalSettings,
   type PlaintextLocalSettings,
 } from '../../data/local-settings.js';
-import type { SaveLocalSettingsMessage } from '../messages.js';
+import type { SearchableMetadataPolicy } from '../../core/metadata-policy.js';
+import { updateBlobKeyInactivityTimeout } from '../../data/crypto/blob-keyring.js';
+import { defineMessage, type MessageDef } from '../message-dispatch.js';
+import * as requestSchemas from '../message-schemas.js';
+import {
+  MessageType,
+  createLoadLocalSettingsResultMessage,
+  createSaveLocalSettingsResultMessage,
+  type ExtensionRequest,
+  type ExtensionResponse,
+  type LoadLocalSettingsMessage,
+  type SaveLocalSettingsMessage,
+} from '../messages.js';
+import type { RecentHistoryCache } from '../recent-history-cache.js';
 import { createSettingsChangeMessage } from '../settings-change-message.js';
 
 export interface LocalSettingsStorageArea {
@@ -15,6 +28,40 @@ export interface LocalSettingsStorageArea {
 export interface SettingsTabMessenger {
   query(queryInfo: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]>;
   sendMessage(tabId: number, message: unknown): Promise<unknown>;
+}
+
+type LocalSettingsRequestType = typeof MessageType.LoadLocalSettings | typeof MessageType.SaveLocalSettings;
+
+export function createLocalSettingsMessageRegistry(deps: {
+  readonly recentHistoryCache: RecentHistoryCache;
+  readonly reconcileSearchableMetadataPolicy: (policy: SearchableMetadataPolicy) => Promise<void>;
+}): Record<LocalSettingsRequestType, MessageDef<ExtensionRequest, ExtensionResponse>> {
+  return {
+    [MessageType.LoadLocalSettings]: defineMessage({
+      requestSchema: requestSchemas.loadLocalSettingsRequestSchema,
+      handle: (_message: LoadLocalSettingsMessage) => handleLoadLocalSettings(),
+      respond: (result) => createLoadLocalSettingsResultMessage(result),
+      fallback: () => createLoadLocalSettingsResultMessage({ ok: false, message: 'Local settings could not be loaded.' }),
+    }),
+    [MessageType.SaveLocalSettings]: defineMessage({
+      requestSchema: requestSchemas.saveLocalSettingsRequestSchema,
+      handle: async (message: SaveLocalSettingsMessage) => {
+        await deps.recentHistoryCache.ready();
+        const result = await handleSaveLocalSettings(message, chrome.storage.local, chrome.tabs, (settings) => {
+          deps.recentHistoryCache.pruneForSettings(settings);
+        });
+        await deps.recentHistoryCache.flush();
+        if (result.ok) {
+          const saved = await loadLocalSettings();
+          await deps.reconcileSearchableMetadataPolicy(saved.searchableMetadataPolicy);
+          await updateBlobKeyInactivityTimeout(saved.blobKeyInactivityTimeoutMinutes);
+        }
+        return result;
+      },
+      respond: (result) => createSaveLocalSettingsResultMessage(result),
+      fallback: () => createSaveLocalSettingsResultMessage({ ok: false }),
+    }),
+  };
 }
 
 export async function loadLocalSettings(storage: LocalSettingsStorageArea = chrome.storage.local): Promise<PlaintextLocalSettings> {

@@ -7,7 +7,11 @@ import {
   reducePanelAction,
 } from '../extension/src/core/actions.js';
 import { createInitialPanelState } from '../extension/src/core/state.js';
+import { applyFieldSplitSpecs, createFieldSplitSpec } from '../extension/src/core/url/field-splits.js';
+import { applyFieldDigitWidthSpecs } from '../extension/src/core/url/field-widths.js';
 import { parseUrl } from '../extension/src/core/url/parse-url.js';
+import { rebuildUrl } from '../extension/src/core/url/rebuild-url.js';
+import { collectUrlFields } from '../extension/src/core/url/tokenize-fields.js';
 import { nextParsedFieldStatePageKey, shouldRestoreParsedFieldState } from '../extension/src/ui/panel.js';
 import type { UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from '../extension/src/core/url/types.js';
 import type { UrlTemplateRecord } from '../extension/src/core/url/templates.js';
@@ -157,14 +161,14 @@ test('clearing split specs collapses fields and clears related markers', () => {
   };
   const state = {
     ...createInitialPanelState(),
-    activeFieldId: 'q:0:2',
-    failedFieldId: 'q:0:1',
-    successfulFieldIds: ['q:0:0', 'q:0:2', 'q:1:0'],
-    unchangedFieldIds: ['q:0:1'],
-    unlockedFieldIds: ['q:0:0', 'q:0:2'],
-    manuallyExcludedFieldIds: ['q:0:1'],
+    activeFieldId: 'q:0:0:s:2',
+    failedFieldId: 'q:0:0:s:1',
+    successfulFieldIds: ['q:0:0', 'q:0:0:s:2', 'q:1:0'],
+    unchangedFieldIds: ['q:0:0:s:1'],
+    unlockedFieldIds: ['q:0:0', 'q:0:0:s:2'],
+    manuallyExcludedFieldIds: ['q:0:0:s:1'],
     fieldSplitSpecs: [splitSpec],
-    fieldDigitWidthSpecs: [{ fieldId: 'q:0:2', width: 4 }],
+    fieldDigitWidthSpecs: [{ fieldId: 'q:0:0:s:2', width: 4 }],
   };
 
   const next = reducePanelAction(state, { name: 'field/transform', fieldId: 'q:0:0', transformId: 'split-clear' });
@@ -203,6 +207,47 @@ test('reapplying identical split spec preserves state reference', () => {
   assert.equal(next, state);
 });
 
+test('splitting an earlier token preserves later field widths and markers by stable identity', () => {
+  const url = 'https://example.com/gallery/2024-456-789/photo.jpg';
+  const model = parseUrl(url);
+  const fields = collectUrlFields(model);
+  const splitTarget = fields.find((field) => field.value === '2024');
+  const widthTarget = fields.find((field) => field.value === '789');
+  assert.ok(splitTarget);
+  assert.ok(widthTarget);
+  assert.equal(widthTarget.id, 'p:3:4');
+  const splitSpec = createFieldSplitSpec(splitTarget, '1-1-2');
+  assert.ok(!('ok' in splitSpec));
+  const state = {
+    ...createInitialPanelState(),
+    activeFieldId: widthTarget.id,
+    successfulFieldIds: [widthTarget.id],
+    unlockedFieldIds: [widthTarget.id],
+    fieldDigitWidthSpecs: [{ fieldId: widthTarget.id, width: 6 }],
+  };
+
+  const splitState = applyFieldSplitSpecToState(state, splitSpec);
+  assert.equal(splitState.activeFieldId, widthTarget.id);
+  assert.deepEqual(splitState.successfulFieldIds, [widthTarget.id]);
+  assert.deepEqual(splitState.unlockedFieldIds, [widthTarget.id]);
+  assert.deepEqual(splitState.fieldDigitWidthSpecs, [{ fieldId: widthTarget.id, width: 6 }]);
+
+  const projected = applyFieldDigitWidthSpecs(applyFieldSplitSpecs(model, splitState.fieldSplitSpecs), splitState.fieldDigitWidthSpecs);
+  assert.equal(rebuildUrl(projected), 'https://example.com/gallery/2024-456-000789/photo.jpg');
+  assert.equal(collectUrlFields(projected).find((field) => field.value === '456')?.id, 'p:3:2');
+  assert.equal(collectUrlFields(projected).find((field) => field.value === '000789')?.id, widthTarget.id);
+
+  const cleared = reducePanelAction(splitState, {
+    name: 'field/transform',
+    fieldId: splitSpec.baseFieldId,
+    transformId: 'split-clear',
+  });
+  assert.equal(cleared.activeFieldId, widthTarget.id);
+  assert.deepEqual(cleared.successfulFieldIds, [widthTarget.id]);
+  assert.deepEqual(cleared.unlockedFieldIds, [widthTarget.id]);
+  assert.deepEqual(cleared.fieldDigitWidthSpecs, [{ fieldId: widthTarget.id, width: 6 }]);
+});
+
 test('pruning stale split specs clears related markers after split collapse', () => {
   const splitSpec: UrlFieldSplitSpec = {
     baseFieldId: 'q:0:0',
@@ -214,14 +259,14 @@ test('pruning stale split specs clears related markers after split collapse', ()
   };
   const state = {
     ...createInitialPanelState(),
-    activeFieldId: 'q:0:2',
-    failedFieldId: 'q:0:1',
-    successfulFieldIds: ['q:0:0', 'q:0:2', 'q:1:0'],
-    unchangedFieldIds: ['q:0:1'],
-    unlockedFieldIds: ['q:0:0', 'q:0:2'],
-    manuallyExcludedFieldIds: ['q:0:1'],
+    activeFieldId: 'q:0:0:s:2',
+    failedFieldId: 'q:0:0:s:1',
+    successfulFieldIds: ['q:0:0', 'q:0:0:s:2', 'q:1:0'],
+    unchangedFieldIds: ['q:0:0:s:1'],
+    unlockedFieldIds: ['q:0:0', 'q:0:0:s:2'],
+    manuallyExcludedFieldIds: ['q:0:0:s:1'],
     fieldSplitSpecs: [splitSpec],
-    fieldDigitWidthSpecs: [{ fieldId: 'q:0:2', width: 4 }],
+    fieldDigitWidthSpecs: [{ fieldId: 'q:0:0:s:2', width: 4 }],
   };
 
   const next = pruneInvalidFieldSplitSpecsFromState(state, parseUrl('https://example.test/image?date=112001'));
@@ -245,7 +290,7 @@ test('parsed field state restore revives saved field markers', () => {
     lengths: [2, 2],
     pattern: '2-2',
   };
-  const digitWidthSpec: UrlFieldDigitWidthSpec = { fieldId: 'q:0:1', width: 5 };
+  const digitWidthSpec: UrlFieldDigitWidthSpec = { fieldId: 'q:0:0:s:1', width: 5 };
 
   const next = reducePanelAction(createInitialPanelState(), {
     name: 'parsed-field-state/restore',
@@ -256,11 +301,11 @@ test('parsed field state restore revives saved field markers', () => {
       sourceUrl: 'https://cdn.example.test/image-0001.jpg',
       selectedUrl: 'https://cdn.example.test/image-0001.jpg',
       selectedHandleId: 'target-1',
-      activeFieldId: 'q:0:1',
-      failedFieldId: 'q:0:0',
-      successfulFieldIds: ['q:0:1'],
+      activeFieldId: 'q:0:0:s:1',
+      failedFieldId: 'q:0:0:s:0',
+      successfulFieldIds: ['q:0:0:s:1'],
       unchangedFieldIds: ['q:1:0'],
-      unlockedFieldIds: ['q:0:1'],
+      unlockedFieldIds: ['q:0:0:s:1'],
       manuallyExcludedFieldIds: ['q:2:0'],
       fieldSplitSpecs: [splitSpec],
       fieldDigitWidthSpecs: [digitWidthSpec],
@@ -269,11 +314,11 @@ test('parsed field state restore revives saved field markers', () => {
     },
   });
 
-  assert.equal(next.activeFieldId, 'q:0:1');
-  assert.equal(next.failedFieldId, 'q:0:0');
-  assert.deepEqual(next.successfulFieldIds, ['q:0:1']);
+  assert.equal(next.activeFieldId, 'q:0:0:s:1');
+  assert.equal(next.failedFieldId, 'q:0:0:s:0');
+  assert.deepEqual(next.successfulFieldIds, ['q:0:0:s:1']);
   assert.deepEqual(next.unchangedFieldIds, ['q:1:0']);
-  assert.deepEqual(next.unlockedFieldIds, ['q:0:1']);
+  assert.deepEqual(next.unlockedFieldIds, ['q:0:0:s:1']);
   assert.deepEqual(next.manuallyExcludedFieldIds, ['q:2:0']);
   assert.deepEqual(next.fieldSplitSpecs, [splitSpec]);
   assert.deepEqual(next.fieldDigitWidthSpecs, [digitWidthSpec]);

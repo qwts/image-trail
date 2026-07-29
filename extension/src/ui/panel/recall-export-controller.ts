@@ -11,14 +11,11 @@ import type {
 } from '../../content/pcloud-provider-client.js';
 import {
   exportEncryptedBookmarks,
-  exportEncryptedFullBackup,
   exportEncryptedHistory,
   exportPlainBookmarks,
   exportPlainHistory,
   exportUrlReviewStatus as exportUrlReviewStatusFile,
-  storedBlobRecordFromPortable,
   type AlbumBackupEntry,
-  type FullBackupBlobKeyBackup,
   type PlaintextLocalSettings,
 } from '../../content/panel-services.js';
 import { hostnameFromLocation } from '../panel-position.js';
@@ -35,12 +32,10 @@ import {
   bookmarkRecordToExportEntry,
   historyRecordToExportEntry,
   isLockedPrivatePin,
-  originalBlobIdsForFullBackup,
-  pcloudBackupFileName,
-  pcloudBackupUploadMessage,
   PRIVATE_PIN_EXPORT_LOCKED_MESSAGE,
   selectedRecords,
 } from './record-export-helpers.js';
+import { PCloudBackupExportCoordinator } from './pcloud-backup-export.js';
 import { SecureSessionUiController } from './secure-session-ui-controller.js';
 
 /**
@@ -75,9 +70,14 @@ export interface RecallExportControllerDeps {
 
 export class RecallExportController {
   private readonly secureSession: SecureSessionUiController;
+  private readonly pcloudBackup: PCloudBackupExportCoordinator;
 
   constructor(private readonly deps: RecallExportControllerDeps) {
     this.secureSession = new SecureSessionUiController(deps);
+    this.pcloudBackup = new PCloudBackupExportCoordinator({
+      ...deps,
+      loadAllBookmarks: () => this.loadAllBookmarksForExport(),
+    });
   }
 
   async setupBlobKey(password: string): Promise<void> {
@@ -150,147 +150,11 @@ export class RecallExportController {
   }
 
   async backupPCloudNow(password: string): Promise<void> {
-    if (this.deps.getState().pcloudBackup.connectionState === 'busy') return;
-    if (password.length < 4) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), {
-          name: 'pcloud-backup/upload-error',
-          message: 'Enter a cloud backup password with at least 4 characters before uploading.',
-        }),
-      );
-      this.deps.render();
-      return;
-    }
-
-    this.deps.setState(
-      reducePanelAction(this.deps.getState(), {
-        name: 'pcloud-backup/busy',
-        pendingOperation: 'backing-up',
-        message: 'Creating encrypted backup...',
-      }),
-    );
-    this.deps.render();
-
-    const bookmarks = await this.loadAllBookmarksForExport();
-    const albums = (await this.deps.albumStore()?.listBackupEntries()) ?? [];
-    if (bookmarks.some(isLockedPrivatePin)) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), { name: 'pcloud-backup/upload-error', message: PRIVATE_PIN_EXPORT_LOCKED_MESSAGE }),
-      );
-      this.deps.render();
-      return;
-    }
-    if (bookmarks.length === 0 && albums.length === 0) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), {
-          name: 'pcloud-backup/upload-error',
-          message: 'No durable pins, bookmarks, or albums to back up.',
-        }),
-      );
-      this.deps.render();
-      return;
-    }
-
-    const originalBlobIds = originalBlobIdsForFullBackup(bookmarks);
-    const captureStore = this.deps.captureStore();
-    const originalBlobResult =
-      originalBlobIds.length > 0 && captureStore
-        ? await captureStore.requestOriginalBlobRecords(originalBlobIds)
-        : { ok: true as const, records: [], missingBlobIds: originalBlobIds };
-    if (!originalBlobResult.ok) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), { name: 'pcloud-backup/upload-error', message: originalBlobResult.message }),
-      );
-      this.deps.render();
-      return;
-    }
-    const originalBlobRecords = originalBlobResult.records.map(storedBlobRecordFromPortable);
-
-    const blobKeyBackupResult = await this.exportBlobKeyBackupsForOriginalRecords(originalBlobRecords, password);
-    if (!blobKeyBackupResult.ok) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), { name: 'pcloud-backup/upload-error', message: blobKeyBackupResult.message }),
-      );
-      this.deps.render();
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const exportResult = await exportEncryptedFullBackup({
-      bookmarks: bookmarks.map(bookmarkRecordToExportEntry),
-      albums,
-      originalBlobs: originalBlobRecords,
-      blobKeyBackups: blobKeyBackupResult.backups,
-      missingOriginalBlobIds: originalBlobResult.missingBlobIds,
-      password,
-      now,
-    });
-    if (!exportResult.status.ok || !exportResult.fileContent) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), { name: 'pcloud-backup/upload-error', message: exportResult.status.message }),
-      );
-      this.deps.render();
-      return;
-    }
-
-    this.deps.setState(
-      reducePanelAction(this.deps.getState(), {
-        name: 'pcloud-backup/busy',
-        pendingOperation: 'backing-up',
-        message: 'Uploading encrypted backup to pCloud...',
-      }),
-    );
-    this.deps.render();
-
-    const upload = await this.deps.uploadPCloudBackup({
-      fileName: pcloudBackupFileName(now),
-      fileContent: exportResult.fileContent,
-    });
-    if (!upload.ok) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), { name: 'pcloud-backup/upload-error', message: upload.message, status: upload.status }),
-      );
-      this.deps.render();
-      return;
-    }
-    const originalBytes = originalBlobRecords.reduce((total, record) => total + record.encryptedByteLength, 0);
-    this.deps.setState(
-      reducePanelAction(this.deps.getState(), {
-        name: 'pcloud-backup/upload-complete',
-        apiHost: upload.apiHost,
-        originalCount: originalBlobRecords.length,
-        originalBytes,
-        missingOriginalCount: originalBlobResult.missingBlobIds.length,
-        historyRecord: upload.historyRecord,
-        message: pcloudBackupUploadMessage(
-          upload.message,
-          originalBlobRecords.length,
-          originalBytes,
-          originalBlobResult.missingBlobIds.length,
-        ),
-      }),
-    );
-    this.deps.render();
+    return this.pcloudBackup.backup(password);
   }
 
-  private async exportBlobKeyBackupsForOriginalRecords(
-    originalBlobRecords: readonly ReturnType<typeof storedBlobRecordFromPortable>[],
-    password: string,
-  ): Promise<
-    { readonly ok: true; readonly backups: readonly FullBackupBlobKeyBackup[] } | { readonly ok: false; readonly message: string }
-  > {
-    if (originalBlobRecords.length === 0) return { ok: true, backups: [] };
-    const captureStore = this.deps.captureStore();
-    if (!captureStore) return { ok: false, message: 'Encrypted original storage is unavailable; no bookmarks were backed up.' };
-
-    const backups: FullBackupBlobKeyBackup[] = [];
-    const keyReferences = [...new Set(originalBlobRecords.map((record) => record.key.reference))].sort();
-    for (const keyReference of keyReferences) {
-      const backup = await captureStore.exportBlobKeyBackup(password, keyReference);
-      if (!backup.ok) return { ok: false, message: backup.message };
-      backups.push({ keyReference: backup.keyReference, fileContent: backup.fileContent });
-    }
-    return { ok: true, backups };
+  cancelPCloudBackup(): void {
+    this.pcloudBackup.cancel();
   }
 
   async exportHistory(password: string, plaintext: boolean): Promise<void> {
@@ -430,7 +294,6 @@ export class RecallExportController {
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/complete', message }));
     this.deps.render();
   }
-
   private selectedImageDownloadRecords(): readonly ImageDisplayRecord[] {
     return [
       ...(this.deps.getState().selectedHistoryIds.length > 0
@@ -496,7 +359,7 @@ export class RecallExportController {
       this.deps.setState(
         reducePanelAction(this.deps.getState(), {
           name: 'import-export/error',
-          message: 'Select an image before exporting encrypted images.',
+          message: 'Select an image record before exporting encrypted images.',
         }),
       );
       this.deps.render();
@@ -516,7 +379,6 @@ export class RecallExportController {
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/complete', message }));
     this.deps.render();
   }
-
   private encryptedImageExportTargets(): readonly {
     readonly url: string;
     readonly fileName: string;
@@ -524,11 +386,13 @@ export class RecallExportController {
   }[] {
     const selected = this.selectedImageDownloadRecords();
     if (selected.length > 0) {
-      return selected.map((record) => ({
-        url: record.url,
-        fileName: filenameForExportedImageRecord(record),
-        blobId: encryptedBlobIdForRecord(record),
-      }));
+      return selected
+        .filter((record) => record.storedOriginal?.mimeType?.startsWith('image/') !== false)
+        .map((record) => ({
+          url: record.url,
+          fileName: filenameForExportedImageRecord(record),
+          blobId: encryptedBlobIdForRecord(record),
+        }));
     }
     const urls = selectImageDownloadUrls({
       history: this.deps.getState().history,

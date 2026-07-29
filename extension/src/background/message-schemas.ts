@@ -73,6 +73,7 @@ export const captureImageRequestSchema = v.object({
   url: v.string(),
   sourceRecordId: v.optional(v.string()),
   sourceType: captureSourceTypeSchema,
+  fileName: v.optional(v.string()),
 });
 
 export const downloadImageRequestSchema = v.object({
@@ -286,4 +287,5 @@ export const grantPermissionAndCaptureRequestSchema = v.object({
   url: v.string(),
   sourceType: captureSourceTypeSchema,
   sourceRecordId: v.optional(v.string()),
+  fileName: v.optional(v.string()),
 });

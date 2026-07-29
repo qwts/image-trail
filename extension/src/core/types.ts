@@ -20,13 +20,15 @@ import type { RecentHistoryScope } from './recent-history-scope.js';
 import type { LibraryPanelState, RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
 import type { SessionInactivityTimeoutMinutes } from './secure-session-policy.js';
 import type { SecureSessionPanelAction } from './secure-session-actions.js';
+import type { ParsedFieldResetBaseline, ParsedFieldStateRecord } from './parsed-field-state-types.js';
 
 export type { RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
 export type { BookmarkStore } from './bookmark-store.js';
+export type { ParsedFieldResetBaseline, ParsedFieldStateRecord } from './parsed-field-state-types.js';
 
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
-
+type CloudBackupControlActionName = 'cloud-backup/disconnect' | 'cloud-backup/cancel';
 export interface TargetState {
   readonly mode: 'auto' | 'manual' | 'none';
   readonly picking: boolean;
@@ -80,37 +82,6 @@ export interface UrlTemplateStore {
   saveGrabSourcePattern(pattern: GrabSourcePattern): Promise<void>;
   remove(hostname: string, id: string): Promise<void>;
   removeGrabSourcePattern(hostname: string, id: string): Promise<void>;
-}
-
-export interface ParsedFieldStateRecord {
-  readonly schemaVersion: 1;
-  readonly hostname: string;
-  readonly pageUrl: string;
-  readonly sourceUrl: string;
-  readonly selectedUrl: string | null;
-  readonly selectedHandleId: string | null;
-  readonly activeFieldId: string | null;
-  readonly failedFieldId: string | null;
-  readonly successfulFieldIds: readonly string[];
-  readonly unchangedFieldIds: readonly string[];
-  readonly unlockedFieldIds: readonly string[];
-  readonly manuallyExcludedFieldIds: readonly string[];
-  readonly fieldSplitSpecs: readonly UrlFieldSplitSpec[];
-  readonly fieldDigitWidthSpecs?: readonly UrlFieldDigitWidthSpec[] | undefined;
-  readonly activeUrlTemplateId: string | null;
-  readonly updatedAt: string;
-}
-
-export interface ParsedFieldResetBaseline {
-  readonly sourceUrl: string;
-  readonly activeFieldId: string | null;
-  readonly failedFieldId: string | null;
-  readonly successfulFieldIds: readonly string[];
-  readonly unchangedFieldIds: readonly string[];
-  readonly unlockedFieldIds: readonly string[];
-  readonly manuallyExcludedFieldIds: readonly string[];
-  readonly fieldSplitSpecs: readonly UrlFieldSplitSpec[];
-  readonly fieldDigitWidthSpecs: readonly UrlFieldDigitWidthSpec[];
 }
 
 export interface ParsedFieldStateStore {
@@ -328,7 +299,7 @@ export type PanelActionName =
   | 'cloud-backup/backup-now'
   | 'cloud-backup/choose-restore'
   | 'cloud-backup/retry'
-  | 'cloud-backup/disconnect'
+  | CloudBackupControlActionName
   | 'export/history'
   | 'export/bookmarks'
   | 'export/image'
@@ -443,7 +414,7 @@ export type PanelAction =
         | 'cloud-backup/backup-now'
         | 'cloud-backup/choose-restore'
         | 'cloud-backup/retry'
-        | 'cloud-backup/disconnect'
+        | CloudBackupControlActionName
         | 'export/history'
         | 'export/bookmarks'
         | 'export/image'
@@ -619,7 +590,7 @@ export type PanelAction =
       readonly password: string;
     }
   | { readonly name: 'cloud-backup/retry'; readonly provider: 'pcloud' }
-  | { readonly name: 'cloud-backup/disconnect'; readonly provider: 'pcloud' }
+  | { readonly name: CloudBackupControlActionName; readonly provider: 'pcloud' }
   | { readonly name: 'export/history' | 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
   | { readonly name: 'export/url-review-status' }
   | { readonly name: 'clear/url-review-status'; readonly scope?: 'hostname' | 'page' | 'source' | 'all' }

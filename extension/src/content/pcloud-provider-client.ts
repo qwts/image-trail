@@ -13,8 +13,12 @@ import {
   isUploadPCloudBackupResultMessage,
 } from '../background/messages.js';
 import type {
+  PCloudBackupCleanupInput,
+  PCloudBackupCleanupResult,
   PCloudBackupDownloadInput,
   PCloudBackupDownloadResult,
+  PCloudBackupFileUploadInput,
+  PCloudBackupFileUploadResult,
   PCloudBackupListResult,
   PCloudBackupUploadInput,
   PCloudBackupUploadResult,
@@ -73,20 +77,28 @@ export async function disconnectPCloudProvider(): Promise<PCloudProviderResult> 
   return { ok: false, status, message: status.message };
 }
 
+export function uploadPCloudBackup(input: PCloudBackupFileUploadInput): Promise<PCloudBackupFileUploadResult>;
+export function uploadPCloudBackup(input: PCloudBackupCleanupInput): Promise<PCloudBackupCleanupResult>;
+export function uploadPCloudBackup(input: PCloudBackupUploadInput): Promise<PCloudBackupUploadResult>;
 export async function uploadPCloudBackup(input: PCloudBackupUploadInput): Promise<PCloudBackupUploadResult> {
   if (!hasRuntimeMessaging()) {
     const message = 'pCloud backup upload is only available in the extension runtime.';
-    return { ok: false, status: { connected: false, message, messageIsError: true }, reason: 'runtime-unavailable', message };
+    return failedPCloudOperation(input, 'runtime-unavailable', message);
   }
   try {
     const response = await sendRuntimeMessage(createUploadPCloudBackupMessage(input));
     if (isUploadPCloudBackupResultMessage(response)) return response.payload;
   } catch {
     const message = 'pCloud backup upload failed.';
-    return { ok: false, status: { connected: false, message, messageIsError: true }, reason: 'upload-failed', message };
+    return failedPCloudOperation(input, 'upload-failed', message);
   }
   const message = 'pCloud backup upload failed.';
-  return { ok: false, status: { connected: false, message, messageIsError: true }, reason: 'upload-failed', message };
+  return failedPCloudOperation(input, 'upload-failed', message);
+}
+
+function failedPCloudOperation(input: PCloudBackupUploadInput, reason: string, message: string): PCloudBackupUploadResult {
+  const base = { ok: false as const, status: { connected: false, message, messageIsError: true }, reason, message };
+  return input.operation === 'cleanup' ? { ...base, deletedFileIds: [], failedFileIds: input.fileIds } : base;
 }
 
 export async function listPCloudBackups(): Promise<PCloudBackupListResult> {
