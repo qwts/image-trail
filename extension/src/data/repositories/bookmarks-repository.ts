@@ -116,15 +116,6 @@ export class BookmarksRepository {
     return { totalBytes, blobCount, thumbnails: { count: thumbnailCount, totalBytes: thumbnailBytes } };
   }
 
-  async hasEncryptedUrlPrefix(prefix: string): Promise<boolean> {
-    if (!prefix) return false;
-    const transaction = this.db.transaction(DataStore.Bookmarks, 'readonly');
-    const index = transaction.objectStore(DataStore.Bookmarks).index(SchemaIndex.BookmarksByUrl);
-    const key = await requestToPromise<IDBValidKey | undefined>(index.getKey(IDBKeyRange.bound(prefix, `${prefix}\uffff`)));
-    await transactionDone(transaction);
-    return key !== undefined;
-  }
-
   async getInteropCustodyPresence(): Promise<boolean | undefined> {
     const transaction = this.db.transaction(DataStore.Metadata, 'readonly');
     const raw = await requestToPromise<unknown>(transaction.objectStore(DataStore.Metadata).get(INTEROP_CUSTODY_PRESENCE_KEY));

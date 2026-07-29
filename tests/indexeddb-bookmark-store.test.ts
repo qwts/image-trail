@@ -257,7 +257,7 @@ test('IndexedDbBookmarkStore finds saved rows by URL without moving queue order'
   }
 });
 
-test('IndexedDbBookmarkStore skips the decrypt-all interop fallback when no interop custody row exists', async () => {
+test('IndexedDbBookmarkStore reuses the custody-absence marker established by its first save', async () => {
   await deleteImageTrailDb();
   const store = new IndexedDbBookmarkStore();
   const originalListEncrypted = BookmarksRepository.prototype.listEncrypted;
@@ -277,6 +277,7 @@ test('IndexedDbBookmarkStore skips the decrypt-all interop fallback when no inte
     };
 
     assert.equal(await store.findByUrl('https://example.test/missing.jpg'), null);
+    assert.equal(await store.findByUrl('https://example.test/still-missing.jpg'), null);
     await store.save(
       createDisplayRecord({
         id: 'https://example.test/new.jpg',
