@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fetchImageBytes } from '../extension/src/background/fetch-image.js';
+import { fetchImageBytes, preferredCaptureFileName } from '../extension/src/background/fetch-image.js';
 
 test('fetchImageBytes does not pass page URLs as service worker referrers', async () => {
   const calls: RequestInit[] = [];
@@ -126,6 +126,22 @@ test('fetchImageBytes recognizes direct MPEG-TS by signature and preserves the o
     assert.deepEqual([result.width, result.height], [64, 64]);
     assert.equal(result.mediaInfo?.kind, 'mpeg-ts');
     assert.deepEqual(new Uint8Array(result.bytes), new Uint8Array(bytes));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('verified MPEG-TS classification overrides an extensionless requested filename', async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = readFileSync('tests/fixtures/mpeg-ts/supported-h264-aac.mpegts');
+  globalThis.fetch = async () => new Response(bytes, { status: 200, headers: { 'content-type': 'video/mp2t' } });
+
+  try {
+    const result = await fetchImageBytes('https://cdn.example.test/stream');
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.fileName, 'stream.ts');
+    assert.equal(preferredCaptureFileName(result, 'stream'), 'stream.ts');
   } finally {
     globalThis.fetch = originalFetch;
   }
