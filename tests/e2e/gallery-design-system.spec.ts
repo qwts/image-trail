@@ -104,6 +104,8 @@ test('Gallery uses the shared design system without mutating durable queue order
   await clearDurableQueue(page);
   await seedGallery(page, seedRecords);
   await expect(page.locator('.image-trail-gallery__card')).toHaveCount(3);
+  await page.waitForTimeout(250);
+  await installGalleryLoadProbe(page);
 
   await expect(page.getByRole('heading', { name: 'Gallery', level: 1 })).toBeVisible();
   await expect(page.locator('.image-trail-gallery')).toHaveClass(/image-trail-panel-root/u);
@@ -142,6 +144,11 @@ test('Gallery uses the shared design system without mutating durable queue order
   await expect(page.locator('.image-trail-gallery__card-title')).toHaveText('Alpine lake');
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await expect(page.locator('.image-trail-gallery__card')).toHaveCount(3);
+  expect(await galleryLoadCalls(page)).toBe(0);
+
+  await page.getByRole('button', { name: 'Reload' }).click();
+  await expect.poll(() => galleryLoadCalls(page)).toBe(1);
+  await expect(page.locator('.image-trail-gallery__card')).toHaveCount(3);
 
   await page.getByRole('textbox', { name: 'New album' }).fill(galleryAlbumName);
   await page.getByRole('button', { name: 'Create album' }).click();
@@ -173,6 +180,26 @@ test('Gallery uses the shared design system without mutating durable queue order
 async function openGallery(page: Page, extensionId: string): Promise<void> {
   await page.goto(`chrome-extension://${extensionId}/src/gallery/gallery.html`);
   await expect(page.getByRole('heading', { name: 'Gallery', level: 1 })).toBeVisible();
+}
+
+async function installGalleryLoadProbe(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const probe = globalThis as typeof globalThis & { __galleryLoadBookmarkCalls?: number };
+    const runtime = chrome.runtime as unknown as { sendMessage: (...args: unknown[]) => Promise<unknown> };
+    const original = runtime.sendMessage.bind(chrome.runtime);
+    probe.__galleryLoadBookmarkCalls = 0;
+    runtime.sendMessage = (...args: unknown[]) => {
+      const message = args[0] as { readonly type?: string; readonly payload?: { readonly limit?: number } } | undefined;
+      if (message?.type === 'imageTrail.loadBookmarks' && message.payload?.limit === 100) {
+        probe.__galleryLoadBookmarkCalls = (probe.__galleryLoadBookmarkCalls ?? 0) + 1;
+      }
+      return original(...args);
+    };
+  });
+}
+
+async function galleryLoadCalls(page: Page): Promise<number> {
+  return page.evaluate(() => (globalThis as typeof globalThis & { __galleryLoadBookmarkCalls?: number }).__galleryLoadBookmarkCalls ?? 0);
 }
 
 async function seedGallery(page: Page, records: readonly SeedRecord[]): Promise<void> {

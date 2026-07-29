@@ -1,5 +1,5 @@
 import { DomObserver } from '../../content/dom-observer.js';
-import { detectPageContext } from '../../content/page-context-detection.js';
+import { PageContextDetector, pageContextMutationAffectsDetection } from '../../content/page-context-detection.js';
 import type { PlaintextLocalSettings } from '../../content/panel-services.js';
 import {
   normalizePageContextScope,
@@ -31,10 +31,68 @@ export interface PageContextControllerDeps {
 }
 
 function defaultEnvironment(): PageContextControllerEnvironment {
+  const detector = new PageContextDetector();
   return {
-    detect: () => detectPageContext(),
+    detect: () => detector.detect(),
     hostname: () => window.location.hostname,
-    createObserver: (onRefresh) => new DomObserver(onRefresh),
+    createObserver: (onRefresh) => {
+      const observer = new DomObserver(onRefresh, {
+        mutationFilter: pageContextMutationAffectsDetection,
+        onMutations: (records) => detector.invalidate(records),
+        observe: {
+          attributes: true,
+          attributeFilter: [
+            'class',
+            'data-full-src',
+            'data-image-url',
+            'data-media-url',
+            'data-original',
+            'data-src',
+            'data-zoom-src',
+            'disabled',
+            'height',
+            'hidden',
+            'href',
+            'media',
+            'rel',
+            'role',
+            'sizes',
+            'src',
+            'srcset',
+            'style',
+            'width',
+          ],
+          childList: true,
+          subtree: true,
+        },
+      });
+      const handleLoad = (event: Event): void => {
+        if (!(event.target instanceof HTMLImageElement)) return;
+        detector.invalidateImage(event.target);
+        observer.requestRefresh();
+      };
+      const handleLayoutChange = (): void => {
+        detector.clear();
+        observer.requestRefresh();
+      };
+      const handleVisibilityChange = (): void => {
+        if (document.visibilityState === 'visible') handleLayoutChange();
+      };
+      return {
+        start: () => {
+          observer.start();
+          document.addEventListener('load', handleLoad, true);
+          document.addEventListener('visibilitychange', handleVisibilityChange);
+          window.addEventListener('resize', handleLayoutChange);
+        },
+        stop: () => {
+          observer.stop();
+          document.removeEventListener('load', handleLoad, true);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          window.removeEventListener('resize', handleLayoutChange);
+        },
+      };
+    },
   };
 }
 

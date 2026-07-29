@@ -4,6 +4,7 @@ import 'fake-indexeddb/auto';
 import { IndexedDbBookmarkStore } from '../extension/src/data/bookmarks-controller.js';
 import { createDisplayRecord, type ImageDisplayRecord } from '../extension/src/core/display-records.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
+import { BookmarksRepository } from '../extension/src/data/repositories/bookmarks-repository.js';
 import { deleteImageTrailDb } from './indexeddb-test-helpers.js';
 
 test('IndexedDbBookmarkStore recalls saved bookmarks after a new store instance opens', async () => {
@@ -252,6 +253,43 @@ test('IndexedDbBookmarkStore finds saved rows by URL without moving queue order'
       before.items.map((item) => item.queueUpdatedAt),
     );
   } finally {
+    await store.close();
+  }
+});
+
+test('IndexedDbBookmarkStore reuses the custody-absence marker established by its first save', async () => {
+  await deleteImageTrailDb();
+  const store = new IndexedDbBookmarkStore();
+  const originalListEncrypted = BookmarksRepository.prototype.listEncrypted;
+  let fullStoreScans = 0;
+  try {
+    await store.save(
+      createDisplayRecord({
+        id: 'https://example.test/existing.jpg',
+        url: 'https://example.test/existing.jpg',
+        timestamp: '2026-06-19T00:00:00.000Z',
+        source: 'bookmark',
+      }),
+    );
+    BookmarksRepository.prototype.listEncrypted = function countedListEncrypted(): ReturnType<BookmarksRepository['listEncrypted']> {
+      fullStoreScans += 1;
+      return originalListEncrypted.call(this);
+    };
+
+    assert.equal(await store.findByUrl('https://example.test/missing.jpg'), null);
+    assert.equal(await store.findByUrl('https://example.test/still-missing.jpg'), null);
+    await store.save(
+      createDisplayRecord({
+        id: 'https://example.test/new.jpg',
+        url: 'https://example.test/new.jpg',
+        timestamp: '2026-06-19T00:00:01.000Z',
+        source: 'bookmark',
+      }),
+    );
+
+    assert.equal(fullStoreScans, 0);
+  } finally {
+    BookmarksRepository.prototype.listEncrypted = originalListEncrypted;
     await store.close();
   }
 });

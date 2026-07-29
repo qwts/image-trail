@@ -2,7 +2,12 @@ import type { ImageDisplayRecord } from '../core/display-records.js';
 import type { PlaintextLocalSettings } from '../data/local-settings.js';
 import { galleryListStore, missingAlbumRecordCount, type GalleryAlbumSummary } from './gallery-albums.js';
 import type { GalleryFilters } from './gallery-filters.js';
-import { loadGallerySearchPage, type GallerySearchPage, type GallerySearchStore } from './gallery-search-loader.js';
+import {
+  loadGallerySearchPage,
+  type GallerySearchPage,
+  type GallerySearchStore,
+  type GallerySourceCache,
+} from './gallery-search-loader.js';
 
 export interface GalleryBookmarkStore extends GallerySearchStore {
   loadByIds(ids: readonly string[]): Promise<readonly ImageDisplayRecord[]>;
@@ -12,6 +17,7 @@ type GalleryPageSettings = Pick<PlaintextLocalSettings, 'galleryPageLimit' | 'pr
 
 export async function loadGalleryPageForSelection(input: {
   readonly store: GalleryBookmarkStore;
+  readonly sourceCache?: GallerySourceCache | undefined;
   readonly album: GalleryAlbumSummary | null;
   readonly query: string;
   readonly filters: GalleryFilters;
@@ -22,6 +28,7 @@ export async function loadGalleryPageForSelection(input: {
     return {
       page: await loadGallerySearchPage({
         store: input.store,
+        sourceItems: input.sourceCache ? await input.sourceCache.load() : undefined,
         query: input.query,
         filters: input.filters,
         offset: input.offset,

@@ -40,6 +40,7 @@ export interface GrabSourcePattern {
 export interface UrlTemplateRecord {
   readonly id: string;
   readonly schemaVersion: 1;
+  readonly fieldIdVersion?: 2 | undefined;
   readonly hostname: string;
   readonly templateUrl: string;
   readonly matchRules: UrlTemplateMatchRules;
@@ -69,6 +70,7 @@ export function createUrlTemplateRecord(input: {
   return {
     id: input.existing?.id ?? templateId(matchRules),
     schemaVersion: 1,
+    fieldIdVersion: 2,
     hostname: matchRules.hostname,
     templateUrl,
     matchRules: input.existing?.matchRules ? { ...matchRules, mode: input.existing.matchRules.mode } : matchRules,
@@ -246,6 +248,7 @@ export function updateTemplateFields(input: {
   const matchRules = templateMatchRules(input.model, input.template.matchRules.mode);
   return {
     ...input.template,
+    fieldIdVersion: 2,
     hostname: matchRules.hostname,
     templateUrl: templateUrlForFields(input.model, included),
     matchRules,

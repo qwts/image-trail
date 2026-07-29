@@ -1,5 +1,15 @@
 # image-trail
 
+## 0.24.10
+
+### Patch Changes
+
+- 6726139: Prevent linked-page image discovery from sending credentials across origins or fetching pages without explicit host permission.
+- 818e1ea: Serve injected panel styles through per-session extension resource URLs to reduce installation fingerprinting.
+- 8a9c847: Encrypt parsed-field resume and URL review metadata at rest when URL-derived searchable metadata is set to encrypted.
+- ddb26bb: Retry IndexedDB after blocked or failed opens instead of leaving extension storage unavailable for the service worker lifetime.
+- abdb201: Require trusted search-page origins and HTTP(S) URLs before saving image-wrapper source links.
+
 ## 0.24.9
 
 ### Patch Changes
