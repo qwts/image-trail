@@ -50,6 +50,7 @@ test('linked-page fetch omits credentials across origins without forwarding the 
   assert.equal(result.ok, true);
   assert.equal(calls[0]?.input, 'https://target.example.test/page');
   assert.equal(calls[0]?.init?.credentials, 'omit');
+  assert.equal(calls[0]?.init?.redirect, 'manual');
   assert.equal('referrer' in calls[0]!.init!, false);
 });
 
@@ -72,6 +73,62 @@ test('linked-page fetch includes credentials only for same-origin source pages',
   assert.equal(sameOrigin.ok, true);
   assert.equal(malformedReferrer.ok, true);
   assert.deepEqual(credentials, ['include', 'omit']);
+});
+
+test('linked-page redirects are followed manually and drop credentials before crossing origins', async () => {
+  const calls: Array<{ readonly input: RequestInfo | URL; readonly credentials: RequestCredentials | undefined }> = [];
+  const checkedOrigins: string[] = [];
+  const result = await fetchLinkedPage(
+    createFetchLinkedPageMessage('https://secure.example.test/page', 'https://secure.example.test/gallery', 1024, 2000),
+    {
+      hasPermission: async (origin) => {
+        checkedOrigins.push(origin);
+        return true;
+      },
+      fetchImpl: async (input, init) => {
+        calls.push({ input, credentials: init?.credentials });
+        if (calls.length === 1) {
+          return new Response(null, {
+            status: 302,
+            headers: { location: 'https://cdn.example.test/landing' },
+          });
+        }
+        return new Response('<html></html>', { status: 200 });
+      },
+    },
+  );
+
+  assert.equal(result.ok && result.finalUrl, 'https://cdn.example.test/landing');
+  assert.deepEqual(checkedOrigins, ['https://secure.example.test', 'https://cdn.example.test']);
+  assert.deepEqual(calls, [
+    { input: 'https://secure.example.test/page', credentials: 'include' },
+    { input: 'https://cdn.example.test/landing', credentials: 'omit' },
+  ]);
+});
+
+test('linked-page redirects require target-origin permission before the redirected request', async () => {
+  const calls: string[] = [];
+  const result = await fetchLinkedPage(
+    createFetchLinkedPageMessage('https://secure.example.test/page', 'https://secure.example.test/gallery', 1024, 2000),
+    {
+      hasPermission: async (origin) => origin === 'https://secure.example.test',
+      fetchImpl: async (input) => {
+        calls.push(String(input));
+        return new Response(null, {
+          status: 302,
+          headers: { location: 'https://blocked.example.test/landing' },
+        });
+      },
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    reason: 'permission-needed',
+    message: 'Permission needed for https://blocked.example.test.',
+    origin: 'https://blocked.example.test',
+  });
+  assert.deepEqual(calls, ['https://secure.example.test/page']);
 });
 
 test('linked-page fetch rejects non-HTTP targets before permission or network access', async () => {
