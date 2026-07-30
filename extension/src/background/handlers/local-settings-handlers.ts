@@ -87,11 +87,11 @@ export async function handleSaveLocalSettings(
   message: SaveLocalSettingsMessage,
   storage: LocalSettingsStorageArea = chrome.storage.local,
   tabs: SettingsTabMessenger = chrome.tabs,
-  onSaved?: (settings: PlaintextLocalSettings) => void,
+  onSaved?: (settings: PlaintextLocalSettings) => void | Promise<void>,
 ): Promise<import('../messages.js').SaveLocalSettingsResultMessage['payload']> {
   const settings = migrateLocalSettings(message.payload.settings);
   await storage.set({ [LOCAL_SETTINGS_KEY]: settings });
-  onSaved?.(settings);
+  await onSaved?.(settings);
   await notifyInjectedPanels(tabs);
   return { ok: true };
 }

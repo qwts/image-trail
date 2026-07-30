@@ -76,6 +76,25 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     return (await this.loadPage({ offset: 0, limit: DEFAULT_LOCAL_SETTINGS.visibleBookmarkSoftMax })).items;
   }
 
+  async applySearchableMetadataPolicy(policy: SearchableMetadataPolicy): Promise<number> {
+    const context = await this.openContext();
+    if (!context || policy.urlDerived !== 'encrypted') return 0;
+    const updates: { uuid: string; url: string }[] = [];
+    for (const record of await context.repository.listEncrypted()) {
+      try {
+        const payload = await context.repository.openRecord(record, context.bookmarkKey.key);
+        if (payload.url.startsWith('data:image/')) continue;
+        const url = await bookmarkSearchIndexKey(payload.url, policy);
+        if (record.url !== url) updates.push({ uuid: record.uuid, url });
+      } catch {
+        // Unreadable records cannot be safely re-indexed; leave them untouched.
+      }
+    }
+    const updated = await context.repository.updateUrlIndexes(updates);
+    if (updated.length > 0) this.invalidateMergedRecordsCache();
+    return updated.length;
+  }
+
   async getStorageUsage(): Promise<StorageUsageSummary> {
     const context = await this.openContext();
     if (!context) return { totalBytes: 0, blobCount: 0, thumbnails: { count: 0, totalBytes: 0 } };

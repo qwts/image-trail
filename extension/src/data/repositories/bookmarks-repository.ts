@@ -207,6 +207,22 @@ export class BookmarksRepository {
     return hydrateRecord(DataStore.Bookmarks, encryptedBookmarkRecordSchema, result);
   }
 
+  async updateUrlIndexes(updates: readonly { readonly uuid: string; readonly url: string }[]): Promise<readonly EncryptedBookmarkRecord[]> {
+    if (updates.length === 0) return [];
+    const transaction = this.db.transaction(DataStore.Bookmarks, 'readwrite');
+    const store = transaction.objectStore(DataStore.Bookmarks);
+    const updated: EncryptedBookmarkRecord[] = [];
+    for (const update of updates) {
+      const existing = await requestToPromise<EncryptedBookmarkRecord | undefined>(store.get(update.uuid));
+      if (!existing || existing.url === update.url) continue;
+      const next = { ...existing, url: update.url };
+      store.put(next);
+      updated.push(next);
+    }
+    await transactionDone(transaction);
+    return updated;
+  }
+
   async remove(uuid: string): Promise<void> {
     const transaction = this.db.transaction(DataStore.Bookmarks, 'readwrite');
     transaction.objectStore(DataStore.Bookmarks).delete(uuid);

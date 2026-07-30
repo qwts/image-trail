@@ -70,7 +70,7 @@ test('saving the same URL twice under the encrypted policy dedups to a single re
   }
 });
 
-test('a legacy plaintext row is still found after switching to encrypted, and is never rewritten', async () => {
+test('a legacy plaintext row is found after switching to encrypted, then redacted when policy is applied', async () => {
   await deleteImageTrailDb();
   // Save under the default (plaintext) policy, then reopen under an encrypted policy.
   const plaintextStore = new IndexedDbBookmarkStore();
@@ -82,12 +82,16 @@ test('a legacy plaintext row is still found after switching to encrypted, and is
 
   const encryptedStore = new IndexedDbBookmarkStore({ getSearchableMetadataPolicy: () => ENCRYPTED_POLICY });
   try {
-    // Dual-encoding lookup resolves the legacy plaintext row without any migration pass.
+    // Dual-encoding lookup resolves the legacy plaintext row before the settings-save reconciliation runs.
     assert.equal((await encryptedStore.findByUrl(URL))?.url, URL, 'the legacy plaintext row is still found by URL');
+    assert.equal(await encryptedStore.applySearchableMetadataPolicy(ENCRYPTED_POLICY), 1);
   } finally {
     await encryptedStore.close();
   }
 
-  // Simply opening under a different policy must not have rewritten anything on disk.
-  assert.deepEqual(await indexPresence(), { plaintext: true, hashed: false }, 'the legacy row stays plaintext — never rewritten');
+  assert.deepEqual(
+    await indexPresence(),
+    { plaintext: false, hashed: true },
+    'the legacy row URL index is hashed after policy reconciliation',
+  );
 });
