@@ -6,6 +6,7 @@ import { packageDirFromModulePath } from './license-policy.mjs';
 const MINIFICATION_CHECK_BYTES = 1_024;
 const MAX_UNIMPROVED_RATIO = 0.98;
 const INJECTED_STYLESHEET = 'extension/src/ui/styles/panel-entry.css';
+const E2E_TEST_BUILD_ATTRIBUTE = 'data-image-trail-e2e-test-build';
 const MPEG_TS_PLAYER_SOURCE_FILTER =
   /[\\/]node_modules[\\/]mpegts\.js[\\/]src[\\/]player[\\/]player-engine-(main-thread|dedicated-thread)\.ts$/;
 const MPEG_TS_LOGGER_SOURCE_FILTER = /[\\/]node_modules[\\/]mpegts\.js[\\/]src[\\/]utils[\\/]logger\.js$/;
@@ -89,8 +90,8 @@ export function isInteropFeatureEnabled(environment = process.env) {
   return environment.IMAGE_TRAIL_ENABLE_INTEROP === '1';
 }
 
-export function opensPanelShadowForE2E(environment = process.env) {
-  return environment.IMAGE_TRAIL_E2E_OPEN_SHADOW === '1';
+export function isE2ETestBuild(environment = process.env) {
+  return environment.IMAGE_TRAIL_E2E_TEST_BUILD === '1';
 }
 
 export function extensionOutputPath(sourcePath, pathApi = path) {
@@ -113,7 +114,7 @@ export function extensionBuildOptions({
   jsx = null,
   release = isReleaseBuild(),
   interopEnabled = isInteropFeatureEnabled(),
-  openPanelShadowForE2E = opensPanelShadowForE2E(),
+  e2eTestBuild = isE2ETestBuild(),
   alias = null,
   define = {},
   plugins = [],
@@ -128,7 +129,8 @@ export function extensionBuildOptions({
     ...(jsx ? { jsx } : {}),
     define: {
       'process.env.NODE_ENV': '"production"',
-      __IMAGE_TRAIL_E2E_OPEN_SHADOW__: openPanelShadowForE2E ? 'true' : 'false',
+      __IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__: e2eTestBuild ? JSON.stringify(E2E_TEST_BUILD_ATTRIBUTE) : 'undefined',
+      __IMAGE_TRAIL_E2E_TEST_BUILD__: e2eTestBuild ? 'true' : 'false',
       __IMAGE_TRAIL_INTEROP_ENABLED__: interopEnabled ? 'true' : 'false',
       ...define,
     },

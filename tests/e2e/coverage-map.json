@@ -142,6 +142,8 @@
           "type": "unit-dom",
           "paths": [
             "tests/dom/panel-shell-view.test.ts",
+            "tests/dom/panel-mount.test.ts",
+            "tests/release-artifacts.test.ts",
             "tests/react-renderer-architecture.test.ts",
             "tests/function-size-ratchet.test.ts",
             "tests/dom/manual-controls-view.test.ts",
@@ -151,7 +153,7 @@
             "tests/dom/primitives.test.ts",
             "tests/primitives-css.test.ts"
           ],
-          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; always-visible navigation, capture, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
+          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, capture, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
         },
         {
           "type": "storybook",
@@ -175,7 +177,7 @@
             "tests/e2e/detachable-sections.spec.ts",
             "tests/e2e/react-renderer-boundary.spec.ts"
           ],
-          "notes": "Covers packaged-extension open/minimize/expand/close, approved standard and narrow panel geometry, deterministic handoff artifacts, capture feedback, grouped Settings and Help surfaces, Host selection, URL application, visible navigation and automation actions, More controls, detached windows, status refresh, detached select focus after native change events, and focus/scroll-preserving rerenders."
+          "notes": "Covers the explicit disposable E2E build intent plus packaged-extension open/minimize/expand/close, approved standard and narrow panel geometry, deterministic handoff artifacts, capture feedback, grouped Settings and Help surfaces, Host selection, URL application, visible navigation and automation actions, More controls, detached windows, status refresh, detached select focus after native change events, and focus/scroll-preserving rerenders."
         },
         {
           "type": "manual",

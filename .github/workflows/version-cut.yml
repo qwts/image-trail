@@ -5,7 +5,8 @@
 #  2. tag — after the version PR merges (package version changed, no pending
 #     changesets), tag v<version> and hand off to the release workflow.
 #
-# Both halves authenticate with RELEASE_TOKEN, for two compounding reasons:
+# Branch and tag pushes authenticate with RELEASE_TOKEN, for two compounding
+# reasons:
 #  - GITHUB_TOKEN events cannot trigger other workflows. The bot-refreshed
 #    version PR got no pull_request CI runs even though main requires the "CI"
 #    and "E2E gate" checks, and a GITHUB_TOKEN tag push fired no on:push:tags
@@ -16,20 +17,27 @@
 #    trigger Actions workflows", so the workaround stopped working too.
 # Under the PAT the actor is an authorized account and both events fire on their
 # own: the version PR gets real pull_request runs, and the tag push starts
-# release.yml directly. The PAT reaches only actions/* steps and our own `run:`
-# blocks — never a third-party action, which is why versioning is a script here
-# rather than changesets/action. If RELEASE_TOKEN is ever absent the jobs fall
-# back to GITHUB_TOKEN and still version and tag correctly; only the downstream
-# runs fail to start (re-dispatching by hand is not a fallback, because the bot
-# cannot dispatch either).
+# release.yml directly. Version PR creation is deliberately not automated here:
+# the rolling branch must already have an open PR authored by
+# qwts-codex-agent[bot]. GITHUB_TOKEN inspects that invariant and refreshes only
+# the PR body, so the workflow cannot create a human-authored release PR.
+#
+# The PAT reaches only actions/* steps and our own `run:` blocks — never a
+# third-party action, which is why versioning is a script here rather than
+# changesets/action. If RELEASE_TOKEN is ever absent the jobs fall back to
+# GITHUB_TOKEN and still version and tag correctly; only the downstream runs
+# fail to start.
 name: Version cut
 
 on:
   push:
     branches:
       - main
-  # Manual refresh / recovery for a cut whose tag or release dispatch failed.
-  workflow_dispatch:
+  # Default-branch-only refresh / recovery. Unlike workflow_dispatch, a
+  # repository_dispatch cannot select an untrusted branch's workflow file.
+  repository_dispatch:
+    types:
+      - version-cut-recovery
 
 concurrency:
   group: version-cut
@@ -146,29 +154,66 @@ jobs:
           } > "$RUNNER_TEMP/pr-body.md"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Push and create or refresh the ready version PR
+      - name: Verify the ready version PR
+        id: version_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: changeset-release/main
+        run: |
+          set -euo pipefail
+          pr_numbers=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[].number')
+          open_prs=()
+          if [ -n "$pr_numbers" ]; then
+            mapfile -t open_prs <<< "$pr_numbers"
+          fi
+          if [ "${#open_prs[@]}" -gt 1 ]; then
+            echo "::error::Refusing to refresh ${#open_prs[@]} open PRs for $BRANCH."
+            exit 1
+          fi
+          open="${open_prs[0]:-}"
+          if [ -z "$open" ]; then
+            echo 'missing=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          author=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$open" --jq '.user.login')
+          if [ "$author" != 'qwts-codex-agent[bot]' ]; then
+            echo "::error::Refusing to refresh PR #$open authored by $author; expected qwts-codex-agent[bot]."
+            exit 1
+          fi
+          echo 'missing=false' >> "$GITHUB_OUTPUT"
+          echo "number=$open" >> "$GITHUB_OUTPUT"
+
+      - name: Push the version branch
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           BRANCH: changeset-release/main
-          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           # The branch is a disposable projection of main + the pending
           # changesets, rebuilt from the current tip on every main push.
           gh auth setup-git
           git -c core.hooksPath=/dev/null push --force origin "$BRANCH"
-          open=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
-          if [ -n "$open" ]; then
-            # The rolling PR outlives the changesets it was opened for. Its body
-            # is regenerated on every refresh, not just at creation — otherwise it
-            # keeps advertising the version and changelog from whenever it was
-            # first opened while the branch underneath moves on (PR #704 review).
-            gh pr edit "$open" --body-file "$RUNNER_TEMP/pr-body.md"
-            echo "Version PR #$open refreshed for v$VERSION."
-            exit 0
+
+      - name: Refresh the ready version PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MISSING_PR: ${{ steps.version_pr.outputs.missing }}
+          PR_NUMBER: ${{ steps.version_pr.outputs.number }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ "$MISSING_PR" = 'true' ]; then
+            echo "::error::Version branch pushed, but no open bot-authored PR exists. Seed it as qwts-codex-agent[bot], then send a version-cut-recovery repository dispatch."
+            exit 1
           fi
-          gh pr create --base main --head "$BRANCH" --title 'chore: version Image Trail' \
-            --body-file "$RUNNER_TEMP/pr-body.md"
+
+          # The rolling PR outlives the changesets it was opened for. Its body
+          # is regenerated on every refresh — otherwise it keeps advertising
+          # the version and changelog from whenever it was first opened while
+          # the branch underneath moves on (PR #704 review).
+          gh pr edit "$PR_NUMBER" --body-file "$RUNNER_TEMP/pr-body.md"
+          echo "Version PR #$PR_NUMBER refreshed for v$VERSION."
 
   tag:
     name: Tag version merges
@@ -191,8 +236,8 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           # A normal main push is a release cut only when package.json changed.
-          # Manual dispatch is recovery-only and still must pass the pending,
-          # synchronized-version, and existing-tag checks below.
+          # Repository dispatch is recovery-only and still must pass the
+          # pending, synchronized-version, and existing-tag checks below.
           if [ "$EVENT_NAME" = "push" ]; then
             prev=$(git show 'HEAD~1:package.json' 2>/dev/null | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).version' 2>/dev/null || echo '')
             cur=$(node -p 'require("./package.json").version')
@@ -244,6 +289,6 @@ jobs:
 
           # No dispatch: pushed under the PAT, this tag fires release.yml's
           # on:push:tags trigger directly. Without RELEASE_TOKEN the push is a
-          # GITHUB_TOKEN push and starts nothing — re-run this workflow via
-          # workflow_dispatch once the secret is present and the already-tagged
-          # recovery path above picks the tag up.
+          # GITHUB_TOKEN push and starts nothing — send a version-cut-recovery
+          # repository dispatch once the secret is present so the already-tagged
+          # recovery path above can pick the tag up.
