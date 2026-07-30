@@ -2,7 +2,7 @@ import * as v from 'valibot';
 import { encryptionAlgorithmSchema, keyKindSchema, keyWrappingModeSchema } from '../crypto/types.schema.js';
 import type { ExportFileEnvelope, ExportFileHeader } from './encrypted-file-format.js';
 
-export const exportPayloadTypeSchema = v.picklist(['history', 'bookmarks', 'mixed', 'keys', 'image']);
+export const exportPayloadTypeSchema = v.picklist(['history', 'bookmarks', 'mixed', 'keys', 'image', 'cloud-backup-manifest']);
 
 // `magic`/`formatVersion` literals mirror EXPORT_FORMAT_MAGIC / EXPORT_FORMAT_VERSION in
 // ./encrypted-file-format.ts. They are inlined (not imported) so this schema stays a

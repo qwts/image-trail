@@ -112,8 +112,8 @@ test('bumps split URL token parts while preserving contiguous URL format', () =>
 
   const splitModel = applyFieldSplitSpecs(model, [spec]);
   const fields = collectUrlFields(splitModel);
-  const month = fields.find((candidate) => candidate.id === 'q:0:0');
-  const year = fields.find((candidate) => candidate.id === 'q:0:2');
+  const month = fields.find((candidate) => candidate.id === 'q:0:0:s:0');
+  const year = fields.find((candidate) => candidate.id === 'q:0:0:s:2');
   assert.ok(month);
   assert.ok(year);
 
@@ -139,9 +139,10 @@ test('applies later split specs against original token indexes after earlier spl
   const firstSplitModel = applyFieldSplitSpecs(model, [firstSpec]);
   const shiftedSecondField = collectUrlFields(firstSplitModel).find((candidate) => candidate.value === '2222');
   assert.ok(shiftedSecondField);
-  assert.equal(shiftedSecondField.id, 'q:0:3');
+  assert.equal(shiftedSecondField.id, 'q:0:2');
   const secondSpec = createFieldSplitSpec(shiftedSecondField, '2-2');
   assert.ok(!('ok' in secondSpec));
+  assert.equal(secondSpec.baseFieldId, 'q:0:2');
   assert.equal(secondSpec.tokenIndex, 2);
 
   const bothSplitModel = applyFieldSplitSpecs(model, [firstSpec, secondSpec]);

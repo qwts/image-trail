@@ -37,10 +37,25 @@ type ReleasePackageModule = {
   releaseArtifactNames(version: string): { archive: string; checksum: string };
 };
 
+type VersionCutModule = {
+  validateChangedEntries(entries: { path: string; status: string }[], pendingChangesets: string[]): string[];
+  validateVersionDocuments(input: {
+    basePackage: Record<string, unknown>;
+    nextPackage: Record<string, unknown>;
+    baseManifest: Record<string, unknown>;
+    nextManifest: Record<string, unknown>;
+    baseLock: Record<string, unknown>;
+    nextLock: Record<string, unknown>;
+    baseChangelog: string;
+    nextChangelog: string;
+  }): string[];
+};
+
 const policy = (await import(pathToFileURL(join(process.cwd(), 'scripts/check-version-policy.mjs')).href)) as VersionPolicyModule;
 const releasePackage = (await import(
   pathToFileURL(join(process.cwd(), 'scripts/package-extension-release.mjs')).href
 )) as ReleasePackageModule;
+const versionCut = (await import(pathToFileURL(join(process.cwd(), 'scripts/validate-version-cut.mjs')).href)) as VersionCutModule;
 
 function versionArtifacts(packageVersion = '0.1.0', manifestVersion = packageVersion) {
   return { packageVersion, manifestVersion, lockVersion: packageVersion, lockRootVersion: packageVersion };
@@ -181,20 +196,153 @@ test('ignores tests, Storybook-only files, and repository tooling', () => {
 test('version-cut workflow refreshes a checked Changesets PR and tags only fresh version merges', () => {
   const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
 
-  assert.match(workflow, /uses: changesets\/action@v1/u);
-  assert.match(workflow, /version: npm run changeset:version/u);
+  assert.match(workflow, /npm run changeset:version/u);
   assert.match(workflow, /pull-requests: write/u);
   assert.match(workflow, /actions: write/u);
-  assert.match(workflow, /gh workflow run ci\.yml --ref changeset-release\/main/u);
+  // The version PR and the version tag are produced under RELEASE_TOKEN: a
+  // GITHUB_TOKEN event triggers no downstream workflow, and github-actions[bot]
+  // is not an authorized Actions actor here, so its runs fail at startup with
+  // "Actor is not allowed to trigger Actions workflows". The version branch
+  // therefore needs no `gh workflow run ci.yml` dispatch — which the bot could
+  // not perform either.
+  assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
+  assert.equal(workflow.match(/gh auth setup-git/gu)?.length, 2);
+  assert.doesNotMatch(workflow, /^\s+token:/mu);
+  assert.doesNotMatch(workflow, /gh workflow run ci\.yml/u);
   assert.match(workflow, /Version unchanged \(\$cur\) — not a version-cut merge/u);
   assert.match(workflow, /Changesets pending — nothing to tag/u);
   assert.match(workflow, /package, manifest, and lockfile versions are not synchronized/u);
   assert.match(workflow, /git tag -a "\$version"/u);
   assert.match(workflow, /git push origin "\$version"/u);
-  assert.match(workflow, /gh workflow run release\.yml --ref main -f tag="\$version"/u);
+  // The only surviving dispatch is stranded-tag recovery: an already-existing
+  // tag has no push event left to replay. The fresh tag's own push starts
+  // release.yml directly.
+  assert.deepEqual(workflow.match(/gh workflow run \S+/gu), ['gh workflow run release.yml']);
   assert.doesNotMatch(workflow, /^\s+publish:/mu);
   assert.doesNotMatch(workflow, /^\s+prDraft:/mu);
   assert.doesNotMatch(workflow, /gh pr merge|auto-merge/u);
+});
+
+test('version-cut keeps dependency code off the clean token-bearing runner', () => {
+  const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
+  const prepareJob = workflow.slice(workflow.indexOf('\n  prepare-version-pr:'), workflow.indexOf('\n  publish-version-pr:'));
+  const publishJob = workflow.slice(workflow.indexOf('\n  publish-version-pr:'), workflow.indexOf('\n  tag:'));
+
+  assert.match(prepareJob, /npm ci/u);
+  assert.match(prepareJob, /npm run changeset:version/u);
+  assert.match(prepareJob, /actions\/upload-artifact@[0-9a-f]{40} # v7\.0\.1/u);
+  assert.doesNotMatch(prepareJob, /RELEASE_TOKEN|GH_TOKEN|contents: write|pull-requests: write/u);
+
+  assert.match(publishJob, /needs: prepare-version-pr/u);
+  assert.match(publishJob, /actions\/download-artifact@[0-9a-f]{40} # v8\.0\.1/u);
+  assert.match(publishJob, /node "\$trusted_validator"/u);
+  assert.match(publishJob, /git -c core\.hooksPath=\/dev\/null -c commit\.gpgsign=false commit/u);
+  assert.match(publishJob, /git -c core\.hooksPath=\/dev\/null push/u);
+  assert.doesNotMatch(publishJob, /npm ci|npm run changeset:version/u);
+});
+
+test('version-cut preserves its trusted validator before an artifact can replace repository code', () => {
+  const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
+  const publishJob = workflow.slice(workflow.indexOf('\n  publish-version-pr:'), workflow.indexOf('\n  tag:'));
+  const preserveValidator = publishJob.indexOf('cp scripts/validate-version-cut.mjs "$trusted_validator"');
+  const applyArtifact = publishJob.indexOf('git apply --index "$RUNNER_TEMP/version-cut/version.patch"');
+  const runValidator = publishJob.indexOf('node "$trusted_validator"');
+
+  assert.ok(preserveValidator >= 0, 'trusted validator must be copied out of the worktree');
+  assert.ok(applyArtifact > preserveValidator, 'untrusted patch must be applied only after preserving the validator');
+  assert.ok(runValidator > applyArtifact, 'the preserved validator must inspect the applied patch');
+  assert.doesNotMatch(publishJob, /node scripts\/validate-version-cut\.mjs/u);
+});
+
+test('version-cut validator accepts only synchronized version artifacts and consumed changesets', () => {
+  const entries = [
+    { status: 'M', path: 'CHANGELOG.md' },
+    { status: 'M', path: 'extension/manifest.json' },
+    { status: 'M', path: 'package-lock.json' },
+    { status: 'M', path: 'package.json' },
+    { status: 'D', path: '.changeset/steady-release.md' },
+  ];
+  assert.deepEqual(versionCut.validateChangedEntries(entries, ['.changeset/steady-release.md']), []);
+
+  const basePackage = { name: 'image-trail', version: '0.25.0', scripts: { test: 'npm run test:unit' } };
+  const nextPackage = { ...basePackage, version: '0.25.1' };
+  const baseManifest = { manifest_version: 3, name: 'Image Trail', version: '0.25.0' };
+  const nextManifest = { ...baseManifest, version: '0.25.1' };
+  const baseLock = {
+    name: 'image-trail',
+    version: '0.25.0',
+    lockfileVersion: 3,
+    packages: { '': { name: 'image-trail', version: '0.25.0' } },
+  };
+  const nextLock = structuredClone(baseLock);
+  nextLock.version = '0.25.1';
+  nextLock.packages[''].version = '0.25.1';
+  assert.deepEqual(
+    versionCut.validateVersionDocuments({
+      basePackage,
+      nextPackage,
+      baseManifest,
+      nextManifest,
+      baseLock,
+      nextLock,
+      baseChangelog: '# image-trail\n\n## 0.25.0\n\n- Previous.\n',
+      nextChangelog: '# image-trail\n\n## 0.25.1\n\n- Fixed.\n\n## 0.25.0\n\n- Previous.\n',
+    }),
+    [],
+  );
+});
+
+test('version-cut validator rejects executable drift and malformed patches', () => {
+  const errors = versionCut.validateChangedEntries(
+    [
+      { status: 'M', path: 'CHANGELOG.md' },
+      { status: 'M', path: 'extension/manifest.json' },
+      { status: 'M', path: 'package-lock.json' },
+      { status: 'M', path: 'package.json' },
+      { status: 'M', path: '.changeset/steady-release.md' },
+      { status: 'M', path: '.github/workflows/release.yml' },
+    ],
+    ['.changeset/steady-release.md'],
+  );
+  assert.match(errors.join(' '), /must be deleted/u);
+  assert.match(errors.join(' '), /forbidden path/u);
+
+  const basePackage = { name: 'image-trail', version: '0.25.0', scripts: { test: 'npm run test:unit' } };
+  const nextPackage = { ...basePackage, version: '0.25.1', scripts: { test: 'curl attacker.invalid' } };
+  const baseManifest = { manifest_version: 3, version: '0.25.0' };
+  const nextManifest = { ...baseManifest, version: '0.25.1' };
+  const baseLock = { version: '0.25.0', packages: { '': { version: '0.25.0' } } };
+  const nextLock = { version: '0.25.1', packages: { '': { version: '0.25.1' } } };
+  assert.match(
+    versionCut
+      .validateVersionDocuments({
+        basePackage,
+        nextPackage,
+        baseManifest,
+        nextManifest,
+        baseLock,
+        nextLock,
+        baseChangelog: '# image-trail\n\n## 0.25.0\n\n- Previous.\n',
+        nextChangelog: '# image-trail\n\n## 0.25.1\n\n- Fixed.\n\n## 0.25.0\n\n- Previous.\n',
+      })
+      .join(' '),
+    /package\.json changes fields other than version/u,
+  );
+});
+
+test('no workflow that carries RELEASE_TOKEN can reach a third-party action', () => {
+  // A repo-scoped PAT must stay inside actions/* steps and our own run: blocks —
+  // never inside an action whose future versions nobody here controls. This is
+  // why `changeset:version` is invoked as a script rather than through
+  // changesets/action (AGENTS.md → Branch And GitHub Hygiene).
+  for (const file of ['version-cut.yml', 'release.yml']) {
+    const workflow = readFileSync(`.github/workflows/${file}`, 'utf8');
+    if (!workflow.includes('RELEASE_TOKEN')) continue;
+    const foreign = [...workflow.matchAll(/^\s*uses: (?<action>[^@\s]+)/gmu)]
+      .map((match) => match.groups?.['action'] ?? '')
+      .filter((action) => !action.startsWith('actions/'));
+    assert.deepEqual(foreign, [], `${file} passes a third-party action into a PAT-bearing workflow`);
+  }
 });
 
 test('required CI runs the version-policy gate', () => {
@@ -209,8 +357,46 @@ test('required CI retains PR base history for consumed-changeset validation', ()
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
   const ciJob = workflow.slice(workflow.indexOf('\n  ci:'), workflow.indexOf('\n  e2e:'));
 
-  assert.ok(ciJob.includes('uses: actions/checkout@v7'));
+  assert.ok(ciJob.includes('uses: actions/checkout@'));
   assert.ok(ciJob.includes('fetch-depth: 0'));
+});
+
+test('all workflow checkouts avoid persisting credentials', () => {
+  for (const file of ['ci.yml', 'close-linked-issues.yml', 'release.yml', 'version-cut.yml', 'zizmor.yml']) {
+    const workflow = readFileSync(`.github/workflows/${file}`, 'utf8');
+    const checkoutCount = workflow.match(/uses: actions\/checkout@/gu)?.length ?? 0;
+    const hardenedCheckoutCount = workflow.match(/persist-credentials: false/gu)?.length ?? 0;
+    assert.ok(checkoutCount > 0, `${file} should contain at least one checkout`);
+    assert.equal(hardenedCheckoutCount, checkoutCount, `${file} must harden every checkout`);
+  }
+});
+
+test('zizmor is digest-pinned without a disallowed wrapper action and enforces the governed action-ref policy', () => {
+  const workflow = readFileSync('.github/workflows/zizmor.yml', 'utf8');
+  const config = readFileSync('.github/zizmor.yml', 'utf8');
+  const dependabot = readFileSync('.github/dependabot.yml', 'utf8');
+
+  assert.doesNotMatch(workflow, /uses: zizmorcore\/zizmor-action@/u);
+  assert.match(workflow, /releases\/download\/v1\.28\.0\/zizmor-x86_64-unknown-linux-gnu\.tar\.gz/u);
+  assert.match(workflow, /ZIZMOR_SHA256: e87b67160194884e375a46a12c57ccc904f762b53845f254fab7f17d98809c09/u);
+  assert.match(workflow, /sha256sum --check --strict/u);
+  assert.match(workflow, /test "\$\("\$RUNNER_TEMP\/zizmor" --version\)" = 'zizmor 1\.28\.0'/u);
+  assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
+  assert.match(workflow, /--persona auditor --format github/u);
+  assert.match(workflow, /--config \.github\/zizmor\.yml \./u);
+  assert.match(config, /allow:\s*\n\s+- RELEASE_TOKEN/u);
+  assert.match(config, /['"]qwts\/playbook-software-engineering\/\*['"]: ref-pin/u);
+  assert.match(config, /['"]\*['"]: hash-pin/u);
+  assert.equal(dependabot.match(/default-days: 7/gu)?.length, 2);
+});
+
+test('release builds do not consume dependency caches or interpolate the tag in shell source', () => {
+  const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
+
+  assert.doesNotMatch(workflow, /^\s+cache: npm/mu);
+  assert.match(workflow, /package-manager-cache: false/u);
+  assert.match(workflow, /RELEASE_TAG: \$\{\{ steps\.release\.outputs\.tag \}\}/u);
+  assert.match(workflow, /npm run package:release -- --tag "\$RELEASE_TAG"/u);
 });
 
 test('release packaging requires an exact version tag and stable artifact names', () => {

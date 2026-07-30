@@ -373,6 +373,7 @@ function importExportState(overrides: Partial<ImportExportStoryState> = {}): Imp
     selectedHistoryCount: 2,
     selectedBookmarkCount: 1,
     selectedImageDownloadCount: 3,
+    selectedEncryptedImageExportCount: 3,
     visibleImageSelectionCount: 5,
     imageDownloadAvailable: true,
     encryptedImageTransferAvailable: true,

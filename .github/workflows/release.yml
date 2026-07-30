@@ -15,18 +15,21 @@ concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
-# Normally dispatched by version-cut.yml after it creates the version tag. The tag trigger also
-# covers tags pushed by humans; workflow_dispatch is the recovery path for GITHUB_TOKEN tags,
-# whose pushes do not trigger another workflow. Every build checks out the tag, never main.
+# Normally started by the tag trigger: version-cut.yml pushes the version tag under
+# RELEASE_TOKEN, so the push emits this run on its own (a GITHUB_TOKEN push would emit nothing,
+# and a bot dispatch is refused by the Actions actor policy). The same trigger covers tags pushed
+# by humans; workflow_dispatch remains the recovery path for a tag whose release run never
+# happened. Every build checks out the tag, never main.
 # This workflow packages and publishes GitHub Release assets only. It does not merge version
 # PRs or submit to the Chrome Web Store.
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   release:
     name: Validate and cut release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to create and refresh GitHub Release assets.
     env:
       INTEROP_PHOTOS_ROOT: ${{ github.workspace }}/node_modules/.interop-photos
     steps:
@@ -43,10 +46,11 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Checkout release source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.release.outputs.tag }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Require tagged source to be on main
         env:
@@ -54,21 +58,22 @@ jobs:
         run: git merge-base --is-ancestor "$(git rev-list -n 1 "$TAG_NAME")" origin/main
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
-          cache: npm
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci
 
       # npm ci replaces node_modules, so the pinned evidence checkout must follow it.
       - name: Checkout pinned Photos acceptance evidence
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: qwts/photos
-          ref: d75346749046ca9ac337e4d987d0e4ad7fed1c8e
+          ref: 760e23ba1abeaf15bf6d56e029ebdd47d521a7e7
           path: node_modules/.interop-photos
+          persist-credentials: false
 
       - name: Run required validation
         run: npm run ci
@@ -80,7 +85,9 @@ jobs:
         run: npm run test:e2e:release
 
       - name: Build and package release
-        run: npm run package:release -- --tag "${{ steps.release.outputs.tag }}"
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: npm run package:release -- --tag "$RELEASE_TAG"
 
       - name: Create or refresh GitHub Release assets
         env:

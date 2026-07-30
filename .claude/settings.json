@@ -1,19 +1,77 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "defaultMode": "acceptEdits",
     "allow": [
-      "Bash(npm run *)",
       "Bash(npm test)",
-      "Bash(npm test *)",
       "Bash(npm ci)",
-      "Bash(npm install)",
-      "Bash(npx *)",
-      "Bash(node scripts/*)",
-      "Bash(git *)",
-      "Bash(gh *)"
+      "Bash(npm run build)",
+      "Bash(npm run build:release)",
+      "Bash(npm run check:acceptance-coverage)",
+      "Bash(npm run check:agent-env)",
+      "Bash(npm run check:agent-primitives)",
+      "Bash(npm run check:artifacts)",
+      "Bash(npm run check:interop-acceptance)",
+      "Bash(npm run check:interop-contract)",
+      "Bash(npm run check:licenses)",
+      "Bash(npm run check:version-policy)",
+      "Bash(npm run ci)",
+      "Bash(npm run format)",
+      "Bash(npm run format:check)",
+      "Bash(npm run lint)",
+      "Bash(npm run test:cov)",
+      "Bash(npm run test:dom)",
+      "Bash(npm run test:e2e)",
+      "Bash(npm run test:e2e:release)",
+      "Bash(npm run test:stories)",
+      "Bash(npm run test:stories:ci)",
+      "Bash(npm run test:unit)",
+      "Bash(npm run typecheck)",
+      "Bash(npx changeset)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git rev-parse*)",
+      "Bash(git merge-base*)",
+      "Bash(git remote -v)",
+      "Bash(git branch --show-current)",
+      "Bash(git worktree list*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(gh auth status*)",
+      "Bash(gh issue list*)",
+      "Bash(gh issue view*)",
+      "Bash(gh pr checks*)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr view*)",
+      "Bash(gh repo view*)",
+      "Bash(gh run list*)",
+      "Bash(gh run view*)"
     ],
-    "ask": ["Bash(npm publish*)", "Bash(gh release *)", "Bash(npm run package:release*)"],
-    "deny": ["Bash(npm run test:e2e:ui*)", "Bash(npm run test:e2e:headed*)"]
+    "ask": [
+      "Bash(npm publish*)",
+      "Bash(npm run package:release*)",
+      "Bash(git push*)",
+      "Bash(git rebase*)",
+      "Bash(git worktree remove*)",
+      "Bash(gh issue comment*)",
+      "Bash(gh issue create*)",
+      "Bash(gh issue develop*)",
+      "Bash(gh issue edit*)",
+      "Bash(gh pr comment*)",
+      "Bash(gh pr create*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh pr ready*)",
+      "Bash(gh pr review*)",
+      "Bash(gh release *)",
+      "Bash(gh run rerun*)",
+      "Bash(gh workflow run*)"
+    ],
+    "deny": [
+      "Bash(npm run test:e2e:ui*)",
+      "Bash(npm run test:e2e:headed*)"
+    ]
   },
   "env": {
     "BASH_MAX_TIMEOUT_MS": "1800000"
@@ -38,6 +96,18 @@
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR\"/scripts/guard-session-context.mjs",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "S=\"${PLAYBOOK_HOME:-$HOME/Code/playbook-engineering}/tools/agent-bot/claude-worktree-create\"; [ -x \"$S\" ] || { echo \"agent-bot: $S not found — clone qwts/playbook-engineering into \\$HOME/Code (ENG-0004), or set PLAYBOOK_HOME\" >&2; exit 127; }; exec \"$S\"",
+            "timeout": 180,
+            "statusMessage": "Creating worktree with its bot identity…"
           }
         ]
       }

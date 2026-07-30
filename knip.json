@@ -6,6 +6,8 @@
     "extension/src/destinations/destination-page.tsx",
     "extension/src/gallery/gallery.ts",
     "extension/src/interop-pairing/import.ts",
+    "extension/src/preview/disabled-mpegts-worker.ts",
+    "extension/src/preview/preview.js",
     "extension/src/ui/**/*.stories.{ts,tsx}",
     "tests/**/*.test.ts",
     "tests/dom/register.ts",
@@ -13,12 +15,7 @@
     "scripts/*.mjs"
   ],
   "project": ["extension/src/**/*.{ts,tsx}", "scripts/**/*.mjs"],
-  "ignore": [
-    "extension/src/core/automation/navigation-queue.ts",
-    "extension/src/data/import-export/key-import.ts",
-    "extension/src/ui/components/lock-view.ts"
-  ],
+  "ignore": ["extension/src/core/automation/navigation-queue.ts", "extension/src/data/import-export/key-import.ts"],
   "ignoreExportsUsedInFile": true,
-  "ignoreBinaries": ["gh", "ps"],
-  "ignoreDependencies": ["@typescript-eslint/eslint-plugin", "@typescript-eslint/parser", "node-test-github-reporter"]
+  "ignoreDependencies": ["@typescript-eslint/eslint-plugin", "@typescript-eslint/parser", "events", "node-test-github-reporter"]
 }

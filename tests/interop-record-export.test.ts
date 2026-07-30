@@ -10,6 +10,7 @@ import {
   type InteropObjectPage,
   type InteropObjectStore,
 } from '../extension/src/core/interop/transport.js';
+import { interopGifWebpMediaBlockFrom } from '../extension/src/core/interop/media.js';
 import { ensureDurableBookmarkKey } from '../extension/src/data/durable-bookmark-key.js';
 import { openImageTrailDb } from '../extension/src/data/db.js';
 import { createKeyReference } from '../extension/src/data/crypto/key-reference.js';
@@ -102,6 +103,36 @@ async function seedBookmark(
     '2026-07-17T12:02:00.000Z',
     url,
     '2026-07-17T12:03:00.000Z',
+  );
+}
+
+async function seedAnimatedGifBookmark(db: IDBDatabase): Promise<void> {
+  const key = await ensureDurableBookmarkKey(new KeysRepository(db));
+  await new BookmarksRepository(db).sealAndPut(
+    'animated-bookmark',
+    {
+      url: 'https://example.test/media/party.gif',
+      label: 'party.gif',
+      width: 8,
+      height: 8,
+      bookmarkedAt: '2026-07-28T12:00:00.000Z',
+      capturedAt: '2026-07-28T12:01:00.000Z',
+      storedOriginal: {
+        blobId: 'animated-blob',
+        mimeType: 'image/gif',
+        byteLength: 255,
+        capturedAt: '2026-07-28T12:01:00.000Z',
+        fileName: 'party.gif',
+        width: 8,
+        height: 8,
+        mediaInfo: { kind: 'gif', animated: true, frameCount: 3, loopCount: 0 },
+      },
+    },
+    key.key,
+    key.reference,
+    '2026-07-28T12:02:00.000Z',
+    'https://example.test/media/party.gif',
+    '2026-07-28T12:03:00.000Z',
   );
 }
 
@@ -199,7 +230,59 @@ test('ordinary encrypted pins gain stable canonical custody without changing que
   assert.deepEqual(second.records, first.records);
   assert.equal(first.records[0]?.reviewCategory, 'metadata-only');
   assert.equal(first.records[0]?.record.original.state, 'metadata-only');
+  assert.equal(first.records[0]?.record.identity.contentHash, null);
   assert.equal((await new BookmarksRepository(opened.db).getEncrypted('bookmark-1'))?.queueUpdatedAt, '2026-07-17T12:03:00.000Z');
+});
+
+test('canonical export attaches GIF/WebP facts inside the existing Photos metadata object', async (t) => {
+  const opened = await openImageTrailDb(new IDBFactory());
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+  await seedAnimatedGifBookmark(opened.db);
+  const exporter = new InteropRecordExportStore(opened.db, { createId: () => INTEROP_ID });
+  const reviewed = await exporter.review(['animated-bookmark']);
+  const record = reviewed.records[0]?.record;
+  assert.ok(record);
+  assert.deepEqual(interopGifWebpMediaBlockFrom(record.roundTripMetadata.overlook), {
+    schemaVersion: 1,
+    kind: 'gif',
+    mimeType: 'image/gif',
+    extension: 'gif',
+    mediaInfo: { animated: true, frameCount: 3, loopCount: 0 },
+  });
+  assert.deepEqual(record.dimensions, { width: 8, height: 8 });
+  assert.equal(record.original.mimeType, 'image/gif');
+});
+
+test('a later verified original updates stable canonical identity custody', async (t) => {
+  const opened = await openImageTrailDb(new IDBFactory());
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+  await seedBookmark(opened.db);
+  const exporter = new InteropRecordExportStore(opened.db, {
+    now: () => '2026-07-17T12:04:00.000Z',
+    createId: () => INTEROP_ID,
+  });
+  const metadataOnly = await exporter.review(['bookmark-1']);
+  assert.equal(metadataOnly.records[0]?.record.identity.contentHash, null);
+
+  const { active, bytes } = await seedOriginalBlob(opened.db);
+  const verified = await exporter.review(['bookmark-1'], active);
+  const expectedHash = await sha256(bytes);
+  assert.equal(verified.records[0]?.record.identity.interopId, INTEROP_ID);
+  assert.equal(verified.records[0]?.record.identity.contentHash, expectedHash);
+  assert.equal(verified.records[0]?.record.original.state, 'available');
+  assert.equal(
+    verified.records[0]?.record.original.state === 'available' ? verified.records[0].record.original.contentHash : null,
+    expectedHash,
+  );
+
+  const encrypted = await new BookmarksRepository(opened.db).getEncrypted('bookmark-1');
+  assert.ok(encrypted);
+  const key = await ensureDurableBookmarkKey(new KeysRepository(opened.db));
+  const persisted = await new BookmarksRepository(opened.db).openRecord(encrypted, key.key);
+  assert.equal(persisted.interop?.record.identity.contentHash, expectedHash);
+  assert.equal(persisted.interop?.record.original.state, 'available');
 });
 
 test('record review zeroes decrypted original bytes when canonical review rejects the record', async (t) => {
@@ -279,6 +362,12 @@ test('unlocked captured originals queue an available record, blob message, and e
   const record = envelopes.find((envelope) => envelope.payload.kind === 'record');
   const blob = envelopes.find((envelope) => envelope.payload.kind === 'blob');
   assert.equal(record?.payload.kind === 'record' ? record.payload.record.original.state : null, 'available');
+  assert.equal(
+    record?.payload.kind === 'record' && record.payload.record.original.state === 'available'
+      ? record.payload.record.identity.contentHash === record.payload.record.original.contentHash
+      : false,
+    true,
+  );
   assert.equal(blob?.payload.kind === 'blob' ? blob.payload.encryptedPath : null, `blobs/${INTEROP_ID}/original.bin.aesgcm`);
   const binary = outbox.find((row) => row.path.endsWith('.bin.aesgcm'));
   assert.ok(binary);

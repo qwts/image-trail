@@ -9,7 +9,7 @@ import {
   type ImportExportViewState,
 } from './components/import-export-view.js';
 import { createSettingsView } from './components/settings-view.js';
-import { formatCloudBackupBytes } from './panel/record-export-helpers.js';
+import { formatCloudBackupBytes, isEncryptedImageExportRecord } from './panel/record-export-helpers.js';
 import { recallDeleteCountForQueue } from './recall-delete-count.js';
 
 /** URL derivation the Settings surface needs from the render pass (template learning fields). */
@@ -97,22 +97,22 @@ export function createSettingsSection(
 }
 
 function importExportViewState(state: PanelState): ImportExportViewState {
+  const selectedCount = selectedRecordCount(state);
+  const encryptedImageCount = selectedEncryptedImageRecordCount(state);
   return {
     busy: state.importExportBusy,
     currentImageUrl: state.target.selectedUrl,
     selectedHistoryCount: state.selectedHistoryIds.length,
     selectedBookmarkCount: state.selectedBookmarkIds.length + state.recall.selectedIds.length,
-    selectedImageDownloadCount: selectedRecordCount(state),
+    selectedImageDownloadCount: selectedCount,
+    selectedEncryptedImageExportCount: encryptedImageCount,
     visibleImageSelectionCount: visibleImageSelectionCount(state),
     imageDownloadAvailable:
       state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
       !!state.target.selectedUrl ||
       state.history.length > 0,
     encryptedImageTransferAvailable:
-      state.blobKeyUnlocked &&
-      (state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length > 0 ||
-        !!state.target.selectedUrl ||
-        state.history.length > 0),
+      state.blobKeyUnlocked && (selectedCount > 0 ? encryptedImageCount > 0 : !!state.target.selectedUrl || state.history.length > 0),
     blobKeyUnlocked: state.blobKeyUnlocked,
     lastMessage: state.importExportMessage,
     lastMessageIsError: state.importExportMessageIsError,
@@ -166,6 +166,17 @@ function cloudBackupProviderState(state: PanelState): CloudBackupProviderState {
 
 function selectedRecordCount(state: PanelState): number {
   return state.selectedHistoryIds.length + state.selectedBookmarkIds.length + state.recall.selectedIds.length;
+}
+
+function selectedEncryptedImageRecordCount(state: PanelState): number {
+  const selectedHistoryIds = new Set(state.selectedHistoryIds);
+  const selectedBookmarkIds = new Set(state.selectedBookmarkIds);
+  const selectedRecallIds = new Set(state.recall.selectedIds);
+  return [
+    ...state.history.filter((record) => selectedHistoryIds.has(record.id)),
+    ...state.bookmarks.filter((record) => selectedBookmarkIds.has(record.id)),
+    ...state.recall.candidates.filter((record) => selectedRecallIds.has(record.id)),
+  ].filter(isEncryptedImageExportRecord).length;
 }
 
 function visibleImageSelectionCount(state: PanelState): number {

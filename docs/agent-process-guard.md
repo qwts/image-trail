@@ -20,8 +20,8 @@ polls `ps -axo pid,ppid,pgid,rss` every 250 ms. Enforced, per run:
 | Concurrency           | one guarded run per worktree                                 | `.guard/active.json` lock (stale-safe)        |
 | DOM test workers      | 1 (`--test-concurrency=1`)                                   | `test:dom:run` script                         |
 
-Environment variables override the per-script flags, so CI or a human can tune
-limits without editing `package.json`. The aggregate-RSS sum counts every
+Environment variables override the per-script flags, so a human can tune
+local limits without editing `package.json`. The aggregate-RSS sum counts every
 descendant of the wrapped command plus anything still in its process group
 (catching orphans that reparent to `launchd`/`init`), so browsers and helper
 binaries count — not just V8 heaps.
@@ -33,16 +33,19 @@ runaway allocating ~2 GB/s outruns a polite shutdown. `SIGINT`/`SIGTERM`/
 group termination, and a final `SIGKILL` sweep runs when the wrapped command
 exits, so no descendants survive the guard.
 
-Every run writes a diagnostic record — label, command, peak RSS, peak process
-count, duration, limits, exit code, termination reason — to
+Every guarded local run writes a diagnostic record — label, command, peak RSS,
+peak process count, duration, limits, exit code, termination reason — to
 `.guard/last-run.json` and appends it to `.guard/history.jsonl` (both
 gitignored). A run killed for `rss-limit` or `timeout` exits non-zero, so a
-test that "passes" while eating 50 GB is a failed test, locally and in CI.
+local test that "passes" while eating 50 GB is a failed test.
 
 Nested guards pass through (`IMAGE_TRAIL_GUARDED=1` in the child environment),
 so chained npm scripts do not deadlock on the worktree lock.
 `IMAGE_TRAIL_GUARD_DISABLE=1` is a human escape hatch; it prints a warning.
 Windows falls back to passthrough (the guard targets macOS/Linux `ps`).
+GitHub Actions also passes through automatically: hosted runners provide
+isolation and workflow-level timeouts, while the guard's purpose is protecting
+local development machines.
 
 ## Guarded entrypoints
 
@@ -62,7 +65,7 @@ evaluation, isolation surfaces, and the reproducible bootstrap).
 
 `.claude/settings.json` registers a `PreToolUse` hook on `Bash`
 (`scripts/guard-agent-command.mjs --protocol=claude`) that denies direct
-`node --test`, `.test-dist` execution, `playwright test`, `test-storybook`,
+`node --test`, `.test-dist` execution, `playwright test`, `test-storybook`, `vitest`,
 `c8`, `:run`/`:inner` scripts, and agent use of `IMAGE_TRAIL_GUARD_DISABLE`,
 steering the agent to the guarded entrypoints. The hook is scoped: it only
 polices commands executing inside a guarded checkout (cwd-aware, leading-`cd`
@@ -110,7 +113,7 @@ three mechanical layers plus the written rules:
 
 1. **execpolicy rules** — `.codex/rules/process-guard.rules` hard-forbids the
    clean argv prefixes (`node --test`, `npx playwright test`, `c8`,
-   `test-storybook`, every `:run`/`:inner` script, headed e2e) with
+   `test-storybook`, `vitest`, every `:run`/`:inner` script, headed e2e) with
    `decision = "forbidden"`; the most restrictive decision wins, so a
    user-side "always allow" cannot override it. It also auto-allows the
    guarded entrypoints and bounded gates so approval friction never tempts a
@@ -170,13 +173,11 @@ probes the rules against a local `codex` CLI. The full reproducibility plan
 
 ### CI (`.github/workflows/ci.yml`)
 
-CI runs the same npm scripts, so every test step inherits the guard and its
-RSS/timeout budgets; `timeout-minutes` on the jobs is the outer backstop,
-sized with headroom above the summed guard budgets plus setup so the guard —
-not a GitHub cancellation — is what kills a hung suite and records its
-diagnostic.
-A memory-runaway or hung suite now fails the build instead of passing on a
-16 GB runner.
+CI runs the same npm scripts, but `scripts/run-guarded.mjs` detects
+`GITHUB_ACTIONS=true` and passes the command through without local RSS, heap,
+lock, or diagnostic enforcement. GitHub-hosted runner isolation contains
+memory use, and each workflow job's `timeout-minutes` remains the hung-suite
+backstop. Local runs keep the complete guard.
 
 ## Bypass cases (accepted, documented)
 
@@ -188,7 +189,9 @@ A memory-runaway or hung suite now fails the build instead of passing on a
   `/hooks`, silently skips the `.codex/` policy layers. The guarded npm
   scripts remain the floor; setup verification (bootstrap `--check` + a live
   denial probe) exists to catch this.
-- `IMAGE_TRAIL_GUARD_DISABLE=1` — intentional, warns loudly.
+- `IMAGE_TRAIL_GUARD_DISABLE=1` — intentional local bypass, warns loudly.
+- GitHub Actions — automatic passthrough; hosted runner isolation and job
+  timeouts are the CI backstops.
 - Non-test entrypoints (`npm run build`, `npm run storybook` dev server) are
   unguarded today; extend with a `--label build` wrapper if they ever misbehave.
 - The Claude/Cursor hooks fail open on malformed payloads by design — the
@@ -215,11 +218,12 @@ ceilings above were set from measured peaks with headroom:
 
 - Full `npm test` (typecheck + compile + unit + single-worker DOM): peak
   1199 MB aggregate across 18 processes → 4096 MB default (~3.4×).
-- `npm run test:e2e` (3 Playwright workers + Chromium + built extension) on a
-  GitHub 16 GB runner: a 6144 MB trial ceiling killed a healthy run at
+- `npm run test:e2e` (3 Playwright workers + Chromium + built extension),
+  measured before GitHub Actions passthrough was enabled: a 6144 MB trial
+  ceiling killed a healthy run at
   6387 MB; the first full green run measured peak 6864 MB across 56 processes
-  in 190 s → 12288 MB (~1.8× headroom). The CI E2E job prints
-  `.guard/last-run.json` after every run; tighten from real peaks there.
+  in 190 s → 12288 MB (~1.8× headroom). Use local `.guard/last-run.json`
+  measurements to tighten the ceiling.
 
 The tickets' 1 GiB research floor was too tight: `tsc` alone peaks near it.
 Ratchet ceilings DOWN as measurements allow; only raise one when the guard

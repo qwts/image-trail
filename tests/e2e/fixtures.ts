@@ -39,12 +39,18 @@ const fixturePaths = {
   redrawImage: '/redraw-image.html',
   thirdPartyCdn: '/third-party-cdn.html',
   workspaceHostMatrix: '/workspace-host-matrix.html',
+  animatedMedia: '/animated-media.html',
 } as const;
 const fixtureAssetPaths = {
   assetOne: '/assets/asset-one.svg',
   assetTwo: '/assets/asset-two.svg',
   assetThree: '/assets/asset-three.svg',
   missingImage: '/missing-image.png',
+  animatedGif: '/assets/animated/animated.gif',
+  animatedWebp: '/assets/animated/animated.webp',
+  staticWebp: '/assets/animated/static.webp',
+  truncatedGif: '/assets/animated/truncated.gif',
+  supportedMpegTs: '/assets/media/supported.m2ts',
 } as const;
 
 async function waitForServiceWorker(context: BrowserContext): Promise<Worker> {
@@ -121,6 +127,88 @@ export async function openFixturePage(page: Page, fixturePath: (typeof fixturePa
 
 export function fixtureUrl(pathname: string): string {
   return new URL(pathname, fixtureBaseUrl).href;
+}
+
+export async function resetExtensionLibrary(
+  page: Page,
+  extensionId: string,
+  options: { readonly recentPageUrl?: string; readonly recordLabels?: readonly string[] } = {},
+): Promise<void> {
+  if (page.isClosed()) return;
+  await page.goto(`chrome-extension://${extensionId}/src/gallery/gallery.html`);
+  const result = await page.evaluate(
+    async ({ pageUrl, recordLabels }) => {
+      const matchesTarget = (item: { readonly label?: string }): boolean =>
+        recordLabels === null || (!!item.label && recordLabels.includes(item.label));
+      const bookmarkSnapshot = await chrome.runtime.sendMessage({
+        type: 'imageTrail.loadBookmarks',
+        version: 1,
+        payload: { offset: 0, limit: 500, scope: 'global' },
+      });
+      const bookmarkIds = ((bookmarkSnapshot?.payload?.items ?? []) as Array<{ id: string; label?: string }>)
+        .filter(matchesTarget)
+        .map((item) => item.id);
+      const bookmarkResult =
+        bookmarkIds.length > 0
+          ? await chrome.runtime.sendMessage({
+              type: 'imageTrail.removeBookmarks',
+              version: 1,
+              payload: { ids: bookmarkIds },
+            })
+          : null;
+
+      const loadRecent = () =>
+        chrome.runtime.sendMessage({
+          type: 'imageTrail.loadRecentHistory',
+          version: 1,
+          payload: { pageUrl, includeRetained: true, scope: 'all' },
+        });
+      const recentSnapshot = await loadRecent();
+      const recentIds = [
+        ...new Set(
+          ((recentSnapshot?.payload?.items ?? []) as Array<{ id: string; label?: string }>).filter(matchesTarget).map((item) => item.id),
+        ),
+      ];
+      await Promise.all(
+        recentIds.map((id) =>
+          chrome.runtime.sendMessage({
+            type: 'imageTrail.removeRecentHistory',
+            version: 1,
+            payload: { pageUrl, id, scope: 'all' },
+          }),
+        ),
+      );
+      const remainingBookmarks = await chrome.runtime.sendMessage({
+        type: 'imageTrail.loadBookmarks',
+        version: 1,
+        payload: { offset: 0, limit: 500, scope: 'global' },
+      });
+      const remainingRecent = await loadRecent();
+      const orphanCleanup = await chrome.runtime.sendMessage({
+        type: 'imageTrail.cleanupOrphanedBlobs',
+        version: 1,
+        payload: {},
+      });
+      return {
+        bookmarkIds,
+        bookmarkResult,
+        orphanCleanup,
+        remainingBookmarkCount: ((remainingBookmarks?.payload?.items ?? []) as Array<{ label?: string }>).filter(matchesTarget).length,
+        remainingRecentCount: ((remainingRecent?.payload?.items ?? []) as Array<{ label?: string }>).filter(matchesTarget).length,
+      };
+    },
+    {
+      pageUrl: options.recentPageUrl ?? fixtureUrl(fixturePaths.singleImage),
+      recordLabels: options.recordLabels ?? null,
+    },
+  );
+  if (result.bookmarkResult) {
+    expect(result.bookmarkResult?.payload?.ok).toBe(true);
+    expect(result.bookmarkResult?.payload?.removedCount).toBe(result.bookmarkIds.length);
+  }
+  expect(result.remainingBookmarkCount).toBe(0);
+  expect(result.remainingRecentCount).toBe(0);
+  expect(result.orphanCleanup?.type).toBe('imageTrail.cleanupOrphanedBlobsResult');
 }
 
 export async function togglePanelFromExtensionAction(page: Page, serviceWorker: Worker): Promise<void> {

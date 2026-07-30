@@ -1,3 +1,5 @@
+import type { StoredMediaInfo } from '../media/media-info.js';
+
 export type CaptureFailureReason =
   | 'permission-needed'
   | 'fetch-forbidden'
@@ -7,6 +9,7 @@ export type CaptureFailureReason =
   | 'auth-required'
   | 'canvas-tainted'
   | 'encryption-locked'
+  | 'not-media'
   | 'unknown';
 
 export type CaptureStatus = 'captured' | 'remote-only' | 'failed';
@@ -25,6 +28,11 @@ export type CaptureResult =
       readonly blobId: string;
       readonly mimeType: string;
       readonly byteLength: number;
+      readonly fileName?: string | undefined;
+      readonly sha256?: string | undefined;
+      readonly width?: number | undefined;
+      readonly height?: number | undefined;
+      readonly mediaInfo?: StoredMediaInfo | undefined;
     }
   | {
       readonly status: 'remote-only';
@@ -39,6 +47,11 @@ export interface StoredOriginalReference {
   readonly mimeType: string;
   readonly byteLength: number;
   readonly capturedAt: string;
+  readonly fileName?: string | undefined;
+  readonly sha256?: string | undefined;
+  readonly width?: number | undefined;
+  readonly height?: number | undefined;
+  readonly mediaInfo?: StoredMediaInfo | undefined;
 }
 
 export interface StorageUsageBucketSummary {
@@ -83,6 +96,8 @@ export function captureFailureMessage(reason: CaptureFailureReason, origin?: str
       return 'The image is tainted by cross-origin restrictions.';
     case 'encryption-locked':
       return 'Image capture is locked until encrypted blob storage is unlocked.';
+    case 'not-media':
+      return 'The source did not contain supported image or MPEG-TS media.';
     case 'unknown':
       return 'An unknown error occurred during capture.';
   }

@@ -241,14 +241,6 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
   scrim.setAttribute('role', 'dialog');
   scrim.setAttribute('aria-modal', 'true');
   scrim.setAttribute('aria-label', 'Transfer and Sync');
-  const close = (): void => {
-    scrim.remove();
-    for (const { root, inert, pointerEvents } of panelRoots) {
-      root.inert = inert;
-      root.style.pointerEvents = pointerEvents;
-    }
-    if (previousFocus?.isConnected) previousFocus.focus();
-  };
   const context: InteropRuntimeContext = { entry, total: recordIds.length, recordIds, locked };
   let selectedProvider: InteropProviderId = 'pcloud';
   let latestRequest = 0;
@@ -256,6 +248,22 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     const request = ++latestRequest;
     const result = await dispatchInteropRuntime(context, action);
     if (result && request === latestRequest && scrim.isConnected) render(result.snapshot);
+  };
+  let refreshPairingOnFocus = false;
+  const refreshPairingStatus = (): void => {
+    if (!refreshPairingOnFocus || !scrim.isConnected) return;
+    refreshPairingOnFocus = false;
+    void dispatch({ name: 'status' });
+  };
+  window.addEventListener('focus', refreshPairingStatus);
+  const close = (): void => {
+    window.removeEventListener('focus', refreshPairingStatus);
+    scrim.remove();
+    for (const { root, inert, pointerEvents } of panelRoots) {
+      root.inert = inert;
+      root.style.pointerEvents = pointerEvents;
+    }
+    if (previousFocus?.isConnected) previousFocus.focus();
   };
   const handlers: InteropWorkflowHandlers = {
     onClose: close,
@@ -266,7 +274,8 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     },
     onConnect: () => void dispatch({ name: 'connect', provider: selectedProvider }),
     onImportPairing: () => {
-      window.open(chrome.runtime.getURL('src/interop-pairing/import.html'), '_blank', 'noopener,noreferrer');
+      refreshPairingOnFocus = true;
+      void dispatch({ name: 'open-pairing-import' });
     },
     onStart: () => void dispatch({ name: 'start' }),
     onPause: () => void dispatch({ name: 'pause' }),

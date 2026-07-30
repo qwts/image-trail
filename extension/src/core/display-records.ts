@@ -38,7 +38,7 @@ export interface ImageDisplayRecord {
     | undefined;
 }
 
-export const IMAGE_RECORD_EXTENSIONS = ['PNG', 'JPG', 'JPEG', 'GIF', 'WEBP'] as const;
+export const IMAGE_RECORD_EXTENSIONS = ['PNG', 'JPG', 'JPEG', 'GIF', 'WEBP', 'TS', 'MTS', 'M2TS'] as const;
 
 export interface ImageRecordUrlValidation {
   readonly ok: boolean;
@@ -53,8 +53,8 @@ export function normalizeDisplayLabel(record: Pick<ImageDisplayRecord, 'url' | '
   if (record.title?.trim()) {
     return record.title.trim();
   }
-  if (isDataImageUrl(record.url)) {
-    return dataImageDisplayLabel(record.url);
+  if (isDataMediaUrl(record.url)) {
+    return dataMediaDisplayLabel(record.url);
   }
 
   try {
@@ -67,7 +67,7 @@ export function normalizeDisplayLabel(record: Pick<ImageDisplayRecord, 'url' | '
 }
 
 export function displayTitleForRecord(record: Pick<ImageDisplayRecord, 'url' | 'label' | 'title'>): string {
-  return isDataImageUrl(record.url) ? normalizeDisplayLabel(record) : record.url;
+  return isDataMediaUrl(record.url) ? normalizeDisplayLabel(record) : record.url;
 }
 
 export function sourceImageUrlFrom(url: string): URL {
@@ -160,6 +160,7 @@ export function imageExtensionForRecord(
   record: Pick<ImageDisplayRecord, 'url' | 'title' | 'label' | 'thumbnail' | 'storedOriginal'>,
 ): string | null {
   return (
+    imageExtensionFromValue(record.storedOriginal?.fileName) ??
     imageExtensionFromImageType(record.storedOriginal?.mimeType) ??
     imageExtensionFromValue(record.label) ??
     imageExtensionFromValue(record.title) ??
@@ -190,6 +191,7 @@ function imageExtensionFromImageQuery(url: URL): string | null {
 
 function imageExtensionFromImageType(value: string | null | undefined): string | null {
   if (!value) return null;
+  if (value.toLowerCase() === 'video/mp2t') return 'TS';
   const normalized = value
     .toUpperCase()
     .replace(/^IMAGE\//u, '')
@@ -215,25 +217,27 @@ export function createDisplayRecord(
 }
 
 function createDisplayRecordId(timestamp: string, url: string): string {
-  if (!isDataImageUrl(url)) return `${timestamp}:${url}`;
-  const mimeType = dataImageMimeType(url)?.replace(/[^a-z0-9.+-]/giu, '-') ?? 'image';
+  if (!isDataMediaUrl(url)) return `${timestamp}:${url}`;
+  const mimeType = dataMediaMimeType(url)?.replace(/[^a-z0-9.+-]/giu, '-') ?? 'media';
   return `${timestamp}:data:${mimeType}:${url.length}`;
 }
 
-function isDataImageUrl(url: string): boolean {
-  return url.startsWith('data:image/');
+function isDataMediaUrl(url: string): boolean {
+  return url.startsWith('data:image/') || url.startsWith('data:video/mp2t');
 }
 
-function dataImageDisplayLabel(url: string): string {
+function dataMediaDisplayLabel(url: string): string {
+  if (url.startsWith('data:video/mp2t')) return 'Data URL MPEG-TS media';
   const extension = imageExtensionFromDataImageUrl(url);
   return extension ? `Data URL image (${extension})` : 'Data URL image';
 }
 
-function dataImageMimeType(url: string): string | null {
-  return /^data:(image\/[a-z0-9.+-]+)[;,]/iu.exec(url)?.[1]?.toLowerCase() ?? null;
+function dataMediaMimeType(url: string): string | null {
+  return /^data:((?:image\/[a-z0-9.+-]+)|(?:video\/mp2t))[;,]/iu.exec(url)?.[1]?.toLowerCase() ?? null;
 }
 
 function imageExtensionFromDataImageUrl(url: string): string | null {
-  const subtype = dataImageMimeType(url)?.replace(/^image\//u, '');
+  if (url.startsWith('data:video/mp2t')) return 'TS';
+  const subtype = dataMediaMimeType(url)?.replace(/^image\//u, '');
   return imageExtensionFromImageType(subtype);
 }

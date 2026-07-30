@@ -1,10 +1,18 @@
-import { cp, mkdir, readdir } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import './write-extension-build-info.mjs';
-import { extensionOutputPath, writeStylesheet } from './extension-build-policy.mjs';
+import {
+  bundleStylesheet,
+  extensionOutputPath,
+  isInjectedStylesheet,
+  isInteropFeatureEnabled,
+  writeStylesheet,
+} from './extension-build-policy.mjs';
+import { extensionManifestForBuild } from './extension-manifest-policy.mjs';
 
 await mkdir('extension/dist', { recursive: true });
-await cp('extension/manifest.json', 'extension/dist/manifest.json');
+const sourceManifest = JSON.parse(await readFile('extension/manifest.json', 'utf8'));
+await writeFile('extension/dist/manifest.json', `${JSON.stringify(extensionManifestForBuild(sourceManifest), null, 2)}\n`);
 // Ship third-party attribution inside the packaged extension so shipped bundles
 // carry the notices for the code they include (react, react-dom, scheduler).
 await cp('THIRD-PARTY-LICENSES.txt', 'extension/dist/THIRD-PARTY-LICENSES.txt');
@@ -15,8 +23,10 @@ await mkdir('extension/dist/src/gallery', { recursive: true });
 await cp('extension/src/gallery/gallery.html', 'extension/dist/src/gallery/gallery.html');
 await mkdir('extension/dist/src/destinations', { recursive: true });
 await cp('extension/src/destinations/view.html', 'extension/dist/src/destinations/view.html');
-await mkdir('extension/dist/src/interop-pairing', { recursive: true });
-await cp('extension/src/interop-pairing/import.html', 'extension/dist/src/interop-pairing/import.html');
+if (isInteropFeatureEnabled()) {
+  await mkdir('extension/dist/src/interop-pairing', { recursive: true });
+  await cp('extension/src/interop-pairing/import.html', 'extension/dist/src/interop-pairing/import.html');
+}
 
 const stylesheets = [
   ...(await stylesheetFiles('extension/src/ui/styles')),
@@ -30,7 +40,9 @@ const stylesheets = [
 ];
 
 for (const sourcePath of stylesheets) {
-  await writeStylesheet(sourcePath, extensionOutputPath(sourcePath));
+  const outputPath = extensionOutputPath(sourcePath);
+  if (isInjectedStylesheet(sourcePath)) await bundleStylesheet(sourcePath, outputPath);
+  else await writeStylesheet(sourcePath, outputPath);
 }
 
 async function stylesheetFiles(directory) {

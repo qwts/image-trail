@@ -32,6 +32,7 @@ const interopRuntimeActionSchema = v.variant('name', [
   v.object({ name: v.literal('select-provider'), provider: v.picklist(['pcloud', 'google-drive', 'icloud-drive']) }),
   v.object({ name: v.literal('connect'), provider: v.picklist(['pcloud', 'google-drive', 'icloud-drive']) }),
   v.object({ name: v.literal('disconnect') }),
+  v.object({ name: v.literal('open-pairing-import') }),
   v.object({ name: v.literal('import-pairing'), fileContent: v.string(), password: v.string() }),
   v.object({ name: v.literal('set-operation'), operation: v.picklist(['move', 'sync']) }),
   v.object({ name: v.literal('start') }),
@@ -73,6 +74,7 @@ export const captureImageRequestSchema = v.object({
   url: v.string(),
   sourceRecordId: v.optional(v.string()),
   sourceType: captureSourceTypeSchema,
+  fileName: v.optional(v.string()),
 });
 
 export const downloadImageRequestSchema = v.object({
@@ -263,6 +265,7 @@ export const checkImageRequestPolicyRequestSchema = v.object({
 
 export const fetchLinkedPageRequestSchema = v.object({
   url: v.string(),
+  referrer: v.string(),
   maxBytes: v.number(),
   timeoutMs: v.number(),
 });
@@ -285,4 +288,5 @@ export const grantPermissionAndCaptureRequestSchema = v.object({
   url: v.string(),
   sourceType: captureSourceTypeSchema,
   sourceRecordId: v.optional(v.string()),
+  fileName: v.optional(v.string()),
 });

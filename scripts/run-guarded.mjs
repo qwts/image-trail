@@ -14,11 +14,13 @@
 //
 // Usage: node scripts/run-guarded.mjs [--label name] [--rss-mb N] [--heap-mb N]
 //        [--timeout-s N] [--] <command> [args...]
-// Env (overrides flags; user/CI tuning knobs): IMAGE_TRAIL_GUARD_RSS_MB,
+// Env (overrides flags; local tuning knobs): IMAGE_TRAIL_GUARD_RSS_MB,
 // IMAGE_TRAIL_GUARD_HEAP_MB, IMAGE_TRAIL_GUARD_TIMEOUT_S,
 // IMAGE_TRAIL_GUARD_DISABLE=1 (passthrough), IMAGE_TRAIL_GUARDED (set for
 // children so nested guarded scripts become passthrough instead of deadlocking
-// on the worktree lock).
+// on the worktree lock). GitHub Actions also passes through: hosted runners
+// provide their own isolation and job timeout, while the guard protects local
+// development machines.
 
 import { execFile, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -74,6 +76,10 @@ export function resolveLimits(options, env) {
     heapMb: pick('IMAGE_TRAIL_GUARD_HEAP_MB', options.heapMb, DEFAULTS.heapMb),
     timeoutS: pick('IMAGE_TRAIL_GUARD_TIMEOUT_S', options.timeoutS, DEFAULTS.timeoutS),
   };
+}
+
+export function shouldBypassGuard(env, platform) {
+  return platform === 'win32' || env.IMAGE_TRAIL_GUARD_DISABLE === '1' || env.GITHUB_ACTIONS === 'true';
 }
 
 // Aggregate RSS (KB) of the guarded tree: descendants of rootPid plus anything
@@ -186,8 +192,9 @@ function main() {
   const { options, command } = parseArgs(process.argv.slice(2));
   if (command.length === 0) fail('no command given');
   if (process.env.IMAGE_TRAIL_GUARDED === '1') return passthrough(command);
-  if (process.platform === 'win32' || process.env.IMAGE_TRAIL_GUARD_DISABLE === '1') {
-    process.stderr.write('[guard] WARNING: guard disabled/unsupported; running unguarded.\n');
+  if (shouldBypassGuard(process.env, process.platform)) {
+    const reason = process.env.GITHUB_ACTIONS === 'true' ? 'GitHub Actions detected' : 'guard disabled/unsupported';
+    process.stderr.write(`[guard] ${reason}; running unguarded.\n`);
     return passthrough(command);
   }
 

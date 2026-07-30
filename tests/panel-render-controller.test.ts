@@ -39,9 +39,9 @@ function createHarness(): Harness {
     applyRestoredPanelPosition: () => {
       log.push('applyRestoredPanelPosition');
     },
-    bufferedNavDebugSnapshot: () => {
-      log.push('bufferedNavDebugSnapshot');
-      return null;
+    bufferedNavSnapshots: () => {
+      log.push('bufferedNavSnapshots');
+      return { debug: null, status: null };
     },
     refreshRecallIfOpen: () => {
       log.push('refreshRecallIfOpen');
@@ -67,7 +67,13 @@ test('renderRecallOnly with no root is a no-op', () => {
 test('renderBufferedDebugOverlay with no root returns before reading the snapshot', () => {
   const { controller, log } = createHarness();
   controller.renderBufferedDebugOverlay();
-  assert.ok(!log.includes('bufferedNavDebugSnapshot'));
+  assert.ok(!log.includes('bufferedNavSnapshots'));
+});
+
+test('renderBufferedNavigationStatus with no root returns before reading the snapshot', () => {
+  const { controller, log } = createHarness();
+  controller.renderBufferedNavigationStatus();
+  assert.ok(!log.includes('bufferedNavSnapshots'));
 });
 
 test('showBufferedNavigationToast with no root/toastRoot is a no-op', () => {

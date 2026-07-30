@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { reducePanelAction } from '../../extension/src/core/actions.js';
+import { createDisplayRecord } from '../../extension/src/core/display-records.js';
 import { createInitialPanelState } from '../../extension/src/core/state.js';
 import type { PanelState } from '../../extension/src/core/types.js';
 import { createSettingsSection } from '../../extension/src/ui/settings-section.js';
@@ -105,4 +106,56 @@ test('an authoritative empty backup history removes stale backup metadata', () =
   const text = cloudBackup.textContent ?? '';
   assert.doesNotMatch(text, /stale-backup\.json/u);
   assert.doesNotMatch(text, /Last backup|Encrypted originals|Original bytes|Missing originals|SHA-256/u);
+});
+
+test('an in-progress chunked backup exposes a cooperative cancel action', () => {
+  const initial = createInitialPanelState(0);
+  const actions: unknown[] = [];
+  const section = build(
+    {
+      ...initial,
+      pcloudBackup: {
+        ...initial.pcloudBackup,
+        connectionState: 'busy',
+        pendingOperation: 'backing-up',
+        message: 'Uploading and verifying records part 2...',
+      },
+    },
+    actions,
+  );
+  const cancel = [...section.querySelectorAll('button')].find((button) => button.textContent === 'Cancel current operation');
+
+  assert.ok(cancel);
+  assert.equal(cancel.disabled, false);
+  cancel.click();
+  assert.deepEqual(actions, [{ name: 'cloud-backup/cancel', provider: 'pcloud' }]);
+});
+
+test('encrypted export stays disabled for selected video originals', () => {
+  const initial = createInitialPanelState(0);
+  const video = createDisplayRecord({
+    id: 'video-1',
+    url: 'image-trail://local-media/video-1/clip.ts',
+    timestamp: '2026-07-29T00:00:00.000Z',
+    source: 'bookmark',
+    captureStatus: 'captured',
+    blobId: 'blob-video-1',
+    storedOriginal: {
+      blobId: 'blob-video-1',
+      mimeType: 'video/mp2t',
+      byteLength: 188 * 4,
+      capturedAt: '2026-07-29T00:00:00.000Z',
+      fileName: 'clip.ts',
+    },
+  });
+  const section = build({
+    ...initial,
+    blobKeyUnlocked: true,
+    bookmarks: [video],
+    selectedBookmarkIds: [video.id],
+  });
+  const encryptedExport = [...section.querySelectorAll('button')].find((button) => button.textContent === 'Export encrypted');
+
+  assert.ok(encryptedExport);
+  assert.equal(encryptedExport.disabled, true);
 });

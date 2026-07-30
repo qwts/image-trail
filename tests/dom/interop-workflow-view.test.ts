@@ -198,6 +198,64 @@ test('open workflow traps keyboard focus inside the active shadow root', () => {
   host.remove();
 });
 
+test('returning from secure pairing import refreshes the open workflow status', async (t) => {
+  let statusCalls = 0;
+  const actions: string[] = [];
+  Object.defineProperty(globalThis, 'chrome', {
+    configurable: true,
+    value: {
+      runtime: {
+        id: 'test-extension',
+        sendMessage: (message: { payload: { action: { name: string } } }) => {
+          actions.push(message.payload.action.name);
+          if (message.payload.action.name === 'status') statusCalls += 1;
+          return Promise.resolve(
+            createInteropRuntimeResultMessage({
+              ok: true,
+              snapshot: {
+                ...blockedInteropWorkflow('bookmark', 1),
+                provider: { id: 'pcloud', label: 'pCloud', state: 'connected', detail: 'Connected.' },
+                pairing: statusCalls > 1 ? 'paired' : 'unpaired',
+                error: null,
+              },
+            }),
+          );
+        },
+      },
+    },
+  });
+  t.after(() => {
+    Reflect.deleteProperty(globalThis, 'chrome');
+  });
+
+  openInteropWorkflow('bookmark', ['bookmark-1']);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const dialog = document.querySelector('[role="dialog"][aria-label="Transfer and Sync"]');
+  assert.ok(dialog instanceof HTMLElement);
+  const importPairing = Array.from(dialog.querySelectorAll('button')).find(
+    (control) => control.textContent === 'Open secure pairing import',
+  );
+  assert.ok(importPairing instanceof HTMLButtonElement);
+  importPairing.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(actions, ['status', 'open-pairing-import']);
+
+  window.dispatchEvent(new Event('focus'));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const start = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Start move');
+  assert.ok(start instanceof HTMLButtonElement);
+  assert.equal(start.disabled, false);
+  assert.equal(statusCalls, 2);
+  assert.deepEqual(actions, ['status', 'open-pairing-import', 'status']);
+
+  Array.from(dialog.querySelectorAll('button'))
+    .find((control) => control.textContent === 'Close')
+    ?.click();
+  window.dispatchEvent(new Event('focus'));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(statusCalls, 2);
+});
+
 test('open workflow ignores an older status response after a newer operation response', async (t) => {
   let resolveStatus: ((value: unknown) => void) | undefined;
   let resolveOperation: ((value: unknown) => void) | undefined;

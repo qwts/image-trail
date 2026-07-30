@@ -23,7 +23,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'node node_modules/http-server/bin/http-server tests/e2e/pages --host 127.0.0.1 --port 4173 --silent',
+    command: 'npm run serve:e2e',
     url: 'http://127.0.0.1:4173/single-image.html',
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,

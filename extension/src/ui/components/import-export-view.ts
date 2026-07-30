@@ -2,6 +2,9 @@ import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePrevie
 import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
 import { createBackupHistory, createCloudBackupMetadata, type CloudBackupHistoryViewRecord } from './cloud-backup-metadata.js';
+import { cloudConnectionLabel, createCloudBackupButton } from './cloud-backup-controls.js';
+import { createDirectMediaUrlControl, readMediaFiles } from './media-import-controls.js';
+import { addTrustedClickListener } from './trusted-events.js';
 
 type UrlReviewStatusClearScope = 'hostname' | 'page' | 'source' | 'all';
 
@@ -38,7 +41,7 @@ export type CloudBackupAction =
       readonly password: string;
     }
   | { readonly name: 'cloud-backup/retry'; readonly provider: 'pcloud' }
-  | { readonly name: 'cloud-backup/disconnect'; readonly provider: 'pcloud' }
+  | { readonly name: 'cloud-backup/disconnect' | 'cloud-backup/cancel'; readonly provider: 'pcloud' }
   | { readonly name: 'import/confirm-restore-preview' }
   | { readonly name: 'import/cancel-restore-preview' };
 
@@ -81,6 +84,7 @@ export interface ImportExportViewState {
   readonly selectedHistoryCount: number;
   readonly selectedBookmarkCount: number;
   readonly selectedImageDownloadCount: number;
+  readonly selectedEncryptedImageExportCount: number;
   readonly visibleImageSelectionCount: number;
   readonly imageDownloadAvailable: boolean;
   readonly encryptedImageTransferAvailable: boolean;
@@ -168,7 +172,6 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
   description.className = 'image-trail-panel__meta';
   description.textContent = 'Manual encrypted backups use Image Trail export files stored in pCloud.';
   group.append(description);
-
   if (state.message) {
     const message = document.createElement('p');
     message.className = state.messageIsError ? 'image-trail-panel__meta image-trail-panel__error' : 'image-trail-panel__meta';
@@ -176,9 +179,7 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
     message.textContent = state.message;
     group.append(message);
   }
-
   appendCloudBackupMetadata(group, state);
-
   if (state.restorePreview) {
     group.append(
       createRestorePreview(state.restorePreview, { ...emptyImportExportState(), busy: state.connectionState === 'busy' }, dispatch),
@@ -212,8 +213,11 @@ export function createCloudBackupView(state: CloudBackupProviderState, dispatch:
 
   const restoreCandidateControls = createRestoreCandidateControls(state, dispatch, passwordInput);
 
-  const retryBtn = createCloudBackupButton('Retry pCloud', state, () => dispatch({ name: 'cloud-backup/retry', provider: 'pcloud' }));
-  retryBtn.disabled = state.connectionState !== 'error';
+  const cancelable = state.connectionState === 'busy' && ['backing-up', 'restoring'].includes(state.pendingOperation ?? '');
+  const retryBtn = createCloudBackupButton(cancelable ? 'Cancel current operation' : 'Retry pCloud', state, () =>
+    dispatch(cancelable ? { name: 'cloud-backup/cancel', provider: 'pcloud' } : { name: 'cloud-backup/retry', provider: 'pcloud' }),
+  );
+  retryBtn.disabled = state.connectionState !== 'error' && !cancelable;
 
   const disconnectBtn = createCloudBackupButton('Disconnect', state, () =>
     dispatch({ name: 'cloud-backup/disconnect', provider: 'pcloud' }),
@@ -249,6 +253,7 @@ function emptyImportExportState(): ImportExportViewState {
     selectedHistoryCount: 0,
     selectedBookmarkCount: 0,
     selectedImageDownloadCount: 0,
+    selectedEncryptedImageExportCount: 0,
     visibleImageSelectionCount: 0,
     imageDownloadAvailable: false,
     encryptedImageTransferAvailable: false,
@@ -287,7 +292,7 @@ function createRestoreCandidateControls(
     row.className = 'image-trail-panel__cloud-restore-row';
     row.disabled = state.connectionState !== 'connected';
     row.title = candidate.fileName;
-    row.addEventListener('click', () => {
+    addTrustedClickListener(row, () => {
       if (passwordInput.value.length < 4) {
         hint.textContent = 'Enter the backup password before previewing this pCloud backup.';
         hint.classList.add('image-trail-panel__error');
@@ -405,7 +410,7 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
   historyBtn.textContent = state.selectedHistoryCount > 0 ? `Export selected history (${state.selectedHistoryCount})` : 'Export history';
   historyBtn.classList.toggle('is-waiting', state.busy);
   historyBtn.disabled = state.busy;
-  historyBtn.addEventListener('click', () => {
+  addTrustedClickListener(historyBtn, () => {
     dispatch({ name: 'export/history', password: passwordInput.value, plaintext: plaintext.input.checked });
     passwordInput.value = '';
     updateExportControls();
@@ -417,7 +422,7 @@ function createExportGroup(state: ImportExportViewState, dispatch: (action: Impo
     state.selectedBookmarkCount > 0 ? `Export selected bookmarks (${state.selectedBookmarkCount})` : 'Export bookmarks';
   bookmarksBtn.classList.toggle('is-waiting', state.busy);
   bookmarksBtn.disabled = state.busy;
-  bookmarksBtn.addEventListener('click', () => {
+  addTrustedClickListener(bookmarksBtn, () => {
     dispatch({ name: 'export/bookmarks', password: passwordInput.value, plaintext: plaintext.input.checked });
     passwordInput.value = '';
     updateExportControls();
@@ -481,11 +486,11 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   group.className = 'image-trail-panel__subsection';
 
   const imageControl = createFilePickerField({
-    label: 'Image files',
-    description: 'Choose one or more local image files to import into the active session.',
-    buttonText: 'Choose images',
+    label: 'Media files',
+    description: 'Choose local images or MPEG-TS files (.ts, .mts, .m2ts). Transport streams are signature-checked and encrypted.',
+    buttonText: 'Choose media',
     noFileText: 'No file selected',
-    accept: 'image/*',
+    accept: 'image/*,video/mp2t,.ts,.mts,.m2ts',
     multiple: true,
     disabled: state.busy,
   });
@@ -504,7 +509,10 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
 
   const controls = document.createElement('div');
   controls.className = 'image-trail-panel__control-stack';
-  controls.append(imageControl.field, encryptedImageControl.field);
+  const mediaUrlControl = createDirectMediaUrlControl(state.busy || !state.blobKeyUnlocked, (file) => {
+    dispatch({ name: 'import/image', files: [file] });
+  });
+  controls.append(imageControl.field, mediaUrlControl.field, encryptedImageControl.field);
 
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
@@ -512,7 +520,7 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   importBtn.classList.toggle('is-waiting', state.busy);
   importBtn.disabled = state.busy;
   importBtn.addEventListener('click', () => {
-    readImageFiles(imageInput, (files) => dispatch({ name: 'import/image', files }));
+    readMediaFiles(imageInput, (files) => dispatch({ name: 'import/image', files }));
   });
 
   const importEncryptedBtn = document.createElement('button');
@@ -543,7 +551,7 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const exportEncryptedBtn = document.createElement('button');
   exportEncryptedBtn.type = 'button';
   exportEncryptedBtn.textContent =
-    state.selectedImageDownloadCount > 0 ? `Export encrypted (${state.selectedImageDownloadCount})` : 'Export encrypted';
+    state.selectedEncryptedImageExportCount > 0 ? `Export encrypted (${state.selectedEncryptedImageExportCount})` : 'Export encrypted';
   exportEncryptedBtn.classList.toggle('is-waiting', state.busy);
   exportEncryptedBtn.disabled = state.busy || !state.encryptedImageTransferAvailable;
   exportEncryptedBtn.addEventListener('click', () => {
@@ -553,7 +561,7 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
   const actions = document.createElement('div');
   actions.className = 'image-trail-panel__action-groups';
   actions.append(
-    createActionGroup('Import files', [importBtn, importEncryptedBtn]),
+    createActionGroup('Import files', [importBtn, mediaUrlControl.button, importEncryptedBtn]),
     createActionGroup('Image downloads', [selectEverythingBtn, exportBtn, exportEncryptedBtn]),
   );
 
@@ -593,7 +601,7 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   historyBtn.textContent = 'Import history';
   historyBtn.classList.toggle('is-waiting', state.busy);
   historyBtn.disabled = state.busy;
-  historyBtn.addEventListener('click', () => {
+  addTrustedClickListener(historyBtn, () => {
     readFileInput(fileInput, (content, fileName) => {
       dispatch({ name: 'import/history', fileContent: content, password: passwordInput.value, fileName });
       passwordInput.value = '';
@@ -605,7 +613,7 @@ function createImportGroup(state: ImportExportViewState, dispatch: (action: Impo
   bookmarksBtn.textContent = 'Import bookmarks';
   bookmarksBtn.classList.toggle('is-waiting', state.busy);
   bookmarksBtn.disabled = state.busy;
-  bookmarksBtn.addEventListener('click', () => {
+  addTrustedClickListener(bookmarksBtn, () => {
     readFileInput(fileInput, (content, fileName) => {
       dispatch({ name: 'import/bookmarks', fileContent: content, password: passwordInput.value, fileName });
       passwordInput.value = '';
@@ -779,34 +787,6 @@ function createRestorePreviewMetadata(rows: ReadonlyArray<readonly [string, stri
   return list;
 }
 
-function createCloudBackupButton(label: string, state: CloudBackupProviderState, onClick: () => void): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = state.pendingOperation ? cloudPendingLabel(label, state.pendingOperation) : label;
-  button.classList.toggle('is-waiting', state.connectionState === 'busy');
-  button.disabled = state.connectionState === 'busy';
-  button.addEventListener('click', onClick);
-  return button;
-}
-
-function cloudConnectionLabel(state: CloudBackupProviderState): string {
-  if (state.connectionState === 'busy' && state.pendingOperation === 'connecting') return 'Connecting';
-  if (state.connectionState === 'busy' && state.pendingOperation === 'disconnecting') return 'Disconnecting';
-  if (state.connectionState === 'busy' && state.pendingOperation === 'backing-up') return 'Backing up';
-  if (state.connectionState === 'busy' && state.pendingOperation === 'restoring') return 'Checking restore';
-  if (state.connectionState === 'connected') return 'Connected';
-  if (state.connectionState === 'error') return 'Needs attention';
-  return 'Not connected';
-}
-
-function cloudPendingLabel(label: string, operation: NonNullable<CloudBackupProviderState['pendingOperation']>): string {
-  if (operation === 'connecting' && label === 'Connect pCloud') return 'Connecting...';
-  if (operation === 'disconnecting' && label === 'Disconnect') return 'Disconnecting...';
-  if (operation === 'backing-up' && label === 'Back up now') return 'Backing up...';
-  if (operation === 'restoring' && label === 'Choose restore file') return 'Checking restore...';
-  return label;
-}
-
 function cloudBackupMetadata(state: CloudBackupProviderState): ReadonlyArray<readonly [string, string]> {
   const rows: Array<readonly [string, string]> = [];
   if (state.apiHost) rows.push(['API host', state.apiHost]);
@@ -840,28 +820,6 @@ function createToggle(text: string): { readonly label: HTMLLabelElement; readonl
   copy.textContent = text;
   label.append(input, copy);
   return { label, input };
-}
-
-function readImageFiles(input: HTMLInputElement, onRead: (files: readonly ImportedImageFile[]) => void): void {
-  const files = Array.from(input.files ?? []).filter((file) => file.type.startsWith('image/'));
-  if (files.length === 0) return;
-  let remaining = files.length;
-  const results: ImportedImageFile[] = [];
-  for (const file of files) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string' && reader.result.startsWith('data:image/')) {
-        results.push({ name: file.name, dataUrl: reader.result });
-      }
-      remaining -= 1;
-      if (remaining === 0) onRead(results);
-    };
-    reader.onerror = () => {
-      remaining -= 1;
-      if (remaining === 0) onRead(results);
-    };
-    reader.readAsDataURL(file);
-  }
 }
 
 function readEncryptedImageFiles(input: HTMLInputElement, onRead: (files: readonly ImportedEncryptedImageFile[]) => void): void {

@@ -5,9 +5,23 @@
 #  2. tag — after the version PR merges (package version changed, no pending
 #     changesets), tag v<version> and hand off to the release workflow.
 #
-# GITHUB_TOKEN events cannot trigger other workflows, so this workflow also:
-#  - dispatches CI onto the bot-refreshed version branch;
-#  - explicitly dispatches release.yml after pushing the version tag.
+# Both halves authenticate with RELEASE_TOKEN, for two compounding reasons:
+#  - GITHUB_TOKEN events cannot trigger other workflows. The bot-refreshed
+#    version PR got no pull_request CI runs even though main requires the "CI"
+#    and "E2E gate" checks, and a GITHUB_TOKEN tag push fired no on:push:tags
+#    run, so both had to be dispatched explicitly.
+#  - This account's Actions policy authorizes actors explicitly and does not
+#    include github-actions[bot]. Anything it triggers — including those
+#    explicit dispatches — now dies at startup with "Actor is not allowed to
+#    trigger Actions workflows", so the workaround stopped working too.
+# Under the PAT the actor is an authorized account and both events fire on their
+# own: the version PR gets real pull_request runs, and the tag push starts
+# release.yml directly. The PAT reaches only actions/* steps and our own `run:`
+# blocks — never a third-party action, which is why versioning is a script here
+# rather than changesets/action. If RELEASE_TOKEN is ever absent the jobs fall
+# back to GITHUB_TOKEN and still version and tag correctly; only the downstream
+# runs fail to start (re-dispatching by hand is not a fallback, because the bot
+# cannot dispatch either).
 name: Version cut
 
 on:
@@ -25,19 +39,19 @@ permissions:
   contents: read
 
 jobs:
-  version-pr:
-    name: Version packages PR
+  prepare-version-pr:
+    name: Prepare version packages PR
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-      actions: write
+    outputs:
+      ready: ${{ steps.version.outputs.ready }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -45,37 +59,135 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Create or refresh the ready version PR
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          version: npm run changeset:version
-          title: 'chore: version Image Trail'
-          commit: 'chore: version Image Trail'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Dependency code runs only in this read-only job. The next job starts on
+      # a clean runner and accepts only the narrow version patch validated here.
+      - name: Prepare the version patch
+        id: version
+        run: |
+          set -euo pipefail
+          if [ -z "$(find .changeset -name '*.md' ! -name 'README.md' -print -quit)" ]; then
+            echo "No changesets pending — nothing to version."
+            exit 0
+          fi
+          npm run changeset:version
+          git add -A
+          if git diff --cached --quiet; then
+            echo '::warning::Changesets are pending but "changeset:version" changed nothing.'
+            exit 0
+          fi
+          node scripts/validate-version-cut.mjs
+          git diff --cached --check
+          git diff --cached --binary --full-index --no-renames HEAD > "$RUNNER_TEMP/version.patch"
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
 
-      - name: Run required checks on the version branch
-        if: steps.changesets.outputs.hasChangesets == 'true'
+      - name: Upload the version patch
+        if: steps.version.outputs.ready == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: version-cut-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/version.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-version-pr:
+    name: Publish version packages PR
+    needs: prepare-version-pr
+    if: needs.prepare-version-pr.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    # These scopes exist only for the `|| github.token` fallback below; a PAT
+    # carries its own.
+    permissions:
+      contents: write # Required to force-push the rolling version branch.
+      pull-requests: write # Required to create or refresh the version PR.
+    steps:
+      - name: Checkout the trusted base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download the version patch
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: version-cut-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/version-cut
+
+      # No package install or dependency code runs on this runner. Validate the
+      # untrusted patch before committing, and disable hooks explicitly so the
+      # authenticated step cannot inherit executable Git state.
+      - name: Apply and validate the version patch
+        id: version
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run ci.yml --ref changeset-release/main
+          BRANCH: changeset-release/main
+        run: |
+          set -euo pipefail
+          trusted_validator="$RUNNER_TEMP/trusted-validate-version-cut.mjs"
+          cp scripts/validate-version-cut.mjs "$trusted_validator"
+          git checkout -B "$BRANCH"
+          git apply --index "$RUNNER_TEMP/version-cut/version.patch"
+          node "$trusted_validator"
+          git diff --cached --check
+          version="$(node -p "require('./package.json').version")"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git -c core.hooksPath=/dev/null -c commit.gpgsign=false commit -m 'chore: version Image Trail'
+          {
+            echo "Merging this PR cuts \`v$version\`: the tag and the release build follow automatically."
+            echo
+            echo "Do not hand-edit — every push to main rebuilds this branch from the pending changesets."
+            echo
+            echo '## Changelog'
+            echo
+            awk -v ver="$version" '
+              $0 ~ "^## " ver "$" { grab = 1; next }
+              grab && /^## / { exit }
+              grab { print }
+            ' CHANGELOG.md
+          } > "$RUNNER_TEMP/pr-body.md"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Push and create or refresh the ready version PR
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          BRANCH: changeset-release/main
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The branch is a disposable projection of main + the pending
+          # changesets, rebuilt from the current tip on every main push.
+          gh auth setup-git
+          git -c core.hooksPath=/dev/null push --force origin "$BRANCH"
+          open=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            # The rolling PR outlives the changesets it was opened for. Its body
+            # is regenerated on every refresh, not just at creation — otherwise it
+            # keeps advertising the version and changelog from whenever it was
+            # first opened while the branch underneath moves on (PR #704 review).
+            gh pr edit "$open" --body-file "$RUNNER_TEMP/pr-body.md"
+            echo "Version PR #$open refreshed for v$VERSION."
+            exit 0
+          fi
+          gh pr create --base main --head "$BRANCH" --title 'chore: version Image Trail' \
+            --body-file "$RUNNER_TEMP/pr-body.md"
 
   tag:
     name: Tag version merges
     runs-on: ubuntu-latest
+    # Scopes for the `|| github.token` fallback only; `actions: write` covers the
+    # stranded-tag recovery dispatch below.
     permissions:
-      contents: write
-      actions: write
+      contents: write # Required to push the signed release tag.
+      actions: write # Required only for stranded-tag recovery dispatch.
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Tag when the current version is a fresh cut
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           # A normal main push is a release cut only when package.json changed.
@@ -113,6 +225,9 @@ jobs:
 
           if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
             echo "$version already tagged."
+            # The one dispatch that survives: an already-existing tag has no push
+            # event left to replay. Runs under the PAT — a github-actions[bot]
+            # dispatch is refused by the Actions actor policy.
             if ! gh release view "$version" >/dev/null 2>&1; then
               echo "$version has no release — dispatching recovery."
               gh workflow run release.yml --ref main -f tag="$version"
@@ -123,10 +238,12 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git tag -a "$version" -m "Image Trail $version"
+          gh auth setup-git
           git push origin "$version"
           echo "Tagged $version."
 
-          # A tag pushed with GITHUB_TOKEN does not emit a new workflow run.
-          # Dispatch from main (which contains release.yml) while pinning the
-          # source built and published to the immutable tag.
-          gh workflow run release.yml --ref main -f tag="$version"
+          # No dispatch: pushed under the PAT, this tag fires release.yml's
+          # on:push:tags trigger directly. Without RELEASE_TOKEN the push is a
+          # GITHUB_TOKEN push and starts nothing — re-run this workflow via
+          # workflow_dispatch once the secret is present and the already-tagged
+          # recovery path above picks the tag up.

@@ -241,7 +241,7 @@ test('importImages delegates each file to addImportedImage and reports the count
   ]);
 
   assert.equal(harness.importedImages, 2);
-  assert.match(harness.getState().message, /Imported 2 images into bookmarks and recent history\./u);
+  assert.match(harness.getState().message, /Imported 2 media items into bookmarks and recent history\./u);
 });
 
 test('previewPCloudRestoreFile requires a cloud password before downloading', async () => {

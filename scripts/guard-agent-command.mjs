@@ -62,6 +62,10 @@ const BLOCKED = [
     what: 'direct Storybook test-runner invocation',
   },
   {
+    pattern: /(^|[\s;(&|])(npx\s+)?vitest(?:\s|$)/u,
+    what: 'direct Vitest invocation',
+  },
+  {
     pattern: /(^|[\s;(&|])(npx\s+)?c8\s/u,
     what: 'direct c8 coverage invocation',
   },
@@ -245,11 +249,7 @@ function respond(protocol, verdict) {
 }
 
 async function main() {
-  const protocol = process.argv.includes('--protocol=cursor')
-    ? 'cursor'
-    : process.argv.includes('--protocol=codex')
-      ? 'codex'
-      : 'claude';
+  const protocol = process.argv.includes('--protocol=cursor') ? 'cursor' : process.argv.includes('--protocol=codex') ? 'codex' : 'claude';
   // The script lives in the checkout it protects, so its own location is the
   // authoritative project dir (CLAUDE_PROJECT_DIR matches it for Claude Code;
   // Cursor and Codex set no equivalent).

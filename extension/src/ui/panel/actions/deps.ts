@@ -34,9 +34,10 @@ export interface PanelActionDeps {
   applyPanelState(nextState: PanelState, options?: { readonly saveParsedFieldState?: boolean; readonly render?: boolean }): boolean;
   syncTargetState(snapshot: TargetSelectionSnapshot): void;
 
-  // Render variants — these are distinct on purpose (see ui/CLAUDE.md: no full panel rerenders for
+  // Render variants — these are distinct on purpose (see ui/AGENTS.md: no full panel rerenders for
   // recall-only updates); each handler must keep calling exactly the variant the if-chain used.
   render(): void;
+  renderRecallOnly(): void;
   renderPanelAndRefreshRecall(): void;
   refreshRecallIfOpen(): void;
   clearRecallMessageTimer(): void;

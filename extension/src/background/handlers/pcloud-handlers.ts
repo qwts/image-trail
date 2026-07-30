@@ -26,16 +26,23 @@ import {
   uploadPCloudBackup,
 } from '../pcloud-provider.js';
 import { PCLOUD_HOST_PERMISSION, requestHostPermission } from '../permissions.js';
-import { preflightChromeInteropAction } from '../interop-runtime-chrome.js';
-import { createChromeInteropRuntime, createInteropRuntimeMessageRegistry } from './interop-runtime-handlers.js';
+import { createChromeInteropRuntime, preflightChromeInteropAction } from '../interop-runtime-chrome.js';
 import type { LibraryChangeNotifier } from '../library-change-notifier.js';
 import { finalizeInteropMoveSource } from '../../data/interop/move-source-finalizer.js';
+import { createDisabledInteropRuntimeMessageRegistry, createInteropRuntimeMessageRegistry } from './interop-runtime-handlers.js';
+
+declare const __IMAGE_TRAIL_INTEROP_ENABLED__: boolean | undefined;
+const transferSyncEnabled = typeof __IMAGE_TRAIL_INTEROP_ENABLED__ === 'boolean' && __IMAGE_TRAIL_INTEROP_ENABLED__;
 
 async function connectPCloudWithPermission(): ReturnType<typeof connectPCloudProvider> {
   const granted = await requestHostPermission(PCLOUD_HOST_PERMISSION);
   if (granted) return connectPCloudProvider();
   const message = 'pCloud access was not granted. Connect again to approve access only to pCloud hosts.';
   return { ok: false, status: { connected: false, message, messageIsError: true }, message };
+}
+
+async function openInteropPairingImport(): Promise<void> {
+  await chrome.tabs.create({ url: chrome.runtime.getURL('src/interop-pairing/import.html') });
 }
 
 type PCloudRequestType =
@@ -80,13 +87,18 @@ export function createPCloudMessageRegistry(): Record<PCloudRequestType, Message
       requestSchema: requestSchemas.uploadPCloudBackupRequestSchema,
       handle: (message: UploadPCloudBackupMessage) => uploadPCloudBackup(message.payload),
       respond: (result) => createUploadPCloudBackupResultMessage(result),
-      fallback: () =>
-        createUploadPCloudBackupResultMessage({
-          ok: false,
-          status: { connected: false, message: 'pCloud backup upload failed.', messageIsError: true },
+      fallback: (message) => {
+        const operationMessage = message.payload.operation === 'cleanup' ? 'pCloud backup cleanup failed.' : 'pCloud backup upload failed.';
+        const base = {
+          ok: false as const,
+          status: { connected: false, message: operationMessage, messageIsError: true },
           reason: 'upload-failed',
-          message: 'pCloud backup upload failed.',
-        }),
+          message: operationMessage,
+        };
+        return createUploadPCloudBackupResultMessage(
+          message.payload.operation === 'cleanup' ? { ...base, deletedFileIds: [], failedFileIds: message.payload.fileIds } : base,
+        );
+      },
     }),
     [MessageType.ListPCloudBackups]: defineMessage({
       requestSchema: requestSchemas.emptyPayloadSchema,
@@ -121,7 +133,13 @@ export function createCloudMessageRegistry(
 ): Record<PCloudRequestType | typeof MessageType.InteropRuntime, MessageDef<ExtensionRequest, ExtensionResponse>> {
   return {
     ...createPCloudMessageRegistry(),
-    ...createInteropRuntimeMessageRegistry(createChromeInteropRuntime(getDb, finalizeSourceRecord), preflightChromeInteropAction),
+    ...(transferSyncEnabled
+      ? createInteropRuntimeMessageRegistry(
+          createChromeInteropRuntime(getDb, finalizeSourceRecord),
+          preflightChromeInteropAction,
+          openInteropPairingImport,
+        )
+      : createDisabledInteropRuntimeMessageRegistry()),
   };
 }
 

@@ -7,6 +7,7 @@ import {
   bookmarkSaveMessage,
   formatCloudBackupBytes,
   historyRecordToExportEntry,
+  isEncryptedImageExportRecord,
   isLockedPrivatePin,
   originalBlobIdsForFullBackup,
   pcloudBackupFileName,
@@ -147,6 +148,21 @@ test('isLockedPrivatePin detects locked status and private placeholder URLs', ()
 
   assert.equal(isLockedPrivatePin(locked), true);
   assert.equal(isLockedPrivatePin(plain), false);
+});
+
+test('isEncryptedImageExportRecord excludes captured video while retaining image and remote records', () => {
+  const record = (mimeType?: string) =>
+    createDisplayRecord({
+      id: mimeType ?? 'remote',
+      url: 'https://example.test/media',
+      timestamp: '2026-06-21T00:00:00.000Z',
+      source: 'bookmark',
+      ...(mimeType ? { storedOriginal: { ...STORED_ORIGINAL, mimeType } } : {}),
+    });
+
+  assert.equal(isEncryptedImageExportRecord(record('image/jpeg')), true);
+  assert.equal(isEncryptedImageExportRecord(record()), true);
+  assert.equal(isEncryptedImageExportRecord(record('video/mp2t')), false);
 });
 
 test('pcloudBackupFileName normalizes ISO timestamps into a filename-safe form', () => {

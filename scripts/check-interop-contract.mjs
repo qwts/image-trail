@@ -6,8 +6,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-const EXPECTED_SOURCE_COMMIT = 'd75346749046ca9ac337e4d987d0e4ad7fed1c8e';
-const EXPECTED_MANIFEST_SHA256 = '07ce556e738dc47ccd68d72e22905760051373df989fe960317e11be49d3dc23';
+const EXPECTED_SOURCE_COMMIT = '760e23ba1abeaf15bf6d56e029ebdd47d521a7e7';
+const EXPECTED_MANIFEST_SHA256 = '16a7a610104d9c62c44a952aa682e56932740b6a65c633afe5ea19a0f752f657';
 const contractRoot = path.resolve('contracts/interop/v1');
 const sourcePath = path.resolve('contracts/interop/source.json');
 
@@ -16,7 +16,7 @@ function sha256(contents) {
 }
 
 async function contractFiles() {
-  const rootFiles = (await readdir(contractRoot)).filter((fileName) => fileName.endsWith('.json'));
+  const rootFiles = (await readdir(contractRoot)).filter((fileName) => fileName.endsWith('.json') || fileName.endsWith('.md'));
   const fixtureFiles = (await readdir(path.join(contractRoot, 'fixtures')))
     .filter((fileName) => fileName.endsWith('.json'))
     .map((fileName) => path.join('fixtures', fileName));
@@ -51,7 +51,7 @@ async function verifyChecksumEntry(line, listed) {
   if (!absolutePath.startsWith(`${contractRoot}${path.sep}`)) throw new Error(`Unsafe interop contract path: ${relativePath}`);
   const contents = await readFile(absolutePath);
   if (sha256(contents) !== expectedHash) throw new Error(`Interop contract checksum mismatch: ${relativePath}`);
-  JSON.parse(contents.toString('utf8'));
+  if (relativePath.endsWith('.json')) JSON.parse(contents.toString('utf8'));
   listed.add(relativePath);
 }
 

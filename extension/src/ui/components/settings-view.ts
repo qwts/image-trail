@@ -34,12 +34,7 @@ import { createUrlSteppingPresetView } from './url-stepping-preset-view.js';
 import { applySettingsPrimitiveContracts } from './settings-primitive-contracts.js';
 import { createSettingsDisclosure } from './settings-disclosure.js';
 
-export {
-  createBuildIdentitySettingsView,
-  createStorageHealthSettingsView,
-  formatStorageHealthBytes,
-  storageHealthRows,
-} from './maintenance-settings-view.js';
+export { formatStorageHealthBytes, storageHealthRows } from './maintenance-settings-view.js';
 
 export interface SettingsUtilityGroups {
   readonly privacy: readonly HTMLElement[];

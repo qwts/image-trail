@@ -1,6 +1,7 @@
 import type { EncryptionAlgorithm, KeyReference } from './crypto/types.js';
 import type { InteropReviewCategory } from '../core/interop/contract.js';
 import type { InteropAlbum, InteropRecord } from '../core/interop/records.js';
+import type { StoredMediaInfo } from '../core/media/media-info.js';
 
 export type DataStoreName =
   | 'metadata'
@@ -80,6 +81,11 @@ export interface StoredOriginalReference {
   readonly mimeType: string;
   readonly byteLength: number;
   readonly capturedAt: string;
+  readonly fileName?: string | undefined;
+  readonly sha256?: string | undefined;
+  readonly width?: number | undefined;
+  readonly height?: number | undefined;
+  readonly mediaInfo?: StoredMediaInfo | undefined;
 }
 
 export interface DurableHistoryPayloadV1 {

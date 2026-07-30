@@ -18,6 +18,7 @@ export type InteropRuntimeAction =
   | { readonly name: 'select-provider'; readonly provider: InteropProviderId }
   | { readonly name: 'connect'; readonly provider: InteropProviderId }
   | { readonly name: 'disconnect' }
+  | { readonly name: 'open-pairing-import' }
   | { readonly name: 'import-pairing'; readonly fileContent: string; readonly password: string }
   | { readonly name: 'set-operation'; readonly operation: InteropOperation }
   | { readonly name: 'start' }

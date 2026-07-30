@@ -6,7 +6,9 @@ import { createDisplayRecord } from '../../extension/src/core/display-records.js
 import type { ImageDisplayRecord } from '../../extension/src/core/display-records.js';
 import type { BookmarkStore, PanelState, UrlReviewStatusStore } from '../../extension/src/core/types.js';
 import type { CaptureStore } from '../../extension/src/content/capture-controller.js';
-import { DEFAULT_LOCAL_SETTINGS, importBookmarks, type AlbumBackupEntry } from '../../extension/src/content/panel-services.js';
+import { DEFAULT_LOCAL_SETTINGS, type AlbumBackupEntry } from '../../extension/src/content/panel-services.js';
+import { decryptCloudBackupManifest, decryptCloudBackupPart } from '../../extension/src/data/import-export/chunked-cloud-backup.js';
+import type { PCloudBackupUploadInput } from '../../extension/src/core/cloud/pcloud-provider.js';
 import { PRIVATE_PIN_EXPORT_LOCKED_MESSAGE } from '../../extension/src/ui/panel/record-export-helpers.js';
 import { RecallExportController, type RecallExportControllerDeps } from '../../extension/src/ui/panel/recall-export-controller.js';
 
@@ -30,19 +32,22 @@ interface ExportHarnessConfig {
   readonly bookmarks?: readonly ImageDisplayRecord[];
   readonly albums?: readonly AlbumBackupEntry[];
   readonly captureStore?: Partial<Record<keyof CaptureStore, unknown>>;
+  readonly failUploadAttempt?: number;
 }
 
 interface ExportHarness {
   readonly controller: RecallExportController;
   getState(): PanelState;
   readonly requestedOriginalBlobIds: string[][];
-  readonly uploads: { readonly fileName: string; readonly fileContent: string }[];
+  readonly uploads: { readonly fileId: number; readonly fileName: string; readonly fileContent: string; readonly recordHistory: boolean }[];
+  readonly cleanups: readonly number[][];
 }
 
 function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
   let state = createInitialPanelState(0);
   const requestedOriginalBlobIds: string[][] = [];
-  const uploads: { readonly fileName: string; readonly fileContent: string }[] = [];
+  const uploads: { fileId: number; fileName: string; fileContent: string; recordHistory: boolean }[] = [];
+  const cleanups: number[][] = [];
 
   const bookmarkStore = {
     loadPage: async () => ({
@@ -55,12 +60,15 @@ function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
     }),
   } as unknown as BookmarkStore;
 
+  const configuredOriginalRequest = config.captureStore?.requestOriginalBlobRecords as
+    CaptureStore['requestOriginalBlobRecords'] | undefined;
   const captureStore = {
+    ...config.captureStore,
     requestOriginalBlobRecords: async (blobIds: readonly string[]) => {
       requestedOriginalBlobIds.push([...blobIds]);
+      if (configuredOriginalRequest) return configuredOriginalRequest(blobIds);
       return { ok: true as const, records: [], missingBlobIds: [...blobIds] };
     },
-    ...config.captureStore,
   } as unknown as CaptureStore;
 
   const deps: RecallExportControllerDeps = {
@@ -83,14 +91,39 @@ function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
       ok: true,
       status: { connected: false },
     })) as RecallExportControllerDeps['disconnectPCloudProvider'],
-    uploadPCloudBackup: (async (input: { readonly fileName: string; readonly fileContent: string }) => {
-      uploads.push({ fileName: input.fileName, fileContent: input.fileContent });
+    uploadPCloudBackup: (async (input: PCloudBackupUploadInput) => {
+      if (input.operation === 'cleanup') {
+        cleanups.push([...input.fileIds]);
+        return {
+          ok: true,
+          status: CONNECTED_STATUS,
+          deletedFileIds: input.fileIds,
+          message: `Cleaned up ${input.fileIds.length} partial backup part(s).`,
+        };
+      }
+      const fileId = 42 + uploads.length;
+      if (config.failUploadAttempt === uploads.length + 1) {
+        return {
+          ok: false,
+          status: CONNECTED_STATUS,
+          reason: 'upload-failed',
+          message: 'Injected part upload failure.',
+          cleanupFileId: 99,
+          cleanupNeeded: true,
+        };
+      }
+      uploads.push({
+        fileId,
+        fileName: input.fileName,
+        fileContent: input.fileContent,
+        recordHistory: input.recordHistory !== false,
+      });
       const uploadedAt = '2026-06-20T00:00:00.000Z';
       const sha256 = 'a'.repeat(64);
       return {
         ok: true,
         status: CONNECTED_STATUS,
-        fileId: 42,
+        fileId,
         fileName: input.fileName,
         folderPath: '/Image Trail',
         apiHost: 'api.pcloud.com',
@@ -114,7 +147,20 @@ function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
     }) as RecallExportControllerDeps['uploadPCloudBackup'],
   };
 
-  return { controller: new RecallExportController(deps), getState: () => state, requestedOriginalBlobIds, uploads };
+  return { controller: new RecallExportController(deps), getState: () => state, requestedOriginalBlobIds, uploads, cleanups };
+}
+
+async function decryptedParts(harness: ExportHarness, password: string) {
+  const manifestUpload = harness.uploads.at(-1);
+  assert.ok(manifestUpload);
+  const decrypted = await decryptCloudBackupManifest(manifestUpload.fileContent, password);
+  const payloads = [];
+  for (const reference of decrypted.manifest.parts) {
+    const upload = harness.uploads.find((candidate) => candidate.fileId === reference.fileId);
+    assert.ok(upload);
+    payloads.push(await decryptCloudBackupPart(upload.fileContent, decrypted.session, reference));
+  }
+  return { ...decrypted, payloads };
 }
 
 test('backupPCloudNow blocks a locked private pin with the export-locked message', async () => {
@@ -166,13 +212,20 @@ test('backupPCloudNow uploads an encrypted backup and reports success', async ()
 
   await harness.controller.backupPCloudNow('cloud-pass');
 
-  assert.equal(harness.uploads.length, 1, 'the encrypted backup is uploaded');
-  assert.ok(harness.uploads[0]!.fileContent.length > 0, 'the uploaded backup has encrypted content');
-  const imported = await importBookmarks(harness.uploads[0]!.fileContent, 'cloud-pass');
+  assert.equal(harness.uploads.length, 3, 'metadata, records, and the manifest are uploaded separately');
   assert.deepEqual(
-    imported.albums.map((album) => ({ name: album.name, recordIds: album.recordIds })),
+    harness.uploads.map((upload) => upload.recordHistory),
+    [false, false, true],
+    'only the published manifest enters backup history',
+  );
+  const backup = await decryptedParts(harness, 'cloud-pass');
+  const metadata = backup.payloads.find((payload) => payload.kind === 'metadata');
+  assert.ok(metadata?.kind === 'metadata');
+  assert.deepEqual(
+    metadata.albums.map((album) => ({ name: album.name, recordIds: album.recordIds })),
     [{ name: 'Reference', recordIds: ['bookmark-1'] }],
   );
+  assert.equal(backup.payloads.filter((payload) => payload.kind === 'records').length, 1);
   assert.equal(harness.getState().pcloudBackup.lastBackupMissingOriginalCount, 0);
   assert.equal(harness.getState().pcloudBackup.messageIsError, false);
 });
@@ -193,11 +246,13 @@ test('backupPCloudNow uploads album-only backups', async () => {
 
   await harness.controller.backupPCloudNow('cloud-pass');
 
-  assert.equal(harness.uploads.length, 1, 'the album-only backup is uploaded');
-  const imported = await importBookmarks(harness.uploads[0]!.fileContent, 'cloud-pass');
-  assert.equal(imported.entries.length, 0);
+  assert.equal(harness.uploads.length, 2, 'metadata is uploaded before the album-only manifest');
+  const backup = await decryptedParts(harness, 'cloud-pass');
+  assert.equal(backup.manifest.recordCount, 0);
+  const metadata = backup.payloads.find((payload) => payload.kind === 'metadata');
+  assert.ok(metadata?.kind === 'metadata');
   assert.deepEqual(
-    imported.albums.map((album) => ({ name: album.name, recordIds: album.recordIds })),
+    metadata.albums.map((album) => ({ name: album.name, recordIds: album.recordIds })),
     [{ name: 'Empty album', recordIds: [] }],
   );
   assert.equal(harness.getState().pcloudBackup.messageIsError, false);
@@ -211,6 +266,61 @@ test('backupPCloudNow surfaces the missing-original count in the completion stat
   await harness.controller.backupPCloudNow('cloud-pass');
 
   assert.deepEqual(harness.requestedOriginalBlobIds, [['blob-1']]);
-  assert.equal(harness.uploads.length, 1);
+  assert.equal(harness.uploads.length, 3);
   assert.equal(harness.getState().pcloudBackup.lastBackupMissingOriginalCount, 1);
+});
+
+test('backupPCloudNow requests and uploads encrypted originals one at a time', async () => {
+  const record = (id: string) => ({
+    id,
+    kind: 'original' as const,
+    schemaVersion: 1 as const,
+    algorithm: 'AES-GCM' as const,
+    iv: 'blob-iv',
+    ciphertext: 'AQID',
+    encryptedByteLength: 3,
+    createdAt: '2026-06-20T00:00:00.000Z',
+    key: { kind: 'blob' as const, uuid: 'key-1', reference: 'blob:key-1' as const },
+    referenceCount: 1,
+  });
+  const harness = createExportHarness({
+    bookmarks: [
+      bookmark({ id: 'one', storedOriginal: { blobId: 'blob-1' } as ImageDisplayRecord['storedOriginal'] }),
+      bookmark({ id: 'two', storedOriginal: { blobId: 'blob-2' } as ImageDisplayRecord['storedOriginal'] }),
+    ],
+    captureStore: {
+      requestOriginalBlobRecords: async (blobIds: readonly string[]) => ({
+        ok: true as const,
+        records: [record(blobIds[0]!)],
+        missingBlobIds: [],
+      }),
+      exportBlobKeyBackup: async () => ({
+        ok: true as const,
+        keyReference: 'blob:key-1',
+        fileContent: '{"encryptedKey":true}',
+        message: 'Exported.',
+      }),
+    },
+  });
+
+  await harness.controller.backupPCloudNow('cloud-pass');
+
+  assert.deepEqual(harness.requestedOriginalBlobIds, [['blob-1'], ['blob-2']]);
+  const backup = await decryptedParts(harness, 'cloud-pass');
+  assert.deepEqual(
+    backup.payloads.filter((payload) => payload.kind === 'original').map((payload) => payload.originalBlob.id),
+    ['blob-1', 'blob-2'],
+  );
+  assert.equal(harness.getState().pcloudBackup.lastBackupOriginalCount, 2);
+});
+
+test('backupPCloudNow cleans verified parts when a later part upload fails', async () => {
+  const harness = createExportHarness({ bookmarks: [bookmark({ id: 'bookmark-1' })], failUploadAttempt: 2 });
+
+  await harness.controller.backupPCloudNow('cloud-pass');
+
+  assert.equal(harness.uploads.length, 1);
+  assert.deepEqual(harness.cleanups, [[harness.uploads[0]!.fileId, 99]]);
+  assert.match(harness.getState().pcloudBackup.message ?? '', /Injected part upload failure/u);
+  assert.match(harness.getState().pcloudBackup.message ?? '', /Cleaned up 2 partial backup part/u);
 });

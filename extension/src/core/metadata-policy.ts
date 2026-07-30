@@ -20,9 +20,11 @@ export const SEARCHABLE_METADATA_CLASSES = ['urlDerived', 'albumName', 'thumbnai
 export type SearchableMetadataClass = (typeof SEARCHABLE_METADATA_CLASSES)[number];
 
 export interface SearchableMetadataPolicy {
-  // Plain-bookmark URL index (BookmarksByUrl). 'encrypted' writes a SHA-256 hash for NEW records —
-  // dedup still works, the real URL stays in the encrypted payload. Protected pins already hash their
-  // URL unconditionally.
+  // URL-derived lookup and workflow metadata. For plain bookmarks, 'encrypted' writes a SHA-256
+  // index for NEW records — dedup still works and the real URL stays in the encrypted payload.
+  // Protected pins already hash their URL unconditionally. Parsed-field resume and URL-review rows
+  // additionally reconcile to opaque hash keys with their URL-bearing values sealed in AES-GCM
+  // envelopes, redacting legacy plaintext rows whenever the policy changes.
   readonly urlDerived: SearchableMetadataMode;
   // User-authored album names ('encrypted' seals the name in an envelope — Slice 2).
   readonly albumName: SearchableMetadataMode;

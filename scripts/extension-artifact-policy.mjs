@@ -19,9 +19,8 @@ const STATIC_APPLICATION_ARTIFACTS = [
   'src/destinations/destination-page.css',
   'src/destinations/destination-surfaces.css',
   'src/destinations/destination-page.js',
-  'src/interop-pairing/import.html',
-  'src/interop-pairing/import.js',
 ];
+const INTEROP_APPLICATION_ARTIFACTS = ['src/interop-pairing/import.html', 'src/interop-pairing/import.js'];
 const TEXT_ARTIFACT = /\.(?:css|html|js|json)$/u;
 const RELEASE_BUILD_INFO_KEYS = ['branch', 'builtAt', 'commit', 'mode', 'schemaVersion', 'timezone', 'version', 'worktree'];
 const FORBIDDEN_RELEASE_TEXT = [
@@ -39,6 +38,9 @@ const FORBIDDEN_RELEASE_TEXT = [
 
 export function expectedExtensionArtifacts(manifest) {
   const expected = new Set(STATIC_APPLICATION_ARTIFACTS);
+  if (manifest.permissions?.includes('nativeMessaging')) {
+    for (const artifact of INTEROP_APPLICATION_ARTIFACTS) expected.add(artifact);
+  }
   if (typeof manifest.background?.service_worker === 'string') expected.add(manifest.background.service_worker);
   for (const iconPath of Object.values(manifest.icons ?? {})) expected.add(iconPath);
   for (const iconPath of Object.values(manifest.action?.default_icon ?? {})) expected.add(iconPath);
@@ -89,6 +91,20 @@ export function validateReleaseBuildInfo(buildInfo) {
   return errors;
 }
 
+export function validateReleaseManifest(manifest) {
+  const permissions = Array.isArray(manifest.permissions) ? manifest.permissions : [];
+  const errors = [];
+  if (permissions.includes('nativeMessaging')) {
+    errors.push('release manifest must not request nativeMessaging while Transfer & Sync is feature-gated');
+  }
+  for (const [index, resourceGroup] of (manifest.web_accessible_resources ?? []).entries()) {
+    if (resourceGroup.use_dynamic_url !== true) {
+      errors.push(`release manifest web-accessible-resource group ${index} must use a dynamic URL`);
+    }
+  }
+  return errors;
+}
+
 export async function collectArtifactFiles(directory, relativeDirectory = '') {
   const files = [];
   const entries = await readdir(path.join(directory, relativeDirectory), { withFileTypes: true });
@@ -110,6 +126,7 @@ export async function auditExtensionArtifacts({ directory, rootDirectory, requir
 
   if (requireRelease || release) {
     errors.push(...validateReleaseBuildInfo(buildInfo));
+    errors.push(...validateReleaseManifest(manifest));
     for (const file of files) {
       if (!TEXT_ARTIFACT.test(file)) continue;
       const content = await readFile(path.join(directory, file), 'utf8');

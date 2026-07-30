@@ -29,3 +29,11 @@ export function restoreFocusedGalleryControl(container: HTMLElement, focus: Gall
   if (!(control instanceof HTMLInputElement) || focus.selectionStart === null || focus.selectionEnd === null) return;
   control.setSelectionRange(focus.selectionStart, focus.selectionEnd, focus.selectionDirection ?? undefined);
 }
+
+export function focusGallerySearchInput(container: HTMLElement): void {
+  const input = container.querySelector<HTMLInputElement>('input[type="search"]');
+  if (!input) return;
+  input.focus();
+  const position = input.value.length;
+  input.setSelectionRange(position, position);
+}
