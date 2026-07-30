@@ -39,20 +39,16 @@ permissions:
   contents: read
 
 jobs:
-  version-pr:
-    name: Version packages PR
+  prepare-version-pr:
+    name: Prepare version packages PR
     runs-on: ubuntu-latest
-    # These scopes exist only for the `|| github.token` fallback below; a PAT
-    # carries its own.
-    permissions:
-      contents: write
-      pull-requests: write
+    outputs:
+      ready: ${{ steps.version.outputs.ready }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Credentials for the version-branch force-push below.
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -63,15 +59,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Done in-repo rather than by changesets/action: the step has to run under
-      # RELEASE_TOKEN (see the header), and the PAT never goes to a third-party
-      # action whose future versions nobody here controls. `changeset:version` is
-      # the same script the action was configured to shell out to, so manifest
-      # and lockfile stay synchronized with package.json exactly as before.
-      - name: Create or refresh the ready version PR
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
-          BRANCH: changeset-release/main
+      # Dependency code runs only in this read-only job. The next job starts on
+      # a clean runner and accepts only the narrow version patch validated here.
+      - name: Prepare the version patch
+        id: version
         run: |
           set -euo pipefail
           if [ -z "$(find .changeset -name '*.md' ! -name 'README.md' -print -quit)" ]; then
@@ -79,19 +70,67 @@ jobs:
             exit 0
           fi
           npm run changeset:version
-          version="$(node -p "require('./package.json').version")"
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git checkout -B "$BRANCH"
           git add -A
           if git diff --cached --quiet; then
             echo '::warning::Changesets are pending but "changeset:version" changed nothing.'
             exit 0
           fi
-          git commit -m 'chore: version Image Trail'
-          # The branch is a disposable projection of main + the pending
-          # changesets, rebuilt from the current tip on every main push.
-          git push --force origin "$BRANCH"
+          node scripts/validate-version-cut.mjs
+          git diff --cached --check
+          git diff --cached --binary --full-index --no-renames HEAD > "$RUNNER_TEMP/version.patch"
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+
+      - name: Upload the version patch
+        if: steps.version.outputs.ready == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: version-cut-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/version.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-version-pr:
+    name: Publish version packages PR
+    needs: prepare-version-pr
+    if: needs.prepare-version-pr.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    # These scopes exist only for the `|| github.token` fallback below; a PAT
+    # carries its own.
+    permissions:
+      contents: write # Required to force-push the rolling version branch.
+      pull-requests: write # Required to create or refresh the version PR.
+    steps:
+      - name: Checkout the trusted base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download the version patch
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: version-cut-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/version-cut
+
+      # No package install or dependency code runs on this runner. Validate the
+      # untrusted patch before committing, and disable hooks explicitly so the
+      # authenticated step cannot inherit executable Git state.
+      - name: Apply and validate the version patch
+        id: version
+        env:
+          BRANCH: changeset-release/main
+        run: |
+          set -euo pipefail
+          trusted_validator="$RUNNER_TEMP/trusted-validate-version-cut.mjs"
+          cp scripts/validate-version-cut.mjs "$trusted_validator"
+          git checkout -B "$BRANCH"
+          git apply --index "$RUNNER_TEMP/version-cut/version.patch"
+          node "$trusted_validator"
+          git diff --cached --check
+          version="$(node -p "require('./package.json').version")"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git -c core.hooksPath=/dev/null -c commit.gpgsign=false commit -m 'chore: version Image Trail'
           {
             echo "Merging this PR cuts \`v$version\`: the tag and the release build follow automatically."
             echo
@@ -105,6 +144,19 @@ jobs:
               grab { print }
             ' CHANGELOG.md
           } > "$RUNNER_TEMP/pr-body.md"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Push and create or refresh the ready version PR
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          BRANCH: changeset-release/main
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The branch is a disposable projection of main + the pending
+          # changesets, rebuilt from the current tip on every main push.
+          gh auth setup-git
+          git -c core.hooksPath=/dev/null push --force origin "$BRANCH"
           open=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
           if [ -n "$open" ]; then
             # The rolling PR outlives the changesets it was opened for. Its body
@@ -112,7 +164,7 @@ jobs:
             # keeps advertising the version and changelog from whenever it was
             # first opened while the branch underneath moves on (PR #704 review).
             gh pr edit "$open" --body-file "$RUNNER_TEMP/pr-body.md"
-            echo "Version PR #$open refreshed for v$version."
+            echo "Version PR #$open refreshed for v$VERSION."
             exit 0
           fi
           gh pr create --base main --head "$BRANCH" --title 'chore: version Image Trail' \
@@ -124,16 +176,14 @@ jobs:
     # Scopes for the `|| github.token` fallback only; `actions: write` covers the
     # stranded-tag recovery dispatch below.
     permissions:
-      contents: write
-      actions: write
+      contents: write # Required to push the signed release tag.
+      actions: write # Required only for stranded-tag recovery dispatch.
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          # The tag push has to start release.yml by itself, so it must carry the
-          # PAT's credentials rather than GITHUB_TOKEN's.
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          persist-credentials: false
 
       - name: Tag when the current version is a fresh cut
         env:
@@ -188,6 +238,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git tag -a "$version" -m "Image Trail $version"
+          gh auth setup-git
           git push origin "$version"
           echo "Tagged $version."
 

@@ -22,13 +22,14 @@ concurrency:
 # happened. Every build checks out the tag, never main.
 # This workflow packages and publishes GitHub Release assets only. It does not merge version
 # PRs or submit to the Chrome Web Store.
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   release:
     name: Validate and cut release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to create and refresh GitHub Release assets.
     env:
       INTEROP_PHOTOS_ROOT: ${{ github.workspace }}/node_modules/.interop-photos
     steps:
@@ -49,6 +50,7 @@ jobs:
         with:
           ref: ${{ steps.release.outputs.tag }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Require tagged source to be on main
         env:
@@ -59,7 +61,7 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
-          cache: npm
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci
@@ -71,6 +73,7 @@ jobs:
           repository: qwts/photos
           ref: 760e23ba1abeaf15bf6d56e029ebdd47d521a7e7
           path: node_modules/.interop-photos
+          persist-credentials: false
 
       - name: Run required validation
         run: npm run ci
@@ -82,7 +85,9 @@ jobs:
         run: npm run test:e2e:release
 
       - name: Build and package release
-        run: npm run package:release -- --tag "${{ steps.release.outputs.tag }}"
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: npm run package:release -- --tag "$RELEASE_TAG"
 
       - name: Create or refresh GitHub Release assets
         env:

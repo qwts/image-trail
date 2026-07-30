@@ -23,9 +23,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
-  contents: read
-  # The acceptance-coverage check and the change filter read the PR's changed files, body, and labels.
-  pull-requests: read
+  contents: read # Required by checkout.
+  pull-requests: read # The coverage and change filters read PR files, body, and labels.
 
 jobs:
   # Path filter for the E2E job — the long pole. Skip it on PRs that cannot change extension
@@ -43,6 +42,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Filter paths
         id: filter
         if: ${{ github.event_name != 'workflow_dispatch' }}
@@ -77,6 +78,7 @@ jobs:
           # Version policy compares package.json at the PR base when Changesets entries are
           # consumed. Keep the base commit available instead of checking out only the merge ref.
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -100,6 +102,7 @@ jobs:
           repository: qwts/photos
           ref: 760e23ba1abeaf15bf6d56e029ebdd47d521a7e7
           path: node_modules/.interop-photos
+          persist-credentials: false
 
       - name: Interop acceptance evidence
         run: npm run check:interop-acceptance
@@ -178,6 +181,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -220,9 +225,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Verify E2E result
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
         run: |
-          changes='${{ needs.changes.result }}'
-          e2e='${{ needs.e2e.result }}'
+          changes="$CHANGES_RESULT"
+          e2e="$E2E_RESULT"
           echo "Detect changes: $changes | E2E job: $e2e"
           # A skip is only trustworthy when change detection itself succeeded and decided E2E
           # wasn't needed. If the changes job failed or was cancelled, the E2E skip is an

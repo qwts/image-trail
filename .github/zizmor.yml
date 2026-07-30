@@ -1,0 +1,14 @@
+rules:
+  secrets-outside-env:
+    config:
+      # RELEASE_TOKEN is a dedicated automation credential for the version
+      # branch and tag jobs; their triggers and permissions constrain its use.
+      allow:
+        - RELEASE_TOKEN
+  unpinned-uses:
+    config:
+      policies:
+        # ENG-0004: governed shared reusable workflows intentionally track the
+        # compatible v1 ref; every other action must use a full commit SHA.
+        'qwts/playbook-software-engineering/*': ref-pin
+        '*': hash-pin
