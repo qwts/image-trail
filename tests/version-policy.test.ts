@@ -390,6 +390,15 @@ test('required CI retains PR base history for consumed-changeset validation', ()
   assert.ok(ciJob.includes('fetch-depth: 0'));
 });
 
+test('Dependabot keeps TypeScript versions outside the parser peer range out of the broad dev-dependency bundle', () => {
+  const dependabot = readFileSync('.github/dependabot.yml', 'utf8');
+
+  assert.match(
+    dependabot,
+    /ignore:\s*\n\s*# typescript-eslint 8\.x supports TypeScript only below 6\.1\.[\s\S]*dependency-name: typescript\s*\n\s*versions:\s*\n\s*- '>=6\.1\.0'/u,
+  );
+});
+
 test('all workflow checkouts avoid persisting credentials', () => {
   for (const file of ['ci.yml', 'close-linked-issues.yml', 'release.yml', 'version-cut.yml', 'zizmor.yml']) {
     const workflow = readFileSync(`.github/workflows/${file}`, 'utf8');
