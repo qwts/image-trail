@@ -12,10 +12,10 @@ updates:
         patterns:
           - '*'
     ignore:
-      # TypeScript 7 is not install-compatible with typescript-eslint 8.x.
+      # typescript-eslint 8.x supports TypeScript only below 6.1.
       - dependency-name: typescript
-        update-types:
-          - version-update:semver-major
+        versions:
+          - '>=6.1.0'
 
   # Keep the pinned action versions in .github/workflows current the same way.
   - package-ecosystem: github-actions
