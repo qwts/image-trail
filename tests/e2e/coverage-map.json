@@ -18,7 +18,7 @@
             "tests/release-artifacts.test.ts",
             "tests/manifest-commands.test.ts"
           ],
-          "notes": "Covers the default-off build define, baseline manifest permission removal, release-audit rejection, exact review and custody counts, durable bookmark selection IDs, stable canonical identity, pairing-key-sealed Move outbox persistence and restart recovery, provider selection and pairing controls, synchronous provider-specific permission preflight, conflict intent, gated Queue and captured-original entry points, and locked-state privacy."
+          "notes": "Covers the default-off build define, baseline manifest permission and pairing-import artifact removal, release-audit rejection, exact review and custody counts, durable bookmark selection IDs, stable canonical identity, pairing-key-sealed Move outbox persistence and restart recovery, provider selection and extension-owned pairing import controls, pairing-return status refresh, synchronous provider-specific permission preflight, conflict intent, gated Queue and captured-original entry points, and locked-state privacy."
         },
         {
           "type": "storybook",
@@ -28,7 +28,7 @@
         {
           "type": "playwright-e2e",
           "paths": ["tests/e2e/interop-ui.spec.ts", "tests/e2e/gallery-design-system.spec.ts", "tests/e2e/detachable-sections.spec.ts"],
-          "notes": "The default packaged workflow proves nativeMessaging, Queue and Gallery controls, and the interop runtime registry are absent. The same spec retains an explicit IMAGE_TRAIL_ENABLE_INTEROP=1 path for the experimental Queue workflow, while existing workflows guard Gallery and detached-panel behavior."
+          "notes": "The default packaged workflow proves nativeMessaging, pairing-import artifacts, Queue and Gallery controls, and the interop runtime registry are absent. The same spec retains an explicit IMAGE_TRAIL_ENABLE_INTEROP=1 path for the experimental Queue workflow and secure extension-page pairing import handoff, while existing workflows guard Gallery and detached-panel behavior."
         },
         {
           "type": "manual",

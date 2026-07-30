@@ -20,6 +20,7 @@ const STATIC_APPLICATION_ARTIFACTS = [
   'src/destinations/destination-surfaces.css',
   'src/destinations/destination-page.js',
 ];
+const INTEROP_APPLICATION_ARTIFACTS = ['src/interop-pairing/import.html', 'src/interop-pairing/import.js'];
 const TEXT_ARTIFACT = /\.(?:css|html|js|json)$/u;
 const E2E_TEST_BUILD_MARKER = 'data-image-trail-e2e-test-build';
 const RELEASE_BUILD_INFO_KEYS = ['branch', 'builtAt', 'commit', 'mode', 'schemaVersion', 'timezone', 'version', 'worktree'];
@@ -38,6 +39,9 @@ const FORBIDDEN_RELEASE_TEXT = [
 
 export function expectedExtensionArtifacts(manifest) {
   const expected = new Set(STATIC_APPLICATION_ARTIFACTS);
+  if (manifest.permissions?.includes('nativeMessaging')) {
+    for (const artifact of INTEROP_APPLICATION_ARTIFACTS) expected.add(artifact);
+  }
   if (typeof manifest.background?.service_worker === 'string') expected.add(manifest.background.service_worker);
   for (const iconPath of Object.values(manifest.icons ?? {})) expected.add(iconPath);
   for (const iconPath of Object.values(manifest.action?.default_icon ?? {})) expected.add(iconPath);

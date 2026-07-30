@@ -32,6 +32,7 @@ const interopRuntimeActionSchema = v.variant('name', [
   v.object({ name: v.literal('select-provider'), provider: v.picklist(['pcloud', 'google-drive', 'icloud-drive']) }),
   v.object({ name: v.literal('connect'), provider: v.picklist(['pcloud', 'google-drive', 'icloud-drive']) }),
   v.object({ name: v.literal('disconnect') }),
+  v.object({ name: v.literal('open-pairing-import') }),
   v.object({ name: v.literal('import-pairing'), fileContent: v.string(), password: v.string() }),
   v.object({ name: v.literal('set-operation'), operation: v.picklist(['move', 'sync']) }),
   v.object({ name: v.literal('start') }),

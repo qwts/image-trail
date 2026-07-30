@@ -122,6 +122,10 @@ test('runtime messages and request schema accept the typed provider boundary', (
   const message = createInteropRuntimeMessage(context, { name: 'select-provider', provider: 'google-drive' });
   assert.equal(v.safeParse(interopRuntimeRequestSchema, message.payload).success, true);
   assert.equal(
+    v.safeParse(interopRuntimeRequestSchema, createInteropRuntimeMessage(context, { name: 'open-pairing-import' }).payload).success,
+    true,
+  );
+  assert.equal(
     v.safeParse(interopRuntimeRequestSchema, { ...message.payload, action: { name: 'select-provider', provider: 'backup-token' } }).success,
     false,
   );
@@ -174,6 +178,26 @@ test('provider permission preflight starts in the synchronous message-listener s
   assert.equal(dispatched, true);
   assert.equal(preflightStarted, true);
   await response;
+});
+
+test('pairing import page opens through the interop service-worker handler', async (t) => {
+  const { runtime, db } = await harness();
+  t.after(() => db.close());
+  let opened = 0;
+  const registry = createInteropRuntimeMessageRegistry(
+    runtime,
+    () => Promise.resolve(),
+    () => {
+      opened += 1;
+      return Promise.resolve();
+    },
+  );
+  const response = new Promise<unknown>((resolve) => {
+    assert.equal(dispatchRequest(registry, createInteropRuntimeMessage(context, { name: 'open-pairing-import' }), resolve), true);
+  });
+
+  assert.equal(isInteropRuntimeResultMessage(await response), true);
+  assert.equal(opened, 1);
 });
 
 test('the baseline cloud registry fails interop closed without initializing a provider runtime', async () => {

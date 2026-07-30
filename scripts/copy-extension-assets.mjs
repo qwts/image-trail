@@ -1,7 +1,13 @@
 import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import './write-extension-build-info.mjs';
-import { bundleStylesheet, extensionOutputPath, isInjectedStylesheet, writeStylesheet } from './extension-build-policy.mjs';
+import {
+  bundleStylesheet,
+  extensionOutputPath,
+  isInjectedStylesheet,
+  isInteropFeatureEnabled,
+  writeStylesheet,
+} from './extension-build-policy.mjs';
 import { extensionManifestForBuild } from './extension-manifest-policy.mjs';
 
 await mkdir('extension/dist', { recursive: true });
@@ -17,6 +23,10 @@ await mkdir('extension/dist/src/gallery', { recursive: true });
 await cp('extension/src/gallery/gallery.html', 'extension/dist/src/gallery/gallery.html');
 await mkdir('extension/dist/src/destinations', { recursive: true });
 await cp('extension/src/destinations/view.html', 'extension/dist/src/destinations/view.html');
+if (isInteropFeatureEnabled()) {
+  await mkdir('extension/dist/src/interop-pairing', { recursive: true });
+  await cp('extension/src/interop-pairing/import.html', 'extension/dist/src/interop-pairing/import.html');
+}
 
 const stylesheets = [
   ...(await stylesheetFiles('extension/src/ui/styles')),

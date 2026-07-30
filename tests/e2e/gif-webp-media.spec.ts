@@ -60,7 +60,7 @@ test('GIF/WebP capture keeps exact originals, static posters, safe failures, and
     await page.waitForTimeout(350);
     expect(await thumbnail.getAttribute('src')).toBe(poster);
 
-    await row.click();
+    await row.press(' ');
     await expect(row).toHaveAttribute('aria-selected', 'true');
     await openSettingsGroup(page, 'Image utilities');
     await clearDownloadRequestLog(serviceWorker);

@@ -99,7 +99,7 @@ test('MPEG-TS import preserves exact bytes, rejects partial state, and provides 
   expect(malformed.result).toMatchObject({ status: 'failed', reason: 'not-media' });
   expect(malformed.after).toBe(malformed.before);
 
-  await supportedRow.click();
+  await supportedRow.press(' ');
   await expect(supportedRow).toHaveAttribute('aria-selected', 'true');
   await clearDownloadRequestLog(serviceWorker);
   await page.getByRole('button', { name: /Export (?:images|media) \(1\)/u }).click();

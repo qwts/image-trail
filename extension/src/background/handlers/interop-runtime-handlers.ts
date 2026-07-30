@@ -22,12 +22,20 @@ export function createDisabledInteropRuntimeMessageRegistry(): Registry {
 export function createInteropRuntimeMessageRegistry(
   runtime: InteropRuntime,
   preflight: (action: InteropRuntimeAction) => Promise<void> = () => Promise.resolve(),
+  openPairingImport: () => Promise<void> = () => Promise.reject(new Error('Pairing import page is unavailable.')),
 ): Registry {
   return {
     [MessageType.InteropRuntime]: defineMessage({
       requestSchema: requestSchemas.interopRuntimeRequestSchema,
-      handle: (message: InteropRuntimeMessage): Promise<InteropRuntimeResult> =>
-        preflight(message.payload.action).then(() => runtime.dispatch(message.payload.context, message.payload.action)),
+      handle: async (message: InteropRuntimeMessage): Promise<InteropRuntimeResult> => {
+        const { action, context } = message.payload;
+        await preflight(action);
+        if (action.name === 'open-pairing-import') {
+          await openPairingImport();
+          return runtime.dispatch(context, { name: 'status' });
+        }
+        return runtime.dispatch(context, action);
+      },
       respond: (payload) => createInteropRuntimeResultMessage(payload),
       fallback: (message) => createInteropRuntimeResultMessage(runtime.fallback(message.payload.context)),
     }),

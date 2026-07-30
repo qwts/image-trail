@@ -41,6 +41,10 @@ async function connectPCloudWithPermission(): ReturnType<typeof connectPCloudPro
   return { ok: false, status: { connected: false, message, messageIsError: true }, message };
 }
 
+async function openInteropPairingImport(): Promise<void> {
+  await chrome.tabs.create({ url: chrome.runtime.getURL('src/interop-pairing/import.html') });
+}
+
 type PCloudRequestType =
   | typeof MessageType.PCloudProviderStatus
   | typeof MessageType.ConnectPCloudProvider
@@ -130,7 +134,11 @@ export function createCloudMessageRegistry(
   return {
     ...createPCloudMessageRegistry(),
     ...(transferSyncEnabled
-      ? createInteropRuntimeMessageRegistry(createChromeInteropRuntime(getDb, finalizeSourceRecord), preflightChromeInteropAction)
+      ? createInteropRuntimeMessageRegistry(
+          createChromeInteropRuntime(getDb, finalizeSourceRecord),
+          preflightChromeInteropAction,
+          openInteropPairingImport,
+        )
       : createDisabledInteropRuntimeMessageRegistry()),
   };
 }

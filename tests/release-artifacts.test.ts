@@ -152,6 +152,8 @@ test('artifact allowlist is derived from the manifest plus explicit application 
   assert.ok(expected.includes('src/background/service-worker.js'));
   assert.ok(expected.includes('src/content/content-script.js'));
   assert.ok(expected.includes('src/preview/preview.css'));
+  assert.equal(expected.includes('src/interop-pairing/import.html'), false);
+  assert.equal(expected.includes('src/interop-pairing/import.js'), false);
   assert.ok(expected.includes('src/gallery/gallery-filters.css'));
   assert.ok(expected.includes('src/ui/styles/panel.css'));
   assert.ok(expected.includes('icons/icon16.png'));
@@ -166,6 +168,15 @@ test('artifact allowlist is derived from the manifest plus explicit application 
       .join(' '),
     /missing required release artifact/u,
   );
+});
+
+test('experimental interop artifacts are allowlisted only when native messaging is enabled', () => {
+  const baseline = manifestFixture();
+  const enabled = { ...manifestFixture(), permissions: ['nativeMessaging'] };
+  assert.equal(artifacts.expectedExtensionArtifacts(baseline).includes('src/interop-pairing/import.html'), false);
+  assert.equal(artifacts.expectedExtensionArtifacts(baseline).includes('src/interop-pairing/import.js'), false);
+  assert.ok(artifacts.expectedExtensionArtifacts(enabled).includes('src/interop-pairing/import.html'));
+  assert.ok(artifacts.expectedExtensionArtifacts(enabled).includes('src/interop-pairing/import.js'));
 });
 
 test('release text audit rejects debug metadata, secrets, and build-machine paths', () => {

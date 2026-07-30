@@ -67,6 +67,11 @@ export const EXTENSION_ENTRY_POINTS = {
     format: 'esm',
     jsx: 'automatic',
   },
+  interopPairingImport: {
+    entryPoint: 'extension/src/interop-pairing/import.ts',
+    outfile: 'extension/dist/src/interop-pairing/import.js',
+    format: 'esm',
+  },
   preview: {
     entryPoint: 'extension/src/preview/preview.js',
     outfile: 'extension/dist/src/preview/preview.js',
