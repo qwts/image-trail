@@ -13,6 +13,18 @@ const record: ImageDisplayRecord = {
   source: 'history',
 };
 
+function dispatchTrustedClick(button: HTMLButtonElement): void {
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'isTrusted', { value: true });
+  button.dispatchEvent(event);
+}
+
+function buttonByText(view: HTMLElement, text: string): HTMLButtonElement {
+  const button = Array.from(view.querySelectorAll('button')).find((candidate) => candidate.textContent === text);
+  assert.ok(button, `expected a button labelled "${text}"`);
+  return button;
+}
+
 function buildHistoryView(
   actions: unknown[],
   selectedIds: readonly string[] = [],
@@ -177,6 +189,44 @@ test('ArrowDown restores recent row focus inside a shadow root', async () => {
   await Promise.resolve();
 
   assert.equal(root.activeElement, nextRow);
+});
+
+test('recent capture and delete original ignore synthetic clicks from the page DOM', () => {
+  const actions: unknown[] = [];
+  const captured = {
+    ...record,
+    captureStatus: 'captured' as const,
+    blobId: 'blob-1',
+    storedOriginal: { blobId: 'blob-1', mimeType: 'image/jpeg', byteLength: 1024, capturedAt: '2026-06-25T15:30:00.000Z' },
+  };
+
+  buttonByText(buildHistoryView(actions), 'Capture').click();
+  const deleteOriginal = buttonByText(buildHistoryView(actions, [], [captured]), 'Delete original');
+  deleteOriginal.click();
+  assert.equal(deleteOriginal.textContent, 'Delete original');
+
+  assert.deepEqual(actions, []);
+});
+
+test('recent capture and delete original accept trusted clicks', () => {
+  const actions: unknown[] = [];
+  const captured = {
+    ...record,
+    captureStatus: 'captured' as const,
+    blobId: 'blob-1',
+    storedOriginal: { blobId: 'blob-1', mimeType: 'image/jpeg', byteLength: 1024, capturedAt: '2026-06-25T15:30:00.000Z' },
+  };
+
+  dispatchTrustedClick(buttonByText(buildHistoryView(actions), 'Capture'));
+  const deleteOriginal = buttonByText(buildHistoryView(actions, [], [captured]), 'Delete original');
+  dispatchTrustedClick(deleteOriginal);
+  assert.equal(deleteOriginal.textContent, 'Confirm delete original');
+  dispatchTrustedClick(deleteOriginal);
+
+  assert.deepEqual(actions, [
+    { name: 'capture/request', url: record.url, sourceType: 'history', sourceRecordId: 'recent-1' },
+    { name: 'capture/delete', id: 'recent-1', blobId: 'blob-1' },
+  ]);
 });
 
 test('stored recent rows render the original indicator', () => {

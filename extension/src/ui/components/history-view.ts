@@ -7,6 +7,7 @@ import { PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordExtensionLabel, recordT
 import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { createRecordRow, type RecordRowState } from './record-row.js';
 import { selectedRangeIds } from './selection-ranges.js';
+import { bindTrustedClick } from '../trusted-activation.js';
 
 export function createHistoryView(
   items: readonly ImageDisplayRecord[],
@@ -183,16 +184,19 @@ export function createHistoryView(
       deleteCapture.className = 'image-trail-panel__delete-original';
       deleteCapture.textContent = 'Delete original';
       deleteCapture.title = 'Delete original from encrypted storage.';
-      deleteCapture.addEventListener('click', (event) => {
-        event.stopPropagation();
-        if (deleteCapture.dataset['confirming'] !== 'true') {
-          deleteCapture.dataset['confirming'] = 'true';
-          deleteCapture.textContent = 'Confirm delete original';
-          deleteCapture.title = 'Click again to delete original from encrypted storage.';
-          return;
-        }
-        dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! });
-      });
+      bindTrustedClick(
+        deleteCapture,
+        () => {
+          if (deleteCapture.dataset['confirming'] !== 'true') {
+            deleteCapture.dataset['confirming'] = 'true';
+            deleteCapture.textContent = 'Confirm delete original';
+            deleteCapture.title = 'Click again to delete original from encrypted storage.';
+            return;
+          }
+          dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! });
+        },
+        { beforeTrustCheck: (event) => event.stopPropagation() },
+      );
       actions.append(deleteCapture);
     } else if (blobKeyUnlocked) {
       const capture = document.createElement('button');
@@ -200,10 +204,13 @@ export function createHistoryView(
       capture.textContent = captureInProgress ? 'Capturing...' : 'Capture';
       capture.disabled = captureInProgress;
       capture.classList.toggle('is-waiting', captureInProgress);
-      capture.addEventListener('click', (event) => {
-        event.stopPropagation();
-        dispatch({ name: 'capture/request', url: item.url, sourceType: 'history', sourceRecordId: item.id });
-      });
+      bindTrustedClick(
+        capture,
+        () => {
+          dispatch({ name: 'capture/request', url: item.url, sourceType: 'history', sourceRecordId: item.id });
+        },
+        { beforeTrustCheck: (event) => event.stopPropagation() },
+      );
       actions.append(capture);
     }
 

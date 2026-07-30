@@ -12,6 +12,12 @@ const record: ImageDisplayRecord = {
   source: 'bookmark',
 };
 
+function dispatchTrustedClick(button: HTMLButtonElement): void {
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'isTrusted', { value: true });
+  button.dispatchEvent(event);
+}
+
 function buildBookmarksView(
   actions: unknown[],
   overrides: {
@@ -161,6 +167,50 @@ test('ArrowDown restores queue row focus inside a shadow root', async () => {
   await Promise.resolve();
 
   assert.equal(root.activeElement, nextRow);
+});
+
+test('queue capture and delete original ignore synthetic clicks from the page DOM', () => {
+  const actions: unknown[] = [];
+  const captured = {
+    ...record,
+    captureStatus: 'captured' as const,
+    blobId: 'blob-1',
+    storedOriginal: { blobId: 'blob-1', mimeType: 'image/jpeg', byteLength: 1024, capturedAt: '2026-06-25T15:30:00.000Z' },
+  };
+
+  const captureView = buildBookmarksView(actions);
+  buttonByText(captureView, 'Capture').click();
+
+  const deleteView = buildBookmarksView(actions, { items: [captured] });
+  const deleteOriginal = buttonByText(deleteView, 'Delete original');
+  deleteOriginal.click();
+  assert.equal(deleteOriginal.textContent, 'Delete original');
+
+  assert.deepEqual(actions, []);
+});
+
+test('queue capture and delete original accept trusted clicks', () => {
+  const actions: unknown[] = [];
+  const captured = {
+    ...record,
+    captureStatus: 'captured' as const,
+    blobId: 'blob-1',
+    storedOriginal: { blobId: 'blob-1', mimeType: 'image/jpeg', byteLength: 1024, capturedAt: '2026-06-25T15:30:00.000Z' },
+  };
+
+  const captureView = buildBookmarksView(actions);
+  dispatchTrustedClick(buttonByText(captureView, 'Capture'));
+
+  const deleteView = buildBookmarksView(actions, { items: [captured] });
+  const deleteOriginal = buttonByText(deleteView, 'Delete original');
+  dispatchTrustedClick(deleteOriginal);
+  assert.equal(deleteOriginal.textContent, 'Confirm delete original');
+  dispatchTrustedClick(deleteOriginal);
+
+  assert.deepEqual(actions, [
+    { name: 'capture/request', url: record.url, sourceType: 'bookmark', sourceRecordId: 'row-1' },
+    { name: 'capture/delete', id: 'row-1', blobId: 'blob-1' },
+  ]);
 });
 
 test('stored queue rows render the original indicator and clear action', () => {
