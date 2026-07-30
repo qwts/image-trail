@@ -8,6 +8,7 @@ const result = await auditExtensionArtifacts({
   directory: 'extension/dist',
   rootDirectory: process.cwd(),
   requireRelease,
+  allowE2ETestBuild: process.env.IMAGE_TRAIL_E2E_TEST_BUILD === '1',
 });
 
 if (result.errors.length > 0) {
