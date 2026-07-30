@@ -739,14 +739,45 @@ async function handleImportEncryptedImage(
   }
   try {
     const result = await openEncryptedImageFile(message.payload.fileContent, activeBlobKey.key, expectedKeyReference);
+    const db = await getDb();
+    if (!db) return { ok: false, reason: 'db-unavailable', message: 'Database unavailable.' };
+    const now = new Date().toISOString();
+    const id = crypto.randomUUID();
+    const aad = {
+      id,
+      kind: 'original' as const,
+      schemaVersion: 1 as const,
+      algorithm: 'AES-GCM' as const,
+      createdAt: now,
+      key: activeBlobKey.reference,
+    };
+    const sealed = await sealBlobPayload({
+      key: activeBlobKey.key,
+      aad,
+      metadata: { mimeType: result.mimeType, byteLength: result.bytes.byteLength, sourceUrl: result.sourceUrl, capturedAt: now },
+      bytes: result.bytes.buffer.slice(result.bytes.byteOffset, result.bytes.byteOffset + result.bytes.byteLength) as ArrayBuffer,
+    });
+    await new BlobsRepository(db).put({
+      id,
+      kind: 'original',
+      schemaVersion: 1,
+      algorithm: 'AES-GCM',
+      iv: sealed.iv,
+      ciphertext: sealed.ciphertext,
+      encryptedByteLength: sealed.encryptedByteLength,
+      createdAt: now,
+      key: activeBlobKey.reference,
+      referenceCount: 1,
+    });
     return {
       ok: true,
-      dataUrl: `data:${result.mimeType};base64,${arrayBufferToBase64(result.bytes)}`,
+      blobId: id,
       fileName: result.fileName,
       sourceUrl: result.sourceUrl,
       mimeType: result.mimeType,
       byteLength: result.bytes.byteLength,
       keyReference: result.keyReference,
+      capturedAt: now,
     };
   } catch (error) {
     return {

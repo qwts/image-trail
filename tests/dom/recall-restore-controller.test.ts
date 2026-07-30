@@ -48,6 +48,7 @@ function createRestoreHarness(retained: readonly ImageDisplayRecord[] = []): Res
     loadRecentHistory: async () => {},
     refreshStorageUsage: async () => {},
     addImportedImage: async () => true,
+    addProtectedImportedImage: async () => true,
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
     bookmarkStore: () => null as BookmarkStore | null,
     albumStore: () => null,

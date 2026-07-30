@@ -32,6 +32,11 @@
           "type": "manual",
           "reason": "Provider credentials and the signed iCloud host are owner-run closeout evidence in issue #590.",
           "notes": "Open Transfer and Sync from one Queue row, a multi-selection, Gallery, a captured original, and the settings path. Verify exact counts and recovery copy, keyboard containment, narrow layout, preserved selection and queue order, and no thumbnails, names, counts, or provider details in the locked workspace."
+        },
+        {
+          "type": "unit-dom",
+          "paths": ["tests/dom/record-library-controller.test.ts", "tests/messages.test.ts"],
+          "notes": "Covers encrypted image imports re-entering the protected original path: import results carry a blobId instead of plaintext data URLs, and saved Queue/Recents rows are captured records without plaintext thumbnails."
         }
       ]
     },
@@ -495,12 +500,12 @@
         {
           "type": "unit-dom",
           "paths": ["tests/dom/fields-view.test.ts", "tests/projection-application-controller.test.ts"],
-          "notes": "Covers #450: a load failure always sets failedFieldId (functional re-basing + review record) and records the failure, but the visible feedback is gated by the loadFailureFeedback mode — the field ring renders only when showFieldFailure is not Mute, and the projection failure branch flashes the status error only in Alert (Display/Mute keep the prior status/message)."
+          "notes": "Covers #450: a load failure always sets failedFieldId (functional re-basing + review record) and records the failure, but the visible feedback is gated by the loadFailureFeedback mode \u2014 the field ring renders only when showFieldFailure is not Mute, and the projection failure branch flashes the status error only in Alert (Display/Mute keep the prior status/message)."
         },
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
-          "notes": "Covers #450 end to end: in Mute (default) a failed apply surfaces no red field ring and no error status, while the same failure in Alert flashes the red status + HTTP error — proving Mute suppresses real feedback rather than being a no-op."
+          "notes": "Covers #450 end to end: in Mute (default) a failed apply surfaces no red field ring and no error status, while the same failure in Alert flashes the red status + HTTP error \u2014 proving Mute suppresses real feedback rather than being a no-op."
         }
       ]
     },
@@ -1214,7 +1219,7 @@
     },
     {
       "id": "searchable-metadata-privacy-policy",
-      "acceptance": "User-controlled searchable metadata privacy policy (issue #451) — Slice 1: policy framework, settings surface, and opt-in URL-derived enforcement for new records",
+      "acceptance": "User-controlled searchable metadata privacy policy (issue #451) \u2014 Slice 1: policy framework, settings surface, and opt-in URL-derived enforcement for new records",
       "repoPath": "docs/acceptance-tests/searchable-metadata-privacy-policy.md",
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Searchable-Metadata-Privacy-Policy",
       "coverage": [

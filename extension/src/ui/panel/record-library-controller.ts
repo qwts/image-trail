@@ -23,6 +23,25 @@ import type { RecordAddOptions, ValidatedRecordUrl } from './record-library-type
 
 export type { RecordAddOptions } from './record-library-types.js';
 
+export interface ProtectedImportedImageFile {
+  readonly name: string;
+  readonly sourceUrl: string;
+  readonly blobId: string;
+  readonly mimeType: string;
+  readonly byteLength: number;
+  readonly capturedAt: string;
+}
+
+function protectedImportUrl(input: Pick<ProtectedImportedImageFile, 'sourceUrl' | 'blobId'>): string {
+  try {
+    const url = new URL(input.sourceUrl);
+    if (url.protocol === 'http:' || url.protocol === 'https:') return url.href;
+  } catch {
+    // Fall through to a private placeholder URL so encrypted imports never persist plaintext data URLs.
+  }
+  return `image-trail-private:${input.blobId}`;
+}
+
 export interface RecordLibraryControllerDeps {
   getState(): PanelState;
   setState(state: PanelState): void;
@@ -107,6 +126,44 @@ export class RecordLibraryController {
     const bookmarkStore = this.deps.bookmarkStore();
     const bookmark = bookmarkStore ? await bookmarkStore.save(draft) : draft;
     const historyItem = createDisplayRecord({ ...draft, id: `${timestamp}:history:${file.name}`, source: 'history' });
+    const recentHistoryStore = this.deps.recentHistoryStore();
+    const history = recentHistoryStore
+      ? await recentHistoryStore.add(historyItem, window.location.href, { scope: this.deps.getState().recentHistoryScope })
+      : [historyItem, ...this.deps.getState().history];
+    this.deps.setState({
+      ...this.deps.getState(),
+      history: history.slice(0, 30),
+      message: bookmarkSaveMessage(bookmark, bookmark.label ?? file.name),
+      lastUpdatedAt: Date.now(),
+    });
+    await this.deps.loadBookmarkPage(0, { render: false });
+    this.deps.renderPanelAndRefreshRecall();
+    void this.deps.refreshStorageUsage({ render: true });
+    return true;
+  }
+
+  async addProtectedImportedImage(file: ProtectedImportedImageFile): Promise<boolean> {
+    const url = protectedImportUrl(file);
+    const draft = createDisplayRecord({
+      id: `${file.capturedAt}:${file.name}`,
+      url,
+      title: file.name,
+      label: file.name,
+      timestamp: file.capturedAt,
+      source: 'bookmark',
+      capturedAt: file.capturedAt,
+      captureStatus: 'captured',
+      blobId: file.blobId,
+      storedOriginal: {
+        blobId: file.blobId,
+        mimeType: file.mimeType,
+        byteLength: file.byteLength,
+        capturedAt: file.capturedAt,
+      },
+    });
+    const bookmarkStore = this.deps.bookmarkStore();
+    const bookmark = bookmarkStore ? await bookmarkStore.save(draft) : draft;
+    const historyItem = createDisplayRecord({ ...draft, id: `${file.capturedAt}:history:${file.name}`, source: 'history' });
     const recentHistoryStore = this.deps.recentHistoryStore();
     const history = recentHistoryStore
       ? await recentHistoryStore.add(historyItem, window.location.href, { scope: this.deps.getState().recentHistoryScope })

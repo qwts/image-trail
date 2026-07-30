@@ -597,12 +597,13 @@ test('creates encrypted image import and export messages', () => {
 
   const importResult = createImportEncryptedImageResultMessage({
     ok: true,
-    dataUrl: 'data:image/png;base64,abc',
+    blobId: 'blob-imported',
     fileName: 'photo.png',
     sourceUrl: 'https://cdn.example.com/photo.png',
     mimeType: 'image/png',
     byteLength: 3,
     keyReference: 'blob:key-1',
+    capturedAt: '2026-07-20T00:00:00.000Z',
   });
   assert.equal(importResult.type, MessageType.ImportEncryptedImageResult);
   assert.equal(isExtensionResponse(importResult), true);

@@ -1,5 +1,6 @@
 import { reducePanelAction } from '../../core/actions.js';
 import type { BookmarkStore, ImportedEncryptedImageFile, ImportedImageFile, PanelState, UrlReviewStatusStore } from '../../core/types.js';
+import type { ProtectedImportedImageFile } from './record-library-controller.js';
 import type { CaptureStore } from '../../content/capture-controller.js';
 import type { RecentHistoryStore } from '../../content/recent-history-store.js';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
@@ -61,6 +62,7 @@ export interface RecallRestoreControllerDeps {
   loadRecentHistory(options?: { readonly render?: boolean }): Promise<void>;
   refreshStorageUsage(options?: { readonly render?: boolean }): Promise<void>;
   addImportedImage(file: ImportedImageFile): Promise<boolean>;
+  addProtectedImportedImage(file: ProtectedImportedImageFile): Promise<boolean>;
   getLocalSettings(): PlaintextLocalSettings;
   bookmarkStore(): BookmarkStore | null;
   albumStore(): {
@@ -240,7 +242,17 @@ export class RecallRestoreController {
         failed += 1;
         continue;
       }
-      if (await this.deps.addImportedImage({ name: result.fileName || file.name, dataUrl: result.dataUrl })) imported += 1;
+      if (
+        await this.deps.addProtectedImportedImage({
+          name: result.fileName || file.name,
+          sourceUrl: result.sourceUrl,
+          blobId: result.blobId,
+          mimeType: result.mimeType,
+          byteLength: result.byteLength,
+          capturedAt: result.capturedAt,
+        })
+      )
+        imported += 1;
     }
 
     if (imported === 0) {

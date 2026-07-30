@@ -152,12 +152,13 @@ export interface ImportEncryptedImageResultMessage {
   readonly payload:
     | {
         readonly ok: true;
-        readonly dataUrl: string;
+        readonly blobId: string;
         readonly fileName: string;
         readonly sourceUrl: string;
         readonly mimeType: string;
         readonly byteLength: number;
         readonly keyReference: string;
+        readonly capturedAt: string;
       }
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }

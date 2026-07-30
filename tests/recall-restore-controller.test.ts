@@ -91,6 +91,10 @@ function createRestoreHarness(config: RestoreHarnessConfig = {}): RestoreHarness
       importedImages += 1;
       return true;
     },
+    addProtectedImportedImage: async () => {
+      importedImages += 1;
+      return true;
+    },
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
     bookmarkStore: () => bookmarkStore,
     albumStore: () => ({

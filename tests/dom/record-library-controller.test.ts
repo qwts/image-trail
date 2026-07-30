@@ -143,6 +143,28 @@ test('addImportedImage saves a paired bookmark and history row against the page 
   assert.deepEqual(harness.log, ['loadBookmarkPage:0:false', 'renderPanelAndRefreshRecall', 'refreshStorageUsage:true']);
 });
 
+test('addProtectedImportedImage saves encrypted imports without plaintext URLs or thumbnails', async () => {
+  const harness = createHarness();
+  const added = await harness.controller.addProtectedImportedImage({
+    name: 'secret.png',
+    sourceUrl: 'data:image/png;base64,plaintext',
+    blobId: 'blob-secret',
+    mimeType: 'image/png',
+    byteLength: 9,
+    capturedAt: '2026-07-20T00:00:00.000Z',
+  });
+
+  assert.equal(added, true);
+  assert.equal(harness.savedBookmarks[0]?.url, 'image-trail-private:blob-secret');
+  assert.equal(harness.savedBookmarks[0]?.thumbnail, undefined);
+  assert.equal(harness.savedBookmarks[0]?.captureStatus, 'captured');
+  assert.equal(harness.savedBookmarks[0]?.blobId, 'blob-secret');
+  assert.equal(harness.savedBookmarks[0]?.storedOriginal?.blobId, 'blob-secret');
+  assert.equal(harness.historyAddLog[0]?.record.url, 'image-trail-private:blob-secret');
+  assert.equal(harness.historyAddLog[0]?.record.thumbnail, undefined);
+  assert.deepEqual(harness.log, ['loadBookmarkPage:0:false', 'renderPanelAndRefreshRecall', 'refreshStorageUsage:true']);
+});
+
 test('removeRecentHistory removes the row first, then cleans up its encrypted blob with a render', async () => {
   const harness = createHarness();
   harness.patchState({ history: [capturedHistoryRecord('history-1', 'blob-1')] });
