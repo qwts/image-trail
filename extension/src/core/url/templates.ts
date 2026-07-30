@@ -1,4 +1,4 @@
-import { rebuildUrl, setUrlFieldValue } from './rebuild-url.js';
+import { rebuildUrl } from './rebuild-url.js';
 import { tokenValue } from './tokenize-fields.js';
 import { normalizeGrabStrategy, type UrlTemplateGrabStrategy } from './grab-strategies.js';
 import type { ParsedUrlModel, UrlField } from './types.js';
@@ -255,11 +255,69 @@ export function updateTemplateFields(input: {
 }
 
 function templateUrlForFields(model: ParsedUrlModel, fields: readonly UrlField[]): string {
-  const templated = fields.reduce<ParsedUrlModel>(
-    (nextModel, field) => setUrlFieldValue(nextModel, field, templateFieldPlaceholder(field)),
-    model,
-  );
-  return rebuildUrl(templated).replace(/%7B([^%]+)%7D/giu, '{$1}');
+  const placeholdersByField = new Map(fields.map((field) => [field.id, templateFieldPlaceholder(field)]));
+  const fieldByLocation = new Map(fields.map((field) => [fieldLocationKey(field), field]));
+  const path = model.pathParts
+    .map((part, partIndex) => {
+      if (part.type === 'sep') return part.raw;
+      const hasIncludedField = part.tokens.some((_, tokenIndex) => fieldByLocation.has(pathFieldLocationKey(partIndex, tokenIndex)));
+      if (!hasIncludedField) return '{path-segment}';
+      const segment = part.tokens
+        .map((token, tokenIndex) => {
+          const field = fieldByLocation.get(pathFieldLocationKey(partIndex, tokenIndex));
+          if (field) return placeholdersByField.get(field.id) ?? templateFieldPlaceholder(field);
+          return token.kind === 'text' ? tokenValue(token) : '';
+        })
+        .join('');
+      return encodePathTemplateSegment(segment || '{path-segment}');
+    })
+    .join('');
+  const queryFields = fields.filter((field) => field.location === 'query' && field.queryIndex !== undefined);
+  const query = queryFields
+    .map((field) => {
+      const source = model.queryFields[field.queryIndex ?? -1];
+      if (!source) return null;
+      return `${encodeQueryKey(source.key)}=${encodeQueryTemplateValue(templateFieldPlaceholder(field))}`;
+    })
+    .filter((value): value is string => value !== null)
+    .join('&');
+  const normalizedPath = path || '/';
+  const normalizedQuery = query ? `${model.queryPrefix || '?'}${query}` : '';
+  return `${model.protocol}//${model.host}${normalizedPath}${normalizedQuery}${model.hash}`.replace(/%7B([^%]+)%7D/giu, '{$1}');
+}
+
+function fieldLocationKey(field: UrlField): string {
+  if (field.location === 'path') return pathFieldLocationKey(field.partIndex ?? -1, field.tokenIndex);
+  return queryFieldLocationKey(field.queryIndex ?? -1, field.tokenIndex);
+}
+
+function pathFieldLocationKey(partIndex: number, tokenIndex: number): string {
+  return `path:${partIndex}:${tokenIndex}`;
+}
+
+function queryFieldLocationKey(queryIndex: number, tokenIndex: number): string {
+  return `query:${queryIndex}:${tokenIndex}`;
+}
+
+function encodePathTemplateSegment(value: string): string {
+  return encodeURIComponent(value)
+    .replaceAll('%7B', '{')
+    .replaceAll('%7D', '}')
+    .replaceAll('%26', '&')
+    .replaceAll('%3D', '=')
+    .replace(/[!'()*]/gu, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function encodeQueryKey(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/gu, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function encodeQueryTemplateValue(value: string): string {
+  return encodeURIComponent(value)
+    .replaceAll('%7B', '{')
+    .replaceAll('%7D', '}')
+    .replace(/[!'()*]/gu, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replaceAll('%20', '+');
 }
 
 function templateField(model: ParsedUrlModel, field: UrlField): UrlTemplateField {
@@ -296,7 +354,7 @@ function exactPathSignature(model: ParsedUrlModel): string {
   return model.pathParts
     .map((part) => {
       if (part.type === 'sep') return `/${part.raw}`;
-      return `s:${part.tokens.map((token) => (token.kind === 'text' ? `text:${tokenValue(token)}` : `field:${token.kind}`)).join(',')}`;
+      return `s:${part.tokens.map((token) => (token.kind === 'text' ? 'text' : `field:${token.kind}`)).join(',')}`;
     })
     .join('|');
 }
@@ -311,7 +369,9 @@ function pathShapeSignature(model: ParsedUrlModel): string {
 }
 
 function querySignature(model: ParsedUrlModel): string {
-  return model.queryFields.map((field) => `${field.key}:${field.valueTokens.map((token) => token.kind).join(',')}`).join('&');
+  return model.queryFields
+    .map((field) => `${field.index}:${field.hasEquals ? 'value' : 'bare'}:${field.valueTokens.map((token) => token.kind).join(',')}`)
+    .join('&');
 }
 
 function templateId(rules: UrlTemplateMatchRules): string {

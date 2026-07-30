@@ -33,11 +33,38 @@ test('url templates replace included fields with readable placeholders', () => {
   assert.ok(template);
   assert.equal(template.hostname, 'example.test');
   assert.equal(template.autoApplyEnabled, true);
-  assert.equal(template.templateUrl, 'https://example.test/gallery/page/{file-0}.jpg?chapter={query-chapter}&size=large');
+  assert.equal(template.templateUrl, 'https://example.test/{path-segment}/{path-segment}/{file-0}.jpg?chapter={query-chapter}');
   assert.deepEqual(
     template.fields.map((field) => field.placeholder),
     ['{file-0}', '{query-chapter}'],
   );
+});
+
+test('url templates redact excluded path and query literals before durable storage', () => {
+  const model = parseUrl(
+    'https://cdn.example/private/alice/img-0001.jpg?page=1&token=SECRET&X-Amz-Signature=SIGSECRET&album=summer-private',
+  );
+  const fields = collectUrlFields(model);
+  const page = fields.find((field) => field.label === 'query page');
+  const file = fields.find((field) => field.label === 'file 1');
+  assert.ok(page);
+  assert.ok(file);
+
+  const template = createUrlTemplateRecord({
+    model,
+    fields,
+    includedFieldIds: [file.id, page.id],
+    now: '2026-06-21T00:00:00.000Z',
+  });
+
+  assert.ok(template);
+  assert.equal(template.templateUrl, 'https://cdn.example/{path-segment}/{path-segment}/img-{file-1}.jpg?page={query-page}');
+  assert.equal(template.templateUrl.includes('SECRET'), false);
+  assert.equal(template.templateUrl.includes('alice'), false);
+  assert.equal(template.templateUrl.includes('X-Amz-Signature'), false);
+  assert.equal(template.matchRules.exactPathSignature.includes('alice'), false);
+  assert.equal(template.matchRules.querySignature.includes('token'), false);
+  assert.equal(template.matchRules.querySignature.includes('X-Amz-Signature'), false);
 });
 
 test('url template match modes are explicit instead of opaque confidence scores', () => {
@@ -57,7 +84,7 @@ test('url template match modes are explicit instead of opaque confidence scores'
   assert.ok(template);
 
   assert.equal(templateMatchesModel(template, sameShape), true);
-  assert.equal(templateMatchesModel(template, differentPathLiteral), false);
+  assert.equal(templateMatchesModel(template, differentPathLiteral), true);
   const pathShape = updateTemplateSettings(template, { matchMode: 'same-path-query-shape', now: '2026-06-21T00:00:01.000Z' });
   assert.equal(templateMatchesModel(pathShape, sameShape), true);
   assert.equal(templateMatchesModel(pathShape, differentPathLiteral), true);
@@ -107,7 +134,7 @@ test('url template field updates preserve review settings and use count', () => 
     updated.fields.map((field) => field.id),
     [file.id],
   );
-  assert.equal(updated.templateUrl, 'https://example.test/gallery/page/{file-0}.jpg?chapter=12&size=large');
+  assert.equal(updated.templateUrl, 'https://example.test/{path-segment}/{path-segment}/{file-0}.jpg');
   assert.equal(updateTemplateFields({ template: configured, model, fields, includedFieldIds: [], now: '2026-06-21T00:00:03.000Z' }), null);
 });
 
@@ -168,7 +195,7 @@ test('grab source patterns match clicked targets independently from image URL te
   assert.equal(pattern.hostname, 'example.test');
   assert.equal(pattern.grabStrategy, undefined);
   assert.equal(grabSourcePatternMatches(pattern, parseUrl('https://example.test/post/67890?src=feed')), true);
-  assert.equal(grabSourcePatternMatches(pattern, parseUrl('https://example.test/other/67890?src=feed')), false);
+  assert.equal(grabSourcePatternMatches(pattern, parseUrl('https://example.test/other/67890?src=feed')), true);
 
   const configured = updateGrabSourcePatternSettings(pattern, {
     grabStrategy: defaultGrabStrategy('linked-page-image'),
