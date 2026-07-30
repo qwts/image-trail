@@ -61,18 +61,10 @@ export type {
   PanelPosition,
   PanelPositionStore,
   StoredWorkspaceLayout,
-  WorkspaceLayout,
   WorkspaceLayoutStore,
   WorkspaceSectionLayout,
 } from './workspace-layout.js';
-export type {
-  ImportedEncryptedImageFile,
-  ImportedImageFile,
-  ImportRestorePreviewSample,
-  ImportRestorePreviewState,
-  ImportRestorePreviewUnsupportedSection,
-  ImportRestorePreviewValidationIssue,
-} from './import-types.js';
+export type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePreviewState } from './import-types.js';
 export type { FieldTransformPanelAction } from './field-transform-panel-action.js';
 
 export interface UrlTemplateStore {
