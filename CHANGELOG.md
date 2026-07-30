@@ -1,5 +1,12 @@
 # image-trail
 
+## 0.26.1
+
+### Patch Changes
+
+- 093bef6: Keep production panel Shadow DOM closed even when test environment variables leak into packaging, while preserving an explicit disposable release-mode E2E build.
+- Keep experimental pairing credentials in an extension-owned page and refresh Transfer & Sync after returning to the workflow.
+
 ## 0.26.0
 
 ### Minor Changes
