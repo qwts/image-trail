@@ -204,7 +204,7 @@ test('version-cut workflow refreshes a checked Changesets PR and tags only fresh
   // actor here. PR API operations use GITHUB_TOKEN and may refresh only a
   // pre-existing PR authored by the Codex App.
   assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
-  assert.match(workflow, /PUSH_TOKEN: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
+  assert.doesNotMatch(workflow, /PUSH_TOKEN/u);
   assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
   assert.match(workflow, /qwts-codex-agent\[bot\]/u);
   assert.doesNotMatch(workflow, /gh pr create/u);
@@ -231,6 +231,15 @@ test('version-cut keeps dependency code off the clean token-bearing runner', () 
   const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
   const prepareJob = workflow.slice(workflow.indexOf('\n  prepare-version-pr:'), workflow.indexOf('\n  publish-version-pr:'));
   const publishJob = workflow.slice(workflow.indexOf('\n  publish-version-pr:'), workflow.indexOf('\n  tag:'));
+  const verifyStep = publishJob.slice(
+    publishJob.indexOf('- name: Verify the ready version PR'),
+    publishJob.indexOf('- name: Push the version branch'),
+  );
+  const pushStep = publishJob.slice(
+    publishJob.indexOf('- name: Push the version branch'),
+    publishJob.indexOf('- name: Refresh the ready version PR'),
+  );
+  const refreshStep = publishJob.slice(publishJob.indexOf('- name: Refresh the ready version PR'));
 
   assert.match(prepareJob, /npm ci/u);
   assert.match(prepareJob, /npm run changeset:version/u);
@@ -244,10 +253,20 @@ test('version-cut keeps dependency code off the clean token-bearing runner', () 
   assert.match(publishJob, /git -c core\.hooksPath=\/dev\/null push/u);
   assert.match(publishJob, /author.*qwts-codex-agent\[bot\]/u);
   assert.match(publishJob, /no open bot-authored PR exists/u);
+  assert.match(verifyStep, /pr_numbers=\$\(gh pr list/u);
+  assert.doesNotMatch(verifyStep, /< <\(/u);
+  assert.doesNotMatch(verifyStep, /RELEASE_TOKEN/u);
+  assert.match(pushStep, /GH_TOKEN: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
+  assert.doesNotMatch(refreshStep, /RELEASE_TOKEN/u);
+  assert.match(refreshStep, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
   const verifyAuthor = publishJob.indexOf('if [ "$author" != \'qwts-codex-agent[bot]\' ]');
   const pushBranch = publishJob.indexOf('git -c core.hooksPath=/dev/null push');
   assert.ok(verifyAuthor >= 0, 'the existing version PR author must be checked');
   assert.ok(pushBranch > verifyAuthor, 'an unexpected PR author must block the branch refresh');
+  assert.ok(
+    publishJob.indexOf('pr_numbers=$(gh pr list') < pushBranch,
+    'a failed PR listing assignment must stop the job before the token-bearing push step',
+  );
   assert.doesNotMatch(publishJob, /npm ci|npm run changeset:version/u);
 });
 
