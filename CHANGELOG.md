@@ -1,5 +1,15 @@
 # image-trail
 
+## 0.26.0
+
+### Minor Changes
+
+- 8b09171: Add bounded MPEG-TS capture, encrypted original custody, honest playable and preserved-only previews, exact export and backup metadata, and gated Photos interoperability.
+
+### Patch Changes
+
+- a43d2e4: Keep MPEG-TS preview labels and exported filenames aligned with verified playback and media classification.
+
 ## 0.25.0
 
 ### Minor Changes
