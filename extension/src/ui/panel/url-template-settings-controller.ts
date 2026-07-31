@@ -34,7 +34,7 @@ export interface UrlTemplateSettingsControllerDeps {
   setState(state: PanelState): void;
   render(): void;
   currentUrlModel(): ParsedUrlModel;
-  setUrlTemplates(templates: readonly UrlTemplateRecord[], activeTemplateId: string | null): void;
+  setUrlTemplates(templates: readonly UrlTemplateRecord[], activeTemplateId: string | null, identityKey: string | null): void;
   setGrabSourcePatterns(patterns: readonly GrabSourcePattern[]): void;
   loadGrabSettings(options?: { readonly render?: boolean; readonly primeBufferedNav?: boolean }): Promise<void>;
   saveParsedFieldState(): Promise<void>;
@@ -45,7 +45,8 @@ export class UrlTemplateSettingsController {
 
   async saveSteppingPreset(presetId: UrlSteppingPresetId): Promise<void> {
     const store = this.deps.store();
-    if (!store) return;
+    const identityKey = this.deps.getState().urlTemplateIdentityKey;
+    if (!store || !identityKey) return;
     let model: ParsedUrlModel;
     try {
       model = this.deps.currentUrlModel();
@@ -55,8 +56,9 @@ export class UrlTemplateSettingsController {
     const fields = collectUrlFields(model);
     const preset = suggestUrlSteppingPresets(fields).find((candidate) => candidate.id === presetId);
     if (!preset) return;
-    const existing = findBestMatchingTemplate(this.deps.getState().urlTemplates, model, { includeDisabled: true }) ?? undefined;
-    const template = createUrlTemplateRecord({ model, fields, includedFieldIds: preset.fieldIds, existing });
+    const existing =
+      findBestMatchingTemplate(this.deps.getState().urlTemplates, model, { identityKey, includeDisabled: true }) ?? undefined;
+    const template = createUrlTemplateRecord({ model, fields, includedFieldIds: preset.fieldIds, identityKey, existing });
     if (!template) return;
     await store.save(template);
     await this.deps.loadGrabSettings({ render: false, primeBufferedNav: false });
@@ -72,7 +74,8 @@ export class UrlTemplateSettingsController {
 
   async saveUrlTemplateFromCurrentFields(): Promise<void> {
     const store = this.deps.store();
-    if (!store) return;
+    const identityKey = this.deps.getState().urlTemplateIdentityKey;
+    if (!store || !identityKey) return;
     let model: ParsedUrlModel;
     try {
       model = this.deps.currentUrlModel();
@@ -80,7 +83,8 @@ export class UrlTemplateSettingsController {
       return;
     }
     const fields = collectUrlFields(model);
-    const existing = findBestMatchingTemplate(this.deps.getState().urlTemplates, model, { includeDisabled: true }) ?? undefined;
+    const existing =
+      findBestMatchingTemplate(this.deps.getState().urlTemplates, model, { identityKey, includeDisabled: true }) ?? undefined;
     if (this.deps.getState().unlockedFieldIds.length === 0) {
       if (existing) {
         await store.remove(existing.hostname, existing.id);
@@ -93,6 +97,7 @@ export class UrlTemplateSettingsController {
       model,
       fields,
       includedFieldIds: this.deps.getState().unlockedFieldIds,
+      identityKey,
       existing,
     });
     if (!template) return;
@@ -119,7 +124,8 @@ export class UrlTemplateSettingsController {
   ): Promise<void> {
     const store = this.deps.store();
     const template = this.deps.getState().urlTemplates.find((candidate) => candidate.id === id);
-    if (!template || !store) return;
+    const identityKey = this.deps.getState().urlTemplateIdentityKey;
+    if (!template || !store || !identityKey) return;
     const updated = updateTemplateSettings(template, {
       matchMode: changes.matchMode,
       hideExcludedFields: changes.hideExcludedFields,
@@ -135,7 +141,8 @@ export class UrlTemplateSettingsController {
   async updateUrlTemplateFields(id: string, changes: Extract<PanelAction, { readonly name: 'url-template/update-fields' }>): Promise<void> {
     const store = this.deps.store();
     const template = this.deps.getState().urlTemplates.find((candidate) => candidate.id === id);
-    if (!template || !store) return;
+    const identityKey = this.deps.getState().urlTemplateIdentityKey;
+    if (!template || !store || !identityKey) return;
     let model: ParsedUrlModel;
     try {
       model = this.deps.currentUrlModel();
@@ -148,6 +155,7 @@ export class UrlTemplateSettingsController {
       model,
       fields,
       includedFieldIds: changes.includedFieldIds,
+      identityKey,
     });
     if (!updated) {
       await store.remove(template.hostname, template.id);
@@ -172,7 +180,8 @@ export class UrlTemplateSettingsController {
 
   async learnGrabSourcePattern(url: string): Promise<void> {
     const store = this.deps.store();
-    if (!store) return;
+    const identityKey = this.deps.getState().urlTemplateIdentityKey;
+    if (!store || !identityKey) return;
     let model: ParsedUrlModel;
     try {
       model = parseUrl(url);
@@ -187,7 +196,7 @@ export class UrlTemplateSettingsController {
       return;
     }
 
-    const updated = upsertGrabSourcePattern(this.deps.getState().grabSourcePatterns, { model });
+    const updated = upsertGrabSourcePattern(this.deps.getState().grabSourcePatterns, { model, identityKey });
     await store.saveGrabSourcePattern(updated);
     this.deps.setState({
       ...this.deps.getState(),
@@ -229,13 +238,14 @@ export class UrlTemplateSettingsController {
 
   syncGrabSettings(): void {
     const state = this.deps.getState();
-    this.deps.setUrlTemplates(state.urlTemplates, state.activeUrlTemplateId);
+    this.deps.setUrlTemplates(state.urlTemplates, state.activeUrlTemplateId, state.urlTemplateIdentityKey);
     this.deps.setGrabSourcePatterns(state.grabSourcePatterns);
   }
 
-  activeTemplateIdForCurrentUrl(templates: readonly UrlTemplateRecord[]): string | null {
+  activeTemplateIdForCurrentUrl(templates: readonly UrlTemplateRecord[], identityKey: string | null): string | null {
+    if (!identityKey) return null;
     try {
-      return findBestMatchingTemplate(templates, this.deps.currentUrlModel(), { includeDisabled: true })?.id ?? null;
+      return findBestMatchingTemplate(templates, this.deps.currentUrlModel(), { identityKey, includeDisabled: true })?.id ?? null;
     } catch {
       return null;
     }

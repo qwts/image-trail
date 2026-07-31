@@ -15,6 +15,7 @@ import {
 
 const SOURCE_URL = 'https://images.example.test/albums/1024/photo_0042.jpg';
 const SOURCE_HOSTNAME = 'images.example.test';
+const IDENTITY_KEY = '42'.repeat(32);
 
 interface Harness {
   readonly controller: UrlTemplateSettingsController;
@@ -41,7 +42,7 @@ interface Harness {
 // stays behind after the extraction — it reloads from the store, re-activates the best-matching
 // template through the controller's own helpers, and pushes to the page adapter.
 function createHarness(model: ParsedUrlModel = parseUrl(SOURCE_URL)): Harness {
-  let state = createInitialPanelState(0);
+  let state: PanelState = { ...createInitialPanelState(0), urlTemplateIdentityKey: IDENTITY_KEY };
   const templatesByHost = new Map<string, UrlTemplateRecord[]>();
   const patternsByHost = new Map<string, GrabSourcePattern[]>();
   const saveLog: UrlTemplateRecord[] = [];
@@ -59,7 +60,7 @@ function createHarness(model: ParsedUrlModel = parseUrl(SOURCE_URL)): Harness {
   let loads = 0;
 
   const store: UrlTemplateStore = {
-    load: async (hostname) => templatesByHost.get(hostname) ?? [],
+    load: async (hostname) => ({ templates: templatesByHost.get(hostname) ?? [], identityKey: IDENTITY_KEY }),
     loadGrabSourcePatterns: async (hostname) => patternsByHost.get(hostname) ?? [],
     save: async (template) => {
       const list = templatesByHost.get(template.hostname) ?? [];
@@ -107,11 +108,12 @@ function createHarness(model: ParsedUrlModel = parseUrl(SOURCE_URL)): Harness {
       loadOptions.push(options);
       const hostname = controller.currentUrlTemplateHostname();
       if (!hostname) return;
-      const [templates, grabSourcePatterns] = await Promise.all([store.load(hostname), store.loadGrabSourcePatterns(hostname)]);
+      const [loadedTemplates, grabSourcePatterns] = await Promise.all([store.load(hostname), store.loadGrabSourcePatterns(hostname)]);
       state = reducePanelAction(state, {
         name: 'url-templates/load',
-        templates,
-        activeTemplateId: controller.activeTemplateIdForCurrentUrl(templates),
+        templates: loadedTemplates.templates,
+        identityKey: loadedTemplates.identityKey,
+        activeTemplateId: controller.activeTemplateIdForCurrentUrl(loadedTemplates.templates, loadedTemplates.identityKey),
       });
       state = reducePanelAction(state, { name: 'grab-source-patterns/load', patterns: grabSourcePatterns });
       controller.syncGrabSettings();
@@ -134,7 +136,7 @@ function createHarness(model: ParsedUrlModel = parseUrl(SOURCE_URL)): Harness {
     },
     seedTemplate: () => {
       const fields = collectUrlFields(model);
-      const template = createUrlTemplateRecord({ model, fields, includedFieldIds: [fields[0]!.id] });
+      const template = createUrlTemplateRecord({ model, fields, includedFieldIds: [fields[0]!.id], identityKey: IDENTITY_KEY });
       assert.ok(template, 'expected a template to be created from the seed model');
       // Seed the backing store directly (not via store.save) so the seed does not pollute saveLog.
       templatesByHost.set(template.hostname, [...(templatesByHost.get(template.hostname) ?? []), template]);

@@ -367,15 +367,15 @@ test('creates extension-owned local settings messages', () => {
 test('creates extension-owned URL template messages', () => {
   const template = {
     id: 'template-001',
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     hostname: 'example.test',
     templateUrl: 'https://example.test/image/{query-page}.jpg?page={query-page}',
     matchRules: {
       mode: 'exact-page-shape' as const,
       hostname: 'example.test',
-      exactPathSignature: 'exact',
+      exactIdentity: '11'.repeat(32),
       pathShapeSignature: 'shape',
-      querySignature: 'page:int',
+      queryShapeSignature: '0:int',
     },
     fields: [
       {
@@ -397,22 +397,22 @@ test('creates extension-owned URL template messages', () => {
   };
 
   const list = createListUrlTemplatesMessage('example.test');
-  const listResult = createListUrlTemplatesResultMessage({ ok: true, templates: [template] });
+  const listResult = createListUrlTemplatesResultMessage({ ok: true, templates: [template], identityKey: '42'.repeat(32) });
   const save = createSaveUrlTemplateMessage(template);
   const saveResult = createSaveUrlTemplateResultMessage({ ok: true });
   const remove = createDeleteUrlTemplateMessage('example.test', template.id);
   const removeResult = createDeleteUrlTemplateResultMessage({ ok: true });
   const pattern = {
     id: 'grab-source-001',
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     hostname: 'example.test',
     patternUrl: 'https://example.test/post/123',
     matchRules: {
       mode: 'exact-page-shape' as const,
       hostname: 'example.test',
-      exactPathSignature: 'post:int',
+      exactIdentity: '22'.repeat(32),
       pathShapeSignature: 'post:int',
-      querySignature: '',
+      queryShapeSignature: '',
     },
     createdAt: '2026-06-21T00:00:00.000Z',
     updatedAt: '2026-06-21T00:00:00.000Z',

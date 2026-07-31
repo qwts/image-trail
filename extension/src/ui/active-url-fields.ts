@@ -20,7 +20,10 @@ export function activeUrlFieldsForState(state: PanelState, fallbackUrl: string):
   const activeUrl = editableUrl?.startsWith('data:') === true ? fallbackUrl : (editableUrl ?? fallbackUrl);
   const targetModel = parseActiveUrl(state, activeUrl);
   const fields = targetModel ? collectUrlFields(targetModel) : [];
-  const activeTemplate = targetModel ? findBestMatchingTemplate(state.urlTemplates, targetModel) : null;
+  const activeTemplate =
+    targetModel && state.urlTemplateIdentityKey
+      ? findBestMatchingTemplate(state.urlTemplates, targetModel, { identityKey: state.urlTemplateIdentityKey })
+      : null;
   const visibleFields =
     activeTemplate?.hideExcludedFields === true
       ? fields.filter((field) => activeTemplate.fields.some((templateField) => templateField.id === field.id))

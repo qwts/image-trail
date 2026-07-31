@@ -536,15 +536,15 @@ test('UrlTemplateRepository saves templates per hostname', async (t) => {
   const repository = new UrlTemplateRepository(db);
   const template: UrlTemplateRecord = {
     id: 'template-001',
-    schemaVersion: 1,
+    schemaVersion: 2,
     hostname: 'example.test',
     templateUrl: 'https://example.test/image/{query-page}.jpg?page={query-page}',
     matchRules: {
       mode: 'exact-page-shape',
       hostname: 'example.test',
-      exactPathSignature: 'exact',
+      exactIdentity: '11'.repeat(32),
       pathShapeSignature: 'shape',
-      querySignature: 'page:int',
+      queryShapeSignature: '0:int',
     },
     fields: [
       {
@@ -572,15 +572,15 @@ test('UrlTemplateRepository saves templates per hostname', async (t) => {
   };
   const pattern: GrabSourcePattern = {
     id: 'grab-source-001',
-    schemaVersion: 1,
+    schemaVersion: 2,
     hostname: 'example.test',
     patternUrl: 'https://example.test/post/123',
     matchRules: {
       mode: 'exact-page-shape',
       hostname: 'example.test',
-      exactPathSignature: 'post:int',
+      exactIdentity: '22'.repeat(32),
       pathShapeSignature: 'post:int',
-      querySignature: '',
+      queryShapeSignature: '',
     },
     grabStrategy: {
       kind: 'linked-page-image',

@@ -24,17 +24,18 @@ interface Harness {
 }
 
 const NO_MODEL = Symbol('no-model');
+const IDENTITY_KEY = '42'.repeat(32);
 
 // `currentUrlModel` throws when seeded with NO_MODEL, matching the panel behaviour when the current
 // URL cannot be parsed. An in-memory Map-backed UrlTemplateStore records writes for assertions.
 function createHarness(model: ParsedUrlModel | typeof NO_MODEL): Harness {
-  let state = createInitialPanelState(0);
+  let state: PanelState = { ...createInitialPanelState(0), urlTemplateIdentityKey: IDENTITY_KEY };
   const savePatternLog: GrabSourcePattern[] = [];
   const pagePatterns: (readonly GrabSourcePattern[])[] = [];
   const patternsByHost = new Map<string, GrabSourcePattern[]>();
 
   const store: UrlTemplateStore = {
-    load: async () => [],
+    load: async () => ({ templates: [], identityKey: IDENTITY_KEY }),
     loadGrabSourcePatterns: async (hostname) => patternsByHost.get(hostname) ?? [],
     save: async () => {},
     saveGrabSourcePattern: async (pattern) => {
@@ -93,7 +94,7 @@ test('activeTemplateIdForCurrentUrl returns null when the current url model thro
   const harness = createHarness(NO_MODEL);
   const templates: readonly UrlTemplateRecord[] = [];
 
-  assert.equal(harness.controller.activeTemplateIdForCurrentUrl(templates), null);
+  assert.equal(harness.controller.activeTemplateIdForCurrentUrl(templates, IDENTITY_KEY), null);
 });
 
 test('learnGrabSourcePattern persists a valid pattern and pushes it to the page', async () => {

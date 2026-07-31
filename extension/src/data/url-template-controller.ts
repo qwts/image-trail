@@ -1,9 +1,10 @@
+import type { LoadedUrlTemplates } from '../core/url/template-store.js';
 import type { GrabSourcePattern, UrlTemplateRecord } from '../core/url/templates.js';
 import { openImageTrailDb } from './db.js';
 import { UrlTemplateRepository } from './repositories/url-template-repository.js';
 
 export interface UrlTemplateStore {
-  load(hostname: string): Promise<readonly UrlTemplateRecord[]>;
+  load(hostname: string): Promise<LoadedUrlTemplates>;
   loadGrabSourcePatterns(hostname: string): Promise<readonly GrabSourcePattern[]>;
   save(template: UrlTemplateRecord): Promise<void>;
   saveGrabSourcePattern(pattern: GrabSourcePattern): Promise<void>;
@@ -17,9 +18,11 @@ export class IndexedDbUrlTemplateStore implements UrlTemplateStore {
     readonly repository: UrlTemplateRepository;
   } | null> | null = null;
 
-  async load(hostname: string): Promise<readonly UrlTemplateRecord[]> {
+  async load(hostname: string): Promise<LoadedUrlTemplates> {
     const context = await this.openContext();
-    return context ? context.repository.listByHostname(hostname) : [];
+    if (!context) return { templates: [], identityKey: null };
+    const [templates, identityKey] = await Promise.all([context.repository.listByHostname(hostname), context.repository.identityKey()]);
+    return { templates, identityKey };
   }
 
   async loadGrabSourcePatterns(hostname: string): Promise<readonly GrabSourcePattern[]> {

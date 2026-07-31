@@ -16,7 +16,7 @@ export interface PanelDataLoadControllerDeps {
   loadLocalSettings(options?: { readonly render?: boolean }): Promise<void>;
   // Grab/template resolution lives on the URL-template settings controller.
   currentUrlTemplateHostname(): string | null;
-  activeTemplateIdForCurrentUrl(templates: readonly UrlTemplateRecord[]): string | null;
+  activeTemplateIdForCurrentUrl(templates: readonly UrlTemplateRecord[], identityKey: string | null): string | null;
   syncGrabSettings(): void;
   primeBufferedNav(): void;
 }
@@ -50,15 +50,16 @@ export class PanelDataLoadController {
     if (!urlTemplateStore) return;
     const hostname = this.deps.currentUrlTemplateHostname();
     if (!hostname) return;
-    const [templates, grabSourcePatterns] = await Promise.all([
+    const [loadedTemplates, grabSourcePatterns] = await Promise.all([
       urlTemplateStore.load(hostname),
       urlTemplateStore.loadGrabSourcePatterns(hostname),
     ]);
     this.deps.setState(
       reducePanelAction(this.deps.getState(), {
         name: 'url-templates/load',
-        templates,
-        activeTemplateId: this.deps.activeTemplateIdForCurrentUrl(templates),
+        templates: loadedTemplates.templates,
+        identityKey: loadedTemplates.identityKey,
+        activeTemplateId: this.deps.activeTemplateIdForCurrentUrl(loadedTemplates.templates, loadedTemplates.identityKey),
       }),
     );
     this.deps.setState(

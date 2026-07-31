@@ -1,6 +1,7 @@
 import { rebuildUrl, setUrlFieldValue } from './rebuild-url.js';
 import { tokenValue } from './tokenize-fields.js';
 import { normalizeGrabStrategy, type UrlTemplateGrabStrategy } from './grab-strategies.js';
+import { deriveUrlTemplateIdentity } from './template-identity.js';
 import type { ParsedUrlModel, UrlField } from './types.js';
 
 export type UrlTemplateMatchMode = 'exact-page-shape' | 'same-path-query-shape' | 'broad-site';
@@ -20,14 +21,14 @@ export interface UrlTemplateField {
 export interface UrlTemplateMatchRules {
   readonly mode: UrlTemplateMatchMode;
   readonly hostname: string;
-  readonly exactPathSignature: string;
+  readonly exactIdentity: string;
   readonly pathShapeSignature: string;
-  readonly querySignature: string;
+  readonly queryShapeSignature: string;
 }
 
 export interface GrabSourcePattern {
   readonly id: string;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly hostname: string;
   readonly patternUrl: string;
   readonly matchRules: UrlTemplateMatchRules;
@@ -39,7 +40,7 @@ export interface GrabSourcePattern {
 
 export interface UrlTemplateRecord {
   readonly id: string;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly fieldIdVersion?: 2 | undefined;
   readonly hostname: string;
   readonly templateUrl: string;
@@ -57,6 +58,7 @@ export function createUrlTemplateRecord(input: {
   readonly model: ParsedUrlModel;
   readonly fields: readonly UrlField[];
   readonly includedFieldIds: readonly string[];
+  readonly identityKey: string;
   readonly existing?: UrlTemplateRecord | undefined;
   readonly now?: string | undefined;
 }): UrlTemplateRecord | null {
@@ -64,12 +66,12 @@ export function createUrlTemplateRecord(input: {
   if (included.length === 0) return null;
 
   const now = input.now ?? new Date().toISOString();
-  const matchRules = templateMatchRules(input.model, 'exact-page-shape');
+  const matchRules = templateMatchRules(input.model, 'exact-page-shape', input.identityKey);
   const templateUrl = templateUrlForFields(input.model, included);
 
   return {
     id: input.existing?.id ?? templateId(matchRules),
-    schemaVersion: 1,
+    schemaVersion: 2,
     fieldIdVersion: 2,
     hostname: matchRules.hostname,
     templateUrl,
@@ -86,17 +88,18 @@ export function createUrlTemplateRecord(input: {
 
 export function createGrabSourcePattern(input: {
   readonly model: ParsedUrlModel;
+  readonly identityKey: string;
   readonly existing?: GrabSourcePattern | undefined;
   readonly grabStrategy?: UrlTemplateGrabStrategy | undefined;
   readonly now?: string | undefined;
 }): GrabSourcePattern {
   const now = input.now ?? new Date().toISOString();
-  const matchRules = templateMatchRules(input.model, 'exact-page-shape');
+  const matchRules = templateMatchRules(input.model, 'exact-page-shape', input.identityKey);
   return {
     id: input.existing?.id ?? `grab-source:${templateId(matchRules)}`,
-    schemaVersion: 1,
+    schemaVersion: 2,
     hostname: matchRules.hostname,
-    patternUrl: rebuildUrl(input.model),
+    patternUrl: redactedPatternUrl(input.model),
     matchRules: input.existing?.matchRules ? { ...matchRules, mode: input.existing.matchRules.mode } : matchRules,
     grabStrategy: normalizeGrabStrategy(input.grabStrategy ?? input.existing?.grabStrategy),
     createdAt: input.existing?.createdAt ?? now,
@@ -107,12 +110,12 @@ export function createGrabSourcePattern(input: {
 
 export function upsertGrabSourcePattern(
   patterns: readonly GrabSourcePattern[],
-  input: { readonly model: ParsedUrlModel; readonly now?: string },
+  input: { readonly model: ParsedUrlModel; readonly identityKey: string; readonly now?: string },
 ): GrabSourcePattern {
-  const matchRules = templateMatchRules(input.model, 'exact-page-shape');
+  const matchRules = templateMatchRules(input.model, 'exact-page-shape', input.identityKey);
   const id = `grab-source:${templateId(matchRules)}`;
   const existing = patterns.find((pattern) => pattern.id === id);
-  return createGrabSourcePattern({ model: input.model, existing, now: input.now });
+  return createGrabSourcePattern({ model: input.model, identityKey: input.identityKey, existing, now: input.now });
 }
 
 export function updateGrabSourcePatternSettings(
@@ -137,8 +140,12 @@ export function updateGrabSourcePatternSettings(
   };
 }
 
-export function findBestMatchingGrabSourcePattern(patterns: readonly GrabSourcePattern[], model: ParsedUrlModel): GrabSourcePattern | null {
-  const matches = patterns.filter((pattern) => grabSourcePatternMatches(pattern, model));
+export function findBestMatchingGrabSourcePattern(
+  patterns: readonly GrabSourcePattern[],
+  model: ParsedUrlModel,
+  identityKey: string,
+): GrabSourcePattern | null {
+  const matches = patterns.filter((pattern) => grabSourcePatternMatches(pattern, model, identityKey));
   return (
     matches.sort(
       (a, b) => matchSpecificity(b.matchRules.mode) - matchSpecificity(a.matchRules.mode) || b.updatedAt.localeCompare(a.updatedAt),
@@ -146,37 +153,36 @@ export function findBestMatchingGrabSourcePattern(patterns: readonly GrabSourceP
   );
 }
 
-export function grabSourcePatternMatches(pattern: GrabSourcePattern, model: ParsedUrlModel): boolean {
-  const current = templateMatchRules(model, pattern.matchRules.mode);
+export function grabSourcePatternMatches(pattern: GrabSourcePattern, model: ParsedUrlModel, identityKey: string): boolean {
+  const current = templateMatchRules(model, pattern.matchRules.mode, identityKey);
   if (pattern.matchRules.hostname !== current.hostname) return false;
   switch (pattern.matchRules.mode) {
     case 'exact-page-shape':
-      return (
-        pattern.matchRules.exactPathSignature === current.exactPathSignature && pattern.matchRules.querySignature === current.querySignature
-      );
+      return pattern.matchRules.exactIdentity === current.exactIdentity;
     case 'same-path-query-shape':
       return (
-        pattern.matchRules.pathShapeSignature === current.pathShapeSignature && pattern.matchRules.querySignature === current.querySignature
+        pattern.matchRules.pathShapeSignature === current.pathShapeSignature &&
+        pattern.matchRules.queryShapeSignature === current.queryShapeSignature
       );
     case 'broad-site':
       return true;
   }
 }
 
-export function templateMatchRules(model: ParsedUrlModel, mode: UrlTemplateMatchMode): UrlTemplateMatchRules {
+export function templateMatchRules(model: ParsedUrlModel, mode: UrlTemplateMatchMode, identityKey: string): UrlTemplateMatchRules {
   return {
     mode,
     hostname: hostnameForModel(model),
-    exactPathSignature: exactPathSignature(model),
+    exactIdentity: deriveUrlTemplateIdentity(identityKey, literalExactSignature(model)),
     pathShapeSignature: pathShapeSignature(model),
-    querySignature: querySignature(model),
+    queryShapeSignature: queryShapeSignature(model),
   };
 }
 
 export function findBestMatchingTemplate(
   templates: readonly UrlTemplateRecord[],
   model: ParsedUrlModel,
-  options: { readonly includeDisabled?: boolean } = {},
+  options: { readonly identityKey: string; readonly includeDisabled?: boolean },
 ): UrlTemplateRecord | null {
   const candidates = templates.filter((template) => templateMatchesModel(template, model, options));
   return (
@@ -189,21 +195,18 @@ export function findBestMatchingTemplate(
 export function templateMatchesModel(
   template: UrlTemplateRecord,
   model: ParsedUrlModel,
-  options: { readonly includeDisabled?: boolean } = {},
+  options: { readonly identityKey: string; readonly includeDisabled?: boolean },
 ): boolean {
   if (template.autoApplyEnabled === false && options.includeDisabled !== true) return false;
-  const current = templateMatchRules(model, template.matchRules.mode);
+  const current = templateMatchRules(model, template.matchRules.mode, options.identityKey);
   if (template.matchRules.hostname !== current.hostname) return false;
   switch (template.matchRules.mode) {
     case 'exact-page-shape':
-      return (
-        template.matchRules.exactPathSignature === current.exactPathSignature &&
-        template.matchRules.querySignature === current.querySignature
-      );
+      return template.matchRules.exactIdentity === current.exactIdentity;
     case 'same-path-query-shape':
       return (
         template.matchRules.pathShapeSignature === current.pathShapeSignature &&
-        template.matchRules.querySignature === current.querySignature
+        template.matchRules.queryShapeSignature === current.queryShapeSignature
       );
     case 'broad-site':
       return true;
@@ -241,11 +244,12 @@ export function updateTemplateFields(input: {
   readonly model: ParsedUrlModel;
   readonly fields: readonly UrlField[];
   readonly includedFieldIds: readonly string[];
+  readonly identityKey: string;
   readonly now?: string;
 }): UrlTemplateRecord | null {
   const included = input.fields.filter((field) => input.includedFieldIds.includes(field.id));
   if (included.length === 0) return null;
-  const matchRules = templateMatchRules(input.model, input.template.matchRules.mode);
+  const matchRules = templateMatchRules(input.model, input.template.matchRules.mode, input.identityKey);
   return {
     ...input.template,
     fieldIdVersion: 2,
@@ -262,7 +266,50 @@ function templateUrlForFields(model: ParsedUrlModel, fields: readonly UrlField[]
     (nextModel, field) => setUrlFieldValue(nextModel, field, templateFieldPlaceholder(field)),
     model,
   );
-  return rebuildUrl(templated).replace(/%7B([^%]+)%7D/giu, '{$1}');
+  const includedPathParts = new Set(fields.filter((field) => field.location === 'path').map((field) => field.partIndex));
+  const path = templated.pathParts
+    .map((part, partIndex) => {
+      if (part.type === 'sep') return part.raw;
+      if (!includedPathParts.has(partIndex)) return '{path-segment}';
+      return encodePathTemplateSegment(part.tokens.map(tokenValue).join(''));
+    })
+    .join('');
+  const includedQueryIndexes = new Set(fields.filter((field) => field.location === 'query').map((field) => field.queryIndex));
+  const query = templated.queryFields
+    .filter((field) => includedQueryIndexes.has(field.index))
+    .map((field) => {
+      const key = encodeQueryKey(field.key);
+      if (!field.hasEquals) return key;
+      return `${key}=${encodeQueryTemplateValue(field.valueTokens.map(tokenValue).join(''))}`;
+    })
+    .join('&');
+  const normalizedPath = path || '/';
+  const normalizedQuery = query ? `${model.queryPrefix || '?'}${query}` : '';
+  return `${model.protocol}//${model.host}${normalizedPath}${normalizedQuery}`;
+}
+
+function redactedPatternUrl(model: ParsedUrlModel): string {
+  const path = model.pathParts.map((part) => (part.type === 'sep' ? part.raw : '{path-segment}')).join('') || '/';
+  return `${model.protocol}//${model.host}${path}`;
+}
+
+function encodePathTemplateSegment(value: string): string {
+  return encodeURIComponent(value)
+    .replaceAll('%26', '&')
+    .replaceAll('%3D', '=')
+    .replace(/[!'()*]/gu, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%7B([^%]+)%7D/giu, '{$1}');
+}
+
+function encodeQueryTemplateValue(value: string): string {
+  return encodeURIComponent(value)
+    .replace(/[!'()*]/gu, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replaceAll('%20', '+')
+    .replace(/%7B([^%]+)%7D/giu, '{$1}');
+}
+
+function encodeQueryKey(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/gu, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
 function templateField(model: ParsedUrlModel, field: UrlField): UrlTemplateField {
@@ -317,17 +364,16 @@ function querySignature(model: ParsedUrlModel): string {
   return model.queryFields.map((field) => `${field.key}:${field.valueTokens.map((token) => token.kind).join(',')}`).join('&');
 }
 
-function templateId(rules: UrlTemplateMatchRules): string {
-  return `${rules.hostname}:${fnv1a(`${rules.exactPathSignature}?${rules.querySignature}`)}`;
+function queryShapeSignature(model: ParsedUrlModel): string {
+  return model.queryFields.map((field, index) => `${index}:${field.valueTokens.map((token) => token.kind).join(',')}`).join('&');
 }
 
-function fnv1a(value: string): string {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
+function literalExactSignature(model: ParsedUrlModel): string {
+  return `${exactPathSignature(model)}?${querySignature(model)}`;
+}
+
+function templateId(rules: UrlTemplateMatchRules): string {
+  return `${rules.hostname}:${rules.exactIdentity}`;
 }
 
 function matchSpecificity(mode: UrlTemplateMatchMode): number {
