@@ -71,7 +71,7 @@ export function createDomPanelHeader(state: PanelState, callbacks: PanelShellCal
     ...(state.blobKeyAvailable && state.blobKeyUnlocked
       ? [
           createIconButton({
-            glyph: 'Lock',
+            glyph: '🔒',
             label: 'Lock workspace',
             className: 'image-trail-panel__icon-button image-trail-panel__lock-button',
             onClick: () => callbacks.dispatch({ name: 'blob-key/lock' }),
