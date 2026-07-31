@@ -36,8 +36,8 @@ test('url templates redact excluded URL material and replace included fields wit
   assert.ok(template);
   assert.equal(template.hostname, 'example.test');
   assert.equal(template.autoApplyEnabled, true);
-  assert.equal(template.templateUrl, 'https://example.test/{path-segment}/{path-segment}/{file-0}.jpg?chapter={query-chapter}');
-  assert.doesNotMatch(template.templateUrl, /private|gallery|secret|large|access_token|hidden/u);
+  assert.equal(template.templateUrl, 'https://example.test/{path-segment}/{path-segment}/{file-0}{path-literal}?chapter={query-chapter}');
+  assert.doesNotMatch(template.templateUrl, /private|gallery|jpg|secret|large|access_token|hidden/u);
   assert.deepEqual(
     template.fields.map((field) => field.placeholder),
     ['{file-0}', '{query-chapter}'],
@@ -119,7 +119,7 @@ test('url template field updates preserve review settings and use count', () => 
     updated.fields.map((field) => field.id),
     [file.id],
   );
-  assert.equal(updated.templateUrl, 'https://example.test/{path-segment}/{path-segment}/{file-0}.jpg');
+  assert.equal(updated.templateUrl, 'https://example.test/{path-segment}/{path-segment}/{file-0}{path-literal}');
   assert.equal(
     updateTemplateFields({
       template: configured,
@@ -212,6 +212,44 @@ test('grab source patterns match clicked targets independently from image URL te
   );
 });
 
+test('url templates redact excluded tokens inside mixed path segments', () => {
+  const model = parseUrl('https://example.test/private-123-secret.jpg');
+  const fields = collectUrlFields(model);
+  const included = fields.find((field) => field.location === 'path' && field.tokenKind === 'int');
+  assert.ok(included);
+
+  const template = createUrlTemplateRecord({
+    model,
+    fields,
+    includedFieldIds: [included.id],
+    identityKey: IDENTITY_KEY,
+    now: '2026-07-30T00:00:00.000Z',
+  });
+
+  assert.ok(template);
+  assert.equal(template.templateUrl, 'https://example.test/{path-literal}{file-1}{path-literal}');
+  assert.doesNotMatch(template.templateUrl, /private|secret|jpg/u);
+});
+
+test('url templates redact excluded tokens inside mixed query values', () => {
+  const model = parseUrl('https://example.test/private?token=123-secret');
+  const fields = collectUrlFields(model);
+  const included = fields.find((field) => field.location === 'query' && field.tokenKind === 'int');
+  assert.ok(included);
+
+  const template = createUrlTemplateRecord({
+    model,
+    fields,
+    includedFieldIds: [included.id],
+    identityKey: IDENTITY_KEY,
+    now: '2026-07-30T00:00:00.000Z',
+  });
+
+  assert.ok(template);
+  assert.equal(template.templateUrl, 'https://example.test/{path-segment}?token={query-token}{query-literal}');
+  assert.doesNotMatch(template.templateUrl, /private|123|secret/u);
+});
+
 test('url templates rebuild multiple included tokens in one query parameter', () => {
   const model = parseUrl('https://example.test/private/image.jpg?size=1920x1080&token=hidden#secret');
   const fields = collectUrlFields(model);
@@ -227,7 +265,7 @@ test('url templates rebuild multiple included tokens in one query parameter', ()
   });
 
   assert.ok(template);
-  assert.equal(template.templateUrl, 'https://example.test/{path-segment}/{path-segment}?size={query-size}x{query-size}');
+  assert.equal(template.templateUrl, 'https://example.test/{path-segment}/{path-segment}?size={query-size}{query-literal}{query-size}');
   assert.equal(template.templateUrl.match(/size=/gu)?.length, 1);
   assert.doesNotMatch(template.templateUrl, /private|image|token|hidden|secret/u);
 });

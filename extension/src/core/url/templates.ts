@@ -1,4 +1,5 @@
-import { rebuildUrl, setUrlFieldValue } from './rebuild-url.js';
+import { rebuildUrl } from './rebuild-url.js';
+import { templateFieldPlaceholder, templateUrlForFields } from './template-display-url.js';
 import { tokenValue } from './tokenize-fields.js';
 import { normalizeGrabStrategy, type UrlTemplateGrabStrategy } from './grab-strategies.js';
 import { deriveUrlTemplateIdentity } from './template-identity.js';
@@ -261,55 +262,9 @@ export function updateTemplateFields(input: {
   };
 }
 
-function templateUrlForFields(model: ParsedUrlModel, fields: readonly UrlField[]): string {
-  const templated = fields.reduce<ParsedUrlModel>(
-    (nextModel, field) => setUrlFieldValue(nextModel, field, templateFieldPlaceholder(field)),
-    model,
-  );
-  const includedPathParts = new Set(fields.filter((field) => field.location === 'path').map((field) => field.partIndex));
-  const path = templated.pathParts
-    .map((part, partIndex) => {
-      if (part.type === 'sep') return part.raw;
-      if (!includedPathParts.has(partIndex)) return '{path-segment}';
-      return encodePathTemplateSegment(part.tokens.map(tokenValue).join(''));
-    })
-    .join('');
-  const includedQueryIndexes = new Set(fields.filter((field) => field.location === 'query').map((field) => field.queryIndex));
-  const query = templated.queryFields
-    .filter((field) => includedQueryIndexes.has(field.index))
-    .map((field) => {
-      const key = encodeQueryKey(field.key);
-      if (!field.hasEquals) return key;
-      return `${key}=${encodeQueryTemplateValue(field.valueTokens.map(tokenValue).join(''))}`;
-    })
-    .join('&');
-  const normalizedPath = path || '/';
-  const normalizedQuery = query ? `${model.queryPrefix || '?'}${query}` : '';
-  return `${model.protocol}//${model.host}${normalizedPath}${normalizedQuery}`;
-}
-
 function redactedPatternUrl(model: ParsedUrlModel): string {
   const path = model.pathParts.map((part) => (part.type === 'sep' ? part.raw : '{path-segment}')).join('') || '/';
   return `${model.protocol}//${model.host}${path}`;
-}
-
-function encodePathTemplateSegment(value: string): string {
-  return encodeURIComponent(value)
-    .replaceAll('%26', '&')
-    .replaceAll('%3D', '=')
-    .replace(/[!'()*]/gu, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)
-    .replace(/%7B([^%]+)%7D/giu, '{$1}');
-}
-
-function encodeQueryTemplateValue(value: string): string {
-  return encodeURIComponent(value)
-    .replace(/[!'()*]/gu, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)
-    .replaceAll('%20', '+')
-    .replace(/%7B([^%]+)%7D/giu, '{$1}');
-}
-
-function encodeQueryKey(value: string): string {
-  return encodeURIComponent(value).replace(/[!'()*]/gu, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
 function templateField(model: ParsedUrlModel, field: UrlField): UrlTemplateField {
@@ -324,14 +279,6 @@ function templateField(model: ParsedUrlModel, field: UrlField): UrlTemplateField
     queryKey: field.queryIndex === undefined ? undefined : model.queryFields[field.queryIndex]?.key,
     tokenIndex: field.tokenIndex,
   };
-}
-
-function templateFieldPlaceholder(field: UrlField): string {
-  const key = field.label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, '-')
-    .replace(/^-|-$/gu, '');
-  return `{${key || field.id}}`;
 }
 
 function hostnameForModel(model: ParsedUrlModel): string {
