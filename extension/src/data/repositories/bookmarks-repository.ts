@@ -211,12 +211,15 @@ export class BookmarksRepository {
     if (updates.length === 0) return [];
     const transaction = this.db.transaction(DataStore.Bookmarks, 'readwrite');
     const store = transaction.objectStore(DataStore.Bookmarks);
+    const urlIndex = store.index(SchemaIndex.BookmarksByUrl);
     const updated: EncryptedBookmarkRecord[] = [];
     for (const update of updates) {
       const existing = await requestToPromise<EncryptedBookmarkRecord | undefined>(store.get(update.uuid));
       if (!existing || existing.url === update.url) continue;
+      const collision = await requestToPromise<unknown>(urlIndex.get(update.url));
+      if (collision !== undefined) continue;
       const next = { ...existing, url: update.url };
-      store.put(next);
+      await requestToPromise(store.put(next));
       updated.push(next);
     }
     await transactionDone(transaction);

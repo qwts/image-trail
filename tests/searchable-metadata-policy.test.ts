@@ -8,6 +8,7 @@ import {
   isSearchableMetadataMode,
   isSearchableMetadataPolicy,
   sanitizeSearchableMetadataPolicy,
+  shouldReconcileBookmarkUrlIndexes,
   type SearchableMetadataPolicy,
 } from '../extension/src/core/metadata-policy.js';
 import { migrateLocalSettings } from '../extension/src/data/local-settings.js';
@@ -22,6 +23,18 @@ test('bookmarkSearchIndexKey returns the URL under the default policy and its ha
   const url = 'https://example.test/photo.jpg';
   assert.equal(await bookmarkSearchIndexKey(url, DEFAULT_SEARCHABLE_METADATA_POLICY), url);
   assert.equal(await bookmarkSearchIndexKey(url, ENCRYPTED_POLICY), await hashSearchableUrl(url));
+});
+
+test('bookmark URL indexes reconcile only when URL metadata transitions to encrypted', () => {
+  const encryptedAlbumsOnly: SearchableMetadataPolicy = {
+    urlDerived: 'plaintext',
+    albumName: 'encrypted',
+    thumbnail: 'encrypted',
+  };
+  assert.equal(shouldReconcileBookmarkUrlIndexes(DEFAULT_SEARCHABLE_METADATA_POLICY, ENCRYPTED_POLICY), true);
+  assert.equal(shouldReconcileBookmarkUrlIndexes(ENCRYPTED_POLICY, ENCRYPTED_POLICY), false);
+  assert.equal(shouldReconcileBookmarkUrlIndexes(DEFAULT_SEARCHABLE_METADATA_POLICY, encryptedAlbumsOnly), false);
+  assert.equal(shouldReconcileBookmarkUrlIndexes(ENCRYPTED_POLICY, DEFAULT_SEARCHABLE_METADATA_POLICY), false);
 });
 
 test('the encrypted index key is a deterministic 64-char hex hash', async () => {
