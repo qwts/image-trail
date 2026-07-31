@@ -816,6 +816,24 @@
       ]
     },
     {
+      "id": "trusted-privileged-activation",
+      "issue": 760,
+      "acceptance": "Privileged capture and destructive UI actions require trusted user activation",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom/manual-controls-view.test.ts",
+            "tests/dom/bookmarks-view.test.ts",
+            "tests/dom/history-view.test.ts",
+            "tests/dom/maintenance-settings-view.test.ts",
+            "tests/dom/keyboard-router.test.ts"
+          ],
+          "notes": "Covers synthetic and trusted activation for primary, Queue, and Recent original capture; Queue repair; original deletion confirmation; Queue and Recent record deletion; destructive Backspace; bulk deletion; and C, B, and capture-configurable ArrowDown shortcuts while retaining synthetic non-destructive navigation and panel shortcuts."
+        }
+      ]
+    },
+    {
       "id": "multi-select-image-download",
       "acceptance": "Multi-select image download",
       "repoPath": "docs/acceptance-tests/multi-select-image-download.md",

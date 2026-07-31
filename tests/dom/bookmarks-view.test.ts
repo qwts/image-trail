@@ -4,12 +4,25 @@ import assert from 'node:assert/strict';
 
 import { createBookmarksView } from '../../extension/src/ui/components/bookmarks-view.js';
 import type { ImageDisplayRecord } from '../../extension/src/core/display-records.js';
+import { dispatchTrustedClick } from './trusted-events.js';
 
 const record: ImageDisplayRecord = {
   id: 'row-1',
   url: 'https://images.example.test/albums/1024/photo_0042.jpg',
   timestamp: '2026-06-25T15:30:00.000Z',
   source: 'bookmark',
+};
+
+const capturedRecord: ImageDisplayRecord = {
+  ...record,
+  captureStatus: 'captured',
+  blobId: 'blob-1',
+  storedOriginal: {
+    blobId: 'blob-1',
+    mimeType: 'image/jpeg',
+    byteLength: 1024,
+    capturedAt: '2026-06-25T15:30:00.000Z',
+  },
 };
 
 function buildBookmarksView(
@@ -233,8 +246,44 @@ test('Repair selected originals is selection-gated and dispatches durable queue 
   const repair = buttonByText(selected, 'Repair selected originals');
   assert.equal(repair.disabled, false);
   repair.click();
+  assert.deepEqual(actions, [], 'synthetic repair clicks are ignored');
+  dispatchTrustedClick(repair);
 
   assert.deepEqual(actions, [{ name: 'capture/repair-selected', ids: ['row-1'] }]);
+});
+
+test('Queue capture, original deletion, and record deletion reject synthetic clicks', () => {
+  const actions: unknown[] = [];
+  const view = buildBookmarksView(actions);
+  buttonByText(view, 'Capture').click();
+  buttonByText(view, 'Delete').click();
+
+  const capturedView = buildBookmarksView(actions, { items: [capturedRecord] });
+  const deleteOriginal = buttonByText(capturedView, 'Delete original');
+  deleteOriginal.click();
+  deleteOriginal.click();
+
+  assert.equal(deleteOriginal.textContent, 'Delete original');
+  assert.deepEqual(actions, []);
+});
+
+test('Queue capture, original deletion, and record deletion accept trusted activation', () => {
+  const actions: unknown[] = [];
+  const view = buildBookmarksView(actions);
+  dispatchTrustedClick(buttonByText(view, 'Capture'));
+  dispatchTrustedClick(buttonByText(view, 'Delete'));
+
+  const capturedView = buildBookmarksView(actions, { items: [capturedRecord] });
+  const deleteOriginal = buttonByText(capturedView, 'Delete original');
+  dispatchTrustedClick(deleteOriginal);
+  assert.equal(deleteOriginal.textContent, 'Confirm delete original');
+  dispatchTrustedClick(deleteOriginal);
+
+  assert.deepEqual(actions, [
+    { name: 'capture/request', url: record.url, sourceType: 'bookmark', sourceRecordId: 'row-1' },
+    { name: 'bookmark/remove', id: 'row-1' },
+    { name: 'capture/delete', id: 'row-1', blobId: 'blob-1' },
+  ]);
 });
 
 test('pager buttons are disabled when there are no other pages', () => {

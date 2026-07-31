@@ -1,6 +1,7 @@
 import { buildIdentityRows, type BuildIdentity } from '../../core/build-info.js';
 import type { StorageUsageSummary } from '../../core/image/capture-result.js';
 import type { PanelAction } from '../../core/types.js';
+import { bindTrustedClick } from '../trusted-activation.js';
 
 export interface BuildIdentitySettingsState {
   readonly identity: BuildIdentity | null;
@@ -134,7 +135,7 @@ function createDangerButton(label: string, disabled: boolean, onConfirm: () => v
   button.textContent = label;
   button.disabled = disabled;
   button.className = 'is-danger';
-  button.addEventListener('click', () => {
+  bindTrustedClick(button, () => {
     if (button.dataset['confirm'] === 'true') {
       onConfirm();
       button.dataset['confirm'] = 'false';

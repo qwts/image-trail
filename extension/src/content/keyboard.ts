@@ -1,4 +1,5 @@
 import { PAGE_SHORTCUTS } from '../core/keyboard-shortcuts.js';
+import { isTrustedActivation } from '../core/trusted-activation.js';
 
 export type KeyTarget = 'typing' | 'button' | 'record-row' | 'detached-window' | 'panel' | 'page';
 
@@ -31,6 +32,8 @@ function shortcutBinding(shortcut: (typeof PAGE_SHORTCUTS)[number]): KeyBinding 
 }
 
 export const DEFAULT_BINDINGS: KeyBinding[] = PAGE_SHORTCUTS.map(shortcutBinding);
+
+const TRUSTED_ACTIVATION_ACTIONS = new Set(['capture-current', 'capture-and-bookmark', 'down-arrow']);
 
 export function classifyTarget(event: KeyboardEvent): KeyTarget {
   const composedPath = event.composedPath?.() ?? [];
@@ -135,6 +138,7 @@ export class KeyboardRouter {
     for (const binding of this.bindings) {
       if (matchesBinding(event, binding)) {
         if (!shouldRouteKeyboardShortcut(target, binding.action, binding.key)) return;
+        if (TRUSTED_ACTIVATION_ACTIONS.has(binding.action) && !isTrustedActivation(event)) return;
         if (!this.handler(binding.action)) return;
         event.preventDefault();
         event.stopPropagation();

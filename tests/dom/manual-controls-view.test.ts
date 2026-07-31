@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createInitialPanelState } from '../../extension/src/core/state.js';
 import type { PanelAction } from '../../extension/src/core/types.js';
 import { createManualControlsView } from '../../extension/src/ui/components/manual-controls-view.js';
+import { dispatchTrustedClick } from './trusted-events.js';
 
 function createView(overrides: Partial<ReturnType<typeof createInitialPanelState>> = {}) {
   const initial = createInitialPanelState(0);
@@ -39,7 +40,11 @@ test('primary workflow exposes navigation, capture, slideshow, and Grab Mode wit
     ['◀ Prev', 'Next ▶', '◉ Capture', '⏵ Slideshow', '⌖ Grab'],
   );
 
-  primary.querySelector<HTMLButtonElement>('[aria-label="Capture original"]')?.click();
+  const capture = primary.querySelector<HTMLButtonElement>('[aria-label="Capture original"]');
+  assert.ok(capture);
+  capture.click();
+  assert.deepEqual(actions, [], 'synthetic capture clicks are ignored');
+  dispatchTrustedClick(capture);
   primary.querySelector<HTMLButtonElement>('[aria-label="Start slideshow"]')?.click();
   primary.querySelector<HTMLButtonElement>('[aria-label="Grab Mode"]')?.click();
   assert.equal(

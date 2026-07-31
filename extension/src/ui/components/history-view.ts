@@ -1,12 +1,14 @@
 import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import { DEFAULT_RECENT_DISPLAY_ORDER, sortRecentRecords, type RecentDisplayOrder } from '../../core/display-order.js';
 import { DEFAULT_RECENT_HISTORY_SCOPE, type RecentHistoryScope } from '../../core/recent-history-scope.js';
+import { isTrustedActivation } from '../../core/trusted-activation.js';
 import { createRecentScopeControl, recentHistoryEmptyText } from './recent-history-scope-view.js';
 import type { HistoryAction, HistoryViewOptions } from './history-view-actions.js';
 import { PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordExtensionLabel, recordTitle } from './record-metadata.js';
 import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { createRecordRow, type RecordRowState } from './record-row.js';
 import { selectedRangeIds } from './selection-ranges.js';
+import { bindTrustedClick } from '../trusted-activation.js';
 
 export function createHistoryView(
   items: readonly ImageDisplayRecord[],
@@ -36,7 +38,7 @@ export function createHistoryView(
     const deleteAll = document.createElement('button');
     deleteAll.type = 'button';
     deleteAll.textContent = `Delete recents (${displayItems.length})`;
-    deleteAll.addEventListener('click', () => dispatch({ name: 'history/delete-all' }));
+    bindTrustedClick(deleteAll, () => dispatch({ name: 'history/delete-all' }));
     sectionActions.append(selectAll, deleteAll);
   }
   const list = document.createElement('ol');
@@ -152,6 +154,7 @@ export function createHistoryView(
         }
         if (event.key === 'Backspace' && selected) {
           event.preventDefault();
+          if (!isTrustedActivation(event)) return;
           dispatch({ name: 'history/remove', id: item.id });
           return;
         }
@@ -183,16 +186,19 @@ export function createHistoryView(
       deleteCapture.className = 'image-trail-panel__delete-original';
       deleteCapture.textContent = 'Delete original';
       deleteCapture.title = 'Delete original from encrypted storage.';
-      deleteCapture.addEventListener('click', (event) => {
-        event.stopPropagation();
-        if (deleteCapture.dataset['confirming'] !== 'true') {
-          deleteCapture.dataset['confirming'] = 'true';
-          deleteCapture.textContent = 'Confirm delete original';
-          deleteCapture.title = 'Click again to delete original from encrypted storage.';
-          return;
-        }
-        dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! });
-      });
+      bindTrustedClick(
+        deleteCapture,
+        () => {
+          if (deleteCapture.dataset['confirming'] !== 'true') {
+            deleteCapture.dataset['confirming'] = 'true';
+            deleteCapture.textContent = 'Confirm delete original';
+            deleteCapture.title = 'Click again to delete original from encrypted storage.';
+            return;
+          }
+          dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! });
+        },
+        { beforeTrustCheck: (event) => event.stopPropagation() },
+      );
       actions.append(deleteCapture);
     } else if (blobKeyUnlocked) {
       const capture = document.createElement('button');
@@ -200,10 +206,13 @@ export function createHistoryView(
       capture.textContent = captureInProgress ? 'Capturing...' : 'Capture';
       capture.disabled = captureInProgress;
       capture.classList.toggle('is-waiting', captureInProgress);
-      capture.addEventListener('click', (event) => {
-        event.stopPropagation();
-        dispatch({ name: 'capture/request', url: item.url, sourceType: 'history', sourceRecordId: item.id });
-      });
+      bindTrustedClick(
+        capture,
+        () => {
+          dispatch({ name: 'capture/request', url: item.url, sourceType: 'history', sourceRecordId: item.id });
+        },
+        { beforeTrustCheck: (event) => event.stopPropagation() },
+      );
       actions.append(capture);
     }
 
@@ -211,9 +220,8 @@ export function createHistoryView(
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.textContent = 'Remove';
-      remove.addEventListener('click', (event) => {
-        event.stopPropagation();
-        dispatch({ name: 'history/remove', id: item.id });
+      bindTrustedClick(remove, () => dispatch({ name: 'history/remove', id: item.id }), {
+        beforeTrustCheck: (event) => event.stopPropagation(),
       });
       actions.append(remove);
     }

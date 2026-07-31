@@ -7,6 +7,7 @@ import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { createQueueRepairButton, createQueueSelectionButton } from './queue-repair-button.js';
 import { createQueueSortControl } from './queue-sort-control.js';
 import { selectedRangeIds } from './selection-ranges.js';
+import { bindTrustedClick } from '../trusted-activation.js';
 
 export function createBookmarksView(
   currentUrl: string | null,
@@ -331,7 +332,7 @@ export function createBookmarksView(
       capture.textContent = captureInProgress ? 'Capturing...' : 'Capture';
       capture.disabled = captureInProgress;
       capture.classList.toggle('is-waiting', captureInProgress);
-      capture.addEventListener('click', () =>
+      bindTrustedClick(capture, () =>
         dispatch({ name: 'capture/request', url: item.url, sourceType: 'bookmark', sourceRecordId: item.id }),
       );
       actions.append(capture);
@@ -344,7 +345,7 @@ export function createBookmarksView(
       deleteCapture.className = 'image-trail-panel__delete-original';
       deleteCapture.textContent = 'Delete original';
       deleteCapture.title = 'Delete original from encrypted storage.';
-      deleteCapture.addEventListener('click', () => {
+      bindTrustedClick(deleteCapture, () => {
         if (deleteCapture.dataset['confirming'] !== 'true') {
           deleteCapture.dataset['confirming'] = 'true';
           deleteCapture.textContent = 'Confirm delete original';
@@ -362,7 +363,7 @@ export function createBookmarksView(
       remove.textContent = 'Delete';
       remove.title = 'Delete this durable queue row. Linked originals follow reference-count cleanup rules.';
       remove.className = 'is-danger';
-      remove.addEventListener('click', () => dispatch({ name: 'bookmark/remove', id: item.id }));
+      bindTrustedClick(remove, () => dispatch({ name: 'bookmark/remove', id: item.id }));
       actions.append(remove);
 
       const clear = document.createElement('button');
