@@ -103,6 +103,166 @@ test('plain bookmark re-save without a blob preserves its captured original', as
   await assertOriginalBlobExists();
 });
 
+test('converting a plaintext bookmark to protected storage preserves its captured original', async () => {
+  await deleteImageTrailDb();
+  let active: ActiveBlobKey | null = null;
+  await putOriginalBlob(createKeyReference('blob', 'plain-to-protected-original-key'));
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  const url = 'https://example.test/plain-to-protected-preserved.jpg';
+  try {
+    const plain = await store.save(
+      createDisplayRecord({
+        id: url,
+        url,
+        timestamp: '2026-07-18T00:00:01.000Z',
+        source: 'bookmark',
+        storedOriginal: ORIGINAL,
+      }),
+    );
+    active = (
+      await createAndActivateWrappedBlobKey({
+        password: 'plain-to-protected-original-password',
+        uuid: 'plain-to-protected-original-key',
+        now: '2026-07-18T00:00:02.000Z',
+      })
+    ).active;
+
+    const protectedPin = await store.save(
+      createDisplayRecord({
+        id: url,
+        url,
+        timestamp: '2026-07-18T00:00:03.000Z',
+        source: 'bookmark',
+      }),
+    );
+
+    assert.equal(protectedPin.id, plain.id);
+    assert.deepEqual(protectedPin.storedOriginal, ORIGINAL);
+    assert.equal(protectedPin.protectedPin?.storedOriginalBlobId, ORIGINAL.blobId);
+    assert.equal((await store.loadOriginalBlobIds()).has(ORIGINAL.blobId), true);
+  } finally {
+    await store.close();
+    active = null;
+    lockBlobKey();
+  }
+  await assertOriginalBlobExists();
+});
+
+test('explicit clearing during plaintext-to-protected conversion removes the captured original', async () => {
+  await deleteImageTrailDb();
+  let active: ActiveBlobKey | null = null;
+  await putOriginalBlob(createKeyReference('blob', 'plain-to-protected-clear-key'));
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  const url = 'https://example.test/plain-to-protected-cleared.jpg';
+  try {
+    await store.save(
+      createDisplayRecord({
+        id: url,
+        url,
+        timestamp: '2026-07-18T00:00:01.000Z',
+        source: 'bookmark',
+        storedOriginal: ORIGINAL,
+      }),
+    );
+    active = (
+      await createAndActivateWrappedBlobKey({
+        password: 'plain-to-protected-clear-password',
+        uuid: 'plain-to-protected-clear-key',
+        now: '2026-07-18T00:00:02.000Z',
+      })
+    ).active;
+
+    const protectedPin = await store.save(
+      createDisplayRecord({
+        id: url,
+        url,
+        timestamp: '2026-07-18T00:00:03.000Z',
+        source: 'bookmark',
+      }),
+      { clearStoredOriginal: true },
+    );
+
+    assert.equal(protectedPin.storedOriginal, undefined);
+    assert.equal(protectedPin.protectedPin?.hasStoredOriginal, false);
+    assert.equal((await store.loadOriginalBlobIds()).has(ORIGINAL.blobId), false);
+  } finally {
+    await store.close();
+    active = null;
+    lockBlobKey();
+  }
+  await assertOriginalBlobMissing();
+});
+
+test('plaintext-to-protected conversion removes stale metadata from the locked queue', async () => {
+  await deleteImageTrailDb();
+  let active: ActiveBlobKey | null = null;
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  const url = 'https://secret.example.test/plain-then-protected.jpg';
+  try {
+    const plain = await store.save(
+      createDisplayRecord({
+        id: url,
+        url,
+        title: 'Stale plaintext title',
+        label: 'Stale plaintext label',
+        thumbnail: 'data:image/png;base64,c3RhbGU=',
+        timestamp: '2026-06-21T00:00:01.000Z',
+        source: 'bookmark',
+      }),
+    );
+    active = (
+      await createAndActivateWrappedBlobKey({
+        password: 'pin-convert-plaintext-password',
+        uuid: 'pin-convert-plaintext-key',
+        now: '2026-06-21T00:00:02.000Z',
+      })
+    ).active;
+
+    const protectedPin = await store.save(
+      createDisplayRecord({
+        id: url,
+        url,
+        title: 'Protected title',
+        label: 'Protected label',
+        thumbnail: 'data:image/png;base64,cHJvdGVjdGVk',
+        timestamp: '2026-06-21T00:00:03.000Z',
+        source: 'bookmark',
+      }),
+    );
+
+    assert.equal(protectedPin.id, plain.id);
+    assert.deepEqual(protectedPin.pinSaveStorage, { destination: 'encrypted' });
+    const unlockedPage = await store.loadPage({ offset: 0, limit: 30 });
+    assert.equal(unlockedPage.items.length, 1);
+    assert.equal(unlockedPage.items[0]?.title, 'Protected title');
+  } finally {
+    await store.close();
+    active = null;
+    lockBlobKey();
+  }
+
+  const lockedStore = new IndexedDbBookmarkStore({ getActiveBlobKey: () => null });
+  try {
+    const lockedPage = await lockedStore.loadPage({ offset: 0, limit: 30 });
+    assert.equal(lockedPage.items.length, 1);
+    assert.equal(lockedPage.items[0]?.privacyStatus, 'locked');
+    assert.equal(lockedPage.items[0]?.url.startsWith('image-trail-private:'), true);
+    assert.equal(lockedPage.items[0]?.title, undefined);
+    assert.equal(lockedPage.items[0]?.label, 'Private pin');
+    assert.equal(lockedPage.items[0]?.thumbnail, undefined);
+  } finally {
+    await lockedStore.close();
+  }
+
+  const db = await openImageTrailDb();
+  assert.ok(db.db);
+  try {
+    assert.equal(await new BookmarksRepository(db.db).countEncrypted(), 1);
+  } finally {
+    db.db.close();
+  }
+});
+
 test('protected bookmark re-save without a blob preserves encrypted metadata and its relationship', async () => {
   await deleteImageTrailDb();
   let active: ActiveBlobKey | null = (
