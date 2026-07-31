@@ -197,17 +197,21 @@ test('version-cut workflow refreshes a checked Changesets PR and tags only fresh
   const workflow = readFileSync('.github/workflows/version-cut.yml', 'utf8');
 
   assert.match(workflow, /npm run changeset:version/u);
-  assert.match(workflow, /pull-requests: write/u);
   assert.match(workflow, /actions: write/u);
-  // Branch and tag pushes use RELEASE_TOKEN because GITHUB_TOKEN events trigger
-  // no downstream workflow and github-actions[bot] is not an authorized Actions
-  // actor here. PR API operations use GITHUB_TOKEN and may refresh only a
-  // pre-existing PR authored by the Codex App.
-  assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
+  // Branch, PR, and tag writes require a short-lived chores-dumb App token
+  // because GITHUB_TOKEN events trigger no downstream workflow and
+  // github-actions[bot] is not an authorized Actions actor here.
+  assert.match(workflow, /uses: actions\/create-github-app-token@[0-9a-f]{40} # v3\.2\.0/u);
+  assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.chores\.outputs\.token \}\}/u);
+  assert.doesNotMatch(workflow, /RELEASE_TOKEN|\|\| github\.token/u);
+  const mints = workflow.split(/- name: Mint the chores-dumb token/u).slice(1);
+  assert.equal(mints.length, 2);
+  for (const mint of mints) {
+    const beforeUses = mint.split('uses:')[0] ?? '';
+    assert.doesNotMatch(beforeUses, /continue-on-error|if:/u);
+  }
   assert.doesNotMatch(workflow, /PUSH_TOKEN/u);
-  assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
-  assert.match(workflow, /qwts-codex-agent\[bot\]/u);
-  assert.doesNotMatch(workflow, /gh pr create/u);
+  assert.match(workflow, /gh pr create/u);
   assert.match(workflow, /repository_dispatch:\s*\n\s+types:\s*\n\s+- version-cut-recovery/u);
   assert.doesNotMatch(workflow, /workflow_dispatch:/u);
   assert.equal(workflow.match(/gh auth setup-git/gu)?.length, 2);
@@ -237,9 +241,9 @@ test('version-cut keeps dependency code off the clean token-bearing runner', () 
   );
   const pushStep = publishJob.slice(
     publishJob.indexOf('- name: Push the version branch'),
-    publishJob.indexOf('- name: Refresh the ready version PR'),
+    publishJob.indexOf('- name: Create or refresh the ready version PR'),
   );
-  const refreshStep = publishJob.slice(publishJob.indexOf('- name: Refresh the ready version PR'));
+  const refreshStep = publishJob.slice(publishJob.indexOf('- name: Create or refresh the ready version PR'));
 
   assert.match(prepareJob, /npm ci/u);
   assert.match(prepareJob, /npm run changeset:version/u);
@@ -251,20 +255,21 @@ test('version-cut keeps dependency code off the clean token-bearing runner', () 
   assert.match(publishJob, /node "\$trusted_validator"/u);
   assert.match(publishJob, /git -c core\.hooksPath=\/dev\/null -c commit\.gpgsign=false commit/u);
   assert.match(publishJob, /git -c core\.hooksPath=\/dev\/null push/u);
-  assert.match(publishJob, /author.*qwts-codex-agent\[bot\]/u);
-  assert.match(publishJob, /no open bot-authored PR exists/u);
-  assert.match(verifyStep, /pr_numbers=\$\(gh pr list/u);
+  assert.match(verifyStep, /GITHUB_REPOSITORY_OWNER:\$BRANCH/u);
+  assert.match(verifyStep, /repos\/\$GITHUB_REPOSITORY\/pulls/u);
   assert.doesNotMatch(verifyStep, /< <\(/u);
   assert.doesNotMatch(verifyStep, /RELEASE_TOKEN/u);
-  assert.match(pushStep, /GH_TOKEN: \$\{\{ secrets\.RELEASE_TOKEN \|\| github\.token \}\}/u);
-  assert.doesNotMatch(refreshStep, /RELEASE_TOKEN/u);
-  assert.match(refreshStep, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
-  const verifyAuthor = publishJob.indexOf('if [ "$author" != \'qwts-codex-agent[bot]\' ]');
+  assert.match(pushStep, /GH_TOKEN: \$\{\{ steps\.chores\.outputs\.token \}\}/u);
+  assert.match(refreshStep, /GH_TOKEN: \$\{\{ steps\.chores\.outputs\.token \}\}/u);
+  assert.match(refreshStep, /gh pr create --base main --head "\$BRANCH"/u);
+  assert.match(refreshStep, /gh pr edit "\$PR_NUMBER"/u);
+  assert.doesNotMatch(publishJob, /qwts-codex-agent\[bot\]|bot-authored/u);
+  const verifyExactHead = publishJob.indexOf('-f head="$GITHUB_REPOSITORY_OWNER:$BRANCH"');
   const pushBranch = publishJob.indexOf('git -c core.hooksPath=/dev/null push');
-  assert.ok(verifyAuthor >= 0, 'the existing version PR author must be checked');
-  assert.ok(pushBranch > verifyAuthor, 'an unexpected PR author must block the branch refresh');
+  assert.ok(verifyExactHead >= 0, 'the exact same-repo version PR head must be checked');
+  assert.ok(pushBranch > verifyExactHead, 'the trusted head lookup must run before the branch refresh');
   assert.ok(
-    publishJob.indexOf('pr_numbers=$(gh pr list') < pushBranch,
+    publishJob.indexOf('pr_numbers=$(') < pushBranch,
     'a failed PR listing assignment must stop the job before the token-bearing push step',
   );
   assert.doesNotMatch(publishJob, /npm ci|npm run changeset:version/u);
@@ -359,18 +364,18 @@ test('version-cut validator rejects executable drift and malformed patches', () 
   );
 });
 
-test('no workflow that carries RELEASE_TOKEN can reach a third-party action', () => {
-  // A repo-scoped PAT must stay inside actions/* steps and our own run: blocks —
-  // never inside an action whose future versions nobody here controls. This is
-  // why `changeset:version` is invoked as a script rather than through
-  // changesets/action (AGENTS.md → Branch And GitHub Hygiene).
+test('no workflow that carries repository automation credentials can reach a third-party action', () => {
+  // Repository automation credentials stay inside actions/* steps and our own
+  // run: blocks — never inside an action whose future versions nobody here
+  // controls. This is why `changeset:version` is invoked as a script rather
+  // than through changesets/action (AGENTS.md → Branch And GitHub Hygiene).
   for (const file of ['version-cut.yml', 'release.yml']) {
     const workflow = readFileSync(`.github/workflows/${file}`, 'utf8');
-    if (!workflow.includes('RELEASE_TOKEN')) continue;
+    if (!workflow.includes('CHORES_DUMB_PRIVATE_KEY')) continue;
     const foreign = [...workflow.matchAll(/^\s*uses: (?<action>[^@\s]+)/gmu)]
       .map((match) => match.groups?.['action'] ?? '')
       .filter((action) => !action.startsWith('actions/'));
-    assert.deepEqual(foreign, [], `${file} passes a third-party action into a PAT-bearing workflow`);
+    assert.deepEqual(foreign, [], `${file} passes a third-party action into a credential-bearing workflow`);
   }
 });
 
@@ -422,7 +427,7 @@ test('zizmor is digest-pinned without a disallowed wrapper action and enforces t
   assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
   assert.match(workflow, /--persona auditor --format github/u);
   assert.match(workflow, /--config \.github\/zizmor\.yml \./u);
-  assert.match(config, /allow:\s*\n\s+- RELEASE_TOKEN/u);
+  assert.match(config, /allow:\s*\n\s+- CHORES_DUMB_APP_ID\s*\n\s+- CHORES_DUMB_PRIVATE_KEY/u);
   assert.match(config, /['"]qwts\/playbook-software-engineering\/\*['"]: ref-pin/u);
   assert.match(config, /['"]\*['"]: hash-pin/u);
   assert.equal(dependabot.match(/default-days: 7/gu)?.length, 2);
@@ -431,6 +436,9 @@ test('zizmor is digest-pinned without a disallowed wrapper action and enforces t
 test('release builds do not consume dependency caches or interpolate the tag in shell source', () => {
   const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
 
+  assert.match(workflow, /uses: actions\/create-github-app-token@[0-9a-f]{40} # v3\.2\.0/u);
+  assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.chores\.outputs\.token \}\}/u);
+  assert.doesNotMatch(workflow, /RELEASE_TOKEN|github\.token|continue-on-error/u);
   assert.doesNotMatch(workflow, /^\s+cache: npm/mu);
   assert.match(workflow, /package-manager-cache: false/u);
   assert.match(workflow, /RELEASE_TAG: \$\{\{ steps\.release\.outputs\.tag \}\}/u);

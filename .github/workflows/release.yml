@@ -15,13 +15,14 @@ concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
-# Normally started by the tag trigger: version-cut.yml pushes the version tag under
-# RELEASE_TOKEN, so the push emits this run on its own (a GITHUB_TOKEN push would emit nothing,
-# and a bot dispatch is refused by the Actions actor policy). The same trigger covers tags pushed
-# by humans; workflow_dispatch remains the recovery path for a tag whose release run never
-# happened. Every build checks out the tag, never main.
-# This workflow packages and publishes GitHub Release assets only. It does not merge version
-# PRs or submit to the Chrome Web Store.
+# Normally started by the tag trigger: version-cut.yml pushes the version tag as
+# chores-dumb[bot], so the push emits this run on its own (a GITHUB_TOKEN push
+# would emit nothing). The same trigger covers tags pushed by humans;
+# workflow_dispatch remains the recovery path for a tag whose release run never
+# happened. Every build checks out the tag, never main. Release asset writes
+# also use chores-dumb[bot]; GITHUB_TOKEN is not an authorized automation actor.
+# This workflow packages and publishes GitHub Release assets only. It does not
+# merge version PRs or submit to the Chrome Web Store.
 permissions: {}
 
 jobs:
@@ -29,10 +30,18 @@ jobs:
     name: Validate and cut release
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Required to create and refresh GitHub Release assets.
+      contents: read # Required only by checkout; writes use the App token.
     env:
       INTEROP_PHOTOS_ROOT: ${{ github.workspace }}/node_modules/.interop-photos
     steps:
+      - name: Mint the chores-dumb token
+        id: chores
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.CHORES_DUMB_APP_ID }}
+          private-key: ${{ secrets.CHORES_DUMB_PRIVATE_KEY }}
+          permission-contents: write
+
       - name: Resolve release tag
         id: release
         env:
@@ -91,7 +100,7 @@ jobs:
 
       - name: Create or refresh GitHub Release assets
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.chores.outputs.token }}
           TAG_NAME: ${{ steps.release.outputs.tag }}
         run: |
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
