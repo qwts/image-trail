@@ -1,10 +1,12 @@
 rules:
   secrets-outside-env:
     config:
-      # RELEASE_TOKEN is a dedicated automation credential for the version
-      # branch and tag jobs; their triggers and permissions constrain its use.
+      # These dedicated automation credentials are consumed only by the
+      # version branch/PR/tag jobs; their triggers and permissions constrain
+      # their use.
       allow:
-        - RELEASE_TOKEN
+        - CHORES_DUMB_APP_ID
+        - CHORES_DUMB_PRIVATE_KEY
   unpinned-uses:
     config:
       policies:

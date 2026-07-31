@@ -79,13 +79,21 @@ async function deleteVisibleRecents(page: Page): Promise<void> {
 }
 
 async function deleteVisibleQueueRows(page: Page): Promise<void> {
-  for (;;) {
-    const rows = page.locator('.image-trail-panel__bookmark-item');
-    const count = await rows.count();
-    if (count === 0) return;
-    await rows.first().getByRole('button', { name: 'Delete', exact: true }).click({ force: true });
-    await expect(rows).toHaveCount(count - 1);
+  for (let pass = 0; pass < 3; pass += 1) {
+    await openSettingsGroup(page, 'System');
+    await confirmQueueDeletion(page, /^Delete current queue \(\d+\)$/u, /^Confirm Delete current queue \(\d+\)$/u);
+    await confirmQueueDeletion(page, /^Delete Recall items \(\d+\)$/u, /^Confirm Delete Recall items \(\d+\)$/u);
+    await closeSettings(page);
+    if ((await page.locator('.image-trail-panel__bookmark-item').count()) === 0) return;
   }
+  await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
+}
+
+async function confirmQueueDeletion(page: Page, actionName: RegExp, confirmName: RegExp): Promise<void> {
+  const action = page.getByRole('button', { name: actionName });
+  if ((await action.count()) === 0 || (await action.isDisabled())) return;
+  await action.click();
+  await page.getByRole('button', { name: confirmName }).click();
 }
 
 async function setupEncryptedOriginals(page: Page, value = password): Promise<void> {

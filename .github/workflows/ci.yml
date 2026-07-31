@@ -10,7 +10,7 @@ on:
       - main
   # Manual lever for running the suite on an arbitrary ref. The bot-maintained
   # Changesets branch no longer needs a dispatch: version-cut.yml opens that PR
-  # under RELEASE_TOKEN, so it emits ordinary pull_request runs (contexts match
+  # as chores-dumb[bot], so it emits ordinary pull_request runs (contexts match
   # by name across event types).
   workflow_dispatch:
 

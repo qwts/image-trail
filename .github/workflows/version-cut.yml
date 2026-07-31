@@ -5,8 +5,9 @@
 #  2. tag — after the version PR merges (package version changed, no pending
 #     changesets), tag v<version> and hand off to the release workflow.
 #
-# Branch and tag pushes authenticate with RELEASE_TOKEN, for two compounding
-# reasons:
+# Branch, PR, and tag writes authenticate as chores-dumb[bot], using a GitHub
+# App installation token minted for each run. No human credential is used. The
+# bot credential is needed for two compounding reasons:
 #  - GITHUB_TOKEN events cannot trigger other workflows. The bot-refreshed
 #    version PR got no pull_request CI runs even though main requires the "CI"
 #    and "E2E gate" checks, and a GITHUB_TOKEN tag push fired no on:push:tags
@@ -15,18 +16,16 @@
 #    include github-actions[bot]. Anything it triggers — including those
 #    explicit dispatches — now dies at startup with "Actor is not allowed to
 #    trigger Actions workflows", so the workaround stopped working too.
-# Under the PAT the actor is an authorized account and both events fire on their
-# own: the version PR gets real pull_request runs, and the tag push starts
-# release.yml directly. Version PR creation is deliberately not automated here:
-# the rolling branch must already have an open PR authored by
-# qwts-codex-agent[bot]. GITHUB_TOKEN inspects that invariant and refreshes only
-# the PR body, so the workflow cannot create a human-authored release PR.
+# Under the App the actor is an authorized non-human account and both events
+# fire on their own: the version PR gets real pull_request runs, and the tag
+# push starts release.yml directly. The workflow verifies the exact same-repo
+# rolling head and base before writing, then creates or refreshes that PR. PR
+# authorship is an outcome of the credential, not a separate trust boundary.
 #
-# The PAT reaches only actions/* steps and our own `run:` blocks — never a
-# third-party action, which is why versioning is a script here rather than
-# changesets/action. If RELEASE_TOKEN is ever absent the jobs fall back to
-# GITHUB_TOKEN and still version and tag correctly; only the downstream runs
-# fail to start.
+# Repository credentials reach only actions/* steps and our own `run:` blocks
+# — never a third-party action, which is why versioning is a script here rather
+# than changesets/action. App minting is mandatory: if it fails, the workflow
+# stops before touching the rolling branch, PR, or release tag.
 name: Version cut
 
 on:
@@ -102,12 +101,20 @@ jobs:
     needs: prepare-version-pr
     if: needs.prepare-version-pr.outputs.ready == 'true'
     runs-on: ubuntu-latest
-    # These scopes exist only for the `|| github.token` fallback below; a PAT
-    # carries its own.
     permissions:
-      contents: write # Required to force-push the rolling version branch.
-      pull-requests: write # Required to create or refresh the version PR.
+      contents: read # Required only by checkout; writes use the App token.
     steps:
+      - name: Mint the chores-dumb token
+        id: chores
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          # This repository currently stores the App client ID under the legacy
+          # CHORES_DUMB_APP_ID secret name; v3 accepts app-id as an alias.
+          app-id: ${{ secrets.CHORES_DUMB_APP_ID }}
+          private-key: ${{ secrets.CHORES_DUMB_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Checkout the trusted base
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -157,11 +164,18 @@ jobs:
       - name: Verify the ready version PR
         id: version_pr
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.chores.outputs.token }}
           BRANCH: changeset-release/main
         run: |
           set -euo pipefail
-          pr_numbers=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[].number')
+          pr_numbers=$(
+            gh api --method GET "repos/$GITHUB_REPOSITORY/pulls" \
+              -f state=open \
+              -f head="$GITHUB_REPOSITORY_OWNER:$BRANCH" \
+              -f base=main \
+              --paginate \
+              --jq '.[].number'
+          )
           open_prs=()
           if [ -n "$pr_numbers" ]; then
             mapfile -t open_prs <<< "$pr_numbers"
@@ -176,17 +190,12 @@ jobs:
             exit 0
           fi
 
-          author=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$open" --jq '.user.login')
-          if [ "$author" != 'qwts-codex-agent[bot]' ]; then
-            echo "::error::Refusing to refresh PR #$open authored by $author; expected qwts-codex-agent[bot]."
-            exit 1
-          fi
           echo 'missing=false' >> "$GITHUB_OUTPUT"
           echo "number=$open" >> "$GITHUB_OUTPUT"
 
       - name: Push the version branch
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ steps.chores.outputs.token }}
           BRANCH: changeset-release/main
         run: |
           set -euo pipefail
@@ -195,17 +204,20 @@ jobs:
           gh auth setup-git
           git -c core.hooksPath=/dev/null push --force origin "$BRANCH"
 
-      - name: Refresh the ready version PR
+      - name: Create or refresh the ready version PR
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.chores.outputs.token }}
+          BRANCH: changeset-release/main
           MISSING_PR: ${{ steps.version_pr.outputs.missing }}
           PR_NUMBER: ${{ steps.version_pr.outputs.number }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           if [ "$MISSING_PR" = 'true' ]; then
-            echo "::error::Version branch pushed, but no open bot-authored PR exists. Seed it as qwts-codex-agent[bot], then send a version-cut-recovery repository dispatch."
-            exit 1
+            gh pr create --base main --head "$BRANCH" --title 'chore: version Image Trail' \
+              --body-file "$RUNNER_TEMP/pr-body.md"
+            echo "Version PR created for v$VERSION."
+            exit 0
           fi
 
           # The rolling PR outlives the changesets it was opened for. Its body
@@ -218,12 +230,18 @@ jobs:
   tag:
     name: Tag version merges
     runs-on: ubuntu-latest
-    # Scopes for the `|| github.token` fallback only; `actions: write` covers the
-    # stranded-tag recovery dispatch below.
     permissions:
-      contents: write # Required to push the signed release tag.
-      actions: write # Required only for stranded-tag recovery dispatch.
+      contents: read # Required only by checkout; writes use the App token.
     steps:
+      - name: Mint the chores-dumb token
+        id: chores
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.CHORES_DUMB_APP_ID }}
+          private-key: ${{ secrets.CHORES_DUMB_PRIVATE_KEY }}
+          permission-contents: write
+          permission-actions: write
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -232,7 +250,7 @@ jobs:
 
       - name: Tag when the current version is a fresh cut
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ steps.chores.outputs.token }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           # A normal main push is a release cut only when package.json changed.
@@ -271,8 +289,8 @@ jobs:
           if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
             echo "$version already tagged."
             # The one dispatch that survives: an already-existing tag has no push
-            # event left to replay. Runs under the PAT — a github-actions[bot]
-            # dispatch is refused by the Actions actor policy.
+            # event left to replay. Runs as chores-dumb[bot] because a
+            # github-actions[bot] dispatch is refused by the Actions actor policy.
             if ! gh release view "$version" >/dev/null 2>&1; then
               echo "$version has no release — dispatching recovery."
               gh workflow run release.yml --ref main -f tag="$version"
@@ -287,8 +305,6 @@ jobs:
           git push origin "$version"
           echo "Tagged $version."
 
-          # No dispatch: pushed under the PAT, this tag fires release.yml's
-          # on:push:tags trigger directly. Without RELEASE_TOKEN the push is a
-          # GITHUB_TOKEN push and starts nothing — send a version-cut-recovery
-          # repository dispatch once the secret is present so the already-tagged
-          # recovery path above can pick the tag up.
+          # No dispatch: pushed under the App token, this tag fires release.yml's
+          # on:push:tags trigger directly. If App minting fails, the job stops
+          # before creating or pushing the tag.
