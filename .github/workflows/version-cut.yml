@@ -108,9 +108,7 @@ jobs:
         id: chores
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          # This repository currently stores the App client ID under the legacy
-          # CHORES_DUMB_APP_ID secret name; v3 accepts app-id as an alias.
-          app-id: ${{ secrets.CHORES_DUMB_APP_ID }}
+          client-id: ${{ secrets.CHORES_DUMB_CLIENT_ID }}
           private-key: ${{ secrets.CHORES_DUMB_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
@@ -237,7 +235,7 @@ jobs:
         id: chores
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ secrets.CHORES_DUMB_APP_ID }}
+          client-id: ${{ secrets.CHORES_DUMB_CLIENT_ID }}
           private-key: ${{ secrets.CHORES_DUMB_PRIVATE_KEY }}
           permission-contents: write
           permission-actions: write
