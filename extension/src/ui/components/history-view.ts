@@ -169,14 +169,11 @@ export function createHistoryView(
       });
     }
     if (!keyUnavailable && !lockedEncrypted && !pinned) {
-      const pin = document.createElement('button');
-      pin.type = 'button';
-      pin.textContent = 'Pin';
-      pin.addEventListener('click', (event) => {
-        event.stopPropagation();
-        dispatch({ name: 'history/pin', id: item.id });
-      });
-      actions.append(pin);
+      actions.append(
+        createTrustedRecordActionButton('Pin', () => dispatch({ name: 'history/pin', id: item.id }), {
+          stopPropagation: true,
+        }),
+      );
     }
 
     if (item.captureStatus === 'captured' && item.blobId && !keyMissing) {

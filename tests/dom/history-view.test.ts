@@ -198,9 +198,10 @@ test('ArrowDown restores recent row focus inside a shadow root', async () => {
   assert.equal(root.activeElement, nextRow);
 });
 
-test('Recent capture, original deletion, removal, and bulk deletion reject synthetic clicks', () => {
+test('Recent pin, capture, original deletion, removal, and bulk deletion reject synthetic clicks', () => {
   const actions: unknown[] = [];
   const view = buildHistoryView(actions);
+  buttonByText(view, 'Pin').click();
   buttonByText(view, 'Capture').click();
   buttonByText(view, 'Remove').click();
   buttonByText(view, 'Delete recents (1)').click();
@@ -214,9 +215,10 @@ test('Recent capture, original deletion, removal, and bulk deletion reject synth
   assert.deepEqual(actions, []);
 });
 
-test('Recent capture, original deletion, removal, and bulk deletion accept trusted activation', () => {
+test('Recent pin, capture, original deletion, removal, and bulk deletion accept trusted activation', () => {
   const actions: unknown[] = [];
   const view = buildHistoryView(actions);
+  dispatchTrustedClick(buttonByText(view, 'Pin'));
   dispatchTrustedClick(buttonByText(view, 'Capture'));
   dispatchTrustedClick(buttonByText(view, 'Remove'));
   dispatchTrustedClick(buttonByText(view, 'Delete recents (1)'));
@@ -228,6 +230,7 @@ test('Recent capture, original deletion, removal, and bulk deletion accept trust
   dispatchTrustedClick(deleteOriginal);
 
   assert.deepEqual(actions, [
+    { name: 'history/pin', id: 'recent-1' },
     { name: 'capture/request', url: record.url, sourceType: 'history', sourceRecordId: 'recent-1' },
     { name: 'history/remove', id: 'recent-1' },
     { name: 'history/delete-all' },
