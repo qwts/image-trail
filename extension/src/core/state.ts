@@ -121,6 +121,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     fieldDigitWidthSpecs: [],
     parsedFieldResetBaseline: null,
     urlTemplates: [],
+    urlTemplateIdentityKey: null,
     grabSourcePatterns: [],
     activeUrlTemplateId: null,
     currentImageFingerprint: null,

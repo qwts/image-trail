@@ -226,17 +226,18 @@ test('minimized panel stays visible without stopping Grab Mode', () => {
 });
 
 test('removing a grab source pattern preserves URL templates', () => {
+  const identityKey = '42'.repeat(32);
   const template: UrlTemplateRecord = {
     id: 'template-001',
-    schemaVersion: 1,
+    schemaVersion: 2,
     hostname: 'example.test',
     templateUrl: 'https://example.test/image.jpg?page={query-page}',
     matchRules: {
       mode: 'exact-page-shape',
       hostname: 'example.test',
-      exactPathSignature: 'exact',
+      exactIdentity: '11'.repeat(32),
       pathShapeSignature: 'shape',
-      querySignature: 'page:int',
+      queryShapeSignature: '0:int',
     },
     fields: [],
     hideExcludedFields: false,
@@ -247,15 +248,15 @@ test('removing a grab source pattern preserves URL templates', () => {
   };
   const pattern: GrabSourcePattern = {
     id: 'grab-source-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     hostname: 'example.test',
     patternUrl: 'https://example.test/post/123',
     matchRules: {
       mode: 'exact-page-shape',
       hostname: 'example.test',
-      exactPathSignature: 'post:int',
+      exactIdentity: '22'.repeat(32),
       pathShapeSignature: 'post:int',
-      querySignature: '',
+      queryShapeSignature: '',
     },
     createdAt: '2026-06-21T00:00:00.000Z',
     updatedAt: '2026-06-21T00:00:00.000Z',
@@ -265,6 +266,7 @@ test('removing a grab source pattern preserves URL templates', () => {
   const withTemplate = reducePanelAction(createInitialPanelState(), {
     name: 'url-templates/load',
     templates: [template],
+    identityKey,
     activeTemplateId: template.id,
   });
   const loaded = reducePanelAction(withTemplate, {

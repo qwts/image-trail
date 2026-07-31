@@ -26,7 +26,10 @@ function createHarness(options: HarnessOptions = {}): Harness {
   let state = createInitialPanelState(0);
   const log: string[] = [];
   const urlTemplateStore: UrlTemplateStore = {
-    load: async () => [{ id: 't1', hostname: 'images.example.test', fields: [] }] as never,
+    load: async () => ({
+      templates: [{ id: 't1', hostname: 'images.example.test', fields: [] }] as never,
+      identityKey: '42'.repeat(32),
+    }),
     loadGrabSourcePatterns: async () => ['*.example.test'] as never,
   } as unknown as UrlTemplateStore;
   const captureStore = {
@@ -56,6 +59,7 @@ test('loadGrabSettings loads templates + grab patterns, syncs settings and prime
   const harness = createHarness();
   await harness.controller.loadGrabSettings();
   assert.equal(harness.getState().urlTemplates.length, 1);
+  assert.equal(harness.getState().urlTemplateIdentityKey, '42'.repeat(32));
   assert.deepEqual(harness.getState().grabSourcePatterns, ['*.example.test']);
   assert.ok(harness.log.includes('syncGrabSettings'));
   assert.ok(harness.log.includes('primeBufferedNav'));

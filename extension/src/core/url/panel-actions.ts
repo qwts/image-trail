@@ -3,7 +3,12 @@ import type { UrlSteppingPresetId } from './stepping-presets.js';
 import type { GrabSourcePattern, UrlTemplateMatchMode, UrlTemplateRecord } from './templates.js';
 
 export type UrlTemplatePanelAction =
-  | { readonly name: 'url-templates/load'; readonly templates: readonly UrlTemplateRecord[]; readonly activeTemplateId?: string | null }
+  | {
+      readonly name: 'url-templates/load';
+      readonly templates: readonly UrlTemplateRecord[];
+      readonly identityKey: string | null;
+      readonly activeTemplateId?: string | null;
+    }
   | { readonly name: 'url-template/save-step-preset'; readonly presetId: UrlSteppingPresetId }
   | { readonly name: 'url-template/remove'; readonly id: string }
   | {

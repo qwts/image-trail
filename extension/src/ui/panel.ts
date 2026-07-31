@@ -154,9 +154,7 @@ export class ImageTrailPanel {
       fieldDigitWidthSpecs: this.state.fieldDigitWidthSpecs,
       selectedHandleId: this.state.target.selectedHandleId,
     }),
-    // preload() decides the source profile per intent: the active parsed-field navigation display
-    // uses the 25 MB navigation budget (matching the skip-policy cache key), everything else keeps
-    // the thumbnail-source budget.
+    // Parsed-field navigation uses its 25 MB budget; other intents keep the thumbnail-source budget.
     fetchThumbnail: (url, options) => fetchThumbnailSource(url, options),
   });
   private readonly urlTemplateSettings = new UrlTemplateSettingsController({
@@ -165,7 +163,7 @@ export class ImageTrailPanel {
     setState: this.replaceState,
     render: () => this.render(),
     currentUrlModel: () => this.currentUrlModel(),
-    setUrlTemplates: (templates, activeId) => this.pageAdapter.setUrlTemplates(templates, activeId),
+    setUrlTemplates: (templates, activeId, identityKey) => this.pageAdapter.setUrlTemplates(templates, activeId, identityKey),
     setGrabSourcePatterns: (patterns) => this.pageAdapter.setGrabSourcePatterns(patterns),
     loadGrabSettings: (options) => this.panelDataLoad.loadGrabSettings(options),
     saveParsedFieldState: () => this.fieldStateSync.save(),
@@ -422,7 +420,8 @@ export class ImageTrailPanel {
     urlTemplateStore: () => this.urlTemplateStore,
     loadLocalSettings: (options) => this.panelSettings.loadLocalSettings(options),
     currentUrlTemplateHostname: () => this.urlTemplateSettings.currentUrlTemplateHostname(),
-    activeTemplateIdForCurrentUrl: (templates) => this.urlTemplateSettings.activeTemplateIdForCurrentUrl(templates),
+    activeTemplateIdForCurrentUrl: (templates, identityKey) =>
+      this.urlTemplateSettings.activeTemplateIdForCurrentUrl(templates, identityKey),
     syncGrabSettings: () => this.urlTemplateSettings.syncGrabSettings(),
     primeBufferedNav: () => this.bufferedNav.prime(),
   });

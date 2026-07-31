@@ -92,7 +92,7 @@ test('legacy template split-child ids migrate with the parsed-state split map', 
   const fields = collectUrlFields(model);
   const month = fields.find((field) => field.id === 'q:0:0:s:1');
   assert.ok(month);
-  const stable = createUrlTemplateRecord({ model, fields, includedFieldIds: [month.id] });
+  const stable = createUrlTemplateRecord({ model, fields, includedFieldIds: [month.id], identityKey: '42'.repeat(32) });
   assert.ok(stable);
   const legacy = {
     ...stable,

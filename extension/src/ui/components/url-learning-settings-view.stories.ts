@@ -10,9 +10,10 @@ import { createUrlSteppingPresetView } from './url-stepping-preset-view.js';
 
 const model = parseUrl('https://images.example.test/albums/1024/photo_0042.jpg');
 const fields = collectUrlFields(model);
-const template = createUrlTemplateRecord({ model, fields, includedFieldIds: [fields[0]!.id] });
+const identityKey = '42'.repeat(32);
+const template = createUrlTemplateRecord({ model, fields, includedFieldIds: [fields[0]!.id], identityKey });
 if (!template) throw new Error('expected URL learning story template');
-const pattern = createGrabSourcePattern({ model });
+const pattern = createGrabSourcePattern({ model, identityKey });
 const dispatchSpy = fn();
 const meta = {
   title: 'Extension UI/URL learning settings',

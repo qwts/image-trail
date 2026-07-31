@@ -4,8 +4,7 @@ import {
   type LinkedPageImageGrabStrategy,
   type UrlTemplateGrabStrategy,
 } from '../core/url/grab-strategies.js';
-import { findBestMatchingGrabSourcePattern, type GrabSourcePattern, type UrlTemplateRecord } from '../core/url/templates.js';
-import { parseUrl } from '../core/url/parse-url.js';
+import type { GrabSourcePattern, UrlTemplateRecord } from '../core/url/templates.js';
 import {
   applyImageUrl,
   captureImageNavigationSnapshot,
@@ -41,6 +40,7 @@ import { sendRuntimeMessage } from './runtime-message.js';
 import { DEFAULT_PREVIEW_OBJECT_FIT, type ObjectFitMode } from '../core/preview-style.js';
 import type { ProjectionReason } from '../core/projection-session.js';
 import { safeHttpUrl } from './http-url.js';
+import { matchingGrabSourcePattern } from './grab-source-pattern-matcher.js';
 
 export type TargetSelectionMode = 'auto' | 'manual' | 'none';
 
@@ -155,6 +155,7 @@ export class PageAdapter {
   private bookmarkShortcutActive = false;
   private grabModeActive = false;
   private grabSourcePatterns: readonly GrabSourcePattern[] = [];
+  private urlTemplateIdentityKey: string | null = null;
   private activeTemplateGrabStrategy: UrlTemplateGrabStrategy | undefined;
   private suppressBookmarkShortcutClickTarget: EventTarget | null = null;
   private grabPreview: { readonly element: HTMLElement; readonly state: 'valid' | 'invalid' } | null = null;
@@ -281,8 +282,9 @@ export class PageAdapter {
     return this.emit('Grab Mode stopped.');
   }
 
-  setUrlTemplates(templates: readonly UrlTemplateRecord[], activeTemplateId: string | null): void {
+  setUrlTemplates(templates: readonly UrlTemplateRecord[], activeTemplateId: string | null, identityKey: string | null): void {
     this.clearGrabPreview();
+    this.urlTemplateIdentityKey = identityKey;
     const template = templates.find((candidate) => candidate.id === activeTemplateId) ?? null;
     this.activeTemplateGrabStrategy = normalizeGrabStrategy(template?.grabStrategy);
   }
@@ -604,12 +606,7 @@ export class PageAdapter {
 
   private grabSourcePatternForTarget(target: Element): GrabSourcePattern | null {
     const sourceUrl = this.grabSourcePatternUrlForTarget(target);
-    if (!sourceUrl) return null;
-    try {
-      return findBestMatchingGrabSourcePattern(this.grabSourcePatterns, parseUrl(sourceUrl.href));
-    } catch {
-      return null;
-    }
+    return sourceUrl ? matchingGrabSourcePattern(this.grabSourcePatterns, sourceUrl.href, this.urlTemplateIdentityKey) : null;
   }
 
   private grabSourcePatternUrlForTarget(target: Element): URL | null {

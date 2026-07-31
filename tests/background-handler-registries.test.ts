@@ -1,14 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ImageDisplayRecord } from '../extension/src/core/display-records.js';
-import type { GrabSourcePattern, UrlTemplateRecord } from '../extension/src/core/url/templates.js';
-import type {
-  PanelPosition,
-  PanelPositionStore,
-  StoredWorkspaceLayout,
-  UrlTemplateStore,
-  WorkspaceLayoutStore,
-} from '../extension/src/core/types.js';
+import type { PanelPosition, PanelPositionStore, StoredWorkspaceLayout, WorkspaceLayoutStore } from '../extension/src/core/types.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
 import { createBookmarkMessageRegistry } from '../extension/src/background/handlers/bookmark-message-handlers.js';
 import { createAlbumMessageRegistry } from '../extension/src/background/handlers/album-handlers.js';
@@ -16,9 +9,9 @@ import { createPanelPositionMessageRegistry } from '../extension/src/background/
 import { createPCloudMessageRegistry } from '../extension/src/background/handlers/pcloud-handlers.js';
 import { createRecallMessageRegistry, type RecallMessageHandlerDeps } from '../extension/src/background/handlers/recall-handlers.js';
 import { createRecentHistoryMessageRegistry } from '../extension/src/background/handlers/recent-history-handlers.js';
-import { createUrlTemplateMessageRegistry } from '../extension/src/background/handlers/url-template-handlers.js';
 import type { MessageDef } from '../extension/src/background/message-dispatch.js';
 import { RecentHistoryCache } from '../extension/src/background/recent-history-cache.js';
+import { grabSourcePattern, URL_TEMPLATE_IDENTITY_KEY, urlTemplateFixture, urlTemplateRecord } from './url-template-handler-fixtures.js';
 import {
   MessageType,
   createAddRecentHistoryMessage,
@@ -218,63 +211,6 @@ test('panel position fallbacks return the documented degraded payloads', () => {
 
 // --- url template registry ---------------------------------------------------
 
-function urlTemplateRecord(hostname: string, id = 'template-1'): UrlTemplateRecord {
-  return {
-    id,
-    schemaVersion: 1,
-    hostname,
-    templateUrl: 'https://example.com/gallery/{page}',
-    matchRules: { mode: 'exact-page-shape', hostname, exactPathSignature: '/gallery', pathShapeSignature: '/gallery', querySignature: '' },
-    fields: [],
-    hideExcludedFields: false,
-    autoApplyEnabled: false,
-    createdAt: '2026-07-01T00:00:00.000Z',
-    updatedAt: '2026-07-01T00:00:00.000Z',
-    useCount: 0,
-  };
-}
-
-function grabSourcePattern(hostname: string, id = 'pattern-1'): GrabSourcePattern {
-  return {
-    id,
-    schemaVersion: 1,
-    hostname,
-    patternUrl: 'https://example.com/photo/{id}',
-    matchRules: { mode: 'exact-page-shape', hostname, exactPathSignature: '/photo', pathShapeSignature: '/photo', querySignature: '' },
-    createdAt: '2026-07-01T00:00:00.000Z',
-    updatedAt: '2026-07-01T00:00:00.000Z',
-    useCount: 0,
-  };
-}
-
-function urlTemplateFixture() {
-  const templates = new Map<string, UrlTemplateRecord[]>();
-  const patterns = new Map<string, GrabSourcePattern[]>();
-  const store: UrlTemplateStore = {
-    load: async (hostname) => templates.get(hostname) ?? [],
-    loadGrabSourcePatterns: async (hostname) => patterns.get(hostname) ?? [],
-    save: async (template) => {
-      templates.set(template.hostname, [...(templates.get(template.hostname) ?? []), template]);
-    },
-    saveGrabSourcePattern: async (pattern) => {
-      patterns.set(pattern.hostname, [...(patterns.get(pattern.hostname) ?? []), pattern]);
-    },
-    remove: async (hostname, id) => {
-      templates.set(
-        hostname,
-        (templates.get(hostname) ?? []).filter((template) => template.id !== id),
-      );
-    },
-    removeGrabSourcePattern: async (hostname, id) => {
-      patterns.set(
-        hostname,
-        (patterns.get(hostname) ?? []).filter((pattern) => pattern.id !== id),
-      );
-    },
-  };
-  return { templates, patterns, registry: createUrlTemplateMessageRegistry({ urlTemplateStore: store }) };
-}
-
 test('url template list normalizes the hostname and answers empty for a blank hostname', async () => {
   const { templates, registry } = urlTemplateFixture();
   templates.set('example.com', [urlTemplateRecord('example.com')]);
@@ -286,12 +222,13 @@ test('url template list normalizes the hostname and answers empty for a blank ho
   assert.equal(listed.type, MessageType.ListUrlTemplatesResult);
   assert.equal(listed.payload.ok, true);
   assert.equal(listed.payload.templates?.length, 1);
+  assert.equal(listed.payload.identityKey, URL_TEMPLATE_IDENTITY_KEY);
 
   const blank = await handleAndRespond<ListUrlTemplatesResultMessage>(
     registry[MessageType.ListUrlTemplates],
     createListUrlTemplatesMessage(' '),
   );
-  assert.deepEqual(blank.payload, { ok: true, templates: [] });
+  assert.deepEqual(blank.payload, { ok: true, templates: [], identityKey: null });
 });
 
 test('url template save stores the record under its normalized hostname and refuses blank hostnames', async () => {
