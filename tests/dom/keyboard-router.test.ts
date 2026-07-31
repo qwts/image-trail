@@ -78,6 +78,7 @@ test('router rejects synthetic privileged shortcuts while preserving synthetic n
   router.enable();
   try {
     assert.equal(dispatchKey(document, 'c').defaultPrevented, false);
+    assert.equal(dispatchKey(document, 'p').defaultPrevented, false);
     assert.equal(dispatchKey(document, 'b').defaultPrevented, false);
     assert.equal(dispatchKey(document, 'ArrowDown').defaultPrevented, false);
     assert.deepEqual(actions, []);
@@ -87,9 +88,10 @@ test('router rejects synthetic privileged shortcuts while preserving synthetic n
     assert.deepEqual(actions, ['next', 'help-toggle']);
 
     assert.equal(dispatchTrustedKeydown(document, 'c').defaultPrevented, true);
+    assert.equal(dispatchTrustedKeydown(document, 'p').defaultPrevented, true);
     assert.equal(dispatchTrustedKeydown(document, 'b').defaultPrevented, true);
     assert.equal(dispatchTrustedKeydown(document, 'ArrowDown').defaultPrevented, true);
-    assert.deepEqual(actions, ['next', 'help-toggle', 'capture-current', 'capture-and-bookmark', 'down-arrow']);
+    assert.deepEqual(actions, ['next', 'help-toggle', 'capture-current', 'pin-current', 'capture-and-bookmark', 'down-arrow']);
   } finally {
     router.disable();
   }

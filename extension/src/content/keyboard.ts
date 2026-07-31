@@ -33,7 +33,7 @@ function shortcutBinding(shortcut: (typeof PAGE_SHORTCUTS)[number]): KeyBinding 
 
 export const DEFAULT_BINDINGS: KeyBinding[] = PAGE_SHORTCUTS.map(shortcutBinding);
 
-const TRUSTED_ACTIVATION_ACTIONS = new Set(['capture-current', 'capture-and-bookmark', 'down-arrow']);
+const TRUSTED_ACTIVATION_ACTIONS = new Set(['capture-current', 'pin-current', 'capture-and-bookmark', 'down-arrow']);
 
 export function classifyTarget(event: KeyboardEvent): KeyTarget {
   const composedPath = event.composedPath?.() ?? [];
