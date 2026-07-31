@@ -202,6 +202,8 @@ test('version-cut workflow refreshes a checked Changesets PR and tags only fresh
   // because GITHUB_TOKEN events trigger no downstream workflow and
   // github-actions[bot] is not an authorized Actions actor here.
   assert.match(workflow, /uses: actions\/create-github-app-token@[0-9a-f]{40} # v3\.2\.0/u);
+  assert.equal(workflow.match(/client-id: \$\{\{ secrets\.CHORES_DUMB_APP_ID \}\}/gu)?.length, 2);
+  assert.doesNotMatch(workflow, /\bapp-id:/u);
   assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.chores\.outputs\.token \}\}/u);
   assert.doesNotMatch(workflow, /RELEASE_TOKEN|\|\| github\.token/u);
   const mints = workflow.split(/- name: Mint the chores-dumb token/u).slice(1);
@@ -437,6 +439,8 @@ test('release builds do not consume dependency caches or interpolate the tag in 
   const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
 
   assert.match(workflow, /uses: actions\/create-github-app-token@[0-9a-f]{40} # v3\.2\.0/u);
+  assert.match(workflow, /client-id: \$\{\{ secrets\.CHORES_DUMB_APP_ID \}\}/u);
+  assert.doesNotMatch(workflow, /\bapp-id:/u);
   assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.chores\.outputs\.token \}\}/u);
   assert.doesNotMatch(workflow, /RELEASE_TOKEN|github\.token|continue-on-error/u);
   assert.doesNotMatch(workflow, /^\s+cache: npm/mu);
