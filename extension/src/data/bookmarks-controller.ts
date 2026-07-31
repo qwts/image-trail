@@ -10,7 +10,7 @@ import {
 } from '../core/metadata-policy.js';
 import type { BookmarkStore, PinSaveStoragePreference } from '../core/types.js';
 import { loadPlainBookmarkRecords, type MergedBookmarkRecordsCache } from './bookmark-record-loader.js';
-import { findInteropBookmarkBySourceUrl, findStoredBookmarkByUrl } from './bookmark-record-lookup.js';
+import { findStoredBookmarkByUrl } from './bookmark-record-lookup.js';
 import {
   privatePinUrl,
   protectedRelationship,
@@ -468,7 +468,6 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const urlHash = await hashSearchableUrl(bookmark.url);
     return withProtectedPinSaveLock(urlHash, () => this.saveProtectedForHash(context, bookmark, activeBlobKey, urlHash, options));
   }
-
   private async saveProtectedForHash(
     context: BookmarkContext,
     bookmark: ImageDisplayRecord,
@@ -477,15 +476,16 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     options: BookmarkSaveOptions,
   ): Promise<ImageDisplayRecord> {
     const existingProtected = await context.encryptedPins.getByUrlHash(urlHash);
-    const interopPlain = existingProtected
+    const existingBookmark = existingProtected
       ? undefined
-      : await findInteropBookmarkBySourceUrl(context.repository, context.bookmarkKey.key, bookmark.url);
-    const plainPinId = existingProtected?.plainPinId ?? interopPlain?.uuid ?? crypto.randomUUID();
+      : await findStoredBookmarkByUrl(context.repository, context.bookmarkKey.key, bookmark.url, await this.searchableMetadataPolicy());
+    const plainPinId = existingProtected?.plainPinId ?? existingBookmark?.uuid ?? crypto.randomUUID();
     const existingPlain = await context.repository.getEncrypted(plainPinId);
     const encryptedPinId = existingProtected?.id ?? crypto.randomUUID();
     const existingPlainPayload = existingPlain
       ? await context.repository.openRecord(existingPlain, context.bookmarkKey.key).catch(() => null)
       : null;
+    if (existingPlainPayload?.interop) await context.repository.setInteropCustodyPresence(true);
     const existingProtectedPayload = existingProtected
       ? await context.encryptedPins.openRecord(existingProtected, activeBlobKey.key).catch(() => null)
       : null;
@@ -497,7 +497,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         bookmark,
         thumbnail?.id,
         existingProtectedPayload?.interop ?? existingPlainPayload?.interop,
-        options.clearStoredOriginal ? undefined : existingProtectedPayload?.storedOriginal,
+        options.clearStoredOriginal ? undefined : (existingProtectedPayload?.storedOriginal ?? existingPlainPayload?.storedOriginal),
       );
       const protectedRecord = await context.encryptedPins.sealAndPut({
         id: encryptedPinId,
