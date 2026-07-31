@@ -153,7 +153,7 @@
             "tests/dom/primitives.test.ts",
             "tests/primitives-css.test.ts"
           ],
-          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, capture, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
+          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, capture, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
         },
         {
           "type": "storybook",
@@ -970,8 +970,13 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/secure-workspace-lock.test.ts", "tests/blob-key-session.test.ts", "tests/dom/panel-render-controller.test.ts"],
-          "notes": "Covers validated lock broadcasts to extension pages and injected tabs, timeout/manual/unlocked status mapping, listener cleanup, fail-closed panel replacement, removal of detached and sensitive DOM, unlock errors, one lock instance, and safe layout/focus restoration."
+          "paths": [
+            "tests/secure-workspace-lock.test.ts",
+            "tests/blob-key-session.test.ts",
+            "tests/dom/panel-render-controller.test.ts",
+            "tests/dom/panel-shell-view.test.ts"
+          ],
+          "notes": "Covers validated lock broadcasts to extension pages and injected tabs, timeout/manual/unlocked status mapping, listener cleanup, fail-closed panel replacement, removal of detached and sensitive DOM, unlock errors, one lock instance, safe layout/focus restoration, and the unlocked title-bar Lock workspace control as a single padlock glyph that dispatches blob-key/lock."
         },
         {
           "type": "storybook",
@@ -981,7 +986,7 @@
         {
           "type": "playwright-e2e",
           "paths": ["tests/e2e/secure-session.spec.ts", "tests/e2e/import-export-settings.spec.ts"],
-          "notes": "Covers one real extension key session across the panel, a detached Recents window, Dashboard, Gallery, and a decrypted preview tab; verifies no protected DOM remains while locked, cold-start Gallery content stays detached, failed unlock cannot flash content, key-import unlock cannot recurse through Recall rendering, cross-context unlock restores every surface, and the injected panel host is never duplicated."
+          "notes": "Covers one real extension key session across the panel, a detached Recents window, Dashboard, Gallery, and a decrypted preview tab; verifies no protected DOM remains while locked, cold-start Gallery content stays detached, failed unlock cannot flash content, key-import unlock cannot recurse through Recall rendering, cross-context unlock restores every surface, and the injected panel host is never duplicated. The packaged path also clicks the title-bar Lock workspace control after password setup."
         }
       ]
     },
