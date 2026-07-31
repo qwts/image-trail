@@ -17,10 +17,9 @@
 #    trigger Actions workflows", so the workaround stopped working too.
 # Under the PAT the actor is an authorized account and both events fire on their
 # own: the version PR gets real pull_request runs, and the tag push starts
-# release.yml directly. Version PR creation is deliberately not automated here:
-# the rolling branch must already have an open PR authored by
-# qwts-codex-agent[bot]. GITHUB_TOKEN inspects that invariant and refreshes only
-# the PR body, so the workflow cannot create a human-authored release PR.
+# release.yml directly. The workflow opens the rolling version PR under the PAT
+# whenever it is missing, then refreshes the body on later runs. Existing PRs
+# are still validated to ensure only the expected bot-owned branch PR is reused.
 #
 # The PAT reaches only actions/* steps and our own `run:` blocks — never a
 # third-party action, which is why versioning is a script here rather than
@@ -195,17 +194,23 @@ jobs:
           gh auth setup-git
           git -c core.hooksPath=/dev/null push --force origin "$BRANCH"
 
-      - name: Refresh the ready version PR
+      - name: Open or refresh the version PR
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           MISSING_PR: ${{ steps.version_pr.outputs.missing }}
           PR_NUMBER: ${{ steps.version_pr.outputs.number }}
           VERSION: ${{ steps.version.outputs.version }}
+          BRANCH: changeset-release/main
         run: |
           set -euo pipefail
           if [ "$MISSING_PR" = 'true' ]; then
-            echo "::error::Version branch pushed, but no open bot-authored PR exists. Seed it as qwts-codex-agent[bot], then send a version-cut-recovery repository dispatch."
-            exit 1
+            created_pr=$(gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title 'Version Packages' \
+              --body-file "$RUNNER_TEMP/pr-body.md")
+            echo "Version PR created for v$VERSION: $created_pr"
+            exit 0
           fi
 
           # The rolling PR outlives the changesets it was opened for. Its body
