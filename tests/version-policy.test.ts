@@ -202,7 +202,7 @@ test('version-cut workflow refreshes a checked Changesets PR and tags only fresh
   // because GITHUB_TOKEN events trigger no downstream workflow and
   // github-actions[bot] is not an authorized Actions actor here.
   assert.match(workflow, /uses: actions\/create-github-app-token@[0-9a-f]{40} # v3\.2\.0/u);
-  assert.equal(workflow.match(/client-id: \$\{\{ secrets\.CHORES_DUMB_APP_ID \}\}/gu)?.length, 2);
+  assert.equal(workflow.match(/client-id: \$\{\{ secrets\.CHORES_DUMB_CLIENT_ID \}\}/gu)?.length, 2);
   assert.doesNotMatch(workflow, /\bapp-id:/u);
   assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.chores\.outputs\.token \}\}/u);
   assert.doesNotMatch(workflow, /RELEASE_TOKEN|\|\| github\.token/u);
@@ -429,7 +429,7 @@ test('zizmor is digest-pinned without a disallowed wrapper action and enforces t
   assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
   assert.match(workflow, /--persona auditor --format github/u);
   assert.match(workflow, /--config \.github\/zizmor\.yml \./u);
-  assert.match(config, /allow:\s*\n\s+- CHORES_DUMB_APP_ID\s*\n\s+- CHORES_DUMB_PRIVATE_KEY/u);
+  assert.match(config, /allow:\s*\n\s+- CHORES_DUMB_CLIENT_ID\s*\n\s+- CHORES_DUMB_PRIVATE_KEY/u);
   assert.match(config, /['"]qwts\/playbook-software-engineering\/\*['"]: ref-pin/u);
   assert.match(config, /['"]\*['"]: hash-pin/u);
   assert.equal(dependabot.match(/default-days: 7/gu)?.length, 2);
@@ -439,7 +439,7 @@ test('release builds do not consume dependency caches or interpolate the tag in 
   const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
 
   assert.match(workflow, /uses: actions\/create-github-app-token@[0-9a-f]{40} # v3\.2\.0/u);
-  assert.match(workflow, /client-id: \$\{\{ secrets\.CHORES_DUMB_APP_ID \}\}/u);
+  assert.match(workflow, /client-id: \$\{\{ secrets\.CHORES_DUMB_CLIENT_ID \}\}/u);
   assert.doesNotMatch(workflow, /\bapp-id:/u);
   assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.chores\.outputs\.token \}\}/u);
   assert.doesNotMatch(workflow, /RELEASE_TOKEN|github\.token|continue-on-error/u);
