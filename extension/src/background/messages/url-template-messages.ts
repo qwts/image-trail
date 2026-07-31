@@ -60,7 +60,11 @@ export interface ListUrlTemplatesResultMessage {
   readonly type: typeof MessageType.ListUrlTemplatesResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
   readonly payload:
-    | { readonly ok: true; readonly templates: readonly import('../../core/url/templates.js').UrlTemplateRecord[] }
+    | {
+        readonly ok: true;
+        readonly templates: readonly import('../../core/url/templates.js').UrlTemplateRecord[];
+        readonly identityKey: string | null;
+      }
     | { readonly ok: false; readonly message: string };
 }
 

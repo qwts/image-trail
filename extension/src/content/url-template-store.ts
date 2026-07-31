@@ -1,3 +1,4 @@
+import type { LoadedUrlTemplates } from '../core/url/template-store.js';
 import type { GrabSourcePattern, UrlTemplateRecord } from '../core/url/templates.js';
 import {
   createDeleteGrabSourcePatternMessage,
@@ -16,9 +17,11 @@ import {
 import { sendRuntimeMessage } from './runtime-message.js';
 
 export class ExtensionUrlTemplateStore {
-  async load(hostname: string): Promise<readonly UrlTemplateRecord[]> {
+  async load(hostname: string): Promise<LoadedUrlTemplates> {
     const response = await sendRuntimeMessage(createListUrlTemplatesMessage(hostname));
-    return isListUrlTemplatesResultMessage(response) && response.payload.ok ? response.payload.templates : [];
+    return isListUrlTemplatesResultMessage(response) && response.payload.ok
+      ? { templates: response.payload.templates, identityKey: response.payload.identityKey }
+      : { templates: [], identityKey: null };
   }
 
   async loadGrabSourcePatterns(hostname: string): Promise<readonly GrabSourcePattern[]> {

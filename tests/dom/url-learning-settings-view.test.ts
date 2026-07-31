@@ -13,12 +13,32 @@ import {
 
 const model = parseUrl('https://images.example.test/albums/1024/photo_0042.jpg');
 const fields = collectUrlFields(model);
-const template = createUrlTemplateRecord({ model, fields, includedFieldIds: [fields[0]!.id], now: '2026-07-12T12:00:00.000Z' });
+const IDENTITY_KEY = '42'.repeat(32);
+const template = createUrlTemplateRecord({
+  model,
+  fields,
+  includedFieldIds: [fields[0]!.id],
+  identityKey: IDENTITY_KEY,
+  now: '2026-07-12T12:00:00.000Z',
+});
 assert.ok(template);
 
 test('URL learning empty states retain their labels', () => {
   assert.match(createTemplateSettingsView([], null, [], () => {}).textContent ?? '', /No learned templates/);
   assert.match(createGrabSourcePatternSettingsView([], () => {}).textContent ?? '', /Cmd-click an image or link/);
+});
+
+test('URL learning renders redacted template and grab-pattern URLs', () => {
+  const templateView = createTemplateSettingsView([template], template.id, fields, () => {});
+  const pattern = createGrabSourcePattern({ model, identityKey: IDENTITY_KEY });
+  const patternView = createGrabSourcePatternSettingsView([pattern], () => {});
+  const templateUrl = templateView.querySelector('.image-trail-panel__settings-template-url')?.textContent ?? '';
+  const patternUrl = patternView.querySelector('.image-trail-panel__settings-template-url')?.textContent ?? '';
+
+  assert.match(templateUrl, /\{path-segment\}/u);
+  assert.doesNotMatch(templateUrl, /1024|photo_0042/u);
+  assert.equal(patternUrl, 'https://images.example.test/{path-segment}/{path-segment}/{path-segment}');
+  assert.doesNotMatch(patternUrl, /albums|1024|photo_0042/u);
 });
 
 test('active template controls preserve order and dispatch setting and removal actions once', () => {
@@ -100,7 +120,7 @@ test('grab pattern controls dispatch match, strategy, extractor, and removal act
   const linkedGrabStrategy = defaultGrabStrategy('linked-page-image');
   assert.equal(linkedGrabStrategy.kind, 'linked-page-image');
   const pattern = {
-    ...createGrabSourcePattern({ model, now: '2026-07-12T12:00:00.000Z' }),
+    ...createGrabSourcePattern({ model, identityKey: IDENTITY_KEY, now: '2026-07-12T12:00:00.000Z' }),
     grabStrategy: {
       ...linkedGrabStrategy,
       extractors: [{ kind: 'selector-attribute' as const, selector: 'img', attribute: 'src' }],

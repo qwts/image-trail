@@ -157,6 +157,7 @@ export function reduceParsedFieldsAction(state: PanelState, action: ParsedFields
       return {
         ...state,
         urlTemplates: action.templates,
+        urlTemplateIdentityKey: action.identityKey,
         activeUrlTemplateId: activeTemplate?.id ?? null,
         unlockedFieldIds: activeTemplate
           ? activeTemplate.fields.map((field) => field.id)

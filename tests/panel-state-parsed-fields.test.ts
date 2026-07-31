@@ -55,17 +55,18 @@ test('Previous/Next inclusion toggle only changes successful fields', () => {
 });
 
 test('loaded active URL templates restore included fields for navigation', () => {
+  const identityKey = '42'.repeat(32);
   const template: UrlTemplateRecord = {
     id: 'template-001',
-    schemaVersion: 1,
+    schemaVersion: 2,
     hostname: 'example.test',
     templateUrl: 'https://example.test/image.jpg?page={query-page}',
     matchRules: {
       mode: 'exact-page-shape',
       hostname: 'example.test',
-      exactPathSignature: 'exact',
+      exactIdentity: '11'.repeat(32),
       pathShapeSignature: 'shape',
-      querySignature: 'page:int',
+      queryShapeSignature: '0:int',
     },
     fields: [
       {
@@ -89,6 +90,7 @@ test('loaded active URL templates restore included fields for navigation', () =>
   const loaded = reducePanelAction(createInitialPanelState(), {
     name: 'url-templates/load',
     templates: [template],
+    identityKey,
     activeTemplateId: template.id,
   });
   assert.equal(loaded.activeUrlTemplateId, template.id);
@@ -100,7 +102,7 @@ test('loaded active URL templates restore included fields for navigation', () =>
 
   const inactive = reducePanelAction(
     { ...loaded, unlockedFieldIds: ['q:0:0', 'q:1:0'], manuallyExcludedFieldIds: ['q:0:0', 'q:2:0'] },
-    { name: 'url-templates/load', templates: [template], activeTemplateId: null },
+    { name: 'url-templates/load', templates: [template], identityKey, activeTemplateId: null },
   );
   assert.equal(inactive.activeUrlTemplateId, null);
   assert.deepEqual(inactive.unlockedFieldIds, ['q:1:0']);
@@ -113,7 +115,7 @@ test('loaded active URL templates restore included fields for navigation', () =>
       status: 'error',
       message: 'Image failed to load: HTTP 404',
     },
-    { name: 'url-templates/load', templates: [template], activeTemplateId: null },
+    { name: 'url-templates/load', templates: [template], identityKey, activeTemplateId: null },
   );
   assert.equal(failedDraft.activeUrlTemplateId, template.id);
   assert.deepEqual(failedDraft.unlockedFieldIds, ['q:0:0']);

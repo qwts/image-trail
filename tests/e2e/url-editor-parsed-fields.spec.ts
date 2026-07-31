@@ -252,8 +252,9 @@ test('URL editor and parsed fields load, fail closed, navigate, learn templates,
   await openUrlLearning(page);
   const savedTemplate = page
     .locator('.image-trail-panel__settings-template-url')
-    .filter({ hasText: '/dynamic-image.svg?frame={query-frame}' });
+    .filter({ hasText: '/{path-segment}?frame={query-frame}' });
   await expect(savedTemplate).toHaveCount(1);
+  await expect(savedTemplate).not.toContainText('dynamic-image.svg');
 
   await page.getByRole('button', { name: 'Close panel' }).click();
   await expectPanelClosed(page);

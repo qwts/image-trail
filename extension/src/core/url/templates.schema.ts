@@ -9,6 +9,14 @@ export const urlTemplateMatchModeSchema = v.picklist(['exact-page-shape', 'same-
 export const urlTemplateMatchRulesSchema = v.object({
   mode: urlTemplateMatchModeSchema,
   hostname: v.string(),
+  exactIdentity: v.string(),
+  pathShapeSignature: v.string(),
+  queryShapeSignature: v.string(),
+});
+
+export const legacyUrlTemplateMatchRulesSchema = v.object({
+  mode: urlTemplateMatchModeSchema,
+  hostname: v.string(),
   exactPathSignature: v.string(),
   pathShapeSignature: v.string(),
   querySignature: v.string(),
@@ -30,7 +38,7 @@ export const urlTemplateFieldSchema = v.object({
 
 export const urlTemplateRecordSchema = v.object({
   id: v.string(),
-  schemaVersion: v.literal(1),
+  schemaVersion: v.literal(2),
   fieldIdVersion: v.optional(v.literal(2)),
   hostname: v.string(),
   templateUrl: v.string(),
@@ -46,10 +54,38 @@ export const urlTemplateRecordSchema = v.object({
 
 export const grabSourcePatternSchema = v.object({
   id: v.string(),
-  schemaVersion: v.literal(1),
+  schemaVersion: v.literal(2),
   hostname: v.string(),
   patternUrl: v.string(),
   matchRules: urlTemplateMatchRulesSchema,
+  grabStrategy: v.optional(urlTemplateGrabStrategySchema),
+  createdAt: v.string(),
+  updatedAt: v.string(),
+  useCount: v.number(),
+});
+
+export const legacyUrlTemplateRecordSchema = v.object({
+  id: v.string(),
+  schemaVersion: v.literal(1),
+  fieldIdVersion: v.optional(v.literal(2)),
+  hostname: v.string(),
+  templateUrl: v.string(),
+  matchRules: legacyUrlTemplateMatchRulesSchema,
+  fields: v.pipe(v.array(urlTemplateFieldSchema), v.readonly()),
+  hideExcludedFields: v.boolean(),
+  autoApplyEnabled: v.boolean(),
+  grabStrategy: v.optional(urlTemplateGrabStrategySchema),
+  createdAt: v.string(),
+  updatedAt: v.string(),
+  useCount: v.number(),
+});
+
+export const legacyGrabSourcePatternSchema = v.object({
+  id: v.string(),
+  schemaVersion: v.literal(1),
+  hostname: v.string(),
+  patternUrl: v.string(),
+  matchRules: legacyUrlTemplateMatchRulesSchema,
   grabStrategy: v.optional(urlTemplateGrabStrategySchema),
   createdAt: v.string(),
   updatedAt: v.string(),

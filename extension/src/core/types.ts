@@ -66,15 +66,7 @@ export type {
 } from './workspace-layout.js';
 export type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePreviewState } from './import-types.js';
 export type { FieldTransformPanelAction } from './field-transform-panel-action.js';
-
-export interface UrlTemplateStore {
-  load(hostname: string): Promise<readonly UrlTemplateRecord[]>;
-  loadGrabSourcePatterns(hostname: string): Promise<readonly GrabSourcePattern[]>;
-  save(template: UrlTemplateRecord): Promise<void>;
-  saveGrabSourcePattern(pattern: GrabSourcePattern): Promise<void>;
-  remove(hostname: string, id: string): Promise<void>;
-  removeGrabSourcePattern(hostname: string, id: string): Promise<void>;
-}
+export type { UrlTemplateStore } from './url/template-store.js';
 
 export interface ParsedFieldStateStore {
   load(hostname: string, pageUrl: string): Promise<ParsedFieldStateRecord | null>;
@@ -181,6 +173,7 @@ export interface PanelState extends LibraryPanelState {
   readonly fieldDigitWidthSpecs: readonly UrlFieldDigitWidthSpec[];
   readonly parsedFieldResetBaseline: ParsedFieldResetBaseline | null;
   readonly urlTemplates: readonly UrlTemplateRecord[];
+  readonly urlTemplateIdentityKey: string | null;
   readonly grabSourcePatterns: readonly GrabSourcePattern[];
   readonly activeUrlTemplateId: string | null;
   readonly currentImageFingerprint: string | null;

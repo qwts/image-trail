@@ -41,8 +41,9 @@ export function createUrlTemplateMessageRegistry({
 }: UrlTemplateMessageHandlerDeps): Record<UrlTemplateRequestType, MessageDef<ExtensionRequest, ExtensionResponse>> {
   async function handleListUrlTemplates(message: ListUrlTemplatesMessage): Promise<ListUrlTemplatesResultMessage['payload']> {
     const hostname = normalizeHostname(message.payload.hostname);
-    if (!hostname) return { ok: true, templates: [] };
-    return { ok: true, templates: await urlTemplateStore.load(hostname) };
+    if (!hostname) return { ok: true, templates: [], identityKey: null };
+    const loaded = await urlTemplateStore.load(hostname);
+    return { ok: true, ...loaded };
   }
 
   async function handleSaveUrlTemplate(message: SaveUrlTemplateMessage): Promise<SaveUrlTemplateResultMessage['payload']> {
