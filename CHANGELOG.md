@@ -1,5 +1,13 @@
 # image-trail
 
+## 0.26.2
+
+### Patch Changes
+
+- d424e68: Redact learned URL metadata while preserving private exact-page template and grab-pattern matching.
+- 6dc165c: Prevent protected-pin conversion from exposing stale plaintext metadata or deleting a captured original.
+- 5f302f0: Hash existing bookmark URL indexes when the searchable metadata policy is saved as encrypted.
+
 ## 0.26.1
 
 ### Patch Changes
