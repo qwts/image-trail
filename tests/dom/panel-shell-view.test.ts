@@ -33,7 +33,9 @@ test('unlocked secure session shows a single-glyph lock control beside help', ()
   assert.equal(lock.textContent, '🔒');
   assert.doesNotMatch(lock.textContent ?? '', /Lock/u);
 
-  const labels = [...header.querySelectorAll<HTMLButtonElement>('.image-trail-ds__icon-button')].map((button) => button.getAttribute('aria-label'));
+  const labels = [...header.querySelectorAll<HTMLButtonElement>('.image-trail-ds__icon-button')].map((button) =>
+    button.getAttribute('aria-label'),
+  );
   assert.deepEqual(labels.slice(0, 2), ['Lock workspace', 'Show help']);
 
   lock.click();
