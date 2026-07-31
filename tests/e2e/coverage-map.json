@@ -819,6 +819,7 @@
       "id": "trusted-privileged-activation",
       "issue": 760,
       "acceptance": "Privileged capture and destructive UI actions require trusted user activation",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Trusted-Privileged-Activation",
       "coverage": [
         {
           "type": "unit-dom",

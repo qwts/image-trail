@@ -7,7 +7,7 @@ import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { createQueueRepairButton, createQueueSelectionButton } from './queue-repair-button.js';
 import { createQueueSortControl } from './queue-sort-control.js';
 import { selectedRangeIds } from './selection-ranges.js';
-import { bindTrustedClick } from '../trusted-activation.js';
+import { createCaptureOriginalButton, createDeleteOriginalButton, createTrustedRecordActionButton } from './privileged-record-actions.js';
 
 export function createBookmarksView(
   currentUrl: string | null,
@@ -327,44 +327,25 @@ export function createBookmarksView(
       });
     }
     if (item.captureStatus !== 'captured' && blobKeyUnlocked) {
-      const capture = document.createElement('button');
-      capture.type = 'button';
-      capture.textContent = captureInProgress ? 'Capturing...' : 'Capture';
-      capture.disabled = captureInProgress;
-      capture.classList.toggle('is-waiting', captureInProgress);
-      bindTrustedClick(capture, () =>
-        dispatch({ name: 'capture/request', url: item.url, sourceType: 'bookmark', sourceRecordId: item.id }),
+      actions.append(
+        createCaptureOriginalButton(captureInProgress, () =>
+          dispatch({ name: 'capture/request', url: item.url, sourceType: 'bookmark', sourceRecordId: item.id }),
+        ),
       );
-      actions.append(capture);
     }
 
     if (item.captureStatus === 'captured' && item.blobId && !keyMissing) {
       const blobId = item.blobId;
-      const deleteCapture = document.createElement('button');
-      deleteCapture.type = 'button';
-      deleteCapture.className = 'image-trail-panel__delete-original';
-      deleteCapture.textContent = 'Delete original';
-      deleteCapture.title = 'Delete original from encrypted storage.';
-      bindTrustedClick(deleteCapture, () => {
-        if (deleteCapture.dataset['confirming'] !== 'true') {
-          deleteCapture.dataset['confirming'] = 'true';
-          deleteCapture.textContent = 'Confirm delete original';
-          deleteCapture.title = 'Click again to delete original from encrypted storage.';
-          return;
-        }
-        dispatch({ name: 'capture/delete', id: item.id, blobId });
-      });
-      actions.append(deleteCapture);
+      actions.append(createDeleteOriginalButton(() => dispatch({ name: 'capture/delete', id: item.id, blobId })));
     }
 
     if (!keyMissing || item.captureStatus === 'captured') {
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.textContent = 'Delete';
-      remove.title = 'Delete this durable queue row. Linked originals follow reference-count cleanup rules.';
-      remove.className = 'is-danger';
-      bindTrustedClick(remove, () => dispatch({ name: 'bookmark/remove', id: item.id }));
-      actions.append(remove);
+      actions.append(
+        createTrustedRecordActionButton('Delete', () => dispatch({ name: 'bookmark/remove', id: item.id }), {
+          title: 'Delete this durable queue row. Linked originals follow reference-count cleanup rules.',
+          className: 'is-danger',
+        }),
+      );
 
       const clear = document.createElement('button');
       clear.type = 'button';
