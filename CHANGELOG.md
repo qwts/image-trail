@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.26.3
+
+### Patch Changes
+
+- e230367: Require trusted user activation before privileged capture and destructive panel actions.
+
 ## 0.26.2
 
 ### Patch Changes
