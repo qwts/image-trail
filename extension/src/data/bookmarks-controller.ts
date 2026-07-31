@@ -477,10 +477,13 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     options: BookmarkSaveOptions,
   ): Promise<ImageDisplayRecord> {
     const existingProtected = await context.encryptedPins.getByUrlHash(urlHash);
-    const interopPlain = existingProtected
+    const existingBookmark = existingProtected
+      ? undefined
+      : await findStoredBookmarkByUrl(context.repository, context.bookmarkKey.key, bookmark.url, await this.searchableMetadataPolicy());
+    const interopPlain = existingBookmark
       ? undefined
       : await findInteropBookmarkBySourceUrl(context.repository, context.bookmarkKey.key, bookmark.url);
-    const plainPinId = existingProtected?.plainPinId ?? interopPlain?.uuid ?? crypto.randomUUID();
+    const plainPinId = existingProtected?.plainPinId ?? existingBookmark?.uuid ?? interopPlain?.uuid ?? crypto.randomUUID();
     const existingPlain = await context.repository.getEncrypted(plainPinId);
     const encryptedPinId = existingProtected?.id ?? crypto.randomUUID();
     const existingPlainPayload = existingPlain
