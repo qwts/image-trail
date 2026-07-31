@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.26.4
+
+### Patch Changes
+
+- 186e35b: Show a padlock glyph for the unlocked title-bar Lock workspace control instead of clipped Lock text.
+
 ## 0.26.3
 
 ### Patch Changes
