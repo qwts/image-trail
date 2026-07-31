@@ -8,6 +8,7 @@ import {
   createDestructiveSettingsView,
   createStorageHealthSettingsView,
 } from '../../extension/src/ui/components/maintenance-settings-view.js';
+import { dispatchTrustedClick } from './trusted-events.js';
 
 const buildIdentity: BuildIdentity = {
   schemaVersion: 1,
@@ -59,15 +60,18 @@ test('destructive controls require confirmation, reset on blur, and dispatch onc
   assert.equal(recall.textContent, 'Delete Recall items (3)');
 
   queue.click();
+  assert.equal(queue.textContent, 'Delete current queue (2)');
+  assert.equal(actions.length, 0);
+  dispatchTrustedClick(queue);
   assert.equal(actions.length, 0);
   assert.equal(queue.textContent, 'Confirm Delete current queue (2)');
   queue.dispatchEvent(new Event('blur'));
   assert.equal(queue.textContent, 'Delete current queue (2)');
-  queue.click();
-  queue.click();
+  dispatchTrustedClick(queue);
+  dispatchTrustedClick(queue);
   assert.deepEqual(actions, [{ name: 'bookmarks/delete-visible' }]);
-  recall.click();
-  recall.click();
+  dispatchTrustedClick(recall);
+  dispatchTrustedClick(recall);
   assert.deepEqual(actions, [{ name: 'bookmarks/delete-visible' }, { name: 'recall/delete-all' }]);
 });
 

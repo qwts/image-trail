@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { KeyboardRouter } from '../../extension/src/content/keyboard.js';
+import { dispatchTrustedKeydown } from './trusted-events.js';
 
 function dispatchKey(target: EventTarget, key: string, options: KeyboardEventInit = {}): KeyboardEvent {
   const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options });
@@ -17,7 +18,7 @@ test('router handles approved bare keys case-insensitively and leaves modifiers 
   });
   router.enable();
   try {
-    assert.equal(dispatchKey(document, 'C', { shiftKey: true }).defaultPrevented, true);
+    assert.equal(dispatchTrustedKeydown(document, 'C', { shiftKey: true }).defaultPrevented, true);
     assert.equal(dispatchKey(document, '?', { shiftKey: true }).defaultPrevented, true);
     for (const modifiers of [{ metaKey: true }, { ctrlKey: true }, { altKey: true }]) {
       assert.equal(dispatchKey(document, 'c', modifiers).defaultPrevented, false);
@@ -61,8 +62,36 @@ test('an unassigned Down action remains native because the handler declines it',
   });
   router.enable();
   try {
-    assert.equal(dispatchKey(document, 'ArrowDown').defaultPrevented, false);
+    assert.equal(dispatchTrustedKeydown(document, 'ArrowDown').defaultPrevented, false);
     assert.deepEqual(actions, ['down-arrow']);
+  } finally {
+    router.disable();
+  }
+});
+
+test('router rejects synthetic privileged shortcuts while preserving synthetic navigation and panel shortcuts', () => {
+  const actions: string[] = [];
+  const router = new KeyboardRouter((action) => {
+    actions.push(action);
+    return true;
+  });
+  router.enable();
+  try {
+    assert.equal(dispatchKey(document, 'c').defaultPrevented, false);
+    assert.equal(dispatchKey(document, 'p').defaultPrevented, false);
+    assert.equal(dispatchKey(document, 'b').defaultPrevented, false);
+    assert.equal(dispatchKey(document, 'ArrowDown').defaultPrevented, false);
+    assert.deepEqual(actions, []);
+
+    assert.equal(dispatchKey(document, 'ArrowRight').defaultPrevented, true);
+    assert.equal(dispatchKey(document, '?', { shiftKey: true }).defaultPrevented, true);
+    assert.deepEqual(actions, ['next', 'help-toggle']);
+
+    assert.equal(dispatchTrustedKeydown(document, 'c').defaultPrevented, true);
+    assert.equal(dispatchTrustedKeydown(document, 'p').defaultPrevented, true);
+    assert.equal(dispatchTrustedKeydown(document, 'b').defaultPrevented, true);
+    assert.equal(dispatchTrustedKeydown(document, 'ArrowDown').defaultPrevented, true);
+    assert.deepEqual(actions, ['next', 'help-toggle', 'capture-current', 'pin-current', 'capture-and-bookmark', 'down-arrow']);
   } finally {
     router.disable();
   }

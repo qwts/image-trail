@@ -1,3 +1,5 @@
+import { bindTrustedClick } from '../trusted-activation.js';
+
 export interface QueueRepairButtonOptions {
   readonly selectedIds: readonly string[];
   readonly captureInProgress: boolean;
@@ -13,7 +15,7 @@ export function createQueueRepairButton(options: QueueRepairButtonOptions): HTML
     ? 'Verify selected durable queue rows and re-capture only missing originals.'
     : 'Unlock encrypted originals before repairing selected queue rows.';
   button.disabled = options.selectedIds.length === 0 || options.captureInProgress || !options.blobKeyUnlocked;
-  button.addEventListener('click', () => options.onRepair(options.selectedIds));
+  bindTrustedClick(button, () => options.onRepair(options.selectedIds));
   return button;
 }
 

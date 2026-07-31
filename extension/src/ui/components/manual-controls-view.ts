@@ -1,4 +1,5 @@
 import type { PanelAction, PanelState } from '../../core/types.js';
+import { bindTrustedClick } from '../trusted-activation.js';
 import { createButton, createKbd, createSectionHeader } from './primitives.js';
 
 export interface ManualControlsViewOptions {
@@ -21,9 +22,14 @@ function actionButton(
     readonly waiting?: boolean;
     readonly disabled?: boolean;
     readonly className?: string;
+    readonly trustedOnly?: boolean;
   } = {},
 ): HTMLButtonElement {
-  return createButton({ label, ...options, ...(action ? { onClick: () => dispatch(action) } : {}) });
+  const { trustedOnly, ...buttonOptions } = options;
+  const button = createButton({ label, ...buttonOptions });
+  if (action && trustedOnly === true) bindTrustedClick(button, () => dispatch(action));
+  else if (action) button.addEventListener('click', () => dispatch(action));
+  return button;
 }
 
 function slideshowPresentation(phase: ManualControlsViewOptions['state']['automation']['slideshowPhase']): {
@@ -53,6 +59,7 @@ function createPrimaryWorkflow(state: ManualControlsViewOptions['state'], dispat
         waiting: state.captureInProgress,
         disabled: noTarget || state.captureInProgress,
         className: 'image-trail-panel__capture-btn',
+        trustedOnly: true,
       },
     ),
   );

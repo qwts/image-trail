@@ -1,12 +1,14 @@
 import { displayTitleForRecord, encryptedBlobIdForRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import { DEFAULT_RECENT_DISPLAY_ORDER, sortRecentRecords, type RecentDisplayOrder } from '../../core/display-order.js';
 import { DEFAULT_RECENT_HISTORY_SCOPE, type RecentHistoryScope } from '../../core/recent-history-scope.js';
+import { isTrustedActivation } from '../../core/trusted-activation.js';
 import { createRecentScopeControl, recentHistoryEmptyText } from './recent-history-scope-view.js';
 import type { HistoryAction, HistoryViewOptions } from './history-view-actions.js';
 import { PRIVACY_RECORD_META, PRIVACY_RECORD_NAME, recordExtensionLabel, recordTitle } from './record-metadata.js';
 import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { createRecordRow, type RecordRowState } from './record-row.js';
 import { selectedRangeIds } from './selection-ranges.js';
+import { createCaptureOriginalButton, createDeleteOriginalButton, createTrustedRecordActionButton } from './privileged-record-actions.js';
 
 export function createHistoryView(
   items: readonly ImageDisplayRecord[],
@@ -33,10 +35,9 @@ export function createHistoryView(
     selectAll.disabled = selectedIds.length === displayItems.length;
     selectAll.addEventListener('click', () => dispatch({ name: 'history-selection/select', ids: displayItems.map((item) => item.id) }));
 
-    const deleteAll = document.createElement('button');
-    deleteAll.type = 'button';
-    deleteAll.textContent = `Delete recents (${displayItems.length})`;
-    deleteAll.addEventListener('click', () => dispatch({ name: 'history/delete-all' }));
+    const deleteAll = createTrustedRecordActionButton(`Delete recents (${displayItems.length})`, () =>
+      dispatch({ name: 'history/delete-all' }),
+    );
     sectionActions.append(selectAll, deleteAll);
   }
   const list = document.createElement('ol');
@@ -152,6 +153,7 @@ export function createHistoryView(
         }
         if (event.key === 'Backspace' && selected) {
           event.preventDefault();
+          if (!isTrustedActivation(event)) return;
           dispatch({ name: 'history/remove', id: item.id });
           return;
         }
@@ -167,55 +169,35 @@ export function createHistoryView(
       });
     }
     if (!keyUnavailable && !lockedEncrypted && !pinned) {
-      const pin = document.createElement('button');
-      pin.type = 'button';
-      pin.textContent = 'Pin';
-      pin.addEventListener('click', (event) => {
-        event.stopPropagation();
-        dispatch({ name: 'history/pin', id: item.id });
-      });
-      actions.append(pin);
+      actions.append(
+        createTrustedRecordActionButton('Pin', () => dispatch({ name: 'history/pin', id: item.id }), {
+          stopPropagation: true,
+        }),
+      );
     }
 
     if (item.captureStatus === 'captured' && item.blobId && !keyMissing) {
-      const deleteCapture = document.createElement('button');
-      deleteCapture.type = 'button';
-      deleteCapture.className = 'image-trail-panel__delete-original';
-      deleteCapture.textContent = 'Delete original';
-      deleteCapture.title = 'Delete original from encrypted storage.';
-      deleteCapture.addEventListener('click', (event) => {
-        event.stopPropagation();
-        if (deleteCapture.dataset['confirming'] !== 'true') {
-          deleteCapture.dataset['confirming'] = 'true';
-          deleteCapture.textContent = 'Confirm delete original';
-          deleteCapture.title = 'Click again to delete original from encrypted storage.';
-          return;
-        }
-        dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! });
-      });
-      actions.append(deleteCapture);
+      actions.append(
+        createDeleteOriginalButton(() => dispatch({ name: 'capture/delete', id: item.id, blobId: item.blobId! }), {
+          stopPropagation: true,
+        }),
+      );
     } else if (blobKeyUnlocked) {
-      const capture = document.createElement('button');
-      capture.type = 'button';
-      capture.textContent = captureInProgress ? 'Capturing...' : 'Capture';
-      capture.disabled = captureInProgress;
-      capture.classList.toggle('is-waiting', captureInProgress);
-      capture.addEventListener('click', (event) => {
-        event.stopPropagation();
-        dispatch({ name: 'capture/request', url: item.url, sourceType: 'history', sourceRecordId: item.id });
-      });
-      actions.append(capture);
+      actions.append(
+        createCaptureOriginalButton(
+          captureInProgress,
+          () => dispatch({ name: 'capture/request', url: item.url, sourceType: 'history', sourceRecordId: item.id }),
+          { stopPropagation: true },
+        ),
+      );
     }
 
     if (!keyMissing || item.captureStatus === 'captured') {
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.textContent = 'Remove';
-      remove.addEventListener('click', (event) => {
-        event.stopPropagation();
-        dispatch({ name: 'history/remove', id: item.id });
-      });
-      actions.append(remove);
+      actions.append(
+        createTrustedRecordActionButton('Remove', () => dispatch({ name: 'history/remove', id: item.id }), {
+          stopPropagation: true,
+        }),
+      );
     }
     list.append(entry);
   }

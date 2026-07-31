@@ -39,7 +39,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const ConfirmedDeleteDispatchesOnce: Story = {
+export const SyntheticDeleteIsIgnored: Story = {
   play: async ({ canvasElement }) => {
     dispatchSpy.mockClear();
     const button = Array.from(canvasElement.querySelectorAll('button')).find((candidate) =>
@@ -48,9 +48,9 @@ export const ConfirmedDeleteDispatchesOnce: Story = {
     if (!button) throw new Error('expected queue deletion control');
     await userEvent.click(button);
     await expect(dispatchSpy).not.toHaveBeenCalledWith({ name: 'bookmarks/delete-visible' });
-    await expect(button).toHaveTextContent('Confirm Delete current queue (2)');
+    await expect(button).toHaveTextContent('Delete current queue (2)');
     await userEvent.click(button);
-    await expect(dispatchSpy).toHaveBeenCalledTimes(1);
-    await expect(dispatchSpy).toHaveBeenCalledWith({ name: 'bookmarks/delete-visible' });
+    await expect(button).toHaveTextContent('Delete current queue (2)');
+    await expect(dispatchSpy).not.toHaveBeenCalledWith({ name: 'bookmarks/delete-visible' });
   },
 };

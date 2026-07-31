@@ -5,12 +5,25 @@ import { createHistoryView } from '../../extension/src/ui/components/history-vie
 import { resetPreviewRowClickTracking } from '../../extension/src/ui/components/record-row-preview-click.js';
 import type { ImageDisplayRecord } from '../../extension/src/core/display-records.js';
 import type { RecentSparseRowDisplayMode } from '../../extension/src/core/types.js';
+import { dispatchTrustedClick, dispatchTrustedKeydown } from './trusted-events.js';
 
 const record: ImageDisplayRecord = {
   id: 'recent-1',
   url: 'https://images.example.test/recent/photo_0042.jpg',
   timestamp: '2026-06-25T15:30:00.000Z',
   source: 'history',
+};
+
+const capturedRecord: ImageDisplayRecord = {
+  ...record,
+  captureStatus: 'captured',
+  blobId: 'blob-1',
+  storedOriginal: {
+    blobId: 'blob-1',
+    mimeType: 'image/jpeg',
+    byteLength: 1024,
+    capturedAt: '2026-06-25T15:30:00.000Z',
+  },
 };
 
 function buildHistoryView(
@@ -39,6 +52,12 @@ function rowFor(view: HTMLElement, id: string): HTMLElement {
   );
   assert.ok(row, `expected a recent row for record "${id}"`);
   return row;
+}
+
+function buttonByText(view: HTMLElement, text: string): HTMLButtonElement {
+  const button = Array.from(view.querySelectorAll('button')).find((candidate) => candidate.textContent === text);
+  assert.ok(button, `expected a button labelled "${text}"`);
+  return button;
 }
 
 test('a plain click selects an unselected recent row without previewing it', () => {
@@ -177,6 +196,46 @@ test('ArrowDown restores recent row focus inside a shadow root', async () => {
   await Promise.resolve();
 
   assert.equal(root.activeElement, nextRow);
+});
+
+test('Recent pin, capture, original deletion, removal, and bulk deletion reject synthetic clicks', () => {
+  const actions: unknown[] = [];
+  const view = buildHistoryView(actions);
+  buttonByText(view, 'Pin').click();
+  buttonByText(view, 'Capture').click();
+  buttonByText(view, 'Remove').click();
+  buttonByText(view, 'Delete recents (1)').click();
+
+  const capturedView = buildHistoryView(actions, [], [capturedRecord]);
+  const deleteOriginal = buttonByText(capturedView, 'Delete original');
+  deleteOriginal.click();
+  deleteOriginal.click();
+
+  assert.equal(deleteOriginal.textContent, 'Delete original');
+  assert.deepEqual(actions, []);
+});
+
+test('Recent pin, capture, original deletion, removal, and bulk deletion accept trusted activation', () => {
+  const actions: unknown[] = [];
+  const view = buildHistoryView(actions);
+  dispatchTrustedClick(buttonByText(view, 'Pin'));
+  dispatchTrustedClick(buttonByText(view, 'Capture'));
+  dispatchTrustedClick(buttonByText(view, 'Remove'));
+  dispatchTrustedClick(buttonByText(view, 'Delete recents (1)'));
+
+  const capturedView = buildHistoryView(actions, [], [capturedRecord]);
+  const deleteOriginal = buttonByText(capturedView, 'Delete original');
+  dispatchTrustedClick(deleteOriginal);
+  assert.equal(deleteOriginal.textContent, 'Confirm delete original');
+  dispatchTrustedClick(deleteOriginal);
+
+  assert.deepEqual(actions, [
+    { name: 'history/pin', id: 'recent-1' },
+    { name: 'capture/request', url: record.url, sourceType: 'history', sourceRecordId: 'recent-1' },
+    { name: 'history/remove', id: 'recent-1' },
+    { name: 'history/delete-all' },
+    { name: 'capture/delete', id: 'recent-1', blobId: 'blob-1' },
+  ]);
 });
 
 test('stored recent rows render the original indicator', () => {
@@ -362,7 +421,7 @@ test('Adaptive Recents center metadata at three or more rows (#478)', () => {
   assert.equal(twoRowList.classList.contains('has-top-left-metadata'), true);
 });
 
-test('Backspace removes the selected recent even when encrypted-original keys are unavailable', () => {
+test('Backspace removes the selected recent only with trusted activation even when encrypted-original keys are unavailable', () => {
   const actions: unknown[] = [];
   const view = createHistoryView([record], ['recent-1'], false, false, (action) => actions.push(action), {
     blobKeyAvailable: false,
@@ -374,8 +433,12 @@ test('Backspace removes the selected recent even when encrypted-original keys ar
   });
   const row = rowFor(view, 'recent-1');
 
-  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
+  const synthetic = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true });
+  row.dispatchEvent(synthetic);
+  assert.equal(synthetic.defaultPrevented, true);
+  assert.deepEqual(actions, []);
 
+  dispatchTrustedKeydown(row, 'Backspace');
   assert.deepEqual(actions, [{ name: 'history/remove', id: 'recent-1' }]);
 });
 
