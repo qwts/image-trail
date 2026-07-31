@@ -343,12 +343,14 @@ test('a Next step that skips a dead run leaves no stray red field outline on the
   page,
   serviceWorker,
 }) => {
-  // Unique high frame numbers no other test in this shared-worker spec touches, so a warm/cached
-  // success can never shadow the dead run: frames 500-501 load, everything from 502 up is a dead
-  // run. Stepping into it skips, then the drain stops with the field resting on the last-good value.
-  await page.context().route(/\/dynamic-image\.svg\?frame=/u, async (route) => {
+  // Frame band 8800+ is reserved for this dead-run skip case across the whole E2E suite.
+  // neighbor-status.spec.ts also uses 500-503 (and treats 503 as a successful skip landing) on a
+  // worker-scoped extension context, so sharing that band lets a warmed 503 leak into this test
+  // and report Loaded instead of Stopped after skipping.
+  await page.context().unroute(dynamicImagePattern);
+  await page.context().route(dynamicImagePattern, async (route) => {
     const frame = Number(new URL(route.request().url()).searchParams.get('frame') ?? '0');
-    if (frame >= 502) {
+    if (frame >= 8802) {
       await route.fulfill({ status: 404, contentType: 'text/plain', body: 'missing fixture frame' });
       return;
     }
@@ -361,23 +363,23 @@ test('a Next step that skips a dead run leaves no stray red field outline on the
   await setLoadFailureFeedback(page, 'display');
   await closeSettings(page);
 
-  await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=500'));
-  await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?frame=500/u);
+  await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=8800'));
+  await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?frame=8800/u);
 
-  // A successful step makes the field lockable; lock it so Next drives it. This rests on frame 501.
+  // A successful step makes the field lockable; lock it so Next drives it. This rests on frame 8801.
   await openParsedFields(page);
   await page.getByRole('button', { name: /Increment .*frame/u }).click();
-  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?frame=501/u);
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*dynamic-image\.svg\?frame=8801/u);
   await ensureQueryFrameIncluded(page);
 
-  // Next steps into frames 502+ — all dead — so the drain gives up after skipping them.
+  // Next steps into frames 8802+ — all dead — so the drain gives up after skipping them.
   await openManualControls(page);
   await page.getByRole('button', { name: 'Next ▶' }).click();
   await expectPanelStatusMessage(page, /Stopped after skipping \d+ unavailable images?/u);
 
   // The field rests on the last-good value and carries no stranded red outline.
   await expect(page.locator('.image-trail-panel__field-row.is-error')).toHaveCount(0);
-  await expectFrame(page, '501');
+  await expectFrame(page, '8801');
 });
 
 test('Mute (default) hides the red ring and error status a failed apply would show in Alert (#450)', async ({ page, serviceWorker }) => {
