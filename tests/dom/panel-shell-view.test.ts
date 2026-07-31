@@ -17,6 +17,31 @@ test('panel header uses shared status and icon primitives with existing actions'
   assert.deepEqual(actions, [{ name: 'destination/select', destination: 'settings' }, { name: 'panel/minimize' }]);
 });
 
+test('unlocked secure session shows a single-glyph lock control beside help', () => {
+  const actions: PanelAction[] = [];
+  const header = createPanelHeader(
+    {
+      ...createInitialPanelState(0),
+      blobKeyAvailable: true,
+      blobKeyUnlocked: true,
+    },
+    { dispatch: (action) => actions.push(action) },
+  );
+
+  const lock = header.querySelector<HTMLButtonElement>('[aria-label="Lock workspace"]');
+  assert.ok(lock);
+  assert.equal(lock.textContent, '🔒');
+  assert.doesNotMatch(lock.textContent ?? '', /Lock/u);
+
+  const labels = [...header.querySelectorAll<HTMLButtonElement>('.image-trail-ds__icon-button')].map((button) =>
+    button.getAttribute('aria-label'),
+  );
+  assert.deepEqual(labels.slice(0, 2), ['Lock workspace', 'Show help']);
+
+  lock.click();
+  assert.deepEqual(actions, [{ name: 'blob-key/lock' }]);
+});
+
 test('privacy mode keeps private URLs out of header and toast text, titles, and accessibility copy', () => {
   const state = {
     ...createInitialPanelState(0),
