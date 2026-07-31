@@ -67,14 +67,18 @@ export function isSearchablePlaintext(cls: SearchableMetadataClass, policy: Sear
   return policy[cls] === 'plaintext';
 }
 
+export function shouldReconcileBookmarkUrlIndexes(previous: SearchableMetadataPolicy, next: SearchableMetadataPolicy): boolean {
+  return previous.urlDerived !== 'encrypted' && next.urlDerived === 'encrypted';
+}
+
 // SHA-256 hex used for the URL index value. Identical to the hash protected pins already use, so plain
 // and protected records stay consistent.
 export function hashSearchableUrl(url: string): Promise<string> {
   return computeSha256(new TextEncoder().encode(url).buffer);
 }
 
-// The index value written for a NEW bookmark URL under the active policy: the URL itself when the
-// class is allowed plaintext, otherwise its hash. Existing records are never rewritten.
+// The bookmark URL index value under the active policy: the URL itself when the class is allowed
+// plaintext, otherwise its hash. Existing plaintext records are reconciled when encryption is enabled.
 export async function bookmarkSearchIndexKey(url: string, policy: SearchableMetadataPolicy): Promise<string> {
   return isSearchablePlaintext('urlDerived', policy) ? url : hashSearchableUrl(url);
 }

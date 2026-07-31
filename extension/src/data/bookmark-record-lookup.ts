@@ -1,8 +1,8 @@
 import { bookmarkSearchIndexKey, hashSearchableUrl, type SearchableMetadataPolicy } from '../core/metadata-policy.js';
 import type { BookmarksRepository, EncryptedBookmarkRecord } from './repositories/bookmarks-repository.js';
 
-// Existing rows are never rewritten when searchable metadata policy changes, so
-// lookup checks both index encodings before opening opaque interop-indexed rows.
+// Reconciliation can leave unreadable or collision-skipped rows untouched, so lookup checks both
+// index encodings before opening opaque interop-indexed rows.
 export async function findStoredBookmarkByUrl(
   repository: BookmarksRepository,
   key: CryptoKey,

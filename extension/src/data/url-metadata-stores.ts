@@ -1,6 +1,9 @@
 import type { SearchableMetadataPolicy } from '../core/metadata-policy.js';
+import { reconcileBookmarkUrlIndexes, shouldReconcileBookmarksForPolicyChange } from './bookmark-url-index-reconciliation.js';
+import { ensureDurableBookmarkKey, type DurableBookmarkKeyContext } from './durable-bookmark-key.js';
 import { ensureDurableMetadataKey, type DurableMetadataKeyContext } from './durable-metadata-key.js';
 import { IndexedDbParsedFieldStateStore } from './parsed-field-state-controller.js';
+import { BookmarksRepository } from './repositories/bookmarks-repository.js';
 import { KeysRepository } from './repositories/keys-repository.js';
 import { IndexedDbUrlReviewStatusStore } from './url-review-status-controller.js';
 
@@ -17,15 +20,26 @@ export function createUrlMetadataStores(options: {
 }): {
   readonly parsedFieldStateStore: IndexedDbParsedFieldStateStore;
   readonly urlReviewStatusStore: IndexedDbUrlReviewStatusStore;
-  readonly reconcileSearchableMetadataPolicy: (policy: SearchableMetadataPolicy) => Promise<void>;
+  readonly reconcileSearchableMetadataPolicy: (
+    policy: SearchableMetadataPolicy,
+    previous?: SearchableMetadataPolicy | undefined,
+  ) => Promise<void>;
 } {
   let keyPromise: Promise<DurableMetadataKeyContext> | null = null;
+  let bookmarkKeyPromise: Promise<DurableBookmarkKeyContext> | null = null;
+  let bookmarkReconciliationPromise: Promise<void> | null = null;
   const getEncryptionKey = (): Promise<DurableMetadataKeyContext> => {
     keyPromise ??= options.getDb().then((db) => {
       if (!db) throw new Error('Image Trail metadata encryption storage is unavailable.');
       return ensureDurableMetadataKey(new KeysRepository(db));
     });
     return keyPromise;
+  };
+  const reconcileBookmarks = async (policy: SearchableMetadataPolicy): Promise<void> => {
+    const db = await options.getDb();
+    if (!db) throw new Error('Image Trail bookmark storage is unavailable for URL index reconciliation.');
+    bookmarkKeyPromise ??= ensureDurableBookmarkKey(new KeysRepository(db));
+    await reconcileBookmarkUrlIndexes(new BookmarksRepository(db), (await bookmarkKeyPromise).key, policy);
   };
   const privacy = {
     getSearchableMetadataPolicy: options.getSearchableMetadataPolicy,
@@ -36,7 +50,18 @@ export function createUrlMetadataStores(options: {
   return {
     parsedFieldStateStore,
     urlReviewStatusStore,
-    reconcileSearchableMetadataPolicy: async (policy) => {
+    reconcileSearchableMetadataPolicy: async (policy, previous) => {
+      if (previous !== undefined) {
+        if (shouldReconcileBookmarksForPolicyChange(previous, policy)) {
+          bookmarkReconciliationPromise ??= reconcileBookmarks(policy);
+          try {
+            await bookmarkReconciliationPromise;
+          } finally {
+            bookmarkReconciliationPromise = null;
+          }
+        }
+        return;
+      }
       await Promise.all([
         parsedFieldStateStore.reconcileSearchableMetadataPolicy(policy),
         urlReviewStatusStore.reconcileSearchableMetadataPolicy(policy),

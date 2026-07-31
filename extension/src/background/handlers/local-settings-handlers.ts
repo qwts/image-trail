@@ -4,7 +4,7 @@ import {
   migrateLocalSettings,
   type PlaintextLocalSettings,
 } from '../../data/local-settings.js';
-import type { SearchableMetadataPolicy } from '../../core/metadata-policy.js';
+import { shouldReconcileBookmarkUrlIndexes, type SearchableMetadataPolicy } from '../../core/metadata-policy.js';
 import { updateBlobKeyInactivityTimeout } from '../../data/crypto/blob-keyring.js';
 import { defineMessage, type MessageDef } from '../message-dispatch.js';
 import * as requestSchemas from '../message-schemas.js';
@@ -34,7 +34,10 @@ type LocalSettingsRequestType = typeof MessageType.LoadLocalSettings | typeof Me
 
 export function createLocalSettingsMessageRegistry(deps: {
   readonly recentHistoryCache: RecentHistoryCache;
-  readonly reconcileSearchableMetadataPolicy: (policy: SearchableMetadataPolicy) => Promise<void>;
+  readonly reconcileSearchableMetadataPolicy: (
+    policy: SearchableMetadataPolicy,
+    previous?: SearchableMetadataPolicy | undefined,
+  ) => Promise<void>;
 }): Record<LocalSettingsRequestType, MessageDef<ExtensionRequest, ExtensionResponse>> {
   return {
     [MessageType.LoadLocalSettings]: defineMessage({
@@ -46,15 +49,19 @@ export function createLocalSettingsMessageRegistry(deps: {
     [MessageType.SaveLocalSettings]: defineMessage({
       requestSchema: requestSchemas.saveLocalSettingsRequestSchema,
       handle: async (message: SaveLocalSettingsMessage) => {
+        const previous = await loadLocalSettings();
+        const next = migrateLocalSettings(message.payload.settings);
+        if (shouldReconcileBookmarkUrlIndexes(previous.searchableMetadataPolicy, next.searchableMetadataPolicy)) {
+          await deps.reconcileSearchableMetadataPolicy(next.searchableMetadataPolicy, previous.searchableMetadataPolicy);
+        }
         await deps.recentHistoryCache.ready();
         const result = await handleSaveLocalSettings(message, chrome.storage.local, chrome.tabs, (settings) => {
           deps.recentHistoryCache.pruneForSettings(settings);
         });
         await deps.recentHistoryCache.flush();
         if (result.ok) {
-          const saved = await loadLocalSettings();
-          await deps.reconcileSearchableMetadataPolicy(saved.searchableMetadataPolicy);
-          await updateBlobKeyInactivityTimeout(saved.blobKeyInactivityTimeoutMinutes);
+          await deps.reconcileSearchableMetadataPolicy(next.searchableMetadataPolicy);
+          await updateBlobKeyInactivityTimeout(next.blobKeyInactivityTimeoutMinutes);
         }
         return result;
       },
@@ -87,11 +94,11 @@ export async function handleSaveLocalSettings(
   message: SaveLocalSettingsMessage,
   storage: LocalSettingsStorageArea = chrome.storage.local,
   tabs: SettingsTabMessenger = chrome.tabs,
-  onSaved?: (settings: PlaintextLocalSettings) => void,
+  onSaved?: (settings: PlaintextLocalSettings) => void | Promise<void>,
 ): Promise<import('../messages.js').SaveLocalSettingsResultMessage['payload']> {
   const settings = migrateLocalSettings(message.payload.settings);
   await storage.set({ [LOCAL_SETTINGS_KEY]: settings });
-  onSaved?.(settings);
+  await onSaved?.(settings);
   await notifyInjectedPanels(tabs);
   return { ok: true };
 }
