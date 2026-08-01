@@ -25,9 +25,9 @@ on:
           - explicit-rerun
 
 permissions:
-  actions: read
-  contents: read
-  pull-requests: read
+  actions: read # Exact-SHA evidence queries inspect prior workflow jobs.
+  contents: read # Checkout reads the selected exact commit.
+  pull-requests: read # Evidence and acceptance gates inspect PR metadata.
 
 # A skipped converted-to-draft run still replaces an obsolete ready-PR run.
 # Queue candidates are isolated by their synthetic head ref; main pushes never
@@ -134,13 +134,22 @@ jobs:
           path: node_modules/.interop-photos
           persist-credentials: false
 
-      - name: Run repository validation
+      - name: Version policy
         env:
           GH_TOKEN: ${{ github.token }}
+        run: npm run check:version-policy
+
+      - name: Run tokenless repository validation
+        env:
           NODE_OPTIONS: >-
             --test-reporter=spec --test-reporter-destination=stdout
             --test-reporter=node-test-github-reporter --test-reporter-destination=stdout
-        run: npm run ci
+        run: npm run ci:tokenless
+
+      - name: Acceptance coverage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run check:acceptance-coverage
 
       - name: Coverage summary
         if: ${{ !cancelled() }}
@@ -207,10 +216,10 @@ jobs:
       needs.policy.outputs.mode == 'post-merge' ||
       (needs.policy.outputs.mode == 'full' && needs.preflight-evidence.outputs.validated != 'true'))
     permissions:
-      actions: read
-      contents: read
-      packages: read
-      security-events: write
+      actions: read # CodeQL reads workflow metadata during analysis.
+      contents: read # CodeQL checks out and scans the selected commit.
+      packages: read # CodeQL may resolve packages referenced by the build.
+      security-events: write # CodeQL uploads SARIF for the analyzed commit.
     uses: ./.github/workflows/codeql.yml
 
   zizmor:

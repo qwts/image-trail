@@ -269,6 +269,7 @@ jobs:
             exit 0
           fi
 
+          # shellcheck disable=SC2016 -- JavaScript template literals expand in Node, not Bash.
           version=$(node -e '
             const fs = require("fs");
             const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
@@ -288,11 +289,13 @@ jobs:
           # main push. Wait for its stable gate so release.yml can reuse exact
           # complete-suite evidence instead of dispatching or rerunning CI.
           run_id=''
-          for attempt in $(seq 1 60); do
+          attempt=1
+          while [ "$attempt" -le 60 ]; do
             run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?event=push&head_sha=$GITHUB_SHA&per_page=100" \
               --jq 'first(.workflow_runs[] | select(.name == "CI" and .path == ".github/workflows/ci.yml") | .id) // empty')
             if [ -n "$run_id" ]; then break; fi
             sleep 5
+            attempt=$((attempt + 1))
           done
           if [ -z "$run_id" ]; then
             echo "No CI run appeared for exact main SHA $GITHUB_SHA." >&2

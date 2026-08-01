@@ -10,7 +10,6 @@ rules:
   unpinned-uses:
     config:
       policies:
-        # ENG-0004: governed shared reusable workflows intentionally track the
-        # compatible v1 ref; every other action must use a full commit SHA.
-        'qwts/playbook-engineering/*': ref-pin
+        # ENG-0004 requires the shared policy action at an immutable reviewed
+        # commit even when that commit has no release tag.
         '*': hash-pin

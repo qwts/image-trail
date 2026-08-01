@@ -49,7 +49,14 @@ test('complete suite retains repository, Storybook, E2E, workflow-security, and 
   const codeql = workflow('codeql.yml');
   const zizmor = workflow('zizmor.yml');
 
-  assert.match(ci, /run: npm run ci/u);
+  assert.match(ci, /name: Run tokenless repository validation[\s\S]*run: npm run ci:tokenless/u);
+  assert.match(ci, /name: Version policy[\s\S]*GH_TOKEN:[\s\S]*run: npm run check:version-policy/u);
+  assert.match(ci, /name: Acceptance coverage[\s\S]*GH_TOKEN:[\s\S]*run: npm run check:acceptance-coverage/u);
+  const tokenlessStep = ci.slice(
+    ci.indexOf('      - name: Run tokenless repository validation'),
+    ci.indexOf('      - name: Acceptance coverage'),
+  );
+  assert.doesNotMatch(tokenlessStep, /GH_TOKEN|github\.token/u);
   assert.match(ci, /run: npm run test:stories:ci/u);
   assert.match(ci, /run: npm run test:e2e/u);
   assert.match(ci, /uses: \.\/\.github\/workflows\/codeql\.yml/u);
@@ -93,7 +100,14 @@ test('release reuses exact generic evidence and preserves release-specific valid
 
 test('actionlint is pinned by version and part of the local lint gate', () => {
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
+  const launcher = readFileSync('scripts/run-actionlint.mjs', 'utf8');
 
-  assert.equal(packageJson.scripts['lint:workflows'], 'go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12');
+  assert.equal(packageJson.scripts['lint:workflows'], 'node scripts/run-actionlint.mjs');
   assert.match(packageJson.scripts['lint'] ?? '', /npm run lint:workflows/u);
+  assert.match(packageJson.scripts['ci'] ?? '', /check:version-policy[\s\S]*ci:tokenless[\s\S]*check:acceptance-coverage/u);
+  assert.match(launcher, /const VERSION = '1\.7\.12'/u);
+  assert.equal(launcher.match(/[a-f0-9]{64}/gu)?.length, 4);
+  assert.match(launcher, /archive digest mismatch/u);
+  assert.match(launcher, /node_modules\/\.cache/u);
+  assert.doesNotMatch(`${launcher}\n${JSON.stringify(packageJson)}`, /\bgo run\b|github-actionlint/u);
 });

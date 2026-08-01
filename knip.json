@@ -17,6 +17,5 @@
   "project": ["extension/src/**/*.{ts,tsx}", "scripts/**/*.mjs"],
   "ignore": ["extension/src/core/automation/navigation-queue.ts", "extension/src/data/import-export/key-import.ts"],
   "ignoreExportsUsedInFile": true,
-  "ignoreBinaries": ["go"],
   "ignoreDependencies": ["@typescript-eslint/eslint-plugin", "@typescript-eslint/parser", "events", "node-test-github-reporter"]
 }

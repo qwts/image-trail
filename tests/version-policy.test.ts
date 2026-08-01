@@ -387,7 +387,9 @@ test('no workflow that carries repository automation credentials can reach a thi
 test('required CI runs the version-policy gate', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 
-  assert.match(workflow, /run: npm run ci/u);
+  assert.match(workflow, /run: npm run check:version-policy/u);
+  assert.match(workflow, /run: npm run ci:tokenless/u);
+  assert.match(workflow, /run: npm run check:acceptance-coverage/u);
   assert.match(workflow, /workflow_dispatch:/u);
   assert.match(workflow, /- exact-sha-preflight/u);
 });
@@ -433,8 +435,8 @@ test('zizmor is digest-pinned without a disallowed wrapper action and enforces t
   assert.match(workflow, /--persona auditor --format github/u);
   assert.match(workflow, /--config \.github\/zizmor\.yml \./u);
   assert.match(config, /allow:\s*\n\s+- CHORES_DUMB_CLIENT_ID\s*\n\s+- CHORES_DUMB_PRIVATE_KEY/u);
-  assert.match(config, /['"]qwts\/playbook-engineering\/\*['"]: ref-pin/u);
   assert.match(config, /['"]\*['"]: hash-pin/u);
+  assert.doesNotMatch(config, /ref-pin/u);
   assert.equal(dependabot.match(/default-days: 7/gu)?.length, 2);
 });
 
