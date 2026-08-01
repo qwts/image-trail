@@ -12,5 +12,5 @@ rules:
       policies:
         # ENG-0004: governed shared reusable workflows intentionally track the
         # compatible v1 ref; every other action must use a full commit SHA.
-        'qwts/playbook-software-engineering/*': ref-pin
+        'qwts/playbook-engineering/*': ref-pin
         '*': hash-pin

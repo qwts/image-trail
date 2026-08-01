@@ -88,7 +88,7 @@ npm test
 npm run build
 ```
 
-Before pushing implementation work, run the CI-equivalent gate:
+Before marking a pull request ready, run the CI-equivalent gate locally:
 
 ```sh
 npm run ci
@@ -96,6 +96,11 @@ npm run ci
 
 `npm run ci` runs lint, format check, coverage-gated tests, and build. The
 coverage gate uses `.c8rc.json`; CI uploads `coverage/lcov.info` when it runs.
+Draft pull requests start no GitHub Actions jobs. After pushing the final branch
+SHA, an agent may manually dispatch the complete `CI` workflow for exact-SHA
+preflight evidence; ready pull requests reuse that result only when it matches
+their current head. Merge-queue candidates always run the complete suite against
+the synthetic commit containing current `main`.
 
 ## Licensing
 

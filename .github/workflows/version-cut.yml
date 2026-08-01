@@ -284,6 +284,28 @@ jobs:
             process.stdout.write(`v${version}`);
           ')
 
+          # Tagging must not outrun the lifecycle workflow started by this same
+          # main push. Wait for its stable gate so release.yml can reuse exact
+          # complete-suite evidence instead of dispatching or rerunning CI.
+          run_id=''
+          for attempt in $(seq 1 60); do
+            run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?event=push&head_sha=$GITHUB_SHA&per_page=100" \
+              --jq 'first(.workflow_runs[] | select(.name == "CI" and .path == ".github/workflows/ci.yml") | .id) // empty')
+            if [ -n "$run_id" ]; then break; fi
+            sleep 5
+          done
+          if [ -z "$run_id" ]; then
+            echo "No CI run appeared for exact main SHA $GITHUB_SHA." >&2
+            exit 1
+          fi
+          gh run watch "$run_id" --exit-status
+          validated=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100" \
+            --jq 'any(.jobs[]; .name == "CI" and .conclusion == "success")')
+          if [ "$validated" != true ]; then
+            echo "CI run $run_id did not produce a successful stable CI gate for $GITHUB_SHA." >&2
+            exit 1
+          fi
+
           if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
             echo "$version already tagged."
             # The one dispatch that survives: an already-existing tag has no push
