@@ -48,7 +48,7 @@ jobs:
     steps:
       - id: policy
         # ENG-0004 requires this reviewed immutable commit even though it has no release tag.
-        uses: qwts/playbook-engineering/.github/actions/ci-policy@012ec7b8cd101c528b587d969e8d21da4e589770 # zizmor: ignore[unpinned-uses]
+        uses: qwts/playbook-engineering/.github/actions/ci-policy@012ec7b8cd101c528b587d969e8d21da4e589770 # zizmor: ignore[stale-action-refs]
 
   merge-evidence:
     name: Verify merged commit evidence
