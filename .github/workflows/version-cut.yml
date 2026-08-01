@@ -269,7 +269,8 @@ jobs:
             exit 0
           fi
 
-          # shellcheck disable=SC2016 -- JavaScript template literals expand in Node, not Bash.
+          # JavaScript template literals expand in Node, not Bash.
+          # shellcheck disable=SC2016
           version=$(node -e '
             const fs = require("fs");
             const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));

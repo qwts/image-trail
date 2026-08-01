@@ -22,7 +22,11 @@ test('CI exposes only the governed lifecycle triggers and skips every draft job'
 test('CI loads immutable actor policy and scopes obsolete-run cancellation to PR or queue identity', () => {
   const ci = workflow('ci.yml');
 
-  assert.match(ci, /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@012ec7b8cd101c528b587d969e8d21da4e589770/u);
+  assert.match(
+    ci,
+    /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@012ec7b8cd101c528b587d969e8d21da4e589770 # zizmor: ignore\[unpinned-uses\]/u,
+  );
+  assert.equal(ci.match(/zizmor: ignore\[unpinned-uses\]/gu)?.length, 1);
   assert.match(ci, /format\('pr-\{0\}', github\.event\.pull_request\.number\)/u);
   assert.match(ci, /format\('merge-group-\{0\}', github\.event\.merge_group\.head_ref\)/u);
   assert.match(ci, /cancel-in-progress: \$\{\{ github\.event_name != 'push' \}\}/u);
