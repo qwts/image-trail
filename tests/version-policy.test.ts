@@ -219,6 +219,9 @@ test('version-cut workflow refreshes a checked Changesets PR and tags only fresh
   assert.equal(workflow.match(/gh auth setup-git/gu)?.length, 2);
   assert.doesNotMatch(workflow, /^\s+token:/mu);
   assert.doesNotMatch(workflow, /gh workflow run ci\.yml/u);
+  assert.match(workflow, /actions\/runs\?event=push&head_sha=\$GITHUB_SHA/u);
+  assert.match(workflow, /gh run watch "\$run_id" --exit-status/u);
+  assert.match(workflow, /\.name == "CI" and \.conclusion == "success"/u);
   assert.match(workflow, /Version unchanged \(\$cur\) — not a version-cut merge/u);
   assert.match(workflow, /Changesets pending — nothing to tag/u);
   assert.match(workflow, /package, manifest, and lockfile versions are not synchronized/u);
@@ -385,13 +388,15 @@ test('required CI runs the version-policy gate', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 
   assert.match(workflow, /run: npm run check:version-policy/u);
+  assert.match(workflow, /run: npm run ci:tokenless/u);
+  assert.match(workflow, /run: npm run check:acceptance-coverage/u);
   assert.match(workflow, /workflow_dispatch:/u);
-  assert.match(workflow, /github\.event_name == 'workflow_dispatch'.*'true'/u);
+  assert.match(workflow, /- exact-sha-preflight/u);
 });
 
 test('required CI retains PR base history for consumed-changeset validation', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
-  const ciJob = workflow.slice(workflow.indexOf('\n  ci:'), workflow.indexOf('\n  e2e:'));
+  const ciJob = workflow.slice(workflow.indexOf('\n  complete:'), workflow.indexOf('\n  e2e:'));
 
   assert.ok(ciJob.includes('uses: actions/checkout@'));
   assert.ok(ciJob.includes('fetch-depth: 0'));
@@ -407,7 +412,7 @@ test('Dependabot keeps TypeScript versions outside the parser peer range out of 
 });
 
 test('all workflow checkouts avoid persisting credentials', () => {
-  for (const file of ['ci.yml', 'close-linked-issues.yml', 'release.yml', 'version-cut.yml', 'zizmor.yml']) {
+  for (const file of ['ci.yml', 'close-linked-issues.yml', 'codeql.yml', 'release.yml', 'version-cut.yml', 'zizmor.yml']) {
     const workflow = readFileSync(`.github/workflows/${file}`, 'utf8');
     const checkoutCount = workflow.match(/uses: actions\/checkout@/gu)?.length ?? 0;
     const hardenedCheckoutCount = workflow.match(/persist-credentials: false/gu)?.length ?? 0;
@@ -430,8 +435,8 @@ test('zizmor is digest-pinned without a disallowed wrapper action and enforces t
   assert.match(workflow, /--persona auditor --format github/u);
   assert.match(workflow, /--config \.github\/zizmor\.yml \./u);
   assert.match(config, /allow:\s*\n\s+- CHORES_DUMB_CLIENT_ID\s*\n\s+- CHORES_DUMB_PRIVATE_KEY/u);
-  assert.match(config, /['"]qwts\/playbook-software-engineering\/\*['"]: ref-pin/u);
   assert.match(config, /['"]\*['"]: hash-pin/u);
+  assert.doesNotMatch(config, /ref-pin/u);
   assert.equal(dependabot.match(/default-days: 7/gu)?.length, 2);
 });
 
@@ -442,7 +447,7 @@ test('release builds do not consume dependency caches or interpolate the tag in 
   assert.match(workflow, /client-id: \$\{\{ secrets\.CHORES_DUMB_CLIENT_ID \}\}/u);
   assert.doesNotMatch(workflow, /\bapp-id:/u);
   assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.chores\.outputs\.token \}\}/u);
-  assert.doesNotMatch(workflow, /RELEASE_TOKEN|github\.token|continue-on-error/u);
+  assert.doesNotMatch(workflow, /RELEASE_TOKEN|continue-on-error/u);
   assert.doesNotMatch(workflow, /^\s+cache: npm/mu);
   assert.match(workflow, /package-manager-cache: false/u);
   assert.match(workflow, /RELEASE_TAG: \$\{\{ steps\.release\.outputs\.tag \}\}/u);
@@ -473,7 +478,10 @@ test('release workflow checks out a supplied tag and publishes assets without st
   assert.match(workflow, /tags:\s*\n\s*- 'v\*\.\*\.\*'/u);
   assert.match(workflow, /tag:\s*\n\s+description: 'Existing exact v<package-version> tag/u);
   assert.match(workflow, /ref: \$\{\{ steps\.release\.outputs\.tag \}\}/u);
-  assert.match(workflow, /run: npm run ci/u);
+  assert.doesNotMatch(workflow, /run: npm run ci/u);
+  assert.match(workflow, /head_sha=\$source_sha/u);
+  assert.match(workflow, /event=pull_request&head_sha=\$pr_head/u);
+  assert.match(workflow, /\.name == "CI" and \.conclusion == "success"/u);
   assert.match(workflow, /npx playwright install --with-deps chromium/u);
   assert.match(workflow, /run: npm run test:e2e:release/u);
   assert.match(workflow, /npm run package:release -- --tag/u);

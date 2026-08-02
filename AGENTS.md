@@ -66,8 +66,11 @@ Layer direction is enforced by ESLint:
 ## Validation and process safety
 
 - Use the Node version in `.nvmrc`; install with `npm ci`.
-- Before pushing, run `npm run ci`. Use the source-command-check skill for the
-  full E2E, Storybook, coverage, and invariant report.
+- Draft PRs start no Actions jobs. Before marking a PR ready, run `npm run ci`
+  and use the source-command-check skill for the full E2E, Storybook, coverage,
+  and invariant report. After pushing the final branch SHA, an agent may
+  dispatch `ci.yml` with purpose `exact-sha-preflight`; wait for that exact SHA
+  to pass before marking the PR ready.
 - Run tests only through guarded npm entrypoints. Never invoke raw test runners,
   `:run`/`:inner` scripts, or headed/UI browser modes as an agent.
 - Poll or terminate a live guarded run before starting another. An `rss-limit`
