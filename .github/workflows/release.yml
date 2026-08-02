@@ -20,7 +20,8 @@ concurrency:
 # would emit nothing). The same trigger covers tags pushed by humans;
 # workflow_dispatch remains the recovery path for a tag whose release run never
 # happened. Every build checks out the tag, never main. Release asset writes
-# also use chores-dumb[bot]; GITHUB_TOKEN is not an authorized automation actor.
+# also use chores-dumb[bot]; GITHUB_TOKEN is a read-only evidence credential,
+# not an authorized workflow initiator.
 # This workflow packages and publishes GitHub Release assets only. It does not
 # merge version PRs or submit to the Chrome Web Store.
 permissions: {}
@@ -30,7 +31,9 @@ jobs:
     name: Validate and cut release
     runs-on: ubuntu-latest
     permissions:
+      actions: read # Required to prove exact-commit complete-suite evidence.
       contents: read # Required only by checkout; writes use the App token.
+      pull-requests: read # Required to prove the reviewed version-PR head.
     env:
       INTEROP_PHOTOS_ROOT: ${{ github.workspace }}/node_modules/.interop-photos
     steps:
@@ -66,6 +69,41 @@ jobs:
           TAG_NAME: ${{ steps.release.outputs.tag }}
         run: git merge-base --is-ancestor "$(git rev-list -n 1 "$TAG_NAME")" origin/main
 
+      - name: Require exact-commit and reviewed-head CI evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          source_sha=$(git rev-list -n 1 "$TAG_NAME")
+          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$source_sha&per_page=100" \
+            --jq 'first(.workflow_runs[] | select(.name == "CI" and .path == ".github/workflows/ci.yml" and (.event == "merge_group" or .event == "push") and .conclusion == "success") | .id) // empty')
+          if [ -z "$run_id" ]; then
+            echo "No successful complete-suite evidence exists for release commit $source_sha." >&2
+            exit 1
+          fi
+          exact_gate=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100" \
+            --jq 'any(.jobs[]; .name == "CI" and .conclusion == "success")')
+          test "$exact_gate" = true
+
+          pr_number=$(gh api "repos/$GITHUB_REPOSITORY/commits/$source_sha/pulls" \
+            --jq 'map(select(.merged_at != null and .base.ref == "main")) | sort_by(.merged_at) | reverse | first | .number // empty')
+          if [ -z "$pr_number" ]; then
+            echo "Release commit $source_sha is not associated with a merged main PR." >&2
+            exit 1
+          fi
+          pr_head=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq '.head.sha')
+          ready_run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?event=pull_request&head_sha=$pr_head&per_page=100" \
+            --jq 'first(.workflow_runs[] | select(.name == "CI" and .path == ".github/workflows/ci.yml" and .conclusion == "success") | .id) // empty')
+          if [ -z "$ready_run" ]; then
+            echo "PR #$pr_number head $pr_head has no successful ready-PR CI evidence." >&2
+            exit 1
+          fi
+          ready_gate=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ready_run/jobs?filter=latest&per_page=100" \
+            --jq 'any(.jobs[]; .name == "CI" and .conclusion == "success")')
+          test "$ready_gate" = true
+          echo "Release evidence: PR #$pr_number head $pr_head; exact source $source_sha; CI runs $ready_run and $run_id."
+
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -83,9 +121,6 @@ jobs:
           ref: 760e23ba1abeaf15bf6d56e029ebdd47d521a7e7
           path: node_modules/.interop-photos
           persist-credentials: false
-
-      - name: Run required validation
-        run: npm run ci
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium

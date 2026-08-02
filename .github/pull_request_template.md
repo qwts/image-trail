@@ -13,7 +13,8 @@
 ## Testing
 
 <!-- List the exact commands you ran locally, for example: `npm test`. -->
-<!-- Once the workflow is added, CI independently verifies `npm ci`, lint, format check, tests, and build. -->
+<!-- Draft PRs start no Actions jobs. Run the agreed local gates before marking ready. -->
+<!-- If you dispatched exact-SHA preflight, record the final SHA and successful CI run URL. -->
 
 <!-- Coverage travels with the change — see the wiki Testing Strategy page. -->
 
