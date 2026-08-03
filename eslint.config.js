@@ -83,6 +83,11 @@ export default tseslint.config(
       // main checkout breaks local gates on unrelated work (prettier already ignores
       // .claude/ via .prettierignore).
       '.claude/**',
+      // Synced byte-identically from playbook-engineering and compared by blob
+      // SHA. They are Node scripts, so this config's browser globals flag every
+      // `process` and `Buffer` -- and editing them to satisfy it would be
+      // reverted by the next sync. Their lint contract is owned upstream.
+      'tools/agent-guard/**',
     ],
   },
   js.configs.recommended,
