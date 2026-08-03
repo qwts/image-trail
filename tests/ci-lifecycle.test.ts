@@ -24,7 +24,7 @@ test('CI loads immutable actor policy and scopes obsolete-run cancellation to PR
 
   assert.match(
     ci,
-    /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@012ec7b8cd101c528b587d969e8d21da4e589770 # zizmor: ignore\[stale-action-refs\]/u,
+    /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@4e70c773155c2c804e52a487352627010bea1897 # zizmor: ignore\[stale-action-refs\]/u,
   );
   assert.equal(ci.match(/zizmor: ignore\[stale-action-refs\]/gu)?.length, 1);
   assert.match(ci, /format\('pr-\{0\}', github\.event\.pull_request\.number\)/u);
