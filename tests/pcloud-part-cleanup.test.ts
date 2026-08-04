@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createPCloudMessageRegistry } from '../extension/src/background/handlers/pcloud-handlers.js';
 import { MESSAGE_PROTOCOL_VERSION, MessageType, type UploadPCloudBackupResultMessage } from '../extension/src/background/messages.js';
-import { uploadPCloudBackup } from '../extension/src/background/pcloud-provider.js';
+
+const buildScope = globalThis as typeof globalThis & { __IMAGE_TRAIL_PCLOUD_CLIENT_ID__?: string };
+buildScope.__IMAGE_TRAIL_PCLOUD_CLIENT_ID__ = 'image-trail-unit-client';
+const [{ createPCloudMessageRegistry }, { uploadPCloudBackup }] = await Promise.all([
+  import('../extension/src/background/handlers/pcloud-handlers.js'),
+  import('../extension/src/background/pcloud-provider.js'),
+]);
 
 const CONNECTION_KEY = 'imageTrail.pcloudConnection';
 

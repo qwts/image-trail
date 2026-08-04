@@ -5,6 +5,7 @@ import {
   type PCloudBackupCleanupResult,
 } from '../core/cloud/pcloud-provider.js';
 import { ensurePCloudBackupFolder } from './pcloud-backup-folder.js';
+import { PCLOUD_BUILD_CONFIG } from './pcloud-build-config.js';
 import { loadPCloudConnectionRecord, pcloudStatusFromRecord, type PCloudConnectionRecord } from './pcloud-connection-store.js';
 import { numberOrUndefined, recordOrNull } from './pcloud-provider-utils.js';
 
@@ -76,12 +77,15 @@ async function deletePart(record: PCloudConnectionRecord, fileId: number): Promi
   await fetchPCloudJson(record, 'deletefile', { fileid: String(fileId) });
 }
 
-function disconnectedResult(fileIds: readonly number[]): PCloudBackupCleanupResult {
-  const message = 'Connect pCloud before cleaning up partial backup files.';
+function disconnectedResult(
+  fileIds: readonly number[],
+  reason = 'not-connected',
+  message = 'Connect pCloud before cleaning up partial backup files.',
+): PCloudBackupCleanupResult {
   return {
     ok: false,
     status: { connected: false, message, messageIsError: true },
-    reason: 'not-connected',
+    reason,
     deletedFileIds: [],
     failedFileIds: fileIds,
     message,
@@ -90,6 +94,7 @@ function disconnectedResult(fileIds: readonly number[]): PCloudBackupCleanupResu
 
 export async function cleanupPCloudBackupParts(input: PCloudBackupCleanupInput): Promise<PCloudBackupCleanupResult> {
   const requestedFileIds = [...new Set(input.fileIds)];
+  if (!PCLOUD_BUILD_CONFIG.enabled) return disconnectedResult(requestedFileIds, 'not-configured', PCLOUD_BUILD_CONFIG.unavailableMessage);
   const record = await loadPCloudConnectionRecord();
   if (!record) return disconnectedResult(requestedFileIds);
   if (requestedFileIds.length === 0) {

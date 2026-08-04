@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 
-import { downloadPCloudBackup, listPCloudBackups, uploadPCloudBackup } from '../extension/src/background/pcloud-provider.js';
 import { BACKUP_HISTORY_STORAGE_KEY } from '../extension/src/background/backup-history-store.js';
+
+const buildScope = globalThis as typeof globalThis & { __IMAGE_TRAIL_PCLOUD_CLIENT_ID__?: string };
+buildScope.__IMAGE_TRAIL_PCLOUD_CLIENT_ID__ = 'image-trail-unit-client';
+const { downloadPCloudBackup, listPCloudBackups, uploadPCloudBackup } = await import('../extension/src/background/pcloud-provider.js');
 
 const CONNECTION_KEY = 'imageTrail.pcloudConnection';
 
