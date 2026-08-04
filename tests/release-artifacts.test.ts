@@ -69,7 +69,7 @@ function releaseBuildInfo(overrides: Record<string, unknown> = {}) {
   };
 }
 
-test('central release build policy minifies, gates pCloud configuration, and removes development-only debugging', () => {
+test('central release build policy minifies and removes development-only debugging', () => {
   const local = builds.extensionBuildOptions({
     entryPoint: 'source.ts',
     outfile: 'output.js',
