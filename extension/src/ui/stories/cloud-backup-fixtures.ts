@@ -3,7 +3,7 @@ import type { CloudBackupHistoryViewRecord } from '../components/cloud-backup-me
 export const VERIFIED_BACKUP_HISTORY = [
   {
     provider: 'pcloud',
-    destination: '/Image Trail/backups',
+    destination: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
     fileName: 'image-trail-pcloud-backup-2026-06-27T16-24-00Z.image-trail-encrypted.json',
     completedAt: '2026-06-27T16:24:08.000Z',
     size: '428 KB',
@@ -12,7 +12,7 @@ export const VERIFIED_BACKUP_HISTORY = [
   },
   {
     provider: 'pcloud',
-    destination: '/Image Trail/backups',
+    destination: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
     fileName: 'image-trail-pcloud-backup-2026-06-26T15-10-00Z.image-trail-encrypted.json',
     completedAt: '2026-06-26T15:10:05.000Z',
     size: '392 KB',

@@ -3,6 +3,9 @@ export type PCloudApiHost = 'api.pcloud.com' | 'eapi.pcloud.com';
 export type BackupHistoryVerificationMethod = 'download-byte-match' | 'provider-checksum';
 export const BACKUP_HISTORY_LIMIT = 20;
 export const PCLOUD_BACKUP_PART_SUFFIX = '.image-trail-part.json';
+export const PCLOUD_BACKUP_FOLDER_SEGMENTS = ['Applications', 'Playbook-Eng-Trail-Overlook-1', 'backups'] as const;
+export const PCLOUD_BACKUP_ROOT_PATH = '/Applications/Playbook-Eng-Trail-Overlook-1';
+export const PCLOUD_BACKUP_FOLDER_PATH = `${PCLOUD_BACKUP_ROOT_PATH}/backups`;
 
 export interface BackupHistoryRecord {
   readonly schemaVersion: 1;

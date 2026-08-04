@@ -13,9 +13,11 @@ import {
   type PCloudApiHost,
   type PCloudProviderResult,
   type PCloudProviderStatus,
+  PCLOUD_BACKUP_FOLDER_PATH,
   PCLOUD_BACKUP_PART_SUFFIX,
 } from '../core/cloud/pcloud-provider.js';
 import { appendBackupHistory, loadBackupHistory } from './backup-history-store.js';
+import { ensurePCloudBackupFolder } from './pcloud-backup-folder.js';
 import { assertPCloudBackupPartReference, cleanupPCloudBackupParts } from './pcloud-part-cleanup.js';
 import { arrayBufferFromBytes, bytesEqual, numberOrUndefined, recordOrNull, stringOrUndefined } from './pcloud-provider-utils.js';
 import {
@@ -26,14 +28,13 @@ import {
   type PCloudConnectionRecord,
 } from './pcloud-connection-store.js';
 
-const PCLOUD_CLIENT_ID = '83ag1CIbJd7';
+declare const __IMAGE_TRAIL_PCLOUD_CLIENT_ID__: string | undefined;
+
+const PCLOUD_CLIENT_ID = typeof __IMAGE_TRAIL_PCLOUD_CLIENT_ID__ === 'string' ? __IMAGE_TRAIL_PCLOUD_CLIENT_ID__.trim() : '';
 const PCLOUD_AUTHORIZE_URL = 'https://my.pcloud.com/oauth2/authorize';
 const PCLOUD_DOWNLOAD_REFERRER = 'https://my.pcloud.com/';
 const PCLOUD_REQUEST_HEADER_RULE_ID_BASE = 900199;
 const DEFAULT_PCLOUD_API_HOST: PCloudApiHost = 'api.pcloud.com';
-const PCLOUD_ROOT_FOLDER_NAME = 'Image Trail';
-const PCLOUD_BACKUP_FOLDER_NAME = 'backups';
-const PCLOUD_BACKUP_FOLDER_PATH = '/Image Trail/backups';
 const PCLOUD_LIST_RETRY_ATTEMPTS = 5;
 const PCLOUD_LIST_RETRY_BASE_MS = 500;
 let pcloudRequestHeaderRuleId = PCLOUD_REQUEST_HEADER_RULE_ID_BASE;
@@ -404,6 +405,7 @@ export async function loadPCloudProviderStatus(): Promise<PCloudProviderStatus> 
 
 export async function connectPCloudProvider(): Promise<PCloudProviderResult> {
   try {
+    if (!PCLOUD_CLIENT_ID) throw new Error('pCloud backup is not configured in this build.');
     const state = crypto.randomUUID();
     const redirectUri = chrome.identity.getRedirectURL('pcloud');
     const authorizeUrl = new URL(PCLOUD_AUTHORIZE_URL);
@@ -460,8 +462,7 @@ async function uploadPCloudBackupFile(input: PCloudBackupFileUploadInput): Promi
   try {
     const bytes = new TextEncoder().encode(input.fileContent);
     const sha256 = await digestHex('SHA-256', bytes);
-    const rootFolderId = await ensureFolder(record, 0, PCLOUD_ROOT_FOLDER_NAME);
-    const backupFolderId = await ensureFolder(record, rootFolderId, PCLOUD_BACKUP_FOLDER_NAME);
+    const backupFolderId = await ensurePCloudBackupFolder(record, ensureFolder);
     const uploaded = await uploadBackupFile(record, backupFolderId, { fileName, fileContent: input.fileContent }, bytes);
 
     let verificationMethod: 'download' | 'checksum';
@@ -522,8 +523,7 @@ export async function listPCloudBackups(): Promise<PCloudBackupListResult> {
   if (!record) return failedListResult(null, 'not-connected', 'Connect pCloud before choosing a restore file.');
 
   try {
-    const rootFolderId = await ensureFolder(record, 0, PCLOUD_ROOT_FOLDER_NAME);
-    const backupFolderId = await ensureFolder(record, rootFolderId, PCLOUD_BACKUP_FOLDER_NAME);
+    const backupFolderId = await ensurePCloudBackupFolder(record, ensureFolder);
     const data = await fetchPCloudJson(record.apiHost, 'listfolder', record.accessToken, {
       folderid: String(backupFolderId),
       noshares: '1',
@@ -535,7 +535,7 @@ export async function listPCloudBackups(): Promise<PCloudBackupListResult> {
     );
     const message =
       candidates.length === 0
-        ? 'No encrypted pCloud backups were found in /Image Trail/backups.'
+        ? `No encrypted pCloud backups were found in ${PCLOUD_BACKUP_FOLDER_PATH}.`
         : `Found ${candidates.length} encrypted pCloud backup${candidates.length === 1 ? '' : 's'}.`;
     return {
       ok: true,

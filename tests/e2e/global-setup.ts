@@ -15,7 +15,11 @@ export default function globalSetup(): void {
   execFileSync('npm', ['run', 'build'], {
     cwd: repoRoot,
     stdio: 'inherit',
-    env: { ...process.env, IMAGE_TRAIL_E2E_TEST_BUILD: '1' },
+    env: {
+      ...process.env,
+      IMAGE_TRAIL_E2E_TEST_BUILD: '1',
+      PCLOUD_CLIENT_ID: 'image-trail-e2e-client',
+    },
   });
   const manifestPath = path.join(repoRoot, 'extension/dist/manifest.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;

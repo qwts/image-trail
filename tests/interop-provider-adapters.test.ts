@@ -99,7 +99,7 @@ describe('pCloud interoperability namespace (#588)', () => {
     assert.deepEqual(await store.put('pairings/a/object.bin', bytes), { bytes: 3 });
     assert.equal((await store.verify('pairings/a/object.bin')).sha256, createHash('sha256').update(bytes).digest('hex'));
     assert.ok(paths.every((path) => path.startsWith('/Image Trail Interop/v1/')));
-    assert.ok(paths.every((path) => !path.includes('/Image Trail/backups')));
+    assert.ok(paths.every((path) => !path.includes('/Applications/Playbook-Eng-Trail-Overlook-1/backups')));
 
     const disconnected = new PCloudInteropObjectStore({ credential: () => null, fetchImpl });
     await assert.rejects(

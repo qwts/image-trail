@@ -43,8 +43,9 @@ function mockedFolderId(init: RequestInit | undefined): number {
   const params = init?.body as URLSearchParams;
   const parentFolderId = params.get('folderid');
   const name = params.get('name');
-  if (parentFolderId === '0' && name === 'Image Trail') return 100;
-  if (parentFolderId === '100' && name === 'backups') return 200;
+  if (parentFolderId === '0' && name === 'Applications') return 100;
+  if (parentFolderId === '100' && name === 'Playbook-Eng-Trail-Overlook-1') return 200;
+  if (parentFolderId === '200' && name === 'backups') return 300;
   throw new Error(`Unexpected folder creation parent=${parentFolderId ?? ''} name=${name ?? ''}`);
 }
 
@@ -117,7 +118,7 @@ test('uploadPCloudBackup creates folders, uploads, retries listfolder, and verif
     if (url.endsWith('/uploadfile')) {
       const form = init?.body as FormData;
       assert.equal(form.get('access_token'), 'token-secret');
-      assert.equal(form.get('folderid'), '200');
+      assert.equal(form.get('folderid'), '300');
       assert.equal(form.get('nopartial'), '1');
       assert.equal(form.get('renameifexists'), '1');
       return jsonResponse({
@@ -148,18 +149,26 @@ test('uploadPCloudBackup creates folders, uploads, retries listfolder, and verif
     if (result.ok) {
       assert.equal(result.fileId, 300);
       assert.equal(result.fileName, 'backup.json');
-      assert.equal(result.folderPath, '/Image Trail/backups');
+      assert.equal(result.folderPath, '/Applications/Playbook-Eng-Trail-Overlook-1/backups');
       assert.equal(result.apiHost, 'api.pcloud.com');
       assert.equal(result.sizeBytes, encryptedContent.length);
       assert.match(result.sha256, /^[a-f0-9]{64}$/u);
       assert.equal(result.verificationMethod, 'download-byte-match');
       assert.equal(result.historyPersisted, true);
-      assert.equal(result.historyRecord.destination, '/Image Trail/backups');
+      assert.equal(result.historyRecord.destination, '/Applications/Playbook-Eng-Trail-Overlook-1/backups');
     }
     assert.equal(listAttempts, 2);
     assert.deepEqual(
       calls.filter(isApiPCloudCall).map((call) => new URL(call.url).pathname.slice(1)),
-      ['createfolderifnotexists', 'createfolderifnotexists', 'uploadfile', 'listfolder', 'listfolder', 'getfilelink'],
+      [
+        'createfolderifnotexists',
+        'createfolderifnotexists',
+        'createfolderifnotexists',
+        'uploadfile',
+        'listfolder',
+        'listfolder',
+        'getfilelink',
+      ],
     );
     assert.equal(JSON.stringify(result).includes('token-secret'), false);
     assert.equal(JSON.stringify(storage[BACKUP_HISTORY_STORAGE_KEY]).includes('token-secret'), false);
@@ -222,7 +231,7 @@ test('uploadPCloudBackup deletes unverified files after verification mismatch', 
     }
     if (url.endsWith('/uploadfile')) {
       const form = init?.body as FormData;
-      assert.equal(form.get('folderid'), '200');
+      assert.equal(form.get('folderid'), '300');
       return jsonResponse({ result: 0, metadata: [{ fileid: 301, size: 18, name: 'backup.json' }] });
     }
     if (url.endsWith('/listfolder')) {
@@ -275,7 +284,7 @@ test('uploadPCloudBackup falls back to checksum verification when pCloud rejects
     }
     if (url.endsWith('/uploadfile')) {
       const form = init?.body as FormData;
-      assert.equal(form.get('folderid'), '200');
+      assert.equal(form.get('folderid'), '300');
       return jsonResponse({ result: 0, metadata: [{ fileid: 303, size: encryptedContent.length, name: 'backup.json' }] });
     }
     if (url.endsWith('/listfolder')) {
@@ -320,7 +329,7 @@ test('uploadPCloudBackup reports cleanup needed when deleting an unverified file
       return jsonResponse({ result: 0, metadata: { isfolder: true, folderid: mockedFolderId(init) } });
     if (url.endsWith('/uploadfile')) {
       const form = init?.body as FormData;
-      assert.equal(form.get('folderid'), '200');
+      assert.equal(form.get('folderid'), '300');
       return jsonResponse({ result: 0, metadata: [{ fileid: 302, size: 18, name: 'backup.json' }] });
     }
     if (url.endsWith('/listfolder')) return jsonResponse({ result: 0, metadata: { contents: [{ fileid: 302 }] } });
@@ -384,7 +393,7 @@ test('listPCloudBackups returns encrypted backup candidates newest first without
 
     assert.equal(result.ok, true);
     if (result.ok) {
-      assert.equal(result.folderPath, '/Image Trail/backups');
+      assert.equal(result.folderPath, '/Applications/Playbook-Eng-Trail-Overlook-1/backups');
       assert.equal(result.candidates.length, 2);
       assert.equal(result.candidates[0]?.fileId, 402);
       assert.equal(result.candidates[1]?.fileId, 401);
@@ -442,7 +451,7 @@ test('downloadPCloudBackup downloads encrypted JSON and reports local SHA-256 wi
       assert.equal(result.fileContent, fileContent);
       assert.equal(result.sizeBytes, fileContent.length);
       assert.equal(result.sha256, sha256(fileContent));
-      assert.equal(result.folderPath, '/Image Trail/backups');
+      assert.equal(result.folderPath, '/Applications/Playbook-Eng-Trail-Overlook-1/backups');
     }
     assert.equal(JSON.stringify(result).includes('token-secret'), false);
     assert.equal(

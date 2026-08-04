@@ -125,7 +125,7 @@ function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
         status: CONNECTED_STATUS,
         fileId,
         fileName: input.fileName,
-        folderPath: '/Image Trail',
+        folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
         apiHost: 'api.pcloud.com',
         sizeBytes: input.fileContent.length,
         sha256,
@@ -134,7 +134,7 @@ function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
         historyRecord: {
           schemaVersion: 1,
           provider: 'pcloud',
-          destination: '/Image Trail/backups',
+          destination: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
           fileName: input.fileName,
           completedAt: uploadedAt,
           sizeBytes: input.fileContent.length,

@@ -58,7 +58,7 @@ test('creates pCloud provider messages without token fields', () => {
     apiHost: 'api.pcloud.com',
     fileId: 42,
     fileName: uploadFileName,
-    folderPath: '/Image Trail/backups',
+    folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
     sizeBytes: uploadFileContent.length,
     sha256: 'a'.repeat(64),
     uploadedAt: '2026-06-27T00:00:00.000Z',
@@ -66,7 +66,7 @@ test('creates pCloud provider messages without token fields', () => {
     historyRecord: {
       schemaVersion: 1,
       provider: 'pcloud',
-      destination: '/Image Trail/backups',
+      destination: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
       fileName: uploadFileName,
       completedAt: '2026-06-27T00:00:00.000Z',
       sizeBytes: uploadFileContent.length,
@@ -81,7 +81,7 @@ test('creates pCloud provider messages without token fields', () => {
     ok: true,
     status: statusResult.payload,
     apiHost: 'api.pcloud.com',
-    folderPath: '/Image Trail/backups',
+    folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
     candidates: [
       {
         fileId: 43,
@@ -101,7 +101,7 @@ test('creates pCloud provider messages without token fields', () => {
     ok: true,
     status: statusResult.payload,
     apiHost: 'api.pcloud.com',
-    folderPath: '/Image Trail/backups',
+    folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
     fileId: download.payload.fileId,
     fileName: download.payload.fileName,
     fileContent: '{"encrypted":true}',
