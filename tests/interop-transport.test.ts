@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { describe, test } from 'node:test';
 
-import { OverlookICloudNativeClient, OVERLOOK_ICLOUD_NATIVE_HOST } from '../extension/src/background/interop-icloud-client.js';
+import {
+  OverlookICloudNativeClient,
+  OVERLOOK_ICLOUD_NATIVE_HOST,
+  RELEASED_IMAGE_TRAIL_EXTENSION_ID,
+} from '../extension/src/background/interop-icloud-client.js';
 import {
   EncryptedInteropTransport,
   InteropTransportError,
@@ -127,5 +131,10 @@ describe('signed iCloud native client (#588)', () => {
       }).request({ operation: 'status' }),
       /requires macOS/u,
     );
+  });
+
+  test('records the published Chrome Web Store beta identity for the Overlook host allowlist', () => {
+    assert.equal(RELEASED_IMAGE_TRAIL_EXTENSION_ID, 'kopcjofaojfpgdoianeddagpenhijphi');
+    assert.match(RELEASED_IMAGE_TRAIL_EXTENSION_ID, /^[a-p]{32}$/u);
   });
 });
