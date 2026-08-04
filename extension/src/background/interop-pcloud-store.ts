@@ -5,8 +5,12 @@ import {
   type InteropObjectPage,
   type InteropObjectStore,
 } from '../core/interop/transport.js';
+import { PCLOUD_DOWNLOAD_REFERRER, installPCloudRequestHeaderRule } from './pcloud-provider.js';
 
-const ROOT = '/Image Trail Interop/v1';
+// Shared mount point with Overlook: the canonical side scans
+// `/Overlook Interop/v1/pairings/<pairingId>/transfers/...`, so moves must be
+// published under the same root or discovery finds nothing.
+const ROOT = '/Overlook Interop/v1';
 
 export interface InteropPCloudCredential {
   readonly accessToken: string;
@@ -42,7 +46,9 @@ export class PCloudInteropObjectStore implements InteropObjectStore {
   private readonly folders = new Set<string>();
 
   constructor(private readonly options: PCloudInteropStoreOptions) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // Bind the global: assigning bare `fetch` to a property and invoking it as a
+    // method makes Chromium throw "Illegal invocation" (receiver is the store).
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
   }
 
   authState(): Promise<'connected' | 'not-connected'> {
@@ -68,7 +74,7 @@ export class PCloudInteropObjectStore implements InteropObjectStore {
   }
 
   async get(pathInput: string): Promise<Uint8Array> {
-    const data = await this.api('getfilelink', { path: this.remote(pathInput), forcedownload: '1' });
+    const data = await this.apiWithReferer('getfilelink', { path: this.remote(pathInput), forcedownload: '1' });
     const hosts = Array.isArray(data['hosts']) ? data['hosts'] : [];
     const host = typeof hosts[0] === 'string' ? hosts[0].toLowerCase() : '';
     const path = typeof data['path'] === 'string' ? data['path'] : '';
@@ -81,11 +87,14 @@ export class PCloudInteropObjectStore implements InteropObjectStore {
     }
     if ((host !== 'pcloud.com' && !host.endsWith('.pcloud.com')) || !path.startsWith('/') || downloadUrl.origin !== origin)
       throw new InteropTransportError('pCloud returned an unsafe download location.', 'corrupt', false);
+    const removeRule = await installPCloudRequestHeaderRule(downloadUrl.toString());
     let response: Response;
     try {
-      response = await this.fetchImpl(downloadUrl);
+      response = await this.fetchImpl(downloadUrl, { referrer: PCLOUD_DOWNLOAD_REFERRER, referrerPolicy: 'origin' });
     } catch {
       throw new InteropTransportError('pCloud interoperability download is offline.', 'offline', true);
+    } finally {
+      await removeRule();
     }
     if (response.status === 404) throw resultError(2009);
     if (!response.ok) throw new InteropTransportError('pCloud interoperability download failed.', 'provider-unavailable', true);
@@ -173,12 +182,41 @@ export class PCloudInteropObjectStore implements InteropObjectStore {
     return this.request(method, new URLSearchParams(params));
   }
 
+  /** pCloud rejects some endpoints without a pCloud Referer/Origin; force them via a scoped DNR rule. */
+  private async apiWithReferer(method: string, params: Record<string, string> = {}): Promise<Record<string, unknown>> {
+    const credential = this.credential();
+    const removeRule = await installPCloudRequestHeaderRule(`https://${credential.apiHost}/${method}`);
+    try {
+      return await this.request(method, new URLSearchParams(params));
+    } finally {
+      await removeRule();
+    }
+  }
+
   private async request(method: string, body: FormData | URLSearchParams): Promise<Record<string, unknown>> {
     const credential = this.credential();
     body.set('access_token', credential.accessToken);
+    // Mirror the proven backup-flow request shape: pCloud's API is strict about
+    // referrer and browser-like headers for URL-encoded calls.
+    const urlEncodedInit: RequestInit =
+      body instanceof URLSearchParams
+        ? {
+            mode: 'cors',
+            credentials: 'include',
+            referrer: PCLOUD_DOWNLOAD_REFERRER,
+            referrerPolicy: 'origin',
+            headers: {
+              accept: '*/*',
+              'accept-language': 'en-US,en;q=0.9',
+              'cache-control': 'no-cache',
+              'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+              pragma: 'no-cache',
+            },
+          }
+        : {};
     let response: Response;
     try {
-      response = await this.fetchImpl(`https://${credential.apiHost}/${method}`, { method: 'POST', body });
+      response = await this.fetchImpl(`https://${credential.apiHost}/${method}`, { method: 'POST', ...urlEncodedInit, body });
     } catch {
       throw new InteropTransportError('pCloud interoperability is offline.', 'offline', true);
     }

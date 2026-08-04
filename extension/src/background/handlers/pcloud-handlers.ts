@@ -30,6 +30,7 @@ import { createChromeInteropRuntime, preflightChromeInteropAction } from '../int
 import type { LibraryChangeNotifier } from '../library-change-notifier.js';
 import { finalizeInteropMoveSource } from '../../data/interop/move-source-finalizer.js';
 import { createDisabledInteropRuntimeMessageRegistry, createInteropRuntimeMessageRegistry } from './interop-runtime-handlers.js';
+import { createDisabledLocalTransferMessageRegistry, createLocalTransferMessageRegistry } from './local-transfer-handlers.js';
 
 declare const __IMAGE_TRAIL_INTEROP_ENABLED__: boolean | undefined;
 const transferSyncEnabled = typeof __IMAGE_TRAIL_INTEROP_ENABLED__ === 'boolean' && __IMAGE_TRAIL_INTEROP_ENABLED__;
@@ -130,7 +131,10 @@ export function createPCloudMessageRegistry(): Record<PCloudRequestType, Message
 export function createCloudMessageRegistry(
   getDb: () => Promise<IDBDatabase | null>,
   finalizeSourceRecord?: ((sourceLocalId: string, sourceUpdatedAt: string) => Promise<void>) | undefined,
-): Record<PCloudRequestType | typeof MessageType.InteropRuntime, MessageDef<ExtensionRequest, ExtensionResponse>> {
+): Record<
+  PCloudRequestType | typeof MessageType.InteropRuntime | typeof MessageType.LocalTransfer,
+  MessageDef<ExtensionRequest, ExtensionResponse>
+> {
   return {
     ...createPCloudMessageRegistry(),
     ...(transferSyncEnabled
@@ -140,6 +144,7 @@ export function createCloudMessageRegistry(
           openInteropPairingImport,
         )
       : createDisabledInteropRuntimeMessageRegistry()),
+    ...(transferSyncEnabled ? createLocalTransferMessageRegistry(getDb) : createDisabledLocalTransferMessageRegistry()),
   };
 }
 

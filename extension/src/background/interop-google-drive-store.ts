@@ -53,7 +53,9 @@ export class GoogleDriveInteropObjectStore implements InteropObjectStore {
   private rootId: string | null = null;
 
   constructor(private readonly options: GoogleDriveInteropStoreOptions) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // Bind the global: assigning bare `fetch` to a property and invoking it as a
+    // method makes Chromium throw "Illegal invocation" (receiver is the store).
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
   }
 
   authState(): Promise<'connected'> {

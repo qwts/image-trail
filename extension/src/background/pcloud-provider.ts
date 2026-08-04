@@ -28,7 +28,7 @@ import {
 
 const PCLOUD_CLIENT_ID = '83ag1CIbJd7';
 const PCLOUD_AUTHORIZE_URL = 'https://my.pcloud.com/oauth2/authorize';
-const PCLOUD_DOWNLOAD_REFERRER = 'https://my.pcloud.com/';
+export const PCLOUD_DOWNLOAD_REFERRER = 'https://my.pcloud.com/';
 const PCLOUD_REQUEST_HEADER_RULE_ID_BASE = 900199;
 const DEFAULT_PCLOUD_API_HOST: PCloudApiHost = 'api.pcloud.com';
 const PCLOUD_ROOT_FOLDER_NAME = 'Image Trail';
@@ -270,7 +270,7 @@ function nextPCloudRequestHeaderRuleId(): number {
   return pcloudRequestHeaderRuleId;
 }
 
-async function installPCloudRequestHeaderRule(url: string): Promise<() => Promise<void>> {
+export async function installPCloudRequestHeaderRule(url: string): Promise<() => Promise<void>> {
   if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest?.updateSessionRules) return async () => {};
   const ruleId = nextPCloudRequestHeaderRuleId();
   const regexFilter = `^${escapeRegExp(url)}$`;

@@ -7,7 +7,7 @@ import {
 } from './interop-pcloud-connection-store.js';
 import { PCloudInteropObjectStore } from './interop-pcloud-store.js';
 
-const PCLOUD_INTEROP_CLIENT_ID = '83ag1CIbJd7';
+const PCLOUD_INTEROP_CLIENT_ID = 'V26QPwebU8j';
 const PCLOUD_AUTHORIZE_URL = 'https://my.pcloud.com/oauth2/authorize';
 
 export interface PCloudInteropAuthOptions {

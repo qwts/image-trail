@@ -215,6 +215,7 @@ export type ExtensionRequest =
   | ListPCloudBackupsMessage
   | DownloadPCloudBackupMessage
   | import('./interop-runtime-messages.js').InteropRuntimeMessage
+  | import('./local-transfer-messages.js').LocalTransferMessage
   | ListUrlTemplatesMessage
   | SaveUrlTemplateMessage
   | DeleteUrlTemplateMessage
@@ -276,6 +277,7 @@ export type ExtensionResponse =
   | ListPCloudBackupsResultMessage
   | DownloadPCloudBackupResultMessage
   | import('./interop-runtime-messages.js').InteropRuntimeResultMessage
+  | import('./local-transfer-messages.js').LocalTransferResultMessage
   | ListUrlTemplatesResultMessage
   | SaveUrlTemplateResultMessage
   | DeleteUrlTemplateResultMessage

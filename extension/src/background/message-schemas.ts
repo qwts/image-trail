@@ -48,6 +48,7 @@ const interopRuntimeActionSchema = v.variant('name', [
   }),
 ]);
 export const interopRuntimeRequestSchema = v.object({ context: interopRuntimeContextSchema, action: interopRuntimeActionSchema });
+export const localTransferRequestSchema = v.object({ recordId: v.pipe(v.string(), v.minLength(1)), syncString: v.optional(v.string()) });
 export const openDestinationRequestSchema = v.object({ destination: v.picklist(EXTENSION_DESTINATION_IDS) });
 export const destinationSourceStatusRequestSchema = v.object({ sourceTabId: v.optional(v.number()) });
 export const focusDestinationSourceRequestSchema = v.object({ sourceTabId: v.number() });
