@@ -1,0 +1,38 @@
+# Advisory semantic check (agentic-code-analysis, issue qwts/agentic-code-analysis#6).
+# Advisory only: this job always exits 0 — findings are informational.
+# Promotion to --enforce is a separate owner decision on advisory evidence.
+# The size ratchet is untouched; the contract is conjunctive (ratchet AND
+# semantic check).
+name: aca
+on:
+  pull_request:
+permissions:
+  contents: read
+# One advisory run per PR; a newer push obsoletes the in-flight judgment.
+concurrency:
+  group: aca-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  context-footprint:
+    name: context-footprint
+    # Repo policy: draft PRs start no Actions jobs (same guard as ci.yml).
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # merge-base with origin/main needs history
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: qwts/agentic-code-analysis
+          ref: 6d4f69f30ca487a6af522f5aa73ca4068a0c4877 # pinned; bump deliberately
+          path: .aca
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - run: npm --prefix .aca clean-install
+      - run: node .aca/src/cli.ts context-footprint --base origin/main
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
