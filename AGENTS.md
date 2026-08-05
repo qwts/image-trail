@@ -1,13 +1,9 @@
 # Agent Instructions
 
-Canonical, vendor-neutral agent context for Image Trail, governed by
-[ENG-0006](https://github.com/qwts/playbook-engineering/blob/main/docs/decisions/ENG-0006-agentic-primitives-governance.md).
-Vendor files are thin adapters onto this file; shared facts belong here once.
+Canonical agent context for Image Trail; vendor files are thin adapters.
 
 Start with [CONTRIBUTING.md](CONTRIBUTING.md) and its
-[wiki guide](https://github.com/qwts/image-trail/wiki/Contributing). Shared
-workflow, review, permission, and untrusted-input rules come from the
-[org-wide agent conventions](https://github.com/qwts/playbook-engineering/blob/main/docs/reference/agent-conventions.md).
+[wiki guide](https://github.com/qwts/image-trail/wiki/Contributing).
 
 ## Product boundaries
 
@@ -79,3 +75,23 @@ Layer direction is enforced by ESLint:
 - Release validation must include `npm run build:release` and confirm
   `nativeMessaging` is absent from both `extension/dist/manifest.json` and the
   packaged baseline.
+
+<!-- governed:shared-agent-discovery:start -->
+
+## Shared agent conventions and skills
+
+PR-first workflow, validation-before-push, commit and PR hygiene, and the
+untrusted-input threat model are defined once, for every repo, in the
+[org-wide agent conventions](https://github.com/qwts/playbook-engineering/blob/main/docs/reference/agent-conventions.md).
+Before creating or copying a repo-local skill, consult the
+[shared agent skills](https://github.com/qwts/playbook-engineering/blob/main/skills/README.md)
+index. Reuse a shared skill when it fits; only a skill genuinely specific
+to this repository belongs in its local context.
+This repository is governed by
+[playbook-engineering](https://github.com/qwts/playbook-engineering) — its
+[shared SOPs](https://github.com/qwts/playbook-engineering/blob/main/docs/sop/README.md)
+and [engineering decisions](https://github.com/qwts/playbook-engineering/blob/main/docs/decisions/README.md)
+apply here by default
+([ENG-0008](https://github.com/qwts/playbook-engineering/blob/main/docs/decisions/ENG-0008-shared-sop-inheritance.md):
+inherit by default, vary by explicit delta).
+<!-- governed:shared-agent-discovery:end -->
