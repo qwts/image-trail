@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.26.6
+
+### Patch Changes
+
+- 389df43: Move the ExtensionRequest and ExtensionResponse unions into their own module so adding a message type no longer grows the message barrel file.
+
 ## 0.26.5
 
 ### Patch Changes
