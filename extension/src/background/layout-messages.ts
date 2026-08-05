@@ -171,3 +171,19 @@ export function isDeleteWorkspaceLayoutResultMessage(value: unknown): value is D
   if (!hasVersionedObjectShape(value)) return false;
   return value.type === MessageType.DeleteWorkspaceLayoutResult;
 }
+
+export type LayoutRequest =
+  | LoadPanelPositionMessage
+  | SavePanelPositionMessage
+  | DeletePanelPositionMessage
+  | LoadWorkspaceLayoutMessage
+  | SaveWorkspaceLayoutMessage
+  | DeleteWorkspaceLayoutMessage;
+
+export type LayoutResponse =
+  | LoadPanelPositionResultMessage
+  | SavePanelPositionResultMessage
+  | DeletePanelPositionResultMessage
+  | LoadWorkspaceLayoutResultMessage
+  | SaveWorkspaceLayoutResultMessage
+  | DeleteWorkspaceLayoutResultMessage;
