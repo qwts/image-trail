@@ -113,7 +113,7 @@
     ]
   },
   "dependencies": {
-    "@noble/hashes": "2.0.1",
+    "@noble/hashes": "2.2.0",
     "events": "3.3.0",
     "mpegts.js": "1.8.0",
     "react": "^19.2.8",
