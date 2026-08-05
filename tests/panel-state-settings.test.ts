@@ -259,7 +259,7 @@ test('pCloud backup reducer tracks backing-up state and verified upload metadata
     historyRecord: {
       schemaVersion: 1,
       provider: 'pcloud',
-      destination: '/Image Trail/backups',
+      destination: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
       fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
       completedAt: '2026-06-27T00:00:01.000Z',
       sizeBytes: 512,
@@ -301,7 +301,7 @@ test('pCloud status hydrates persisted backup history while disconnected', () =>
           {
             schemaVersion: 1,
             provider: 'pcloud',
-            destination: '/Image Trail/backups',
+            destination: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
             fileName: 'persisted.image-trail-encrypted.json',
             completedAt: '2026-06-27T00:00:01.000Z',
             sizeBytes: 768,
@@ -453,7 +453,7 @@ test('pCloud restore reducer tracks candidates and downloaded metadata', () => {
   const candidates = reducePanelAction(restoring, {
     name: 'pcloud-backup/restore-candidates-loaded',
     apiHost: 'api.pcloud.com',
-    folderPath: '/Image Trail/backups',
+    folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
     candidates: [
       {
         fileId: 402,
@@ -472,7 +472,7 @@ test('pCloud restore reducer tracks candidates and downloaded metadata', () => {
   const downloaded = reducePanelAction(candidates, {
     name: 'pcloud-backup/restore-downloaded',
     apiHost: 'api.pcloud.com',
-    folderPath: '/Image Trail/backups',
+    folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
     fileName: 'image-trail-pcloud-backup-2026-06-27T00-00-00Z.image-trail-encrypted.json',
     sizeBytes: 512,
     sha256: 'c'.repeat(64),

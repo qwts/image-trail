@@ -126,10 +126,13 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Smoke-test hardened release build
+        env:
+          PCLOUD_CLIENT_ID: ${{ secrets.PCLOUD_CLIENT_ID }}
         run: npm run test:e2e:release
 
       - name: Build and package release
         env:
+          PCLOUD_CLIENT_ID: ${{ secrets.PCLOUD_CLIENT_ID }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: npm run package:release -- --tag "$RELEASE_TAG"
 

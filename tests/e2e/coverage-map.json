@@ -1045,7 +1045,7 @@
             "tests/dom/recall-export-controller.test.ts",
             "tests/dom/settings-section.test.ts"
           ],
-          "notes": "Covers encrypted manifest-plus-parts schema and integrity, bounded one-original backup/restore messages, manifest-last history publication, allowlisted partial cleanup, cooperative cancel UI, provider operations, trusted bounded backup-history persistence, disconnected-state hydration, verification-method rendering, plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
+          "notes": "Covers the build-time regular-backup client-id gate, release configuration requirement, /Applications/Playbook-Eng-Trail-Overlook-1/backups folder contract, encrypted manifest-plus-parts schema and integrity, bounded one-original backup/restore messages, manifest-last history publication, allowlisted partial cleanup, cooperative cancel UI, provider operations, trusted bounded backup-history persistence, disconnected-state hydration, verification-method rendering, plus the narrow optional https://*.pcloud.com/* request and explicit denial result before OAuth."
         },
         {
           "type": "storybook",
@@ -1059,7 +1059,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/import-export-settings.spec.ts",
-          "notes": "Covers mocked pCloud connect, token-hiding UI boundary, sequential encrypted part uploads with a manifest published last, persistent manifest-only backup history across disconnect and Settings rerender, restore candidate listing, and bounded restore preview without real pCloud secrets."
+          "notes": "Covers the injected non-secret pCloud OAuth client id, exact application-root folder creation, mocked connect, token-hiding UI boundary, sequential encrypted part uploads with a manifest published last, persistent manifest-only backup history across disconnect and Settings rerender, restore candidate listing, and bounded restore preview without real pCloud credentials."
         }
       ]
     },

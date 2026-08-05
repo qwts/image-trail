@@ -840,7 +840,7 @@ test('pcloud connect reports a failed connection without chrome identity', async
   assert.equal(response.payload.status.connected, false);
 });
 
-test('pcloud upload, list, and download degrade to invalid-input and not-connected reasons', async () => {
+test('disabled pcloud upload, list, and download degrade to invalid-input and not-configured reasons', async () => {
   const uploadEntry = pcloudRegistry[MessageType.UploadPCloudBackup];
   const invalidUpload = await handleAndRespond<UploadPCloudBackupResultMessage>(uploadEntry, {
     type: MessageType.UploadPCloudBackup,
@@ -856,14 +856,14 @@ test('pcloud upload, list, and download degrade to invalid-input and not-connect
     version: MESSAGE_PROTOCOL_VERSION,
     payload: { fileName: 'backup.json', fileContent: 'cipher' },
   });
-  assert.equal(disconnectedUpload.payload.ok === false && disconnectedUpload.payload.reason, 'not-connected');
+  assert.equal(disconnectedUpload.payload.ok === false && disconnectedUpload.payload.reason, 'not-configured');
 
   const list = await handleAndRespond<ListPCloudBackupsResultMessage>(
     pcloudRegistry[MessageType.ListPCloudBackups],
     createListPCloudBackupsMessage(),
   );
   assert.equal(list.type, MessageType.ListPCloudBackupsResult);
-  assert.equal(list.payload.ok === false && list.payload.reason, 'not-connected');
+  assert.equal(list.payload.ok === false && list.payload.reason, 'not-configured');
 
   const badName = await handleAndRespond<DownloadPCloudBackupResultMessage>(
     pcloudRegistry[MessageType.DownloadPCloudBackup],
@@ -882,7 +882,7 @@ test('pcloud upload, list, and download degrade to invalid-input and not-connect
     pcloudRegistry[MessageType.DownloadPCloudBackup],
     createDownloadPCloudBackupMessage({ fileId: 7, fileName: 'backup.image-trail-encrypted.json' }),
   );
-  assert.equal(disconnectedDownload.payload.ok === false && disconnectedDownload.payload.reason, 'not-connected');
+  assert.equal(disconnectedDownload.payload.ok === false && disconnectedDownload.payload.reason, 'not-configured');
 });
 
 test('pcloud fallbacks return the documented degraded payloads', () => {

@@ -25,10 +25,13 @@ type BuildPolicyModule = {
     release?: boolean;
     interopEnabled?: boolean;
     e2eTestBuild?: boolean;
+    pcloudClientId?: string | null;
   }): Record<string, unknown>;
   isInteropFeatureEnabled(environment?: Record<string, string | undefined>): boolean;
   isReleaseBuild(environment?: Record<string, string | undefined>): boolean;
   isE2ETestBuild(environment?: Record<string, string | undefined>): boolean;
+  isPCloudBackupFeatureEnabled(environment?: Record<string, string | undefined>): boolean;
+  pcloudClientIdFromEnvironment(environment?: Record<string, string | undefined>): string | null;
   minificationImproved(unminifiedBytes: number, minifiedBytes: number): boolean;
 };
 
@@ -67,13 +70,25 @@ function releaseBuildInfo(overrides: Record<string, unknown> = {}) {
 }
 
 test('central release build policy minifies and removes development-only debugging', () => {
-  const local = builds.extensionBuildOptions({ entryPoint: 'source.ts', outfile: 'output.js', format: 'esm', release: false });
+  const local = builds.extensionBuildOptions({
+    entryPoint: 'source.ts',
+    outfile: 'output.js',
+    format: 'esm',
+    release: false,
+    pcloudClientId: null,
+  });
   assert.equal(local['minify'], false);
   assert.equal(local['legalComments'], 'inline');
   assert.equal(local['drop'], undefined);
   assert.equal(local['pure'], undefined);
 
-  const release = builds.extensionBuildOptions({ entryPoint: 'source.ts', outfile: 'output.js', format: 'esm', release: true });
+  const release = builds.extensionBuildOptions({
+    entryPoint: 'source.ts',
+    outfile: 'output.js',
+    format: 'esm',
+    release: true,
+    pcloudClientId: 'release-client-id',
+  });
   assert.equal(release['minify'], true);
   assert.equal(release['legalComments'], 'eof');
   assert.deepEqual(release['drop'], ['debugger']);
@@ -83,13 +98,24 @@ test('central release build policy minifies and removes development-only debuggi
     __IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__: 'undefined',
     __IMAGE_TRAIL_E2E_TEST_BUILD__: 'false',
     __IMAGE_TRAIL_INTEROP_ENABLED__: 'false',
+    __IMAGE_TRAIL_PCLOUD_CLIENT_ID__: '"release-client-id"',
+    __IMAGE_TRAIL_PCLOUD_ENABLED__: 'true',
   });
+
+  assert.equal((local['define'] as Record<string, string>)['__IMAGE_TRAIL_PCLOUD_CLIENT_ID__'], 'undefined');
+  assert.equal((local['define'] as Record<string, string>)['__IMAGE_TRAIL_PCLOUD_ENABLED__'], 'false');
+  assert.throws(
+    () =>
+      builds.extensionBuildOptions({ entryPoint: 'source.ts', outfile: 'output.js', format: 'esm', release: true, pcloudClientId: null }),
+    /Release builds require PCLOUD_CLIENT_ID/u,
+  );
 
   const e2e = builds.extensionBuildOptions({
     entryPoint: 'source.ts',
     outfile: 'output.js',
     format: 'esm',
     e2eTestBuild: true,
+    pcloudClientId: null,
   });
   assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_TEST_BUILD__'], 'true');
   assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__'], '"data-image-trail-e2e-test-build"');
@@ -100,6 +126,7 @@ test('central release build policy minifies and removes development-only debuggi
     format: 'esm',
     release: true,
     e2eTestBuild: true,
+    pcloudClientId: 'release-client-id',
   });
   assert.equal((releaseE2E['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_TEST_BUILD__'], 'true');
   assert.equal(
@@ -112,6 +139,7 @@ test('central release build policy minifies and removes development-only debuggi
     outfile: 'output.js',
     format: 'esm',
     interopEnabled: true,
+    pcloudClientId: null,
   });
   assert.equal((interop['define'] as Record<string, string>)['__IMAGE_TRAIL_INTEROP_ENABLED__'], 'true');
 });
@@ -123,6 +151,10 @@ test('release-mode detection and minification regression threshold are explicit'
   assert.equal(builds.isInteropFeatureEnabled({ IMAGE_TRAIL_ENABLE_INTEROP: '0' }), false);
   assert.equal(builds.isE2ETestBuild({ IMAGE_TRAIL_E2E_TEST_BUILD: '1' }), true);
   assert.equal(builds.isE2ETestBuild({ IMAGE_TRAIL_E2E_TEST_BUILD: '0' }), false);
+  assert.equal(builds.isPCloudBackupFeatureEnabled({ PCLOUD_CLIENT_ID: ' repo-client-id ' }), true);
+  assert.equal(builds.isPCloudBackupFeatureEnabled({}), false);
+  assert.equal(builds.pcloudClientIdFromEnvironment({ PCLOUD_CLIENT_ID: ' repo-client-id ' }), 'repo-client-id');
+  assert.throws(() => builds.pcloudClientIdFromEnvironment({ PCLOUD_CLIENT_ID: 'not a client id' }), /PCLOUD_CLIENT_ID/u);
   assert.equal(builds.minificationImproved(1_000, 1_000), true);
   assert.equal(builds.minificationImproved(10_000, 9_900), false);
   assert.equal(builds.minificationImproved(10_000, 8_000), true);

@@ -89,7 +89,7 @@ test('cancel waits for the current provider request, removes verified parts, and
     status: { connected: true, apiHost: 'api.pcloud.com' },
     fileId: 701,
     fileName,
-    folderPath: '/Image Trail/backups',
+    folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
     apiHost: 'api.pcloud.com',
     sizeBytes: 128,
     sha256: 'a'.repeat(64),
@@ -98,7 +98,7 @@ test('cancel waits for the current provider request, removes verified parts, and
     historyRecord: {
       schemaVersion: 1,
       provider: 'pcloud',
-      destination: '/Image Trail/backups',
+      destination: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
       fileName,
       completedAt: '2026-07-28T12:00:00.000Z',
       sizeBytes: 128,
