@@ -8,8 +8,13 @@ on:
   pull_request:
 permissions:
   contents: read
+# One advisory run per PR; a newer push obsoletes the in-flight judgment.
+concurrency:
+  group: aca-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 jobs:
   context-footprint:
+    name: context-footprint
     # Repo policy: draft PRs start no Actions jobs (same guard as ci.yml).
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
