@@ -245,6 +245,9 @@ async function installPCloudMock(serviceWorker: Worker): Promise<void> {
     scope.__imageTrailOriginalLaunchWebAuthFlow ??= chrome.identity.launchWebAuthFlow.bind(chrome.identity);
     chrome.identity.launchWebAuthFlow = ((details, callback) => {
       const authorizeUrl = new URL(details.url);
+      if (authorizeUrl.searchParams.get('client_id') !== 'image-trail-e2e-client') {
+        throw new Error('The regular pCloud backup OAuth client id was not injected into the E2E build.');
+      }
       const state = authorizeUrl.searchParams.get('state') ?? '';
       const redirectUrl = `${chrome.identity.getRedirectURL('pcloud')}#access_token=e2e-pcloud-token&state=${encodeURIComponent(
         state,
@@ -265,7 +268,14 @@ async function installPCloudMock(serviceWorker: Worker): Promise<void> {
       if (method === 'userinfo') return json({ result: 0, premium: true, quota: 1000000, usedquota: 250000 });
       if (method === 'createfolderifnotexists') {
         const params = parametersFromBody(init?.body);
-        return json({ result: 0, metadata: { isfolder: true, folderid: params.get('name') === 'backups' ? 42 : 41 } });
+        const parent = params.get('folderid');
+        const name = params.get('name');
+        if (parent === '0' && name === 'Applications') return json({ result: 0, metadata: { isfolder: true, folderid: 41 } });
+        if (parent === '41' && name === 'Playbook-Eng-Trail-Overlook-1') {
+          return json({ result: 0, metadata: { isfolder: true, folderid: 42 } });
+        }
+        if (parent === '42' && name === 'backups') return json({ result: 0, metadata: { isfolder: true, folderid: 43 } });
+        throw new Error(`Unexpected pCloud backup folder segment ${name ?? ''} under ${parent ?? ''}.`);
       }
       if (method === 'uploadfile' && init?.body instanceof FormData) {
         const file = init.body.get('file');
@@ -281,7 +291,7 @@ async function installPCloudMock(serviceWorker: Worker): Promise<void> {
       }
       if (method === 'listfolder') {
         const params = parametersFromBody(init?.body);
-        const files = params.get('folderid') === '42' ? Object.entries(scope.__imageTrailPCloudMock?.files ?? {}) : [];
+        const files = params.get('folderid') === '43' ? Object.entries(scope.__imageTrailPCloudMock?.files ?? {}) : [];
         return json({
           result: 0,
           metadata: {
@@ -457,7 +467,7 @@ test('settings utilities persist through rerenders and pCloud remains a mocked m
     );
     expect(uploadedNames.slice(0, -1).every((fileName) => fileName.endsWith('.image-trail-part.json'))).toBe(true);
     expect(uploadedNames.at(-1)).toMatch(/\.image-trail-encrypted\.json$/u);
-    await expect(cloudProvider).toContainText('/Image Trail/backups');
+    await expect(cloudProvider).toContainText('/Applications/Playbook-Eng-Trail-Overlook-1/backups');
     await expect(cloudProvider.getByRole('heading', { name: 'Backup history (1)' })).toBeVisible();
     await expect(cloudProvider.locator('.image-trail-panel__backup-history-item')).toContainText('Image Trail SHA-256');
     await expect(cloudProvider.locator('.image-trail-panel__backup-history-item')).toContainText('Downloaded bytes matched export');

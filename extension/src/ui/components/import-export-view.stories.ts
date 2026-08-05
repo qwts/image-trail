@@ -200,7 +200,7 @@ export const CloudBackupConnected: Story = {
     cloudBackupStory({
       connectionState: 'connected',
       apiHost: 'api.pcloud.com',
-      folderPath: '/Image Trail/backups',
+      folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
       message: 'Ready for manual encrypted backup.',
     }),
 };
@@ -211,7 +211,7 @@ export const CloudBackupCollapsed: Story = {
       {
         connectionState: 'connected',
         apiHost: 'api.pcloud.com',
-        folderPath: '/Image Trail/backups',
+        folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
         message: 'Ready for manual encrypted backup.',
       },
       { collapsed: true },
@@ -224,7 +224,7 @@ export const CloudBackupBackingUp: Story = {
       connectionState: 'busy',
       pendingOperation: 'backing-up',
       apiHost: 'api.pcloud.com',
-      folderPath: '/Image Trail/backups',
+      folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
       message: 'Uploading encrypted backup to pCloud...',
     }),
 };
@@ -234,7 +234,7 @@ export const CloudBackupVerified: Story = {
     cloudBackupStory({
       connectionState: 'connected',
       apiHost: 'api.pcloud.com',
-      folderPath: '/Image Trail/backups',
+      folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
       lastBackupName: 'image-trail-pcloud-backup-2026-06-27T16-24-00Z.image-trail-encrypted.json',
       lastBackupAt: '2026-06-27 11:24 AM',
       lastBackupSize: '428 KB',
@@ -249,7 +249,7 @@ export const CloudBackupRestoreAvailable: Story = {
     cloudBackupStory({
       connectionState: 'connected',
       apiHost: 'api.pcloud.com',
-      folderPath: '/Image Trail/backups',
+      folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
       restoreCandidates: [
         {
           fileId: 402,
@@ -273,7 +273,7 @@ export const CloudBackupRestorePreviewReady: Story = {
     cloudBackupStory({
       connectionState: 'connected',
       apiHost: 'api.pcloud.com',
-      folderPath: '/Image Trail/backups',
+      folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
       lastBackupName: 'image-trail-pcloud-backup-2026-06-28T00-51-15Z.image-trail-encrypted.json',
       lastBackupAt: '2026-06-28T00:51:22.335Z',
       lastBackupSize: '22.3 KB',
@@ -313,7 +313,7 @@ export const CloudBackupError: Story = {
     cloudBackupStory({
       connectionState: 'error',
       apiHost: 'eapi.pcloud.com',
-      folderPath: '/Image Trail/backups',
+      folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
       message: 'pCloud upload failed after the encrypted backup was created locally.',
       messageIsError: true,
     }),
@@ -325,7 +325,7 @@ export const CloudBackupNarrow: Story = {
       {
         connectionState: 'connected',
         apiHost: 'api.pcloud.com',
-        folderPath: '/Image Trail/backups',
+        folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
         lastBackupName: 'image-trail-pcloud-backup-2026-06-27T16-24-00Z.image-trail-encrypted.json',
         lastBackupAt: '2026-06-27 11:24 AM',
         lastBackupSize: '428 KB',

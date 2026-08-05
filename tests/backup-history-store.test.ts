@@ -8,7 +8,7 @@ function historyRecord(index: number, overrides: Partial<BackupHistoryRecord> = 
   return {
     schemaVersion: 1,
     provider: 'pcloud',
-    destination: '/Image Trail/backups',
+    destination: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
     fileName: `backup-${index}.image-trail-encrypted.json`,
     completedAt: new Date(Date.UTC(2026, 6, 1, 0, index)).toISOString(),
     sizeBytes: 1024 + index,

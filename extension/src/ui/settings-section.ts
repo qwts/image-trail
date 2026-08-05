@@ -1,3 +1,4 @@
+import { PCLOUD_BACKUP_FOLDER_PATH } from '../core/cloud/pcloud-provider.js';
 import type { PanelAction, PanelState } from '../core/types.js';
 import type { UrlField } from '../core/url/types.js';
 import { createEncryptionView } from './components/encryption-view.js';
@@ -27,6 +28,7 @@ export function createSettingsSection(
   state: PanelState,
   urlContext: SettingsUrlContext,
   dispatch: (action: PanelAction) => void,
+  options: { readonly pcloudBackupEnabled?: boolean } = {},
 ): HTMLElement {
   const importExportState = importExportViewState(state);
   const cloudBackupState = cloudBackupProviderState(state);
@@ -89,7 +91,7 @@ export function createSettingsSection(
       utilities: [
         createImageTransferView(importExportState, dispatch),
         createImportExportView(importExportState, dispatch),
-        createCloudBackupView(cloudBackupState, dispatch),
+        ...(options.pcloudBackupEnabled === false ? [] : [createCloudBackupView(cloudBackupState, dispatch)]),
       ],
     },
     dispatch,
@@ -125,7 +127,7 @@ function cloudBackupProviderState(state: PanelState): CloudBackupProviderState {
     provider: 'pcloud',
     connectionState: state.pcloudBackup.connectionState,
     apiHost: state.pcloudBackup.apiHost,
-    folderPath: '/Image Trail/backups',
+    folderPath: PCLOUD_BACKUP_FOLDER_PATH,
     lastBackupAt: state.pcloudBackup.lastBackupAt,
     lastBackupName: state.pcloudBackup.lastBackupFileName,
     lastBackupSize:

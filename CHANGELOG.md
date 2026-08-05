@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.26.5
+
+### Patch Changes
+
+- 368241b: Re-enable regular pCloud backups through a release-injected OAuth client ID and store backups under the shared Playbook Engineering application root.
+
 ## 0.26.4
 
 ### Patch Changes

@@ -1,9 +1,14 @@
-import { PCLOUD_BACKUP_PART_SUFFIX, type PCloudBackupCleanupInput, type PCloudBackupCleanupResult } from '../core/cloud/pcloud-provider.js';
+import {
+  PCLOUD_BACKUP_FOLDER_PATH,
+  PCLOUD_BACKUP_PART_SUFFIX,
+  type PCloudBackupCleanupInput,
+  type PCloudBackupCleanupResult,
+} from '../core/cloud/pcloud-provider.js';
+import { ensurePCloudBackupFolder } from './pcloud-backup-folder.js';
+import { PCLOUD_BUILD_CONFIG } from './pcloud-build-config.js';
 import { loadPCloudConnectionRecord, pcloudStatusFromRecord, type PCloudConnectionRecord } from './pcloud-connection-store.js';
 import { numberOrUndefined, recordOrNull } from './pcloud-provider-utils.js';
 
-const ROOT_FOLDER_NAME = 'Image Trail';
-const BACKUP_FOLDER_NAME = 'backups';
 const PART_FILE_NAME = /^image-trail-cloud-([a-zA-Z0-9-]{1,36})-\d{6}-(?:metadata|records|original)\.image-trail-part\.json$/u;
 const PART_CATALOG_TTL_MS = 60_000;
 
@@ -43,8 +48,7 @@ async function ensureFolder(record: PCloudConnectionRecord, parentFolderId: numb
 }
 
 async function loadPartCatalog(record: PCloudConnectionRecord): Promise<ReadonlyMap<number, string>> {
-  const rootFolderId = await ensureFolder(record, 0, ROOT_FOLDER_NAME);
-  const backupFolderId = await ensureFolder(record, rootFolderId, BACKUP_FOLDER_NAME);
+  const backupFolderId = await ensurePCloudBackupFolder(record, ensureFolder);
   const data = await fetchPCloudJson(record, 'listfolder', { folderid: String(backupFolderId), noshares: '1' });
   const metadata = recordOrNull(data['metadata']);
   const contents = Array.isArray(metadata?.['contents']) ? metadata['contents'] : [];
@@ -65,7 +69,7 @@ export async function assertPCloudBackupPartReference(record: PCloudConnectionRe
     partCatalogCache = { key: cacheKey, expiresAt: Date.now() + PART_CATALOG_TTL_MS, files: await loadPartCatalog(record) };
   }
   if (partCatalogCache.files.get(fileId) !== fileName) {
-    throw new Error('pCloud backup part was not found under its exact manifest filename in /Image Trail/backups.');
+    throw new Error(`pCloud backup part was not found under its exact manifest filename in ${PCLOUD_BACKUP_FOLDER_PATH}.`);
   }
 }
 
@@ -73,12 +77,15 @@ async function deletePart(record: PCloudConnectionRecord, fileId: number): Promi
   await fetchPCloudJson(record, 'deletefile', { fileid: String(fileId) });
 }
 
-function disconnectedResult(fileIds: readonly number[]): PCloudBackupCleanupResult {
-  const message = 'Connect pCloud before cleaning up partial backup files.';
+function disconnectedResult(
+  fileIds: readonly number[],
+  reason = 'not-connected',
+  message = 'Connect pCloud before cleaning up partial backup files.',
+): PCloudBackupCleanupResult {
   return {
     ok: false,
     status: { connected: false, message, messageIsError: true },
-    reason: 'not-connected',
+    reason,
     deletedFileIds: [],
     failedFileIds: fileIds,
     message,
@@ -87,6 +94,7 @@ function disconnectedResult(fileIds: readonly number[]): PCloudBackupCleanupResu
 
 export async function cleanupPCloudBackupParts(input: PCloudBackupCleanupInput): Promise<PCloudBackupCleanupResult> {
   const requestedFileIds = [...new Set(input.fileIds)];
+  if (!PCLOUD_BUILD_CONFIG.enabled) return disconnectedResult(requestedFileIds, 'not-configured', PCLOUD_BUILD_CONFIG.unavailableMessage);
   const record = await loadPCloudConnectionRecord();
   if (!record) return disconnectedResult(requestedFileIds);
   if (requestedFileIds.length === 0) {
