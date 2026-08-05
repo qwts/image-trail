@@ -14,3 +14,6 @@ test-results/
 
 # Generated e2e fixture assets (created at test runtime)
 tests/e2e/pages/assets/generated-*
+
+# aca verdict cache
+.cache/aca/
