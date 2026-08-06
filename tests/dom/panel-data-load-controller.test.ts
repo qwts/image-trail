@@ -238,9 +238,26 @@ test('loadRecentHistory loads the recents for the current page and stamps lastUp
   const before = harness.getState().lastUpdatedAt;
   await harness.controller.loadRecentHistory();
   assert.equal(harness.getState().history.length, 1);
-  assert.deepEqual(harness.recentLoadInputs, [{ scope: 'site' }]);
+  assert.deepEqual(harness.recentLoadInputs, [{ scope: 'site', includeRetained: false }]);
   assert.notEqual(harness.getState().lastUpdatedAt, before);
   assert.ok(harness.log.includes('render'));
+});
+
+test('session review requests retained recents without changing persisted retention (#209)', async () => {
+  const harness = createHarness();
+  harness.patchState({
+    reviewingRecentSession: true,
+    recentHistoryLimit: 2,
+    recentHistoryRetainedLimit: 5,
+    recentHistoryOverflowBehavior: 'keep-session',
+  });
+
+  await harness.controller.loadRecentHistory();
+
+  assert.deepEqual(harness.recentLoadInputs, [{ scope: 'site', includeRetained: true }]);
+  assert.equal(harness.getState().reviewingRecentSession, true);
+  assert.equal(harness.getState().recentHistoryLimit, 2);
+  assert.equal(harness.getState().recentHistoryRetainedLimit, 5);
 });
 
 test('loadRecentHistory ignores a stale response after the scope changes', async () => {

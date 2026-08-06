@@ -22,7 +22,6 @@ import type { RecallExportController } from '../extension/src/ui/panel/recall-ex
 import type { RecallRestoreController } from '../extension/src/ui/panel/recall-restore-controller.js';
 import type { UrlTemplateSettingsController } from '../extension/src/ui/panel/url-template-settings-controller.js';
 import { workspaceActionDeps, workspaceActionFixtures } from './support/workspace-action-fixtures.js';
-
 interface Harness {
   readonly deps: PanelActionDeps;
   readonly log: string[];
@@ -249,6 +248,8 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'settings/update-recent-sparse-row-display-mode': { name: 'settings/update-recent-sparse-row-display-mode', mode: 'compact' },
   'history/update-display-order': { name: 'history/update-display-order', order: 'oldest-first' },
   'history/update-scope': { name: 'history/update-scope', scope: 'all' },
+  'history/review-session': { name: 'history/review-session' },
+  'history/finish-session-review': { name: 'history/finish-session-review' },
   'bookmarks/update-display-order': { name: 'bookmarks/update-display-order', order: 'back-first' },
   'settings/update-pin-save-storage-preference': { name: 'settings/update-pin-save-storage-preference', value: 'encrypted' },
   'settings/update-privacy-mode': { name: 'settings/update-privacy-mode', enabled: true },
@@ -375,7 +376,6 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'navigate-next': { name: 'navigate-next' },
   'navigate-previous': { name: 'navigate-previous' },
 };
-
 function flushMicrotasks(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }

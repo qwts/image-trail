@@ -304,7 +304,10 @@ export class CapturedOriginalsController {
   }
 
   private addRecentHistoryRecord(store: RecentHistoryStore, record: ImageDisplayRecord): Promise<readonly ImageDisplayRecord[]> {
-    return store.add(record, window.location.href, { scope: this.deps.getState().recentHistoryScope });
+    return store.add(record, window.location.href, {
+      scope: this.deps.getState().recentHistoryScope,
+      includeRetained: this.deps.getState().reviewingRecentSession,
+    });
   }
 
   private async findSavedRecordDuringCapturePreflight(url: string): Promise<ImageDisplayRecord | null> {

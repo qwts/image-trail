@@ -41,9 +41,13 @@ export function createRecentsSettingsView(state: RecentHistorySettingsState, dis
   apply.type = 'submit';
   apply.textContent = 'Apply';
 
-  const showHidden = document.createElement('button');
-  showHidden.type = 'button';
-  showHidden.textContent = 'Show hidden recents';
+  const reviewSession = document.createElement('button');
+  reviewSession.type = 'button';
+  reviewSession.textContent = 'Review recent session';
+  reviewSession.disabled = state.overflowBehavior !== 'keep-session' || state.retainedLimit <= state.limit;
+  reviewSession.title = reviewSession.disabled
+    ? 'Keep hidden session overflow above the visible limit to make a review available.'
+    : 'Temporarily show every retained Recent from this browser session.';
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -53,16 +57,7 @@ export function createRecentsSettingsView(state: RecentHistorySettingsState, dis
     if (!Number.isInteger(limit) || !Number.isInteger(retainedLimit) || !overflowBehavior) return;
     dispatch({ name: 'settings/update-recent-history-retention', limit, retainedLimit, overflowBehavior });
   });
-  showHidden.addEventListener('click', () => {
-    limitInput.value = String(state.retainedLimit);
-    overflowSelect.value = 'keep-session';
-    dispatch({
-      name: 'settings/update-recent-history-retention',
-      limit: state.retainedLimit,
-      retainedLimit: state.retainedLimit,
-      overflowBehavior: 'keep-session',
-    });
-  });
+  reviewSession.addEventListener('click', () => dispatch({ name: 'history/review-session' }));
   sparseModeSelect.addEventListener('change', () => {
     const mode = recentSparseRowDisplayModeFrom(sparseModeSelect.value);
     if (!mode) return;
@@ -71,7 +66,8 @@ export function createRecentsSettingsView(state: RecentHistorySettingsState, dis
 
   const meta = document.createElement('p');
   meta.className = 'image-trail-panel__settings-empty';
-  meta.textContent = 'Recents stay transient. Hidden overflow is kept only for the current extension session up to the max kept count.';
+  meta.textContent =
+    'Recents stay transient. Review temporarily shows hidden session overflow without changing retention settings or creating pins.';
 
   const sparseModeField = createField('Recent layout', sparseModeSelect);
   sparseModeField.classList.add('image-trail-panel__settings-field--wide');
@@ -82,7 +78,7 @@ export function createRecentsSettingsView(state: RecentHistorySettingsState, dis
     createField('Max kept recents', retainedLimitInput),
     createField('Overflow', overflowSelect),
     apply,
-    showHidden,
+    reviewSession,
   );
   wrapper.append(heading, form, meta);
   return wrapper;

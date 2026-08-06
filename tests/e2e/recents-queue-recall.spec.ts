@@ -92,11 +92,12 @@ async function setVisibleRecents(
   }
 }
 
-async function showHiddenRecents(page: Page, expectedVisibleCount: number): Promise<void> {
+async function reviewRecentSession(page: Page, expectedVisibleCount: number): Promise<void> {
   await openSettingsGroup(page, 'Display');
-  await page.getByRole('button', { name: 'Show hidden recents' }).click();
+  await page.getByRole('button', { name: 'Review recent session' }).click();
   await closeSettings(page);
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(expectedVisibleCount);
+  await expect(page.getByRole('button', { name: 'Finish review' })).toBeVisible();
 }
 
 async function deleteVisibleRecents(page: Page): Promise<void> {
@@ -191,7 +192,7 @@ test('successful loads add Recents while failed loads do not', async ({ page, se
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(2);
 });
 
-test('Recents retention settings hide overflow rows without persisting them', async ({ page, serviceWorker }) => {
+test('Recents session review reveals retained overflow without persisting or pinning it (#209)', async ({ page, serviceWorker }) => {
   await openPanel(page, serviceWorker);
   await deleteVisibleRecents(page);
   await setVisibleRecents(page, { limit: '2', retainedLimit: '3', overflow: 'Keep hidden this session' });
@@ -215,10 +216,23 @@ test('Recents retention settings hide overflow rows without persisting them', as
   await expect(page.locator('.image-trail-panel__history-item').first()).toContainText('asset-one.svg');
   await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-two.svg' })).toHaveCount(0);
 
-  await showHiddenRecents(page, 3);
+  const queueCountBeforeReview = await page.locator('.image-trail-panel__bookmark-item').count();
+  await reviewRecentSession(page, 3);
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(3);
   await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' })).toHaveCount(1);
   await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-two.svg' })).toHaveCount(1);
+  await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(queueCountBeforeReview);
+
+  await page.getByRole('button', { name: 'Finish review' }).click();
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(2);
+  await openSettingsGroup(page, 'Display');
+  const recents = page
+    .getByRole('heading', { name: 'Recents' })
+    .locator('xpath=ancestor::div[contains(@class, "image-trail-panel__settings-templates")][1]');
+  await expect(recents.locator('input[type="number"]').nth(0)).toHaveValue('2');
+  await expect(recents.locator('input[type="number"]').nth(1)).toHaveValue('3');
+  await closeSettings(page);
+  await setVisibleRecents(page, { limit: '30', overflow: 'Drop oldest' });
 });
 
 test('pins persist across panel reopen and Recall recalls offscreen durable rows to the capped queue', async ({ page, serviceWorker }) => {

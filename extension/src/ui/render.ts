@@ -268,6 +268,9 @@ function createHistorySection(target: PanelRenderTarget, state: PanelState): HTM
     scope: state.recentHistoryScope,
     pageUrl: window.location.href,
     privacyMode: state.privacyModeEnabled,
+    reviewingSession: state.reviewingRecentSession,
+    sessionReviewAvailable:
+      state.recentHistoryOverflowBehavior === 'keep-session' && state.recentHistoryRetainedLimit > state.recentHistoryLimit,
   });
 }
 

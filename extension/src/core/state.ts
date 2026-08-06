@@ -64,6 +64,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     recentSparseRowDisplayMode: 'adaptive',
     recentDisplayOrder: DEFAULT_RECENT_DISPLAY_ORDER,
     recentHistoryScope: DEFAULT_RECENT_HISTORY_SCOPE,
+    reviewingRecentSession: false,
     bookmarks: [],
     bookmarkOffset: 0,
     bookmarkLimit: 30,

@@ -10,10 +10,16 @@ import {
 
 const record = { id: 'recent-1', url: 'https://images.example/recent.jpg', timestamp: '2026-07-15T00:00:00.000Z' };
 
-test('recent history message builders carry explicit view scopes', () => {
+test('recent history message builders carry explicit view scopes and session-review projection (#209)', () => {
   const pageUrl = 'https://source.example/gallery';
   assert.equal(createLoadRecentHistoryMessage(pageUrl, { includeRetained: true, scope: 'all' }).payload.scope, 'all');
-  assert.equal(createAddRecentHistoryMessage(pageUrl, record, { scope: 'page' }).payload.scope, 'page');
-  assert.equal(createUpdateRecentHistoryMessage(pageUrl, record, { scope: 'all' }).payload.scope, 'all');
-  assert.equal(createRemoveRecentHistoryMessage(pageUrl, record.id, { scope: 'site' }).payload.scope, 'site');
+  const add = createAddRecentHistoryMessage(pageUrl, record, { scope: 'page', includeRetained: true });
+  const update = createUpdateRecentHistoryMessage(pageUrl, record, { scope: 'all', includeRetained: true });
+  const remove = createRemoveRecentHistoryMessage(pageUrl, record.id, { scope: 'site', includeRetained: true });
+  assert.equal(add.payload.scope, 'page');
+  assert.equal(update.payload.scope, 'all');
+  assert.equal(remove.payload.scope, 'site');
+  assert.equal(add.payload.includeRetained, true);
+  assert.equal(update.payload.includeRetained, true);
+  assert.equal(remove.payload.includeRetained, true);
 });

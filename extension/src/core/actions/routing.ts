@@ -41,6 +41,8 @@ export const PANEL_ACTION_DOMAINS = {
   'history/select': 'queue-recents',
   'history/update-display-order': 'queue-recents',
   'history/update-scope': 'queue-recents',
+  'history/review-session': 'queue-recents',
+  'history/finish-session-review': 'queue-recents',
   'selection/select-visible': 'queue-recents',
   'history-selection/toggle': 'queue-recents',
   'history-selection/select': 'queue-recents',

@@ -60,6 +60,7 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
         recentHistoryLimit: action.limit,
         recentHistoryRetainedLimit: action.retainedLimit,
         recentHistoryOverflowBehavior: action.overflowBehavior,
+        reviewingRecentSession: false,
         history,
         selectedHistoryIds: keepItems(
           state.selectedHistoryIds,

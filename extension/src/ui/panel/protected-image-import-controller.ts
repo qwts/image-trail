@@ -24,12 +24,18 @@ export async function addProtectedImportedImageToLibrary(
   });
   const historyItem = withDurableQueueState(historyDraft, { ...bookmark, thumbnail: undefined });
   const recentHistoryStore = deps.recentHistoryStore();
+  const reviewLimit = deps.getState().reviewingRecentSession
+    ? deps.getState().recentHistoryRetainedLimit
+    : deps.getState().recentHistoryLimit;
   const history = recentHistoryStore
-    ? await recentHistoryStore.add(historyItem, window.location.href, { scope: deps.getState().recentHistoryScope })
+    ? await recentHistoryStore.add(historyItem, window.location.href, {
+        scope: deps.getState().recentHistoryScope,
+        includeRetained: deps.getState().reviewingRecentSession,
+      })
     : [historyItem, ...deps.getState().history.filter((item) => item.id !== historyItem.id && item.url !== historyItem.url)];
   deps.setState({
     ...deps.getState(),
-    history: history.slice(0, 30),
+    history: history.slice(0, reviewLimit),
     message: bookmarkSaveMessage(bookmark, bookmark.label),
     lastUpdatedAt: Date.now(),
   });

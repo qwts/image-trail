@@ -117,8 +117,12 @@ export class RecordLibraryController {
     if (!item) return;
     if (!this.isProjectionActive(options)) return;
     const recentHistoryStore = this.deps.recentHistoryStore();
+    const reviewingRecentSession = this.deps.getState().reviewingRecentSession;
     const history = recentHistoryStore
-      ? await recentHistoryStore.add(item, window.location.href, { scope: this.deps.getState().recentHistoryScope })
+      ? await recentHistoryStore.add(item, window.location.href, {
+          scope: this.deps.getState().recentHistoryScope,
+          includeRetained: reviewingRecentSession,
+        })
       : [item, ...next.slice(1)];
     if (!this.isProjectionActive(options)) return;
     this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
@@ -198,7 +202,10 @@ export class RecordLibraryController {
     const recentHistoryStore = this.deps.recentHistoryStore();
     const scope = this.deps.getState().recentHistoryScope;
     const history = recentHistoryStore
-      ? await recentHistoryStore.update(linkedHistory, window.location.href, { scope })
+      ? await recentHistoryStore.update(linkedHistory, window.location.href, {
+          scope,
+          includeRetained: this.deps.getState().reviewingRecentSession,
+        })
       : this.deps.getState().history;
     if (this.deps.getState().recentHistoryScope !== scope) return;
     this.deps.setState({
@@ -287,7 +294,10 @@ export class RecordLibraryController {
     const blobId = existing && !existing.pinnedRecordId ? encryptedBlobIdForRecord(existing) : undefined;
     const recentHistoryStore = this.deps.recentHistoryStore();
     const history = recentHistoryStore
-      ? await recentHistoryStore.remove(id, window.location.href, { scope: this.deps.getState().recentHistoryScope })
+      ? await recentHistoryStore.remove(id, window.location.href, {
+          scope: this.deps.getState().recentHistoryScope,
+          includeRetained: this.deps.getState().reviewingRecentSession,
+        })
       : reducePanelAction(this.deps.getState(), { name: 'history/remove', id }).history;
     this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
     this.deps.render();

@@ -112,18 +112,21 @@ export const findBookmarkByUrlRequestSchema = v.object({ url: v.string() });
 export const addRecentHistoryRequestSchema = v.object({
   pageUrl: v.string(),
   item: imageDisplayRecordSchema,
+  includeRetained: v.optional(v.boolean()),
   scope: v.optional(v.picklist(['page', 'site', 'all'])),
 });
 
 export const updateRecentHistoryRequestSchema = v.object({
   pageUrl: v.string(),
   item: imageDisplayRecordSchema,
+  includeRetained: v.optional(v.boolean()),
   scope: v.optional(v.picklist(['page', 'site', 'all'])),
 });
 
 export const removeRecentHistoryRequestSchema = v.object({
   pageUrl: v.string(),
   id: v.string(),
+  includeRetained: v.optional(v.boolean()),
   scope: v.optional(v.picklist(['page', 'site', 'all'])),
 });
 

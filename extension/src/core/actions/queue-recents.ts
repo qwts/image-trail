@@ -55,7 +55,7 @@ export function reduceQueueRecentsAction(state: PanelState, action: QueueRecents
       });
       const history = [item, ...state.history.filter((entry) => entry.url !== item.url && entry.id !== item.id)].slice(
         0,
-        state.recentHistoryLimit,
+        state.reviewingRecentSession ? state.recentHistoryRetainedLimit : state.recentHistoryLimit,
       );
       return {
         ...state,
@@ -290,6 +290,10 @@ export function reduceQueueRecentsAction(state: PanelState, action: QueueRecents
       return { ...state, recentDisplayOrder: action.order, lastUpdatedAt: Date.now() };
     case 'history/update-scope':
       return { ...state, recentHistoryScope: action.scope, selectedHistoryIds: [], lastUpdatedAt: Date.now() };
+    case 'history/review-session':
+      return { ...state, reviewingRecentSession: true, selectedHistoryIds: [], lastUpdatedAt: Date.now() };
+    case 'history/finish-session-review':
+      return { ...state, reviewingRecentSession: false, selectedHistoryIds: [], lastUpdatedAt: Date.now() };
     case 'capture/start':
       return {
         ...state,

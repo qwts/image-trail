@@ -73,13 +73,20 @@ export class PanelDataLoadController {
     if (options.render !== false) this.deps.render();
   }
 
-  loadRecentHistory = async (options: { readonly render?: boolean } = {}): Promise<void> => {
+  loadRecentHistory = async (options: { readonly render?: boolean; readonly includeRetained?: boolean } = {}): Promise<void> => {
     const recentHistoryStore = this.deps.recentHistoryStore();
     if (!recentHistoryStore) return;
-    const scope = this.deps.getState().recentHistoryScope;
+    const state = this.deps.getState();
+    const scope = state.recentHistoryScope;
+    const includeRetained = options.includeRetained ?? state.reviewingRecentSession;
     const requestId = (this.recentHistoryRequestId += 1);
-    const history = await recentHistoryStore.load(window.location.href, { scope });
-    if (requestId !== this.recentHistoryRequestId || this.deps.getState().recentHistoryScope !== scope) return;
+    const history = await recentHistoryStore.load(window.location.href, { scope, includeRetained });
+    if (
+      requestId !== this.recentHistoryRequestId ||
+      this.deps.getState().recentHistoryScope !== scope ||
+      this.deps.getState().reviewingRecentSession !== includeRetained
+    )
+      return;
     this.deps.setState({
       ...this.deps.getState(),
       history,

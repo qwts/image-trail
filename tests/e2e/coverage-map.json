@@ -720,7 +720,7 @@
     },
     {
       "id": "recents-retention-settings",
-      "acceptance": "Recents retention settings",
+      "acceptance": "Recents retention settings and explicit recent-session review (issue #209)",
       "repoPath": "docs/acceptance-tests/recents-retention-settings.md",
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Recents-Retention-Settings",
       "coverage": [
@@ -737,12 +737,12 @@
             "tests/dom/history-view.test.ts",
             "tests/dom/recents-settings-view.test.ts"
           ],
-          "notes": "Covers Recents retention plus #452 sparse-row display-mode persistence, Settings UI dispatch, mode-specific Recents row classes, privacy-masked Recents labels, the CSS contract for adaptive/full/half/compact row sizing, and #478 centered Adaptive metadata at three or more rows while one or two rows remain top-left and two-row thumbnails retain the full-width background effect with a fully visible center 40% and symmetric edge feathering."
+          "notes": "Covers Recents retention plus the #209 session-only review state and explicit enter/finish actions, #452 sparse-row display-mode persistence, Settings UI dispatch, mode-specific Recents row classes, privacy-masked Recents labels, the CSS contract for adaptive/full/half/compact row sizing, and #478 centered Adaptive metadata at three or more rows while one or two rows remain top-left and two-row thumbnails retain the full-width background effect with a fully visible center 40% and symmetric edge feathering."
         },
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/recents-queue-recall.spec.ts",
-          "notes": "Covers visible Recents being populated only by successful image loads, failed loads being excluded from the transient recent list, Visible recents limiting, Max kept recents bounding hidden session retention, Keep hidden this session retention, and Show hidden recents reveal behavior."
+          "notes": "Covers visible Recents being populated only by successful image loads, failed loads being excluded from the transient recent list, Visible recents limiting, Max kept recents bounding hidden session retention, Keep hidden this session retention, and #209 explicitly reviewing then finishing retained session overflow without changing retention settings or creating durable queue rows."
         }
       ]
     },

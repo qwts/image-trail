@@ -22,12 +22,18 @@ export async function addImportedImageToLibrary(
   const bookmark = bookmarkStore ? await bookmarkStore.save(records.bookmark) : records.bookmark;
   const historyItem = { ...records.history, pinnedRecordId: bookmark.id, pinnedAt: bookmark.queueUpdatedAt ?? bookmark.timestamp };
   const recentHistoryStore = deps.recentHistoryStore();
+  const reviewLimit = deps.getState().reviewingRecentSession
+    ? deps.getState().recentHistoryRetainedLimit
+    : deps.getState().recentHistoryLimit;
   const history = recentHistoryStore
-    ? await recentHistoryStore.add(historyItem, window.location.href, { scope: deps.getState().recentHistoryScope })
+    ? await recentHistoryStore.add(historyItem, window.location.href, {
+        scope: deps.getState().recentHistoryScope,
+        includeRetained: deps.getState().reviewingRecentSession,
+      })
     : [historyItem, ...deps.getState().history];
   deps.setState({
     ...deps.getState(),
-    history: history.slice(0, 30),
+    history: history.slice(0, reviewLimit),
     message: bookmarkSaveMessage(bookmark, bookmark.label ?? file.name),
     lastUpdatedAt: Date.now(),
   });
