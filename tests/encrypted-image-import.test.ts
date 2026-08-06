@@ -109,7 +109,7 @@ test('successful protected import leaves the durable queue record pointing at an
   const opened = await openImageTrailDb();
   assert.ok(opened.db);
   const db = opened.db;
-  const store = new IndexedDbBookmarkStore();
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
   t.after(async () => {
     await store.close();
     db.close();
@@ -119,7 +119,7 @@ test('successful protected import leaves the durable queue record pointing at an
   const result = await importEncryptedImageToDurableStorage(exported.fileContent, {
     restoreActiveBlobKey: async () => active,
     getDb: async () => db,
-    saveBookmark: (record) => store.saveResult(record),
+    saveBookmark: (record, importKey) => store.saveProtectedResult(record, importKey),
     now: () => '2026-07-20T00:00:01.000Z',
     randomUuid: () => 'blob-durable',
   });
@@ -129,4 +129,45 @@ test('successful protected import leaves the durable queue record pointing at an
   const durable = (await store.loadByIds([result.record.id]))[0];
   assert.equal(durable?.storedOriginal?.blobId, 'blob-durable');
   assert.equal((await new BlobsRepository(db).get('blob-durable'))?.referenceCount, 1);
+});
+
+test('protected import releases its blob when the active key changes before the durable save', async (t) => {
+  await deleteImageTrailDb();
+  const { exported, active } = await encryptedFixture('https://images.example.test/key-switch.png');
+  const switched = { key: await generateAesGcmKey(false), reference: createKeyReference('blob', 'switched-key') };
+  let current = active;
+  const opened = await openImageTrailDb();
+  assert.ok(opened.db);
+  const db = opened.db;
+  const blobs = new BlobsRepository(db);
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => current });
+  t.after(async () => {
+    await store.close();
+    db.close();
+    await deleteImageTrailDb();
+  });
+
+  const result = await importEncryptedImageToDurableStorage(exported.fileContent, {
+    restoreActiveBlobKey: async () => active,
+    getDb: async () => db,
+    createBlobsRepository: () => ({
+      put: async (record) => {
+        const saved = await blobs.put(record);
+        current = switched;
+        return saved;
+      },
+      remove: (id) => blobs.remove(id),
+    }),
+    saveBookmark: (record, importKey) => store.saveProtectedResult(record, importKey),
+    now: () => '2026-07-20T00:00:01.000Z',
+    randomUuid: () => 'blob-key-switch',
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    reason: 'durable-save-failed',
+    message: 'Encrypted original key changed during import.',
+  });
+  assert.equal(await blobs.get('blob-key-switch'), undefined);
+  assert.equal((await store.loadPage({ offset: 0, limit: 30 })).total, 0);
 });

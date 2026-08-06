@@ -14,7 +14,7 @@ export type DurableEncryptedImageImportResult =
 export interface EncryptedImageImportDeps {
   readonly restoreActiveBlobKey: () => Promise<ActiveBlobKey | null>;
   readonly getDb: () => Promise<IDBDatabase | null>;
-  readonly saveBookmark: (record: ImageDisplayRecord) => Promise<BookmarkSaveResult>;
+  readonly saveBookmark: (record: ImageDisplayRecord, activeBlobKey: ActiveBlobKey) => Promise<BookmarkSaveResult>;
   readonly createBlobsRepository?: ((db: IDBDatabase) => Pick<BlobsRepository, 'put' | 'remove'>) | undefined;
   readonly notifyBookmarkSaved?: ((record: ImageDisplayRecord) => void) | undefined;
   readonly now?: (() => string) | undefined;
@@ -113,7 +113,7 @@ export async function importEncryptedImageToDurableStorage(
         fileName: opened.fileName,
       },
     });
-    const saved = await deps.saveBookmark(draft);
+    const saved = await deps.saveBookmark(draft, activeBlobKey);
     if (!saved.ok) {
       await blobs.remove(blobId);
       blobStored = false;
