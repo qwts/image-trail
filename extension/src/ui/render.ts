@@ -32,7 +32,9 @@ import {
 } from './panel-render-preservation.js';
 
 declare const __IMAGE_TRAIL_INTEROP_ENABLED__: boolean | undefined;
+declare const __IMAGE_TRAIL_PCLOUD_ENABLED__: boolean | undefined;
 const transferSyncEnabled = typeof __IMAGE_TRAIL_INTEROP_ENABLED__ === 'boolean' && __IMAGE_TRAIL_INTEROP_ENABLED__;
+const pcloudBackupEnabled = typeof __IMAGE_TRAIL_PCLOUD_ENABLED__ === 'boolean' && __IMAGE_TRAIL_PCLOUD_ENABLED__;
 
 export type { PanelLayoutState, PanelRenderTarget } from './panel-render-types.js';
 
@@ -146,7 +148,9 @@ const SETTINGS_SECTION: DetachableSectionDefinition = {
   visible: (state) => state.activeDestination === 'settings',
   create: (target, state) => {
     const { fields, activeTemplate } = cachedActiveUrlFields(state);
-    return createSettingsSection(state, { fields, activeTemplateId: activeTemplate?.id ?? state.activeUrlTemplateId }, target.dispatch);
+    return createSettingsSection(state, { fields, activeTemplateId: activeTemplate?.id ?? state.activeUrlTemplateId }, target.dispatch, {
+      pcloudBackupEnabled,
+    });
   },
 };
 

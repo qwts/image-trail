@@ -7,6 +7,13 @@ rules:
       allow:
         - CHORES_DUMB_CLIENT_ID
         - CHORES_DUMB_PRIVATE_KEY
+        # Public OAuth configuration is injected only into the hardened release
+        # build; the repository secret keeps it out of source control.
+        - PCLOUD_CLIENT_ID
+        # Consumed only by the advisory aca judge (contents: read, pull_request
+        # from same-repo branches; fork PRs receive no secrets). Budget-capped
+        # key; absence degrades to a one-line notice, never a failure.
+        - ANTHROPIC_API_KEY
   unpinned-uses:
     config:
       policies:

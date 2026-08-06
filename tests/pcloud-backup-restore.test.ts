@@ -142,7 +142,7 @@ function createHarness(files: ReadonlyMap<number, { readonly fileName: string; r
       return {
         ok: true as const,
         status: { connected: true as const, apiHost: 'api.pcloud.com' as const },
-        folderPath: '/Image Trail/backups',
+        folderPath: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
         apiHost: 'api.pcloud.com' as const,
         fileId: input.fileId,
         fileName: input.fileName,

@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createPCloudMessageRegistry } from '../extension/src/background/handlers/pcloud-handlers.js';
 import { PCLOUD_HOST_PERMISSION } from '../extension/src/background/permissions.js';
 import { MessageType, createConnectPCloudProviderMessage } from '../extension/src/background/messages.js';
+
+const buildScope = globalThis as typeof globalThis & { __IMAGE_TRAIL_PCLOUD_CLIENT_ID__?: string };
+buildScope.__IMAGE_TRAIL_PCLOUD_CLIENT_ID__ = 'image-trail-unit-client';
+const { createPCloudMessageRegistry } = await import('../extension/src/background/handlers/pcloud-handlers.js');
 
 test('pCloud connection requests only pCloud hosts and fails cleanly when denied', async () => {
   const originalChrome = globalThis.chrome;

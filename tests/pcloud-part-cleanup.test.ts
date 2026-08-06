@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createPCloudMessageRegistry } from '../extension/src/background/handlers/pcloud-handlers.js';
 import { MESSAGE_PROTOCOL_VERSION, MessageType, type UploadPCloudBackupResultMessage } from '../extension/src/background/messages.js';
-import { uploadPCloudBackup } from '../extension/src/background/pcloud-provider.js';
+
+const buildScope = globalThis as typeof globalThis & { __IMAGE_TRAIL_PCLOUD_CLIENT_ID__?: string };
+buildScope.__IMAGE_TRAIL_PCLOUD_CLIENT_ID__ = 'image-trail-unit-client';
+const [{ createPCloudMessageRegistry }, { uploadPCloudBackup }] = await Promise.all([
+  import('../extension/src/background/handlers/pcloud-handlers.js'),
+  import('../extension/src/background/pcloud-provider.js'),
+]);
 
 const CONNECTION_KEY = 'imageTrail.pcloudConnection';
 
@@ -38,7 +43,10 @@ function installConnection(): () => void {
 
 function folderId(init: RequestInit | undefined): number {
   const params = init?.body as URLSearchParams;
-  return params.get('name') === 'Image Trail' ? 100 : 200;
+  if (params.get('folderid') === '0' && params.get('name') === 'Applications') return 100;
+  if (params.get('folderid') === '100' && params.get('name') === 'Playbook-Eng-Trail-Overlook-1') return 200;
+  if (params.get('folderid') === '200' && params.get('name') === 'backups') return 300;
+  throw new Error(`Unexpected pCloud folder path segment ${params.get('name') ?? ''}.`);
 }
 
 test('partial cleanup deletes only allowlisted Image Trail part files from the backup folder', async () => {

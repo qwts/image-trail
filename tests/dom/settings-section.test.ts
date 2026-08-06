@@ -7,8 +7,10 @@ import { createInitialPanelState } from '../../extension/src/core/state.js';
 import type { PanelState } from '../../extension/src/core/types.js';
 import { createSettingsSection } from '../../extension/src/ui/settings-section.js';
 
-function build(state: PanelState, actions: unknown[] = []): HTMLElement {
-  return createSettingsSection(state, { fields: [], activeTemplateId: null }, (action) => actions.push(action));
+function build(state: PanelState, actions: unknown[] = [], pcloudBackupEnabled = true): HTMLElement {
+  return createSettingsSection(state, { fields: [], activeTemplateId: null }, (action) => actions.push(action), {
+    pcloudBackupEnabled,
+  });
 }
 
 test('createSettingsSection renders the full settings surface from an initial state', () => {
@@ -17,6 +19,13 @@ test('createSettingsSection renders the full settings surface from an initial st
   assert.ok(section.classList.contains('image-trail-panel__settings-section'));
   assert.ok(section.querySelector('.image-trail-panel__settings-checkbox input'), 'settings checkboxes render');
   assert.match(section.textContent ?? '', /pCloud/u, 'the cloud backup utility renders');
+});
+
+test('createSettingsSection hides regular pCloud backup when its build-time client id gate is disabled', () => {
+  const section = build({ ...createInitialPanelState(0), visible: true }, [], false);
+
+  assert.equal(section.querySelector('.image-trail-panel__cloud-backup'), null);
+  assert.doesNotMatch(section.textContent ?? '', /Connect pCloud/u);
 });
 
 test('createSettingsSection reflects populated backup, restore, and selection state', () => {
@@ -46,7 +55,7 @@ test('createSettingsSection reflects populated backup, restore, and selection st
         {
           schemaVersion: 1,
           provider: 'pcloud',
-          destination: '/Image Trail/backups',
+          destination: '/Applications/Playbook-Eng-Trail-Overlook-1/backups',
           fileName: 'image-trail-backup.json',
           completedAt: '2026-06-25T15:31:00.000Z',
           sizeBytes: 2048,
