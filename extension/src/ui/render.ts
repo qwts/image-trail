@@ -177,9 +177,15 @@ const PRIMARY_SECTIONS: readonly DetachableSectionDefinition[] = [
     id: 'url-editor',
     title: 'URL editor',
     attachedVisible: dashboardSectionVisible,
-    create: (target, state) =>
-      createUrlEditorView(
-        { url: cachedActiveUrlFields(state).activeUrl, privacyMode: state.privacyModeEnabled },
+    create: (target, state) => {
+      const selectedUrl = state.target.selectedUrl;
+      return createUrlEditorView(
+        {
+          url: cachedActiveUrlFields(state).activeUrl,
+          hostUrl: selectedUrl,
+          isDataUrl: selectedUrl?.startsWith('data:') === true,
+          privacyMode: state.privacyModeEnabled,
+        },
         {
           onApply: (url) => {
             target.dispatch({ name: 'selected-url/apply', url });
@@ -188,7 +194,8 @@ const PRIMARY_SECTIONS: readonly DetachableSectionDefinition[] = [
             target.dispatch({ name: 'selected-url/reject-unsupported-input' });
           },
         },
-      ),
+      );
+    },
   },
   {
     id: 'fields',
