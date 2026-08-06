@@ -177,7 +177,7 @@
             "tests/e2e/detachable-sections.spec.ts",
             "tests/e2e/react-renderer-boundary.spec.ts"
           ],
-          "notes": "Covers the explicit disposable E2E build intent plus packaged-extension open/minimize/expand/close, approved standard and narrow panel geometry, deterministic handoff artifacts, capture feedback, grouped Settings and Help surfaces, Host selection, URL application, visible navigation and automation actions, More controls, detached windows, status refresh, detached select focus after native change events, and focus/scroll-preserving rerenders."
+          "notes": "Covers the explicit disposable E2E build intent plus packaged-extension open/minimize/expand/close, approved standard and narrow panel geometry, deterministic handoff artifacts, capture feedback, grouped Settings and Help surfaces, Host selection, URL application, visible navigation and automation actions, More controls, detached windows, #753 usable target-action flyout/button/select geometry, status refresh, detached select focus after native change events, and focus/scroll-preserving rerenders."
         },
         {
           "type": "manual",

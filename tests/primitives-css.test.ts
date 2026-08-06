@@ -14,6 +14,7 @@ const fieldsCss = read('extension/src/ui/styles/fields.css');
 const settingsSurfaceCss = read('extension/src/ui/styles/settings-surface.css');
 const settingsIntegrationsCss = read('extension/src/ui/styles/settings-integrations.css');
 const designSystemCss = read('extension/src/ui/styles/design-system.css');
+const handoffBaselineCss = read('extension/src/ui/styles/handoff-baseline.css');
 const css = `${primitiveCss}\n${feedbackCss}\n${shortcutFeedbackCss}\n${panelShellCss}\n${primaryWorkflowCss}\n${recordRowCss}\n${fieldsCss}\n${settingsSurfaceCss}\n${settingsIntegrationsCss}`;
 const panel = read('extension/src/ui/styles/panel.css');
 const manifest = JSON.parse(read('extension/manifest.json')) as {
@@ -49,6 +50,13 @@ test('primitive styles preserve focus and reduced-motion behavior', () => {
 test('SectionHeader title track can shrink without pushing actions outside narrow panels', () => {
   assert.match(css, /grid-template-columns:\s*minmax\(0, 1fr\)\s+minmax\(0, max-content\)/u);
   assert.match(css, /\.image-trail-ds__section-title[\s\S]*min-width:\s*0;[\s\S]*text-overflow:\s*ellipsis;/u);
+});
+
+test('Host target flyout keeps its viewport-bounded width instead of inheriting the 26px trigger width', () => {
+  assert.match(
+    handoffBaselineCss,
+    /target-controls\[open\][^{]*target-actions[^{]*\{[\s\S]*inline-size:\s*min\(310px, calc\(100vw - 62px\)\);[\s\S]*max-width:\s*none;/u,
+  );
 });
 
 test('RecordRow styles keep selection stronger than stored-original and cover private lock states', () => {
