@@ -17,12 +17,14 @@ import {
 } from '../../core/display-records.js';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
 import type { ProjectionReason } from '../../core/projection-session.js';
-import type { BookmarkStore, ImportedImageFile, PanelState } from '../../core/types.js';
+import type { BookmarkStore, PanelState } from '../../core/types.js';
 import { bookmarkSaveMessage, withoutRecentPinState } from './record-export-helpers.js';
-import { createImportedMediaRecords, type CapturedImportedMedia } from './imported-media-record.js';
+import type { CapturedImportedMedia } from './imported-media-record.js';
+import { addImportedImageToLibrary, type RecordLibraryImportInput } from './imported-image-library.js';
 import type { RecordAddOptions, ValidatedRecordUrl } from './record-library-types.js';
 
 export type { RecordAddOptions } from './record-library-types.js';
+export type { RecordLibraryImportInput } from './imported-image-library.js';
 
 export interface RecordLibraryControllerDeps {
   getState(): PanelState;
@@ -93,26 +95,8 @@ export class RecordLibraryController {
     return true;
   }
 
-  async addImportedImage(file: ImportedImageFile, captured?: CapturedImportedMedia): Promise<boolean> {
-    const records = createImportedMediaRecords(file, captured);
-    if (!records) return false;
-    const bookmarkStore = this.deps.bookmarkStore();
-    const bookmark = bookmarkStore ? await bookmarkStore.save(records.bookmark) : records.bookmark;
-    const historyItem = { ...records.history, pinnedRecordId: bookmark.id, pinnedAt: bookmark.queueUpdatedAt ?? bookmark.timestamp };
-    const recentHistoryStore = this.deps.recentHistoryStore();
-    const history = recentHistoryStore
-      ? await recentHistoryStore.add(historyItem, window.location.href, { scope: this.deps.getState().recentHistoryScope })
-      : [historyItem, ...this.deps.getState().history];
-    this.deps.setState({
-      ...this.deps.getState(),
-      history: history.slice(0, 30),
-      message: bookmarkSaveMessage(bookmark, bookmark.label ?? file.name),
-      lastUpdatedAt: Date.now(),
-    });
-    await this.deps.loadBookmarkPage(0, { render: false });
-    this.deps.renderPanelAndRefreshRecall();
-    void this.deps.refreshStorageUsage({ render: true });
-    return true;
+  async addImportedImage(file: RecordLibraryImportInput, captured?: CapturedImportedMedia): Promise<boolean> {
+    return addImportedImageToLibrary(this.deps, file, captured);
   }
 
   async addRecentHistory(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<void> {

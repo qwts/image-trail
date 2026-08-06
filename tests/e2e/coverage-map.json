@@ -446,7 +446,7 @@
           "paths": [
             "tests/dom/gallery-view.test.ts",
             "tests/gallery-model.test.ts",
-            "tests/messages.test.ts",
+            "tests/encrypted-image-messages.test.ts",
             "tests/action-dispatch.test.ts"
           ],
           "notes": "Covers the panel open-gallery action, runtime message classification, bounded gallery paging controls, URL/data/blob activation decisions, and locked private-record disabling without implementing search, filters, or albums."
@@ -868,10 +868,13 @@
           "paths": [
             "tests/indexeddb-protected-pins.test.ts",
             "tests/encrypted-blobs.test.ts",
+            "tests/encrypted-image-import.test.ts",
+            "tests/messages.test.ts",
+            "tests/dom/record-library-controller.test.ts",
             "tests/dom/history-view.test.ts",
             "tests/dom/bookmarks-view.test.ts"
           ],
-          "notes": "Covers encrypted image export/import plus locked or unavailable encrypted rows remaining disabled until keys are available."
+          "notes": "Covers encrypted image export/import, including background-only decryption, encrypted-original resealing, byte-free message responses, confirmed durable saves, failure cleanup, direct Recent-to-queue linkage, and locked or unavailable encrypted rows remaining disabled until keys are available."
         },
         {
           "type": "playwright-e2e",

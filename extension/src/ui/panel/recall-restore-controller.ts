@@ -3,9 +3,10 @@ import type { BookmarkStore, ImportedEncryptedImageFile, ImportedImageFile, Pane
 import type { CaptureStore } from '../../content/capture-controller.js';
 import type { RecentHistoryStore } from '../../content/recent-history-store.js';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
-import { requestEncryptedImageImport } from '../../content/download-controller.js';
 import type { CapturedImportedMedia } from './imported-media-record.js';
 import { importMediaFiles } from './imported-media-batch.js';
+import { importEncryptedImageFiles } from './encrypted-image-restore.js';
+import type { RecordLibraryImportInput } from './record-library-controller.js';
 import type { downloadPCloudBackup, listPCloudBackups } from '../../content/pcloud-provider-client.js';
 import {
   importBookmarks as importBookmarkRecords,
@@ -58,7 +59,7 @@ export interface RecallRestoreControllerDeps {
   loadBookmarkPage(offset: number, options?: { readonly render?: boolean }): Promise<void>;
   loadRecentHistory(options?: { readonly render?: boolean }): Promise<void>;
   refreshStorageUsage(options?: { readonly render?: boolean }): Promise<void>;
-  addImportedImage(file: ImportedImageFile, captured?: CapturedImportedMedia): Promise<boolean>;
+  addImportedImage(file: RecordLibraryImportInput, captured?: CapturedImportedMedia): Promise<boolean>;
   getLocalSettings(): PlaintextLocalSettings;
   bookmarkStore(): BookmarkStore | null;
   albumStore(): {
@@ -139,66 +140,7 @@ export class RecallRestoreController {
   }
 
   async importEncryptedImages(files: readonly ImportedEncryptedImageFile[]): Promise<void> {
-    if (files.length === 0) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), {
-          name: 'import-export/error',
-          message: 'Choose one or more encrypted image files to import.',
-        }),
-      );
-      this.deps.render();
-      return;
-    }
-    if (!this.deps.getState().blobKeyUnlocked) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), {
-          name: 'import-export/error',
-          message: 'Unlock encrypted originals before importing encrypted images.',
-        }),
-      );
-      this.deps.render();
-      return;
-    }
-
-    this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/start' }));
-    this.deps.render();
-    let imported = 0;
-    let failed = 0;
-    let firstFailureMessage: string | null = null;
-    for (const file of files) {
-      const result = await requestEncryptedImageImport(file.fileContent);
-      if (!result.ok) {
-        if (result.reason === 'encryption-locked') await this.deps.refreshBlobKeyStatus();
-        firstFailureMessage ??= result.message;
-        failed += 1;
-        continue;
-      }
-      if (await this.deps.addImportedImage({ name: result.fileName || file.name, dataUrl: result.dataUrl })) imported += 1;
-    }
-
-    if (imported === 0) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), {
-          name: 'import-export/error',
-          message: firstFailureMessage ?? 'No encrypted image files could be imported.',
-        }),
-      );
-    } else if (failed > 0) {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), {
-          name: 'import-export/complete',
-          message: `Imported ${imported} encrypted image${imported === 1 ? '' : 's'}. ${failed} failed.`,
-        }),
-      );
-    } else {
-      this.deps.setState(
-        reducePanelAction(this.deps.getState(), {
-          name: 'import-export/complete',
-          message: `Imported ${imported} encrypted image${imported === 1 ? '' : 's'} into bookmarks and recent history.`,
-        }),
-      );
-    }
-    this.deps.render();
+    return importEncryptedImageFiles(files, this.deps);
   }
 
   async previewHistoryImport(fileContent: string, password: string, fileName?: string): Promise<void> {
