@@ -272,6 +272,36 @@ test('render restores a focused text input value and selection range across a re
   assert.equal(restored.selectionEnd, 9);
 });
 
+test('render resynchronizes URL apply status after restoring the focused editor value', () => {
+  const harness = createHarness();
+  const hostUrl = 'https://images.example.test/a/1.jpg';
+  harness.patchState({
+    visible: true,
+    target: { ...harness.getState().target, selectedUrl: hostUrl },
+    draftUrl: 'https://images.example.test/a/failed.jpg',
+  });
+  harness.controller.render();
+  const input = harness.root.querySelector<HTMLTextAreaElement>('.image-trail-panel__full-url-input');
+  assert.ok(input);
+  input.focus();
+  input.value = hostUrl;
+  input.setSelectionRange(12, 20);
+  input.dispatchEvent(new Event('input'));
+  harness.controller.render();
+
+  const restored = harness.root.querySelector<HTMLTextAreaElement>('.image-trail-panel__full-url-input');
+  const apply = Array.from(harness.root.querySelectorAll<HTMLButtonElement>('button')).find(
+    (button) => button.textContent === 'Apply to Host',
+  );
+  assert.ok(restored);
+  assert.ok(apply);
+  assert.equal(restored.value, hostUrl);
+  assert.equal(restored.selectionStart, 12);
+  assert.equal(restored.selectionEnd, 20);
+  assert.equal(apply.disabled, true);
+  assert.equal(harness.root.querySelector('.image-trail-panel__url-editor-status')?.textContent, 'in address bar');
+});
+
 test('renderRecallOnly rewrites only the recall root, leaving the panel root untouched', () => {
   const harness = createHarness();
   harness.patchState({ visible: true });

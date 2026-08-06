@@ -207,6 +207,7 @@
   inset-block-start: 31px;
   inset-inline-end: 0;
   display: flex;
+  box-sizing: border-box;
   inline-size: min(310px, calc(100vw - 62px));
   max-width: none;
   padding: 7px;
@@ -214,6 +215,14 @@
   border-radius: var(--it-radius-row);
   background: var(--it-menu-bg);
   box-shadow: var(--it-shadow-menu);
+}
+
+.image-trail-workspace__window .image-trail-panel__target-controls[open] .image-trail-ds__target-actions {
+  inline-size: min(310px, 100cqi);
+}
+
+.image-trail-workspace__dom-body {
+  container-type: inline-size;
 }
 
 .image-trail-panel-root .image-trail-panel__target-controls:not([open]) > :not(summary) {

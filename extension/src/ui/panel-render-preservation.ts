@@ -1,4 +1,5 @@
 import type { PanelDestinationId } from '../core/types.js';
+import { URL_EDITOR_VALUE_RESTORED_EVENT } from './components/url-editor-view.js';
 import { isPanelDestinationId } from './destination-registry.js';
 import type { PanelLayoutState, PanelRenderTarget } from './panel-render-types.js';
 
@@ -114,6 +115,7 @@ function restoreFocusedTextControl(target: PanelRenderTarget, snapshot: FocusedT
     target.detachedRoot?.querySelector<HTMLInputElement | HTMLTextAreaElement>(snapshot.selector);
   if (!next) return;
   next.value = snapshot.value;
+  if (snapshot.selector === '.image-trail-panel__full-url-input') next.dispatchEvent(new Event(URL_EDITOR_VALUE_RESTORED_EVENT));
   queueMicrotask(() => {
     next.focus({ preventScroll: true });
     if (snapshot.selectionStart !== null && snapshot.selectionEnd !== null) {

@@ -1,6 +1,7 @@
-import type { ImageDisplayRecord } from '../core/display-records.js';
+import { createDisplayRecord, type ImageDisplayRecord } from '../core/display-records.js';
 import { queueTimeForRecord } from '../core/display-order.js';
-import type { DurableBookmarkPayloadV1 } from './types.js';
+import type { ActiveBlobKey } from './crypto/blob-keyring.js';
+import type { DurableBookmarkPayloadV1, DurableEncryptedPinPayloadV1 } from './types.js';
 
 export function clampPageOffset(offset: number, limit: number, total: number): number {
   if (total <= 0) return 0;
@@ -62,6 +63,26 @@ export async function removeReplacedOriginal(
 ): Promise<void> {
   const previousBlobId = previous?.protectedPin?.storedOriginalBlobId ?? previous?.storedOriginal?.blobId;
   if (previousBlobId && previousBlobId !== nextBlobId) await context.blobs.remove(previousBlobId);
+}
+
+export function preserveImportedBookmarkMetadata(
+  record: ImageDisplayRecord,
+  existing: DurableBookmarkPayloadV1 | DurableEncryptedPinPayloadV1 | null,
+): ImageDisplayRecord {
+  if (!existing) return record;
+  return createDisplayRecord({
+    ...record,
+    title: existing.title ?? record.title,
+    label: existing.label ?? record.label,
+    width: existing.width ?? record.width,
+    height: existing.height ?? record.height,
+    timestamp: existing.bookmarkedAt,
+    downloadedAt: existing.downloadedAt ?? record.downloadedAt,
+  });
+}
+
+export function protectedImportOptions(activeBlobKey: ActiveBlobKey) {
+  return { preserveExistingMetadata: true, preserveExistingThumbnail: true, requiredActiveBlobKey: activeBlobKey } as const;
 }
 
 export function dataUrlToBytes(dataUrl: string): { readonly mimeType: string; readonly bytes: ArrayBuffer } | null {
