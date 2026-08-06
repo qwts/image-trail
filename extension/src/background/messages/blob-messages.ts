@@ -66,12 +66,8 @@ export interface ImportEncryptedImageResultMessage {
   readonly payload:
     | {
         readonly ok: true;
-        readonly dataUrl: string;
         readonly fileName: string;
-        readonly sourceUrl: string;
-        readonly mimeType: string;
-        readonly byteLength: number;
-        readonly keyReference: string;
+        readonly record: import('../../core/display-records.js').ImageDisplayRecord;
       }
     | { readonly ok: false; readonly reason: string; readonly message: string };
 }

@@ -143,6 +143,42 @@ test('addImportedImage saves a paired bookmark and history row against the page 
   assert.deepEqual(harness.log, ['loadBookmarkPage:0:false', 'renderPanelAndRefreshRecall', 'refreshStorageUsage:true']);
 });
 
+test('addProtectedImportedImage links Recent directly to the returned durable record without plaintext presentation', async () => {
+  const harness = createHarness();
+  const durable = createDisplayRecord({
+    id: 'durable-offscreen',
+    url: 'image-trail-private:blob-imported',
+    label: 'secret.png',
+    thumbnail: 'data:image/png;base64,existing-thumbnail',
+    timestamp: '2026-07-20T00:00:00.000Z',
+    queueUpdatedAt: '2026-07-01T00:00:00.000Z',
+    source: 'bookmark',
+    captureStatus: 'captured',
+    blobId: 'blob-imported',
+    storedOriginal: {
+      blobId: 'blob-imported',
+      mimeType: 'image/png',
+      byteLength: 3,
+      capturedAt: '2026-07-20T00:00:00.000Z',
+    },
+  });
+
+  assert.equal(await harness.controller.addImportedImage({ durableRecord: durable }), true);
+  const recent = harness.historyAddLog[0]?.record;
+  assert.equal(recent?.pinnedRecordId, 'durable-offscreen');
+  assert.equal(recent?.pinnedAt, durable.queueUpdatedAt);
+  assert.equal(recent?.blobId, 'blob-imported');
+  assert.equal(recent?.thumbnail, undefined);
+  assert.equal(JSON.stringify(recent).includes('data:image'), false);
+
+  await harness.controller.removeRecentHistory(recent!.id);
+  assert.equal(
+    harness.log.some((entry) => entry.includes('removeCapturedBlobReference:blob-imported')),
+    false,
+    'removing a linked Recent must not release the durable original',
+  );
+});
+
 test('removeRecentHistory removes the row first, then cleans up its encrypted blob with a render', async () => {
   const harness = createHarness();
   harness.patchState({ history: [capturedHistoryRecord('history-1', 'blob-1')] });
