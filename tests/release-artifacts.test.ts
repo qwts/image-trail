@@ -25,11 +25,13 @@ type BuildPolicyModule = {
     release?: boolean;
     interopEnabled?: boolean;
     e2eTestBuild?: boolean;
+    pageContextSwitcherEnabled?: boolean;
     pcloudClientId?: string | null;
   }): Record<string, unknown>;
   isInteropFeatureEnabled(environment?: Record<string, string | undefined>): boolean;
   isReleaseBuild(environment?: Record<string, string | undefined>): boolean;
   isE2ETestBuild(environment?: Record<string, string | undefined>): boolean;
+  isPageContextSwitcherFeatureEnabled(environment?: Record<string, string | undefined>, e2eTestBuild?: boolean): boolean;
   isPCloudBackupFeatureEnabled(environment?: Record<string, string | undefined>): boolean;
   pcloudClientIdFromEnvironment(environment?: Record<string, string | undefined>): string | null;
   minificationImproved(unminifiedBytes: number, minifiedBytes: number): boolean;
@@ -98,6 +100,7 @@ test('central release build policy minifies and removes development-only debuggi
     __IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__: 'undefined',
     __IMAGE_TRAIL_E2E_TEST_BUILD__: 'false',
     __IMAGE_TRAIL_INTEROP_ENABLED__: 'false',
+    __IMAGE_TRAIL_PAGE_CONTEXT_SWITCHER_ENABLED__: 'false',
     __IMAGE_TRAIL_PCLOUD_CLIENT_ID__: '"release-client-id"',
     __IMAGE_TRAIL_PCLOUD_ENABLED__: 'true',
   });
@@ -119,6 +122,7 @@ test('central release build policy minifies and removes development-only debuggi
   });
   assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_TEST_BUILD__'], 'true');
   assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__'], '"data-image-trail-e2e-test-build"');
+  assert.equal((e2e['define'] as Record<string, string>)['__IMAGE_TRAIL_PAGE_CONTEXT_SWITCHER_ENABLED__'], 'true');
 
   const releaseE2E = builds.extensionBuildOptions({
     entryPoint: 'source.ts',
@@ -133,6 +137,7 @@ test('central release build policy minifies and removes development-only debuggi
     (releaseE2E['define'] as Record<string, string>)['__IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__'],
     '"data-image-trail-e2e-test-build"',
   );
+  assert.equal((releaseE2E['define'] as Record<string, string>)['__IMAGE_TRAIL_PAGE_CONTEXT_SWITCHER_ENABLED__'], 'true');
 
   const interop = builds.extensionBuildOptions({
     entryPoint: 'source.ts',
@@ -151,6 +156,10 @@ test('release-mode detection and minification regression threshold are explicit'
   assert.equal(builds.isInteropFeatureEnabled({ IMAGE_TRAIL_ENABLE_INTEROP: '0' }), false);
   assert.equal(builds.isE2ETestBuild({ IMAGE_TRAIL_E2E_TEST_BUILD: '1' }), true);
   assert.equal(builds.isE2ETestBuild({ IMAGE_TRAIL_E2E_TEST_BUILD: '0' }), false);
+  assert.equal(builds.isPageContextSwitcherFeatureEnabled({}, false), false);
+  assert.equal(builds.isPageContextSwitcherFeatureEnabled({}, true), true);
+  assert.equal(builds.isPageContextSwitcherFeatureEnabled({ IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER: '1' }, false), true);
+  assert.equal(builds.isPageContextSwitcherFeatureEnabled({ IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER: '0' }, true), false);
   assert.equal(builds.isPCloudBackupFeatureEnabled({ PCLOUD_CLIENT_ID: ' repo-client-id ' }), true);
   assert.equal(builds.isPCloudBackupFeatureEnabled({}), false);
   assert.equal(builds.pcloudClientIdFromEnvironment({ PCLOUD_CLIENT_ID: ' repo-client-id ' }), 'repo-client-id');
@@ -312,9 +321,11 @@ test('build pipeline typechecks without emitting source-shaped modules and audit
   assert.match(packageJson.scripts['build'] ?? '', /build-preview-page\.mjs/u);
   assert.match(packageJson.scripts['build'] ?? '', /npm run check:artifacts/u);
   assert.match(packageJson.scripts['build:release'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=0/u);
+  assert.match(packageJson.scripts['build:release'] ?? '', /IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER=0/u);
   assert.match(packageJson.scripts['build:release'] ?? '', /IMAGE_TRAIL_E2E_TEST_BUILD=0/u);
   assert.match(packageJson.scripts['build:release'] ?? '', /audit-extension-artifacts\.mjs --require-release/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=0/u);
+  assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER=0/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_RELEASE_BUILD=1 npm run test:e2e/u);
   assert.match(readFileSync('tests/e2e/global-setup.ts', 'utf8'), /IMAGE_TRAIL_E2E_TEST_BUILD: '1'/u);
 });

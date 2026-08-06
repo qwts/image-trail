@@ -10,6 +10,8 @@ import {
   togglePanelFromExtensionAction,
 } from './fixtures.js';
 
+const contextSwitcherEnabled = process.env['IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER'] !== '0';
+
 async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
@@ -55,12 +57,12 @@ test('React Host target keeps detached focus, actions, and subtree lifecycle sta
   await fit.selectOption('cover');
   await expect(fit).toHaveValue('cover');
   await expect(fit).toBeFocused();
-  await expect(page.locator('[data-image-trail-react-root]')).toHaveCount(4);
-  await expect(page.locator('.image-trail-page-context-root[data-image-trail-react-root]')).toHaveCount(1);
+  await expect(page.locator('[data-image-trail-react-root]')).toHaveCount(contextSwitcherEnabled ? 4 : 3);
+  await expect(page.locator('.image-trail-page-context-root[data-image-trail-react-root]')).toHaveCount(contextSwitcherEnabled ? 1 : 0);
 
   await targetWindow.getByRole('button', { name: 'Restore Host target into the panel' }).focus();
   await page.keyboard.press('Escape');
   await expect(targetWindow).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Detach Host target into a floating window (drag to place)' })).toBeFocused();
-  await expect(page.locator('[data-image-trail-react-root]')).toHaveCount(4);
+  await expect(page.locator('[data-image-trail-react-root]')).toHaveCount(contextSwitcherEnabled ? 4 : 3);
 });
