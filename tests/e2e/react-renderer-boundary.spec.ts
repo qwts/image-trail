@@ -50,12 +50,18 @@ test('React Host target keeps detached focus, actions, and subtree lifecycle sta
   const targetWindow = page.getByRole('dialog', { name: 'Host target (floating)' });
   await expect(targetWindow).toBeVisible();
   await expect(targetWindow.locator('[data-image-trail-react-root]')).toHaveCount(1);
+  await targetWindow.evaluate((element) => {
+    (element as HTMLElement).style.width = '240px';
+  });
 
   await openTargetControls(page);
   const targetActions = targetWindow.locator('.image-trail-ds__target-actions');
   await expect(targetActions).toBeVisible();
+  const windowBox = await targetWindow.boundingBox();
   const actionsBox = await targetActions.boundingBox();
-  expect(actionsBox?.width ?? 0).toBeGreaterThan(250);
+  expect(actionsBox?.width ?? 0).toBeGreaterThan(180);
+  expect((actionsBox?.x ?? 0) + 1).toBeGreaterThanOrEqual(windowBox?.x ?? 0);
+  expect((actionsBox?.x ?? 0) + (actionsBox?.width ?? 0)).toBeLessThanOrEqual((windowBox?.x ?? 0) + (windowBox?.width ?? 0));
   const releaseBox = await targetWindow.getByRole('button', { name: 'Release host image' }).boundingBox();
   expect(releaseBox?.width ?? 0).toBeGreaterThan(80);
   const fit = targetWindow.getByRole('combobox', { name: 'Preview object fit' });

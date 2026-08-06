@@ -8,7 +8,7 @@ export function rebuildUrl(model: ParsedUrlModel): string {
 }
 
 export function bumpUrlField(model: ParsedUrlModel, field: UrlField, delta: number): ParsedUrlModel {
-  return setUrlFieldToken(model, field, (token) => bumpToken(token, delta));
+  return setUrlFieldToken(model, field, (token) => bumpToken(token, delta), delta);
 }
 
 export function setUrlFieldValue(model: ParsedUrlModel, field: UrlField, nextValue: string): ParsedUrlModel {
@@ -25,7 +25,12 @@ export function rebuildUrlWithRawFieldValue(model: ParsedUrlModel, field: UrlFie
   return markedUrl.replace(marker, normalizeTokenValue(nextValue));
 }
 
-function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token: UrlToken) => UrlToken): ParsedUrlModel {
+function setUrlFieldToken(
+  model: ParsedUrlModel,
+  field: UrlField,
+  update: (token: UrlToken) => UrlToken,
+  splitDelta?: number,
+): ParsedUrlModel {
   if (field.location === 'path' && field.partIndex !== undefined) {
     return {
       ...model,
@@ -34,7 +39,7 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
           ? {
               ...part,
               edited: true,
-              tokens: updateFieldTokens(part.tokens, field, update),
+              tokens: updateFieldTokens(part.tokens, field, update, splitDelta),
             }
           : part,
       ),
@@ -48,7 +53,7 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
         queryField.index === field.queryIndex
           ? {
               ...queryField,
-              valueTokens: updateFieldTokens(queryField.valueTokens, field, update),
+              valueTokens: updateFieldTokens(queryField.valueTokens, field, update, splitDelta),
             }
           : queryField,
       ),
@@ -58,7 +63,12 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
   return model;
 }
 
-function updateFieldTokens(tokens: readonly UrlToken[], field: UrlField, update: (token: UrlToken) => UrlToken): UrlToken[] {
+function updateFieldTokens(
+  tokens: readonly UrlToken[],
+  field: UrlField,
+  update: (token: UrlToken) => UrlToken,
+  splitDelta?: number,
+): UrlToken[] {
   if (!field.splitBaseId) return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token));
 
   const target = tokens[field.tokenIndex];
@@ -99,10 +109,11 @@ function updateFieldTokens(tokens: readonly UrlToken[], field: UrlField, update:
   const place = BigInt(radix) ** BigInt(suffixWidth);
   const totalWidth = currentWholeDigits.length;
   const maximum = BigInt(radix) ** BigInt(totalWidth) - 1n;
-  const arithmetic = currentWhole + (nextTarget - currentTarget) * place;
+  const requestedDelta = splitDelta === undefined ? nextTarget - currentTarget : BigInt(splitDelta);
+  const arithmetic = currentWhole + requestedDelta * place;
   const bounded = arithmetic < 0n ? 0n : arithmetic > maximum ? maximum : arithmetic;
   const nextWhole = bounded.toString(radix).padStart(totalWidth, '0');
-  const casedWhole = radix === 16 && /[A-F]/u.test(currentWholeDigits) ? nextWhole.toUpperCase() : nextWhole;
+  const casedWhole = radix === 16 ? preserveHexCase(currentWholeDigits, nextWhole, updatedTarget.uppercase === true) : nextWhole;
   const nextRaw = `${prefix}${casedWhole}`;
 
   let cursor = 0;
@@ -114,6 +125,16 @@ function updateFieldTokens(tokens: readonly UrlToken[], field: UrlField, update:
     replacements.set(tokenIndex, { ...token, ...setTokenValue(token, value) });
   }
   return tokens.map((token, tokenIndex) => replacements.get(tokenIndex) ?? token);
+}
+
+function preserveHexCase(current: string, next: string, uppercaseChanges: boolean): string {
+  return [...next]
+    .map((digit, index) => {
+      const previous = current[index];
+      if (previous?.toLowerCase() === digit.toLowerCase()) return previous;
+      return uppercaseChanges ? digit.toUpperCase() : digit.toLowerCase();
+    })
+    .join('');
 }
 
 function parseNumericTokenValue(value: string, radix: 10 | 16): bigint | null {

@@ -67,3 +67,48 @@ test('protected import reuses an encrypted duplicate thumbnail without orphaning
   assert.equal(imported.record.thumbnail, thumbnail);
   assert.equal(imported.record.protectedPin?.encryptedThumbnailId, thumbnailId);
 });
+
+test('protected import merges current curated metadata after a stale import draft was created', async (t) => {
+  await deleteImageTrailDb();
+  const active = await activeBlobKey();
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  t.after(async () => {
+    await store.close();
+    await deleteImageTrailDb();
+  });
+  const url = 'https://images.example.test/concurrent-import.png';
+  const original = await store.save(record(url));
+  const staleImport = createDisplayRecord({
+    ...record(url),
+    title: 'Stale title',
+    label: 'Stale label',
+    storedOriginal: {
+      blobId: 'new-original',
+      mimeType: 'image/png',
+      byteLength: 42,
+      capturedAt: '2026-07-20T00:00:02.000Z',
+      fileName: 'concurrent-import.png',
+    },
+  });
+  await store.save(
+    createDisplayRecord({
+      ...record(url),
+      title: 'Current title',
+      label: 'Current label',
+      width: 2048,
+      height: 1024,
+      downloadedAt: '2026-07-20T00:00:03.000Z',
+    }),
+  );
+
+  const imported = await store.saveProtectedResult(staleImport, active);
+  assert.equal(imported.ok, true);
+  if (!imported.ok) return;
+  assert.equal(imported.record.title, 'Current title');
+  assert.equal(imported.record.label, 'Current label');
+  assert.equal(imported.record.width, 2048);
+  assert.equal(imported.record.height, 1024);
+  assert.equal(imported.record.downloadedAt, '2026-07-20T00:00:03.000Z');
+  assert.equal(imported.record.queueUpdatedAt, original.queueUpdatedAt);
+  assert.equal(imported.record.storedOriginal?.blobId, 'new-original');
+});
