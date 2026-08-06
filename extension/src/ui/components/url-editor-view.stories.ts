@@ -21,11 +21,11 @@ export const Empty: Story = {
 };
 
 export const DraftUrl: Story = {
-  render: () => urlEditorStory(urlEditorFixtures.draft),
+  render: () => urlEditorStory(urlEditorFixtures.draft, { hostUrl: urlEditorFixtures.current }),
 };
 
 export const ReviewNeededUrl: Story = {
-  render: () => urlEditorStory(urlEditorFixtures.invalidDraft),
+  render: () => urlEditorStory(urlEditorFixtures.invalidDraft, { hostUrl: urlEditorFixtures.current }),
 };
 
 export const DataUrl: Story = {
@@ -69,7 +69,7 @@ export const Narrow: Story = {
 
 function urlEditorStory(
   url: string | null,
-  stateOverrides: { readonly isDataUrl?: boolean; readonly privacyMode?: boolean } = {},
+  stateOverrides: { readonly hostUrl?: string | null; readonly isDataUrl?: boolean; readonly privacyMode?: boolean } = {},
   storyOptions: { readonly width?: number } = {},
   callbacks: UrlEditorViewCallbacks = { onApply: mockDispatch<string>('url editor apply') },
 ) {

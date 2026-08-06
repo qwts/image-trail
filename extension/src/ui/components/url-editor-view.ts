@@ -3,6 +3,8 @@ import { createButton, createInput, createKbd, createSectionHeader } from './pri
 
 export interface UrlEditorViewState {
   readonly url: string | null;
+  /** URL currently projected into the selected host image. Defaults to `url` for isolated views. */
+  readonly hostUrl?: string | null;
   readonly isDataUrl?: boolean;
   readonly privacyMode?: boolean;
 }
@@ -51,9 +53,10 @@ export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEdi
       });
   if (privacyMasked) value.value = PRIVACY_URL_TEXT;
   value.title = state.privacyMode && state.url ? 'Privacy mode is hiding this URL for screen sharing.' : (state.url ?? EMPTY_URL_MESSAGE);
+  const hostUrl = state.hostUrl === undefined ? state.url : state.hostUrl;
 
   const applyUrl = (): void => {
-    if (state.isDataUrl) return;
+    if (state.isDataUrl || hostUrl === null) return;
     callbacks.onApply(state.privacyMode ? (state.url ?? '') : value.value);
     syncEditorStatus();
   };
@@ -88,8 +91,9 @@ export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEdi
   const status = document.createElement('span');
   status.className = 'image-trail-panel__url-editor-status';
   const syncEditorStatus = (): void => {
-    const applied = state.url !== null && value.value === (state.isDataUrl ? 'data URL' : state.url);
-    apply.disabled = state.url === null || state.isDataUrl === true || state.privacyMode === true || applied;
+    const editedUrl = state.privacyMode ? state.url : value.value;
+    const applied = hostUrl !== null && editedUrl === hostUrl;
+    apply.disabled = state.url === null || hostUrl === null || state.isDataUrl === true || state.privacyMode === true || applied;
     status.classList.toggle('is-applied', applied);
     status.textContent = applied ? 'in address bar' : 'not applied — refresh reverts';
   };

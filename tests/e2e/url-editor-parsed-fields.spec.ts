@@ -220,9 +220,15 @@ test('URL editor and parsed fields load, fail closed, navigate, learn templates,
   await setLoadFailureFeedback(page, 'alert');
   await closeSettings(page);
 
-  await applyUrlInEditor(page, fixtureUrl('/dynamic-image.svg?frame=1'));
+  const firstUrl = fixtureUrl('/dynamic-image.svg?frame=1');
+  const urlEditor = page.locator('.image-trail-panel__full-url-input');
+  const applyToHost = page.getByRole('button', { name: 'Apply to Host' });
+  await urlEditor.fill(firstUrl);
+  await expect(applyToHost).toBeEnabled();
+  await applyToHost.click();
   await expectPanelStatusMessage(page, /Loaded .*dynamic-image\.svg\?frame=1/u);
   await expectFrame(page, '1');
+  await expect(applyToHost).toBeDisabled();
 
   await openParsedFields(page);
   await page.getByRole('button', { name: /Increment .*frame/u }).click();
