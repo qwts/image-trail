@@ -23,6 +23,21 @@ async function clearPageContextOverrides(serviceWorker: Worker): Promise<void> {
   });
 }
 
+async function seedPageContextOverride(serviceWorker: Worker, context: 'single' | 'gallery' | 'feed'): Promise<void> {
+  await serviceWorker.evaluate(async (nextContext) => {
+    const key = 'imageTrail.localSettings';
+    const stored = await chrome.storage.local.get(key);
+    const raw = stored[key];
+    const settings = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : ((raw ?? {}) as Record<string, unknown>);
+    await chrome.storage.local.set({
+      [key]: JSON.stringify({
+        ...settings,
+        pageContextOverrides: { '127.0.0.1': { context: nextContext, updatedAt: Date.now() } },
+      }),
+    });
+  }, context);
+}
+
 async function hideBuildOverlay(page: Page): Promise<void> {
   const overlay = page.locator('#image-trail-build-identity-overlay');
   if ((await overlay.count()) > 0) await overlay.evaluate((element) => element.remove());
@@ -86,10 +101,12 @@ test.beforeEach(async ({ page, serviceWorker }) => {
 });
 
 test('automatically detects single and gallery contexts and supports a reversible override', async ({ page, serviceWorker }, testInfo) => {
+  if (!contextSwitcherEnabled) await seedPageContextOverride(serviceWorker, 'feed');
   await openPanel(page, serviceWorker, fixturePaths.singleImage);
   if (!contextSwitcherEnabled) {
     await expect(page.locator('.image-trail-page-context-root')).toHaveCount(0);
     await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Single image');
+    expect(await storedOverride(serviceWorker)).toBe('feed');
     await openPanel(page, serviceWorker, fixturePaths.multipleImages);
     await expect(page.locator('.image-trail-page-context-root')).toHaveCount(0);
     await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Gallery page · 3 images');
