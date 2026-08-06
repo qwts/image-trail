@@ -151,6 +151,20 @@ test('carries split-child overflow across the fixed-width source token', () => {
   assert.equal(rebuildUrl(setUrlFieldValue(groupedSplit, trailingGroup, '105')), 'https://example.test/image?n=6005');
 });
 
+test('borrows the requested delta across a split child that is already zero', () => {
+  const model = parseUrl('https://example.test/image?n=1200');
+  const field = collectUrlFields(model).find((candidate) => candidate.label === 'query n');
+  assert.ok(field);
+  const spec = createFieldSplitSpec(field, '2-2');
+  assert.ok(!('ok' in spec));
+  const split = applyFieldSplitSpecs(model, [spec]);
+  const trailingGroup = collectUrlFields(split).find((candidate) => candidate.id === 'q:0:0:s:1');
+  assert.ok(trailingGroup);
+
+  assert.equal(rebuildUrl(bumpUrlField(split, trailingGroup, -1)), 'https://example.test/image?n=1199');
+  assert.equal(rebuildUrl(bumpUrlField(split, trailingGroup, -105)), 'https://example.test/image?n=1095');
+});
+
 test('carries across every split hex digit, including letter-only and prefixed children', () => {
   for (const [source, pattern, expected] of [
     ['5a99', '1-1-1-1', '5a9a'],
@@ -166,6 +180,19 @@ test('carries across every split hex digit, including letter-only and prefixed c
     assert.ok(finalDigit);
     assert.equal(rebuildUrl(bumpUrlField(split, finalDigit, 1)), `https://example.test/image?n=${expected}`);
   }
+});
+
+test('preserves the casing of unchanged hex digits while carrying a split child', () => {
+  const model = parseUrl('https://example.test/image?n=5aB9');
+  const field = collectUrlFields(model).find((candidate) => candidate.label === 'query n');
+  assert.ok(field);
+  const spec = createFieldSplitSpec(field, '2-2');
+  assert.ok(!('ok' in spec));
+  const split = applyFieldSplitSpecs(model, [spec]);
+  const trailingGroup = collectUrlFields(split).find((candidate) => candidate.id === 'q:0:0:s:1');
+  assert.ok(trailingGroup);
+
+  assert.equal(rebuildUrl(bumpUrlField(split, trailingGroup, 1)), 'https://example.test/image?n=5aBA');
 });
 
 test('applies later split specs against original token indexes after earlier splits', () => {
