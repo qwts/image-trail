@@ -1,4 +1,6 @@
 import type { ImageDisplayRecord } from '../core/display-records.js';
+import { queueTimeForRecord } from '../core/display-order.js';
+import type { DurableBookmarkPayloadV1 } from './types.js';
 
 export function clampPageOffset(offset: number, limit: number, total: number): number {
   if (total <= 0) return 0;
@@ -27,6 +29,39 @@ function hostnameFromUrl(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** Queue ordering is `queueUpdatedAt`, never the encrypted envelope's `updatedAt`. */
+export function recordQueueTime(record: ImageDisplayRecord): string {
+  return queueTimeForRecord(record);
+}
+
+const protectedPinSaveLocks = new Map<string, Promise<void>>();
+
+export async function withProtectedPinSaveLock<T>(urlHash: string, work: () => Promise<T>): Promise<T> {
+  const previous = protectedPinSaveLocks.get(urlHash) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const next = previous.catch(() => undefined).then(() => current);
+  protectedPinSaveLocks.set(urlHash, next);
+  await previous.catch(() => undefined);
+  try {
+    return await work();
+  } finally {
+    release();
+    if (protectedPinSaveLocks.get(urlHash) === next) protectedPinSaveLocks.delete(urlHash);
+  }
+}
+
+export async function removeReplacedOriginal(
+  context: { readonly blobs: { remove(id: string): Promise<void> } },
+  previous: DurableBookmarkPayloadV1 | null,
+  nextBlobId: string | undefined,
+): Promise<void> {
+  const previousBlobId = previous?.protectedPin?.storedOriginalBlobId ?? previous?.storedOriginal?.blobId;
+  if (previousBlobId && previousBlobId !== nextBlobId) await context.blobs.remove(previousBlobId);
 }
 
 export function dataUrlToBytes(dataUrl: string): { readonly mimeType: string; readonly bytes: ArrayBuffer } | null {

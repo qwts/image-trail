@@ -23,19 +23,32 @@ import type { ActiveBlobKey } from './crypto/blob-keyring.js';
 import { openImageTrailDb } from './db.js';
 import { ensureDurableBookmarkKey, type DurableBookmarkKeyContext } from './durable-bookmark-key.js';
 import { DEFAULT_LOCAL_SETTINGS } from './local-settings.js';
-import { DEFAULT_QUEUE_DISPLAY_ORDER, queueTimeForRecord, sortQueueRecords, type QueueDisplayOrder } from '../core/display-order.js';
+import { DEFAULT_QUEUE_DISPLAY_ORDER, sortQueueRecords, type QueueDisplayOrder } from '../core/display-order.js';
 import { BlobsRepository } from './repositories/blobs-repository.js';
 import { BookmarksRepository } from './repositories/bookmarks-repository.js';
 import { EncryptedPinsRepository, type EncryptedPinRecord } from './repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from './repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from './repositories/keys-repository.js';
 import type { DurableBookmarkPayloadV1, ProtectedPinRelationshipV1 } from './types.js';
-import { clampPageOffset, dataUrlToBytes, filterByVisibilityScope, isVisibleInScope } from './bookmark-controller-helpers.js';
+import {
+  clampPageOffset,
+  dataUrlToBytes,
+  filterByVisibilityScope,
+  isVisibleInScope,
+  removeReplacedOriginal,
+  withProtectedPinSaveLock,
+} from './bookmark-controller-helpers.js';
+export { recordQueueTime } from './bookmark-controller-helpers.js';
 
 interface ProtectedBookmarkOptions {
   readonly getActiveBlobKey?: () => ActiveBlobKey | null | Promise<ActiveBlobKey | null>;
   readonly getPinSaveStoragePreference?: () => PinSaveStoragePreference | Promise<PinSaveStoragePreference>;
   readonly getSearchableMetadataPolicy?: () => SearchableMetadataPolicy | Promise<SearchableMetadataPolicy>;
+}
+
+interface BookmarkPersistenceOptions extends BookmarkSaveOptions {
+  readonly preserveExistingThumbnail?: boolean | undefined;
+  readonly requiredActiveBlobKey?: ActiveBlobKey | undefined;
 }
 
 type BookmarkContext = {
@@ -144,8 +157,14 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   private async saveWithContext(
     context: BookmarkContext,
     bookmark: ImageDisplayRecord,
-    options: BookmarkSaveOptions,
+    options: BookmarkPersistenceOptions,
   ): Promise<ImageDisplayRecord> {
+    if (options.requiredActiveBlobKey) {
+      return {
+        ...(await this.saveProtected(context, bookmark, options.requiredActiveBlobKey, options)),
+        pinSaveStorage: { destination: 'encrypted' },
+      };
+    }
     const activeBlobKey = (await this.options.getActiveBlobKey?.()) ?? null;
     const preference = (await this.options.getPinSaveStoragePreference?.()) ?? DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference;
     if (preference === 'plaintext') {
@@ -186,11 +205,28 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     }
   }
 
+  async saveProtectedResult(record: ImageDisplayRecord, activeBlobKey: ActiveBlobKey) {
+    const context = await this.openContext();
+    const current = (await this.options.getActiveBlobKey?.()) ?? null;
+    if (!context || current?.reference.reference !== activeBlobKey.reference.reference) {
+      return { ok: false as const, message: 'Encrypted original key changed during import.' };
+    }
+    const bookmark = createDisplayRecord({ ...record, id: record.url, source: 'bookmark' });
+    try {
+      return {
+        ok: true as const,
+        record: await this.saveWithContext(context, bookmark, { preserveExistingThumbnail: true, requiredActiveBlobKey: activeBlobKey }),
+      };
+    } catch (error) {
+      return { ok: false as const, message: error instanceof Error ? error.message : 'Bookmark save failed.' };
+    }
+  }
+
   private async savePlain(
     context: BookmarkContext,
     bookmark: ImageDisplayRecord,
     pinSaveStorage?: ImageDisplayRecord['pinSaveStorage'],
-    options: BookmarkSaveOptions = {},
+    options: BookmarkPersistenceOptions = {},
   ): Promise<ImageDisplayRecord> {
     const importedDataUrl = bookmark.url.startsWith('data:image/');
 
@@ -207,6 +243,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const uuid = existing?.uuid ?? crypto.randomUUID();
     const payload = toBookmarkPayload(bookmark, existingPayload, {
       preserveExistingOriginal: !options.clearStoredOriginal,
+      ...(options.preserveExistingThumbnail === undefined ? {} : { preserveExistingThumbnail: options.preserveExistingThumbnail }),
     });
     await context.repository.sealAndPut(
       uuid,
@@ -484,7 +521,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     context: BookmarkContext,
     bookmark: ImageDisplayRecord,
     activeBlobKey: ActiveBlobKey,
-    options: BookmarkSaveOptions,
+    options: BookmarkPersistenceOptions,
   ): Promise<ImageDisplayRecord> {
     const urlHash = await hashSearchableUrl(bookmark.url);
     return withProtectedPinSaveLock(urlHash, () => this.saveProtectedForHash(context, bookmark, activeBlobKey, urlHash, options));
@@ -494,7 +531,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     bookmark: ImageDisplayRecord,
     activeBlobKey: ActiveBlobKey,
     urlHash: string,
-    options: BookmarkSaveOptions,
+    options: BookmarkPersistenceOptions,
   ): Promise<ImageDisplayRecord> {
     const existingProtected = await context.encryptedPins.getByUrlHash(urlHash);
     const existingBookmark = existingProtected
@@ -513,10 +550,25 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const queueUpdatedAt = existingPlain?.queueUpdatedAt ?? existingProtected?.queueUpdatedAt ?? bookmark.timestamp;
     let thumbnail: { readonly id: string } | null = null;
     try {
-      thumbnail = await this.saveProtectedThumbnail(context, bookmark, activeBlobKey, plainPinId, existingPlainPayload?.protectedPin);
+      const bookmarkWithThumbnail =
+        options.preserveExistingThumbnail && !bookmark.thumbnail && existingPlainPayload?.thumbnail
+          ? { ...bookmark, thumbnail: existingPlainPayload.thumbnail }
+          : bookmark;
+      thumbnail = await this.saveProtectedThumbnail(
+        context,
+        bookmarkWithThumbnail,
+        activeBlobKey,
+        plainPinId,
+        existingPlainPayload?.protectedPin,
+      );
+      const thumbnailId =
+        thumbnail?.id ??
+        (options.preserveExistingThumbnail
+          ? (existingProtectedPayload?.thumbnailId ?? existingPlainPayload?.protectedPin?.encryptedThumbnailId)
+          : undefined);
       const protectedPayload = toProtectedPayload(
         bookmark,
-        thumbnail?.id,
+        thumbnailId,
         existingProtectedPayload?.interop ?? existingPlainPayload?.interop,
         options.clearStoredOriginal ? undefined : (existingProtectedPayload?.storedOriginal ?? existingPlainPayload?.storedOriginal),
       );
@@ -533,7 +585,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       const relationship = protectedRelationship({
         plainPinId,
         encryptedPinId,
-        encryptedThumbnailId: thumbnail?.id ?? existingPlainPayload?.protectedPin?.encryptedThumbnailId,
+        encryptedThumbnailId: thumbnailId,
         storedOriginalBlobId:
           protectedPayload.storedOriginal?.blobId ??
           bookmark.blobId ??
@@ -722,42 +774,4 @@ async function removeLinkedPinStorage(context: BookmarkContext, payload: Durable
     return;
   }
   if (payload.storedOriginal?.blobId) await context.blobs.remove(payload.storedOriginal.blobId);
-}
-
-async function removeReplacedOriginal(
-  context: BookmarkContext,
-  previous: DurableBookmarkPayloadV1 | null,
-  nextBlobId: string | undefined,
-): Promise<void> {
-  const previousBlobId = previous?.protectedPin?.storedOriginalBlobId ?? previous?.storedOriginal?.blobId;
-  if (!previousBlobId || previousBlobId === nextBlobId) return;
-  await context.blobs.remove(previousBlobId);
-}
-
-/**
- * Queue sort key for a record. Queue ordering is `queueUpdatedAt` (falling back to the
- * capture `timestamp`), never the encrypted envelope's `updatedAt` — see AGENTS.md
- * "Storage Rules". Exported so the invariant can be asserted directly (tests/invariants.test.ts).
- */
-export function recordQueueTime(record: ImageDisplayRecord): string {
-  return queueTimeForRecord(record);
-}
-
-const protectedPinSaveLocks = new Map<string, Promise<void>>();
-
-async function withProtectedPinSaveLock<T>(urlHash: string, work: () => Promise<T>): Promise<T> {
-  const previous = protectedPinSaveLocks.get(urlHash) ?? Promise.resolve();
-  let release!: () => void;
-  const current = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const next = previous.catch(() => undefined).then(() => current);
-  protectedPinSaveLocks.set(urlHash, next);
-  await previous.catch(() => undefined);
-  try {
-    return await work();
-  } finally {
-    release();
-    if (protectedPinSaveLocks.get(urlHash) === next) protectedPinSaveLocks.delete(urlHash);
-  }
 }

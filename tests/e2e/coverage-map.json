@@ -869,6 +869,7 @@
             "tests/indexeddb-protected-pins.test.ts",
             "tests/encrypted-blobs.test.ts",
             "tests/encrypted-image-import.test.ts",
+            "tests/encrypted-image-bookmark-save.test.ts",
             "tests/messages.test.ts",
             "tests/dom/record-library-controller.test.ts",
             "tests/dom/history-view.test.ts",

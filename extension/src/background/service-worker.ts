@@ -626,7 +626,7 @@ async function handleImportEncryptedImage(
   return importEncryptedImageToDurableStorage(message.payload.fileContent, {
     restoreActiveBlobKey,
     getDb,
-    saveBookmark: (record) => bookmarkStore.saveResult(record),
+    saveBookmark: (record, activeBlobKey) => bookmarkStore.saveProtectedResult(record, activeBlobKey),
     notifyBookmarkSaved: (record) => notifyLibraryChange({ topic: 'bookmarks', reason: 'bookmark-saved', recordIds: [record.id] }),
   });
 }
