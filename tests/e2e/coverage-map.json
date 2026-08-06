@@ -1474,8 +1474,8 @@
         },
         {
           "type": "manual",
-          "reason": "Detection quality and the fixed page-level switcher must be checked against representative real-world gallery and infinite-feed markup.",
-          "notes": "Open the built extension on one standalone image, one multi-image gallery, and one infinite feed. Verify the automatic label, enabled overrides, target badge, Grab availability and hint, reset-to-automatic behavior, reload persistence, SPA transitions, keyboard focus, and pixel fidelity against handoff screenshots 08 and 09 without exposing URL evidence in the switcher."
+          "reason": "Detection quality must be checked in a release build, while the feature-gated switcher needs a separate explicit flagged-build review against representative real-world markup.",
+          "notes": "Release build: open one standalone image, one multi-image gallery, and one infinite feed; verify the switcher is absent, saved legacy overrides are ignored, and automatic labels, target badges, Grab availability/hints, and SPA transitions remain correct. Flagged build (`IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER=1`): verify enabled overrides, reset-to-automatic behavior, reload persistence, keyboard focus, and pixel fidelity against handoff screenshots 08 and 09 without exposing URL evidence."
         }
       ]
     },

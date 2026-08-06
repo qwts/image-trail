@@ -7,7 +7,12 @@ import { createInitialPanelState } from '../extension/src/core/state.js';
 import type { PanelState } from '../extension/src/core/types.js';
 import { PageContextController, type PageContextControllerEnvironment } from '../extension/src/ui/panel/page-context-controller.js';
 
-function createHarness(input: { detection: PageContextDetection; hostname?: string; settings?: PlaintextLocalSettings }) {
+function createHarness(input: {
+  detection: PageContextDetection;
+  hostname?: string;
+  settings?: PlaintextLocalSettings;
+  overridesEnabled?: boolean;
+}) {
   let state: PanelState = { ...createInitialPanelState(0), visible: true };
   let settings = input.settings ?? DEFAULT_LOCAL_SETTINGS;
   let detection = input.detection;
@@ -19,6 +24,7 @@ function createHarness(input: { detection: PageContextDetection; hostname?: stri
   const environment: PageContextControllerEnvironment = {
     detect: () => detection,
     hostname: () => hostname,
+    ...(input.overridesEnabled === undefined ? {} : { overridesEnabled: input.overridesEnabled }),
     createObserver: (onRefresh) => {
       refresh = onRefresh;
       return {
@@ -100,4 +106,26 @@ test('keeps unsupported saved overrides inactive and reloads overrides after a h
   assert.equal(harness.getState().pageContext.effective, 'gallery');
   assert.equal(harness.getState().pageContext.override, 'gallery');
   assert.ok(harness.getRenders() >= 2);
+});
+
+test('ignores saved and requested overrides when the production switcher feature is disabled', () => {
+  const harness = createHarness({
+    detection: { detected: 'single', available: ['single', 'gallery', 'feed'], imageCount: 1 },
+    overridesEnabled: false,
+    settings: {
+      ...DEFAULT_LOCAL_SETTINGS,
+      pageContextOverrides: {
+        'example.test': { context: 'feed', updatedAt: 1 },
+      },
+    },
+  });
+
+  harness.controller.applyStoredOverride();
+  assert.equal(harness.getState().pageContext.effective, 'single');
+  assert.equal(harness.getState().pageContext.override, null);
+
+  harness.controller.setOverride('gallery');
+  assert.equal(harness.getState().pageContext.effective, 'single');
+  assert.equal(harness.getSettings().pageContextOverrides['example.test']?.context, 'feed');
+  assert.equal(harness.saved.length, 0);
 });
