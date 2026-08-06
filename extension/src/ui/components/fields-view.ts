@@ -81,7 +81,7 @@ export function createFieldsView(model: FieldEditorViewModel, callbacks: FieldsV
     }
 
     queueMicrotask(() => {
-      if (options.blockSize !== null) return;
+      if (options.blockSize !== null) return callbacks.onOpenChange(true, options.blockSize);
       const blockSize = rowCountBlockSize(wrapper, summary, body, intro, list);
       wrapper.classList.add('is-height-locked');
       wrapper.style.setProperty('--image-trail-fields-size', `${blockSize}px`);

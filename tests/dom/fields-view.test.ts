@@ -131,6 +131,17 @@ test('Field Editor uses the shared explicit Hide/Show header control (#755)', ()
   assert.deepEqual(calls, [{ name: 'onOpenChange', args: [false, null] }]);
 });
 
+test('expanding persists open state when reusing a detached resize block size', async () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls, { options: { open: false, blockSize: 320 } });
+  buttonByLabel(view, 'Show Field Editor').click();
+  await Promise.resolve();
+
+  assert.deepEqual(calls, [{ name: 'onOpenChange', args: [true, 320] }]);
+  const rerendered = buildFieldsView([], { options: { open: true, blockSize: 320 } });
+  assert.equal(rerendered.querySelector<HTMLElement>('.image-trail-panel__fields-body')?.hidden, false);
+});
+
 test('the summary and FieldRow expose active hierarchy without replacing native controls', () => {
   const view = buildFieldsView([], { activeFieldId: 'query-page', successfulFieldIds: ['query-page'] });
   const summary = view.querySelector('.image-trail-ds__field-summary');
