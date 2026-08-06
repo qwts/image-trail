@@ -151,6 +151,23 @@ test('carries split-child overflow across the fixed-width source token', () => {
   assert.equal(rebuildUrl(setUrlFieldValue(groupedSplit, trailingGroup, '105')), 'https://example.test/image?n=6005');
 });
 
+test('carries across every split hex digit, including letter-only and prefixed children', () => {
+  for (const [source, pattern, expected] of [
+    ['5a99', '1-1-1-1', '5a9a'],
+    ['0x5A99', '1-1-1-1-1-1', '0x5A9A'],
+  ] as const) {
+    const model = parseUrl(`https://example.test/image?n=${source}`);
+    const field = collectUrlFields(model).find((candidate) => candidate.label === 'query n');
+    assert.ok(field);
+    const spec = createFieldSplitSpec(field, pattern);
+    assert.ok(!('ok' in spec));
+    const split = applyFieldSplitSpecs(model, [spec]);
+    const finalDigit = collectUrlFields(split).find((candidate) => candidate.splitPartIndex === pattern.split('-').length - 1);
+    assert.ok(finalDigit);
+    assert.equal(rebuildUrl(bumpUrlField(split, finalDigit, 1)), `https://example.test/image?n=${expected}`);
+  }
+});
+
 test('applies later split specs against original token indexes after earlier splits', () => {
   const model = parseUrl('https://example.test/image?v=1111x2222');
   const firstField = collectUrlFields(model).find((candidate) => candidate.value === '1111');

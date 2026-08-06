@@ -68,46 +68,48 @@ function updateFieldTokens(tokens: readonly UrlToken[], field: UrlField, update:
 
   const group = tokens
     .map((token, tokenIndex) => ({ token, tokenIndex }))
-    .filter(
-      ({ token }) =>
-        token.splitBaseId === field.splitBaseId &&
-        token.originalTokenIndex === target.originalTokenIndex &&
-        token.kind !== 'text' &&
-        token.prefix === undefined,
-    );
+    .filter(({ token }) => token.splitBaseId === field.splitBaseId && token.originalTokenIndex === target.originalTokenIndex);
   const targetGroupIndex = group.findIndex(({ tokenIndex }) => tokenIndex === field.tokenIndex);
   if (group.length < 2 || targetGroupIndex === -1) {
     return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token));
   }
 
-  const updatedTarget = update(target);
+  const currentParts = group.map(({ token }) => tokenValue(token));
+  const currentRaw = currentParts.join('');
+  const prefix = /^0[xX]/u.exec(currentRaw)?.[0] ?? '';
+  const currentWholeDigits = currentRaw.slice(prefix.length);
+  const currentRadix = prefix || /[a-f]/iu.test(currentWholeDigits) ? 16 : 10;
+  const targetForUpdate =
+    currentRadix === 16 && target.kind === 'int'
+      ? { ...target, kind: 'hex' as const, uppercase: /[A-F]/u.test(currentWholeDigits) }
+      : target;
+  const updatedTarget = update(targetForUpdate);
   if (updatedTarget.kind === 'text' || updatedTarget.prefix) {
     return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? updatedTarget : token));
   }
-
-  const radix = group.some(({ token }) => token.kind === 'hex') || updatedTarget.kind === 'hex' ? 16 : 10;
-  const currentParts = group.map(({ token }) => tokenValue(token));
+  const radix = currentRadix === 16 || updatedTarget.kind === 'hex' ? 16 : 10;
   const currentTarget = parseNumericTokenValue(currentParts[targetGroupIndex]!, radix);
   const nextTarget = parseNumericTokenValue(tokenValue(updatedTarget), radix);
-  const currentWhole = parseNumericTokenValue(currentParts.join(''), radix);
+  const currentWhole = parseNumericTokenValue(currentWholeDigits, radix);
   if (currentTarget === null || nextTarget === null || currentWhole === null) {
     return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? updatedTarget : token));
   }
 
   const suffixWidth = currentParts.slice(targetGroupIndex + 1).reduce((sum, part) => sum + part.length, 0);
   const place = BigInt(radix) ** BigInt(suffixWidth);
-  const totalWidth = currentParts.reduce((sum, part) => sum + part.length, 0);
+  const totalWidth = currentWholeDigits.length;
   const maximum = BigInt(radix) ** BigInt(totalWidth) - 1n;
   const arithmetic = currentWhole + (nextTarget - currentTarget) * place;
   const bounded = arithmetic < 0n ? 0n : arithmetic > maximum ? maximum : arithmetic;
   const nextWhole = bounded.toString(radix).padStart(totalWidth, '0');
-  const casedWhole = radix === 16 && group.some(({ token }) => token.uppercase) ? nextWhole.toUpperCase() : nextWhole;
+  const casedWhole = radix === 16 && /[A-F]/u.test(currentWholeDigits) ? nextWhole.toUpperCase() : nextWhole;
+  const nextRaw = `${prefix}${casedWhole}`;
 
   let cursor = 0;
   const replacements = new Map<number, UrlToken>();
   for (const { token, tokenIndex } of group) {
     const width = tokenValue(token).length;
-    const value = casedWhole.slice(cursor, cursor + width);
+    const value = nextRaw.slice(cursor, cursor + width);
     cursor += width;
     replacements.set(tokenIndex, { ...token, ...setTokenValue(token, value) });
   }
