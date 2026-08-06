@@ -82,21 +82,46 @@ test(
   'maps every companion epic scenario to current cross-repository evidence',
   { skip: process.env['INTEROP_PHOTOS_ROOT'] ? false : 'requires the pinned Photos checkout' },
   () => {
-    const output = execFileSync(process.execPath, ['scripts/check-interop-acceptance.mjs'], { encoding: 'utf8' });
-    assert.equal(output, 'Verified 10 interop scenarios with 40 automated evidence references; manual 0/4.\n');
+    const output = execFileSync(process.execPath, ['scripts/check-interop-acceptance.mjs', '--require-companion'], { encoding: 'utf8' });
+    assert.equal(output, 'Verified 10 interop scenarios with 20 cross-repository evidence sets; manual 0/4.\n');
   },
 );
 
-test('fails closed when the companion evidence checkout is unavailable', () => {
+test('maps every interop scenario to local evidence without a companion checkout', () => {
   const env = { ...process.env };
   delete env['INTEROP_PHOTOS_ROOT'];
   const result = spawnSync(process.execPath, ['scripts/check-interop-acceptance.mjs'], { encoding: 'utf8', env });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, 'Verified 10 interop scenarios with 10 local evidence sets; manual 0/4.\n');
+});
+
+test('local evidence validation ignores an unrelated stale companion path', () => {
+  const result = spawnSync(process.execPath, ['scripts/check-interop-acceptance.mjs'], {
+    encoding: 'utf8',
+    env: { ...process.env, INTEROP_PHOTOS_ROOT: process.cwd() },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, 'Verified 10 interop scenarios with 10 local evidence sets; manual 0/4.\n');
+});
+
+test('fails closed when explicitly required companion evidence is unavailable', () => {
+  const env = { ...process.env };
+  delete env['INTEROP_PHOTOS_ROOT'];
+  const result = spawnSync(process.execPath, ['scripts/check-interop-acceptance.mjs', '--require-companion'], { encoding: 'utf8', env });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /INTEROP_PHOTOS_ROOT must point to the pinned Photos evidence checkout/u);
+});
+
+test('manual closeout implies fail-closed companion evidence', () => {
+  const env = { ...process.env };
+  delete env['INTEROP_PHOTOS_ROOT'];
+  const result = spawnSync(process.execPath, ['scripts/check-interop-acceptance.mjs', '--require-manual'], { encoding: 'utf8', env });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /INTEROP_PHOTOS_ROOT must point to the pinned Photos evidence checkout/u);
 });
 
 test('refuses companion evidence from a checkout that is not pinned to the reviewed revision', () => {
-  const result = spawnSync(process.execPath, ['scripts/check-interop-acceptance.mjs'], {
+  const result = spawnSync(process.execPath, ['scripts/check-interop-acceptance.mjs', '--require-companion'], {
     encoding: 'utf8',
     env: { ...process.env, INTEROP_PHOTOS_ROOT: process.cwd() },
   });
