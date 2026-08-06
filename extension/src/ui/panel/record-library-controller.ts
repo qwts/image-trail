@@ -22,6 +22,7 @@ import { bookmarkSaveMessage, withoutRecentPinState } from './record-export-help
 import type { CapturedImportedMedia } from './imported-media-record.js';
 import { addImportedImageToLibrary, type RecordLibraryImportInput } from './imported-image-library.js';
 import type { RecordAddOptions, ValidatedRecordUrl } from './record-library-types.js';
+import { recentHistoryMutationIsCurrent, recentHistoryMutationProjection } from './recent-history-mutation-projection.js';
 
 export type { RecordAddOptions } from './record-library-types.js';
 export type { RecordLibraryImportInput } from './imported-image-library.js';
@@ -117,14 +118,13 @@ export class RecordLibraryController {
     if (!item) return;
     if (!this.isProjectionActive(options)) return;
     const recentHistoryStore = this.deps.recentHistoryStore();
-    const reviewingRecentSession = this.deps.getState().reviewingRecentSession;
+    const historyProjection = recentHistoryMutationProjection(this.deps.getState());
     const history = recentHistoryStore
       ? await recentHistoryStore.add(item, window.location.href, {
-          scope: this.deps.getState().recentHistoryScope,
-          includeRetained: reviewingRecentSession,
+          ...historyProjection,
         })
       : [item, ...next.slice(1)];
-    if (!this.isProjectionActive(options)) return;
+    if (!this.isProjectionActive(options) || !recentHistoryMutationIsCurrent(this.deps.getState(), historyProjection)) return;
     this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
     this.deps.render();
   }
@@ -200,14 +200,13 @@ export class RecordLibraryController {
       lastUpdatedAt: Date.now(),
     });
     const recentHistoryStore = this.deps.recentHistoryStore();
-    const scope = this.deps.getState().recentHistoryScope;
+    const historyProjection = recentHistoryMutationProjection(this.deps.getState());
     const history = recentHistoryStore
       ? await recentHistoryStore.update(linkedHistory, window.location.href, {
-          scope,
-          includeRetained: this.deps.getState().reviewingRecentSession,
+          ...historyProjection,
         })
       : this.deps.getState().history;
-    if (this.deps.getState().recentHistoryScope !== scope) return;
+    if (!recentHistoryMutationIsCurrent(this.deps.getState(), historyProjection)) return;
     this.deps.setState({
       ...this.deps.getState(),
       history,
@@ -293,14 +292,16 @@ export class RecordLibraryController {
     const existing = this.deps.getState().history.find((item) => item.id === id);
     const blobId = existing && !existing.pinnedRecordId ? encryptedBlobIdForRecord(existing) : undefined;
     const recentHistoryStore = this.deps.recentHistoryStore();
+    const historyProjection = recentHistoryMutationProjection(this.deps.getState());
     const history = recentHistoryStore
       ? await recentHistoryStore.remove(id, window.location.href, {
-          scope: this.deps.getState().recentHistoryScope,
-          includeRetained: this.deps.getState().reviewingRecentSession,
+          ...historyProjection,
         })
       : reducePanelAction(this.deps.getState(), { name: 'history/remove', id }).history;
-    this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
-    this.deps.render();
+    if (recentHistoryMutationIsCurrent(this.deps.getState(), historyProjection)) {
+      this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
+      this.deps.render();
+    }
     if (blobId) await this.deps.removeCapturedBlobReference(blobId, { render: true });
   }
 

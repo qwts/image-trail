@@ -25,7 +25,9 @@ interface Harness {
 function createHarness(
   options: {
     readonly findSelectedImage?: () => HTMLImageElement | null;
+    readonly addRecentHistory?: RecentHistoryStore['add'];
     readonly updateRecentHistory?: RecentHistoryStore['update'];
+    readonly removeRecentHistory?: RecentHistoryStore['remove'];
   } = {},
 ): Harness {
   let state = createInitialPanelState(0);
@@ -48,6 +50,7 @@ function createHarness(
   const recentHistoryStore = {
     add: async (record: ImageDisplayRecord, pageUrl: string) => {
       historyAddLog.push({ record, pageUrl });
+      if (options.addRecentHistory) return options.addRecentHistory(record, pageUrl);
       historyRows = [record, ...historyRows.filter((row) => row.id !== record.id)];
       return historyRows;
     },
@@ -59,6 +62,7 @@ function createHarness(
     },
     remove: async (id: string, pageUrl: string) => {
       log.push(`historyRemove:${id}:${pageUrl}`);
+      if (options.removeRecentHistory) return options.removeRecentHistory(id, pageUrl);
       historyRows = historyRows.filter((row) => row.id !== id);
       return historyRows;
     },
@@ -263,6 +267,44 @@ test('markRecentHistoryRowPinned does not apply an all-scope response after scop
 
   assert.equal(harness.getState().recentHistoryScope, 'site');
   assert.deepEqual(harness.getState().history, [siteOnlyRow]);
+});
+
+test('recent add and remove responses cannot overwrite a review-mode transition', async () => {
+  let resolveAdd: ((rows: readonly ImageDisplayRecord[]) => void) | undefined;
+  let resolveRemove: ((rows: readonly ImageDisplayRecord[]) => void) | undefined;
+  let signalAddStarted: (() => void) | undefined;
+  let signalRemoveStarted: (() => void) | undefined;
+  const addStarted = new Promise<void>((resolve) => (signalAddStarted = resolve));
+  const removeStarted = new Promise<void>((resolve) => (signalRemoveStarted = resolve));
+  const harness = createHarness({
+    addRecentHistory: async () => {
+      signalAddStarted?.();
+      return new Promise((resolve) => (resolveAdd = resolve));
+    },
+    removeRecentHistory: async () => {
+      signalRemoveStarted?.();
+      return new Promise((resolve) => (resolveRemove = resolve));
+    },
+  });
+  const retained = capturedHistoryRecord('retained');
+
+  const pendingAdd = harness.controller.addRecentHistory('https://images.example.test/new.jpg');
+  await addStarted;
+  harness.patchState({ reviewingRecentSession: true, history: [retained] });
+  resolveAdd?.([capturedHistoryRecord('stale-add')]);
+  await pendingAdd;
+  assert.deepEqual(harness.getState().history, [retained]);
+
+  harness.patchState({ reviewingRecentSession: false, history: [retained] });
+  const pendingRemove = harness.controller.removeRecentHistory(retained.id);
+  await removeStarted;
+  harness.patchState({ reviewingRecentSession: true, history: [retained, capturedHistoryRecord('hidden')] });
+  resolveRemove?.([]);
+  await pendingRemove;
+  assert.deepEqual(
+    harness.getState().history.map((row) => row.id),
+    ['retained', 'hidden'],
+  );
 });
 
 test('deleteRecallBookmarks pages by the visible soft max and scopes to the current page URL', async () => {

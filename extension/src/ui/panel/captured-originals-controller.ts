@@ -7,6 +7,7 @@ import { isCapturedResult, type CaptureResult, type CaptureRetryRequest, type Ca
 import type { BookmarkStore, PanelState } from '../../core/types.js';
 import { bookmarkSaveMessage, recordHasBlobId } from './record-export-helpers.js';
 import { MissingOriginalRepairController } from './missing-original-repair-controller.js';
+import { recentHistoryAfterMutation, recentHistoryMutationProjection } from './recent-history-mutation-projection.js';
 import { createTargetCaptureRecord } from './target-capture-record.js';
 
 function captureRetryMatches(left: CaptureRetryRequest | null, right: CaptureRetryRequest): boolean {
@@ -278,7 +279,11 @@ export class CapturedOriginalsController {
     const recentHistoryStore = this.deps.recentHistoryStore();
     if (updatedHistory && recentHistoryStore) {
       const history = await this.addRecentHistoryRecord(recentHistoryStore, updatedHistory);
-      this.deps.setState({ ...this.deps.getState(), history, lastUpdatedAt: Date.now() });
+      this.deps.setState({
+        ...this.deps.getState(),
+        history,
+        lastUpdatedAt: Date.now(),
+      });
     }
     const visibleBookmark = this.deps
       .getState()
@@ -303,11 +308,12 @@ export class CapturedOriginalsController {
     return (await this.deps.bookmarkStore()?.findByUrl(url)) ?? null;
   }
 
-  private addRecentHistoryRecord(store: RecentHistoryStore, record: ImageDisplayRecord): Promise<readonly ImageDisplayRecord[]> {
-    return store.add(record, window.location.href, {
-      scope: this.deps.getState().recentHistoryScope,
-      includeRetained: this.deps.getState().reviewingRecentSession,
+  private async addRecentHistoryRecord(store: RecentHistoryStore, record: ImageDisplayRecord): Promise<readonly ImageDisplayRecord[]> {
+    const projection = recentHistoryMutationProjection(this.deps.getState());
+    const history = await store.add(record, window.location.href, {
+      ...projection,
     });
+    return recentHistoryAfterMutation(this.deps.getState(), projection, history);
   }
 
   private async findSavedRecordDuringCapturePreflight(url: string): Promise<ImageDisplayRecord | null> {
