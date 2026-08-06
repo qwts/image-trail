@@ -8,7 +8,7 @@ import {
   validFieldSplitSpecsForModel,
 } from '../extension/src/core/url/field-splits.js';
 import { applyFieldDigitWidthSpecs } from '../extension/src/core/url/field-widths.js';
-import { bumpUrlField, rebuildUrl } from '../extension/src/core/url/rebuild-url.js';
+import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../extension/src/core/url/rebuild-url.js';
 import { collectUrlFields, selectDefaultField } from '../extension/src/core/url/tokenize-fields.js';
 import type { UrlField } from '../extension/src/core/url/types.js';
 import { urlFixtures } from '../extension/src/test-fixtures/urls.js';
@@ -127,6 +127,28 @@ test('bumps split URL token parts while preserving contiguous URL format', () =>
       .map((candidate) => candidate.value),
     ['02', '01', '2001'],
   );
+});
+
+test('carries split-child overflow across the fixed-width source token', () => {
+  const digitModel = parseUrl('https://example.test/image?n=5995');
+  const digitField = collectUrlFields(digitModel).find((candidate) => candidate.label === 'query n');
+  assert.ok(digitField);
+  const digitSpec = createFieldSplitSpec(digitField, '1-1-1-1');
+  assert.ok(!('ok' in digitSpec));
+  const digitSplit = applyFieldSplitSpecs(digitModel, [digitSpec]);
+  const lastNine = collectUrlFields(digitSplit).find((candidate) => candidate.id === 'q:0:0:s:2');
+  assert.ok(lastNine);
+  assert.equal(rebuildUrl(bumpUrlField(digitSplit, lastNine, 1)), 'https://example.test/image?n=6005');
+
+  const groupedModel = parseUrl('https://example.test/image?n=5995');
+  const groupedField = collectUrlFields(groupedModel).find((candidate) => candidate.label === 'query n');
+  assert.ok(groupedField);
+  const groupedSpec = createFieldSplitSpec(groupedField, '2-2');
+  assert.ok(!('ok' in groupedSpec));
+  const groupedSplit = applyFieldSplitSpecs(groupedModel, [groupedSpec]);
+  const trailingGroup = collectUrlFields(groupedSplit).find((candidate) => candidate.id === 'q:0:0:s:1');
+  assert.ok(trailingGroup);
+  assert.equal(rebuildUrl(setUrlFieldValue(groupedSplit, trailingGroup, '105')), 'https://example.test/image?n=6005');
 });
 
 test('applies later split specs against original token indexes after earlier splits', () => {

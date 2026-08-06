@@ -112,6 +112,18 @@ export function resetAllParsedFieldState(state: PanelState, baseline: ParsedFiel
   };
 }
 
+export function updateParsedFieldResetBaselineSplitSpecs(state: PanelState): PanelState {
+  const baseline = state.parsedFieldResetBaseline;
+  if (!baseline) return state;
+  let fieldSplitSpecs = baseline.fieldSplitSpecs;
+  try {
+    fieldSplitSpecs = validFieldSplitSpecsForModel(parseUrl(baseline.sourceUrl), state.fieldSplitSpecs);
+  } catch {
+    // Keep the previous baseline specs when its source can no longer be parsed.
+  }
+  return { ...state, parsedFieldResetBaseline: { ...baseline, fieldSplitSpecs } };
+}
+
 export function resetParsedFieldStructureState(state: PanelState, baseline: ParsedFieldResetBaseline): PanelState {
   const baselineModel = parseUrl(baseline.sourceUrl);
   const fieldSplitSpecs = validFieldSplitSpecsForModel(baselineModel, state.fieldSplitSpecs);

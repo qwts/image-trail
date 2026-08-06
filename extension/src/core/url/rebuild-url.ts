@@ -17,6 +17,7 @@ export function setUrlFieldValue(model: ParsedUrlModel, field: UrlField, nextVal
 }
 
 export function rebuildUrlWithRawFieldValue(model: ParsedUrlModel, field: UrlField, nextValue: string): string {
+  if (field.splitBaseId) return rebuildUrl(setUrlFieldValue(model, field, nextValue));
   const currentUrl = rebuildUrl(model);
   let marker = '__IMAGE_TRAIL_RAW_FIELD_VALUE__';
   while (currentUrl.includes(marker)) marker += '_';
@@ -33,7 +34,7 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
           ? {
               ...part,
               edited: true,
-              tokens: part.tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token)),
+              tokens: updateFieldTokens(part.tokens, field, update),
             }
           : part,
       ),
@@ -47,7 +48,7 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
         queryField.index === field.queryIndex
           ? {
               ...queryField,
-              valueTokens: queryField.valueTokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token)),
+              valueTokens: updateFieldTokens(queryField.valueTokens, field, update),
             }
           : queryField,
       ),
@@ -55,6 +56,68 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
   }
 
   return model;
+}
+
+function updateFieldTokens(tokens: readonly UrlToken[], field: UrlField, update: (token: UrlToken) => UrlToken): UrlToken[] {
+  if (!field.splitBaseId) return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token));
+
+  const target = tokens[field.tokenIndex];
+  if (!target || target.kind === 'text' || target.prefix) {
+    return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token));
+  }
+
+  const group = tokens
+    .map((token, tokenIndex) => ({ token, tokenIndex }))
+    .filter(
+      ({ token }) =>
+        token.splitBaseId === field.splitBaseId &&
+        token.originalTokenIndex === target.originalTokenIndex &&
+        token.kind !== 'text' &&
+        token.prefix === undefined,
+    );
+  const targetGroupIndex = group.findIndex(({ tokenIndex }) => tokenIndex === field.tokenIndex);
+  if (group.length < 2 || targetGroupIndex === -1) {
+    return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token));
+  }
+
+  const updatedTarget = update(target);
+  if (updatedTarget.kind === 'text' || updatedTarget.prefix) {
+    return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? updatedTarget : token));
+  }
+
+  const radix = group.some(({ token }) => token.kind === 'hex') || updatedTarget.kind === 'hex' ? 16 : 10;
+  const currentParts = group.map(({ token }) => tokenValue(token));
+  const currentTarget = parseNumericTokenValue(currentParts[targetGroupIndex]!, radix);
+  const nextTarget = parseNumericTokenValue(tokenValue(updatedTarget), radix);
+  const currentWhole = parseNumericTokenValue(currentParts.join(''), radix);
+  if (currentTarget === null || nextTarget === null || currentWhole === null) {
+    return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? updatedTarget : token));
+  }
+
+  const suffixWidth = currentParts.slice(targetGroupIndex + 1).reduce((sum, part) => sum + part.length, 0);
+  const place = BigInt(radix) ** BigInt(suffixWidth);
+  const totalWidth = currentParts.reduce((sum, part) => sum + part.length, 0);
+  const maximum = BigInt(radix) ** BigInt(totalWidth) - 1n;
+  const arithmetic = currentWhole + (nextTarget - currentTarget) * place;
+  const bounded = arithmetic < 0n ? 0n : arithmetic > maximum ? maximum : arithmetic;
+  const nextWhole = bounded.toString(radix).padStart(totalWidth, '0');
+  const casedWhole = radix === 16 && group.some(({ token }) => token.uppercase) ? nextWhole.toUpperCase() : nextWhole;
+
+  let cursor = 0;
+  const replacements = new Map<number, UrlToken>();
+  for (const { token, tokenIndex } of group) {
+    const width = tokenValue(token).length;
+    const value = casedWhole.slice(cursor, cursor + width);
+    cursor += width;
+    replacements.set(tokenIndex, { ...token, ...setTokenValue(token, value) });
+  }
+  return tokens.map((token, tokenIndex) => replacements.get(tokenIndex) ?? token);
+}
+
+function parseNumericTokenValue(value: string, radix: 10 | 16): bigint | null {
+  const pattern = radix === 16 ? /^[\da-f]+$/iu : /^\d+$/u;
+  if (!pattern.test(value)) return null;
+  return BigInt(radix === 16 ? `0x${value}` : value);
 }
 
 function bumpToken(token: UrlToken, delta: number): UrlToken {

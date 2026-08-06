@@ -86,6 +86,22 @@ test('set-value transform reports same URL when value is unchanged', () => {
   assert.deepEqual(result.attemptedFieldIds, [field.id]);
 });
 
+test('set-value carries an overflowing split child without changing the split width', () => {
+  const baseModel = parseUrl('https://example.test/image?n=2025');
+  const baseField = collectUrlFields(baseModel).find((candidate) => candidate.label === 'query n');
+  assert.ok(baseField);
+  const split = applyFieldSplitTransform(baseField, '1-1-1-1');
+  assert.equal(split.ok, true);
+  const splitModel = applyFieldSplitSpecs(baseModel, [split.splitSpec]);
+  const zero = collectUrlFields(splitModel).find((candidate) => candidate.id === 'q:0:0:s:1');
+  assert.ok(zero);
+
+  const result = applySetFieldValueTransform(splitModel, zero, '10');
+
+  assert.equal(result.url, 'https://example.test/image?n=3025');
+  assert.equal(collectUrlFields(applyFieldSplitSpecs(parseUrl(result.url), [split.splitSpec])).length, 5);
+});
+
 test('set-value accepts empty text and lets the reparsed URL define the resulting fields', () => {
   const pathModel = parseUrl('https://example.test/images/word');
   const pathField = collectUrlFields(pathModel).find((candidate) => candidate.value === 'word');

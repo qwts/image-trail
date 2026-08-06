@@ -276,6 +276,36 @@ test('split-child set-value accepts a valid replacement and rejects invalidation
   assert.equal(invalid.resetCalls.length, 1);
 });
 
+test('split-child overflow carries in place and Reset all restores the URL without collapsing the split', async () => {
+  const rawUrl = 'https://example.test/image?n=2025';
+  const splitSpec = {
+    baseFieldId: 'q:0:0',
+    location: 'query' as const,
+    queryIndex: 0,
+    tokenIndex: 0,
+    lengths: [1, 1, 1, 1],
+    pattern: '1-1-1-1',
+  };
+  const harness = createHarness({ rawUrl, currentUrlModel: () => applyFieldSplitSpecs(parseUrl(rawUrl), [splitSpec]) });
+  harness.patchState({ fieldSplitSpecs: [splitSpec] });
+
+  harness.controller.enqueueFieldTransform({
+    name: 'field/transform',
+    fieldId: 'q:0:0:s:1',
+    transformId: 'set-value',
+    value: '10',
+  });
+  await harness.settle();
+
+  assert.equal(harness.applyCalls[0]?.url, 'https://example.test/image?n=3025');
+  assert.deepEqual(harness.getState().parsedFieldResetBaseline?.fieldSplitSpecs, [splitSpec]);
+
+  harness.controller.enqueueFieldTransform({ name: 'field/transform', transformId: 'reset-all' });
+  await harness.settle();
+  assert.equal(harness.applyCalls.length, 1);
+  assert.deepEqual(harness.getState().fieldSplitSpecs, [splitSpec]);
+});
+
 test('invalid numeric commits use bounded generic feedback without projection', async () => {
   const harness = createHarness();
   harness.controller.enqueueRejectedFieldCommit();
