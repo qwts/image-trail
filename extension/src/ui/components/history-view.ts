@@ -25,8 +25,8 @@ export function createHistoryView(
   const sectionOpen = options?.sectionOpen !== false;
   const collapsible = options?.collapsible !== false;
   const scope = options?.scope ?? DEFAULT_RECENT_HISTORY_SCOPE;
-  const header = createHistoryHeader(sectionOpen, collapsible, options?.displayOrder ?? DEFAULT_RECENT_DISPLAY_ORDER, dispatch);
-  const scopeRow = createHistoryScopeRow(scope, options?.pageUrl ?? window.location.href, options?.privacyMode === true, dispatch);
+  const header = createHistoryHeader(sectionOpen, collapsible, dispatch);
+  const scopeRow = createHistoryScopeRow(scope, options, dispatch);
   const sectionActions = document.createElement('div');
   sectionActions.className = 'image-trail-panel__section-actions image-trail-panel__history-actions';
   if (displayItems.length > 0) {
@@ -222,12 +222,7 @@ export function createHistoryView(
   return section;
 }
 
-function createHistoryHeader(
-  sectionOpen: boolean,
-  collapsible: boolean,
-  displayOrder: RecentDisplayOrder,
-  dispatch: (action: HistoryAction) => void,
-): HTMLElement {
+function createHistoryHeader(sectionOpen: boolean, collapsible: boolean, dispatch: (action: HistoryAction) => void): HTMLElement {
   const heading = document.createElement('h3');
   heading.textContent = 'Recent history';
   const header = document.createElement('div');
@@ -236,10 +231,7 @@ function createHistoryHeader(
   if (collapsible) {
     header.classList.add('image-trail-panel__section-header--collapsible');
   }
-  const toolbar = document.createElement('div');
-  toolbar.className = 'image-trail-panel__history-toolbar';
-  toolbar.append(createRecentSortControl(displayOrder, dispatch));
-  header.append(heading, toolbar);
+  header.append(heading);
   if (collapsible) {
     header.append(
       createSectionToggle({
@@ -254,14 +246,16 @@ function createHistoryHeader(
 
 function createHistoryScopeRow(
   scope: RecentHistoryScope,
-  pageUrl: string,
-  privacyMode: boolean,
+  options: HistoryViewOptions | undefined,
   dispatch: (action: HistoryAction) => void,
 ): HTMLElement {
   const row = document.createElement('div');
   row.className = 'image-trail-panel__history-context';
   row.append(
-    createRecentScopeControl(scope, pageUrl, privacyMode, (nextScope) => dispatch({ name: 'history/update-scope', scope: nextScope })),
+    createRecentSortControl(options?.displayOrder ?? DEFAULT_RECENT_DISPLAY_ORDER, dispatch),
+    createRecentScopeControl(scope, options?.pageUrl ?? window.location.href, options?.privacyMode === true, (nextScope) =>
+      dispatch({ name: 'history/update-scope', scope: nextScope }),
+    ),
   );
   return row;
 }

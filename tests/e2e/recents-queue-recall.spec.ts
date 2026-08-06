@@ -426,6 +426,10 @@ test('the Recents and Queue sections collapse and expand from their heading togg
   await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(1);
 
   const queueToggle = page.getByRole('button', { name: 'Hide Queue' });
+  const queueActions = page.locator('.image-trail-panel__bookmark-actions');
+  await expect(queueToggle.locator('select')).toHaveCount(0);
+  await expect(queueActions.locator('select[aria-label="Queue order"]')).toBeVisible();
+  await expect(queueActions.locator(':scope > :first-child')).toHaveAttribute('aria-label', 'Queue order');
   await queueToggle.click({ position: { x: 10, y: 10 } });
   await expect(page.locator('.image-trail-panel__bookmark-status-row')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Pin current' })).toBeVisible();

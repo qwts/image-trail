@@ -223,8 +223,6 @@
   gap: 6px 8px;
 }
 
-.image-trail-panel-root .image-trail-panel__bookmark-toolbar,
-.image-trail-panel-root .image-trail-panel__history-toolbar,
 .image-trail-panel-root .image-trail-panel__history-context {
   display: flex;
   justify-content: flex-end;
@@ -232,27 +230,18 @@
   min-width: 0;
 }
 
-.image-trail-panel-root .image-trail-panel__bookmark-toolbar {
-  flex-wrap: wrap;
-}
-
-.image-trail-panel-root .image-trail-panel__history-toolbar,
 .image-trail-panel-root .image-trail-panel__history-context {
   flex-wrap: nowrap;
 }
 
-/* Keep context and bulk controls out of the collapsible heading grid: sorting remains in the
-   single-line header while scope and existing actions stay available when the list is collapsed. */
+/* Keep context and controls out of the collapsible heading grid so they stay available when the
+   list is collapsed. */
 .image-trail-panel-root .image-trail-panel__section-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
   min-width: 0;
-}
-
-.image-trail-panel-root .image-trail-panel__bookmark-toolbar .image-trail-panel__primary-action {
-  text-align: center;
 }
 
 .image-trail-panel-root .image-trail-panel__record-sort-select {

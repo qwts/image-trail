@@ -364,12 +364,14 @@ test('Recall is disabled when the queue is empty', () => {
   assert.equal(buttonByText(view, 'Recall').disabled, true);
 });
 
-test('the Queue sort control stays in the section header while actions render below it (#448)', () => {
+test('the Queue sort control sits with Pin current, Recall, and Queue actions (#448/#754)', () => {
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions);
-  const toolbar = view.querySelector('.image-trail-panel__section-header--with-actions .image-trail-panel__bookmark-toolbar');
-  assert.ok(toolbar?.querySelector('select[aria-label="Queue order"]'));
-  assert.ok(view.querySelector('.image-trail-panel__bookmark-actions'), 'Queue actions stay outside the constrained header grid');
+  const header = view.querySelector('.image-trail-panel__section-header--with-actions');
+  const actionRow = view.querySelector('.image-trail-panel__bookmark-actions');
+  assert.equal(header?.querySelector('select[aria-label="Queue order"]'), null);
+  assert.ok(actionRow?.querySelector('select[aria-label="Queue order"]'));
+  assert.equal(actionRow?.firstElementChild?.matches('select[aria-label="Queue order"]'), true);
 });
 
 test('the explicit header toggle collapses and expands the queue section (#438/#755)', () => {
