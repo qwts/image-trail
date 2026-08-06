@@ -2,7 +2,7 @@ import { InteropTransportError } from '../core/interop/transport.js';
 import { restoreActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { DRIVE_FILE_SCOPE } from './interop-chrome-identity.js';
 import { createChromeIdentityInteropDriveStore } from './interop-google-drive-store.js';
-import { OverlookICloudNativeClient } from './interop-icloud-client.js';
+import { OverlookICloudNativeClient, RELEASED_IMAGE_TRAIL_EXTENSION_ID } from './interop-icloud-client.js';
 import { createChromePCloudInteropAuth } from './interop-pcloud-auth.js';
 import { InteropRuntime } from './interop-runtime.js';
 import { PCLOUD_HOST_PERMISSION, requestHostPermission } from './permissions.js';
@@ -67,7 +67,7 @@ export function createChromeInteropRuntime(
     },
     disconnectGoogleDrive: () => chrome.identity.clearAllCachedAuthTokens(),
     probeICloud: async () => {
-      await new OverlookICloudNativeClient(chrome.runtime.id).request({ operation: 'status' });
+      await new OverlookICloudNativeClient(RELEASED_IMAGE_TRAIL_EXTENSION_ID).request({ operation: 'status' });
     },
     openProvider: async (provider) => {
       if (provider === 'pcloud') return pcloud.openProvider();

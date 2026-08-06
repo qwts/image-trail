@@ -2,6 +2,13 @@ import { InteropTransportError, assertBoundedControlFrame, assertSafeInteropPath
 
 export const OVERLOOK_ICLOUD_NATIVE_HOST = 'com.qwts.overlook.interop';
 
+/**
+ * Chrome Web Store beta listing identity for Image Trail. The signed Overlook
+ * host allowlists exactly this origin, so unpacked or renamed builds must fail
+ * the identity gate locally instead of reaching the host.
+ */
+export const RELEASED_IMAGE_TRAIL_EXTENSION_ID = 'kopcjofaojfpgdoianeddagpenhijphi';
+
 export type ICloudControlOperation = 'status' | 'put-file' | 'materialize-file' | 'list' | 'delete' | 'quota' | 'verify';
 
 export interface ICloudControlRequest {
