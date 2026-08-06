@@ -304,9 +304,7 @@
   margin-inline-start: auto;
 }
 
-.image-trail-panel-root .image-trail-panel__target-summary::after,
-.image-trail-panel-root .image-trail-panel__secondary-controls-summary::after,
-.image-trail-panel-root .image-trail-panel__fields-summary::after {
+.image-trail-panel-root .image-trail-panel__secondary-controls-summary::after {
   content: 'Show';
   flex: none;
   inline-size: 30px;
@@ -383,4 +381,7 @@
   .image-trail-panel-root.image-trail-panel__toast-root .image-trail-panel__toast {
     animation: none;
   }
+}
+.image-trail-panel-root [hidden] {
+  display: none !important;
 }

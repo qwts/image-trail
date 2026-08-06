@@ -203,40 +203,14 @@
   max-width: 100%;
 }
 
-/* Collapsible section headers (#438/#441): the WHOLE row is the toggle (summary ergonomics — the
-   hint area included), interactive children pass through, and the row stays the drag-out handle.
-   The doubled class selector outranks the --with-actions template regardless of rule order, so the
-   hint gets a real fourth column instead of auto-placing onto a stray row. */
+/* Collapsible section headers reserve explicit columns for toolbar, Hide/Show, and detach actions. */
 .image-trail-panel-root .image-trail-panel__section-header--with-actions.image-trail-panel__section-header--collapsible {
   grid-template-columns: minmax(min-content, 1fr) minmax(0, max-content) max-content max-content;
-  cursor: pointer;
 }
 
-.image-trail-panel-root .image-trail-panel__section-header--collapsible::after {
-  content: 'Show';
-  inline-size: 30px;
-  text-align: end;
-  color: #999;
-  font:
-    11px system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.image-trail-panel-root .image-trail-panel__section-header--collapsible[data-open='true']::after {
-  content: 'Hide';
-}
-
-/* The hint occupies the reserved hint column, so the detach control drops its stand-in margin. */
+/* The toggle occupies its own column, so the detach control drops its stand-in margin. */
 .image-trail-panel-root .image-trail-panel__section-header--collapsible .image-trail-panel__section-detach {
   margin-inline-end: 0;
-}
-
-/* Detached windows are their own container: no collapse there, so no hint either. */
-.image-trail-panel-root .image-trail-panel__detached-body .image-trail-panel__section-header--collapsible::after {
-  content: none;
 }
 
 /* Section headers that carry their action toolbar (#430): heading | toolbar | detach columns.

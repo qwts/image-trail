@@ -1,34 +1,36 @@
 import type { PanelAction, TargetState } from '../../core/types.js';
 import { OBJECT_FIT_MODES, isObjectFitMode } from '../../core/preview-style.js';
 import { PRIVACY_URL_TEXT } from './record-metadata.js';
-import { createBadge, createButton, createSelect } from './primitives.js';
-
-let targetUtilityOpen: boolean | null = null;
+import { createBadge, createButton, createSectionToggle, createSelect } from './primitives.js';
 
 export function createDomTargetPickerView(
   target: TargetState,
   dispatch: (action: PanelAction) => void,
-  options: { readonly privacyMode?: boolean } = {},
+  options: {
+    readonly privacyMode?: boolean;
+    readonly open?: boolean;
+    readonly collapsible?: boolean;
+    readonly onOpenChange?: (open: boolean) => void;
+  } = {},
 ): HTMLElement {
-  const targetNeedsAttention = target.picking || target.grabModeActive || target.mode !== 'auto' || target.candidateCount !== 1;
-  const wrapper = document.createElement('details');
+  const wrapper = document.createElement('section');
   wrapper.className = 'image-trail-panel__section image-trail-panel__target-utility image-trail-ds__target';
-  wrapper.open = targetNeedsAttention || (targetUtilityOpen ?? false);
-  wrapper.addEventListener('toggle', () => {
-    if (targetNeedsAttention) {
-      if (!wrapper.open) wrapper.open = true;
-      return;
-    }
-    targetUtilityOpen = wrapper.open;
-  });
-
-  wrapper.append(createTargetHeading(target), createTargetBody(target, dispatch, options.privacyMode === true));
+  const open = options.open !== false;
+  const body = createTargetBody(target, dispatch, options.privacyMode === true);
+  body.hidden = !open;
+  wrapper.append(
+    createTargetHeading(target, open, options.collapsible !== false, (nextOpen) => {
+      body.hidden = !nextOpen;
+      options.onOpenChange?.(nextOpen);
+    }),
+    body,
+  );
   return wrapper;
 }
 
-function createTargetHeading(target: TargetState): HTMLElement {
-  const heading = document.createElement('summary');
-  heading.className = 'image-trail-panel__target-summary image-trail-ds__section-header';
+function createTargetHeading(target: TargetState, open: boolean, collapsible: boolean, onOpenChange: (open: boolean) => void): HTMLElement {
+  const heading = document.createElement('div');
+  heading.className = 'image-trail-panel__target-summary image-trail-panel__section-header image-trail-ds__section-header';
   const title = document.createElement('h3');
   title.className = 'image-trail-ds__section-title';
   title.textContent = 'Host target';
@@ -38,6 +40,7 @@ function createTargetHeading(target: TargetState): HTMLElement {
     className: 'image-trail-panel__target-count',
   });
   heading.append(title, summaryMeta);
+  if (collapsible) heading.append(createSectionToggle({ open, sectionLabel: 'Host target', onToggle: onOpenChange }));
   return heading;
 }
 

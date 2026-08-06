@@ -61,6 +61,27 @@ test('primary workflow exposes navigation, capture, slideshow, and Grab Mode wit
   ]);
 });
 
+test('Controls uses the shared explicit Hide/Show header control (#755)', () => {
+  const openChanges: boolean[] = [];
+  const initial = createInitialPanelState(0);
+  const view = createManualControlsView({
+    state: { ...initial, target: { ...initial.target, selectedUrl: 'https://images.example.test/photo.jpg' } },
+    previousFieldId: null,
+    nextFieldId: null,
+    dispatch: () => undefined,
+    open: true,
+    onOpenChange: (open) => openChanges.push(open),
+  });
+  const toggle = view.querySelector<HTMLButtonElement>(':scope > .image-trail-panel__section-header .image-trail-ds__section-toggle');
+  const body = view.querySelector<HTMLElement>('.image-trail-panel__secondary-controls-body-shell');
+  assert.ok(toggle && body);
+
+  toggle.click();
+  assert.equal(toggle.textContent, 'Show');
+  assert.equal(body.hidden, true);
+  assert.deepEqual(openChanges, [false]);
+});
+
 test('single-image context hides Grab while feed context explains its state', () => {
   const single = createView().view;
   assert.equal(single.querySelector('[aria-label="Grab Mode"]'), null);

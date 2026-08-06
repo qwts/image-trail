@@ -353,16 +353,14 @@ test('Recents sort control orders timestamps stably and dispatches its persisted
   assert.deepEqual(actions, [{ name: 'history/update-display-order', order: 'newest-first' }]);
 });
 
-test('the heading toggle collapses and expands the recents section (#438)', () => {
+test('the explicit header toggle collapses and expands the recents section (#438/#755)', () => {
   const actions: unknown[] = [];
   const view = buildHistoryView(actions);
-  const toggle = view.querySelector<HTMLElement>('.image-trail-panel__section-header--collapsible');
+  const toggle = view.querySelector<HTMLButtonElement>('.image-trail-panel__section-header--collapsible .image-trail-ds__section-toggle');
   assert.ok(toggle);
-  assert.equal(toggle.getAttribute('role'), 'button');
   assert.equal(toggle.getAttribute('aria-expanded'), 'true');
-  assert.equal(toggle.getAttribute('aria-label'), 'Hide the Recent history list', 'the accessible name carries the action');
+  assert.equal(toggle.textContent, 'Hide', 'the visible label carries the action');
 
-  // Summary ergonomics (#441): the whole header row toggles — a click on the row itself counts.
   toggle.click();
   assert.deepEqual(actions, [{ name: 'panel/history-section-open', open: false }]);
 });
@@ -387,6 +385,7 @@ test('a non-collapsible render (detached window) has no toggle affordance (#441)
   assert.ok(header);
   assert.equal(header.getAttribute('role'), null, 'no button role in a detached window');
   assert.equal(header.classList.contains('image-trail-panel__section-header--collapsible'), false);
+  assert.equal(header.querySelector('.image-trail-ds__section-toggle'), null);
 
   header.click();
   assert.deepEqual(actions, [], 'a detached header click must not flip the hidden attached collapse state');

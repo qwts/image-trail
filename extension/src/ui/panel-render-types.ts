@@ -19,6 +19,8 @@ export interface PanelRenderTarget {
 
 export interface PanelLayoutState {
   fieldsPanelOpen: boolean;
+  /** Session-only attached section visibility; detached windows always render expanded. */
+  sectionOpen: Map<DetachableSectionId, boolean>;
   fieldsPanelBlockSize: number | null;
   historyListBlockSize: number | null;
   fieldDisplayModes: Map<string, NumericFieldDisplayMode>;

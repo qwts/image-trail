@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import { useState, type ChangeEvent } from 'react';
 
 import { OBJECT_FIT_MODES, isObjectFitMode } from '../../core/preview-style.js';
 import { pageContextLabel, type PageContextState } from '../../core/page-context.js';
@@ -6,7 +6,6 @@ import type { PanelAction, TargetState } from '../../core/types.js';
 import { PRIVACY_URL_TEXT } from '../components/record-metadata.js';
 import { renderReactSubtree } from './react-subtree.js';
 
-let targetUtilityOpen: boolean | null = null;
 let targetControlsOpen = false;
 
 interface TargetPickerProps {
@@ -14,6 +13,9 @@ interface TargetPickerProps {
   readonly pageContext: PageContextState;
   readonly dispatch: (action: PanelAction) => void;
   readonly privacyMode: boolean;
+  readonly open: boolean;
+  readonly collapsible: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 function targetUrl(target: TargetState, privacyMode: boolean): string {
@@ -154,13 +156,30 @@ function reapplyFitSelectFocusAfterNativeChange(root: Node, ownerDocument: Docum
   }, 0);
 }
 
-function TargetPickerContent({ target, pageContext, dispatch, privacyMode }: TargetPickerProps) {
+function TargetPickerContent({ target, pageContext, dispatch, privacyMode, open, collapsible, onOpenChange }: TargetPickerProps) {
+  const [sectionOpen, setSectionOpen] = useState(open);
   return (
     <>
-      <summary className="image-trail-panel__target-summary image-trail-ds__section-header">
+      <div className="image-trail-panel__target-summary image-trail-panel__section-header image-trail-ds__section-header">
         <h3 className="image-trail-ds__section-title">Host target</h3>
-      </summary>
-      <div className="image-trail-panel__target-card image-trail-ds__card">
+        {collapsible ? (
+          <button
+            type="button"
+            className="image-trail-ds__button image-trail-ds__section-toggle"
+            data-variant="ghost"
+            aria-expanded={sectionOpen}
+            aria-label={`${sectionOpen ? 'Hide' : 'Show'} Host target`}
+            onClick={() => {
+              const nextOpen = !sectionOpen;
+              setSectionOpen(nextOpen);
+              onOpenChange?.(nextOpen);
+            }}
+          >
+            {sectionOpen ? 'Hide' : 'Show'}
+          </button>
+        ) : null}
+      </div>
+      <div className="image-trail-panel__target-card image-trail-ds__card" hidden={!sectionOpen}>
         <TargetThumbnail target={target} privacyMode={privacyMode} />
         <TargetIdentity target={target} pageContext={pageContext} privacyMode={privacyMode} />
         <TargetControls target={target} dispatch={dispatch} />
@@ -172,16 +191,17 @@ function TargetPickerContent({ target, pageContext, dispatch, privacyMode }: Tar
 export function createTargetPickerView(
   target: TargetState,
   dispatch: (action: PanelAction) => void,
-  options: { readonly pageContext?: PageContextState; readonly privacyMode?: boolean } = {},
+  options: {
+    readonly pageContext?: PageContextState;
+    readonly privacyMode?: boolean;
+    readonly open?: boolean;
+    readonly collapsible?: boolean;
+    readonly onOpenChange?: (open: boolean) => void;
+  } = {},
 ): HTMLElement {
-  const targetNeedsAttention = target.picking || target.grabModeActive || target.mode !== 'auto' || target.candidateCount !== 1;
-  const wrapper = document.createElement('details');
+  const wrapper = document.createElement('section');
   wrapper.className = 'image-trail-panel__section image-trail-panel__target-utility image-trail-ds__target';
-  wrapper.open = targetNeedsAttention || (targetUtilityOpen ?? true);
-  wrapper.addEventListener('toggle', () => {
-    if (targetNeedsAttention && !wrapper.open) wrapper.open = true;
-    else targetUtilityOpen = wrapper.open;
-  });
+  const open = options.open !== false;
   return renderReactSubtree(
     wrapper,
     <TargetPickerContent
@@ -197,6 +217,9 @@ export function createTargetPickerView(
       }
       dispatch={dispatch}
       privacyMode={options.privacyMode === true}
+      open={open}
+      collapsible={options.collapsible !== false}
+      {...(options.onOpenChange ? { onOpenChange: options.onOpenChange } : {})}
     />,
   );
 }

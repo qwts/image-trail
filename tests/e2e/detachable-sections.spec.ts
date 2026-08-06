@@ -259,7 +259,7 @@ test('the per-site workspace layout persists across a reload when opted in, and 
   const restoreToggle = page.getByLabel('Restore workspace layout per site');
   await restoreToggle.check();
   await page.getByRole('button', { name: 'Hide settings' }).click();
-  await page.getByRole('button', { name: 'Hide the Queue list' }).click();
+  await page.getByRole('button', { name: 'Hide Queue' }).click();
 
   // Detach Recent history, drag its window to a distinctive spot, and shade it.
   await page.getByRole('button', { name: detachHistoryName }).click();
@@ -292,7 +292,7 @@ test('the per-site workspace layout persists across a reload when opted in, and 
   expect(Math.abs(restoredBox!.x - movedBox!.x)).toBeLessThanOrEqual(4);
   expect(Math.abs(restoredBox!.y - movedBox!.y)).toBeLessThanOrEqual(4);
   await expect(restoredWindow.locator('.image-trail-workspace__dom-body')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Show the Queue list' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Show Queue' })).toBeVisible();
 
   // Reset clears the saved layout for the site and reattaches the section.
   await openSystemGroup();
@@ -300,7 +300,7 @@ test('the per-site workspace layout persists across a reload when opted in, and 
   await expect(restoredWindow).toHaveCount(0);
   await page.getByRole('button', { name: 'Hide settings' }).click();
   await expect(page.getByRole('button', { name: detachHistoryName })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Hide the Queue list' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hide Queue' })).toBeVisible();
 
   // Leave the shared profile the way we found it: opt back out.
   await openSystemGroup();
@@ -327,6 +327,6 @@ test('a detached section window keeps its header-row action toolbar usable (#430
 
   await windowEl.getByRole('button', { name: 'Restore Queue into the panel' }).click();
   await expect(windowEl).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Hide the Queue list' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hide Queue' })).toBeVisible();
   await expect(page.locator('.image-trail-panel__bookmark-status-row')).toHaveCount(1);
 });

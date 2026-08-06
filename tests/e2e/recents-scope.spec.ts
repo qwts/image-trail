@@ -63,7 +63,7 @@ test('Recents keeps its scope context below a one-line header at narrow widths',
   await openFixturePage(page, fixturePaths.singleImage);
   await openPanel(page, serviceWorker);
 
-  const header = page.getByRole('button', { name: 'Hide the Recent history list' });
+  const header = page.getByRole('button', { name: 'Hide Recent history' });
   const scope = page.getByLabel('Recents scope');
   const headerBox = (await header.boundingBox())!;
   const scopeBox = (await scope.boundingBox())!;

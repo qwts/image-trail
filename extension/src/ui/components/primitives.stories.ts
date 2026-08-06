@@ -59,7 +59,7 @@ export const InteractionStates: Story = {
     await userEvent.click(canvas.getByRole('checkbox', { name: 'Privacy mode' }));
     await expect(toggleAction).toHaveBeenCalled();
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Show' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Show Interactive contract' }));
     await expect(sectionAction).toHaveBeenCalledTimes(1);
   },
 };

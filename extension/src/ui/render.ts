@@ -167,11 +167,14 @@ const PRIMARY_SECTIONS: readonly DetachableSectionDefinition[] = [
     id: 'target',
     title: 'Host target',
     attachedVisible: dashboardSectionVisible,
-    create: (target, state) =>
-      createTargetPickerView(state.target, target.dispatch, {
+    create: (target, state) => {
+      const visibility = sectionVisibility(target, state, 'target');
+      return createTargetPickerView(state.target, target.dispatch, {
         pageContext: state.pageContext,
         privacyMode: state.privacyModeEnabled,
-      }),
+        ...visibility,
+      });
+    },
   },
   {
     id: 'url-editor',
@@ -179,6 +182,7 @@ const PRIMARY_SECTIONS: readonly DetachableSectionDefinition[] = [
     attachedVisible: dashboardSectionVisible,
     create: (target, state) => {
       const selectedUrl = state.target.selectedUrl;
+      const visibility = sectionVisibility(target, state, 'url-editor');
       return createUrlEditorView(
         {
           url: cachedActiveUrlFields(state).activeUrl,
@@ -193,7 +197,9 @@ const PRIMARY_SECTIONS: readonly DetachableSectionDefinition[] = [
           onRejectUnsupportedInput: () => {
             target.dispatch({ name: 'selected-url/reject-unsupported-input' });
           },
+          onOpenChange: visibility.onOpenChange,
         },
+        visibility,
       );
     },
   },
@@ -202,13 +208,20 @@ const PRIMARY_SECTIONS: readonly DetachableSectionDefinition[] = [
     title: 'Field Editor',
     windowInlineSize: 380,
     attachedVisible: dashboardSectionVisible,
-    create: (target, state) => createParsedFieldsSection(cachedFieldEditorViewModel(state), target),
+    create: (target, state) => {
+      const detached = state.detachedSections.includes('fields');
+      return createParsedFieldsSection(cachedFieldEditorViewModel(state), target, {
+        open: detached || target.layoutState.fieldsPanelOpen,
+        collapsible: !detached,
+      });
+    },
   },
   {
     id: 'controls',
     title: 'Manual controls',
     attachedVisible: dashboardSectionVisible,
-    create: (target, state) => createManualControlsSection(target, state, cachedFieldEditorViewModel(state)),
+    create: (target, state) =>
+      createManualControlsSection(target, state, cachedFieldEditorViewModel(state), sectionVisibility(target, state, 'controls')),
   },
   { id: 'history', title: 'Recent history', attachedVisible: dashboardSectionVisible, create: createHistorySection },
   { id: 'bookmarks', title: 'Queue', attachedVisible: dashboardSectionVisible, create: createBookmarksSection },
@@ -217,6 +230,19 @@ const SECTIONS: readonly DetachableSectionDefinition[] = [SETTINGS_SECTION, ...P
 
 function dashboardSectionVisible(state: PanelState): boolean {
   return !state.helpOpen;
+}
+
+function sectionVisibility(
+  target: PanelRenderTarget,
+  state: PanelState,
+  sectionId: 'target' | 'url-editor' | 'controls',
+): { readonly open: boolean; readonly collapsible: boolean; readonly onOpenChange: (open: boolean) => void } {
+  if (state.detachedSections.includes(sectionId)) return { open: true, collapsible: false, onOpenChange: () => undefined };
+  return {
+    open: target.layoutState.sectionOpen.get(sectionId) ?? true,
+    collapsible: true,
+    onOpenChange: (open) => target.layoutState.sectionOpen.set(sectionId, open),
+  };
 }
 
 function createDestinationDomBody(target: PanelRenderTarget, state: PanelState): HTMLElement | undefined {

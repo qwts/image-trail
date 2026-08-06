@@ -8,6 +8,7 @@ import { createQueueRepairButton, createQueueSelectionButton } from './queue-rep
 import { createQueueSortControl } from './queue-sort-control.js';
 import { selectedRangeIds } from './selection-ranges.js';
 import { createCaptureOriginalButton, createDeleteOriginalButton, createTrustedRecordActionButton } from './privileged-record-actions.js';
+import { createSectionToggle } from './primitives.js';
 
 export function createBookmarksView(
   currentUrl: string | null,
@@ -43,31 +44,10 @@ export function createBookmarksView(
   const header = document.createElement('div');
   header.className = 'image-trail-panel__section-header image-trail-panel__section-header--with-actions';
   header.dataset['open'] = String(sectionOpen);
-  // Summary ergonomics (#441): the WHOLE header row is the toggle — hint area included — while
-  // clicks on its interactive children (toolbar buttons, queue menu, detach) pass through, and
-  // dragging the row still pops the section out (an engaged drag suppresses the click). A detached
-  // window renders the header non-interactive: it is always open there, and a live toggle would
-  // silently flip the ATTACHED collapse state behind the user's back.
+  // A detached window renders the header non-interactive: it is always open there, and a live
+  // toggle would silently flip the attached collapse state behind the user's back.
   if (collapsible) {
     header.classList.add('image-trail-panel__section-header--collapsible');
-    header.setAttribute('role', 'button');
-    header.tabIndex = 0;
-    header.setAttribute('aria-expanded', String(sectionOpen));
-    header.setAttribute('aria-label', sectionOpen ? 'Hide the Queue list' : 'Show the Queue list');
-    header.title = sectionOpen ? 'Hide the Queue list' : 'Show the Queue list';
-    const toggleSection = (): void => dispatch({ name: 'panel/bookmarks-section-open', open: !sectionOpen });
-    header.addEventListener('click', (event) => {
-      const target = event.target;
-      if (target instanceof Element && target.closest('button, summary, details, input, select, a')) return;
-      event.preventDefault();
-      toggleSection();
-    });
-    header.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      if (event.target !== header) return;
-      event.preventDefault();
-      toggleSection();
-    });
   }
   header.append(heading);
 
@@ -370,6 +350,15 @@ export function createBookmarksView(
   // Keep the sort control in the one-line heading. Queue actions stay visible while collapsed, but
   // render in their own row so they cannot wrap the collapse toggle header (#438/#448).
   header.append(toolbar);
+  if (collapsible) {
+    header.append(
+      createSectionToggle({
+        open: sectionOpen,
+        sectionLabel: 'Queue',
+        onToggle: (open) => dispatch({ name: 'panel/bookmarks-section-open', open }),
+      }),
+    );
+  }
   section.append(header, sectionActions);
   // Collapsed (#438): the heading and action rows stay; the content hides.
   if (sectionOpen) {

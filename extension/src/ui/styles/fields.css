@@ -24,14 +24,6 @@
   list-style: none;
 }
 
-.image-trail-panel-root .image-trail-panel__fields-summary::-webkit-details-marker {
-  display: none;
-}
-
-.image-trail-panel-root .image-trail-panel__fields[open] .image-trail-panel__fields-summary::after {
-  content: 'Hide';
-}
-
 .image-trail-panel-root .image-trail-ds__field-summary {
   min-width: 0;
   overflow: hidden;
@@ -59,11 +51,6 @@
 .image-trail-panel-root
   .image-trail-panel__fields-summary:has(.image-trail-panel__fields-reset-controls)
   .image-trail-panel__section-detach {
-  margin-inline-start: 0;
-}
-
-.image-trail-panel-root
-  .image-trail-panel__fields-summary:has(.image-trail-panel__fields-reset-controls):not(:has(.image-trail-panel__section-detach))::after {
   margin-inline-start: 0;
 }
 

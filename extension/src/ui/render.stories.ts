@@ -242,6 +242,7 @@ function detachedPanelStory(
   const detachedRoot = document.createElement('div');
   const layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
+    sectionOpen: new Map(),
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
@@ -280,6 +281,7 @@ function panelLayoutStory(
 
   const layoutState: PanelLayoutState = {
     fieldsPanelOpen: true,
+    sectionOpen: new Map(),
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),

@@ -46,6 +46,25 @@ test('Apply URL button dispatches the current edited value', () => {
   assert.match(view.textContent ?? '', /Enter apply URL/u);
 });
 
+test('URL editor uses the shared explicit Hide/Show header control (#755)', () => {
+  const openChanges: boolean[] = [];
+  const view = createUrlEditorView(
+    { url: CURRENT_URL },
+    { onApply: () => undefined, onOpenChange: (open) => openChanges.push(open) },
+    { open: true },
+  );
+  const toggle = view.querySelector<HTMLButtonElement>('.image-trail-ds__section-toggle');
+  const textarea = textareaOf(view);
+  const footer = view.querySelector<HTMLElement>('.image-trail-panel__url-editor-footer');
+  assert.ok(toggle && footer);
+
+  toggle.click();
+  assert.equal(toggle.textContent, 'Show');
+  assert.equal(textarea.hidden, true);
+  assert.equal(footer.hidden, true);
+  assert.deepEqual(openChanges, [false]);
+});
+
 test('Apply to Host starts enabled when the draft differs from the selected host URL', () => {
   const applied: string[] = [];
   const draftUrl = 'https://images.example.test/albums/1024/photo_0044.jpg';

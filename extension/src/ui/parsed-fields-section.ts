@@ -16,7 +16,11 @@ export interface ParsedFieldsRenderTarget {
 
 const MIN_FIELDS_PANEL_BLOCK_SIZE = 160;
 
-export function createParsedFieldsSection(model: FieldEditorViewModel, target: ParsedFieldsRenderTarget): HTMLElement {
+export function createParsedFieldsSection(
+  model: FieldEditorViewModel,
+  target: ParsedFieldsRenderTarget,
+  options: { readonly open?: boolean; readonly collapsible?: boolean } = {},
+): HTMLElement {
   return createFieldsView(
     model,
     {
@@ -43,7 +47,8 @@ export function createParsedFieldsSection(model: FieldEditorViewModel, target: P
       },
     },
     {
-      open: target.layoutState.fieldsPanelOpen,
+      open: options.open ?? target.layoutState.fieldsPanelOpen,
+      ...(options.collapsible === undefined ? {} : { collapsible: options.collapsible }),
       blockSize: target.layoutState.fieldsPanelBlockSize,
       numericDisplayModes: target.layoutState.fieldDisplayModes,
     },

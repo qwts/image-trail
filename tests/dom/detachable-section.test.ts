@@ -29,6 +29,7 @@ function createHarness(): Harness {
   const actions: PanelAction[] = [];
   const layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
+    sectionOpen: new Map(),
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),
