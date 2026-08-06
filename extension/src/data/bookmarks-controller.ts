@@ -35,6 +35,8 @@ import {
   dataUrlToBytes,
   filterByVisibilityScope,
   isVisibleInScope,
+  preserveImportedBookmarkMetadata,
+  protectedImportOptions,
   removeReplacedOriginal,
   withProtectedPinSaveLock,
 } from './bookmark-controller-helpers.js';
@@ -47,6 +49,7 @@ interface ProtectedBookmarkOptions {
 }
 
 interface BookmarkPersistenceOptions extends BookmarkSaveOptions {
+  readonly preserveExistingMetadata?: boolean | undefined;
   readonly preserveExistingThumbnail?: boolean | undefined;
   readonly requiredActiveBlobKey?: ActiveBlobKey | undefined;
 }
@@ -215,7 +218,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     try {
       return {
         ok: true as const,
-        record: await this.saveWithContext(context, bookmark, { preserveExistingThumbnail: true, requiredActiveBlobKey: activeBlobKey }),
+        record: await this.saveWithContext(context, bookmark, protectedImportOptions(activeBlobKey)),
       };
     } catch (error) {
       return { ok: false as const, message: error instanceof Error ? error.message : 'Bookmark save failed.' };
@@ -547,13 +550,16 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const existingProtectedPayload = existingProtected
       ? await context.encryptedPins.openRecord(existingProtected, activeBlobKey.key).catch(() => null)
       : null;
+    const savedBookmark = options.preserveExistingMetadata
+      ? preserveImportedBookmarkMetadata(bookmark, existingProtectedPayload ?? existingPlainPayload)
+      : bookmark;
     const queueUpdatedAt = existingPlain?.queueUpdatedAt ?? existingProtected?.queueUpdatedAt ?? bookmark.timestamp;
     let thumbnail: { readonly id: string } | null = null;
     try {
       const bookmarkWithThumbnail =
-        options.preserveExistingThumbnail && !bookmark.thumbnail && existingPlainPayload?.thumbnail
-          ? { ...bookmark, thumbnail: existingPlainPayload.thumbnail }
-          : bookmark;
+        options.preserveExistingThumbnail && !savedBookmark.thumbnail && existingPlainPayload?.thumbnail
+          ? { ...savedBookmark, thumbnail: existingPlainPayload.thumbnail }
+          : savedBookmark;
       thumbnail = await this.saveProtectedThumbnail(
         context,
         bookmarkWithThumbnail,
@@ -567,7 +573,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
           ? (existingProtectedPayload?.thumbnailId ?? existingPlainPayload?.protectedPin?.encryptedThumbnailId)
           : undefined);
       const protectedPayload = toProtectedPayload(
-        bookmark,
+        savedBookmark,
         thumbnailId,
         existingProtectedPayload?.interop ?? existingPlainPayload?.interop,
         options.clearStoredOriginal ? undefined : (existingProtectedPayload?.storedOriginal ?? existingPlainPayload?.storedOriginal),
@@ -588,7 +594,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         encryptedThumbnailId: thumbnailId,
         storedOriginalBlobId:
           protectedPayload.storedOriginal?.blobId ??
-          bookmark.blobId ??
+          savedBookmark.blobId ??
           (options.clearStoredOriginal ? undefined : existingPlainPayload?.protectedPin?.storedOriginalBlobId),
         queueUpdatedAt,
       });

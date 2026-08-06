@@ -57,6 +57,8 @@ test('Host target flyout keeps its viewport-bounded width instead of inheriting 
     handoffBaselineCss,
     /target-controls\[open\][^{]*target-actions[^{]*\{[\s\S]*inline-size:\s*min\(310px, calc\(100vw - 62px\)\);[\s\S]*max-width:\s*none;/u,
   );
+  assert.match(handoffBaselineCss, /workspace__window[^{]*target-actions[^{]*\{[\s\S]*inline-size:\s*min\(310px, 100cqi\);/u);
+  assert.match(handoffBaselineCss, /workspace__dom-body\s*\{[\s\S]*container-type:\s*inline-size;/u);
 });
 
 test('RecordRow styles keep selection stronger than stored-original and cover private lock states', () => {

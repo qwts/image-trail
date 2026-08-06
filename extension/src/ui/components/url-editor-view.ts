@@ -21,6 +21,7 @@ export interface UrlEditorViewOptions {
 }
 
 const EMPTY_URL_MESSAGE = 'Select a target image to inspect its URL.';
+export const URL_EDITOR_VALUE_RESTORED_EVENT = 'image-trail:url-editor-value-restored';
 
 export function isUnsupportedUrlEditorInput(url: string): boolean {
   return url.trim().toLowerCase().startsWith('data:');
@@ -81,6 +82,7 @@ export function createUrlEditorView(
     status.textContent = applied ? 'in address bar' : 'not applied — refresh reverts';
   };
   value.addEventListener('input', syncEditorStatus);
+  value.addEventListener(URL_EDITOR_VALUE_RESTORED_EVENT, syncEditorStatus);
 
   const footer = document.createElement('div');
   footer.className = 'image-trail-panel__url-editor-footer';
