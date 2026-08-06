@@ -94,6 +94,11 @@ export function isE2ETestBuild(environment = process.env) {
   return environment.IMAGE_TRAIL_E2E_TEST_BUILD === '1';
 }
 
+export function isPageContextSwitcherFeatureEnabled(environment = process.env, e2eTestBuild = isE2ETestBuild(environment)) {
+  const configured = environment.IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER;
+  return configured === undefined ? e2eTestBuild : configured === '1';
+}
+
 export function pcloudClientIdFromEnvironment(environment = process.env) {
   const clientId = environment.PCLOUD_CLIENT_ID?.trim() ?? '';
   if (!clientId) return null;
@@ -128,6 +133,7 @@ export function extensionBuildOptions({
   release = isReleaseBuild(),
   interopEnabled = isInteropFeatureEnabled(),
   e2eTestBuild = isE2ETestBuild(),
+  pageContextSwitcherEnabled = isPageContextSwitcherFeatureEnabled(process.env, e2eTestBuild),
   pcloudClientId = pcloudClientIdFromEnvironment(),
   alias = null,
   define = {},
@@ -148,6 +154,7 @@ export function extensionBuildOptions({
       __IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__: e2eTestBuild ? JSON.stringify(E2E_TEST_BUILD_ATTRIBUTE) : 'undefined',
       __IMAGE_TRAIL_E2E_TEST_BUILD__: e2eTestBuild ? 'true' : 'false',
       __IMAGE_TRAIL_INTEROP_ENABLED__: interopEnabled ? 'true' : 'false',
+      __IMAGE_TRAIL_PAGE_CONTEXT_SWITCHER_ENABLED__: pageContextSwitcherEnabled ? 'true' : 'false',
       __IMAGE_TRAIL_PCLOUD_CLIENT_ID__: pcloudClientId ? JSON.stringify(pcloudClientId) : 'undefined',
       __IMAGE_TRAIL_PCLOUD_ENABLED__: pcloudClientId ? 'true' : 'false',
       ...define,

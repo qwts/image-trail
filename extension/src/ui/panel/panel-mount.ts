@@ -5,6 +5,7 @@ const STYLE_PATH = 'src/ui/styles/panel-entry.css';
 const STYLES_READY_FALLBACK_MS = 300;
 declare const __IMAGE_TRAIL_E2E_TEST_BUILD_ATTRIBUTE__: string | undefined;
 declare const __IMAGE_TRAIL_E2E_TEST_BUILD__: boolean | undefined;
+declare const __IMAGE_TRAIL_PAGE_CONTEXT_SWITCHER_ENABLED__: boolean | undefined;
 
 function isE2ETestBuild(): boolean {
   return typeof __IMAGE_TRAIL_E2E_TEST_BUILD__ === 'boolean' && __IMAGE_TRAIL_E2E_TEST_BUILD__;
@@ -39,6 +40,8 @@ export interface PanelMountEnvironment {
   scheduleStylesReadyFallback(reveal: () => void): void;
   /** Test seam for asserting closed shadow root contents without exposing them to host pages. */
   onShadowRootCreated?(shadow: ShadowRoot): void;
+  /** Test seam for the compile-time page-context switcher feature. */
+  pageContextSwitcherEnabled?: boolean;
 }
 
 function defaultEnvironment(): PanelMountEnvironment {
@@ -130,8 +133,15 @@ export class PanelMount {
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-label', 'Image Trail panel');
     this.rootEl = root;
-    const contextRoot = doc.createElement('div');
-    contextRoot.className = 'image-trail-page-context-root';
+    const contextRoot =
+      typeof __IMAGE_TRAIL_PAGE_CONTEXT_SWITCHER_ENABLED__ === 'boolean'
+        ? __IMAGE_TRAIL_PAGE_CONTEXT_SWITCHER_ENABLED__
+          ? doc.createElement('div')
+          : null
+        : this.environment.pageContextSwitcherEnabled
+          ? doc.createElement('div')
+          : null;
+    if (contextRoot) contextRoot.className = 'image-trail-page-context-root';
     this.contextRootEl = contextRoot;
     const detachedRoot = doc.createElement('div');
     detachedRoot.className = 'image-trail-panel-detached-root';
@@ -160,7 +170,7 @@ export class PanelMount {
       link.addEventListener('error', reveal, { once: true });
       this.environment.scheduleStylesReadyFallback(reveal);
     });
-    shadow.replaceChildren(link, root, contextRoot, detachedRoot, toastRoot);
+    shadow.replaceChildren(link, root, ...(contextRoot ? [contextRoot] : []), detachedRoot, toastRoot);
     // Prefer document.body; fall back to documentElement only when body is absent. The logical
     // expression keeps this clear of the no-document-element-append lint rule.
     (doc.body ?? doc.documentElement).append(host);
