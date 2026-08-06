@@ -203,6 +203,41 @@ test('Settings renders all groups and persists through the extension-owned servi
   }
 });
 
+test('standalone Settings preserves and submits the auto-pin overflow policy', async () => {
+  const saved: string[] = [];
+  const root = await mount(
+    <SettingsDestination
+      services={services({
+        loadSettings: async () => ({ ...DEFAULT_LOCAL_SETTINGS, recentHistoryOverflowBehavior: 'auto-pin' }),
+        saveSettings: async (settings) => {
+          saved.push(settings.recentHistoryOverflowBehavior);
+        },
+      })}
+    />,
+  );
+  try {
+    await flush();
+    const overflow = root.querySelector<HTMLSelectElement>('select[name="recentHistoryOverflowBehavior"]');
+    assert.equal(overflow?.value, 'auto-pin');
+    assert.deepEqual(
+      Array.from(overflow?.options ?? []).map((option) => [option.value, option.textContent]),
+      [
+        ['drop-oldest', 'Drop oldest'],
+        ['keep-session', 'Keep for this session'],
+        ['auto-pin', 'Auto-pin overflow'],
+      ],
+    );
+    assert.match(root.textContent ?? '', /converts older entries into durable Queue pins; it never captures original bytes/u);
+
+    const displayApply = root.querySelector<HTMLButtonElement>('button[type="submit"]');
+    await act(async () => displayApply?.click());
+    await flush();
+    assert.deepEqual(saved, ['auto-pin']);
+  } finally {
+    await cleanup(root);
+  }
+});
+
 test('React Settings uses the handoff keybinding control and persists the Down assignment', async () => {
   const saved: string[] = [];
   const root = await mount(

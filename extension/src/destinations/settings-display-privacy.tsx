@@ -63,12 +63,16 @@ export function DisplaySettingsGroup({ settings, disabled, save }: SettingsGroup
             <select name="recentHistoryOverflowBehavior" defaultValue={settings.recentHistoryOverflowBehavior}>
               <option value="drop-oldest">Drop oldest</option>
               <option value="keep-session">Keep for this session</option>
+              <option value="auto-pin">Auto-pin overflow</option>
             </select>
           </SettingField>
         </div>
         <ApplyButton disabled={disabled} />
       </form>
-      <SettingNote>Recents stay transient. Gallery page limit 0 means an unlimited durable page; other reads remain bounded.</SettingNote>
+      <SettingNote>
+        Recents stay transient unless Auto-pin overflow converts older entries into durable Queue pins; it never captures original bytes.
+        Gallery page limit 0 means an unlimited durable page; other reads remain bounded.
+      </SettingNote>
     </SettingsGroup>
   );
 }
