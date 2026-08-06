@@ -30,6 +30,11 @@ test('recent history handlers compose page, site, and all scopes through the tra
   const registry = createRecentHistoryMessageRegistry({
     recentHistoryCache: new RecentHistoryCache(),
     loadLocalSettings: async () => DEFAULT_LOCAL_SETTINGS,
+    bookmarkStore: {
+      findByUrl: async () => null,
+      hasProtectedPinForUrl: async () => false,
+      saveResult: async (savedRecord) => ({ ok: true as const, record: savedRecord }),
+    },
   });
   for (const [pageUrl, id] of [
     ['https://a.example/page-one', 'a-one'],

@@ -2,7 +2,7 @@ import type { ImageDisplayRecord } from './display-records.js';
 import type { QueueDisplayOrder, RecentDisplayOrder } from './display-order.js';
 import type { RecentHistoryScope } from './recent-history-scope.js';
 
-export type RecentHistoryOverflowBehavior = 'drop-oldest' | 'keep-session';
+export type RecentHistoryOverflowBehavior = 'drop-oldest' | 'keep-session' | 'auto-pin';
 export type RecentSparseRowDisplayMode = 'adaptive' | 'full' | 'half' | 'compact';
 
 export type LibraryPreferencePanelAction =

@@ -33,7 +33,7 @@ function createRestoreHarness(retained: readonly ImageDisplayRecord[] = []): Res
     load: async () => retained,
     add: async (record: ImageDisplayRecord) => {
       addedHistory.push(record);
-      return addedHistory;
+      return { items: addedHistory };
     },
   } as unknown as RecentHistoryStore;
 

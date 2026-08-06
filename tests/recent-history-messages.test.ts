@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   createAddRecentHistoryMessage,
+  createAddRecentHistoryResultMessage,
   createLoadRecentHistoryMessage,
   createRemoveRecentHistoryMessage,
   createUpdateRecentHistoryMessage,
@@ -22,4 +23,15 @@ test('recent history message builders carry explicit view scopes and session-rev
   assert.equal(add.payload.includeRetained, true);
   assert.equal(update.payload.includeRetained, true);
   assert.equal(remove.payload.includeRetained, true);
+});
+
+test('recent history add result carries explicit auto-pin promotion status (#148)', () => {
+  const result = createAddRecentHistoryResultMessage([record], {
+    message: 'Auto-pinned 1 overflow recent.',
+    tone: 'info',
+    promotedCount: 1,
+    failedCount: 0,
+  });
+  assert.equal(result.payload.autoPinStatus?.promotedCount, 1);
+  assert.deepEqual(result.payload.items, [record]);
 });

@@ -34,6 +34,11 @@ interface RecentHistoryEntry {
   readonly sequence: number;
 }
 
+export interface RecentHistoryAddOutcome {
+  readonly items: readonly ImageDisplayRecord[];
+  readonly overflowCandidates: readonly ImageDisplayRecord[];
+}
+
 const recentHistoryEntrySchema = v.object({
   item: imageDisplayRecordSchema,
   pageKey: v.string(),
@@ -97,6 +102,16 @@ export class RecentHistoryCache {
     scope: RecentHistoryScope = DEFAULT_RECENT_HISTORY_SCOPE,
     includeRetained = false,
   ): readonly ImageDisplayRecord[] {
+    return this.addWithOverflow(pageUrl, item, settings, scope, includeRetained).items;
+  }
+
+  addWithOverflow(
+    pageUrl: string,
+    item: ImageDisplayRecord,
+    settings: PlaintextLocalSettings,
+    scope: RecentHistoryScope = DEFAULT_RECENT_HISTORY_SCOPE,
+    includeRetained = false,
+  ): RecentHistoryAddOutcome {
     const key = recentHistorySiteKey(pageUrl);
     const entry = { item, pageKey: recentHistoryPageKey(pageUrl), sequence: (this.sequence += 1) };
     const next = [
@@ -105,7 +120,24 @@ export class RecentHistoryCache {
     ].slice(0, retainedLimit(settings));
     this.bySite.set(key, next);
     this.persist();
-    return this.load(pageUrl, settings, includeRetained, scope);
+    return {
+      items: this.load(pageUrl, settings, includeRetained, scope),
+      overflowCandidates:
+        settings.recentHistoryOverflowBehavior === 'auto-pin'
+          ? next.slice(settings.recentHistoryLimit).map((candidate) => candidate.item)
+          : [],
+    };
+  }
+
+  removeSiteItems(pageUrl: string, ids: readonly string[]): void {
+    if (ids.length === 0) return;
+    const key = recentHistorySiteKey(pageUrl);
+    const removed = new Set(ids);
+    this.bySite.set(
+      key,
+      (this.bySite.get(key) ?? []).filter((entry) => !removed.has(entry.item.id)),
+    );
+    this.persist();
   }
 
   update(

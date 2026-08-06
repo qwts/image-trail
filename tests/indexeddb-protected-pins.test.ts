@@ -361,10 +361,10 @@ test('IndexedDbBookmarkStore writes protected pins and locked relationship place
   } finally {
     db.db.close();
   }
-
   active = null;
   const lockedStore = new IndexedDbBookmarkStore({ getActiveBlobKey: () => null });
   try {
+    assert.equal(await lockedStore.hasProtectedPinForUrl(saved.url), true);
     const lockedPage = await lockedStore.loadPage({ offset: 0, limit: 30 });
     assert.equal(lockedPage.items.length, 1);
     assert.equal(lockedPage.items[0]?.id, saved.id);

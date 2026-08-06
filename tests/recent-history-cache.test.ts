@@ -172,6 +172,39 @@ test('RecentHistoryCache.add caps retained hidden rows at recentHistoryRetainedL
   );
 });
 
+test('RecentHistoryCache.addWithOverflow reports auto-pin candidates while retaining them for confirmed promotion', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 1,
+    recentHistoryRetainedLimit: 3,
+    recentHistoryOverflowBehavior: 'auto-pin' as const,
+  };
+
+  cache.addWithOverflow('https://a.test/page', record('1'), settings);
+  const added = cache.addWithOverflow('https://a.test/page', record('2'), settings);
+
+  assert.deepEqual(
+    added.items.map((item) => item.id),
+    ['2'],
+  );
+  assert.deepEqual(
+    added.overflowCandidates.map((item) => item.id),
+    ['1'],
+  );
+  assert.deepEqual(
+    cache.load('https://a.test/page', settings, true).map((item) => item.id),
+    ['2', '1'],
+    'overflow remains transient until the durable save succeeds',
+  );
+
+  cache.removeSiteItems('https://a.test/page', ['1']);
+  assert.deepEqual(
+    cache.load('https://a.test/page', settings, true).map((item) => item.id),
+    ['2'],
+  );
+});
+
 test('RecentHistoryCache.remove drops only the matching id', () => {
   const cache = new RecentHistoryCache();
   cache.add('https://a.test/page', record('1'), DEFAULT_LOCAL_SETTINGS);

@@ -51,7 +51,7 @@ function createHarness(options: { readonly pinFails?: boolean } = {}): Harness {
     add: async (record: ImageDisplayRecord, pageUrl: string) => {
       historyAddLog.push({ record, pageUrl });
       log.push(`historyAdd:${record.id}`);
-      return [record];
+      return { items: [record] };
     },
   } as unknown as RecentHistoryStore;
   const deps: CapturedOriginalsControllerDeps = {

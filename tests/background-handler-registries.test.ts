@@ -2,19 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ImageDisplayRecord } from '../extension/src/core/display-records.js';
 import type { PanelPosition, PanelPositionStore, StoredWorkspaceLayout, WorkspaceLayoutStore } from '../extension/src/core/types.js';
-import { DEFAULT_LOCAL_SETTINGS } from '../extension/src/data/local-settings.js';
 import { createBookmarkMessageRegistry } from '../extension/src/background/handlers/bookmark-message-handlers.js';
 import { createAlbumMessageRegistry } from '../extension/src/background/handlers/album-handlers.js';
 import { createPanelPositionMessageRegistry } from '../extension/src/background/handlers/panel-position-handlers.js';
 import { createPCloudMessageRegistry } from '../extension/src/background/handlers/pcloud-handlers.js';
 import { createRecallMessageRegistry, type RecallMessageHandlerDeps } from '../extension/src/background/handlers/recall-handlers.js';
-import { createRecentHistoryMessageRegistry } from '../extension/src/background/handlers/recent-history-handlers.js';
 import type { MessageDef } from '../extension/src/background/message-dispatch.js';
-import { RecentHistoryCache } from '../extension/src/background/recent-history-cache.js';
 import { grabSourcePattern, URL_TEMPLATE_IDENTITY_KEY, urlTemplateFixture, urlTemplateRecord } from './url-template-handler-fixtures.js';
 import {
   MessageType,
-  createAddRecentHistoryMessage,
   createAddAlbumRecordsMessage,
   createCreateAlbumMessage,
   createConnectPCloudProviderMessage,
@@ -34,21 +30,17 @@ import {
   createLoadBookmarksMessage,
   createLoadPanelPositionMessage,
   createLoadRecallCandidatesMessage,
-  createLoadRecentHistoryMessage,
   createPCloudProviderStatusMessage,
   createRecallRecordsMessage,
   createRemoveAlbumRecordMessage,
   createRemoveBookmarkMessage,
   createRemoveBookmarksMessage,
   createRemoveRecallBookmarksMessage,
-  createRemoveRecentHistoryMessage,
   createRenameAlbumMessage,
   createSaveBookmarkMessage,
   createSaveGrabSourcePatternMessage,
   createSavePanelPositionMessage,
   createSaveUrlTemplateMessage,
-  type AddRecentHistoryMessage,
-  type AddRecentHistoryResultMessage,
   type AddAlbumRecordsResultMessage,
   type CreateAlbumResultMessage,
   type DeleteAlbumResultMessage,
@@ -70,14 +62,12 @@ import {
   type LoadBookmarksResultMessage,
   type LoadPanelPositionResultMessage,
   type LoadRecallCandidatesResultMessage,
-  type LoadRecentHistoryResultMessage,
   type PCloudProviderStatusResultMessage,
   type RecallRecordsResultMessage,
   type RemoveAlbumRecordResultMessage,
   type RemoveBookmarkResultMessage,
   type RemoveBookmarksResultMessage,
   type RemoveRecallBookmarksResultMessage,
-  type RemoveRecentHistoryResultMessage,
   type RenameAlbumResultMessage,
   type SaveBookmarkResultMessage,
   type SaveGrabSourcePatternResultMessage,
@@ -459,83 +449,6 @@ test('recall fallbacks return the documented degraded payloads', () => {
   const records = registry[MessageType.RecallRecords].fallback(createRecallRecordsMessage(['recall-a'])) as RecallRecordsResultMessage;
   assert.equal(records.type, MessageType.RecallRecordsResult);
   assert.deepEqual(records.payload, { ok: false, reason: 'unknown', message: 'Selected records could not be recalled.' });
-});
-
-// --- recent history registry ---------------------------------------------------
-
-function recentHistoryFixture() {
-  return createRecentHistoryMessageRegistry({
-    recentHistoryCache: new RecentHistoryCache(),
-    loadLocalSettings: async () => DEFAULT_LOCAL_SETTINGS,
-  });
-}
-
-test('recent history add, load, and remove round-trip through the cache per page url', async () => {
-  const registry = recentHistoryFixture();
-  const pageUrl = 'https://example.com/gallery';
-  const item = displayRecord('recent-1');
-
-  const added = await handleAndRespond<AddRecentHistoryResultMessage>(
-    registry[MessageType.AddRecentHistory],
-    createAddRecentHistoryMessage(pageUrl, item),
-  );
-  assert.equal(added.type, MessageType.AddRecentHistoryResult);
-  assert.deepEqual(
-    added.payload.items.map((entry) => entry.id),
-    ['recent-1'],
-  );
-
-  const loaded = await handleAndRespond<LoadRecentHistoryResultMessage>(
-    registry[MessageType.LoadRecentHistory],
-    createLoadRecentHistoryMessage(pageUrl),
-  );
-  assert.equal(loaded.type, MessageType.LoadRecentHistoryResult);
-  assert.deepEqual(
-    loaded.payload.items.map((entry) => entry.id),
-    ['recent-1'],
-  );
-
-  const otherPage = await handleAndRespond<LoadRecentHistoryResultMessage>(
-    registry[MessageType.LoadRecentHistory],
-    createLoadRecentHistoryMessage('https://other.example.com/'),
-  );
-  assert.deepEqual(otherPage.payload.items, []);
-
-  const removed = await handleAndRespond<RemoveRecentHistoryResultMessage>(
-    registry[MessageType.RemoveRecentHistory],
-    createRemoveRecentHistoryMessage(pageUrl, 'recent-1'),
-  );
-  assert.equal(removed.type, MessageType.RemoveRecentHistoryResult);
-  assert.deepEqual(removed.payload.items, []);
-});
-
-test('recent history fallbacks echo a valid add item and degrade to empty lists otherwise', () => {
-  const registry = recentHistoryFixture();
-  const pageUrl = 'https://example.com/gallery';
-  const item = displayRecord('recent-1');
-
-  const load = registry[MessageType.LoadRecentHistory].fallback(createLoadRecentHistoryMessage(pageUrl)) as LoadRecentHistoryResultMessage;
-  assert.equal(load.type, MessageType.LoadRecentHistoryResult);
-  assert.deepEqual(load.payload.items, []);
-
-  const addValid = registry[MessageType.AddRecentHistory].fallback(
-    createAddRecentHistoryMessage(pageUrl, item),
-  ) as AddRecentHistoryResultMessage;
-  assert.deepEqual(addValid.payload.items, [item]);
-
-  // A payload that failed schema validation reaches the fallback too; a malformed item must not be echoed.
-  const malformed: AddRecentHistoryMessage = {
-    type: MessageType.AddRecentHistory,
-    version: MESSAGE_PROTOCOL_VERSION,
-    payload: { pageUrl, item: { id: 'recent-2' } as ImageDisplayRecord },
-  };
-  const addInvalid = registry[MessageType.AddRecentHistory].fallback(malformed) as AddRecentHistoryResultMessage;
-  assert.deepEqual(addInvalid.payload.items, []);
-
-  const remove = registry[MessageType.RemoveRecentHistory].fallback(
-    createRemoveRecentHistoryMessage(pageUrl, 'recent-1'),
-  ) as RemoveRecentHistoryResultMessage;
-  assert.deepEqual(remove.payload.items, []);
 });
 
 // --- bookmark registry ----------------------------------------------------------

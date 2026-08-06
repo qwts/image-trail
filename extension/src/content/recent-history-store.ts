@@ -10,7 +10,13 @@ import {
 } from '../background/messages.js';
 import type { ImageDisplayRecord } from '../core/display-records.js';
 import type { RecentHistoryScope } from '../core/recent-history-scope.js';
+import type { AutoPinOverflowStatus } from '../background/recent-history-messages.js';
 import { sendRuntimeMessage } from './runtime-message.js';
+
+export interface RecentHistoryAddResult {
+  readonly items: readonly ImageDisplayRecord[];
+  readonly autoPinStatus?: AutoPinOverflowStatus | undefined;
+}
 
 export class RecentHistoryStore {
   async load(
@@ -25,9 +31,9 @@ export class RecentHistoryStore {
     item: ImageDisplayRecord,
     pageUrl = window.location.href,
     options: { readonly includeRetained?: boolean; readonly scope?: RecentHistoryScope } = {},
-  ): Promise<readonly ImageDisplayRecord[]> {
+  ): Promise<RecentHistoryAddResult> {
     const response = await sendRuntimeMessage(createAddRecentHistoryMessage(pageUrl, item, options));
-    return isAddRecentHistoryResultMessage(response) ? response.payload.items : [item];
+    return isAddRecentHistoryResultMessage(response) ? response.payload : { items: [item] };
   }
 
   async update(

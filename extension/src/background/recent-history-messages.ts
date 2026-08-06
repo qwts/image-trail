@@ -26,10 +26,20 @@ export interface AddRecentHistoryMessage {
   readonly payload: RecentHistoryRequestPayload & { readonly item: ImageDisplayRecord };
 }
 
+export interface AutoPinOverflowStatus {
+  readonly message: string;
+  readonly tone: 'info' | 'error';
+  readonly promotedCount: number;
+  readonly failedCount: number;
+}
+
 export interface AddRecentHistoryResultMessage {
   readonly type: typeof MessageType.AddRecentHistoryResult;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly items: readonly ImageDisplayRecord[] };
+  readonly payload: {
+    readonly items: readonly ImageDisplayRecord[];
+    readonly autoPinStatus?: AutoPinOverflowStatus | undefined;
+  };
 }
 
 export interface UpdateRecentHistoryMessage {
@@ -80,8 +90,11 @@ export function createAddRecentHistoryMessage(
   return { type: MessageType.AddRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl, item, ...options } };
 }
 
-export function createAddRecentHistoryResultMessage(items: readonly ImageDisplayRecord[]): AddRecentHistoryResultMessage {
-  return { type: MessageType.AddRecentHistoryResult, version: MESSAGE_PROTOCOL_VERSION, payload: { items } };
+export function createAddRecentHistoryResultMessage(
+  items: readonly ImageDisplayRecord[],
+  autoPinStatus?: AutoPinOverflowStatus,
+): AddRecentHistoryResultMessage {
+  return { type: MessageType.AddRecentHistoryResult, version: MESSAGE_PROTOCOL_VERSION, payload: { items, autoPinStatus } };
 }
 
 export function createUpdateRecentHistoryMessage(
