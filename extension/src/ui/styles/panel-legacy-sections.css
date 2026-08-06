@@ -225,13 +225,14 @@
 
 .image-trail-panel-root .image-trail-panel__history-context {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
   min-width: 0;
 }
 
-.image-trail-panel-root .image-trail-panel__history-context {
-  flex-wrap: nowrap;
+.image-trail-panel-root .image-trail-panel__history-context > select {
+  min-inline-size: 0;
 }
 
 /* Keep context and controls out of the collapsible heading grid so they stay available when the
@@ -246,6 +247,7 @@
 
 .image-trail-panel-root .image-trail-panel__record-sort-select {
   box-sizing: border-box;
+  flex: 0 1 124px;
   min-block-size: 28px;
   max-inline-size: 124px;
   border: 1px solid rgb(255 255 255 / 24%);
@@ -261,6 +263,7 @@
 }
 
 .image-trail-panel-root .image-trail-panel__recent-scope-select {
+  flex: 1 1 160px;
   max-inline-size: min(100%, 220px);
 }
 
