@@ -131,6 +131,44 @@ test('successful protected import leaves the durable queue record pointing at an
   assert.equal((await new BlobsRepository(db).get('blob-durable'))?.referenceCount, 1);
 });
 
+test('protected import preserves existing bookmark metadata and queue order while attaching the original', async () => {
+  const { exported, active } = await encryptedFixture('https://images.example.test/existing.png');
+  const existing: ImageDisplayRecord = {
+    id: 'existing-id',
+    url: 'https://images.example.test/existing.png',
+    title: 'Curated title',
+    label: 'Curated label',
+    width: 2048,
+    height: 1024,
+    downloadedAt: '2026-06-01T00:00:00.000Z',
+    timestamp: '2026-05-01T00:00:00.000Z',
+    queueUpdatedAt: '2026-05-02T00:00:00.000Z',
+    source: 'bookmark',
+  };
+  let saved: ImageDisplayRecord | undefined;
+  const result = await importEncryptedImageToDurableStorage(exported.fileContent, {
+    restoreActiveBlobKey: async () => active,
+    getDb: async () => ({}) as IDBDatabase,
+    createBlobsRepository: () => ({ put: async (record) => record, remove: async () => undefined }),
+    findBookmarkByUrl: async () => existing,
+    saveBookmark: async (record) => {
+      saved = record;
+      return { ok: true, record };
+    },
+    now: () => '2026-07-20T00:00:01.000Z',
+    randomUuid: () => 'blob-existing',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(saved?.title, existing.title);
+  assert.equal(saved?.label, existing.label);
+  assert.equal(saved?.width, existing.width);
+  assert.equal(saved?.height, existing.height);
+  assert.equal(saved?.downloadedAt, existing.downloadedAt);
+  assert.equal(saved?.queueUpdatedAt, existing.queueUpdatedAt);
+  assert.equal(saved?.storedOriginal?.blobId, 'blob-existing');
+});
+
 test('protected import releases its blob when the active key changes before the durable save', async (t) => {
   await deleteImageTrailDb();
   const { exported, active } = await encryptedFixture('https://images.example.test/key-switch.png');
