@@ -86,7 +86,7 @@ function isPinnedCompanionCheckout(companionRoot = process.env['INTEROP_PHOTOS_R
 
 test('vendored interoperability artifacts match the pinned canonical Overlook contract', () => {
   const output = execFileSync(process.execPath, ['scripts/check-interop-contract.mjs'], { encoding: 'utf8' });
-  assert.equal(output, 'Verified 16 canonical interop files from 9768e4df59ed82909ed19524c2a988344abedc4a.\n');
+  assert.equal(output, 'Verified 16 canonical interop files from 7135057bde2aa55e0535a9fba960e9d6f78fd504.\n');
 });
 
 test(

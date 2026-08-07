@@ -127,11 +127,11 @@ jobs:
       # Keep the companion checkout under the ignored dependency tree so repo
       # lint/format tooling sees only Image Trail while the acceptance gate can
       # read the pinned cross-repository evidence.
-      - name: Checkout pinned Photos acceptance evidence
+      - name: Checkout pinned Overlook acceptance evidence
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: qwts/photos
-          ref: 760e23ba1abeaf15bf6d56e029ebdd47d521a7e7
+          repository: qwts/overlook
+          ref: 7135057bde2aa55e0535a9fba960e9d6f78fd504
           path: node_modules/.interop-photos
           persist-credentials: false
 

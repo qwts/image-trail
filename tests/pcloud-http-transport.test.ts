@@ -40,6 +40,19 @@ test('shared pCloud transport leaves multipart boundaries to fetch and exposes t
   );
 });
 
+test('shared pCloud transport preserves non-JSON HTTP outages as typed provider failures', async () => {
+  const transport = new PCloudHttpTransport({
+    referrer: 'https://my.pcloud.com/',
+    fetchImpl: async () => new Response('<html>upstream unavailable</html>', { status: 502 }),
+  });
+
+  await assert.rejects(
+    transport.request(credential, 'userinfo'),
+    (error: unknown) =>
+      error instanceof PCloudApiError && error.method === 'userinfo' && error.resultCode === null && error.httpStatus === 502,
+  );
+});
+
 test('shared pCloud transport accepts only HTTPS pCloud download locations', () => {
   assert.equal(pCloudDownloadUrl('c123.pcloud.com', '/download/object.bin').toString(), 'https://c123.pcloud.com/download/object.bin');
   assert.throws(() => pCloudDownloadUrl('attacker.example', '/object.bin'), /unexpected download location/u);

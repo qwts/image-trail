@@ -92,7 +92,13 @@ export class PCloudHttpTransport {
           : {}),
         body,
       });
-      const data = (await response.json()) as Record<string, unknown>;
+      let data: Record<string, unknown>;
+      try {
+        data = (await response.json()) as Record<string, unknown>;
+      } catch (error) {
+        if (!response.ok) throw new PCloudApiError(`pCloud ${method} failed.`, method, null, response.status);
+        throw error;
+      }
       const resultCode = numberOrUndefined(data['result']) ?? null;
       if (!response.ok || resultCode !== 0) {
         const message = typeof data['error'] === 'string' ? data['error'] : `pCloud ${method} failed.`;
