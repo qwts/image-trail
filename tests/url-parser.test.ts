@@ -182,6 +182,19 @@ test('carries across every split hex digit, including letter-only and prefixed c
   }
 });
 
+test('excludes split hexadecimal prefix fragments from positional arithmetic', () => {
+  const model = parseUrl('https://example.test/image?n=0x5A99');
+  const field = collectUrlFields(model).find((candidate) => candidate.label === 'query n');
+  assert.ok(field);
+  const spec = createFieldSplitSpec(field, '1-1-1-1-1-1');
+  assert.ok(!('ok' in spec));
+  const split = applyFieldSplitSpecs(model, [spec]);
+  const prefixZero = collectUrlFields(split).find((candidate) => candidate.splitPartIndex === 0);
+  assert.ok(prefixZero);
+
+  assert.equal(rebuildUrl(bumpUrlField(split, prefixZero, 1)), 'https://example.test/image?n=0x5A99');
+});
+
 test('preserves the casing of unchanged hex digits while carrying a split child', () => {
   const model = parseUrl('https://example.test/image?n=5aB9');
   const field = collectUrlFields(model).find((candidate) => candidate.label === 'query n');
