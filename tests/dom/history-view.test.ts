@@ -277,13 +277,13 @@ test('stored recent rows label the captured source MIME before the navigation su
   assert.equal(view.querySelector('.image-trail-panel__bookmark-source')?.textContent, 'WEBP');
 });
 
-test('Recents keeps sorting in the one-line header while scope and bulk actions render below it (#448)', () => {
+test('Recents places sorting beside scope below the title row (#448/#754)', () => {
   const actions: unknown[] = [];
   const view = buildHistoryView(actions);
   const header = view.querySelector('.image-trail-panel__section-header--with-actions');
-  const toolbar = view.querySelector('.image-trail-panel__section-header--with-actions .image-trail-panel__history-toolbar');
-  assert.ok(toolbar?.querySelector('select[aria-label="Sort Recents"]'));
+  assert.equal(header?.querySelector('select[aria-label="Sort Recents"]'), null);
   assert.equal(header?.querySelector('select[aria-label="Recents scope"]'), null);
+  assert.ok(view.querySelector('.image-trail-panel__history-context select[aria-label="Sort Recents"]'));
   assert.ok(view.querySelector('.image-trail-panel__history-context select[aria-label="Recents scope"]'));
   assert.ok(view.querySelector('.image-trail-panel__history-actions'), 'bulk actions stay outside the constrained header grid');
 });

@@ -58,23 +58,35 @@ async function seedOtherSiteRecent(page: Page, extensionId: string): Promise<unk
   }
 }
 
-test('Recents keeps its scope context below a one-line header at narrow widths', async ({ page, serviceWorker }) => {
+test('Recents keeps sort and scope context below a one-line header at narrow widths (#754)', async ({ page, serviceWorker }) => {
   await page.setViewportSize({ width: 340, height: 720 });
   await openFixturePage(page, fixturePaths.singleImage);
+  await page.evaluate(() => history.replaceState(null, '', '/a-very-long-gallery-path-that-forces-the-recents-scope-label-to-wrap'));
   await openPanel(page, serviceWorker);
 
   const header = page.getByRole('button', { name: 'Hide Recent history' });
+  const sort = page.getByLabel('Sort Recents');
   const scope = page.getByLabel('Recents scope');
   const headerBox = (await header.boundingBox())!;
+  const sortBox = (await sort.boundingBox())!;
   const scopeBox = (await scope.boundingBox())!;
+  const panelBox = (await page.getByRole('dialog', { name: 'Image Trail panel' }).boundingBox())!;
 
   expect(headerBox.height).toBeLessThan(44);
+  expect(sortBox.y).toBeGreaterThanOrEqual(headerBox.y + headerBox.height);
   expect(scopeBox.y).toBeGreaterThanOrEqual(headerBox.y + headerBox.height);
+  expect(sortBox.y).toBeLessThanOrEqual(scopeBox.y);
+  for (const box of [sortBox, scopeBox]) {
+    expect(box.x).toBeGreaterThanOrEqual(panelBox.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(panelBox.x + panelBox.width);
+  }
+  await expect(page.locator('.image-trail-panel__section-header--with-actions select')).toHaveCount(0);
+  await expect(page.locator('.image-trail-panel__history-context select')).toHaveCount(2);
   expect(await scope.evaluate((element) => element.closest('.image-trail-panel__section-header') === null)).toBe(true);
 
   await header.click({ position: { x: headerBox.width - 6, y: headerBox.height / 2 } });
   await expect(scope).toBeVisible();
-  await expect(page.getByLabel('Sort Recents')).toBeVisible();
+  await expect(sort).toBeVisible();
 });
 
 test('Recents switches between current page, current site, and all sites', async ({ extensionId, page, serviceWorker }) => {

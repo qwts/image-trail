@@ -175,12 +175,14 @@ export function createBookmarksView(
   );
   queueMenu.append(queueMenuActions);
 
-  const toolbar = document.createElement('div');
-  toolbar.className = 'image-trail-panel__bookmark-toolbar';
-  toolbar.append(createQueueSortControl(options.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER, dispatch));
   const sectionActions = document.createElement('div');
   sectionActions.className = 'image-trail-panel__section-actions image-trail-panel__bookmark-actions';
-  sectionActions.append(add, recallButton, queueMenu);
+  sectionActions.append(
+    createQueueSortControl(options.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER, dispatch),
+    add,
+    recallButton,
+    queueMenu,
+  );
 
   const pageMeta = document.createElement('p');
   pageMeta.className = 'image-trail-panel__meta';
@@ -347,9 +349,7 @@ export function createBookmarksView(
     selectedIds.length > 0
       ? `${selectedIds.length} queue row(s) selected for export.`
       : 'Cmd/Ctrl-click rows to select queue rows for export. Shift-click selects a range.';
-  // Keep the sort control in the one-line heading. Queue actions stay visible while collapsed, but
-  // render in their own row so they cannot wrap the collapse toggle header (#438/#448).
-  header.append(toolbar);
+  // Queue controls stay visible while collapsed and share one action row below the title (#438/#754).
   if (collapsible) {
     header.append(
       createSectionToggle({
