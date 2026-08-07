@@ -73,6 +73,17 @@ async function assertDeterministicInteropKey(key: CryptoKey): Promise<void> {
   iv.fill(0);
 }
 
+function isPinnedCompanionCheckout(companionRoot = process.env['INTEROP_PHOTOS_ROOT']): boolean {
+  if (!companionRoot) return false;
+  try {
+    const source = JSON.parse(readFileSync('contracts/interop/source.json', 'utf8')) as { canonicalCommit?: string };
+    const revision = execFileSync('git', ['-C', companionRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+    return revision === source.canonicalCommit;
+  } catch {
+    return false;
+  }
+}
+
 test('vendored interoperability artifacts match the pinned canonical Photos contract', () => {
   const output = execFileSync(process.execPath, ['scripts/check-interop-contract.mjs'], { encoding: 'utf8' });
   assert.equal(output, 'Verified 15 canonical interop files from 760e23ba1abeaf15bf6d56e029ebdd47d521a7e7.\n');
@@ -80,12 +91,16 @@ test('vendored interoperability artifacts match the pinned canonical Photos cont
 
 test(
   'maps every companion epic scenario to current cross-repository evidence',
-  { skip: process.env['INTEROP_PHOTOS_ROOT'] ? false : 'requires the pinned Photos checkout' },
+  { skip: isPinnedCompanionCheckout() ? false : 'requires the pinned Photos checkout' },
   () => {
     const output = execFileSync(process.execPath, ['scripts/check-interop-acceptance.mjs', '--require-companion'], { encoding: 'utf8' });
     assert.equal(output, 'Verified 10 interop scenarios with 20 cross-repository evidence sets; manual 0/4.\n');
   },
 );
+
+test('companion acceptance stays skipped for an unrelated stale checkout path', () => {
+  assert.equal(isPinnedCompanionCheckout(process.cwd()), false);
+});
 
 test('maps every interop scenario to local evidence without a companion checkout', () => {
   const env = { ...process.env };
