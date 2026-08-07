@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const LOCAL_REPOSITORY = 'qwts/image-trail';
 const COMPANION_REPOSITORY = 'qwts/photos';
-const COMPANION_COMMIT = 'ee09ef8840371692f4d7a8a392ccbd475d04f588';
+const COMPANION_COMMIT = '723729d50d63af085502e68cc1377c54a85f1595';
 const MANIFEST_PATH = 'contracts/interop/v1/acceptance-evidence.json';
 const REPOSITORIES = new Set(['qwts/image-trail', 'qwts/photos']);
 const EXPECTED_SCENARIOS = new Set([

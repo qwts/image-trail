@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
+  INTEROP_GOOGLE_DRIVE_DISCOVERY,
   INTEROP_GOOGLE_DRIVE_OWNER,
   INTEROP_PROVIDER_LIBRARY_ID,
   INTEROP_PROVIDER_LOGICAL_ROOT,
@@ -18,6 +19,7 @@ test('runtime provider-root constants match the checksum-pinned canonical contra
     libraryId: INTEROP_PROVIDER_LIBRARY_ID,
     logicalPath: INTEROP_PROVIDER_LOGICAL_ROOT,
     googleDriveOwner: INTEROP_GOOGLE_DRIVE_OWNER,
+    googleDriveDiscovery: INTEROP_GOOGLE_DRIVE_DISCOVERY,
   });
   assert.equal(INTEROP_PROVIDER_LOGICAL_ROOT, 'Overlook Interop/v1');
   assert.doesNotMatch(INTEROP_PROVIDER_LOGICAL_ROOT, /^\//u);

@@ -6,8 +6,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-const EXPECTED_SOURCE_COMMIT = 'ee09ef8840371692f4d7a8a392ccbd475d04f588';
-const EXPECTED_MANIFEST_SHA256 = '2e68d437133b8e08b6f5b88201c18dd9ae4c77948be9e609011466621a2794a4';
+const EXPECTED_SOURCE_COMMIT = '723729d50d63af085502e68cc1377c54a85f1595';
+const EXPECTED_MANIFEST_SHA256 = 'e46c3322833398da6827d76b158e57fed62b244f1be79de8b48ea262caf5dd93';
 const contractRoot = path.resolve('contracts/interop/v1');
 const sourcePath = path.resolve('contracts/interop/source.json');
 

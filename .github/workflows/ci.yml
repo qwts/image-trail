@@ -131,7 +131,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: qwts/overlook
-          ref: ee09ef8840371692f4d7a8a392ccbd475d04f588
+          ref: 723729d50d63af085502e68cc1377c54a85f1595
           path: node_modules/.interop-photos
           persist-credentials: false
 
