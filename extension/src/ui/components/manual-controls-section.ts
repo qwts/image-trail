@@ -7,11 +7,13 @@ export function createManualControlsSection(
   target: PanelRenderTarget,
   state: PanelState,
   fieldEditor: Pick<FieldEditorViewModel, 'previousFieldId' | 'nextFieldId'>,
+  options: { readonly open?: boolean; readonly collapsible?: boolean; readonly onOpenChange?: (open: boolean) => void } = {},
 ): HTMLElement {
   return createManualControlsView({
     state,
     previousFieldId: fieldEditor.previousFieldId,
     nextFieldId: fieldEditor.nextFieldId,
     dispatch: target.dispatch,
+    ...options,
   });
 }

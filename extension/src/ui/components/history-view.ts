@@ -9,6 +9,7 @@ import { registerPreviewRowClick } from './record-row-preview-click.js';
 import { createRecordRow, type RecordRowState } from './record-row.js';
 import { selectedRangeIds } from './selection-ranges.js';
 import { createCaptureOriginalButton, createDeleteOriginalButton, createTrustedRecordActionButton } from './privileged-record-actions.js';
+import { createSectionToggle } from './primitives.js';
 
 export function createHistoryView(
   items: readonly ImageDisplayRecord[],
@@ -234,29 +235,20 @@ function createHistoryHeader(
   header.dataset['open'] = String(sectionOpen);
   if (collapsible) {
     header.classList.add('image-trail-panel__section-header--collapsible');
-    header.setAttribute('role', 'button');
-    header.tabIndex = 0;
-    header.setAttribute('aria-expanded', String(sectionOpen));
-    header.setAttribute('aria-label', sectionOpen ? 'Hide the Recent history list' : 'Show the Recent history list');
-    header.title = sectionOpen ? 'Hide the Recent history list' : 'Show the Recent history list';
-    const toggleSection = (): void => dispatch({ name: 'panel/history-section-open', open: !sectionOpen });
-    header.addEventListener('click', (event) => {
-      const target = event.target;
-      if (target instanceof Element && target.closest('button, summary, details, input, select, a')) return;
-      event.preventDefault();
-      toggleSection();
-    });
-    header.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      if (event.target !== header) return;
-      event.preventDefault();
-      toggleSection();
-    });
   }
   const toolbar = document.createElement('div');
   toolbar.className = 'image-trail-panel__history-toolbar';
   toolbar.append(createRecentSortControl(displayOrder, dispatch));
   header.append(heading, toolbar);
+  if (collapsible) {
+    header.append(
+      createSectionToggle({
+        open: sectionOpen,
+        sectionLabel: 'Recent history',
+        onToggle: (open) => dispatch({ name: 'panel/history-section-open', open }),
+      }),
+    );
+  }
   return header;
 }
 

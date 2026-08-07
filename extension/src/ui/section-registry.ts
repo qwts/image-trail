@@ -92,7 +92,7 @@ function detachableSectionElement(definition: DetachableSectionDefinition, targe
  * — so individual views need no knowledge of detachment.
  */
 function injectDetachControl(sectionEl: HTMLElement, control: HTMLElement): void {
-  const headerRow = sectionEl.querySelector<HTMLElement>(':scope > .image-trail-panel__section-header');
+  const headerRow = sectionEl.querySelector<HTMLElement>('.image-trail-panel__section-header');
   if (headerRow) {
     headerRow.classList.add('image-trail-ds__section-header');
     headerRow.querySelector<HTMLElement>('h2, h3, h4')?.classList.add('image-trail-ds__section-title');

@@ -60,7 +60,7 @@ async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
 async function openParsedFields(page: Page): Promise<void> {
   const fields = page.locator('.image-trail-panel__fields');
   if (!(await fields.evaluate((element) => element.hasAttribute('open')))) {
-    await page.locator('.image-trail-panel__fields-summary').click();
+    await page.getByRole('button', { name: 'Show Field Editor' }).click();
   }
 }
 

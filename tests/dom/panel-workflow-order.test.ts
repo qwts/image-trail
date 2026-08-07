@@ -8,6 +8,7 @@ test('attached workflow follows the handoff order from Host target through Contr
   const root = document.createElement('div');
   const layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
+    sectionOpen: new Map(),
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),

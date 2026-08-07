@@ -11,6 +11,7 @@ const DESTINATIONS: readonly PanelDestinationId[] = ['dashboard', 'gallery', 're
 function layoutState(): PanelLayoutState {
   return {
     fieldsPanelOpen: false,
+    sectionOpen: new Map(),
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),

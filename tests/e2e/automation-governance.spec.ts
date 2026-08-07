@@ -49,7 +49,7 @@ async function setRequestThrottle(
 async function openParsedFields(page: Parameters<typeof openFixturePage>[0]): Promise<void> {
   const fields = page.locator('.image-trail-panel__fields');
   const isOpen = await fields.evaluate((element) => element.hasAttribute('open'));
-  if (!isOpen) await page.locator('.image-trail-panel__fields-summary').click();
+  if (!isOpen) await page.getByRole('button', { name: 'Show Field Editor' }).click();
 }
 
 async function openManualControls(page: Parameters<typeof openFixturePage>[0]): Promise<void> {

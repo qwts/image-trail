@@ -75,6 +75,34 @@ test('panel shell matches the approved standard and narrow geometry', async ({ p
   await captureArtifact(page, testInfo, '01-panel-narrow');
 });
 
+test('every dashboard section uses the same explicit Hide/Show header control (#755)', async ({ page, serviceWorker }) => {
+  await openPanel(page, serviceWorker);
+  const initialActions = [
+    'Hide Host target',
+    'Hide URL editor',
+    'Show Field Editor',
+    'Hide Controls',
+    'Hide Recent history',
+    'Hide Queue',
+  ] as const;
+  for (const name of initialActions) await expect(page.getByRole('button', { name })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Hide Host target' }).click();
+  await expect(page.getByRole('button', { name: 'Show Host target' })).toBeVisible();
+  await expect(page.locator('.image-trail-panel__target-card')).toBeHidden();
+
+  await page.getByRole('button', { name: 'Hide URL editor' }).click();
+  await expect(page.getByRole('button', { name: 'Show URL editor' })).toBeVisible();
+  await expect(page.locator('.image-trail-panel__full-url-input')).toBeHidden();
+
+  await page.getByRole('button', { name: 'Show Field Editor' }).click();
+  await expect(page.getByRole('button', { name: 'Hide Field Editor' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Hide Controls' }).click();
+  await expect(page.getByRole('button', { name: 'Show Controls' })).toBeVisible();
+  await expect(page.locator('.image-trail-panel__secondary-controls-body-shell')).toBeHidden();
+});
+
 test('locked capture uses the approved bottom-center pin feedback', async ({ page, serviceWorker }, testInfo) => {
   await openPanel(page, serviceWorker);
   await page.keyboard.press('c');

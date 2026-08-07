@@ -78,7 +78,7 @@ async function storedDownArrowAction(serviceWorker: Worker): Promise<string | un
 async function includeQueryFrame(page: Page): Promise<void> {
   const fields = page.locator('.image-trail-panel__fields');
   if (!(await fields.evaluate((element) => element.hasAttribute('open')))) {
-    await page.locator('.image-trail-panel__fields-summary').click();
+    await page.getByRole('button', { name: 'Show Field Editor' }).click();
   }
   await page.getByRole('button', { name: /Increment .*frame/u }).click();
   const include = page.getByRole('button', { name: /Include query frame/u });

@@ -2,6 +2,7 @@ import type { FieldEditorViewModel } from '../field-editor-view-model.js';
 import { createFieldRow, type FieldRowCallbacks } from './field-row.js';
 import type { NumericFieldDisplayMode } from './field-value-commit-controller.js';
 import { createFieldsResetControls } from './fields-reset-controls.js';
+import { createSectionToggle } from './primitives.js';
 
 export { type NumericFieldDisplayMode, numericFieldCommitValue } from './field-value-commit-controller.js';
 export {
@@ -23,6 +24,7 @@ export interface FieldsViewCallbacks extends FieldRowCallbacks {
 
 export interface FieldsViewOptions {
   readonly open: boolean;
+  readonly collapsible?: boolean;
   readonly blockSize: number | null;
   readonly numericDisplayModes?: ReadonlyMap<string, NumericFieldDisplayMode>;
 }
@@ -57,17 +59,21 @@ function rowCountBlockSize(wrapper: HTMLElement, summary: HTMLElement, body: HTM
 }
 
 export function createFieldsView(model: FieldEditorViewModel, callbacks: FieldsViewCallbacks, options: FieldsViewOptions): HTMLElement {
-  const wrapper = document.createElement('details');
+  const wrapper = document.createElement('section');
   wrapper.className = 'image-trail-panel__section image-trail-panel__fields';
   if (model.privacyMode) wrapper.classList.add('is-privacy-masked');
-  wrapper.open = options.open;
+  let open = options.open;
+  wrapper.toggleAttribute('open', open);
   if (options.blockSize !== null) {
     wrapper.classList.add('is-height-locked');
     wrapper.style.setProperty('--image-trail-fields-size', `${options.blockSize}px`);
   }
   let resizeStartBlockSize: number | null = null;
-  wrapper.addEventListener('toggle', () => {
-    if (!wrapper.open) {
+  const changeOpen = (nextOpen: boolean): void => {
+    open = nextOpen;
+    wrapper.toggleAttribute('open', open);
+    body.hidden = !open;
+    if (!open) {
       wrapper.classList.remove('is-height-locked');
       wrapper.style.removeProperty('--image-trail-fields-size');
       callbacks.onOpenChange(false, null);
@@ -75,21 +81,21 @@ export function createFieldsView(model: FieldEditorViewModel, callbacks: FieldsV
     }
 
     queueMicrotask(() => {
-      if (options.blockSize !== null) return;
+      if (options.blockSize !== null) return callbacks.onOpenChange(true, options.blockSize);
       const blockSize = rowCountBlockSize(wrapper, summary, body, intro, list);
       wrapper.classList.add('is-height-locked');
       wrapper.style.setProperty('--image-trail-fields-size', `${blockSize}px`);
       callbacks.onOpenChange(true, blockSize);
     });
-  });
+  };
   wrapper.addEventListener('pointerdown', (event) => {
-    if (!wrapper.open) return;
+    if (!open) return;
     const rect = wrapper.getBoundingClientRect();
     if (rect.bottom - event.clientY > 18) return;
     resizeStartBlockSize = Math.round(rect.height);
   });
   wrapper.addEventListener('pointerup', () => {
-    if (!wrapper.open) return;
+    if (!open) return;
     if (resizeStartBlockSize === null) return;
     const blockSize = Math.round(wrapper.getBoundingClientRect().height);
     const changed = blockSize !== resizeStartBlockSize;
@@ -100,7 +106,7 @@ export function createFieldsView(model: FieldEditorViewModel, callbacks: FieldsV
     callbacks.onResize(blockSize);
   });
 
-  const summary = document.createElement('summary');
+  const summary = document.createElement('div');
   summary.className = 'image-trail-panel__fields-summary';
   const heading = document.createElement('h3');
   heading.textContent = 'Field Editor';
@@ -113,9 +119,11 @@ export function createFieldsView(model: FieldEditorViewModel, callbacks: FieldsV
     onResetAll: callbacks.onResetAll,
   });
   if (resetControls) summary.append(resetControls);
+  if (options.collapsible !== false) summary.append(createSectionToggle({ open, sectionLabel: 'Field Editor', onToggle: changeOpen }));
 
   const body = document.createElement('div');
   body.className = 'image-trail-panel__fields-body';
+  body.hidden = !open;
   const intro = document.createElement('p');
   intro.className = 'image-trail-panel__meta';
   intro.textContent = model.privacyMode

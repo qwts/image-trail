@@ -30,8 +30,8 @@ interface ReplacementFrame {
 async function openHostTargetDetails(page: Parameters<typeof imageNavigationSnapshot>[0]): Promise<void> {
   const release = page.getByRole('button', { name: 'Release host image' });
   if (await release.isVisible()) return;
-  const target = page.locator('.image-trail-panel__target-utility');
-  if ((await target.getAttribute('open')) === null) await page.locator('.image-trail-panel__target-summary').click();
+  const show = page.getByRole('button', { name: 'Show Host target' });
+  if ((await show.count()) > 0) await show.click();
   await openTargetControls(page);
   await expect(release).toBeVisible();
 }

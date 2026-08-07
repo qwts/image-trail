@@ -69,6 +69,7 @@ export class PanelRenderController {
   private preLockFocus: FocusedPanelControlSnapshot | null = null;
   private readonly layoutState: PanelLayoutState = {
     fieldsPanelOpen: false,
+    sectionOpen: new Map(),
     fieldsPanelBlockSize: null,
     historyListBlockSize: null,
     fieldDisplayModes: new Map(),

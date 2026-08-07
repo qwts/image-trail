@@ -18,7 +18,7 @@ const privateToken = 'private-url-metadata-641';
 
 async function openParsedFields(page: Page): Promise<void> {
   const fields = page.locator('.image-trail-panel__fields');
-  if ((await fields.getAttribute('open')) === null) await page.locator('.image-trail-panel__fields-summary').click();
+  if ((await fields.getAttribute('open')) === null) await page.getByRole('button', { name: 'Show Field Editor' }).click();
 }
 
 async function urlMetadataRows(worker: Worker): Promise<Record<string, unknown>[]> {

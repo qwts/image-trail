@@ -7,6 +7,9 @@ export interface ManualControlsViewOptions {
   readonly previousFieldId: string | null;
   readonly nextFieldId: string | null;
   readonly dispatch: (action: PanelAction) => void;
+  readonly open?: boolean;
+  readonly collapsible?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 function actionButton(
@@ -112,7 +115,23 @@ export function createManualControlsView(options: ManualControlsViewOptions): HT
   const { state, dispatch } = options;
   const section = document.createElement('section');
   section.className = 'image-trail-panel__section image-trail-panel__secondary-controls image-trail-ds__workflow';
-  section.append(createSectionHeader({ title: 'Controls', className: 'image-trail-panel__section-header', divider: false }));
+  const open = options.open !== false;
+  const sectionBody = document.createElement('div');
+  sectionBody.className = 'image-trail-panel__secondary-controls-body-shell';
+  sectionBody.hidden = !open;
+  section.append(
+    createSectionHeader({
+      title: 'Controls',
+      className: 'image-trail-panel__section-header',
+      divider: false,
+      collapsible: options.collapsible !== false,
+      open,
+      onToggle: (nextOpen) => {
+        sectionBody.hidden = !nextOpen;
+        options.onOpenChange?.(nextOpen);
+      },
+    }),
+  );
 
   const trailStatus = document.createElement('p');
   trailStatus.className = 'image-trail-panel__workflow-meta';
@@ -120,10 +139,10 @@ export function createManualControlsView(options: ManualControlsViewOptions): HT
     options.previousFieldId || options.nextFieldId
       ? 'Trail fields step together with Prev/Next.'
       : 'Add a field to the Trail to walk it with Prev/Next.';
-  section.append(trailStatus);
+  sectionBody.append(trailStatus);
 
-  section.append(createPrimaryWorkflow(state, dispatch));
-  appendContextHints(section, state);
+  sectionBody.append(createPrimaryWorkflow(state, dispatch));
+  appendContextHints(sectionBody, state);
 
   const details = document.createElement('details');
   details.className = 'image-trail-panel__secondary-controls-details';
@@ -134,8 +153,8 @@ export function createManualControlsView(options: ManualControlsViewOptions): HT
   const summary = document.createElement('summary');
   summary.className = 'image-trail-panel__secondary-controls-summary';
   summary.textContent = 'More controls';
-  const body = document.createElement('div');
-  body.className = 'image-trail-panel__secondary-controls-body';
+  const detailsBody = document.createElement('div');
+  detailsBody.className = 'image-trail-panel__secondary-controls-body';
 
   const fieldActions = document.createElement('div');
   fieldActions.className = 'image-trail-panel__actions image-trail-panel__field-navigation';
@@ -149,7 +168,7 @@ export function createManualControlsView(options: ManualControlsViewOptions): HT
       disabled: options.nextFieldId === null,
     }),
   );
-  body.append(fieldActions);
+  detailsBody.append(fieldActions);
 
   const automation = document.createElement('div');
   automation.className = 'image-trail-panel__automation-actions';
@@ -163,8 +182,9 @@ export function createManualControlsView(options: ManualControlsViewOptions): HT
   if (state.automation.slideshowPhase !== 'idle' || state.automation.retryPhase !== 'idle') {
     automation.append(actionButton('Stop all', { name: 'stop-all' }, dispatch, { variant: 'danger' }));
   }
-  body.append(automation);
-  details.append(summary, body);
-  section.append(details);
+  detailsBody.append(automation);
+  details.append(summary, detailsBody);
+  sectionBody.append(details);
+  section.append(sectionBody);
   return section;
 }

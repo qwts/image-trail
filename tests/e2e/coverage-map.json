@@ -153,7 +153,7 @@
             "tests/dom/primitives.test.ts",
             "tests/primitives-css.test.ts"
           ],
-          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, capture, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
+          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; #755 explicit Hide/Show header controls across Host target, URL editor, Field Editor, Controls, Recents, and Queue; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, capture, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
         },
         {
           "type": "storybook",
@@ -177,7 +177,7 @@
             "tests/e2e/detachable-sections.spec.ts",
             "tests/e2e/react-renderer-boundary.spec.ts"
           ],
-          "notes": "Covers the explicit disposable E2E build intent plus packaged-extension open/minimize/expand/close, approved standard and narrow panel geometry, deterministic handoff artifacts, capture feedback, grouped Settings and Help surfaces, Host selection, URL application, visible navigation and automation actions, More controls, detached windows, #753 usable target-action flyout/button/select geometry, status refresh, detached select focus after native change events, and focus/scroll-preserving rerenders."
+          "notes": "Covers the explicit disposable E2E build intent plus packaged-extension open/minimize/expand/close, approved standard and narrow panel geometry, #755 one explicit Hide/Show contract for all six dashboard sections, deterministic handoff artifacts, capture feedback, grouped Settings and Help surfaces, Host selection, URL application, visible navigation and automation actions, More controls, detached windows, #753 usable target-action flyout/button/select geometry, status refresh, detached select focus after native change events, and focus/scroll-preserving rerenders."
         },
         {
           "type": "manual",
@@ -1280,12 +1280,12 @@
         {
           "type": "unit-dom",
           "paths": ["tests/dom/history-view.test.ts", "tests/dom/bookmarks-view.test.ts"],
-          "notes": "Covers #438/#441: the Recents/Queue HEADER ROWS collapse and expand the section body (role=button, aria-expanded, Enter/Space); a collapsed section keeps its header-row actions usable; clicks on interactive children never toggle."
+          "notes": "Covers #438/#441/#755: explicit Recents/Queue Hide/Show buttons collapse and expand the section body while keeping sort, detach, and bulk actions independently usable; detached windows omit the attached collapse control."
         },
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/recents-queue-recall.spec.ts",
-          "notes": "Covers #438/#441 end to end with geometry pins: single-row header (hint shares the row), the far-right hint area and heading side both toggle, header actions stay usable while collapsed (pinning while the queue is collapsed works), and toolbar clicks do not toggle."
+          "notes": "Covers #438/#441/#755 end to end: the explicit far-right Hide/Show button toggles each list, header actions stay usable while collapsed (pinning while the queue is collapsed works), and toolbar clicks do not toggle."
         },
         {
           "type": "unit-dom",

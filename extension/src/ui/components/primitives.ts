@@ -1,3 +1,7 @@
+import { createSectionToggle } from './section-toggle.js';
+
+export { createSectionToggle } from './section-toggle.js';
+
 export type ButtonVariant = 'default' | 'primary' | 'secondary' | 'ghost' | 'danger';
 export type BadgeTone = 'neutral' | 'selected' | 'encryption' | 'count' | 'success' | 'warning' | 'error';
 export type StatusTone = 'ready' | 'connected' | 'busy' | 'success' | 'warning' | 'error' | 'neutral';
@@ -141,7 +145,7 @@ export interface SectionHeaderOptions extends PrimitiveOptions {
   readonly headingLevel?: 2 | 3 | 4;
   readonly collapsible?: boolean;
   readonly open?: boolean;
-  readonly onToggle?: (event: MouseEvent) => void;
+  readonly onToggle?: (open: boolean) => void;
   readonly detachable?: boolean;
   readonly onDetach?: (event: MouseEvent) => void;
   readonly divider?: boolean;
@@ -359,12 +363,14 @@ export function createSectionHeader(options: SectionHeaderOptions): HTMLElement 
     header.append(detach);
   }
   if (options.collapsible) {
-    const toggle = options.onToggle
-      ? createButton({ label: options.open ? 'Hide' : 'Show', variant: 'ghost', onClick: options.onToggle })
-      : createButton({ label: options.open ? 'Hide' : 'Show', variant: 'ghost', disabled: true });
-    toggle.classList.add('image-trail-ds__section-toggle');
-    toggle.setAttribute('aria-expanded', String(options.open === true));
-    header.append(toggle);
+    header.append(
+      createSectionToggle({
+        open: options.open === true,
+        sectionLabel: options.title,
+        ...(options.onToggle ? { onToggle: options.onToggle } : {}),
+        disabled: !options.onToggle,
+      }),
+    );
   }
   configureElement(header, options);
   return header;

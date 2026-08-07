@@ -94,6 +94,7 @@ function buildFieldsView(
   return createFieldsView(model, recordingCallbacks(calls), {
     open: viewOptions.open,
     blockSize: viewOptions.blockSize,
+    ...(viewOptions.collapsible === undefined ? {} : { collapsible: viewOptions.collapsible }),
     ...(viewOptions.numericDisplayModes ? { numericDisplayModes: viewOptions.numericDisplayModes } : {}),
   });
 }
@@ -115,6 +116,30 @@ test('the section uses the Field Editor feature name', () => {
 
   assert.equal(view.querySelector('h3')?.textContent, 'Field Editor');
   assert.equal(view.querySelector('.image-trail-ds__field-summary')?.textContent, '1 field');
+});
+
+test('Field Editor uses the shared explicit Hide/Show header control (#755)', () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls);
+  const toggle = view.querySelector<HTMLButtonElement>('.image-trail-ds__section-toggle');
+  const body = view.querySelector<HTMLElement>('.image-trail-panel__fields-body');
+  assert.ok(toggle && body);
+
+  toggle.click();
+  assert.equal(toggle.textContent, 'Show');
+  assert.equal(body.hidden, true);
+  assert.deepEqual(calls, [{ name: 'onOpenChange', args: [false, null] }]);
+});
+
+test('expanding persists open state when reusing a detached resize block size', async () => {
+  const calls: CallbackCall[] = [];
+  const view = buildFieldsView(calls, { options: { open: false, blockSize: 320 } });
+  buttonByLabel(view, 'Show Field Editor').click();
+  await Promise.resolve();
+
+  assert.deepEqual(calls, [{ name: 'onOpenChange', args: [true, 320] }]);
+  const rerendered = buildFieldsView([], { options: { open: true, blockSize: 320 } });
+  assert.equal(rerendered.querySelector<HTMLElement>('.image-trail-panel__fields-body')?.hidden, false);
 });
 
 test('the summary and FieldRow expose active hierarchy without replacing native controls', () => {

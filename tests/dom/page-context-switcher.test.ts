@@ -65,6 +65,77 @@ test('preserves the zero-image target count before a qualifying image exists', (
   unmountReactSubtree(root);
 });
 
+test('Host target uses the shared explicit Hide/Show header control (#755)', async () => {
+  const openChanges: boolean[] = [];
+  const target: TargetState = {
+    mode: 'auto',
+    picking: false,
+    grabModeActive: false,
+    candidateCount: 1,
+    selectedUrl: null,
+    selectedHandleId: null,
+    selectedDimensions: null,
+    fillScreen: false,
+    objectFit: 'contain',
+    message: '',
+  };
+  const root = createTargetPickerView(target, () => undefined, {
+    open: false,
+    onOpenChange: (open) => openChanges.push(open),
+  });
+  const toggle = root.querySelector<HTMLButtonElement>('.image-trail-ds__section-toggle');
+  const card = root.querySelector<HTMLElement>('.image-trail-panel__target-card');
+  assert.ok(toggle && card);
+  assert.equal(toggle.textContent, 'Show');
+  assert.equal(card.hidden, true);
+
+  toggle.click();
+  await Promise.resolve();
+  assert.equal(toggle.textContent, 'Hide');
+  assert.equal(card.hidden, false);
+  assert.deepEqual(openChanges, [true]);
+  unmountReactSubtree(root);
+});
+
+test('Host target cannot stay collapsed while target selection needs attention', async () => {
+  const baseTarget: TargetState = {
+    mode: 'auto',
+    picking: false,
+    grabModeActive: false,
+    candidateCount: 1,
+    selectedUrl: null,
+    selectedHandleId: null,
+    selectedDimensions: null,
+    fillScreen: false,
+    objectFit: 'contain',
+    message: '',
+  };
+
+  for (const target of [
+    { ...baseTarget, picking: true },
+    { ...baseTarget, grabModeActive: true },
+    { ...baseTarget, mode: 'manual' as const },
+    { ...baseTarget, candidateCount: 2 },
+  ]) {
+    const openChanges: boolean[] = [];
+    const root = createTargetPickerView(target, () => undefined, {
+      open: false,
+      onOpenChange: (open) => openChanges.push(open),
+    });
+    const toggle = root.querySelector<HTMLButtonElement>('.image-trail-ds__section-toggle');
+    const card = root.querySelector<HTMLElement>('.image-trail-panel__target-card');
+    assert.ok(toggle && card);
+    assert.equal(toggle.textContent, 'Hide');
+    assert.equal(card.hidden, false);
+
+    toggle.click();
+    await Promise.resolve();
+    assert.equal(card.hidden, false);
+    assert.deepEqual(openChanges, []);
+    unmountReactSubtree(root);
+  }
+});
+
 test('restores Host fit focus after a native change replaces the React subtree', async () => {
   const host = document.createElement('div');
   const shadow = host.attachShadow({ mode: 'open' });

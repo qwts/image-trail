@@ -12,6 +12,12 @@ export interface UrlEditorViewState {
 export interface UrlEditorViewCallbacks {
   readonly onApply: (url: string) => void;
   readonly onRejectUnsupportedInput?: () => void;
+  readonly onOpenChange?: (open: boolean) => void;
+}
+
+export interface UrlEditorViewOptions {
+  readonly open?: boolean;
+  readonly collapsible?: boolean;
 }
 
 const EMPTY_URL_MESSAGE = 'Select a target image to inspect its URL.';
@@ -21,39 +27,16 @@ export function isUnsupportedUrlEditorInput(url: string): boolean {
   return url.trim().toLowerCase().startsWith('data:');
 }
 
-export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEditorViewCallbacks): HTMLElement {
+export function createUrlEditorView(
+  state: UrlEditorViewState,
+  callbacks: UrlEditorViewCallbacks,
+  options: UrlEditorViewOptions = {},
+): HTMLElement {
   const wrapper = document.createElement('section');
   wrapper.className = 'image-trail-panel__section image-trail-panel__url-editor image-trail-ds__url-editor';
 
-  const heading = createSectionHeader({ title: 'URL editor', className: 'image-trail-panel__section-header', divider: false });
-  const privacyMasked = state.privacyMode === true && state.url !== null;
-  const value = privacyMasked
-    ? createInput({
-        ariaLabel: 'Full image URL',
-        multiline: true,
-        privacyMasked: true,
-        maskedPlaceholder: PRIVACY_URL_TEXT,
-        rows: state.isDataUrl ? 1 : 3,
-        wrap: 'soft',
-        spellcheck: false,
-        disabled: state.url === null || state.isDataUrl === true,
-        readOnly: true,
-        className: 'image-trail-panel__full-url-input',
-      })
-    : createInput({
-        ariaLabel: 'Full image URL',
-        multiline: true,
-        value: state.isDataUrl ? 'data URL' : (state.url ?? ''),
-        rows: state.isDataUrl ? 1 : 3,
-        wrap: 'soft',
-        spellcheck: false,
-        disabled: state.url === null || state.isDataUrl === true,
-        readOnly: false,
-        placeholder: EMPTY_URL_MESSAGE,
-        className: 'image-trail-panel__full-url-input',
-      });
-  if (privacyMasked) value.value = PRIVACY_URL_TEXT;
-  value.title = state.privacyMode && state.url ? 'Privacy mode is hiding this URL for screen sharing.' : (state.url ?? EMPTY_URL_MESSAGE);
+  const open = options.open !== false;
+  const value = createUrlInput(state);
   const hostUrl = state.hostUrl === undefined ? state.url : state.hostUrl;
 
   const applyUrl = (): void => {
@@ -111,6 +94,52 @@ export function createUrlEditorView(state: UrlEditorViewState, callbacks: UrlEdi
   hint.append(createKbd('Enter'), document.createTextNode(' apply URL'));
   footer.append(actions, status, hint);
   syncEditorStatus();
+  value.hidden = !open;
+  footer.hidden = !open;
+  const heading = createSectionHeader({
+    title: 'URL editor',
+    className: 'image-trail-panel__section-header',
+    divider: false,
+    collapsible: options.collapsible !== false,
+    open,
+    onToggle: (nextOpen) => {
+      value.hidden = !nextOpen;
+      footer.hidden = !nextOpen;
+      callbacks.onOpenChange?.(nextOpen);
+    },
+  });
   wrapper.append(heading, value, footer);
   return wrapper;
+}
+
+function createUrlInput(state: UrlEditorViewState): HTMLTextAreaElement {
+  const privacyMasked = state.privacyMode === true && state.url !== null;
+  const value = privacyMasked
+    ? createInput({
+        ariaLabel: 'Full image URL',
+        multiline: true,
+        privacyMasked: true,
+        maskedPlaceholder: PRIVACY_URL_TEXT,
+        rows: state.isDataUrl ? 1 : 3,
+        wrap: 'soft',
+        spellcheck: false,
+        disabled: state.url === null || state.isDataUrl === true,
+        readOnly: true,
+        className: 'image-trail-panel__full-url-input',
+      })
+    : createInput({
+        ariaLabel: 'Full image URL',
+        multiline: true,
+        value: state.isDataUrl ? 'data URL' : (state.url ?? ''),
+        rows: state.isDataUrl ? 1 : 3,
+        wrap: 'soft',
+        spellcheck: false,
+        disabled: state.url === null || state.isDataUrl === true,
+        readOnly: false,
+        placeholder: EMPTY_URL_MESSAGE,
+        className: 'image-trail-panel__full-url-input',
+      });
+  if (privacyMasked) value.value = PRIVACY_URL_TEXT;
+  value.title = state.privacyMode && state.url ? 'Privacy mode is hiding this URL for screen sharing.' : (state.url ?? EMPTY_URL_MESSAGE);
+  return value;
 }
