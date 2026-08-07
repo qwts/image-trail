@@ -23,18 +23,36 @@ import type { ActiveBlobKey } from './crypto/blob-keyring.js';
 import { openImageTrailDb } from './db.js';
 import { ensureDurableBookmarkKey, type DurableBookmarkKeyContext } from './durable-bookmark-key.js';
 import { DEFAULT_LOCAL_SETTINGS } from './local-settings.js';
-import { DEFAULT_QUEUE_DISPLAY_ORDER, queueTimeForRecord, sortQueueRecords, type QueueDisplayOrder } from '../core/display-order.js';
+import { DEFAULT_QUEUE_DISPLAY_ORDER, sortQueueRecords, type QueueDisplayOrder } from '../core/display-order.js';
 import { BlobsRepository } from './repositories/blobs-repository.js';
 import { BookmarksRepository } from './repositories/bookmarks-repository.js';
 import { EncryptedPinsRepository, type EncryptedPinRecord } from './repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from './repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from './repositories/keys-repository.js';
-import type { DurableBookmarkPayloadV1, ProtectedPinRelationshipV1 } from './types.js';
+import type { DurableBookmarkPayloadV1 } from './types.js';
+import {
+  BookmarkPersistenceError,
+  clampPageOffset,
+  filterByVisibilityScope,
+  isVisibleInScope,
+  preserveImportedBookmarkMetadata,
+  protectedImportOptions,
+  removeReplacedOriginal,
+  saveProtectedThumbnail,
+  withProtectedPinSaveLock,
+} from './bookmark-controller-helpers.js';
+export { recordQueueTime } from './bookmark-controller-helpers.js';
 
 interface ProtectedBookmarkOptions {
   readonly getActiveBlobKey?: () => ActiveBlobKey | null | Promise<ActiveBlobKey | null>;
   readonly getPinSaveStoragePreference?: () => PinSaveStoragePreference | Promise<PinSaveStoragePreference>;
   readonly getSearchableMetadataPolicy?: () => SearchableMetadataPolicy | Promise<SearchableMetadataPolicy>;
+}
+
+interface BookmarkPersistenceOptions extends BookmarkSaveOptions {
+  readonly preserveExistingMetadata?: boolean | undefined;
+  readonly preserveExistingThumbnail?: boolean | undefined;
+  readonly requiredActiveBlobKey?: ActiveBlobKey | undefined;
 }
 
 type BookmarkContext = {
@@ -137,6 +155,20 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const bookmark = createDisplayRecord({ ...record, id: importedDataUrl ? record.id : record.url, source: 'bookmark' });
     if (!context) return bookmark;
 
+    return this.saveWithContext(context, bookmark, options);
+  }
+
+  private async saveWithContext(
+    context: BookmarkContext,
+    bookmark: ImageDisplayRecord,
+    options: BookmarkPersistenceOptions,
+  ): Promise<ImageDisplayRecord> {
+    if (options.requiredActiveBlobKey) {
+      return {
+        ...(await this.saveProtected(context, bookmark, options.requiredActiveBlobKey, options)),
+        pinSaveStorage: { destination: 'encrypted' },
+      };
+    }
     const activeBlobKey = (await this.options.getActiveBlobKey?.()) ?? null;
     const preference = (await this.options.getPinSaveStoragePreference?.()) ?? DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference;
     if (preference === 'plaintext') {
@@ -165,11 +197,44 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     );
   }
 
+  async saveResult(record: ImageDisplayRecord, options?: BookmarkSaveOptions) {
+    const context = await this.openContext();
+    if (!context) return { ok: false as const, message: 'Bookmark storage is unavailable.' };
+    const importedDataUrl = record.url.startsWith('data:image/');
+    const bookmark = createDisplayRecord({ ...record, id: importedDataUrl ? record.id : record.url, source: 'bookmark' });
+    try {
+      return { ok: true as const, record: await this.saveWithContext(context, bookmark, options ?? {}) };
+    } catch (error) {
+      return { ok: false as const, message: error instanceof Error ? error.message : 'Bookmark save failed.' };
+    }
+  }
+
+  async saveProtectedResult(record: ImageDisplayRecord, activeBlobKey: ActiveBlobKey) {
+    const context = await this.openContext();
+    const current = (await this.options.getActiveBlobKey?.()) ?? null;
+    if (!context || current?.reference.reference !== activeBlobKey.reference.reference) {
+      return { ok: false as const, message: 'Encrypted original key changed during import.' };
+    }
+    const bookmark = createDisplayRecord({ ...record, id: record.url, source: 'bookmark' });
+    try {
+      return {
+        ok: true as const,
+        record: await this.saveWithContext(context, bookmark, protectedImportOptions(activeBlobKey)),
+      };
+    } catch (error) {
+      return {
+        ok: false as const,
+        message: error instanceof Error ? error.message : 'Bookmark save failed.',
+        durableMetadataCommitted: error instanceof BookmarkPersistenceError && error.durableMetadataCommitted,
+      };
+    }
+  }
+
   private async savePlain(
     context: BookmarkContext,
     bookmark: ImageDisplayRecord,
     pinSaveStorage?: ImageDisplayRecord['pinSaveStorage'],
-    options: BookmarkSaveOptions = {},
+    options: BookmarkPersistenceOptions = {},
   ): Promise<ImageDisplayRecord> {
     const importedDataUrl = bookmark.url.startsWith('data:image/');
 
@@ -186,6 +251,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const uuid = existing?.uuid ?? crypto.randomUUID();
     const payload = toBookmarkPayload(bookmark, existingPayload, {
       preserveExistingOriginal: !options.clearStoredOriginal,
+      ...(options.preserveExistingThumbnail === undefined ? {} : { preserveExistingThumbnail: options.preserveExistingThumbnail }),
     });
     await context.repository.sealAndPut(
       uuid,
@@ -463,7 +529,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     context: BookmarkContext,
     bookmark: ImageDisplayRecord,
     activeBlobKey: ActiveBlobKey,
-    options: BookmarkSaveOptions,
+    options: BookmarkPersistenceOptions,
   ): Promise<ImageDisplayRecord> {
     const urlHash = await hashSearchableUrl(bookmark.url);
     return withProtectedPinSaveLock(urlHash, () => this.saveProtectedForHash(context, bookmark, activeBlobKey, urlHash, options));
@@ -473,7 +539,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     bookmark: ImageDisplayRecord,
     activeBlobKey: ActiveBlobKey,
     urlHash: string,
-    options: BookmarkSaveOptions,
+    options: BookmarkPersistenceOptions,
   ): Promise<ImageDisplayRecord> {
     const existingProtected = await context.encryptedPins.getByUrlHash(urlHash);
     const existingBookmark = existingProtected
@@ -489,13 +555,33 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const existingProtectedPayload = existingProtected
       ? await context.encryptedPins.openRecord(existingProtected, activeBlobKey.key).catch(() => null)
       : null;
+    const savedBookmark = options.preserveExistingMetadata
+      ? preserveImportedBookmarkMetadata(bookmark, existingProtectedPayload ?? existingPlainPayload)
+      : bookmark;
     const queueUpdatedAt = existingPlain?.queueUpdatedAt ?? existingProtected?.queueUpdatedAt ?? bookmark.timestamp;
     let thumbnail: { readonly id: string } | null = null;
+    let protectedRecordCommitted = false;
+    let relationshipCommitted = false;
     try {
-      thumbnail = await this.saveProtectedThumbnail(context, bookmark, activeBlobKey, plainPinId, existingPlainPayload?.protectedPin);
+      const bookmarkWithThumbnail =
+        options.preserveExistingThumbnail && !savedBookmark.thumbnail && existingPlainPayload?.thumbnail
+          ? { ...savedBookmark, thumbnail: existingPlainPayload.thumbnail }
+          : savedBookmark;
+      thumbnail = await saveProtectedThumbnail(
+        context,
+        bookmarkWithThumbnail,
+        activeBlobKey,
+        plainPinId,
+        existingPlainPayload?.protectedPin,
+      );
+      const thumbnailId =
+        thumbnail?.id ??
+        (options.preserveExistingThumbnail
+          ? (existingProtectedPayload?.thumbnailId ?? existingPlainPayload?.protectedPin?.encryptedThumbnailId)
+          : undefined);
       const protectedPayload = toProtectedPayload(
-        bookmark,
-        thumbnail?.id,
+        savedBookmark,
+        thumbnailId,
         existingProtectedPayload?.interop ?? existingPlainPayload?.interop,
         options.clearStoredOriginal ? undefined : (existingProtectedPayload?.storedOriginal ?? existingPlainPayload?.storedOriginal),
       );
@@ -509,13 +595,14 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         keyReference: activeBlobKey.reference,
         now: existingProtected?.envelope.updatedAt,
       });
+      protectedRecordCommitted = true;
       const relationship = protectedRelationship({
         plainPinId,
         encryptedPinId,
-        encryptedThumbnailId: thumbnail?.id ?? existingPlainPayload?.protectedPin?.encryptedThumbnailId,
+        encryptedThumbnailId: thumbnailId,
         storedOriginalBlobId:
           protectedPayload.storedOriginal?.blobId ??
-          bookmark.blobId ??
+          savedBookmark.blobId ??
           (options.clearStoredOriginal ? undefined : existingPlainPayload?.protectedPin?.storedOriginalBlobId),
         queueUpdatedAt,
       });
@@ -528,38 +615,26 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         privatePinUrl(plainPinId),
         queueUpdatedAt,
       );
+      relationshipCommitted = true;
       await removeReplacedOriginal(context, existingPlainPayload, relationship.storedOriginalBlobId);
       this.invalidateMergedRecordsCache();
       return this.openProtectedDisplayRecord(context, protectedRecord, activeBlobKey);
     } catch (error) {
+      let durableMetadataCommitted = relationshipCommitted || (!!existingProtected && protectedRecordCommitted);
       const existingThumbnailId = existingPlainPayload?.protectedPin?.encryptedThumbnailId;
-      if (thumbnail?.id && thumbnail.id !== existingThumbnailId) await context.encryptedThumbnails.remove(thumbnail.id);
-      if (!existingProtected) await context.encryptedPins.remove(encryptedPinId);
+      if (!durableMetadataCommitted && thumbnail?.id && thumbnail.id !== existingThumbnailId) {
+        await context.encryptedThumbnails.remove(thumbnail.id).catch(() => undefined);
+      }
+      if (!durableMetadataCommitted && !existingProtected && protectedRecordCommitted) {
+        try {
+          await context.encryptedPins.remove(encryptedPinId);
+        } catch {
+          durableMetadataCommitted = true;
+        }
+      }
       this.invalidateMergedRecordsCache();
-      throw error;
+      throw new BookmarkPersistenceError(error instanceof Error ? error.message : 'Bookmark save failed.', durableMetadataCommitted);
     }
-  }
-
-  private async saveProtectedThumbnail(
-    context: BookmarkContext,
-    bookmark: ImageDisplayRecord,
-    activeBlobKey: ActiveBlobKey,
-    plainPinId: string,
-    existing?: ProtectedPinRelationshipV1,
-  ): Promise<{ readonly id: string } | null> {
-    if (!bookmark.thumbnail?.startsWith('data:image/')) return null;
-    const parsed = dataUrlToBytes(bookmark.thumbnail);
-    if (!parsed) return null;
-    const id = existing?.encryptedThumbnailId ?? crypto.randomUUID();
-    await context.encryptedThumbnails.sealAndPut({
-      id,
-      pinId: plainPinId,
-      mimeType: parsed.mimeType,
-      bytes: parsed.bytes,
-      key: activeBlobKey.key,
-      keyReference: activeBlobKey.reference,
-    });
-    return { id };
   }
 
   private async openProtectedDisplayRecord(
@@ -692,29 +767,6 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
   }
 }
 
-function filterByVisibilityScope(
-  records: readonly ImageDisplayRecord[],
-  scope: 'global' | 'site',
-  currentPageUrl: string | undefined,
-): readonly ImageDisplayRecord[] {
-  return records.filter((record) => isVisibleInScope(record, scope, currentPageUrl));
-}
-
-function isVisibleInScope(record: ImageDisplayRecord, scope: 'global' | 'site', currentPageUrl: string | undefined): boolean {
-  if (scope !== 'site' || !currentPageUrl) return true;
-  const currentHostname = hostnameFromUrl(currentPageUrl);
-  if (!currentHostname) return true;
-  return hostnameFromUrl(record.url) === currentHostname;
-}
-
-function hostnameFromUrl(url: string): string | null {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return null;
-  }
-}
-
 async function removeLinkedPinStorage(context: BookmarkContext, payload: DurableBookmarkPayloadV1): Promise<void> {
   if (payload.protectedPin?.encryptedPinId) await context.encryptedPins.remove(payload.protectedPin.encryptedPinId);
   if (payload.protectedPin?.encryptedThumbnailId) await context.encryptedThumbnails.remove(payload.protectedPin.encryptedThumbnailId);
@@ -724,60 +776,4 @@ async function removeLinkedPinStorage(context: BookmarkContext, payload: Durable
     return;
   }
   if (payload.storedOriginal?.blobId) await context.blobs.remove(payload.storedOriginal.blobId);
-}
-
-async function removeReplacedOriginal(
-  context: BookmarkContext,
-  previous: DurableBookmarkPayloadV1 | null,
-  nextBlobId: string | undefined,
-): Promise<void> {
-  const previousBlobId = previous?.protectedPin?.storedOriginalBlobId ?? previous?.storedOriginal?.blobId;
-  if (!previousBlobId || previousBlobId === nextBlobId) return;
-  await context.blobs.remove(previousBlobId);
-}
-
-function clampPageOffset(offset: number, limit: number, total: number): number {
-  if (total <= 0) return 0;
-  const lastPageOffset = Math.floor((total - 1) / limit) * limit;
-  return Math.min(offset, lastPageOffset);
-}
-
-/**
- * Queue sort key for a record. Queue ordering is `queueUpdatedAt` (falling back to the
- * capture `timestamp`), never the encrypted envelope's `updatedAt` — see AGENTS.md
- * "Storage Rules". Exported so the invariant can be asserted directly (tests/invariants.test.ts).
- */
-export function recordQueueTime(record: ImageDisplayRecord): string {
-  return queueTimeForRecord(record);
-}
-
-const protectedPinSaveLocks = new Map<string, Promise<void>>();
-
-async function withProtectedPinSaveLock<T>(urlHash: string, work: () => Promise<T>): Promise<T> {
-  const previous = protectedPinSaveLocks.get(urlHash) ?? Promise.resolve();
-  let release!: () => void;
-  const current = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const next = previous.catch(() => undefined).then(() => current);
-  protectedPinSaveLocks.set(urlHash, next);
-  await previous.catch(() => undefined);
-  try {
-    return await work();
-  } finally {
-    release();
-    if (protectedPinSaveLocks.get(urlHash) === next) protectedPinSaveLocks.delete(urlHash);
-  }
-}
-
-function dataUrlToBytes(dataUrl: string): { readonly mimeType: string; readonly bytes: ArrayBuffer } | null {
-  const match = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/iu.exec(dataUrl);
-  if (!match) return null;
-  try {
-    const binary = atob(match[2]!.replace(/\s/gu, ''));
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    return { mimeType: match[1]!.toLowerCase(), bytes: bytes.buffer };
-  } catch {
-    return null;
-  }
 }

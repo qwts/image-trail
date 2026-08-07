@@ -4,13 +4,13 @@ import type { DurableBookmarkPayloadV1, DurableEncryptedPinPayloadV1, ProtectedP
 export function toBookmarkPayload(
   record: ImageDisplayRecord,
   existing?: DurableBookmarkPayloadV1 | null,
-  options: { readonly preserveExistingOriginal?: boolean } = {},
+  options: { readonly preserveExistingOriginal?: boolean; readonly preserveExistingThumbnail?: boolean } = {},
 ): DurableBookmarkPayloadV1 {
   return {
     url: record.url,
     title: record.title,
     label: record.label,
-    thumbnail: record.thumbnail,
+    thumbnail: record.thumbnail ?? (options.preserveExistingThumbnail ? existing?.thumbnail : undefined),
     width: record.width,
     height: record.height,
     bookmarkedAt: record.timestamp,

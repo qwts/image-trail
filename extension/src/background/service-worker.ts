@@ -10,7 +10,7 @@ import { createUrlMetadataStores, reconcilePersistedUrlMetadataPolicy } from '..
 import { RecentHistoryCache } from './recent-history-cache.js';
 import { configureBlobKeySessionStorage, restoreActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { openBlobPayload, sealBlobPayload } from '../data/crypto/binary-envelope.js';
-import { createEncryptedImageFile, openEncryptedImageFile, parseEncryptedImageFileHeader } from '../data/import-export/encrypted-image.js';
+import { createEncryptedImageFile } from '../data/import-export/encrypted-image.js';
 import { openImageTrailDb } from '../data/db.js';
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
 import { EncryptedPinsRepository } from '../data/repositories/encrypted-pins-repository.js';
@@ -106,6 +106,7 @@ import { createChangeNotifiers } from './change-notifiers.js';
 import type { ServiceWorkerContext } from './service-worker-context.js';
 import { createShortcutActionMessage } from './shortcut-action-message.js';
 import { createRetryingDbProvider } from './db-provider.js';
+import { importEncryptedImageToDurableStorage } from './encrypted-image-import.js';
 const CONTENT_SCRIPT_FILE = 'src/content/content-script.js';
 const TOGGLE_BUILD_IDENTITY_COMMAND = 'toggle-build-info-overlay';
 const BROWSER_COMMAND_ACTIONS = new Map(BROWSER_COMMAND_SHORTCUTS.map((shortcut) => [shortcut.command, shortcut.action]));
@@ -622,42 +623,13 @@ async function imageBytesFromUrl(
 async function handleImportEncryptedImage(
   message: ImportEncryptedImageMessage,
 ): Promise<import('./messages.js').ImportEncryptedImageResultMessage['payload']> {
-  let expectedKeyReference: string;
-  try {
-    expectedKeyReference = parseEncryptedImageFileHeader(message.payload.fileContent).keyReference;
-  } catch (error) {
-    return {
-      ok: false,
-      reason: 'invalid-format',
-      message: error instanceof Error ? error.message : 'Encrypted image import file is invalid.',
-    };
-  }
-
-  const activeBlobKey = await restoreActiveBlobKey();
-  if (!activeBlobKey) {
-    return { ok: false, reason: 'encryption-locked', message: 'Unlock encrypted originals before importing encrypted images.' };
-  }
-  if (activeBlobKey.reference.reference !== expectedKeyReference) {
-    return { ok: false, reason: 'wrong-key', message: `Unlock ${expectedKeyReference} before importing this encrypted image.` };
-  }
-  try {
-    const result = await openEncryptedImageFile(message.payload.fileContent, activeBlobKey.key, expectedKeyReference);
-    return {
-      ok: true,
-      dataUrl: imageDataUrlFromBytes(result.bytes, result.mimeType),
-      fileName: result.fileName,
-      sourceUrl: result.sourceUrl,
-      mimeType: result.mimeType,
-      byteLength: result.bytes.byteLength,
-      keyReference: result.keyReference,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      reason: 'decryption-failed',
-      message: error instanceof Error ? error.message : 'Encrypted image import failed.',
-    };
-  }
+  return importEncryptedImageToDurableStorage(message.payload.fileContent, {
+    restoreActiveBlobKey,
+    getDb,
+    findBookmarkByUrl: (url) => bookmarkStore.findByUrl(url),
+    saveBookmark: (record, activeBlobKey) => bookmarkStore.saveProtectedResult(record, activeBlobKey),
+    notifyBookmarkSaved: (record) => notifyLibraryChange({ topic: 'bookmarks', reason: 'bookmark-saved', recordIds: [record.id] }),
+  });
 }
 
 async function handleLoadBuildIdentity(): Promise<ReturnType<typeof createLoadBuildIdentityResultMessage>['payload']> {
