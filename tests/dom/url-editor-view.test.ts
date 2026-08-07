@@ -46,6 +46,34 @@ test('Apply URL button dispatches the current edited value', () => {
   assert.match(view.textContent ?? '', /Enter apply URL/u);
 });
 
+test('Apply to Host starts enabled when the draft differs from the selected host URL', () => {
+  const applied: string[] = [];
+  const draftUrl = 'https://images.example.test/albums/1024/photo_0044.jpg';
+  const view = createUrlEditorView({ url: draftUrl, hostUrl: CURRENT_URL }, { onApply: (url) => applied.push(url) });
+  const apply = Array.from(view.querySelectorAll<HTMLButtonElement>('button')).find((button) => button.textContent === 'Apply to Host');
+
+  assert.ok(apply);
+  assert.equal(apply.disabled, false);
+  apply.click();
+
+  assert.deepEqual(applied, [draftUrl]);
+});
+
+test('Apply to Host stays disabled when no host image is selected', () => {
+  const applied: string[] = [];
+  const view = createUrlEditorView({ url: CURRENT_URL, hostUrl: null }, { onApply: (url) => applied.push(url) });
+  const textarea = textareaOf(view);
+  const apply = Array.from(view.querySelectorAll<HTMLButtonElement>('button')).find((button) => button.textContent === 'Apply to Host');
+
+  textarea.value = 'https://images.example.test/albums/1024/photo_0044.jpg';
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }));
+
+  assert.ok(apply);
+  assert.equal(apply.disabled, true);
+  assert.deepEqual(applied, []);
+});
+
 test('pasting a data: URL is rejected before it reaches the textarea', () => {
   const applied: string[] = [];
   let rejected = 0;
