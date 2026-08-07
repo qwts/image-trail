@@ -60,7 +60,7 @@ export function createRecentHistoryMessageRegistry({
       message.payload.includeRetained ?? false,
     );
     const promotion = await promoteOverflowCandidates(added.overflowCandidates, bookmarkStore, notifyLibraryChange);
-    recentHistoryCache.removeSiteItems(message.payload.pageUrl, promotion.removeIds);
+    recentHistoryCache.removeItems(message.payload.pageUrl, promotion.removeIds, message.payload.scope);
     await recentHistoryCache.flush();
     return {
       items: recentHistoryCache.load(message.payload.pageUrl, settings, message.payload.includeRetained ?? false, message.payload.scope),

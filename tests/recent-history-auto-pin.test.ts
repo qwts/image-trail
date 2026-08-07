@@ -235,6 +235,38 @@ test('an imported data Recent reuses its linked durable pin without saving or re
   );
 });
 
+test('all-sites auto-pin promotes and removes the actual global overflow row', async () => {
+  const cache = new RecentHistoryCache();
+  const saved: ImageDisplayRecord[] = [];
+  const registry = createRecentHistoryMessageRegistry({
+    recentHistoryCache: cache,
+    loadLocalSettings: async () => settings,
+    bookmarkStore: {
+      findByUrl: async () => null,
+      hasProtectedPinForUrl: async () => false,
+      saveResult: async (candidate) => {
+        saved.push(candidate);
+        return { ok: true as const, record: candidate };
+      },
+    },
+  });
+  const addEntry = registry[MessageType.AddRecentHistory] as MessageDef<ExtensionRequest, ExtensionResponse>;
+  await addEntry.handle(createAddRecentHistoryMessage('https://first.example/page', record('one'), { scope: 'all' }));
+  const response = addEntry.respond(
+    await addEntry.handle(createAddRecentHistoryMessage('https://second.example/page', record('two'), { scope: 'all' })),
+  ) as AddRecentHistoryResultMessage;
+
+  assert.deepEqual(
+    saved.map((item) => item.id),
+    ['https://images.example/one.jpg'],
+  );
+  assert.deepEqual(
+    response.payload.items.map((item) => item.id),
+    ['two'],
+  );
+  assert.deepEqual(cache.load('https://first.example/page', settings, true, 'site'), []);
+});
+
 test('a locked protected pin is detected by URL hash before auto-pin can create a plaintext duplicate', async () => {
   let saveCalls = 0;
   const protectedUrlChecks: string[] = [];

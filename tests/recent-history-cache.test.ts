@@ -198,11 +198,55 @@ test('RecentHistoryCache.addWithOverflow reports auto-pin candidates while retai
     'overflow remains transient until the durable save succeeds',
   );
 
-  cache.removeSiteItems('https://a.test/page', ['1']);
+  cache.removeItems('https://a.test/page', ['1']);
   assert.deepEqual(
     cache.load('https://a.test/page', settings, true).map((item) => item.id),
     ['2'],
   );
+});
+
+test('RecentHistoryCache selects auto-pin overflow from the requested page scope', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 1,
+    recentHistoryRetainedLimit: 3,
+    recentHistoryOverflowBehavior: 'auto-pin' as const,
+  };
+
+  cache.addWithOverflow('https://a.test/gallery', record('gallery-1'), settings, 'page');
+  const otherPage = cache.addWithOverflow('https://a.test/details', record('details-1'), settings, 'page');
+  const galleryOverflow = cache.addWithOverflow('https://a.test/gallery', record('gallery-2'), settings, 'page');
+
+  assert.deepEqual(otherPage.overflowCandidates, [], 'an entry visible on another page is not overflow');
+  assert.deepEqual(
+    galleryOverflow.overflowCandidates.map((item) => item.id),
+    ['gallery-1'],
+  );
+});
+
+test('RecentHistoryCache selects and removes auto-pin overflow across all sites', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 1,
+    recentHistoryRetainedLimit: 3,
+    recentHistoryOverflowBehavior: 'auto-pin' as const,
+  };
+
+  cache.addWithOverflow('https://a.test/gallery', record('a-1'), settings, 'all');
+  const added = cache.addWithOverflow('https://b.test/gallery', record('b-1'), settings, 'all');
+
+  assert.deepEqual(
+    added.overflowCandidates.map((item) => item.id),
+    ['a-1'],
+  );
+  cache.removeItems('https://b.test/gallery', ['a-1'], 'all');
+  assert.deepEqual(
+    cache.load('https://b.test/gallery', settings, true, 'all').map((item) => item.id),
+    ['b-1'],
+  );
+  assert.deepEqual(cache.load('https://a.test/gallery', settings, true, 'site'), []);
 });
 
 test('RecentHistoryCache keeps an auto-pin transaction slot when visible and retained limits are equal', () => {

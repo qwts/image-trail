@@ -123,19 +123,33 @@ export class RecentHistoryCache {
       items: this.load(pageUrl, settings, includeRetained, scope),
       overflowCandidates:
         settings.recentHistoryOverflowBehavior === 'auto-pin'
-          ? candidates.slice(settings.recentHistoryLimit).map((candidate) => candidate.item)
+          ? this.entriesFor(pageUrl, scope, candidates)
+              .slice(settings.recentHistoryLimit)
+              .map((candidate) => candidate.item)
           : [],
     };
   }
 
-  removeSiteItems(pageUrl: string, ids: readonly string[]): void {
+  removeItems(pageUrl: string, ids: readonly string[], scope: RecentHistoryScope = DEFAULT_RECENT_HISTORY_SCOPE): void {
     if (ids.length === 0) return;
-    const key = recentHistorySiteKey(pageUrl);
+    const siteKey = recentHistorySiteKey(pageUrl);
     const removed = new Set(ids);
-    this.bySite.set(
-      key,
-      (this.bySite.get(key) ?? []).filter((entry) => !removed.has(entry.item.id)),
-    );
+    const globalUrls =
+      scope === 'all'
+        ? new Set(
+            [...this.bySite.values()]
+              .flat()
+              .filter((entry) => removed.has(entry.item.id))
+              .map((entry) => entry.item.url),
+          )
+        : undefined;
+    for (const [key, entries] of this.bySite) {
+      if (scope !== 'all' && key !== siteKey) continue;
+      this.bySite.set(
+        key,
+        entries.filter((entry) => !removed.has(entry.item.id) && !globalUrls?.has(entry.item.url)),
+      );
+    }
     this.persist();
   }
 
@@ -202,14 +216,20 @@ export class RecentHistoryCache {
     return Array.from(this.bySite.values(), (entries) => entries.map((entry) => entry.item)).values();
   }
 
-  private entriesFor(pageUrl: string, scope: RecentHistoryScope): readonly RecentHistoryEntry[] {
-    const siteEntries = this.bySite.get(recentHistorySiteKey(pageUrl)) ?? [];
+  private entriesFor(
+    pageUrl: string,
+    scope: RecentHistoryScope,
+    currentSiteEntries = this.bySite.get(recentHistorySiteKey(pageUrl)) ?? [],
+  ): readonly RecentHistoryEntry[] {
+    const siteKey = recentHistorySiteKey(pageUrl);
+    const siteEntries = currentSiteEntries;
     if (scope === 'site') return siteEntries;
     if (scope === 'page') {
       const pageKey = recentHistoryPageKey(pageUrl);
       return siteEntries.filter((entry) => entry.pageKey === pageKey);
     }
-    return uniqueEntries([...this.bySite.values()].flat().sort((left, right) => right.sequence - left.sequence));
+    const allEntries = [...this.bySite.entries()].flatMap(([key, entries]) => (key === siteKey ? currentSiteEntries : entries));
+    return uniqueEntries(allEntries.sort((left, right) => right.sequence - left.sequence));
   }
 
   private async hydrate(): Promise<void> {
