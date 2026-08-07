@@ -27,8 +27,7 @@ export function createHistoryView(
   const scope = options?.scope ?? DEFAULT_RECENT_HISTORY_SCOPE;
   const header = createHistoryHeader(sectionOpen, collapsible, dispatch);
   const scopeRow = createHistoryScopeRow(scope, options, dispatch);
-  const sectionActions = document.createElement('div');
-  sectionActions.className = 'image-trail-panel__section-actions image-trail-panel__history-actions';
+  const sectionActions = createHistorySectionActions(options, dispatch);
   if (displayItems.length > 0) {
     const selectAll = document.createElement('button');
     selectAll.type = 'button';
@@ -213,13 +212,36 @@ export function createHistoryView(
       ? `${selectedIds.length} recent item(s) selected for export.`
       : 'Cmd/Ctrl-click rows to select recent items for export. Shift-click selects a range.';
   section.append(header, scopeRow);
-  if (displayItems.length) section.append(sectionActions);
+  if (displayItems.length || options?.reviewingSession || options?.sessionReviewAvailable) section.append(sectionActions);
   // Collapsed (#438): the heading and bulk-action rows stay; the list content hides.
   if (sectionOpen) {
     section.append(displayItems.length ? selectionMeta : empty);
     if (displayItems.length) section.append(list);
   }
   return section;
+}
+
+function createHistorySectionActions(options: HistoryViewOptions | undefined, dispatch: (action: HistoryAction) => void): HTMLElement {
+  const actions = document.createElement('div');
+  actions.className = 'image-trail-panel__section-actions image-trail-panel__history-actions';
+  const reviewSession = createSessionReviewButton(options, dispatch);
+  if (reviewSession) actions.append(reviewSession);
+  return actions;
+}
+
+function createSessionReviewButton(
+  options: HistoryViewOptions | undefined,
+  dispatch: (action: HistoryAction) => void,
+): HTMLButtonElement | null {
+  if (!options?.sessionReviewAvailable && !options?.reviewingSession) return null;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = options.reviewingSession ? 'Finish review' : 'Review session';
+  button.setAttribute('aria-pressed', String(options.reviewingSession === true));
+  button.addEventListener('click', () =>
+    dispatch({ name: options.reviewingSession ? 'history/finish-session-review' : 'history/review-session' }),
+  );
+  return button;
 }
 
 function createHistoryHeader(sectionOpen: boolean, collapsible: boolean, dispatch: (action: HistoryAction) => void): HTMLElement {

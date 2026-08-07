@@ -10,14 +10,12 @@ import type { FieldTransformPanelAction } from './field-transform-panel-action.j
 import type { UrlTemplatePanelAction } from './url/panel-actions.js';
 import type { UrlFieldDigitWidthSpec, UrlFieldSplitSpec } from './url/types.js';
 import type { ObjectFitMode } from './preview-style.js';
-import type { QueueDisplayOrder, RecentDisplayOrder } from './display-order.js';
 import type { DetachableSectionId } from './workspace-layout.js';
 import type { PCloudBackupState } from './cloud/pcloud-provider.js';
 import type { PageContext, PageContextState } from './page-context.js';
 import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePreviewState } from './import-types.js';
 import type { WorkspacePanelAction } from './workspace-actions.js';
-import type { RecentHistoryScope } from './recent-history-scope.js';
-import type { LibraryPanelState, RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
+import type { LibraryPanelState, LibraryPreferencePanelAction } from './library-panel-state.js';
 import type { SessionInactivityTimeoutMinutes } from './secure-session-policy.js';
 import type { SecureSessionPanelAction } from './secure-session-actions.js';
 import type { ParsedFieldResetBaseline, ParsedFieldStateRecord } from './parsed-field-state-types.js';
@@ -430,8 +428,7 @@ export type PanelAction =
       readonly id: string;
     }
   | { readonly name: 'history/mark-pinned'; readonly id: string; readonly pinnedAt: string; readonly pinnedRecordId: string }
-  | { readonly name: 'history/update-display-order'; readonly order: RecentDisplayOrder }
-  | { readonly name: 'history/update-scope'; readonly scope: RecentHistoryScope }
+  | LibraryPreferencePanelAction
   | { readonly name: 'selection/select-visible' }
   | { readonly name: 'history-selection/toggle' | 'bookmark-selection/toggle' | 'bookmark-selection/single'; readonly id: string }
   | {
@@ -450,21 +447,12 @@ export type PanelAction =
       readonly hasOlder: boolean;
       readonly hasNewer: boolean;
     }
-  | { readonly name: 'bookmarks/update-display-order'; readonly order: QueueDisplayOrder }
   | { readonly name: 'history/load' | 'history/download' }
   | { readonly name: 'panel/secondary-controls-open'; readonly open: boolean }
   | { readonly name: 'destination/select' | 'destination/open-tab'; readonly destination: PanelDestinationId }
   | { readonly name: 'panel/history-section-open'; readonly open: boolean }
   | { readonly name: 'panel/bookmarks-section-open'; readonly open: boolean }
   | WorkspacePanelAction
-  | { readonly name: 'settings/update-visible-bookmark-soft-max'; readonly value: number }
-  | {
-      readonly name: 'settings/update-recent-history-retention';
-      readonly limit: number;
-      readonly retainedLimit: number;
-      readonly overflowBehavior: RecentHistoryOverflowBehavior;
-    }
-  | { readonly name: 'settings/update-recent-sparse-row-display-mode'; readonly mode: RecentSparseRowDisplayMode }
   | { readonly name: 'settings/update-pin-save-storage-preference'; readonly value: PinSaveStoragePreference }
   | SecureSessionPanelAction
   | { readonly name: 'settings/update-privacy-mode'; readonly enabled: boolean }

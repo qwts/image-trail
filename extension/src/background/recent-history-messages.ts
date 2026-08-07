@@ -4,13 +4,14 @@ import { MESSAGE_PROTOCOL_VERSION, MessageType, hasVersionedObjectShape } from '
 
 interface RecentHistoryRequestPayload {
   readonly pageUrl: string;
+  readonly includeRetained?: boolean | undefined;
   readonly scope?: RecentHistoryScope | undefined;
 }
 
 export interface LoadRecentHistoryMessage {
   readonly type: typeof MessageType.LoadRecentHistory;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: RecentHistoryRequestPayload & { readonly includeRetained?: boolean | undefined };
+  readonly payload: RecentHistoryRequestPayload;
 }
 
 export interface LoadRecentHistoryResultMessage {
@@ -74,7 +75,7 @@ export function createLoadRecentHistoryResultMessage(items: readonly ImageDispla
 export function createAddRecentHistoryMessage(
   pageUrl: string,
   item: ImageDisplayRecord,
-  options: { readonly scope?: RecentHistoryScope } = {},
+  options: { readonly includeRetained?: boolean; readonly scope?: RecentHistoryScope } = {},
 ): AddRecentHistoryMessage {
   return { type: MessageType.AddRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl, item, ...options } };
 }
@@ -86,7 +87,7 @@ export function createAddRecentHistoryResultMessage(items: readonly ImageDisplay
 export function createUpdateRecentHistoryMessage(
   pageUrl: string,
   item: ImageDisplayRecord,
-  options: { readonly scope?: RecentHistoryScope } = {},
+  options: { readonly includeRetained?: boolean; readonly scope?: RecentHistoryScope } = {},
 ): UpdateRecentHistoryMessage {
   return { type: MessageType.UpdateRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl, item, ...options } };
 }
@@ -98,7 +99,7 @@ export function createUpdateRecentHistoryResultMessage(items: readonly ImageDisp
 export function createRemoveRecentHistoryMessage(
   pageUrl: string,
   id: string,
-  options: { readonly scope?: RecentHistoryScope } = {},
+  options: { readonly includeRetained?: boolean; readonly scope?: RecentHistoryScope } = {},
 ): RemoveRecentHistoryMessage {
   return { type: MessageType.RemoveRecentHistory, version: MESSAGE_PROTOCOL_VERSION, payload: { pageUrl, id, ...options } };
 }

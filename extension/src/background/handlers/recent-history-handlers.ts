@@ -44,7 +44,13 @@ export function createRecentHistoryMessageRegistry({
   async function handleAddRecentHistory(message: AddRecentHistoryMessage): Promise<AddRecentHistoryResultMessage['payload']> {
     await recentHistoryCache.ready();
     const settings = await loadLocalSettings();
-    const items = recentHistoryCache.add(message.payload.pageUrl, message.payload.item, settings, message.payload.scope);
+    const items = recentHistoryCache.add(
+      message.payload.pageUrl,
+      message.payload.item,
+      settings,
+      message.payload.scope,
+      message.payload.includeRetained ?? false,
+    );
     await recentHistoryCache.flush();
     return { items };
   }
@@ -52,7 +58,13 @@ export function createRecentHistoryMessageRegistry({
   async function handleUpdateRecentHistory(message: UpdateRecentHistoryMessage): Promise<UpdateRecentHistoryResultMessage['payload']> {
     await recentHistoryCache.ready();
     const settings = await loadLocalSettings();
-    const items = recentHistoryCache.update(message.payload.pageUrl, message.payload.item, settings, message.payload.scope);
+    const items = recentHistoryCache.update(
+      message.payload.pageUrl,
+      message.payload.item,
+      settings,
+      message.payload.scope,
+      message.payload.includeRetained ?? false,
+    );
     await recentHistoryCache.flush();
     return { items };
   }
@@ -60,7 +72,13 @@ export function createRecentHistoryMessageRegistry({
   async function handleRemoveRecentHistory(message: RemoveRecentHistoryMessage): Promise<RemoveRecentHistoryResultMessage['payload']> {
     await recentHistoryCache.ready();
     const settings = await loadLocalSettings();
-    const items = recentHistoryCache.remove(message.payload.pageUrl, message.payload.id, settings, message.payload.scope);
+    const items = recentHistoryCache.remove(
+      message.payload.pageUrl,
+      message.payload.id,
+      settings,
+      message.payload.scope,
+      message.payload.includeRetained ?? false,
+    );
     await recentHistoryCache.flush();
     return { items };
   }

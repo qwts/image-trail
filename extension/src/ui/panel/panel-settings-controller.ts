@@ -31,7 +31,7 @@ export interface PanelSettingsControllerDeps {
   render(): void;
   renderPanelAndRefreshRecall(): void;
   loadBookmarkPage(offset: number, options?: { readonly render?: boolean }): Promise<void>;
-  loadRecentHistory(options?: { readonly render?: boolean }): Promise<void>;
+  loadRecentHistory(options?: { readonly render?: boolean; readonly includeRetained?: boolean }): Promise<void>;
   // Parsed-field navigation helpers stay panel-owned (the nav queue slice consumes them too); only
   // `preloadMoreNeighbors` reaches them here.
   currentNavigationBaseModel(): ParsedUrlModel;
@@ -84,6 +84,7 @@ export class PanelSettingsController {
       recentHistoryLimit: settings.recentHistoryLimit,
       recentHistoryRetainedLimit: settings.recentHistoryRetainedLimit,
       recentHistoryOverflowBehavior: settings.recentHistoryOverflowBehavior,
+      reviewingRecentSession: false,
       recentSparseRowDisplayMode: settings.recentSparseRowDisplayMode,
       recentDisplayOrder: settings.recentDisplayOrder,
       pinSaveStoragePreference: settings.pinSaveStoragePreference,

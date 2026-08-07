@@ -24,7 +24,7 @@ export class RecentHistoryStore {
   async add(
     item: ImageDisplayRecord,
     pageUrl = window.location.href,
-    options: { readonly scope?: RecentHistoryScope } = {},
+    options: { readonly includeRetained?: boolean; readonly scope?: RecentHistoryScope } = {},
   ): Promise<readonly ImageDisplayRecord[]> {
     const response = await sendRuntimeMessage(createAddRecentHistoryMessage(pageUrl, item, options));
     return isAddRecentHistoryResultMessage(response) ? response.payload.items : [item];
@@ -33,7 +33,7 @@ export class RecentHistoryStore {
   async update(
     item: ImageDisplayRecord,
     pageUrl = window.location.href,
-    options: { readonly scope?: RecentHistoryScope } = {},
+    options: { readonly includeRetained?: boolean; readonly scope?: RecentHistoryScope } = {},
   ): Promise<readonly ImageDisplayRecord[]> {
     const response = await sendRuntimeMessage(createUpdateRecentHistoryMessage(pageUrl, item, options));
     return isUpdateRecentHistoryResultMessage(response) ? response.payload.items : [];
@@ -42,7 +42,7 @@ export class RecentHistoryStore {
   async remove(
     id: string,
     pageUrl = window.location.href,
-    options: { readonly scope?: RecentHistoryScope } = {},
+    options: { readonly includeRetained?: boolean; readonly scope?: RecentHistoryScope } = {},
   ): Promise<readonly ImageDisplayRecord[]> {
     const response = await sendRuntimeMessage(createRemoveRecentHistoryMessage(pageUrl, id, options));
     return isRemoveRecentHistoryResultMessage(response) ? response.payload.items : [];

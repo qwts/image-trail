@@ -95,6 +95,7 @@ export class RecentHistoryCache {
     item: ImageDisplayRecord,
     settings: PlaintextLocalSettings,
     scope: RecentHistoryScope = DEFAULT_RECENT_HISTORY_SCOPE,
+    includeRetained = false,
   ): readonly ImageDisplayRecord[] {
     const key = recentHistorySiteKey(pageUrl);
     const entry = { item, pageKey: recentHistoryPageKey(pageUrl), sequence: (this.sequence += 1) };
@@ -104,7 +105,7 @@ export class RecentHistoryCache {
     ].slice(0, retainedLimit(settings));
     this.bySite.set(key, next);
     this.persist();
-    return this.load(pageUrl, settings, false, scope);
+    return this.load(pageUrl, settings, includeRetained, scope);
   }
 
   update(
@@ -112,6 +113,7 @@ export class RecentHistoryCache {
     item: ImageDisplayRecord,
     settings: PlaintextLocalSettings,
     scope: RecentHistoryScope = DEFAULT_RECENT_HISTORY_SCOPE,
+    includeRetained = false,
   ): readonly ImageDisplayRecord[] {
     for (const [key, entries] of this.bySite) {
       const index = entries.findIndex((entry) => entry.item.id === item.id);
@@ -123,7 +125,7 @@ export class RecentHistoryCache {
       this.persist();
       break;
     }
-    return this.load(pageUrl, settings, false, scope);
+    return this.load(pageUrl, settings, includeRetained, scope);
   }
 
   remove(
@@ -131,6 +133,7 @@ export class RecentHistoryCache {
     id: string,
     settings: PlaintextLocalSettings,
     scope: RecentHistoryScope = DEFAULT_RECENT_HISTORY_SCOPE,
+    includeRetained = false,
   ): readonly ImageDisplayRecord[] {
     const pageKey = recentHistoryPageKey(pageUrl);
     const siteKey = recentHistorySiteKey(pageUrl);
@@ -153,7 +156,7 @@ export class RecentHistoryCache {
       );
     }
     this.persist();
-    return this.load(pageUrl, settings, false, scope);
+    return this.load(pageUrl, settings, includeRetained, scope);
   }
 
   pruneForSettings(settings: PlaintextLocalSettings): void {

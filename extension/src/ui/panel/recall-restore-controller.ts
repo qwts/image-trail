@@ -57,7 +57,7 @@ export interface RecallRestoreControllerDeps {
   render(): void;
   renderPanelAndRefreshRecall(): void;
   loadBookmarkPage(offset: number, options?: { readonly render?: boolean }): Promise<void>;
-  loadRecentHistory(options?: { readonly render?: boolean }): Promise<void>;
+  loadRecentHistory(options?: { readonly render?: boolean; readonly includeRetained?: boolean }): Promise<void>;
   refreshStorageUsage(options?: { readonly render?: boolean }): Promise<void>;
   addImportedImage(file: RecordLibraryImportInput, captured?: CapturedImportedMedia): Promise<boolean>;
   getLocalSettings(): PlaintextLocalSettings;

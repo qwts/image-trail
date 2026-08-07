@@ -11,6 +11,7 @@ export type HistoryAction =
   | { readonly name: 'history-selection/clear' }
   | { readonly name: 'history/update-display-order'; readonly order: RecentDisplayOrder }
   | { readonly name: 'history/update-scope'; readonly scope: RecentHistoryScope }
+  | { readonly name: 'history/review-session' | 'history/finish-session-review' }
   | { readonly name: 'capture/request'; readonly url: string; readonly sourceType: 'history'; readonly sourceRecordId: string }
   | { readonly name: 'capture/preview'; readonly url: string; readonly blobId?: string | undefined }
   | { readonly name: 'panel/history-section-open'; readonly open: boolean }
@@ -27,4 +28,6 @@ export interface HistoryViewOptions {
   readonly privacyMode?: boolean;
   readonly scope?: RecentHistoryScope;
   readonly pageUrl?: string;
+  readonly reviewingSession?: boolean;
+  readonly sessionReviewAvailable?: boolean;
 }

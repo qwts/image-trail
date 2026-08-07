@@ -70,7 +70,7 @@ export interface PanelActionDeps {
   removeBookmark(id: string): Promise<void>;
   openDestination(destination: PanelDestinationId): Promise<void>;
   loadBookmarkPage(offset: number, options?: { readonly render?: boolean }): Promise<void>;
-  loadRecentHistory(options?: { readonly render?: boolean }): Promise<void>;
+  loadRecentHistory(options?: { readonly render?: boolean; readonly includeRetained?: boolean }): Promise<void>;
   refreshBookmarkThumbnails(): Promise<void>;
   deleteVisibleBookmarks(): Promise<void>;
   deleteRecallBookmarks(): Promise<void>;

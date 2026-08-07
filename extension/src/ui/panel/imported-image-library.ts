@@ -3,6 +3,7 @@ import type { BookmarkStore, ImportedImageFile } from '../../core/types.js';
 import { bookmarkSaveMessage } from './record-export-helpers.js';
 import { createImportedMediaRecords, type CapturedImportedMedia } from './imported-media-record.js';
 import { addProtectedImportedImageToLibrary, type ProtectedImageImportLibraryDeps } from './protected-image-import-controller.js';
+import { recentHistoryAfterMutation, recentHistoryMutationProjection } from './recent-history-mutation-projection.js';
 
 export type RecordLibraryImportInput = ImportedImageFile | { readonly durableRecord: ImageDisplayRecord };
 
@@ -22,12 +23,19 @@ export async function addImportedImageToLibrary(
   const bookmark = bookmarkStore ? await bookmarkStore.save(records.bookmark) : records.bookmark;
   const historyItem = { ...records.history, pinnedRecordId: bookmark.id, pinnedAt: bookmark.queueUpdatedAt ?? bookmark.timestamp };
   const recentHistoryStore = deps.recentHistoryStore();
+  const stateBeforeHistoryAdd = deps.getState();
+  const historyProjection = recentHistoryMutationProjection(stateBeforeHistoryAdd);
+  const reviewLimit = historyProjection.includeRetained
+    ? stateBeforeHistoryAdd.recentHistoryRetainedLimit
+    : stateBeforeHistoryAdd.recentHistoryLimit;
   const history = recentHistoryStore
-    ? await recentHistoryStore.add(historyItem, window.location.href, { scope: deps.getState().recentHistoryScope })
+    ? await recentHistoryStore.add(historyItem, window.location.href, {
+        ...historyProjection,
+      })
     : [historyItem, ...deps.getState().history];
   deps.setState({
     ...deps.getState(),
-    history: history.slice(0, 30),
+    history: recentHistoryAfterMutation(deps.getState(), historyProjection, history, reviewLimit),
     message: bookmarkSaveMessage(bookmark, bookmark.label ?? file.name),
     lastUpdatedAt: Date.now(),
   });

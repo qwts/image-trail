@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { PanelAction } from '../../extension/src/core/types.js';
 import { createRecentsSettingsView } from '../../extension/src/ui/components/recents-settings-view.js';
 
-test('recents settings dispatches retention, reveal, and sparse layout actions', () => {
+test('recents settings dispatches retention, transient review, and sparse layout actions (#209)', () => {
   const actions: PanelAction[] = [];
   const view = createRecentsSettingsView(
     { limit: 2, retainedLimit: 3, overflowBehavior: 'keep-session', sparseRowDisplayMode: 'adaptive' },
@@ -25,12 +25,7 @@ test('recents settings dispatches retention, reveal, and sparse layout actions',
     overflowBehavior: 'drop-oldest',
   });
   view.querySelector<HTMLButtonElement>('button[type="button"]')!.click();
-  assert.deepEqual(actions.at(-1), {
-    name: 'settings/update-recent-history-retention',
-    limit: 3,
-    retainedLimit: 3,
-    overflowBehavior: 'keep-session',
-  });
+  assert.deepEqual(actions.at(-1), { name: 'history/review-session' });
   const sparse = selects.find((select) => Array.from(select.options).some((option) => option.value === 'adaptive'));
   assert.ok(sparse);
   sparse.value = 'compact';

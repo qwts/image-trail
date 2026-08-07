@@ -22,6 +22,8 @@ export type LibraryActionName =
   | 'history-selection/select'
   | 'history-selection/clear'
   | 'history/update-scope'
+  | 'history/review-session'
+  | 'history/finish-session-review'
   | 'bookmark-selection/toggle'
   | 'bookmark-selection/single'
   | 'bookmark-selection/select'
@@ -45,13 +47,27 @@ function updateHistoryScopeAction(deps: PanelActionDeps): ActionEntries<'history
   };
 }
 
+function reviewRecentSessionAction(deps: PanelActionDeps, includeRetained: boolean): AnyActionDef {
+  return {
+    handle(action) {
+      if (deps.getState().reviewingRecentSession === includeRetained) return;
+      deps.reduce(action);
+      void deps.loadRecentHistory({ includeRetained, render: false }).then(() => deps.render());
+    },
+  };
+}
+
 function actionDef(handle: AnyActionDef['handle']): AnyActionDef {
   return { handle };
 }
 
+function primaryLibraryActions(deps: PanelActionDeps): Pick<ActionEntries<LibraryActionName>, 'pin/current' | 'bookmark/current'> {
+  const bookmarkCurrent = actionDef(() => void deps.bookmarkCurrentImage());
+  return { 'pin/current': bookmarkCurrent, 'bookmark/current': bookmarkCurrent };
+}
+
 /** Recent history, bookmarks, and row selection. Bodies moved verbatim from the panel dispatch chain. */
 export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<LibraryActionName> {
-  const bookmarkCurrent = actionDef(() => void deps.bookmarkCurrentImage());
   const reduceAndRender: AnyActionDef = {
     handle(action) {
       deps.reduce(action);
@@ -65,8 +81,7 @@ export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<
     },
   };
   return {
-    'pin/current': bookmarkCurrent,
-    'bookmark/current': bookmarkCurrent,
+    ...primaryLibraryActions(deps),
     'history/remove': {
       handle(action) {
         clearMatchingCaptureRetry(deps, 'history', [action.id]);
@@ -80,6 +95,8 @@ export function buildLibraryActionEntries(deps: PanelActionDeps): ActionEntries<
       },
     },
     'history/update-scope': updateHistoryScopeAction(deps),
+    'history/review-session': reviewRecentSessionAction(deps, true),
+    'history/finish-session-review': reviewRecentSessionAction(deps, false),
     'history/pin': {
       handle(action) {
         void deps.pinRecentHistory(action.id);

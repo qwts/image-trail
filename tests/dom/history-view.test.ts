@@ -288,6 +288,35 @@ test('Recents places sorting beside scope below the title row (#448/#754)', () =
   assert.ok(view.querySelector('.image-trail-panel__history-actions'), 'bulk actions stay outside the constrained header grid');
 });
 
+test('session review is explicit and exposes a Finish review path without pinning (#209)', () => {
+  const actions: unknown[] = [];
+  const reviewAvailable = createHistoryView([record], [], false, true, (action) => actions.push(action), {
+    blobKeyAvailable: true,
+    listBlockSize: null,
+    onListResize: () => undefined,
+    sparseRowDisplayMode: 'adaptive',
+    sessionReviewAvailable: true,
+  });
+  buttonByText(reviewAvailable, 'Review session').click();
+  assert.deepEqual(actions, [{ name: 'history/review-session' }]);
+  assert.equal(
+    actions.some((action) => (action as { name?: string }).name === 'history/pin'),
+    false,
+  );
+
+  const reviewing = createHistoryView([record], [], false, true, (action) => actions.push(action), {
+    blobKeyAvailable: true,
+    listBlockSize: null,
+    onListResize: () => undefined,
+    sparseRowDisplayMode: 'adaptive',
+    reviewingSession: true,
+  });
+  const finish = buttonByText(reviewing, 'Finish review');
+  assert.equal(finish.getAttribute('aria-pressed'), 'true');
+  finish.click();
+  assert.deepEqual(actions.at(-1), { name: 'history/finish-session-review' });
+});
+
 test('Recents scope control labels the current page/site, dispatches changes, and hides private URL metadata', () => {
   const actions: unknown[] = [];
   const view = createHistoryView([], [], false, true, (action) => actions.push(action), {
