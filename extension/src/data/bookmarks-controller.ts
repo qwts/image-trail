@@ -29,16 +29,17 @@ import { BookmarksRepository } from './repositories/bookmarks-repository.js';
 import { EncryptedPinsRepository, type EncryptedPinRecord } from './repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from './repositories/encrypted-pin-thumbnails-repository.js';
 import { KeysRepository } from './repositories/keys-repository.js';
-import type { DurableBookmarkPayloadV1, ProtectedPinRelationshipV1 } from './types.js';
+import type { DurableBookmarkPayloadV1 } from './types.js';
 import {
+  BookmarkPersistenceError,
   type BookmarkPersistenceOptions,
   clampPageOffset,
-  dataUrlToBytes,
   filterByVisibilityScope,
   isVisibleInScope,
   preserveImportedBookmarkMetadata,
   protectedImportOptions,
   removeReplacedOriginal,
+  saveProtectedThumbnail,
   withProtectedPinSaveLock,
 } from './bookmark-controller-helpers.js';
 export { recordQueueTime } from './bookmark-controller-helpers.js';
@@ -216,7 +217,11 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         record: await this.saveWithContext(context, bookmark, protectedImportOptions(activeBlobKey)),
       };
     } catch (error) {
-      return { ok: false as const, message: error instanceof Error ? error.message : 'Bookmark save failed.' };
+      return {
+        ok: false as const,
+        message: error instanceof Error ? error.message : 'Bookmark save failed.',
+        durableMetadataCommitted: error instanceof BookmarkPersistenceError && error.durableMetadataCommitted,
+      };
     }
   }
 
@@ -555,12 +560,14 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
       : bookmark;
     const queueUpdatedAt = existingPlain?.queueUpdatedAt ?? existingProtected?.queueUpdatedAt ?? bookmark.timestamp;
     let thumbnail: { readonly id: string } | null = null;
+    let protectedRecordCommitted = false;
+    let relationshipCommitted = false;
     try {
       const bookmarkWithThumbnail =
         options.preserveExistingThumbnail && !savedBookmark.thumbnail && existingPlainPayload?.thumbnail
           ? { ...savedBookmark, thumbnail: existingPlainPayload.thumbnail }
           : savedBookmark;
-      thumbnail = await this.saveProtectedThumbnail(
+      thumbnail = await saveProtectedThumbnail(
         context,
         bookmarkWithThumbnail,
         activeBlobKey,
@@ -588,6 +595,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         keyReference: activeBlobKey.reference,
         now: existingProtected?.envelope.updatedAt,
       });
+      protectedRecordCommitted = true;
       const relationship = protectedRelationship({
         plainPinId,
         encryptedPinId,
@@ -607,38 +615,26 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
         privatePinUrl(plainPinId),
         queueUpdatedAt,
       );
+      relationshipCommitted = true;
       await removeReplacedOriginal(context, existingPlainPayload, relationship.storedOriginalBlobId);
       this.invalidateMergedRecordsCache();
       return this.openProtectedDisplayRecord(context, protectedRecord, activeBlobKey);
     } catch (error) {
+      let durableMetadataCommitted = relationshipCommitted || (!!existingProtected && protectedRecordCommitted);
       const existingThumbnailId = existingPlainPayload?.protectedPin?.encryptedThumbnailId;
-      if (thumbnail?.id && thumbnail.id !== existingThumbnailId) await context.encryptedThumbnails.remove(thumbnail.id);
-      if (!existingProtected) await context.encryptedPins.remove(encryptedPinId);
+      if (!durableMetadataCommitted && thumbnail?.id && thumbnail.id !== existingThumbnailId) {
+        await context.encryptedThumbnails.remove(thumbnail.id).catch(() => undefined);
+      }
+      if (!durableMetadataCommitted && !existingProtected && protectedRecordCommitted) {
+        try {
+          await context.encryptedPins.remove(encryptedPinId);
+        } catch {
+          durableMetadataCommitted = true;
+        }
+      }
       this.invalidateMergedRecordsCache();
-      throw error;
+      throw new BookmarkPersistenceError(error instanceof Error ? error.message : 'Bookmark save failed.', durableMetadataCommitted);
     }
-  }
-
-  private async saveProtectedThumbnail(
-    context: BookmarkContext,
-    bookmark: ImageDisplayRecord,
-    activeBlobKey: ActiveBlobKey,
-    plainPinId: string,
-    existing?: ProtectedPinRelationshipV1,
-  ): Promise<{ readonly id: string } | null> {
-    if (!bookmark.thumbnail?.startsWith('data:image/')) return null;
-    const parsed = dataUrlToBytes(bookmark.thumbnail);
-    if (!parsed) return null;
-    const id = existing?.encryptedThumbnailId ?? crypto.randomUUID();
-    await context.encryptedThumbnails.sealAndPut({
-      id,
-      pinId: plainPinId,
-      mimeType: parsed.mimeType,
-      bytes: parsed.bytes,
-      key: activeBlobKey.key,
-      keyReference: activeBlobKey.reference,
-    });
-    return { id };
   }
 
   private async openProtectedDisplayRecord(

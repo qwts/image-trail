@@ -5,7 +5,9 @@ import { openEncryptedImageFile, parseEncryptedImageFileHeader } from '../data/i
 import { BlobsRepository } from '../data/repositories/blobs-repository.js';
 import type { StoredBlobRecord } from '../data/types.js';
 
-type BookmarkSaveResult = { readonly ok: true; readonly record: ImageDisplayRecord } | { readonly ok: false; readonly message: string };
+type BookmarkSaveResult =
+  | { readonly ok: true; readonly record: ImageDisplayRecord }
+  | { readonly ok: false; readonly message: string; readonly durableMetadataCommitted?: boolean };
 
 export type DurableEncryptedImageImportResult =
   | { readonly ok: true; readonly fileName: string; readonly record: ImageDisplayRecord }
@@ -118,7 +120,7 @@ export async function importEncryptedImageToDurableStorage(
     });
     const saved = await deps.saveBookmark(draft, activeBlobKey);
     if (!saved.ok) {
-      await blobs.remove(blobId);
+      if (!saved.durableMetadataCommitted) await blobs.remove(blobId);
       blobStored = false;
       return { ok: false, reason: 'durable-save-failed', message: saved.message };
     }

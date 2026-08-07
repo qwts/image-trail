@@ -2,7 +2,9 @@ import { createDisplayRecord, type ImageDisplayRecord } from '../core/display-re
 import { queueTimeForRecord } from '../core/display-order.js';
 import type { BookmarkSaveOptions } from '../core/bookmark-save-options.js';
 import type { ActiveBlobKey } from './crypto/blob-keyring.js';
+import type { EncryptedPinThumbnailsRepository } from './repositories/encrypted-pin-thumbnails-repository.js';
 import type { DurableBookmarkPayloadV1, DurableEncryptedPinPayloadV1 } from './types.js';
+import type { ProtectedPinRelationshipV1 } from './types.js';
 
 export interface BookmarkPersistenceOptions extends BookmarkSaveOptions {
   readonly preserveExistingMetadata?: boolean | undefined;
@@ -63,6 +65,15 @@ export async function withProtectedPinSaveLock<T>(urlHash: string, work: () => P
   }
 }
 
+export class BookmarkPersistenceError extends Error {
+  constructor(
+    message: string,
+    readonly durableMetadataCommitted: boolean,
+  ) {
+    super(message);
+  }
+}
+
 export async function removeReplacedOriginal(
   context: { readonly blobs: { remove(id: string): Promise<void> } },
   previous: DurableBookmarkPayloadV1 | null,
@@ -102,4 +113,26 @@ export function dataUrlToBytes(dataUrl: string): { readonly mimeType: string; re
   } catch {
     return null;
   }
+}
+
+export async function saveProtectedThumbnail(
+  context: { readonly encryptedThumbnails: EncryptedPinThumbnailsRepository },
+  bookmark: ImageDisplayRecord,
+  activeBlobKey: ActiveBlobKey,
+  plainPinId: string,
+  existing?: ProtectedPinRelationshipV1,
+): Promise<{ readonly id: string } | null> {
+  if (!bookmark.thumbnail?.startsWith('data:image/')) return null;
+  const parsed = dataUrlToBytes(bookmark.thumbnail);
+  if (!parsed) return null;
+  const id = existing?.encryptedThumbnailId ?? crypto.randomUUID();
+  await context.encryptedThumbnails.sealAndPut({
+    id,
+    pinId: plainPinId,
+    mimeType: parsed.mimeType,
+    bytes: parsed.bytes,
+    key: activeBlobKey.key,
+    keyReference: activeBlobKey.reference,
+  });
+  return { id };
 }

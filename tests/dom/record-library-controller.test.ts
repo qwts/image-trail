@@ -60,9 +60,9 @@ function createHarness(
       historyRows = [record, ...historyRows.filter((row) => row.id !== record.id)];
       return historyRows;
     },
-    remove: async (id: string, pageUrl: string) => {
+    remove: async (id: string, pageUrl: string, removeOptions: Parameters<RecentHistoryStore['remove']>[2]) => {
       log.push(`historyRemove:${id}:${pageUrl}`);
-      if (options.removeRecentHistory) return options.removeRecentHistory(id, pageUrl);
+      if (options.removeRecentHistory) return options.removeRecentHistory(id, pageUrl, removeOptions);
       historyRows = historyRows.filter((row) => row.id !== id);
       return historyRows;
     },
@@ -254,6 +254,31 @@ test('deleteRecentHistory leaves linked durable originals intact', async () => {
     'removeCapturedBlobReference:blob-1:false',
     'refreshStorageUsage:true',
   ]);
+});
+
+test('deleteRecentHistory does not clear rows loaded after a review-mode transition', async () => {
+  let resolveRemove: ((rows: readonly ImageDisplayRecord[]) => void) | undefined;
+  let signalRemoveStarted: (() => void) | undefined;
+  const removeStarted = new Promise<void>((resolve) => (signalRemoveStarted = resolve));
+  const harness = createHarness({
+    removeRecentHistory: async () => {
+      signalRemoveStarted?.();
+      return new Promise((resolve) => (resolveRemove = resolve));
+    },
+  });
+  const visible = capturedHistoryRecord('visible');
+  const retained = capturedHistoryRecord('retained');
+  harness.patchState({ history: [visible], reviewingRecentSession: false });
+
+  const pendingDelete = harness.controller.deleteRecentHistory();
+  await removeStarted;
+  harness.patchState({ history: [visible, retained], reviewingRecentSession: true });
+  resolveRemove?.([]);
+  await pendingDelete;
+
+  assert.equal(harness.getState().reviewingRecentSession, true);
+  assert.deepEqual(harness.getState().history, [visible, retained]);
+  assert.equal(harness.log.includes('render'), false);
 });
 
 test('markRecentHistoryRowPinned updates the original transient row and prunes stale selections', async () => {
