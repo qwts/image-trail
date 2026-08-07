@@ -70,13 +70,13 @@
     "@changesets/parse": "^0.4.3",
     "@eslint/js": "^10.0.1",
     "@happy-dom/global-registrator": "^20.11.1",
-    "@playwright/test": "^1.62.0",
+    "@playwright/test": "^1.62.1",
     "@storybook/addon-vitest": "^10.5.3",
     "@storybook/html-vite": "^10.5.5",
     "@types/chrome": "^0.2.2",
     "@types/node": "^26.1.2",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
     "@vitest/browser-playwright": "^4.1.10",
@@ -96,7 +96,7 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0",
     "valibot": "^1.4.2",
-    "vite": "^8.1.5",
+    "vite": "^8.2.0",
     "vitest": "^4.1.10"
   },
   "overrides": {
@@ -114,7 +114,7 @@
     ]
   },
   "dependencies": {
-    "@noble/hashes": "2.0.1",
+    "@noble/hashes": "2.2.0",
     "events": "3.3.0",
     "mpegts.js": "1.8.0",
     "react": "^19.2.8",
