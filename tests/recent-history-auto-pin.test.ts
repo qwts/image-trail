@@ -153,6 +153,28 @@ test('failed auto-pin overflow remains in transient session storage for retry', 
   );
 });
 
+test('failed auto-pin remains retained when visible and retained limits are equal', async () => {
+  const equalLimits = { ...settings, recentHistoryRetainedLimit: settings.recentHistoryLimit };
+  const cache = new RecentHistoryCache();
+  const registry = createRecentHistoryMessageRegistry({
+    recentHistoryCache: cache,
+    loadLocalSettings: async () => equalLimits,
+    bookmarkStore: {
+      findByUrl: async () => null,
+      hasProtectedPinForUrl: async () => false,
+      saveResult: async () => ({ ok: false as const, message: 'storage unavailable' }),
+    },
+  });
+  await add(registry, 'one');
+  const response = await add(registry, 'two');
+
+  assert.equal(response.payload.autoPinStatus?.failedCount, 1);
+  assert.deepEqual(
+    cache.load(pageUrl, equalLimits, true).map((item) => item.id),
+    ['two', 'one'],
+  );
+});
+
 test('an existing durable pin is not re-saved or reordered', async () => {
   let saveCalls = 0;
   const registry = createRecentHistoryMessageRegistry({
@@ -174,6 +196,41 @@ test('an existing durable pin is not re-saved or reordered', async () => {
   assert.equal(response.payload.autoPinStatus, undefined);
   assert.deepEqual(
     response.payload.items.map((item) => item.id),
+    ['two'],
+  );
+});
+
+test('an imported data Recent reuses its linked durable pin without saving or reordering', async () => {
+  let saveCalls = 0;
+  const cache = new RecentHistoryCache();
+  const registry = createRecentHistoryMessageRegistry({
+    recentHistoryCache: cache,
+    loadLocalSettings: async () => settings,
+    bookmarkStore: {
+      findByUrl: async () => null,
+      hasProtectedPinForUrl: async () => false,
+      saveResult: async () => {
+        saveCalls += 1;
+        return { ok: false as const, message: 'must not save a linked pin again' };
+      },
+    },
+  });
+  const addEntry = registry[MessageType.AddRecentHistory] as MessageDef<ExtensionRequest, ExtensionResponse>;
+  const imported = createDisplayRecord({
+    id: 'recent-import',
+    url: 'data:image/png;base64,AQID',
+    timestamp: '2026-07-15T00:00:00.000Z',
+    pinnedRecordId: 'image-trail-import:bookmark-import',
+  });
+  await addEntry.handle(createAddRecentHistoryMessage(pageUrl, imported));
+  const response = addEntry.respond(
+    await addEntry.handle(createAddRecentHistoryMessage(pageUrl, record('two'))),
+  ) as AddRecentHistoryResultMessage;
+
+  assert.equal(saveCalls, 0);
+  assert.equal(response.payload.autoPinStatus, undefined);
+  assert.deepEqual(
+    cache.load(pageUrl, settings, true).map((item) => item.id),
     ['two'],
   );
 });

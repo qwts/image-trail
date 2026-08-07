@@ -142,6 +142,10 @@ async function promoteOverflowCandidates(
       failedCount += 1;
       continue;
     }
+    if (candidate.pinnedRecordId) {
+      removeIds.push(candidate.id);
+      continue;
+    }
     const existing = await bookmarkStore.findByUrl(candidate.url);
     const hasLockedProtectedPin = !existing && (await bookmarkStore.hasProtectedPinForUrl(candidate.url));
     if (existing || hasLockedProtectedPin) {
@@ -163,6 +167,7 @@ async function promoteOverflowCandidates(
 }
 
 function autoPinDraft(record: ImageDisplayRecord): ImageDisplayRecord {
+  const importedPinId = record.pinnedRecordId ?? record.id;
   const { pinnedAt, pinnedRecordId, queueUpdatedAt, pinSaveStorage, privacyStatus, protectedPin, ...unpinned } = record;
   void pinnedAt;
   void pinnedRecordId;
@@ -172,7 +177,7 @@ function autoPinDraft(record: ImageDisplayRecord): ImageDisplayRecord {
   void protectedPin;
   return createDisplayRecord({
     ...unpinned,
-    id: record.url.startsWith('data:image/') ? record.id : record.url,
+    id: record.url.startsWith('data:image/') ? importedPinId : record.url,
     timestamp: new Date().toISOString(),
     source: 'bookmark',
   });

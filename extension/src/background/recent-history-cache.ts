@@ -52,9 +52,7 @@ const recentHistorySessionStateSchema = v.object({
 });
 
 function retainedRecentHistory(items: readonly ImageDisplayRecord[], settings: PlaintextLocalSettings): readonly ImageDisplayRecord[] {
-  const limit =
-    settings.recentHistoryOverflowBehavior === 'drop-oldest' ? settings.recentHistoryLimit : settings.recentHistoryRetainedLimit;
-  return items.slice(0, limit);
+  return items.slice(0, retainedLimit(settings));
 }
 
 function visibleRecentHistory(items: readonly ImageDisplayRecord[], settings: PlaintextLocalSettings): readonly ImageDisplayRecord[] {
@@ -114,17 +112,18 @@ export class RecentHistoryCache {
   ): RecentHistoryAddOutcome {
     const key = recentHistorySiteKey(pageUrl);
     const entry = { item, pageKey: recentHistoryPageKey(pageUrl), sequence: (this.sequence += 1) };
-    const next = [
+    const candidates = [
       entry,
       ...(this.bySite.get(key) ?? []).filter((candidate) => candidate.item.url !== item.url && candidate.item.id !== item.id),
-    ].slice(0, retainedLimit(settings));
+    ];
+    const next = candidates.slice(0, retainedLimit(settings));
     this.bySite.set(key, next);
     this.persist();
     return {
       items: this.load(pageUrl, settings, includeRetained, scope),
       overflowCandidates:
         settings.recentHistoryOverflowBehavior === 'auto-pin'
-          ? next.slice(settings.recentHistoryLimit).map((candidate) => candidate.item)
+          ? candidates.slice(settings.recentHistoryLimit).map((candidate) => candidate.item)
           : [],
     };
   }
@@ -254,5 +253,9 @@ function uniqueEntries(entries: readonly RecentHistoryEntry[]): readonly RecentH
 }
 
 function retainedLimit(settings: PlaintextLocalSettings): number {
-  return settings.recentHistoryOverflowBehavior === 'drop-oldest' ? settings.recentHistoryLimit : settings.recentHistoryRetainedLimit;
+  if (settings.recentHistoryOverflowBehavior === 'drop-oldest') return settings.recentHistoryLimit;
+  // Auto-pin needs one bounded transaction slot beyond the configured retained rows. Without
+  // it, equal visible/retained limits discard the candidate before the durable save can finish,
+  // and a failed save cannot truthfully report that the Recent remains available for retry.
+  return settings.recentHistoryRetainedLimit + (settings.recentHistoryOverflowBehavior === 'auto-pin' ? 1 : 0);
 }

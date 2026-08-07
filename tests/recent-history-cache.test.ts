@@ -205,6 +205,30 @@ test('RecentHistoryCache.addWithOverflow reports auto-pin candidates while retai
   );
 });
 
+test('RecentHistoryCache keeps an auto-pin transaction slot when visible and retained limits are equal', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 2,
+    recentHistoryRetainedLimit: 2,
+    recentHistoryOverflowBehavior: 'auto-pin' as const,
+  };
+
+  cache.addWithOverflow('https://a.test/page', record('1'), settings);
+  cache.addWithOverflow('https://a.test/page', record('2'), settings);
+  const added = cache.addWithOverflow('https://a.test/page', record('3'), settings);
+
+  assert.deepEqual(
+    added.overflowCandidates.map((item) => item.id),
+    ['1'],
+  );
+  assert.deepEqual(
+    cache.load('https://a.test/page', settings, true).map((item) => item.id),
+    ['3', '2', '1'],
+    'the candidate remains in the bounded transaction slot until promotion is confirmed',
+  );
+});
+
 test('RecentHistoryCache.remove drops only the matching id', () => {
   const cache = new RecentHistoryCache();
   cache.add('https://a.test/page', record('1'), DEFAULT_LOCAL_SETTINGS);
