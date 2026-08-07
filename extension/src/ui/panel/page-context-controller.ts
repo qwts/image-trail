@@ -11,6 +11,8 @@ import {
 } from '../../core/page-context.js';
 import type { PanelState } from '../../core/types.js';
 
+declare const __IMAGE_TRAIL_PAGE_CONTEXT_SWITCHER_ENABLED__: boolean | undefined;
+
 interface RefreshObserver {
   start(): void;
   stop(): void;
@@ -20,6 +22,8 @@ export interface PageContextControllerEnvironment {
   detect(): PageContextDetection;
   hostname(): string;
   createObserver(onRefresh: () => void): RefreshObserver;
+  /** Test seam for the compile-time manual-override feature. */
+  overridesEnabled?: boolean;
 }
 
 export interface PageContextControllerDeps {
@@ -127,6 +131,7 @@ export class PageContextController {
   }
 
   setOverride(context: PageContext | null): void {
+    if (!this.overridesEnabled()) return;
     const state = this.deps.getState();
     if (context && !state.pageContext.available.includes(context)) return;
     this.scope = normalizePageContextScope(this.environment.hostname());
@@ -144,13 +149,18 @@ export class PageContextController {
     const nextScope = normalizePageContextScope(this.environment.hostname());
     const scopeChanged = nextScope !== this.scope;
     this.scope = nextScope;
-    const override = scopeChanged ? this.storedOverride() : this.deps.getState().pageContext.override;
+    const override = this.overridesEnabled() ? (scopeChanged ? this.storedOverride() : this.deps.getState().pageContext.override) : null;
     this.applyDetection(this.environment.detect(), override);
   }
 
   private storedOverride(): PageContext | null {
-    if (!this.scope) return null;
+    if (!this.overridesEnabled() || !this.scope) return null;
     return this.deps.getLocalSettings().pageContextOverrides[this.scope]?.context ?? null;
+  }
+
+  private overridesEnabled(): boolean {
+    if (this.environment.overridesEnabled !== undefined) return this.environment.overridesEnabled;
+    return typeof __IMAGE_TRAIL_PAGE_CONTEXT_SWITCHER_ENABLED__ !== 'boolean' || __IMAGE_TRAIL_PAGE_CONTEXT_SWITCHER_ENABLED__;
   }
 
   private applyDetection(detection: PageContextDetection, override: PageContext | null): void {

@@ -11,6 +11,7 @@ import {
 } from './fixtures.js';
 
 const viewport = { width: 924, height: 540 };
+const contextSwitcherEnabled = process.env['IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER'] !== '0';
 
 async function clearPageContextOverrides(serviceWorker: Worker): Promise<void> {
   await serviceWorker.evaluate(async () => {
@@ -20,6 +21,21 @@ async function clearPageContextOverrides(serviceWorker: Worker): Promise<void> {
     const settings = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : ((raw ?? {}) as Record<string, unknown>);
     await chrome.storage.local.set({ [key]: JSON.stringify({ ...settings, pageContextOverrides: {} }) });
   });
+}
+
+async function seedPageContextOverride(serviceWorker: Worker, context: 'single' | 'gallery' | 'feed'): Promise<void> {
+  await serviceWorker.evaluate(async (nextContext) => {
+    const key = 'imageTrail.localSettings';
+    const stored = await chrome.storage.local.get(key);
+    const raw = stored[key];
+    const settings = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : ((raw ?? {}) as Record<string, unknown>);
+    await chrome.storage.local.set({
+      [key]: JSON.stringify({
+        ...settings,
+        pageContextOverrides: { '127.0.0.1': { context: nextContext, updatedAt: Date.now() } },
+      }),
+    });
+  }, context);
 }
 
 async function hideBuildOverlay(page: Page): Promise<void> {
@@ -85,7 +101,17 @@ test.beforeEach(async ({ page, serviceWorker }) => {
 });
 
 test('automatically detects single and gallery contexts and supports a reversible override', async ({ page, serviceWorker }, testInfo) => {
+  if (!contextSwitcherEnabled) await seedPageContextOverride(serviceWorker, 'feed');
   await openPanel(page, serviceWorker, fixturePaths.singleImage);
+  if (!contextSwitcherEnabled) {
+    await expect(page.locator('.image-trail-page-context-root')).toHaveCount(0);
+    await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Single image');
+    expect(await storedOverride(serviceWorker)).toBe('feed');
+    await openPanel(page, serviceWorker, fixturePaths.multipleImages);
+    await expect(page.locator('.image-trail-page-context-root')).toHaveCount(0);
+    await expect(page.locator('.image-trail-panel__target-count')).toHaveText('Gallery page · 3 images');
+    return;
+  }
   await expect(page.getByRole('button', { name: 'Single image' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Gallery page' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Grab Mode' })).toHaveCount(0);
@@ -104,6 +130,7 @@ test('automatically detects single and gallery contexts and supports a reversibl
 });
 
 test('detects feed context and persists only an explicit per-host override', async ({ page, serviceWorker }, testInfo) => {
+  test.skip(!contextSwitcherEnabled, 'The production build intentionally omits manual page-context overrides.');
   await openPanel(page, serviceWorker, fixturePaths.feed);
   await expect(page.locator('.image-trail-page-context__status')).toHaveText('Automatic · Feed');
   await expect(page.locator('.image-trail-panel__feed-hint')).toHaveText('Turn on Grab mode, then click feed images to pin.');

@@ -1456,6 +1456,7 @@
           "paths": [
             "tests/page-context.test.ts",
             "tests/page-context-controller.test.ts",
+            "tests/release-artifacts.test.ts",
             "tests/data-crypto.test.ts",
             "tests/schema-validation.test.ts",
             "tests/action-dispatch.test.ts",
@@ -1464,17 +1465,17 @@
             "tests/dom/manual-controls-view.test.ts",
             "tests/dom/panel-mount.test.ts"
           ],
-          "notes": "Covers the capability model, semantic feed heuristics, gallery and single-image fallbacks, bounded normalized extension-owned override persistence, stale override behavior, action routing, React switcher accessibility, context-aware target labels and Grab hints, and mount lifecycle cleanup."
+          "notes": "Covers the capability model, semantic feed heuristics, gallery and single-image fallbacks, bounded normalized extension-owned override persistence, stale override behavior, action routing, React switcher accessibility, the fail-closed production build flag, context-aware target labels and Grab hints, and mount lifecycle cleanup."
         },
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/page-context.spec.ts",
-          "notes": "Covers packaged-extension auto-detection across single, gallery, and semantic-feed fixtures; disabled unsupported modes; context-aware target and Controls behavior; explicit override/reset; per-host persistence across reload; and deterministic artifacts for handoff screenshots 08 and 09."
+          "notes": "Covers packaged-extension auto-detection across single, gallery, and semantic-feed fixtures; production omission of the manual override root while automatic labels remain; disabled unsupported modes in flagged test builds; context-aware target and Controls behavior; explicit override/reset; per-host persistence across reload; and deterministic artifacts for handoff screenshots 08 and 09."
         },
         {
           "type": "manual",
-          "reason": "Detection quality and the fixed page-level switcher must be checked against representative real-world gallery and infinite-feed markup.",
-          "notes": "Open the built extension on one standalone image, one multi-image gallery, and one infinite feed. Verify the automatic label, enabled overrides, target badge, Grab availability and hint, reset-to-automatic behavior, reload persistence, SPA transitions, keyboard focus, and pixel fidelity against handoff screenshots 08 and 09 without exposing URL evidence in the switcher."
+          "reason": "Detection quality must be checked in a release build, while the feature-gated switcher needs a separate explicit flagged-build review against representative real-world markup.",
+          "notes": "Release build: open one standalone image, one multi-image gallery, and one infinite feed; verify the switcher is absent, saved legacy overrides are ignored, and automatic labels, target badges, Grab availability/hints, and SPA transitions remain correct. Flagged build (`IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER=1`): verify enabled overrides, reset-to-automatic behavior, reload persistence, keyboard focus, and pixel fidelity against handoff screenshots 08 and 09 without exposing URL evidence."
         }
       ]
     },

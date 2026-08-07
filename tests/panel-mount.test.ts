@@ -103,6 +103,7 @@ function createHarness(overrides: Partial<PanelMountDeps> = {}): Harness {
     scheduleStylesReadyFallback: (reveal) => {
       fallbackReveal = reveal;
     },
+    pageContextSwitcherEnabled: true,
   };
   (harness as { mount: PanelMount }).mount = new PanelMount(deps, environment);
   return harness;

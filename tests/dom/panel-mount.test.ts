@@ -31,6 +31,7 @@ function createHarness(depOverrides: Partial<PanelMountDeps> = {}): Harness {
     scheduleStylesReadyFallback: (reveal) => {
       fallback = reveal;
     },
+    pageContextSwitcherEnabled: true,
     onShadowRootCreated: (shadow) => {
       shadowRoots.push(shadow);
     },
