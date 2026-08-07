@@ -308,14 +308,17 @@ export class RecordLibraryController {
   async deleteRecentHistory(): Promise<void> {
     const records = this.deps.getState().history;
     if (records.length === 0) return;
+    const historyProjection = recentHistoryMutationProjection(this.deps.getState());
     const recentHistoryStore = this.deps.recentHistoryStore();
     if (recentHistoryStore) {
       for (const record of records) {
-        await recentHistoryStore.remove(record.id, window.location.href, { scope: this.deps.getState().recentHistoryScope });
+        await recentHistoryStore.remove(record.id, window.location.href, { ...historyProjection });
       }
     }
-    this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'history/delete-all' }));
-    this.deps.render();
+    if (recentHistoryMutationIsCurrent(this.deps.getState(), historyProjection)) {
+      this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'history/delete-all' }));
+      this.deps.render();
+    }
     let removedCapturedBlob = false;
     for (const record of records) {
       const blobId = record.pinnedRecordId ? undefined : encryptedBlobIdForRecord(record);
