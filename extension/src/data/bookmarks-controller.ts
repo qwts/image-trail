@@ -32,6 +32,7 @@ import { KeysRepository } from './repositories/keys-repository.js';
 import type { DurableBookmarkPayloadV1 } from './types.js';
 import {
   BookmarkPersistenceError,
+  type BookmarkPersistenceOptions,
   clampPageOffset,
   filterByVisibilityScope,
   isVisibleInScope,
@@ -47,12 +48,6 @@ interface ProtectedBookmarkOptions {
   readonly getActiveBlobKey?: () => ActiveBlobKey | null | Promise<ActiveBlobKey | null>;
   readonly getPinSaveStoragePreference?: () => PinSaveStoragePreference | Promise<PinSaveStoragePreference>;
   readonly getSearchableMetadataPolicy?: () => SearchableMetadataPolicy | Promise<SearchableMetadataPolicy>;
-}
-
-interface BookmarkPersistenceOptions extends BookmarkSaveOptions {
-  readonly preserveExistingMetadata?: boolean | undefined;
-  readonly preserveExistingThumbnail?: boolean | undefined;
-  readonly requiredActiveBlobKey?: ActiveBlobKey | undefined;
 }
 
 type BookmarkContext = {
@@ -172,7 +167,7 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     const activeBlobKey = (await this.options.getActiveBlobKey?.()) ?? null;
     const preference = (await this.options.getPinSaveStoragePreference?.()) ?? DEFAULT_LOCAL_SETTINGS.pinSaveStoragePreference;
     if (preference === 'plaintext') {
-      if (activeBlobKey && (await this.hasProtectedPinForBookmark(context, bookmark))) {
+      if (activeBlobKey && (await this.hasProtectedPinForUrlInContext(context, bookmark.url))) {
         return { ...(await this.saveProtected(context, bookmark, activeBlobKey, options)), pinSaveStorage: { destination: 'encrypted' } };
       }
       return this.savePlain(context, bookmark, { destination: 'plaintext', reason: 'setting' }, options);
@@ -267,8 +262,8 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     return { ...bookmark, id: uuid, pinSaveStorage };
   }
 
-  private async hasProtectedPinForBookmark(context: BookmarkContext, bookmark: ImageDisplayRecord): Promise<boolean> {
-    return !!(await context.encryptedPins.getByUrlHash(await hashSearchableUrl(bookmark.url)));
+  private async hasProtectedPinForUrlInContext(context: BookmarkContext, url: string): Promise<boolean> {
+    return !!(await context.encryptedPins.getByUrlHash(await hashSearchableUrl(url)));
   }
 
   private async searchableMetadataPolicy(): Promise<SearchableMetadataPolicy> {
@@ -404,6 +399,11 @@ export class IndexedDbBookmarkStore implements BookmarkStore {
     } catch {
       return null;
     }
+  }
+
+  async hasProtectedPinForUrl(url: string): Promise<boolean> {
+    const context = await this.openContext();
+    return context ? this.hasProtectedPinForUrlInContext(context, url) : false;
   }
 
   async remove(record: ImageDisplayRecord): Promise<void> {

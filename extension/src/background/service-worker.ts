@@ -703,7 +703,7 @@ const messageRegistry = {
     fallback: () => createStorageUsageResponseMessage({ totalBytes: 0, blobCount: 0 }),
   }),
   ...createBookmarkMessageRegistry({ bookmarkStore, notifyLibraryChange }),
-  ...createRecentHistoryMessageRegistry(context),
+  ...createRecentHistoryMessageRegistry({ ...context, notifyLibraryChange }),
   ...createRecallMessageRegistry(context),
   ...createPanelPositionMessageRegistry(context),
   [MessageType.LoadParsedFieldState]: defineMessage({

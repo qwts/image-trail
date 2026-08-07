@@ -34,6 +34,11 @@ interface RecentHistoryEntry {
   readonly sequence: number;
 }
 
+export interface RecentHistoryAddOutcome {
+  readonly items: readonly ImageDisplayRecord[];
+  readonly overflowCandidates: readonly ImageDisplayRecord[];
+}
+
 const recentHistoryEntrySchema = v.object({
   item: imageDisplayRecordSchema,
   pageKey: v.string(),
@@ -47,9 +52,7 @@ const recentHistorySessionStateSchema = v.object({
 });
 
 function retainedRecentHistory(items: readonly ImageDisplayRecord[], settings: PlaintextLocalSettings): readonly ImageDisplayRecord[] {
-  const limit =
-    settings.recentHistoryOverflowBehavior === 'drop-oldest' ? settings.recentHistoryLimit : settings.recentHistoryRetainedLimit;
-  return items.slice(0, limit);
+  return items.slice(0, retainedLimit(settings));
 }
 
 function visibleRecentHistory(items: readonly ImageDisplayRecord[], settings: PlaintextLocalSettings): readonly ImageDisplayRecord[] {
@@ -97,15 +100,57 @@ export class RecentHistoryCache {
     scope: RecentHistoryScope = DEFAULT_RECENT_HISTORY_SCOPE,
     includeRetained = false,
   ): readonly ImageDisplayRecord[] {
+    return this.addWithOverflow(pageUrl, item, settings, scope, includeRetained).items;
+  }
+
+  addWithOverflow(
+    pageUrl: string,
+    item: ImageDisplayRecord,
+    settings: PlaintextLocalSettings,
+    scope: RecentHistoryScope = DEFAULT_RECENT_HISTORY_SCOPE,
+    includeRetained = false,
+  ): RecentHistoryAddOutcome {
     const key = recentHistorySiteKey(pageUrl);
     const entry = { item, pageKey: recentHistoryPageKey(pageUrl), sequence: (this.sequence += 1) };
-    const next = [
+    const candidates = [
       entry,
       ...(this.bySite.get(key) ?? []).filter((candidate) => candidate.item.url !== item.url && candidate.item.id !== item.id),
-    ].slice(0, retainedLimit(settings));
+    ];
+    const next = candidates.slice(0, retainedLimit(settings));
     this.bySite.set(key, next);
     this.persist();
-    return this.load(pageUrl, settings, includeRetained, scope);
+    return {
+      items: this.load(pageUrl, settings, includeRetained, scope),
+      overflowCandidates:
+        settings.recentHistoryOverflowBehavior === 'auto-pin'
+          ? this.entriesFor(pageUrl, scope, next)
+              .slice(settings.recentHistoryLimit)
+              .map((candidate) => candidate.item)
+          : [],
+    };
+  }
+
+  removeItems(pageUrl: string, ids: readonly string[], scope: RecentHistoryScope = DEFAULT_RECENT_HISTORY_SCOPE): void {
+    if (ids.length === 0) return;
+    const siteKey = recentHistorySiteKey(pageUrl);
+    const removed = new Set(ids);
+    const globalUrls =
+      scope === 'all'
+        ? new Set(
+            [...this.bySite.values()]
+              .flat()
+              .filter((entry) => removed.has(entry.item.id))
+              .map((entry) => entry.item.url),
+          )
+        : undefined;
+    for (const [key, entries] of this.bySite) {
+      if (scope !== 'all' && key !== siteKey) continue;
+      this.bySite.set(
+        key,
+        entries.filter((entry) => !removed.has(entry.item.id) && !globalUrls?.has(entry.item.url)),
+      );
+    }
+    this.persist();
   }
 
   update(
@@ -171,14 +216,20 @@ export class RecentHistoryCache {
     return Array.from(this.bySite.values(), (entries) => entries.map((entry) => entry.item)).values();
   }
 
-  private entriesFor(pageUrl: string, scope: RecentHistoryScope): readonly RecentHistoryEntry[] {
-    const siteEntries = this.bySite.get(recentHistorySiteKey(pageUrl)) ?? [];
+  private entriesFor(
+    pageUrl: string,
+    scope: RecentHistoryScope,
+    currentSiteEntries = this.bySite.get(recentHistorySiteKey(pageUrl)) ?? [],
+  ): readonly RecentHistoryEntry[] {
+    const siteKey = recentHistorySiteKey(pageUrl);
+    const siteEntries = currentSiteEntries;
     if (scope === 'site') return siteEntries;
     if (scope === 'page') {
       const pageKey = recentHistoryPageKey(pageUrl);
       return siteEntries.filter((entry) => entry.pageKey === pageKey);
     }
-    return uniqueEntries([...this.bySite.values()].flat().sort((left, right) => right.sequence - left.sequence));
+    const allEntries = [...this.bySite.entries()].flatMap(([key, entries]) => (key === siteKey ? currentSiteEntries : entries));
+    return uniqueEntries(allEntries.sort((left, right) => right.sequence - left.sequence));
   }
 
   private async hydrate(): Promise<void> {
@@ -222,5 +273,9 @@ function uniqueEntries(entries: readonly RecentHistoryEntry[]): readonly RecentH
 }
 
 function retainedLimit(settings: PlaintextLocalSettings): number {
-  return settings.recentHistoryOverflowBehavior === 'drop-oldest' ? settings.recentHistoryLimit : settings.recentHistoryRetainedLimit;
+  if (settings.recentHistoryOverflowBehavior === 'drop-oldest') return settings.recentHistoryLimit;
+  // Auto-pin needs one bounded transaction slot beyond the configured retained rows. Without
+  // it, equal visible/retained limits discard the candidate before the durable save can finish,
+  // and a failed save cannot truthfully report that the Recent remains available for retry.
+  return settings.recentHistoryRetainedLimit + (settings.recentHistoryOverflowBehavior === 'auto-pin' ? 1 : 0);
 }

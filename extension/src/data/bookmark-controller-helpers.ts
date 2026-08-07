@@ -1,9 +1,16 @@
 import { createDisplayRecord, type ImageDisplayRecord } from '../core/display-records.js';
 import { queueTimeForRecord } from '../core/display-order.js';
+import type { BookmarkSaveOptions } from '../core/bookmark-save-options.js';
 import type { ActiveBlobKey } from './crypto/blob-keyring.js';
 import type { EncryptedPinThumbnailsRepository } from './repositories/encrypted-pin-thumbnails-repository.js';
 import type { DurableBookmarkPayloadV1, DurableEncryptedPinPayloadV1 } from './types.js';
 import type { ProtectedPinRelationshipV1 } from './types.js';
+
+export interface BookmarkPersistenceOptions extends BookmarkSaveOptions {
+  readonly preserveExistingMetadata?: boolean | undefined;
+  readonly preserveExistingThumbnail?: boolean | undefined;
+  readonly requiredActiveBlobKey?: ActiveBlobKey | undefined;
+}
 
 export function clampPageOffset(offset: number, limit: number, total: number): number {
   if (total <= 0) return 0;

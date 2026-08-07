@@ -34,10 +34,10 @@ export async function addProtectedImportedImageToLibrary(
     ? await recentHistoryStore.add(historyItem, window.location.href, {
         ...historyProjection,
       })
-    : [historyItem, ...deps.getState().history.filter((item) => item.id !== historyItem.id && item.url !== historyItem.url)];
+    : { items: [historyItem, ...deps.getState().history.filter((item) => item.id !== historyItem.id && item.url !== historyItem.url)] };
   deps.setState({
     ...deps.getState(),
-    history: recentHistoryAfterMutation(deps.getState(), historyProjection, history, reviewLimit),
+    history: recentHistoryAfterMutation(deps.getState(), historyProjection, history.items, reviewLimit),
     message: bookmarkSaveMessage(bookmark, bookmark.label),
     lastUpdatedAt: Date.now(),
   });

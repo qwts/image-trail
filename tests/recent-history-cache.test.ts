@@ -172,6 +172,129 @@ test('RecentHistoryCache.add caps retained hidden rows at recentHistoryRetainedL
   );
 });
 
+test('RecentHistoryCache.addWithOverflow reports auto-pin candidates while retaining them for confirmed promotion', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 1,
+    recentHistoryRetainedLimit: 3,
+    recentHistoryOverflowBehavior: 'auto-pin' as const,
+  };
+
+  cache.addWithOverflow('https://a.test/page', record('1'), settings);
+  const added = cache.addWithOverflow('https://a.test/page', record('2'), settings);
+
+  assert.deepEqual(
+    added.items.map((item) => item.id),
+    ['2'],
+  );
+  assert.deepEqual(
+    added.overflowCandidates.map((item) => item.id),
+    ['1'],
+  );
+  assert.deepEqual(
+    cache.load('https://a.test/page', settings, true).map((item) => item.id),
+    ['2', '1'],
+    'overflow remains transient until the durable save succeeds',
+  );
+
+  cache.removeItems('https://a.test/page', ['1']);
+  assert.deepEqual(
+    cache.load('https://a.test/page', settings, true).map((item) => item.id),
+    ['2'],
+  );
+});
+
+test('RecentHistoryCache selects auto-pin overflow from the requested page scope', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 1,
+    recentHistoryRetainedLimit: 3,
+    recentHistoryOverflowBehavior: 'auto-pin' as const,
+  };
+
+  cache.addWithOverflow('https://a.test/gallery', record('gallery-1'), settings, 'page');
+  const otherPage = cache.addWithOverflow('https://a.test/details', record('details-1'), settings, 'page');
+  const galleryOverflow = cache.addWithOverflow('https://a.test/gallery', record('gallery-2'), settings, 'page');
+
+  assert.deepEqual(otherPage.overflowCandidates, [], 'an entry visible on another page is not overflow');
+  assert.deepEqual(
+    galleryOverflow.overflowCandidates.map((item) => item.id),
+    ['gallery-1'],
+  );
+});
+
+test('RecentHistoryCache selects and removes auto-pin overflow across all sites', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 1,
+    recentHistoryRetainedLimit: 3,
+    recentHistoryOverflowBehavior: 'auto-pin' as const,
+  };
+
+  cache.addWithOverflow('https://a.test/gallery', record('a-1'), settings, 'all');
+  const added = cache.addWithOverflow('https://b.test/gallery', record('b-1'), settings, 'all');
+
+  assert.deepEqual(
+    added.overflowCandidates.map((item) => item.id),
+    ['a-1'],
+  );
+  cache.removeItems('https://b.test/gallery', ['a-1'], 'all');
+  assert.deepEqual(
+    cache.load('https://b.test/gallery', settings, true, 'all').map((item) => item.id),
+    ['b-1'],
+  );
+  assert.deepEqual(cache.load('https://a.test/gallery', settings, true, 'site'), []);
+});
+
+test('RecentHistoryCache keeps an auto-pin transaction slot when visible and retained limits are equal', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 2,
+    recentHistoryRetainedLimit: 2,
+    recentHistoryOverflowBehavior: 'auto-pin' as const,
+  };
+
+  cache.addWithOverflow('https://a.test/page', record('1'), settings);
+  cache.addWithOverflow('https://a.test/page', record('2'), settings);
+  const added = cache.addWithOverflow('https://a.test/page', record('3'), settings);
+
+  assert.deepEqual(
+    added.overflowCandidates.map((item) => item.id),
+    ['1'],
+  );
+  assert.deepEqual(
+    cache.load('https://a.test/page', settings, true).map((item) => item.id),
+    ['3', '2', '1'],
+    'the candidate remains in the bounded transaction slot until promotion is confirmed',
+  );
+});
+
+test('RecentHistoryCache excludes evicted rows from auto-pin candidates', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 1,
+    recentHistoryRetainedLimit: 3,
+    recentHistoryOverflowBehavior: 'auto-pin' as const,
+  };
+
+  for (const id of ['1', '2', '3', '4']) cache.addWithOverflow('https://a.test/page', record(id), settings);
+  const added = cache.addWithOverflow('https://a.test/page', record('5'), settings);
+
+  assert.deepEqual(
+    added.overflowCandidates.map((item) => item.id),
+    ['4', '3', '2'],
+  );
+  assert.deepEqual(
+    cache.load('https://a.test/page', settings, true).map((item) => item.id),
+    ['5', '4', '3', '2'],
+  );
+});
+
 test('RecentHistoryCache.remove drops only the matching id', () => {
   const cache = new RecentHistoryCache();
   cache.add('https://a.test/page', record('1'), DEFAULT_LOCAL_SETTINGS);

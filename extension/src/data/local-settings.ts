@@ -231,7 +231,7 @@ export function isSessionInactivityTimeoutMinutes(value: unknown): value is Sess
 }
 
 export function isRecentHistoryOverflowBehavior(value: unknown): value is RecentHistoryOverflowBehavior {
-  return value === 'drop-oldest' || value === 'keep-session';
+  return value === 'drop-oldest' || value === 'keep-session' || value === 'auto-pin';
 }
 
 export function isRecentSparseRowDisplayMode(value: unknown): value is RecentSparseRowDisplayMode {
@@ -299,7 +299,7 @@ function isSafeRecentHistoryRetainedLimit(value: unknown): value is number {
 function migrateRecentHistoryRetainedLimit(value: unknown, visibleLimit: number, overflowBehavior: RecentHistoryOverflowBehavior): number {
   if (isSafeRecentHistoryRetainedLimit(value)) return Math.max(value, visibleLimit);
   if (value === undefined) {
-    return overflowBehavior === 'keep-session' ? RECENT_HISTORY_RETAINED_LIMITS.max : visibleLimit;
+    return overflowBehavior === 'drop-oldest' ? visibleLimit : RECENT_HISTORY_RETAINED_LIMITS.max;
   }
   return Math.max(DEFAULT_LOCAL_SETTINGS.recentHistoryRetainedLimit, visibleLimit);
 }

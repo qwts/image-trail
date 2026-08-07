@@ -26,7 +26,7 @@ const plaintextLocalSettingsEntries = {
   galleryPageLimit: v.number(),
   recentHistoryLimit: v.number(),
   recentHistoryRetainedLimit: v.number(),
-  recentHistoryOverflowBehavior: v.picklist(['drop-oldest', 'keep-session']),
+  recentHistoryOverflowBehavior: v.picklist(['drop-oldest', 'keep-session', 'auto-pin']),
   recentSparseRowDisplayMode: recentSparseRowDisplayModeSchema,
   recentDisplayOrder: v.picklist(['newest-first', 'oldest-first']),
   bookmarkVisibilityScope: v.picklist(['global', 'site']),

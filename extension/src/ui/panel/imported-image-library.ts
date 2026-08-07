@@ -32,10 +32,10 @@ export async function addImportedImageToLibrary(
     ? await recentHistoryStore.add(historyItem, window.location.href, {
         ...historyProjection,
       })
-    : [historyItem, ...deps.getState().history];
+    : { items: [historyItem, ...deps.getState().history] };
   deps.setState({
     ...deps.getState(),
-    history: recentHistoryAfterMutation(deps.getState(), historyProjection, history, reviewLimit),
+    history: recentHistoryAfterMutation(deps.getState(), historyProjection, history.items, reviewLimit),
     message: bookmarkSaveMessage(bookmark, bookmark.label ?? file.name),
     lastUpdatedAt: Date.now(),
   });

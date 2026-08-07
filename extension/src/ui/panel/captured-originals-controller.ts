@@ -310,10 +310,10 @@ export class CapturedOriginalsController {
 
   private async addRecentHistoryRecord(store: RecentHistoryStore, record: ImageDisplayRecord): Promise<readonly ImageDisplayRecord[]> {
     const projection = recentHistoryMutationProjection(this.deps.getState());
-    const history = await store.add(record, window.location.href, {
+    const result = await store.add(record, window.location.href, {
       ...projection,
     });
-    return recentHistoryAfterMutation(this.deps.getState(), projection, history);
+    return recentHistoryAfterMutation(this.deps.getState(), projection, result.items);
   }
 
   private async findSavedRecordDuringCapturePreflight(url: string): Promise<ImageDisplayRecord | null> {

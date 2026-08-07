@@ -16,6 +16,7 @@ test('recents settings dispatches retention, transient review, and sparse layout
   inputs[1]!.value = '7';
   const overflow = selects.find((select) => Array.from(select.options).some((option) => option.value === 'drop-oldest'));
   assert.ok(overflow);
+  assert.equal(Array.from(overflow.options).find((option) => option.value === 'auto-pin')?.textContent, 'Auto-pin overflow');
   overflow.value = 'drop-oldest';
   view.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
   assert.deepEqual(actions.at(-1), {

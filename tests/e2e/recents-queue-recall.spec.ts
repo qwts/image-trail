@@ -67,7 +67,7 @@ async function setVisibleRecents(
   input: {
     readonly limit: string;
     readonly retainedLimit?: string;
-    readonly overflow: 'Drop oldest' | 'Keep hidden this session';
+    readonly overflow: 'Drop oldest' | 'Keep hidden this session' | 'Auto-pin overflow';
     readonly expectedVisibleCount?: number;
   },
 ): Promise<void> {
@@ -90,6 +90,13 @@ async function setVisibleRecents(
   if (input.expectedVisibleCount !== undefined) {
     await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(input.expectedVisibleCount);
   }
+}
+
+async function setEncryptedPinPreference(page: Page, encrypted: boolean): Promise<void> {
+  await openSettingsGroup(page, 'Privacy');
+  const preference = page.getByLabel('Prefer encrypted pin saves');
+  if ((await preference.isChecked()) !== encrypted) await preference.setChecked(encrypted);
+  await closeSettings(page);
 }
 
 async function reviewRecentSession(page: Page, expectedVisibleCount: number): Promise<void> {
@@ -233,6 +240,43 @@ test('Recents session review reveals retained overflow without persisting or pin
   await expect(recents.locator('input[type="number"]').nth(1)).toHaveValue('3');
   await closeSettings(page);
   await setVisibleRecents(page, { limit: '30', overflow: 'Drop oldest' });
+});
+
+test('Auto-pin overflow promotes through the durable pin path without capturing originals (#148)', async ({ page, serviceWorker }) => {
+  await openPanel(page, serviceWorker);
+  await setVisiblePins(page, '30');
+  await deleteAllDurableQueueRows(page);
+  await deleteVisibleRecents(page);
+  await setupEncryptedOriginals(page);
+  await setEncryptedPinPreference(page, false);
+  await setVisibleRecents(page, { limit: '2', retainedLimit: '3', overflow: 'Auto-pin overflow' });
+
+  const autoPinAssets = [fixtureAssetPaths.assetOne, fixtureAssetPaths.assetTwo, fixtureAssetPaths.assetThree] as const;
+  for (const [index, assetPath] of autoPinAssets.entries()) {
+    await applyUrlInEditor(page, fixtureUrl(assetPath));
+    if (index < autoPinAssets.length - 1) {
+      await expectPanelStatusMessage(
+        page,
+        new RegExp(
+          `Loaded .*${escapedFilenameFromAssetPath(assetPath)}|Image loaded but did not change\\.|Applied .*${escapedFilenameFromAssetPath(assetPath)}`,
+          'u',
+        ),
+      );
+    } else {
+      await expectPanelStatusMessage(page, /Auto-pinned 1 overflow recent/u);
+    }
+  }
+
+  await expect(page.locator('.image-trail-panel__history-item')).toHaveCount(2);
+  await expect(page.locator('.image-trail-panel__history-item', { hasText: 'asset-one.svg' })).toHaveCount(0);
+  const promoted = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
+  await expect(promoted).toBeVisible();
+  await expect(promoted.getByRole('button', { name: 'Capture' })).toBeVisible();
+  await expect(promoted.getByRole('button', { name: 'Delete original' })).toHaveCount(0);
+  await expectPanelStatusMessage(page, /Auto-pinned 1 overflow recent; 1 saved plaintext \(current storage setting\)\./u);
+
+  await setVisibleRecents(page, { limit: '30', overflow: 'Drop oldest' });
+  await setEncryptedPinPreference(page, true);
 });
 
 test('pins persist across panel reopen and Recall recalls offscreen durable rows to the capped queue', async ({ page, serviceWorker }) => {

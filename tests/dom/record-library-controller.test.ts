@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createInitialPanelState } from '../../extension/src/core/state.js';
 import { createDisplayRecord, type ImageDisplayRecord } from '../../extension/src/core/display-records.js';
 import type { BookmarkStore, PanelState } from '../../extension/src/core/types.js';
-import type { RecentHistoryStore } from '../../extension/src/content/recent-history-store.js';
+import type { RecentHistoryAddResult, RecentHistoryStore } from '../../extension/src/content/recent-history-store.js';
 import { RecordLibraryController, type RecordLibraryControllerDeps } from '../../extension/src/ui/panel/record-library-controller.js';
 
 // This suite runs under happy-dom (tests/dom/register.ts preload) to exercise the paths that read
@@ -52,7 +52,7 @@ function createHarness(
       historyAddLog.push({ record, pageUrl });
       if (options.addRecentHistory) return options.addRecentHistory(record, pageUrl);
       historyRows = [record, ...historyRows.filter((row) => row.id !== record.id)];
-      return historyRows;
+      return { items: historyRows };
     },
     update: async (record: ImageDisplayRecord, pageUrl: string) => {
       historyUpdateLog.push({ record, pageUrl });
@@ -132,6 +132,26 @@ test('addImportedImage rejects non-image data URLs', async () => {
   assert.equal(await harness.controller.addImportedImage({ name: 'notes.txt', dataUrl: 'data:text/plain;base64,aGk=' }), false);
   assert.deepEqual(harness.log, []);
   assert.deepEqual(harness.savedBookmarks, []);
+});
+
+test('addRecentHistory surfaces auto-pin fallback and refreshes the durable queue', async () => {
+  const harness = createHarness({
+    addRecentHistory: async (record) => ({
+      items: [record],
+      autoPinStatus: {
+        message: 'Auto-pinned 1 overflow recent; 1 saved plaintext (encrypted storage locked).',
+        tone: 'info',
+        promotedCount: 1,
+        failedCount: 0,
+      },
+    }),
+  });
+
+  await harness.controller.addRecentHistory('https://images.example.test/overflow.jpg');
+
+  assert.match(harness.getState().message, /Auto-pinned 1 overflow recent/u);
+  assert.equal(harness.getState().history.length, 1);
+  assert.deepEqual(harness.log, ['loadBookmarkPage:0:false', 'renderPanelAndRefreshRecall', 'refreshStorageUsage:true']);
 });
 
 test('addImportedImage saves a paired bookmark and history row against the page URL', async () => {
@@ -295,7 +315,7 @@ test('markRecentHistoryRowPinned does not apply an all-scope response after scop
 });
 
 test('recent add and remove responses cannot overwrite a review-mode transition', async () => {
-  let resolveAdd: ((rows: readonly ImageDisplayRecord[]) => void) | undefined;
+  let resolveAdd: ((result: RecentHistoryAddResult) => void) | undefined;
   let resolveRemove: ((rows: readonly ImageDisplayRecord[]) => void) | undefined;
   let signalAddStarted: (() => void) | undefined;
   let signalRemoveStarted: (() => void) | undefined;
@@ -316,7 +336,7 @@ test('recent add and remove responses cannot overwrite a review-mode transition'
   const pendingAdd = harness.controller.addRecentHistory('https://images.example.test/new.jpg');
   await addStarted;
   harness.patchState({ reviewingRecentSession: true, history: [retained] });
-  resolveAdd?.([capturedHistoryRecord('stale-add')]);
+  resolveAdd?.({ items: [capturedHistoryRecord('stale-add')] });
   await pendingAdd;
   assert.deepEqual(harness.getState().history, [retained]);
 

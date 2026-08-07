@@ -363,6 +363,10 @@ test('migrates recent history retention settings safely', () => {
       JSON.stringify({ recentHistoryLimit: 12, recentHistoryRetainedLimit: 20, recentHistoryOverflowBehavior: 'keep-session' }),
     setItem: () => {},
   });
+  const validAutoPin = new LocalSettingsRepository({
+    getItem: () => JSON.stringify({ recentHistoryLimit: 10, recentHistoryOverflowBehavior: 'auto-pin' }),
+    setItem: () => {},
+  });
   const missingDropRetained = new LocalSettingsRepository({
     getItem: () => JSON.stringify({ recentHistoryLimit: 8, recentHistoryOverflowBehavior: 'drop-oldest' }),
     setItem: () => {},
@@ -381,7 +385,7 @@ test('migrates recent history retention settings safely', () => {
     setItem: () => {},
   });
   const invalidBehavior = new LocalSettingsRepository({
-    getItem: () => JSON.stringify({ recentHistoryOverflowBehavior: 'pin-overflow' }),
+    getItem: () => JSON.stringify({ recentHistoryOverflowBehavior: 'persist-forever' }),
     setItem: () => {},
   });
 
@@ -393,6 +397,8 @@ test('migrates recent history retention settings safely', () => {
   assert.equal(validKeep.load().recentHistoryLimit, 12);
   assert.equal(validKeep.load().recentHistoryRetainedLimit, 20);
   assert.equal(validKeep.load().recentHistoryOverflowBehavior, 'keep-session');
+  assert.equal(validAutoPin.load().recentHistoryOverflowBehavior, 'auto-pin');
+  assert.equal(validAutoPin.load().recentHistoryRetainedLimit, 200);
   assert.equal(missingDropRetained.load().recentHistoryRetainedLimit, 8);
   assert.equal(missingKeepRetained.load().recentHistoryRetainedLimit, 200);
   assert.equal(retainedBelowVisible.load().recentHistoryRetainedLimit, 12);

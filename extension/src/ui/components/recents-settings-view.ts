@@ -32,6 +32,7 @@ export function createRecentsSettingsView(state: RecentHistorySettingsState, dis
   overflowSelect.append(
     createOption('drop-oldest', 'Drop oldest', state.overflowBehavior),
     createOption('keep-session', 'Keep hidden this session', state.overflowBehavior),
+    createOption('auto-pin', 'Auto-pin overflow', state.overflowBehavior),
   );
   const sparseModeSelect = document.createElement('select');
   sparseModeSelect.className = 'image-trail-panel__settings-select';
@@ -66,8 +67,15 @@ export function createRecentsSettingsView(state: RecentHistorySettingsState, dis
 
   const meta = document.createElement('p');
   meta.className = 'image-trail-panel__settings-empty';
-  meta.textContent =
-    'Recents stay transient. Review temporarily shows hidden session overflow without changing retention settings or creating pins.';
+  const updateMeta = (): void => {
+    const overflowBehavior = recentHistoryOverflowBehaviorFrom(overflowSelect.value);
+    meta.textContent =
+      overflowBehavior === 'auto-pin'
+        ? 'Auto-pin overflow converts older transient Recents into durable Queue pins. It never captures original bytes.'
+        : 'Recents stay transient. Review temporarily shows hidden session overflow without changing retention settings or creating pins.';
+  };
+  overflowSelect.addEventListener('change', updateMeta);
+  updateMeta();
 
   const sparseModeField = createField('Recent layout', sparseModeSelect);
   sparseModeField.classList.add('image-trail-panel__settings-field--wide');
@@ -118,7 +126,7 @@ function createOption(
 }
 
 function recentHistoryOverflowBehaviorFrom(value: string): RecentHistoryOverflowBehavior | null {
-  return value === 'drop-oldest' || value === 'keep-session' ? value : null;
+  return value === 'drop-oldest' || value === 'keep-session' || value === 'auto-pin' ? value : null;
 }
 
 function createSparseModeOption(
