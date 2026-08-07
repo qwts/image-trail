@@ -87,6 +87,8 @@ function updateFieldTokens(
   const currentParts = group.map(({ token }) => tokenValue(token));
   const currentRaw = currentParts.join('');
   const prefix = /^0[xX]/u.exec(currentRaw)?.[0] ?? '';
+  const targetOffset = currentParts.slice(0, targetGroupIndex).reduce((sum, part) => sum + part.length, 0);
+  if (targetOffset < prefix.length) return [...tokens];
   const currentWholeDigits = currentRaw.slice(prefix.length);
   const currentRadix = prefix || /[a-f]/iu.test(currentWholeDigits) ? 16 : 10;
   const targetForUpdate =
