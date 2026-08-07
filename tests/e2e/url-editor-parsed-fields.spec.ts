@@ -307,6 +307,44 @@ test('Reset all stays available across successful steps instead of flickering aw
   await expect(page.getByRole('button', { name: /Reset (all parsed fields|private parsed fields)/u })).toHaveCount(0);
 });
 
+test('overflow carries across split fields and Reset all preserves the split (#757)', async ({ page, serviceWorker }) => {
+  await page.context().route(/\/carry-image\.svg\?carry=/u, async (route) => {
+    const carry = new URL(route.request().url()).searchParams.get('carry') ?? '0';
+    await route.fulfill({ status: 200, contentType: 'image/svg+xml', body: dynamicSvg(carry) });
+  });
+  await openPanel(page, serviceWorker);
+  await setRequestThrottle(page, { minimumIntervalMs: '0', maxRequests: '100', windowMs: '1000' });
+  await closeSettings(page);
+  await applyUrlInEditor(page, fixtureUrl('/carry-image.svg?carry=2025'));
+  await expectPanelStatusMessage(page, /(?:Loaded|Applied) .*carry-image\.svg\?carry=2025/u);
+  await openParsedFields(page);
+
+  await page.getByLabel('Split pattern for query carry').fill('1-1-1-1');
+  await page.getByRole('button', { name: 'Split query carry' }).click();
+  await expect(page.getByLabel(/Edit query carry \d\/4/u)).toHaveCount(4);
+  await expect(page.getByLabel('Edit query carry 1/4')).toHaveValue('2');
+  await expect(page.getByLabel('Edit query carry 2/4')).toHaveValue('0');
+  await expect(page.getByLabel('Edit query carry 3/4')).toHaveValue('2');
+  await expect(page.getByLabel('Edit query carry 4/4')).toHaveValue('5');
+
+  const carry = page.getByLabel('Edit query carry 2/4');
+  await carry.click();
+  await expect(carry.locator('xpath=ancestor::div[contains(@class, "image-trail-panel__field-row")][1]')).toHaveClass(/is-active/u);
+  await carry.fill('10');
+  await expect(carry).toHaveValue('10');
+  await carry.press('Enter');
+  await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl('/carry-image.svg?carry=3025'));
+  await expect(page.getByLabel('Edit query carry 1/4')).toHaveValue('3');
+  await expect(page.getByLabel('Edit query carry 2/4')).toHaveValue('0');
+  await expect(page.getByLabel('Edit query carry 3/4')).toHaveValue('2');
+  await expect(page.getByLabel('Edit query carry 4/4')).toHaveValue('5');
+
+  await page.getByRole('button', { name: /Reset (all parsed fields|private parsed fields)/u }).click();
+  await expect(page.locator('.image-trail-panel__target-url')).toHaveText(fixtureUrl('/carry-image.svg?carry=2025'));
+  await expect(page.getByLabel(/Edit query carry \d\/4/u)).toHaveCount(4);
+  await expect(page.getByLabel('Edit query carry 2/4')).toHaveValue('0');
+});
+
 test('previewing a recent clears the red failed-field marker left by a failed step (#429)', async ({ page, serviceWorker }) => {
   await installMultiParamImageRoute(page);
   // Registered after the catch-all so it wins: frame=99 is a dead neighbor.

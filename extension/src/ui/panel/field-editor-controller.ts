@@ -19,6 +19,7 @@ import {
   resetAllParsedFieldState,
   resetOneParsedFieldState,
   resetParsedFieldStructureState,
+  updateParsedFieldResetBaselineSplitSpecs,
 } from './parsed-field-reset-baseline.js';
 
 // The intermediate result of a field-editor transform: `noop` skips application, `state` applies a
@@ -40,6 +41,10 @@ type FieldEditorEffect =
       readonly attemptedFieldIds: readonly string[];
       readonly saveTemplateOnLoad: 'always' | 'when-unlocked' | 'never';
     };
+
+function splitStateEffect(state: PanelState): FieldEditorEffect {
+  return { kind: 'state', state: updateParsedFieldResetBaselineSplitSpecs(state) };
+}
 
 export interface FieldEditorControllerDeps {
   getState(): PanelState;
@@ -162,7 +167,14 @@ export class FieldEditorController {
     coalescedStepDelta?: number,
   ): Promise<void> {
     const prunedInvalidSplitSpecs = action.transformId !== 'split-clear' && this.pruneInvalidFieldSplitSpecsForCurrentUrl();
-    if (action.transformId !== 'reset-all' && action.transformId !== 'reset-field') this.captureResetBaseline();
+    if (
+      action.transformId !== 'reset-all' &&
+      action.transformId !== 'reset-field' &&
+      action.transformId !== 'split-apply' &&
+      action.transformId !== 'split-clear'
+    ) {
+      this.captureResetBaseline();
+    }
     const effect = this.fieldEditorEffect(action, coalescedStepDelta);
     if (effect.kind === 'noop') {
       if (prunedInvalidSplitSpecs) this.deps.render();
@@ -221,7 +233,7 @@ export class FieldEditorController {
     if (action.transformId === 'split-clear') {
       const transform = clearFieldSplitTransform(action.fieldId);
       if (!transform.ok) return { kind: 'noop' };
-      return { kind: 'state', state: reducePanelAction(this.deps.getState(), action) };
+      return splitStateEffect(reducePanelAction(this.deps.getState(), action));
     }
 
     let model: ParsedUrlModel;
@@ -252,7 +264,7 @@ export class FieldEditorController {
         };
       }
 
-      return { kind: 'state', state: applyFieldSplitSpecToState(this.deps.getState(), transform.splitSpec) };
+      return splitStateEffect(applyFieldSplitSpecToState(this.deps.getState(), transform.splitSpec));
     }
 
     const transform =

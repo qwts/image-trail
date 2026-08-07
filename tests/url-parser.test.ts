@@ -8,7 +8,7 @@ import {
   validFieldSplitSpecsForModel,
 } from '../extension/src/core/url/field-splits.js';
 import { applyFieldDigitWidthSpecs } from '../extension/src/core/url/field-widths.js';
-import { bumpUrlField, rebuildUrl } from '../extension/src/core/url/rebuild-url.js';
+import { bumpUrlField, rebuildUrl, setUrlFieldValue } from '../extension/src/core/url/rebuild-url.js';
 import { collectUrlFields, selectDefaultField } from '../extension/src/core/url/tokenize-fields.js';
 import type { UrlField } from '../extension/src/core/url/types.js';
 import { urlFixtures } from '../extension/src/test-fixtures/urls.js';
@@ -127,6 +127,85 @@ test('bumps split URL token parts while preserving contiguous URL format', () =>
       .map((candidate) => candidate.value),
     ['02', '01', '2001'],
   );
+});
+
+test('carries split-child overflow across the fixed-width source token', () => {
+  const digitModel = parseUrl('https://example.test/image?n=5995');
+  const digitField = collectUrlFields(digitModel).find((candidate) => candidate.label === 'query n');
+  assert.ok(digitField);
+  const digitSpec = createFieldSplitSpec(digitField, '1-1-1-1');
+  assert.ok(!('ok' in digitSpec));
+  const digitSplit = applyFieldSplitSpecs(digitModel, [digitSpec]);
+  const lastNine = collectUrlFields(digitSplit).find((candidate) => candidate.id === 'q:0:0:s:2');
+  assert.ok(lastNine);
+  assert.equal(rebuildUrl(bumpUrlField(digitSplit, lastNine, 1)), 'https://example.test/image?n=6005');
+
+  const groupedModel = parseUrl('https://example.test/image?n=5995');
+  const groupedField = collectUrlFields(groupedModel).find((candidate) => candidate.label === 'query n');
+  assert.ok(groupedField);
+  const groupedSpec = createFieldSplitSpec(groupedField, '2-2');
+  assert.ok(!('ok' in groupedSpec));
+  const groupedSplit = applyFieldSplitSpecs(groupedModel, [groupedSpec]);
+  const trailingGroup = collectUrlFields(groupedSplit).find((candidate) => candidate.id === 'q:0:0:s:1');
+  assert.ok(trailingGroup);
+  assert.equal(rebuildUrl(setUrlFieldValue(groupedSplit, trailingGroup, '105')), 'https://example.test/image?n=6005');
+});
+
+test('borrows the requested delta across a split child that is already zero', () => {
+  const model = parseUrl('https://example.test/image?n=1200');
+  const field = collectUrlFields(model).find((candidate) => candidate.label === 'query n');
+  assert.ok(field);
+  const spec = createFieldSplitSpec(field, '2-2');
+  assert.ok(!('ok' in spec));
+  const split = applyFieldSplitSpecs(model, [spec]);
+  const trailingGroup = collectUrlFields(split).find((candidate) => candidate.id === 'q:0:0:s:1');
+  assert.ok(trailingGroup);
+
+  assert.equal(rebuildUrl(bumpUrlField(split, trailingGroup, -1)), 'https://example.test/image?n=1199');
+  assert.equal(rebuildUrl(bumpUrlField(split, trailingGroup, -105)), 'https://example.test/image?n=1095');
+});
+
+test('carries across every split hex digit, including letter-only and prefixed children', () => {
+  for (const [source, pattern, expected] of [
+    ['5a99', '1-1-1-1', '5a9a'],
+    ['0x5A99', '1-1-1-1-1-1', '0x5A9A'],
+  ] as const) {
+    const model = parseUrl(`https://example.test/image?n=${source}`);
+    const field = collectUrlFields(model).find((candidate) => candidate.label === 'query n');
+    assert.ok(field);
+    const spec = createFieldSplitSpec(field, pattern);
+    assert.ok(!('ok' in spec));
+    const split = applyFieldSplitSpecs(model, [spec]);
+    const finalDigit = collectUrlFields(split).find((candidate) => candidate.splitPartIndex === pattern.split('-').length - 1);
+    assert.ok(finalDigit);
+    assert.equal(rebuildUrl(bumpUrlField(split, finalDigit, 1)), `https://example.test/image?n=${expected}`);
+  }
+});
+
+test('excludes split hexadecimal prefix fragments from positional arithmetic', () => {
+  const model = parseUrl('https://example.test/image?n=0x5A99');
+  const field = collectUrlFields(model).find((candidate) => candidate.label === 'query n');
+  assert.ok(field);
+  const spec = createFieldSplitSpec(field, '1-1-1-1-1-1');
+  assert.ok(!('ok' in spec));
+  const split = applyFieldSplitSpecs(model, [spec]);
+  const prefixZero = collectUrlFields(split).find((candidate) => candidate.splitPartIndex === 0);
+  assert.ok(prefixZero);
+
+  assert.equal(rebuildUrl(bumpUrlField(split, prefixZero, 1)), 'https://example.test/image?n=0x5A99');
+});
+
+test('preserves the casing of unchanged hex digits while carrying a split child', () => {
+  const model = parseUrl('https://example.test/image?n=5aB9');
+  const field = collectUrlFields(model).find((candidate) => candidate.label === 'query n');
+  assert.ok(field);
+  const spec = createFieldSplitSpec(field, '2-2');
+  assert.ok(!('ok' in spec));
+  const split = applyFieldSplitSpecs(model, [spec]);
+  const trailingGroup = collectUrlFields(split).find((candidate) => candidate.id === 'q:0:0:s:1');
+  assert.ok(trailingGroup);
+
+  assert.equal(rebuildUrl(bumpUrlField(split, trailingGroup, 1)), 'https://example.test/image?n=5aBA');
 });
 
 test('applies later split specs against original token indexes after earlier splits', () => {

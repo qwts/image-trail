@@ -8,7 +8,7 @@ export function rebuildUrl(model: ParsedUrlModel): string {
 }
 
 export function bumpUrlField(model: ParsedUrlModel, field: UrlField, delta: number): ParsedUrlModel {
-  return setUrlFieldToken(model, field, (token) => bumpToken(token, delta));
+  return setUrlFieldToken(model, field, (token) => bumpToken(token, delta), delta);
 }
 
 export function setUrlFieldValue(model: ParsedUrlModel, field: UrlField, nextValue: string): ParsedUrlModel {
@@ -17,6 +17,7 @@ export function setUrlFieldValue(model: ParsedUrlModel, field: UrlField, nextVal
 }
 
 export function rebuildUrlWithRawFieldValue(model: ParsedUrlModel, field: UrlField, nextValue: string): string {
+  if (field.splitBaseId) return rebuildUrl(setUrlFieldValue(model, field, nextValue));
   const currentUrl = rebuildUrl(model);
   let marker = '__IMAGE_TRAIL_RAW_FIELD_VALUE__';
   while (currentUrl.includes(marker)) marker += '_';
@@ -24,7 +25,12 @@ export function rebuildUrlWithRawFieldValue(model: ParsedUrlModel, field: UrlFie
   return markedUrl.replace(marker, normalizeTokenValue(nextValue));
 }
 
-function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token: UrlToken) => UrlToken): ParsedUrlModel {
+function setUrlFieldToken(
+  model: ParsedUrlModel,
+  field: UrlField,
+  update: (token: UrlToken) => UrlToken,
+  splitDelta?: number,
+): ParsedUrlModel {
   if (field.location === 'path' && field.partIndex !== undefined) {
     return {
       ...model,
@@ -33,7 +39,7 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
           ? {
               ...part,
               edited: true,
-              tokens: part.tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token)),
+              tokens: updateFieldTokens(part.tokens, field, update, splitDelta),
             }
           : part,
       ),
@@ -47,7 +53,7 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
         queryField.index === field.queryIndex
           ? {
               ...queryField,
-              valueTokens: queryField.valueTokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token)),
+              valueTokens: updateFieldTokens(queryField.valueTokens, field, update, splitDelta),
             }
           : queryField,
       ),
@@ -55,6 +61,88 @@ function setUrlFieldToken(model: ParsedUrlModel, field: UrlField, update: (token
   }
 
   return model;
+}
+
+function updateFieldTokens(
+  tokens: readonly UrlToken[],
+  field: UrlField,
+  update: (token: UrlToken) => UrlToken,
+  splitDelta?: number,
+): UrlToken[] {
+  if (!field.splitBaseId) return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token));
+
+  const target = tokens[field.tokenIndex];
+  if (!target || target.kind === 'text' || target.prefix) {
+    return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token));
+  }
+
+  const group = tokens
+    .map((token, tokenIndex) => ({ token, tokenIndex }))
+    .filter(({ token }) => token.splitBaseId === field.splitBaseId && token.originalTokenIndex === target.originalTokenIndex);
+  const targetGroupIndex = group.findIndex(({ tokenIndex }) => tokenIndex === field.tokenIndex);
+  if (group.length < 2 || targetGroupIndex === -1) {
+    return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? update(token) : token));
+  }
+
+  const currentParts = group.map(({ token }) => tokenValue(token));
+  const currentRaw = currentParts.join('');
+  const prefix = /^0[xX]/u.exec(currentRaw)?.[0] ?? '';
+  const targetOffset = currentParts.slice(0, targetGroupIndex).reduce((sum, part) => sum + part.length, 0);
+  if (targetOffset < prefix.length) return [...tokens];
+  const currentWholeDigits = currentRaw.slice(prefix.length);
+  const currentRadix = prefix || /[a-f]/iu.test(currentWholeDigits) ? 16 : 10;
+  const targetForUpdate =
+    currentRadix === 16 && target.kind === 'int'
+      ? { ...target, kind: 'hex' as const, uppercase: /[A-F]/u.test(currentWholeDigits) }
+      : target;
+  const updatedTarget = update(targetForUpdate);
+  if (updatedTarget.kind === 'text' || updatedTarget.prefix) {
+    return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? updatedTarget : token));
+  }
+  const radix = currentRadix === 16 || updatedTarget.kind === 'hex' ? 16 : 10;
+  const currentTarget = parseNumericTokenValue(currentParts[targetGroupIndex]!, radix);
+  const nextTarget = parseNumericTokenValue(tokenValue(updatedTarget), radix);
+  const currentWhole = parseNumericTokenValue(currentWholeDigits, radix);
+  if (currentTarget === null || nextTarget === null || currentWhole === null) {
+    return tokens.map((token, tokenIndex) => (tokenIndex === field.tokenIndex ? updatedTarget : token));
+  }
+
+  const suffixWidth = currentParts.slice(targetGroupIndex + 1).reduce((sum, part) => sum + part.length, 0);
+  const place = BigInt(radix) ** BigInt(suffixWidth);
+  const totalWidth = currentWholeDigits.length;
+  const maximum = BigInt(radix) ** BigInt(totalWidth) - 1n;
+  const requestedDelta = splitDelta === undefined ? nextTarget - currentTarget : BigInt(splitDelta);
+  const arithmetic = currentWhole + requestedDelta * place;
+  const bounded = arithmetic < 0n ? 0n : arithmetic > maximum ? maximum : arithmetic;
+  const nextWhole = bounded.toString(radix).padStart(totalWidth, '0');
+  const casedWhole = radix === 16 ? preserveHexCase(currentWholeDigits, nextWhole, updatedTarget.uppercase === true) : nextWhole;
+  const nextRaw = `${prefix}${casedWhole}`;
+
+  let cursor = 0;
+  const replacements = new Map<number, UrlToken>();
+  for (const { token, tokenIndex } of group) {
+    const width = tokenValue(token).length;
+    const value = nextRaw.slice(cursor, cursor + width);
+    cursor += width;
+    replacements.set(tokenIndex, { ...token, ...setTokenValue(token, value) });
+  }
+  return tokens.map((token, tokenIndex) => replacements.get(tokenIndex) ?? token);
+}
+
+function preserveHexCase(current: string, next: string, uppercaseChanges: boolean): string {
+  return [...next]
+    .map((digit, index) => {
+      const previous = current[index];
+      if (previous?.toLowerCase() === digit.toLowerCase()) return previous;
+      return uppercaseChanges ? digit.toUpperCase() : digit.toLowerCase();
+    })
+    .join('');
+}
+
+function parseNumericTokenValue(value: string, radix: 10 | 16): bigint | null {
+  const pattern = radix === 16 ? /^[\da-f]+$/iu : /^\d+$/u;
+  if (!pattern.test(value)) return null;
+  return BigInt(radix === 16 ? `0x${value}` : value);
 }
 
 function bumpToken(token: UrlToken, delta: number): UrlToken {
