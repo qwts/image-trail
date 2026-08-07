@@ -123,7 +123,7 @@ export class RecentHistoryCache {
       items: this.load(pageUrl, settings, includeRetained, scope),
       overflowCandidates:
         settings.recentHistoryOverflowBehavior === 'auto-pin'
-          ? this.entriesFor(pageUrl, scope, candidates)
+          ? this.entriesFor(pageUrl, scope, next)
               .slice(settings.recentHistoryLimit)
               .map((candidate) => candidate.item)
           : [],

@@ -117,7 +117,22 @@ test('auto-pin overflow uses the durable save path and reports plaintext fallbac
     },
     notifyLibraryChange: (event) => notifications.push([...(event.recordIds ?? [])]),
   });
-  await add(registry, 'one');
+  const addEntry = registry[MessageType.AddRecentHistory] as MessageDef<ExtensionRequest, ExtensionResponse>;
+  const storedOriginal = {
+    blobId: 'blob-one',
+    mimeType: 'image/jpeg',
+    byteLength: 42,
+    capturedAt: '2026-07-15T00:00:00.000Z',
+  };
+  await addEntry.handle(
+    createAddRecentHistoryMessage(pageUrl, {
+      ...record('one'),
+      captureStatus: 'captured',
+      blobId: storedOriginal.blobId,
+      capturedAt: storedOriginal.capturedAt,
+      storedOriginal,
+    }),
+  );
   const response = await add(registry, 'two');
 
   assert.deepEqual(
@@ -128,6 +143,9 @@ test('auto-pin overflow uses the durable save path and reports plaintext fallbac
   assert.match(response.payload.autoPinStatus?.message ?? '', /saved plaintext.*locked/u);
   assert.equal(saved[0]?.source, 'bookmark');
   assert.equal(saved[0]?.captureStatus, undefined);
+  assert.equal(saved[0]?.blobId, undefined);
+  assert.equal(saved[0]?.capturedAt, undefined);
+  assert.equal(saved[0]?.storedOriginal, undefined);
   assert.deepEqual(notifications, [[saved[0]?.id ?? '']]);
 });
 
@@ -150,6 +168,28 @@ test('failed auto-pin overflow remains in transient session storage for retry', 
   assert.deepEqual(
     cache.load(pageUrl, settings, true).map((item) => item.id),
     ['two', 'one'],
+  );
+});
+
+test('failed auto-pin reports only candidates retained in the bounded retry window', async () => {
+  const cache = new RecentHistoryCache();
+  const registry = createRecentHistoryMessageRegistry({
+    recentHistoryCache: cache,
+    loadLocalSettings: async () => settings,
+    bookmarkStore: {
+      findByUrl: async () => null,
+      hasProtectedPinForUrl: async () => false,
+      saveResult: async () => ({ ok: false as const, message: 'storage unavailable' }),
+    },
+  });
+  for (const id of ['one', 'two', 'three', 'four']) await add(registry, id);
+  const response = await add(registry, 'five');
+
+  assert.equal(response.payload.autoPinStatus?.failedCount, 3);
+  assert.deepEqual(
+    cache.load(pageUrl, settings, true).map((item) => item.id),
+    ['five', 'four', 'three', 'two'],
+    'every candidate reported as failed remains available for a later session retry',
   );
 });
 

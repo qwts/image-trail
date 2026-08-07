@@ -1,5 +1,10 @@
 import * as v from 'valibot';
-import { createDisplayRecord, isDurableImageSourceUrl, type ImageDisplayRecord } from '../../core/display-records.js';
+import {
+  createDisplayRecord,
+  isDurableImageSourceUrl,
+  withoutStoredOriginal,
+  type ImageDisplayRecord,
+} from '../../core/display-records.js';
 import { imageDisplayRecordSchema } from '../../core/display-records.schema.js';
 import { noopLibraryChangeNotifier, type LibraryChangeNotifier } from '../library-change-notifier.js';
 import { defineMessage, type MessageDef } from '../message-dispatch.js';
@@ -168,7 +173,8 @@ async function promoteOverflowCandidates(
 
 function autoPinDraft(record: ImageDisplayRecord): ImageDisplayRecord {
   const importedPinId = record.pinnedRecordId ?? record.id;
-  const { pinnedAt, pinnedRecordId, queueUpdatedAt, pinSaveStorage, privacyStatus, protectedPin, ...unpinned } = record;
+  const { pinnedAt, pinnedRecordId, queueUpdatedAt, pinSaveStorage, privacyStatus, protectedPin, ...unpinned } =
+    withoutStoredOriginal(record);
   void pinnedAt;
   void pinnedRecordId;
   void queueUpdatedAt;

@@ -273,6 +273,28 @@ test('RecentHistoryCache keeps an auto-pin transaction slot when visible and ret
   );
 });
 
+test('RecentHistoryCache excludes evicted rows from auto-pin candidates', () => {
+  const cache = new RecentHistoryCache();
+  const settings = {
+    ...DEFAULT_LOCAL_SETTINGS,
+    recentHistoryLimit: 1,
+    recentHistoryRetainedLimit: 3,
+    recentHistoryOverflowBehavior: 'auto-pin' as const,
+  };
+
+  for (const id of ['1', '2', '3', '4']) cache.addWithOverflow('https://a.test/page', record(id), settings);
+  const added = cache.addWithOverflow('https://a.test/page', record('5'), settings);
+
+  assert.deepEqual(
+    added.overflowCandidates.map((item) => item.id),
+    ['4', '3', '2'],
+  );
+  assert.deepEqual(
+    cache.load('https://a.test/page', settings, true).map((item) => item.id),
+    ['5', '4', '3', '2'],
+  );
+});
+
 test('RecentHistoryCache.remove drops only the matching id', () => {
   const cache = new RecentHistoryCache();
   cache.add('https://a.test/page', record('1'), DEFAULT_LOCAL_SETTINGS);
