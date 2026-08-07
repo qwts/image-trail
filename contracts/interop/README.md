@@ -5,6 +5,11 @@
 Its source commit and checksum are pinned in `source.json` and enforced by
 `npm run check:interop-contract`.
 
+`v1/provider-root.json` pins the provider-relative `Overlook Interop/v1`
+subtree and the Google Drive discovery owner. Adapters resolve that logical
+root below their provider-owned app origin; it is never an account-root
+absolute path.
+
 `npm run check:interop-acceptance` validates every local Image Trail evidence
 set and needs no companion checkout. With `INTEROP_PHOTOS_ROOT` pointed at the
 pinned Photos source, `npm run check:interop-acceptance:cross-repo` validates
