@@ -59,10 +59,11 @@ function checkExactIds(entries, expected, label, failures) {
   for (const id of ids) if (!expected.has(id)) failures.push(`${label} contains unexpected id ${id}.`);
 }
 
-function resolveRepositoryRoots(rootDirectory, failures) {
+function resolveRepositoryRoots(rootDirectory, requireCompanion, failures) {
+  if (!requireCompanion) return new Map([[LOCAL_REPOSITORY, rootDirectory]]);
   const companionDirectory = process.env['INTEROP_PHOTOS_ROOT'];
   if (!nonEmptyString(companionDirectory)) {
-    failures.push('INTEROP_PHOTOS_ROOT must point to the pinned Photos evidence checkout.');
+    if (requireCompanion) failures.push('INTEROP_PHOTOS_ROOT must point to the pinned Photos evidence checkout.');
     return new Map([[LOCAL_REPOSITORY, rootDirectory]]);
   }
 
@@ -82,10 +83,10 @@ function resolveRepositoryRoots(rootDirectory, failures) {
   ]);
 }
 
-async function validateEvidence(evidence, scenarioId, repositoryRoots, failures) {
+async function validateEvidence(evidence, scenarioId, repositoryRoots, requiredRepositories, failures) {
   if (!Array.isArray(evidence) || evidence.length === 0) {
     failures.push(`${scenarioId}: evidence must be a non-empty array.`);
-    return;
+    return new Set();
   }
 
   const represented = new Set();
@@ -111,9 +112,10 @@ async function validateEvidence(evidence, scenarioId, repositoryRoots, failures)
       else throw error;
     }
   }
-  for (const repository of REPOSITORIES) {
+  for (const repository of requiredRepositories) {
     if (!represented.has(repository)) failures.push(`${scenarioId}: evidence is missing ${repository}.`);
   }
+  return represented;
 }
 
 function validateManualCheck(check, requireManual, failures) {
@@ -138,10 +140,13 @@ function validateManualCheck(check, requireManual, failures) {
 export async function verifyInteropAcceptance(options = {}) {
   const rootDirectory = path.resolve(options.rootDirectory ?? process.cwd());
   const requireManual = options.requireManual ?? false;
+  const requireCompanion = options.requireCompanion ?? requireManual;
   const manifestPath = path.resolve(rootDirectory, options.manifestPath ?? MANIFEST_PATH);
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
   const failures = [];
-  const repositoryRoots = resolveRepositoryRoots(rootDirectory, failures);
+  const repositoryRoots = resolveRepositoryRoots(rootDirectory, requireCompanion, failures);
+  const requiredRepositories = requireCompanion ? REPOSITORIES : new Set([LOCAL_REPOSITORY]);
+  let validatedEvidence = 0;
 
   if (manifest.schemaVersion !== 1) failures.push('schemaVersion must be 1.');
   if (manifest.contractVersion !== 1) failures.push('contractVersion must be 1.');
@@ -161,7 +166,8 @@ export async function verifyInteropAcceptance(options = {}) {
     const label = nonEmptyString(scenario?.id) ? scenario.id : 'scenario';
     if (!arrayOfStrings(scenario?.parentScenarios)) failures.push(`${label}: parentScenarios must be non-empty strings.`);
     if (!arrayOfStrings(scenario?.requirements)) failures.push(`${label}: requirements must be non-empty strings.`);
-    await validateEvidence(scenario?.evidence, label, repositoryRoots, failures);
+    const represented = await validateEvidence(scenario?.evidence, label, repositoryRoots, requiredRepositories, failures);
+    validatedEvidence += represented.size;
   }
 
   const manualChecks = Array.isArray(manifest.manualChecks) ? manifest.manualChecks : [];
@@ -172,15 +178,21 @@ export async function verifyInteropAcceptance(options = {}) {
   if (failures.length > 0) throw new Error(`Interop acceptance evidence failed:\n- ${failures.join('\n- ')}`);
   return {
     scenarios: scenarios.length,
-    automatedEvidence: scenarios.flatMap((scenario) => scenario.evidence).length,
+    validatedEvidence,
+    companionRequired: requireCompanion,
     manualVerified: manualChecks.filter((check) => check.status === 'verified').length,
     manualTotal: manualChecks.length,
   };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const result = await verifyInteropAcceptance({ requireManual: process.argv.includes('--require-manual') });
+  const requireManual = process.argv.includes('--require-manual');
+  const result = await verifyInteropAcceptance({
+    requireCompanion: requireManual || process.argv.includes('--require-companion'),
+    requireManual,
+  });
+  const evidenceScope = result.companionRequired ? 'cross-repository' : 'local';
   console.log(
-    `Verified ${result.scenarios} interop scenarios with ${result.automatedEvidence} automated evidence references; manual ${result.manualVerified}/${result.manualTotal}.`,
+    `Verified ${result.scenarios} interop scenarios with ${result.validatedEvidence} ${evidenceScope} evidence sets; manual ${result.manualVerified}/${result.manualTotal}.`,
   );
 }

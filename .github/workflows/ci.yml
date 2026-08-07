@@ -147,6 +147,9 @@ jobs:
             --test-reporter=node-test-github-reporter --test-reporter-destination=stdout
         run: npm run ci:tokenless
 
+      - name: Verify pinned cross-repository interop evidence
+        run: npm run check:interop-acceptance:cross-repo
+
       - name: Acceptance coverage
         env:
           GH_TOKEN: ${{ github.token }}
