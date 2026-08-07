@@ -6,6 +6,7 @@ import { createDisplayRecord } from '../extension/src/core/display-records.js';
 import { createKeyReference } from '../extension/src/data/crypto/key-reference.js';
 import { generateAesGcmKey } from '../extension/src/data/crypto/webcrypto.js';
 import { IndexedDbBookmarkStore } from '../extension/src/data/bookmarks-controller.js';
+import { BookmarksRepository } from '../extension/src/data/repositories/bookmarks-repository.js';
 import { deleteImageTrailDb } from './indexeddb-test-helpers.js';
 
 async function activeBlobKey() {
@@ -111,4 +112,40 @@ test('protected import merges current curated metadata after a stale import draf
   assert.equal(imported.record.downloadedAt, '2026-07-20T00:00:03.000Z');
   assert.equal(imported.record.queueUpdatedAt, original.queueUpdatedAt);
   assert.equal(imported.record.storedOriginal?.blobId, 'new-original');
+});
+
+test('protected import reports when existing protected metadata committed before its relationship write failed', async (t) => {
+  await deleteImageTrailDb();
+  const active = await activeBlobKey();
+  const store = new IndexedDbBookmarkStore({ getActiveBlobKey: () => active });
+  const url = 'https://images.example.test/committed-before-failure.png';
+  await store.save(record(url));
+  const originalSealAndPut = BookmarksRepository.prototype.sealAndPut;
+  BookmarksRepository.prototype.sealAndPut = async function failingRelationshipWrite(): ReturnType<BookmarksRepository['sealAndPut']> {
+    throw new Error('simulated relationship failure');
+  };
+  t.after(async () => {
+    BookmarksRepository.prototype.sealAndPut = originalSealAndPut;
+    await store.close();
+    await deleteImageTrailDb();
+  });
+
+  const imported = await store.saveProtectedResult(
+    createDisplayRecord({
+      ...record(url),
+      storedOriginal: {
+        blobId: 'committed-original',
+        mimeType: 'image/png',
+        byteLength: 42,
+        capturedAt: '2026-07-20T00:00:02.000Z',
+        fileName: 'committed-before-failure.png',
+      },
+    }),
+    active,
+  );
+
+  assert.equal(imported.ok, false);
+  if (imported.ok) return;
+  assert.equal(imported.durableMetadataCommitted, true);
+  assert.equal(imported.message, 'simulated relationship failure');
 });

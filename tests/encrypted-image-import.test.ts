@@ -103,6 +103,27 @@ test('protected encrypted import releases the new blob when the durable bookmark
   assert.deepEqual(removed, ['blob-failed']);
 });
 
+test('protected encrypted import keeps the new blob when durable metadata committed before cleanup failed', async () => {
+  const { exported, active } = await encryptedFixture('https://images.example.test/secret.png');
+  const removed: string[] = [];
+  const result = await importEncryptedImageToDurableStorage(exported.fileContent, {
+    restoreActiveBlobKey: async () => active,
+    getDb: async () => ({}) as IDBDatabase,
+    createBlobsRepository: () => ({
+      put: async (record) => record,
+      remove: async (id) => {
+        removed.push(id);
+      },
+    }),
+    saveBookmark: async () => ({ ok: false, message: 'old original cleanup failed', durableMetadataCommitted: true }),
+    now: () => '2026-07-20T00:00:01.000Z',
+    randomUuid: () => 'blob-committed',
+  });
+
+  assert.deepEqual(result, { ok: false, reason: 'durable-save-failed', message: 'old original cleanup failed' });
+  assert.deepEqual(removed, [], 'the committed protected metadata still references the imported blob');
+});
+
 test('successful protected import leaves the durable queue record pointing at an existing encrypted original', async (t) => {
   await deleteImageTrailDb();
   const { exported, active } = await encryptedFixture('https://images.example.test/durable.png');
