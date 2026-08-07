@@ -7,10 +7,12 @@ import {
 import { ensurePCloudBackupFolder } from './pcloud-backup-folder.js';
 import { PCLOUD_BUILD_CONFIG } from './pcloud-build-config.js';
 import { loadPCloudConnectionRecord, pcloudStatusFromRecord, type PCloudConnectionRecord } from './pcloud-connection-store.js';
+import { PCloudHttpTransport } from './pcloud-http-transport.js';
 import { numberOrUndefined, recordOrNull } from './pcloud-provider-utils.js';
 
 const PART_FILE_NAME = /^image-trail-cloud-([a-zA-Z0-9-]{1,36})-\d{6}-(?:metadata|records|original)\.image-trail-part\.json$/u;
 const PART_CATALOG_TTL_MS = 60_000;
+const pcloudHttp = new PCloudHttpTransport({ referrer: PCLOUD_BUILD_CONFIG.downloadReferrer });
 
 let partCatalogCache: {
   readonly key: string;
@@ -23,20 +25,7 @@ async function fetchPCloudJson(
   method: string,
   params: Record<string, string>,
 ): Promise<Record<string, unknown>> {
-  const response = await fetch(`https://${record.apiHost}/${method}`, {
-    method: 'POST',
-    mode: 'cors',
-    credentials: 'include',
-    referrer: 'https://my.pcloud.com/',
-    referrerPolicy: 'origin',
-    headers: { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-    body: new URLSearchParams({ access_token: record.accessToken, ...params }),
-  });
-  const data = (await response.json()) as Record<string, unknown>;
-  if (!response.ok || numberOrUndefined(data['result']) !== 0) {
-    throw new Error(typeof data['error'] === 'string' ? data['error'] : `pCloud ${method} failed.`);
-  }
-  return data;
+  return pcloudHttp.request(record, method, params);
 }
 
 async function ensureFolder(record: PCloudConnectionRecord, parentFolderId: number, name: string): Promise<number> {

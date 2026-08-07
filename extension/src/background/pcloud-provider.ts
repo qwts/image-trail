@@ -20,6 +20,7 @@ import { appendBackupHistory, loadBackupHistory } from './backup-history-store.j
 import { ensurePCloudBackupFolder } from './pcloud-backup-folder.js';
 import { assertPCloudBackupPartReference, cleanupPCloudBackupParts } from './pcloud-part-cleanup.js';
 import { PCLOUD_BUILD_CONFIG } from './pcloud-build-config.js';
+import { PCloudHttpTransport, pCloudDownloadUrl } from './pcloud-http-transport.js';
 import { arrayBufferFromBytes, bytesEqual, numberOrUndefined, recordOrNull, stringOrUndefined } from './pcloud-provider-utils.js';
 import {
   clearPCloudConnectionRecord,
@@ -29,11 +30,10 @@ import {
   type PCloudConnectionRecord,
 } from './pcloud-connection-store.js';
 
-const PCLOUD_REQUEST_HEADER_RULE_ID_BASE = 900199;
 const DEFAULT_PCLOUD_API_HOST: PCloudApiHost = 'api.pcloud.com';
 const PCLOUD_LIST_RETRY_ATTEMPTS = 5;
 const PCLOUD_LIST_RETRY_BASE_MS = 500;
-let pcloudRequestHeaderRuleId = PCLOUD_REQUEST_HEADER_RULE_ID_BASE;
+const pcloudHttp = new PCloudHttpTransport({ referrer: PCLOUD_BUILD_CONFIG.downloadReferrer });
 
 function hasChromeIdentity(): boolean {
   return typeof chrome !== 'undefined' && !!chrome.identity?.launchWebAuthFlow && !!chrome.identity?.getRedirectURL;
@@ -62,44 +62,13 @@ function launchWebAuthFlow(url: string): Promise<string> {
   });
 }
 
-async function requestPCloudJson(apiHost: PCloudApiHost, method: string, body: BodyInit): Promise<Record<string, unknown>> {
-  const isUrlEncodedBody = body instanceof URLSearchParams;
-  const urlEncodedInit: RequestInit = isUrlEncodedBody
-    ? {
-        mode: 'cors',
-        credentials: 'include',
-        referrer: PCLOUD_BUILD_CONFIG.downloadReferrer,
-        referrerPolicy: 'origin',
-        headers: {
-          accept: '*/*',
-          'accept-language': 'en-US,en;q=0.9',
-          'cache-control': 'no-cache',
-          'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-          pragma: 'no-cache',
-        },
-      }
-    : {};
-  const response = await fetch(`https://${apiHost}/${method}`, {
-    method: 'POST',
-    ...urlEncodedInit,
-    body,
-  });
-  const data = (await response.json()) as Record<string, unknown>;
-  const resultCode = numberOrUndefined(data['result']);
-  if (!response.ok || resultCode !== 0) {
-    const error = typeof data['error'] === 'string' ? data['error'] : `pCloud ${method} failed.`;
-    throw new Error(error);
-  }
-  return data;
-}
-
 async function fetchPCloudJson(
   apiHost: PCloudApiHost,
   method: string,
   accessToken: string,
   params: Record<string, string> = {},
 ): Promise<Record<string, unknown>> {
-  return requestPCloudJson(apiHost, method, new URLSearchParams({ access_token: accessToken, ...params }));
+  return pcloudHttp.request({ apiHost, accessToken }, method, params);
 }
 
 async function fetchPCloudJsonWithReferer(
@@ -108,13 +77,7 @@ async function fetchPCloudJsonWithReferer(
   accessToken: string,
   params: Record<string, string> = {},
 ): Promise<Record<string, unknown>> {
-  const url = `https://${apiHost}/${method}`;
-  const removeRule = await installPCloudRequestHeaderRule(url);
-  try {
-    return await requestPCloudJson(apiHost, method, new URLSearchParams({ access_token: accessToken, ...params }));
-  } finally {
-    await removeRule();
-  }
+  return pcloudHttp.request({ apiHost, accessToken }, method, params, true);
 }
 
 async function loadValidatedStatus(record: PCloudConnectionRecord): Promise<PCloudProviderStatus> {
@@ -185,14 +148,13 @@ async function uploadBackupFile(
   bytes: Uint8Array,
 ): Promise<{ readonly fileId: number; readonly sizeBytes: number; readonly fileName: string }> {
   const form = new FormData();
-  form.set('access_token', record.accessToken);
   form.set('folderid', String(folderId));
   form.set('filename', input.fileName);
   form.set('nopartial', '1');
   form.set('renameifexists', '1');
   form.set('file', new Blob([arrayBufferFromBytes(bytes)], { type: 'application/json' }), input.fileName);
 
-  const data = await requestPCloudJson(record.apiHost, 'uploadfile', form);
+  const data = await pcloudHttp.requestForm(record, 'uploadfile', form);
   const metadata = uploadMetadataFromResponse(data);
   const fileId = numberOrUndefined(metadata['fileid']);
   const sizeBytes = numberOrUndefined(metadata['size']);
@@ -222,12 +184,6 @@ async function waitForListedFile(record: PCloudConnectionRecord, folderId: numbe
   throw new Error('Uploaded pCloud backup was not visible in the backup folder listing.');
 }
 
-function validateDownloadHost(host: string): string {
-  const normalized = host.trim().toLowerCase();
-  if (normalized === 'pcloud.com' || normalized.endsWith('.pcloud.com')) return normalized;
-  throw new Error('pCloud returned an unexpected download host.');
-}
-
 async function downloadPCloudFile(record: PCloudConnectionRecord, fileId: number): Promise<Uint8Array> {
   const data = await fetchPCloudJsonWithReferer(record.apiHost, 'getfilelink', record.accessToken, {
     fileid: String(fileId),
@@ -242,69 +198,12 @@ async function downloadPCloudFile(record: PCloudConnectionRecord, fileId: number
   for (const hostValue of hosts) {
     const host = stringOrUndefined(hostValue);
     if (!host) continue;
-    const response = await fetchPCloudDownloadUrl(`https://${validateDownloadHost(host)}${path}`);
+    const response = await pcloudHttp.download(pCloudDownloadUrl(host, path));
     if (response.ok) return new Uint8Array(await response.arrayBuffer());
     const text = await response.text();
     lastError = text.trim() || lastError;
   }
   throw new Error(lastError);
-}
-
-async function fetchPCloudDownloadUrl(url: string): Promise<Response> {
-  const removeRule = await installPCloudRequestHeaderRule(url);
-  try {
-    return await fetch(url, {
-      referrer: PCLOUD_BUILD_CONFIG.downloadReferrer,
-      referrerPolicy: 'origin',
-    });
-  } finally {
-    await removeRule();
-  }
-}
-
-function nextPCloudRequestHeaderRuleId(): number {
-  pcloudRequestHeaderRuleId += 1;
-  return pcloudRequestHeaderRuleId;
-}
-
-async function installPCloudRequestHeaderRule(url: string): Promise<() => Promise<void>> {
-  if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest?.updateSessionRules) return async () => {};
-  const ruleId = nextPCloudRequestHeaderRuleId();
-  const regexFilter = `^${escapeRegExp(url)}$`;
-  await chrome.declarativeNetRequest.updateSessionRules({
-    addRules: [
-      {
-        id: ruleId,
-        priority: 1,
-        action: {
-          type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
-          requestHeaders: [
-            {
-              header: 'Referer',
-              operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-              value: PCLOUD_BUILD_CONFIG.downloadReferrer,
-            },
-            {
-              header: 'Origin',
-              operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-              value: PCLOUD_BUILD_CONFIG.downloadReferrer,
-            },
-          ],
-        },
-        condition: {
-          regexFilter,
-          resourceTypes: [chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST],
-        },
-      },
-    ],
-  });
-  return async () => {
-    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [ruleId] });
-  };
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 async function digestHex(algorithm: 'SHA-1' | 'SHA-256', bytes: Uint8Array): Promise<string> {
