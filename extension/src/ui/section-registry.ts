@@ -99,6 +99,13 @@ function injectDetachControl(sectionEl: HTMLElement, control: HTMLElement): void
     headerRow.append(control);
     return;
   }
+  const fieldsSummary = sectionEl.querySelector<HTMLElement>('.image-trail-panel__fields-summary');
+  if (fieldsSummary) {
+    fieldsSummary.classList.add('image-trail-ds__section-header');
+    fieldsSummary.querySelector<HTMLElement>('h3')?.classList.add('image-trail-ds__section-title');
+    fieldsSummary.append(control);
+    return;
+  }
   const heading = sectionEl.querySelector<HTMLElement>('h3');
   if (!heading || !heading.parentElement) {
     sectionEl.prepend(control);
