@@ -315,7 +315,7 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     root.style.pointerEvents = 'none';
   }
   const scrim = document.createElement('div');
-  scrim.className = 'image-trail-interop-scrim';
+  scrim.className = 'image-trail-interop-scrim image-trail-panel-root';
   scrim.setAttribute('role', 'dialog');
   scrim.setAttribute('aria-modal', 'true');
   scrim.setAttribute('aria-label', 'Transfer and Sync');
