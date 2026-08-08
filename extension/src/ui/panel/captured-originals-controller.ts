@@ -11,11 +11,9 @@ import { MissingOriginalRepairController } from './missing-original-repair-contr
 import { recentHistoryAfterMutation, recentHistoryMutationProjection } from './recent-history-mutation-projection.js';
 import { createTargetCaptureRecord } from './target-capture-record.js';
 import { siteCaptureBehaviorForHostname, type SiteCaptureRules } from '../../core/site-capture-rules.js';
-
 function captureRetryMatches(left: CaptureRetryRequest | null, right: CaptureRetryRequest): boolean {
   return left?.url === right.url && left.sourceType === right.sourceType && left.sourceRecordId === right.sourceRecordId;
 }
-
 export interface CapturedOriginalsControllerDeps {
   getState(): PanelState;
   setState(state: PanelState): void;
@@ -39,7 +37,6 @@ export interface CapturedOriginalsControllerDeps {
   bookmarkStore(): BookmarkStore | null;
   recentHistoryStore(): RecentHistoryStore | null;
 }
-
 /**
  * Captured-original (encrypted blob) flows, moved verbatim off `ImageTrailPanel`: capture with its
  * per-source-type pin/save orchestration, blob-reference deletion, and orphan cleanup. The
@@ -50,14 +47,12 @@ export class CapturedOriginalsController {
   private capturePreflightInProgress = false;
   private captureQueue: Promise<void> = Promise.resolve();
   private readonly missingOriginalRepair: MissingOriginalRepairController;
-
   constructor(private readonly deps: CapturedOriginalsControllerDeps) {
     this.missingOriginalRepair = new MissingOriginalRepairController({
       ...deps,
       captureBookmark: (record) => this.repairBookmarkOriginal(record),
     });
   }
-
   async captureGrabbedBookmark(record: ImageDisplayRecord, rules: SiteCaptureRules, pageHostname: string): Promise<void> {
     if (siteCaptureBehaviorForHostname(rules, pageHostname) !== 'capture-original') return;
     const task = () => this.captureImage(record.url, 'bookmark', record.id);
@@ -68,11 +63,9 @@ export class CapturedOriginalsController {
     );
     await queued;
   }
-
   repairSelectedOriginals(ids: readonly string[]): Promise<void> {
     return this.missingOriginalRepair.repairSelected(ids);
   }
-
   async removeCapturedBlobReference(blobId: string, options: { readonly render?: boolean } = {}): Promise<void> {
     const captureStore = this.deps.captureStore();
     if (!captureStore) return;
@@ -84,7 +77,6 @@ export class CapturedOriginalsController {
       void this.deps.refreshStorageUsage({ render: options.render });
     }
   }
-
   async cleanupOrphanedBlobs(): Promise<void> {
     const captureStore = this.deps.captureStore();
     if (!captureStore) return;
@@ -103,7 +95,6 @@ export class CapturedOriginalsController {
     this.deps.invalidateStorageUsageRequests();
     this.deps.render();
   }
-
   async captureImage(url: string, sourceType: CaptureSourceType, sourceRecordId?: string): Promise<CaptureResult | null> {
     return this.captureImageWithOptions(url, sourceType, sourceRecordId);
   }
@@ -178,106 +169,112 @@ export class CapturedOriginalsController {
       await this.deps.refreshBlobKeyStatus();
     }
     if (isCapturedResult(result) && sourceType === 'history' && sourceRecordId) {
-      const updatedHistory = this.deps.getState().history.find((item) => item.id === sourceRecordId);
-      if (updatedHistory) {
-        const saved = await this.deps.saveRecentRecordAsBookmark(updatedHistory, { render: false });
-        if (saved.ok) {
-          await this.deps.markRecentHistoryRowPinned(sourceRecordId, saved.record);
-          this.deps.setState({
-            ...this.deps.getState(),
-            message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image. ${bookmarkSaveMessage(saved.record, saved.record.label)}`,
-            lastUpdatedAt: Date.now(),
-          });
-          queueChanged = true;
-        } else {
-          this.deps.setState(
-            reducePanelAction(this.deps.getState(), { name: 'capture/delete', id: sourceRecordId, blobId: result.blobId }),
-          );
-          const clearedHistory = this.deps.getState().history.find((item) => item.id === sourceRecordId);
-          await this.removeCapturedBlobReference(result.blobId);
-          const recentHistoryStore = this.deps.recentHistoryStore();
-          const history =
-            recentHistoryStore && clearedHistory
-              ? await this.addRecentHistoryRecord(recentHistoryStore, clearedHistory)
-              : this.deps.getState().history;
-          this.deps.setState({
-            ...this.deps.getState(),
-            history,
-            message: `Captured original was discarded because the recent row was not pinned: ${saved.message}`,
-            status: 'error',
-            lastUpdatedAt: Date.now(),
-          });
-        }
-      }
+      if (await this.handleHistoryCapture(result, sourceRecordId)) queueChanged = true;
     }
     if (isCapturedResult(result) && sourceType === 'target') {
-      const draft = await createTargetCaptureRecord({
-        url,
-        result,
-        state: this.deps.getState(),
-        existingSavedRecord: await this.findSavedRecordByUrl(url),
-        createTargetThumbnail: this.deps.createTargetThumbnail,
-      });
-      const bookmarkStore = this.deps.bookmarkStore();
-      if (!bookmarkStore) {
-        await this.removeCapturedBlobReference(result.blobId);
-        this.deps.setState({
-          ...this.deps.getState(),
-          message: 'Captured original was discarded because bookmark storage is unavailable.',
-          status: 'error',
-          lastUpdatedAt: Date.now(),
-        });
-      } else {
-        const saved = bookmarkStore.saveResult
-          ? await bookmarkStore.saveResult(draft)
-          : { ok: true as const, record: await bookmarkStore.save(draft) };
-        if (saved.ok) {
-          await this.deps.loadBookmarkPage(0, { render: false });
-          this.deps.setState({
-            ...this.deps.getState(),
-            message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image. ${bookmarkSaveMessage(saved.record, saved.record.label)}`,
-            lastUpdatedAt: Date.now(),
-          });
-          queueChanged = true;
-        } else {
-          await this.removeCapturedBlobReference(result.blobId);
-          this.deps.setState({
-            ...this.deps.getState(),
-            message: `Captured original was discarded because the target pin was not saved: ${saved.message}`,
-            status: 'error',
-            lastUpdatedAt: Date.now(),
-          });
-        }
-      }
+      if (await this.handleTargetCapture(result, url)) queueChanged = true;
     }
-    const bookmarkStoreForSource = this.deps.bookmarkStore();
-    if (isCapturedResult(result) && sourceType === 'bookmark' && sourceRecordId && bookmarkStoreForSource) {
-      const updatedBookmark = await this.updatedCapturedBookmark(bookmarkStoreForSource, sourceRecordId, result);
-      if (updatedBookmark) {
-        const sr = bookmarkStoreForSource.saveResult
-          ? await bookmarkStoreForSource.saveResult(updatedBookmark)
-          : { ok: true as const, record: await bookmarkStoreForSource.save(updatedBookmark) };
-        if (sr.ok) {
-          await this.deps.loadBookmarkPage(this.deps.getState().bookmarkOffset, { render: false });
-          queueChanged = true;
-        } else {
-          await this.removeCapturedBlobReference(result.blobId);
-          this.deps.setState({
-            ...this.deps.getState(),
-            message: `Captured original was discarded because the queue row was not updated: ${sr.message}`,
-            status: 'error',
-            lastUpdatedAt: Date.now(),
-          });
-        }
-      }
+    if (isCapturedResult(result) && sourceType === 'bookmark' && sourceRecordId) {
+      if (await this.handleBookmarkCapture(result, sourceRecordId)) queueChanged = true;
     }
     await this.deps.refreshStorageUsage();
     if (finiteCaptureResultError) this.deps.scheduleFiniteCaptureErrorReset(this.deps.getState().lastUpdatedAt, 'capture-result');
-    if (queueChanged) {
-      this.deps.renderPanelAndRefreshRecall();
-    } else {
-      this.deps.render();
+    if (queueChanged) this.deps.renderPanelAndRefreshRecall();
+    else this.deps.render();
+  }
+
+  private async handleHistoryCapture(result: CaptureResult & { readonly status: 'captured' }, sourceRecordId: string): Promise<boolean> {
+    const updatedHistory = this.deps.getState().history.find((item) => item.id === sourceRecordId);
+    if (!updatedHistory) return false;
+    const saved = await this.deps.saveRecentRecordAsBookmark(updatedHistory, { render: false });
+    if (saved.ok) {
+      await this.deps.markRecentHistoryRowPinned(sourceRecordId, saved.record);
+      this.deps.setState({
+        ...this.deps.getState(),
+        message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image. ${bookmarkSaveMessage(saved.record, saved.record.label)}`,
+        lastUpdatedAt: Date.now(),
+      });
+      return true;
     }
+    this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'capture/delete', id: sourceRecordId, blobId: result.blobId }));
+    const clearedHistory = this.deps.getState().history.find((item) => item.id === sourceRecordId);
+    await this.removeCapturedBlobReference(result.blobId);
+    const recentHistoryStore = this.deps.recentHistoryStore();
+    const history =
+      recentHistoryStore && clearedHistory
+        ? await this.addRecentHistoryRecord(recentHistoryStore, clearedHistory)
+        : this.deps.getState().history;
+    this.deps.setState({
+      ...this.deps.getState(),
+      history,
+      message: `Captured original was discarded because the recent row was not pinned: ${saved.message}`,
+      status: 'error',
+      lastUpdatedAt: Date.now(),
+    });
+    return false;
+  }
+
+  private async handleTargetCapture(result: CaptureResult & { readonly status: 'captured' }, url: string): Promise<boolean> {
+    const draft = await createTargetCaptureRecord({
+      url,
+      result,
+      state: this.deps.getState(),
+      existingSavedRecord: await this.findSavedRecordByUrl(url),
+      createTargetThumbnail: this.deps.createTargetThumbnail,
+    });
+    const bookmarkStore = this.deps.bookmarkStore();
+    if (!bookmarkStore) {
+      await this.removeCapturedBlobReference(result.blobId);
+      this.deps.setState({
+        ...this.deps.getState(),
+        message: 'Captured original was discarded because bookmark storage is unavailable.',
+        status: 'error',
+        lastUpdatedAt: Date.now(),
+      });
+      return false;
+    }
+    const saved = bookmarkStore.saveResult
+      ? await bookmarkStore.saveResult(draft)
+      : { ok: true as const, record: await bookmarkStore.save(draft) };
+    if (saved.ok) {
+      await this.deps.loadBookmarkPage(0, { render: false });
+      this.deps.setState({
+        ...this.deps.getState(),
+        message: `Captured ${(result.byteLength / 1024).toFixed(1)} KB image. ${bookmarkSaveMessage(saved.record, saved.record.label)}`,
+        lastUpdatedAt: Date.now(),
+      });
+      return true;
+    }
+    await this.removeCapturedBlobReference(result.blobId);
+    this.deps.setState({
+      ...this.deps.getState(),
+      message: `Captured original was discarded because the target pin was not saved: ${saved.message}`,
+      status: 'error',
+      lastUpdatedAt: Date.now(),
+    });
+    return false;
+  }
+
+  private async handleBookmarkCapture(result: CaptureResult & { readonly status: 'captured' }, sourceRecordId: string): Promise<boolean> {
+    const bookmarkStoreForSource = this.deps.bookmarkStore();
+    if (!bookmarkStoreForSource) return false;
+    const updatedBookmark = await this.updatedCapturedBookmark(bookmarkStoreForSource, sourceRecordId, result);
+    if (!updatedBookmark) return false;
+    const sr = bookmarkStoreForSource.saveResult
+      ? await bookmarkStoreForSource.saveResult(updatedBookmark)
+      : { ok: true as const, record: await bookmarkStoreForSource.save(updatedBookmark) };
+    if (sr.ok) {
+      await this.deps.loadBookmarkPage(this.deps.getState().bookmarkOffset, { render: false });
+      return true;
+    }
+    await this.removeCapturedBlobReference(result.blobId);
+    this.deps.setState({
+      ...this.deps.getState(),
+      message: `Captured original was discarded because the queue row was not updated: ${sr.message}`,
+      status: 'error',
+      lastUpdatedAt: Date.now(),
+    });
+    return false;
   }
 
   private async updatedCapturedBookmark(

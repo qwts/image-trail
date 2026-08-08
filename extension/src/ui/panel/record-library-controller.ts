@@ -47,12 +47,9 @@ export interface RecordLibraryControllerDeps {
   createThumbnailDataUrlFromDataUrl: typeof createThumbnailDataUrlFromDataUrl;
   fetchThumbnailSource: typeof fetchThumbnailSource;
 }
-
 export class RecordLibraryController {
   private bookmarkMutationQueue: Promise<void> = Promise.resolve();
-
   constructor(private readonly deps: RecordLibraryControllerDeps) {}
-
   async bookmarkCurrentImage(): Promise<boolean> {
     const state = this.deps.getState();
     const url = state.target.selectedUrl;
@@ -65,12 +62,10 @@ export class RecordLibraryController {
       height: image?.naturalHeight || undefined,
     });
   }
-
   enqueueBookmarkMutation(work: () => Promise<void>): void {
     this.bookmarkMutationQueue = this.bookmarkMutationQueue.then(work, work);
     void this.bookmarkMutationQueue;
   }
-
   async bookmarkUrl(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<boolean> {
     const validation = await this.validateRecordUrlForAdd(url, options);
     if (!validation.ok || !validation.sourceUrl) return false;
@@ -107,7 +102,6 @@ export class RecordLibraryController {
   async addImportedImage(file: RecordLibraryImportInput, captured?: CapturedImportedMedia): Promise<boolean> {
     return addImportedImageToLibrary(this.deps, file, captured);
   }
-
   async addRecentHistory(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<void> {
     if (!this.isProjectionActive(options)) return;
     const validation = await this.validateRecordUrlForAdd(url, options);
@@ -135,7 +129,6 @@ export class RecordLibraryController {
     if (!this.isProjectionActive(options) || !recentHistoryMutationIsCurrent(this.deps.getState(), historyProjection)) return;
     await renderRecentHistoryAddResult(this.deps, addResult);
   }
-
   async pinRecentHistory(id: string): Promise<void> {
     const record = this.deps.getState().history.find((item) => item.id === id);
     if (!record) return;
