@@ -481,10 +481,12 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
 
   const imageControl = createFilePickerField({
     label: 'Media files',
-    description: 'Choose local images or MPEG-TS files (.ts, .mts, .m2ts). Transport streams are signature-checked and encrypted.',
+    description:
+      'Choose local images or supported video/audio files. Containers are signature-checked before exact original bytes are encrypted.',
     buttonText: 'Choose media',
     noFileText: 'No file selected',
-    accept: 'image/*,video/mp2t,.ts,.mts,.m2ts',
+    accept:
+      'image/*,video/mp2t,video/mp4,audio/mp4,video/quicktime,video/webm,audio/webm,video/x-matroska,audio/x-matroska,video/x-msvideo,video/mpeg,audio/mpeg,.ts,.mts,.m2ts,.mp4,.m4v,.m4a,.mpeg4,.mov,.qt,.webm,.weba,.mkv,.mka,.avi,.mpg,.mpeg,.mp2',
     multiple: true,
     disabled: state.busy,
   });

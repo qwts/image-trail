@@ -53,6 +53,10 @@ p {
   background: #000;
 }
 
+.image-trail-preview-media__audio {
+  width: min(100%, 720px);
+}
+
 .image-trail-preview-media__video-status {
   position: fixed;
   inset-block-end: 20px;

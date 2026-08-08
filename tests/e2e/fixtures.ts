@@ -51,6 +51,7 @@ const fixtureAssetPaths = {
   staticWebp: '/assets/animated/static.webp',
   truncatedGif: '/assets/animated/truncated.gif',
   supportedMpegTs: '/assets/media/supported.m2ts',
+  commonWebm: '/assets/media/common/vp9-opus.webm',
 } as const;
 
 async function waitForServiceWorker(context: BrowserContext): Promise<Worker> {

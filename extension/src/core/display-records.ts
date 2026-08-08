@@ -38,7 +38,30 @@ export interface ImageDisplayRecord {
     | undefined;
 }
 
-export const IMAGE_RECORD_EXTENSIONS = ['PNG', 'JPG', 'JPEG', 'GIF', 'WEBP', 'TS', 'MTS', 'M2TS'] as const;
+export const IMAGE_RECORD_EXTENSIONS = [
+  'PNG',
+  'JPG',
+  'JPEG',
+  'GIF',
+  'WEBP',
+  'TS',
+  'MTS',
+  'M2TS',
+  'MP4',
+  'M4V',
+  'M4A',
+  'MPEG4',
+  'MOV',
+  'QT',
+  'WEBM',
+  'WEBA',
+  'MKV',
+  'MKA',
+  'AVI',
+  'MPG',
+  'MPEG',
+  'MP2',
+] as const;
 
 export interface ImageRecordUrlValidation {
   readonly ok: boolean;
@@ -191,7 +214,23 @@ function imageExtensionFromImageQuery(url: URL): string | null {
 
 function imageExtensionFromImageType(value: string | null | undefined): string | null {
   if (!value) return null;
-  if (value.toLowerCase() === 'video/mp2t') return 'TS';
+  const mediaExtension = (
+    {
+      'video/mp2t': 'TS',
+      'video/mp4': 'MP4',
+      'audio/mp4': 'M4A',
+      'video/quicktime': 'MOV',
+      'video/webm': 'WEBM',
+      'audio/webm': 'WEBA',
+      'video/x-matroska': 'MKV',
+      'audio/x-matroska': 'MKA',
+      'video/x-msvideo': 'AVI',
+      'audio/x-msvideo': 'AVI',
+      'video/mpeg': 'MPG',
+      'audio/mpeg': 'MP2',
+    } as Record<string, string>
+  )[value.toLowerCase()];
+  if (mediaExtension && isImageRecordExtension(mediaExtension)) return mediaExtension;
   const normalized = value
     .toUpperCase()
     .replace(/^IMAGE\//u, '')
@@ -223,21 +262,19 @@ function createDisplayRecordId(timestamp: string, url: string): string {
 }
 
 function isDataMediaUrl(url: string): boolean {
-  return url.startsWith('data:image/') || url.startsWith('data:video/mp2t');
+  return /^data:(?:image|video|audio)\//iu.test(url);
 }
 
 function dataMediaDisplayLabel(url: string): string {
-  if (url.startsWith('data:video/mp2t')) return 'Data URL MPEG-TS media';
   const extension = imageExtensionFromDataImageUrl(url);
+  if (/^data:(?:video|audio)\//iu.test(url)) return extension ? `Data URL media (${extension})` : 'Data URL media';
   return extension ? `Data URL image (${extension})` : 'Data URL image';
 }
 
 function dataMediaMimeType(url: string): string | null {
-  return /^data:((?:image\/[a-z0-9.+-]+)|(?:video\/mp2t))[;,]/iu.exec(url)?.[1]?.toLowerCase() ?? null;
+  return /^data:((?:image|video|audio)\/[a-z0-9.+-]+)[;,]/iu.exec(url)?.[1]?.toLowerCase() ?? null;
 }
 
 function imageExtensionFromDataImageUrl(url: string): string | null {
-  if (url.startsWith('data:video/mp2t')) return 'TS';
-  const subtype = dataMediaMimeType(url)?.replace(/^image\//u, '');
-  return imageExtensionFromImageType(subtype);
+  return imageExtensionFromImageType(dataMediaMimeType(url));
 }

@@ -1,7 +1,9 @@
 import type { CaptureFailureReason } from '../core/image/capture-result.js';
 import { DEFAULT_MAX_ORIGINAL_BYTES } from '../core/image/capture-result.js';
 import { sanitizeFilename } from '../core/image/downloads.js';
+import { commonMediaHint } from '../core/media/common-media.js';
 import { inspectSpecializedMedia } from '../core/media/inspect-media.js';
+import { hasMpegTsHint } from '../core/media/mpeg-ts-hints.js';
 import type { StoredMediaInfo } from '../core/media/media-info.js';
 
 const ALLOWED_MEDIA_TYPES = new Set([
@@ -15,6 +17,17 @@ const ALLOWED_MEDIA_TYPES = new Set([
   'image/x-icon',
   'image/vnd.microsoft.icon',
   'video/mp2t',
+  'video/mp4',
+  'audio/mp4',
+  'video/quicktime',
+  'video/webm',
+  'audio/webm',
+  'video/x-matroska',
+  'audio/x-matroska',
+  'video/x-msvideo',
+  'audio/x-msvideo',
+  'video/mpeg',
+  'audio/mpeg',
 ]);
 
 export interface FetchImageSuccess {
@@ -65,8 +78,8 @@ export async function fetchImageBytes(
 
   const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ?? '';
   const responseUrl = response.url || url;
-  const transportStreamHint = isTransportStreamName(responseUrl);
-  if (!ALLOWED_MEDIA_TYPES.has(contentType) && !transportStreamHint) {
+  const specializedHint = hasMpegTsHint(contentType, responseUrl) || commonMediaHint(contentType, responseUrl);
+  if (!ALLOWED_MEDIA_TYPES.has(contentType) && !specializedHint) {
     return { ok: false, reason: 'not-image', message: `Response content-type "${contentType}" is not supported media.` };
   }
 
@@ -77,7 +90,7 @@ export async function fetchImageBytes(
 
   const body = await readBoundedResponseBody(response, maxBytes);
   if (!body.ok) return body;
-  return classifyFetchedMedia(response, responseUrl, body.bytes, contentType, transportStreamHint);
+  return classifyFetchedMedia(response, responseUrl, body.bytes, contentType, specializedHint);
 }
 
 function responseStatusFailure(response: Response): FetchImageFailure | null {
@@ -129,30 +142,30 @@ function classifyFetchedMedia(
   responseUrl: string,
   bytes: ArrayBuffer,
   contentType: string,
-  transportStreamHint: boolean,
+  specializedHint: boolean,
 ): FetchImageResult {
   const media = inspectSpecializedMedia(bytes, contentType, responseUrl);
   if (media.status === 'invalid') {
     return {
       ok: false,
-      reason:
-        media.reason === 'probe-limit' ? 'too-large' : transportStreamHint || contentType === 'video/mp2t' ? 'not-media' : 'not-image',
+      reason: media.reason === 'probe-limit' ? 'too-large' : specializedHint ? 'not-media' : 'not-image',
       message: media.message,
     };
   }
   if (media.status === 'supported') {
-    const fallbackExtension = media.mediaInfo.kind === 'mpeg-ts' ? (media.extension ?? 'ts') : media.mediaInfo.kind;
+    const fallbackExtension =
+      media.mediaInfo.kind === 'common-media'
+        ? (media.extension ?? 'bin')
+        : media.mediaInfo.kind === 'mpeg-ts'
+          ? (media.extension ?? 'ts')
+          : media.mediaInfo.kind;
+    const fallbackBase = media.mediaInfo.kind === 'gif' || media.mediaInfo.kind === 'webp' ? 'image' : 'media';
     return {
       ok: true,
       bytes,
       mimeType: media.mimeType,
       byteLength: bytes.byteLength,
-      fileName: originalMediaFileName(
-        response.headers.get('content-disposition'),
-        responseUrl,
-        fallbackExtension,
-        media.mediaInfo.kind === 'mpeg-ts' ? 'media' : 'image',
-      ),
+      fileName: originalMediaFileName(response.headers.get('content-disposition'), responseUrl, fallbackExtension, fallbackBase),
       width: media.width,
       height: media.height,
       mediaInfo: media.mediaInfo,
@@ -216,12 +229,4 @@ function sanitizeOriginalFileName(value: string, fallback: string): string {
 
 function stripHeaderQuotes(value: string): string {
   return value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1) : value;
-}
-
-function isTransportStreamName(value: string): boolean {
-  try {
-    return /\.(?:ts|mts|m2ts)$/iu.test(new URL(value).pathname);
-  } catch {
-    return /\.(?:ts|mts|m2ts)$/iu.test(value);
-  }
 }

@@ -36,7 +36,7 @@ test('direct media URL control disables both input and action while locked', () 
   assert.equal(control.button.disabled, true);
 });
 
-test('local media reader accepts images and TS extensions, normalizes video MIME, and ignores unrelated files', async () => {
+test('local media reader accepts images and supported media extensions, normalizes MIME, and ignores unrelated files', async () => {
   const input = document.createElement('input');
   input.type = 'file';
   Object.defineProperty(input, 'files', {
@@ -44,15 +44,21 @@ test('local media reader accepts images and TS extensions, normalizes video MIME
     value: [
       new File(['image-bytes'], 'photo.png', { type: 'image/png' }),
       new File(['transport-bytes'], 'camera.mts', { type: 'application/octet-stream' }),
+      new File(['video-bytes'], 'clip.MOV', { type: 'application/octet-stream' }),
+      new File(['audio-bytes'], 'sound.mp2', { type: 'application/octet-stream' }),
       new File(['notes'], 'notes.txt', { type: 'text/plain' }),
     ],
   });
   const files = await new Promise<readonly ImportedImageFile[]>((resolve) => readMediaFiles(input, resolve));
-  assert.equal(files.length, 2);
+  assert.equal(files.length, 4);
   assert.equal(files[0]?.name, 'photo.png');
   assert.match(files[0]?.dataUrl ?? '', /^data:image\/png;base64,/u);
   assert.equal(files[1]?.name, 'camera.mts');
   assert.match(files[1]?.dataUrl ?? '', /^data:video\/mp2t;base64,/u);
+  assert.equal(files[2]?.name, 'clip.MOV');
+  assert.match(files[2]?.dataUrl ?? '', /^data:video\/quicktime;base64,/u);
+  assert.equal(files[3]?.name, 'sound.mp2');
+  assert.match(files[3]?.dataUrl ?? '', /^data:audio\/mpeg;base64,/u);
 });
 
 test('local media reader preserves selection order when reads complete out of order', async () => {

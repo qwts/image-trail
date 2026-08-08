@@ -7,7 +7,8 @@ import type { FetchImageResult } from './fetch-image.js';
 
 const MAX_ENCODED_MEDIA_DATA_URL_LENGTH = 4 * Math.ceil(DEFAULT_MAX_ORIGINAL_BYTES / 3) + 128;
 const IMAGE_MIME_TYPE = /^image\/[a-z0-9.+-]+$/u;
-const DATA_URL_MIME_TYPE = /^(?:image\/[a-z0-9.+-]+|video\/mp2t)$/u;
+const DATA_URL_MIME_TYPE =
+  /^(?:image\/[a-z0-9.+-]+|video\/(?:mp2t|mp4|quicktime|webm|x-matroska|x-msvideo|mpeg)|audio\/(?:mp4|webm|x-matroska|x-msvideo|mpeg))$/u;
 
 export type OpenedImageDataResult =
   | {
@@ -24,9 +25,14 @@ export type OpenedImageDataResult =
     }
   | { readonly ok: false; readonly reason: 'corrupt-original'; readonly message: string };
 
+export function isSupportedMediaDataUrl(value: string): boolean {
+  const mimeType = /^data:((?:image|video|audio)\/[a-z0-9.+-]+)[;,]/iu.exec(value)?.[1]?.toLowerCase();
+  return mimeType !== undefined && DATA_URL_MIME_TYPE.test(mimeType);
+}
+
 export function dataUrlToImageBytes(dataUrl: string, fileName = ''): FetchImageResult {
   if (dataUrl.length > MAX_ENCODED_MEDIA_DATA_URL_LENGTH) return oversizedDataUrl();
-  const match = /^data:((?:image\/[a-z0-9.+-]+)|(?:video\/mp2t));base64,([a-z0-9+/=\s]+)$/iu.exec(dataUrl);
+  const match = /^data:((?:image|video|audio)\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/iu.exec(dataUrl);
   if (!match) return invalidDataUrl();
 
   const mimeType = match[1]!.toLowerCase();
@@ -43,7 +49,7 @@ export function dataUrlToImageBytes(dataUrl: string, fileName = ''): FetchImageR
     if (media.status === 'invalid') {
       return {
         ok: false,
-        reason: media.reason === 'probe-limit' ? 'too-large' : mimeType === 'video/mp2t' ? 'not-media' : 'not-image',
+        reason: media.reason === 'probe-limit' ? 'too-large' : IMAGE_MIME_TYPE.test(mimeType) ? 'not-image' : 'not-media',
         message: media.message,
       };
     }
@@ -56,7 +62,15 @@ export function dataUrlToImageBytes(dataUrl: string, fileName = ''): FetchImageR
           width: media.width,
           height: media.height,
           mediaInfo: media.mediaInfo,
-          ...(fileName ? { fileName: sanitizeFilename(fileName, media.mediaInfo.kind === 'mpeg-ts' ? 'media.ts' : 'image', 240) } : {}),
+          ...(fileName
+            ? {
+                fileName: sanitizeFilename(
+                  fileName,
+                  media.mediaInfo.kind === 'gif' || media.mediaInfo.kind === 'webp' ? 'image' : `media.${media.extension ?? 'bin'}`,
+                  240,
+                ),
+              }
+            : {}),
         }
       : { ok: true, bytes: bytes.buffer, mimeType, byteLength: bytes.byteLength };
   } catch {

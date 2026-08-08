@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { imageExtensionForRecord } from '../extension/src/core/display-records.js';
-import { createImportedMediaRecords, transportStreamPosterDataUrl } from '../extension/src/ui/panel/imported-media-record.js';
+import {
+  commonMediaPosterDataUrl,
+  createImportedMediaRecords,
+  transportStreamPosterDataUrl,
+} from '../extension/src/ui/panel/imported-media-record.js';
+import type { CommonMediaInfo } from '../extension/src/core/media/common-media-types.js';
 import type { MpegTsMediaInfo } from '../extension/src/core/media/mpeg-ts.js';
 
 const mediaInfo: MpegTsMediaInfo = {
@@ -94,4 +99,78 @@ test('the MPEG-TS queue poster never labels preserved-only profiles ready to pre
 
   assert.match(decoded, /Preserved only/u);
   assert.doesNotMatch(decoded, /Ready to preview/u);
+});
+
+test('common local video imports use opaque queue URLs, exact custody facts, and deterministic inert posters', () => {
+  const commonMediaInfo: CommonMediaInfo = {
+    kind: 'common-media',
+    mediaKind: 'video',
+    animated: false,
+    frameCount: null,
+    loopCount: null,
+    container: 'ISO-BMFF',
+    streams: [
+      {
+        type: 'video',
+        codec: 'H.264',
+        profile: 'Baseline',
+        level: '3.0',
+        bitDepth: 8,
+        channels: null,
+        sampleRate: null,
+        language: null,
+      },
+      {
+        type: 'audio',
+        codec: 'AAC',
+        profile: 'LC',
+        level: null,
+        bitDepth: null,
+        channels: 1,
+        sampleRate: 48_000,
+        language: null,
+      },
+    ],
+    durationSeconds: 1,
+    codedWidth: 64,
+    codedHeight: 48,
+    displayWidth: 64,
+    displayHeight: 48,
+    rotationDegrees: 0,
+    frameRate: 15,
+    variableFrameRate: false,
+    audioPresent: true,
+    hdr: false,
+    colorTransfer: 'BT.709',
+    probeIncomplete: false,
+  };
+  const records = createImportedMediaRecords(
+    { name: 'clip.mp4', dataUrl: 'data:video/mp4;base64,AAAA' },
+    {
+      status: 'captured',
+      blobId: 'blob-mp4',
+      mimeType: 'video/mp4',
+      byteLength: 3,
+      fileName: 'clip.mp4',
+      sha256: '255d0bf97174c3be46680efa94e9fc5a0fc22509c94cf7e92e805bd013eca020',
+      width: 64,
+      height: 48,
+      mediaInfo: commonMediaInfo,
+    },
+    '2026-07-29T00:00:00.000Z',
+  );
+  assert.ok(records);
+  assert.match(records.bookmark.url, /^image-trail:\/\/local-media\//u);
+  assert.equal(records.bookmark.url.includes('AAAA'), false);
+  assert.equal(records.bookmark.storedOriginal?.mediaInfo?.kind, 'common-media');
+  assert.equal(imageExtensionForRecord(records.bookmark), 'MP4');
+  assert.equal(records.history.pinnedRecordId, records.bookmark.id);
+
+  const first = commonMediaPosterDataUrl(commonMediaInfo);
+  const second = commonMediaPosterDataUrl(commonMediaInfo);
+  assert.equal(first, second);
+  const decoded = atob(first.slice(first.indexOf(',') + 1));
+  assert.match(decoded, /MP4/u);
+  assert.match(decoded, /H\.264 \+ AAC/u);
+  assert.equal(/<script|onload=/iu.test(decoded), false);
 });

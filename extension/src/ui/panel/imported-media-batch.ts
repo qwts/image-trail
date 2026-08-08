@@ -44,7 +44,7 @@ async function captureImportedOriginal(
   deps: ImportedMediaBatchDeps,
 ): Promise<{ readonly ok: true; readonly captured: CapturedImportedMedia | undefined } | { readonly ok: false; readonly message: string }> {
   const remote = /^https?:\/\//iu.test(file.dataUrl);
-  if (!file.dataUrl.startsWith('data:video/mp2t') && !remote) return { ok: true, captured: undefined };
+  if (!/^data:(?:video|audio)\//iu.test(file.dataUrl) && !remote) return { ok: true, captured: undefined };
   const store = deps.captureStore();
   if (!store) return { ok: false, message: 'Encrypted original storage is unavailable.' };
   const result = remote
