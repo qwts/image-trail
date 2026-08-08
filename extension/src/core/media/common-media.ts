@@ -19,7 +19,7 @@ const COMMON_MEDIA_MIME_TYPES = new Set([
 ]);
 const COMMON_MEDIA_EXTENSION = /\.(?:mp4|m4v|m4a|mpeg4|mov|qt|webm|weba|mkv|mka|avi|mpg|mpeg|mp2)$/iu;
 
-export type { CommonMediaInfo, CommonMediaProbe, CommonMediaProbeResult, CommonMediaStreamInfo } from './common-media-types.js';
+export type { CommonMediaInfo, CommonMediaProbeResult } from './common-media-types.js';
 
 export function inspectCommonMedia(bytes: Uint8Array, declaredMimeType = '', fileNameOrUrl = ''): CommonMediaProbeResult {
   for (const inspect of [inspectIsoBmffMedia, inspectEbmlMedia, inspectAviMedia, inspectMpegProgramMedia] as const) {

@@ -109,7 +109,7 @@
     {
       "id": "common-video-audio-original-preservation",
       "acceptance": "Signature-validated MP4, MOV, WebM, Matroska, AVI, MPEG program, and MP2 encrypted custody, metadata, preview tiers, export, backup, and Photos preservation",
-      "repoPath": "tests/e2e/common-video-media.spec.ts",
+      "repoPath": "docs/acceptance-tests/common-video-and-audio-media.md",
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Common-Video-And-Audio-Media",
       "coverage": [
         {
