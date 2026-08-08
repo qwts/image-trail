@@ -51,6 +51,9 @@ export function inspectIsoBmffMedia(bytes: Uint8Array, _declaredMimeType = '', f
   const ftyp = topLevel.find((box) => box.type === 'ftyp');
   if (!ftyp) return { status: 'not-common-media' };
   if (reader.probeLimitExceeded) return invalid('ISO BMFF metadata exceeds the bounded element limit.', true);
+  if (topLevel[0]?.start !== 0 || topLevel.at(-1)?.end !== bytes.byteLength) {
+    return invalid('ISO BMFF top-level container structure is truncated or malformed.');
+  }
   if (ftyp.end - ftyp.payloadStart > 8 + MAX_ISO_BRANDS * 4) {
     return invalid('ISO BMFF file-type metadata exceeds the bounded brand limit.', true);
   }

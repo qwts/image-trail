@@ -145,6 +145,26 @@ test('declared extensions never override signatures and malformed media fails cl
   assert.match(spoofed.status === 'invalid' ? spoofed.message : '', /does not match a validated/u);
 });
 
+test('complete ISO metadata cannot hide a truncated declared top-level payload', () => {
+  const complete = fixture('h264-aac.mp4');
+  const truncatedPayload = complete.subarray(0, complete.byteLength - 1);
+  const result = inspectSpecializedMedia(truncatedPayload, 'video/mp4', 'truncated-payload.mp4');
+  assert.equal(result.status, 'invalid');
+  assert.match(result.status === 'invalid' ? result.message : '', /top-level container structure is truncated/u);
+});
+
+test('bounded MPEG audio discovery accepts valid frames beyond a large metadata prefix', () => {
+  const audio = fixture('audio-only.mp2');
+  const prefixed = new Uint8Array(8_192 + audio.byteLength);
+  prefixed.set(audio, 8_192);
+  const result = inspectSpecializedMedia(prefixed, 'audio/mpeg', 'large-metadata.mp2');
+  assert.equal(result.status, 'supported');
+  assert.equal(
+    result.status === 'supported' && result.mediaInfo.kind === 'common-media' ? result.mediaInfo.streams[0]?.codec : null,
+    'MP2',
+  );
+});
+
 test('hostile ISO box tables stop at the explicit element limit', () => {
   const hostile = new Uint8Array(16 + MAX_COMMON_MEDIA_ELEMENTS * 8);
   const view = new DataView(hostile.buffer);

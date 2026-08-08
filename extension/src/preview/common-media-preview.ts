@@ -104,7 +104,9 @@ function activateNativePreview(
   });
   media.addEventListener('error', () => {
     if (destroyed) return;
-    finish(`${label} playback failed safely. The exact original remains available for export.`);
+    settled = true;
+    clearTimeout(timeout);
+    status.textContent = `${label} playback failed safely. The exact original remains available for export.`;
     destroy();
   });
   document.defaultView?.addEventListener('pagehide', destroy, { once: true });

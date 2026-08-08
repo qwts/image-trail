@@ -118,6 +118,8 @@ test('native playback failure revokes the object URL without overwriting the fai
   });
   const video = surface.querySelector('video');
   assert.ok(video);
+  video.dispatchEvent(new Event('loadedmetadata'));
+  assert.match(surface.textContent ?? '', /MP4 ready/u);
   video.dispatchEvent(new Event('error'));
   assert.match(surface.textContent ?? '', /playback failed safely/u);
   assert.deepEqual(revoked, ['blob:image-trail/common-media-error']);

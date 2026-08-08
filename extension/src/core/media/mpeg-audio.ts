@@ -1,5 +1,5 @@
 import { BoundedMediaReader } from './binary-media-probe.js';
-import type { CommonMediaStreamInfo } from './common-media-types.js';
+import { MAX_COMMON_MEDIA_PROBE_BYTES, type CommonMediaStreamInfo } from './common-media-types.js';
 
 export interface MpegAudioProbe {
   readonly stream: CommonMediaStreamInfo;
@@ -25,7 +25,7 @@ const MPEG2_LAYER3_BITRATES = [0, 8, 16, 24, 32, 40, 48, 64, 80, 96, 112, 128, 1
 
 export function probeMpegAudio(bytes: Uint8Array, requireLayerTwo = false): MpegAudioProbe | null {
   const reader = new BoundedMediaReader(bytes);
-  const searchEnd = Math.min(bytes.byteLength - 4, 4_096);
+  const searchEnd = Math.min(bytes.byteLength - 4, MAX_COMMON_MEDIA_PROBE_BYTES - 4);
   for (let firstOffset = 0; firstOffset <= searchEnd; firstOffset += 1) {
     const first = parseFrame(reader, firstOffset);
     if (!first || (requireLayerTwo && first.codec !== 'MP2')) continue;
