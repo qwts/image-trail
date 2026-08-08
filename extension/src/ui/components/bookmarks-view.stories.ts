@@ -80,7 +80,7 @@ function bookmarksStory(
   items: Parameters<typeof createBookmarksView>[0],
   selectedIds: readonly string[],
   options: { readonly width?: number } = {},
-  dispatch: Parameters<typeof createBookmarksView>[9] = mockDispatch(),
+  dispatch: Parameters<typeof createBookmarksView>[8] = mockDispatch(),
 ) {
   return panelStory(
     createBookmarksView(
@@ -97,7 +97,6 @@ function bookmarksStory(
         hasOlder: items.length > 2,
         hasNewer: false,
       },
-      { recallOpen: false },
       { privacyMode: false },
       dispatch,
     ),
