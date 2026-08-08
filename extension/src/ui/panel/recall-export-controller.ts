@@ -155,7 +155,6 @@ export class RecallExportController {
     const result = plaintext ? exportPlainHistory({ entries }) : await exportEncryptedHistory({ entries, password });
     finishStatusExport(this.deps, result);
   }
-
   async exportBookmarks(password: string, plaintext: boolean): Promise<void> {
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/start' }));
     this.deps.render();
