@@ -52,7 +52,7 @@ export function updateSiteCaptureRule(rules: SiteCaptureRules, hostname: unknown
   const next = { ...sanitizeSiteCaptureRules(rules) };
   if (behavior === null) {
     delete next[normalized];
-  } else if (isSiteCaptureBehavior(behavior) && (normalized in next || Object.keys(next).length < SITE_CAPTURE_RULE_LIMIT)) {
+  } else if (isSiteCaptureBehavior(behavior) && (Object.hasOwn(next, normalized) || Object.keys(next).length < SITE_CAPTURE_RULE_LIMIT)) {
     next[normalized] = behavior;
   }
   return next;

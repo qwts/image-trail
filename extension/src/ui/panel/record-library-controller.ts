@@ -24,10 +24,8 @@ import { addImportedImageToLibrary, type RecordLibraryImportInput } from './impo
 import type { RecordAddOptions, ValidatedRecordUrl } from './record-library-types.js';
 import { renderRecentHistoryAddResult } from './recent-history-add-result.js';
 import { recentHistoryMutationIsCurrent, recentHistoryMutationProjection } from './recent-history-mutation-projection.js';
-
 export type { RecordAddOptions } from './record-library-types.js';
 export type { RecordLibraryImportInput } from './imported-image-library.js';
-
 export interface RecordLibraryControllerDeps {
   getState(): PanelState;
   setState(state: PanelState): void;
@@ -86,8 +84,19 @@ export class RecordLibraryController {
       height: options.height,
       source: 'bookmark',
     });
+    let bookmark: ImageDisplayRecord = draft;
     const bookmarkStore = this.deps.bookmarkStore();
-    const bookmark = bookmarkStore ? await bookmarkStore.save(draft) : draft;
+    if (bookmarkStore) {
+      const r = bookmarkStore.saveResult
+        ? await bookmarkStore.saveResult(draft)
+        : { ok: true as const, record: await bookmarkStore.save(draft) };
+      if (!r.ok) {
+        this.deps.setState({ ...this.deps.getState(), message: r.message, status: 'error' as const, lastUpdatedAt: Date.now() });
+        this.deps.render();
+        return false;
+      }
+      bookmark = r.record;
+    }
     options.onBookmarkSaved?.(bookmark);
     this.deps.setState({ ...this.deps.getState(), message: bookmarkSaveMessage(bookmark), lastUpdatedAt: Date.now() });
     await this.deps.loadBookmarkPage(0, { render: false });
@@ -95,7 +104,6 @@ export class RecordLibraryController {
     void this.deps.refreshStorageUsage({ render: true });
     return true;
   }
-
   async addImportedImage(file: RecordLibraryImportInput, captured?: CapturedImportedMedia): Promise<boolean> {
     return addImportedImageToLibrary(this.deps, file, captured);
   }

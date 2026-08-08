@@ -48,6 +48,7 @@ export interface CapturedOriginalsControllerDeps {
  */
 export class CapturedOriginalsController {
   private capturePreflightInProgress = false;
+  private captureQueue: Promise<void> = Promise.resolve();
   private readonly missingOriginalRepair: MissingOriginalRepairController;
 
   constructor(private readonly deps: CapturedOriginalsControllerDeps) {
@@ -59,7 +60,13 @@ export class CapturedOriginalsController {
 
   async captureGrabbedBookmark(record: ImageDisplayRecord, rules: SiteCaptureRules, pageHostname: string): Promise<void> {
     if (siteCaptureBehaviorForHostname(rules, pageHostname) !== 'capture-original') return;
-    await this.captureImage(record.url, 'bookmark', record.id);
+    const task = () => this.captureImage(record.url, 'bookmark', record.id);
+    const queued = this.captureQueue.then(task, task);
+    this.captureQueue = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    await queued;
   }
 
   repairSelectedOriginals(ids: readonly string[]): Promise<void> {
@@ -247,9 +254,21 @@ export class CapturedOriginalsController {
     if (isCapturedResult(result) && sourceType === 'bookmark' && sourceRecordId && bookmarkStoreForSource) {
       const updatedBookmark = await this.updatedCapturedBookmark(bookmarkStoreForSource, sourceRecordId, result);
       if (updatedBookmark) {
-        await bookmarkStoreForSource.save(updatedBookmark);
-        await this.deps.loadBookmarkPage(this.deps.getState().bookmarkOffset, { render: false });
-        queueChanged = true;
+        const sr = bookmarkStoreForSource.saveResult
+          ? await bookmarkStoreForSource.saveResult(updatedBookmark)
+          : { ok: true as const, record: await bookmarkStoreForSource.save(updatedBookmark) };
+        if (sr.ok) {
+          await this.deps.loadBookmarkPage(this.deps.getState().bookmarkOffset, { render: false });
+          queueChanged = true;
+        } else {
+          await this.removeCapturedBlobReference(result.blobId);
+          this.deps.setState({
+            ...this.deps.getState(),
+            message: `Captured original was discarded because the queue row was not updated: ${sr.message}`,
+            status: 'error',
+            lastUpdatedAt: Date.now(),
+          });
+        }
       }
     }
     await this.deps.refreshStorageUsage();
