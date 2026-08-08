@@ -38,6 +38,7 @@ import {
   type RecentDisplayOrder,
 } from '../core/display-order.js';
 import type { SessionInactivityTimeoutMinutes } from '../core/secure-session-policy.js';
+import { isBackupReminderIntervalDays, sanitizeBackupReminderTimestamp, type BackupReminderIntervalDays } from '../core/backup-reminder.js';
 
 export interface PlaintextLocalSettings {
   readonly schemaVersion: 1;
@@ -62,6 +63,9 @@ export interface PlaintextLocalSettings {
   readonly previewFillScreen: boolean;
   readonly urlReviewStatusLimit: number;
   readonly clearUrlReviewStatusAfterExport: boolean;
+  readonly backupReminderEnabled: boolean;
+  readonly backupReminderIntervalDays: BackupReminderIntervalDays;
+  readonly backupReminderNextAt: string | null;
   readonly neighborPreloadEnabled: boolean;
   readonly neighborPreloadRadius: number;
   readonly neighborPreloadCacheLimit: number;
@@ -96,6 +100,9 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   previewFillScreen: true,
   urlReviewStatusLimit: DEFAULT_URL_REVIEW_STATUS_LIMIT,
   clearUrlReviewStatusAfterExport: false,
+  backupReminderEnabled: false,
+  backupReminderIntervalDays: 30,
+  backupReminderNextAt: null,
   neighborPreloadEnabled: false,
   neighborPreloadRadius: DEFAULT_NEIGHBOR_PRELOAD_RADIUS,
   neighborPreloadCacheLimit: DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
@@ -198,6 +205,11 @@ export function migrateLocalSettings(input: LocalSettingsMigrationInput): Plaint
       ? input.urlReviewStatusLimit
       : DEFAULT_LOCAL_SETTINGS.urlReviewStatusLimit,
     clearUrlReviewStatusAfterExport: input.clearUrlReviewStatusAfterExport === true,
+    backupReminderEnabled: input.backupReminderEnabled === true,
+    backupReminderIntervalDays: isBackupReminderIntervalDays(input.backupReminderIntervalDays)
+      ? input.backupReminderIntervalDays
+      : DEFAULT_LOCAL_SETTINGS.backupReminderIntervalDays,
+    backupReminderNextAt: sanitizeBackupReminderTimestamp(input.backupReminderNextAt),
     neighborPreloadEnabled: input.neighborPreloadEnabled === true,
     neighborPreloadRadius: isSafeNeighborPreloadRadius(input.neighborPreloadRadius)
       ? input.neighborPreloadRadius

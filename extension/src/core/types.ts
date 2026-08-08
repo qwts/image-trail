@@ -19,6 +19,7 @@ import type { LibraryPanelState, LibraryPreferencePanelAction } from './library-
 import type { SessionInactivityTimeoutMinutes } from './secure-session-policy.js';
 import type { SecureSessionPanelAction } from './secure-session-actions.js';
 import type { ParsedFieldResetBaseline, ParsedFieldStateRecord } from './parsed-field-state-types.js';
+import type { BackupReminderPanelAction, BackupReminderPanelState } from './backup-reminder.js';
 
 export type { RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
 export type { BookmarkStore } from './bookmark-store.js';
@@ -116,7 +117,7 @@ export interface RecallState {
   readonly messageIsError?: boolean | undefined;
 }
 
-export interface PanelState extends LibraryPanelState {
+export interface PanelState extends LibraryPanelState, BackupReminderPanelState {
   readonly visible: boolean;
   readonly minimized: boolean;
   readonly status: PanelStatus;
@@ -203,7 +204,6 @@ export type PanelActionName =
   | 'history/load'
   | 'history/download'
   | 'history/select'
-  | 'history/update-display-order'
   | 'selection/select-visible'
   | 'history-selection/toggle'
   | 'history-selection/select'
@@ -223,7 +223,6 @@ export type PanelActionName =
   | 'bookmark-selection/select'
   | 'bookmark-selection/clear'
   | 'bookmarks/page-loaded'
-  | 'bookmarks/update-display-order'
   | 'gallery/open'
   | 'bookmarks/page-front'
   | 'bookmarks/page-back'
@@ -232,14 +231,13 @@ export type PanelActionName =
   | 'bookmarks/refresh-thumbnails'
   | 'settings/toggle'
   | 'help/toggle'
-  | 'settings/update-visible-bookmark-soft-max'
-  | 'settings/update-recent-history-retention'
-  | 'settings/update-recent-sparse-row-display-mode'
+  | LibraryPreferencePanelAction['name']
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
   | 'settings/update-metadata-policy'
   | 'settings/update-build-info-overlay-visibility'
   | 'settings/update-url-review-status-retention'
+  | BackupReminderPanelAction['name']
   | 'settings/update-request-throttle'
   | 'settings/update-neighbor-preload'
   | 'settings/update-down-arrow-action'
@@ -327,7 +325,6 @@ export type PanelAction =
         | 'history/mark-pinned'
         | 'history/delete-all'
         | 'history/select'
-        | 'history/update-display-order'
         | 'selection/select-visible'
         | 'history-selection/toggle'
         | 'history-selection/select'
@@ -350,15 +347,13 @@ export type PanelAction =
         | 'bookmark-selection/select'
         | 'bookmark-selection/clear'
         | 'bookmarks/page-loaded'
-        | 'bookmarks/update-display-order'
-        | 'settings/update-visible-bookmark-soft-max'
-        | 'settings/update-recent-history-retention'
-        | 'settings/update-recent-sparse-row-display-mode'
+        | LibraryPreferencePanelAction['name']
         | 'settings/update-pin-save-storage-preference'
         | 'settings/update-privacy-mode'
         | 'settings/update-metadata-policy'
         | 'settings/update-build-info-overlay-visibility'
         | 'settings/update-url-review-status-retention'
+        | 'settings/update-backup-reminder'
         | 'settings/update-request-throttle'
         | 'settings/update-neighbor-preload'
         | 'settings/update-down-arrow-action'
@@ -464,6 +459,7 @@ export type PanelAction =
       readonly limit: number;
       readonly clearAfterExport: boolean;
     }
+  | BackupReminderPanelAction
   | {
       readonly name: 'settings/update-request-throttle';
       readonly minimumIntervalMs: number;

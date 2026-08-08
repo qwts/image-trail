@@ -6,9 +6,11 @@ import type { GrabSourcePattern, UrlTemplateRecord } from '../../core/url/templa
 import type { UrlField } from '../../core/url/types.js';
 import {
   createNeighborPreloadSettingsView,
+  createBackupReminderSettingsView,
   createRequestThrottleSettingsView,
   createUrlReviewStatusSettingsView,
   type NeighborPreloadSettingsState,
+  type BackupReminderSettingsState,
   type RequestThrottleSettingsState,
   type UrlReviewStatusSettingsState,
 } from './automation-settings-view.js';
@@ -55,6 +57,7 @@ export function createSettingsView(
   storageUsage: StorageUsageSummary | null,
   buildIdentityState: BuildIdentitySettingsState,
   urlReviewStatusState: UrlReviewStatusSettingsState,
+  backupReminderState: BackupReminderSettingsState,
   requestThrottleState: RequestThrottleSettingsState,
   neighborPreloadState: NeighborPreloadSettingsState,
   downArrowAction: DownArrowAction,
@@ -90,6 +93,7 @@ export function createSettingsView(
       createRequestThrottleSettingsView(requestThrottleState, dispatch),
       createNeighborPreloadSettingsView(neighborPreloadState, dispatch),
       createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),
+      createBackupReminderSettingsView(backupReminderState, dispatch),
       createUrlSteppingPresetView(currentFields, dispatch),
       createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
       createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),

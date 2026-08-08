@@ -227,6 +227,24 @@ test('saveLocalSettingsAsync tolerates a missing store', async () => {
   assert.deepEqual(harness.saved, []);
 });
 
+test('backup reminder updates and completions only reschedule an enabled local reminder', () => {
+  const harness = createHarness();
+  harness.controller.recordManualBackupCompleted(Date.parse('2026-08-01T00:00:00.000Z'));
+  assert.equal(harness.saved.length, 0, 'disabled reminders retain no completion timestamp');
+
+  harness.controller.updateBackupReminder(true, 7, Date.parse('2026-08-01T00:00:00.000Z'));
+  assert.equal(harness.getState().backupReminderEnabled, true);
+  assert.equal(harness.getLocalSettings().backupReminderNextAt, '2026-08-08T00:00:00.000Z');
+
+  harness.controller.snoozeBackupReminder(Date.parse('2026-08-03T00:00:00.000Z'));
+  assert.equal(harness.getState().backupReminderNextAt, '2026-08-10T00:00:00.000Z');
+
+  harness.controller.recordManualBackupCompleted(Date.parse('2026-08-04T00:00:00.000Z'));
+  assert.equal(harness.getLocalSettings().backupReminderNextAt, '2026-08-11T00:00:00.000Z');
+  assert.equal(harness.saved.length, 3);
+  assert.deepEqual(harness.log, ['render', 'render']);
+});
+
 test('updateVisibleBookmarkSoftMax no-ops when unchanged or out of range', async () => {
   for (const value of [30, 0, 201, 12.5]) {
     const harness = createHarness();

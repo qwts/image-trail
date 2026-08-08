@@ -4,7 +4,7 @@ import { act, type ReactNode } from 'react';
 
 import type { RecallRecordsResult } from '../../extension/src/content/recall-store.js';
 import type { RecallCandidate, UrlReviewStatusRecord } from '../../extension/src/core/types.js';
-import { DEFAULT_LOCAL_SETTINGS } from '../../extension/src/data/local-settings.js';
+import { DEFAULT_LOCAL_SETTINGS, type PlaintextLocalSettings } from '../../extension/src/data/local-settings.js';
 import { DashboardDestination } from '../../extension/src/destinations/dashboard-destination.js';
 import { RecallDestination } from '../../extension/src/destinations/recall-destination.js';
 import { SettingsDestination } from '../../extension/src/destinations/settings-destination.js';
@@ -273,6 +273,37 @@ test('Settings reviews URL status by site and status without loading durable or 
     assert.equal(root.querySelector<HTMLSelectElement>('[aria-label="URL review site"]')?.value, 'site-3');
     assert.match(root.textContent ?? '', /https:\/\/images\.example\.test\/broken\.jpg/u);
     assert.doesNotMatch(root.textContent ?? '', /aardvark\.example\.test\/new/u);
+  } finally {
+    await cleanup(root);
+  }
+});
+
+test('Settings opts into a local-only backup reminder without invoking library or provider services', async () => {
+  const saved: PlaintextLocalSettings[] = [];
+  const root = await mount(
+    <SettingsDestination
+      services={services({
+        saveSettings: async (settings) => {
+          saved.push(settings);
+        },
+      })}
+    />,
+  );
+  try {
+    await flush();
+    const automation = Array.from(root.querySelectorAll('details')).find(
+      (details) => details.querySelector('summary')?.textContent === 'Automation',
+    );
+    automation?.querySelector('summary')?.click();
+    const enabled = Array.from(automation?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? []).find((input) =>
+      input.parentElement?.textContent?.includes('manual encrypted backups'),
+    );
+    await act(async () => enabled?.click());
+    await flush();
+    assert.equal(saved.at(-1)?.backupReminderEnabled, true);
+    assert.equal(saved.at(-1)?.backupReminderIntervalDays, 30);
+    assert.match(saved.at(-1)?.backupReminderNextAt ?? '', /^\d{4}-\d{2}-\d{2}T/u);
+    assert.match(root.textContent ?? '', /Nothing uploads automatically/u);
   } finally {
     await cleanup(root);
   }

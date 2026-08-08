@@ -58,6 +58,24 @@
   white-space: nowrap;
 }
 
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__backup-reminder {
+  display: grid;
+  gap: var(--it-space-5);
+  padding: var(--it-space-7);
+  border: 1px solid var(--it-warn-strong);
+  border-radius: var(--it-radius-control);
+  background: var(--it-fill-4);
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__backup-reminder strong {
+  color: var(--it-text-3);
+  font: var(--it-type-label);
+}
+
+.image-trail-panel-root .image-trail-ds__settings .image-trail-panel__backup-reminder button {
+  justify-self: start;
+}
+
 .image-trail-panel-root .image-trail-ds__settings .image-trail-panel__cloud-provider-metadata {
   display: grid;
   grid-template-columns: minmax(70px, max-content) minmax(0, 1fr);
