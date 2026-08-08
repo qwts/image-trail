@@ -9,9 +9,7 @@ import { createBackupHistory, createCloudBackupMetadata, type CloudBackupHistory
 import { cloudConnectionLabel, createCloudBackupButton } from './cloud-backup-controls.js';
 import { createDirectMediaUrlControl, readMediaFiles } from './media-import-controls.js';
 import { addTrustedClickListener } from './trusted-events.js';
-
 export type { ImportExportAction } from './import-export-actions.js';
-
 type RestorePreviewAction = Extract<
   ImportExportAction,
   { readonly name: 'import/confirm-restore-preview' } | { readonly name: 'import/cancel-restore-preview' }
