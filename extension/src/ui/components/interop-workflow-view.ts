@@ -294,13 +294,16 @@ function createProviderRecovery(
   };
 }
 
-export function openInteropWorkflow(entry: InteropEntryContext, recordIds: readonly string[], locked = false): void {
+export function openInteropWorkflow(entry: InteropEntryContext, recordIds: readonly string[], locked = false, anchor?: Element): void {
   let focused = document.activeElement;
   while (focused instanceof HTMLElement && focused.shadowRoot?.activeElement instanceof HTMLElement) {
     focused = focused.shadowRoot.activeElement;
   }
-  const previousFocus = focused instanceof HTMLElement ? focused : null;
-  const activeRoot = previousFocus?.getRootNode();
+  const previousFocus = anchor instanceof HTMLElement ? anchor : focused instanceof HTMLElement ? focused : null;
+  // Production panels keep their shadow root closed, so the activeElement walk stops at the
+  // shadow host; only the opener control's own root node still reaches inside the panel.
+  const anchorRoot = anchor?.getRootNode();
+  const activeRoot = anchorRoot instanceof ShadowRoot ? anchorRoot : previousFocus?.getRootNode();
   const modalParent = activeRoot instanceof ShadowRoot ? activeRoot : document.body;
   const panelRoots = Array.from(modalParent.querySelectorAll<HTMLElement>('.image-trail-panel-root')).map((root) => ({
     root,
@@ -312,7 +315,7 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     root.style.pointerEvents = 'none';
   }
   const scrim = document.createElement('div');
-  scrim.className = 'image-trail-interop-scrim';
+  scrim.className = 'image-trail-interop-scrim image-trail-panel-root';
   scrim.setAttribute('role', 'dialog');
   scrim.setAttribute('aria-modal', 'true');
   scrim.setAttribute('aria-label', 'Transfer and Sync');
