@@ -6,6 +6,7 @@ import type { DestinationServices } from './destination-services.js';
 import { useRequestGeneration } from './request-generation.js';
 import { AutomationSettingsGroup, SystemSettingsGroup, UtilitySettingsGroup } from './settings-automation-system.js';
 import { DisplaySettingsGroup, PrivacySettingsGroup } from './settings-display-privacy.js';
+import { UrlReviewStatusSettingsGroup } from './url-review-status-settings.js';
 
 interface SettingsState {
   readonly settings: PlaintextLocalSettings | null;
@@ -81,6 +82,7 @@ export function SettingsDestination({ services }: { readonly services: Destinati
       <DisplaySettingsGroup {...props} />
       <PrivacySettingsGroup {...props} />
       <AutomationSettingsGroup {...props} />
+      <UrlReviewStatusSettingsGroup services={services} privacyMode={page.settings.privacyModeEnabled} />
       <UtilitySettingsGroup {...props} />
       <SystemSettingsGroup {...props} identity={page.identity} />
     </div>

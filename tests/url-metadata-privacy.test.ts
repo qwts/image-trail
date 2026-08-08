@@ -29,6 +29,7 @@ test('encrypted URL metadata rows round-trip without plaintext host, page, or im
   assert.deepEqual(await parsed.get(parsedRecord.hostname, parsedRecord.pageUrl), parsedRecord);
   assert.deepEqual(await parsed.getForSource(parsedRecord.hostname, parsedRecord.selectedUrl!), parsedRecord);
   assert.deepEqual(await reviews.listByHostname(reviewRecord.hostname), [reviewRecord]);
+  assert.deepEqual(await reviews.listAll(), [reviewRecord]);
 
   const records = await metadataRecords(db);
   const privateRows = records.filter((record) => String(record['kind']).endsWith('Encrypted'));

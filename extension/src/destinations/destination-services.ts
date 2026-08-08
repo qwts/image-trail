@@ -6,8 +6,10 @@ import { RecallStore, type RecallCandidatesResult, type RecallRecordsResult } fr
 import { sendRuntimeMessage } from '../content/runtime-message.js';
 import type { BuildIdentity } from '../core/build-info.js';
 import { recordHasStoredOriginal } from '../core/display-records.js';
+import type { UrlReviewStatusRecord } from '../core/types.js';
 import type { PlaintextLocalSettings } from '../data/local-settings.js';
 import { LOCAL_SETTINGS_KEY } from '../data/local-settings.js';
+import { IndexedDbUrlReviewStatusStore } from '../data/url-review-status-controller.js';
 
 const DASHBOARD_LIMIT = 200;
 const RECALL_LIMIT = 100;
@@ -32,6 +34,7 @@ export interface DestinationServices {
   loadRecall(offset?: number): Promise<RecallWindow>;
   recall(ids: readonly string[]): Promise<RecallRecordsResult>;
   loadSettings(): Promise<PlaintextLocalSettings>;
+  loadUrlReviewStatus(): Promise<readonly UrlReviewStatusRecord[]>;
   saveSettings(settings: PlaintextLocalSettings): Promise<void>;
   loadBuildIdentity(): Promise<BuildIdentity | null>;
   subscribeLibrary(refresh: () => void): () => void;
@@ -62,6 +65,17 @@ export function createDestinationServices(): DestinationServices {
     },
     recall: (ids) => recall.recall(ids),
     loadSettings: () => settings.load(),
+    loadUrlReviewStatus: async () => {
+      const current = await settings.load();
+      const reviews = new IndexedDbUrlReviewStatusStore({
+        getSearchableMetadataPolicy: () => current.searchableMetadataPolicy,
+      });
+      try {
+        return await reviews.listAll();
+      } finally {
+        await reviews.close();
+      }
+    },
     saveSettings: (value) => settings.save(value),
     loadBuildIdentity,
     subscribeLibrary: (refresh) => subscribeLibrary(refresh),

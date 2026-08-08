@@ -3,7 +3,7 @@ import test from 'node:test';
 import { act, type ReactNode } from 'react';
 
 import type { RecallRecordsResult } from '../../extension/src/content/recall-store.js';
-import type { RecallCandidate } from '../../extension/src/core/types.js';
+import type { RecallCandidate, UrlReviewStatusRecord } from '../../extension/src/core/types.js';
 import { DEFAULT_LOCAL_SETTINGS } from '../../extension/src/data/local-settings.js';
 import { DashboardDestination } from '../../extension/src/destinations/dashboard-destination.js';
 import { RecallDestination } from '../../extension/src/destinations/recall-destination.js';
@@ -57,6 +57,7 @@ function services(overrides: Partial<DestinationServices> = {}): DestinationServ
     loadRecall: async () => recallWindow([]),
     recall: async (): Promise<RecallRecordsResult> => ({ ok: true, records: [], failedCount: 0, message: 'Recalled records.' }),
     loadSettings: async () => DEFAULT_LOCAL_SETTINGS,
+    loadUrlReviewStatus: async () => [],
     saveSettings: async () => undefined,
     loadBuildIdentity: async () => null,
     subscribeLibrary: noopSubscription,
@@ -177,7 +178,7 @@ test('Settings renders all groups and persists through the extension-owned servi
     await flush();
     assert.deepEqual(
       Array.from(root.querySelectorAll('summary')).map((summary) => summary.textContent),
-      ['Display', 'Privacy', 'Automation', 'Utilities', 'System'],
+      ['Display', 'Privacy', 'Automation', 'URL review history', 'Utilities', 'System'],
     );
     const privacyGroup = Array.from(root.querySelectorAll('details')).find(
       (details) => details.querySelector('summary')?.textContent === 'Privacy',
@@ -198,6 +199,80 @@ test('Settings renders all groups and persists through the extension-owned servi
     assert.equal(preloadCache?.min, '1');
     assert.equal(preloadCache?.max, '500');
     assert.match(root.textContent ?? '', /Cache holds 1–500 image responses per page session/u);
+  } finally {
+    await cleanup(root);
+  }
+});
+
+test('Settings reviews URL status by site and status without loading durable or transient libraries', async () => {
+  let dashboardLoads = 0;
+  let recallLoads = 0;
+  const root = await mount(
+    <SettingsDestination
+      services={services({
+        loadDashboard: async () => {
+          dashboardLoads += 1;
+          throw new Error('unexpected dashboard read');
+        },
+        loadRecall: async () => {
+          recallLoads += 1;
+          throw new Error('unexpected Recall read');
+        },
+        loadUrlReviewStatus: async () => reviewRecords(),
+      })}
+    />,
+  );
+  try {
+    await flush();
+    assert.equal(dashboardLoads, 0);
+    assert.equal(recallLoads, 0);
+    assert.match(root.textContent ?? '', /3 matching review records/u);
+    assert.match(root.textContent ?? '', /First reviewed: 2026-07-14 10:00:00Z/u);
+    assert.match(root.textContent ?? '', /Last reviewed: 2026-07-14 12:30:00Z/u);
+    assert.match(root.textContent ?? '', /Elapsed span: 2 hours 30 min/u);
+    assert.deepEqual(
+      Array.from(root.querySelectorAll<HTMLSelectElement>('[aria-label="URL review site"] option')).map((option) => option.textContent),
+      ['All sites', 'alpha.example.test', 'images.example.test'],
+    );
+
+    const site = root.querySelector<HTMLSelectElement>('[aria-label="URL review site"]');
+    const status = root.querySelector<HTMLSelectElement>('[aria-label="URL review status"]');
+    await act(async () => {
+      if (site) {
+        site.value = 'site-2';
+        site.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (status) {
+        status.value = 'failed';
+        status.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+    await flush();
+    assert.equal(root.querySelectorAll('.image-trail-url-review__record').length, 1);
+    assert.match(root.textContent ?? '', /https:\/\/images\.example\.test\/broken\.jpg/u);
+    assert.match(root.textContent ?? '', /Image failed: HTTP 404/u);
+    assert.doesNotMatch(root.textContent ?? '', /alpha\.example\.test\/one/u);
+  } finally {
+    await cleanup(root);
+  }
+});
+
+test('Settings URL review history masks site, URL, field, reason, and exact time metadata in Privacy Mode', async () => {
+  const root = await mount(
+    <SettingsDestination
+      services={services({
+        loadSettings: async () => ({ ...DEFAULT_LOCAL_SETTINGS, privacyModeEnabled: true }),
+        loadUrlReviewStatus: async () => reviewRecords(),
+      })}
+    />,
+  );
+  try {
+    await flush();
+    assert.doesNotMatch(root.innerHTML, /alpha\.example|images\.example|broken\.jpg|field-secret|HTTP 404|2026-07-14T|2026-07-14 1/iu);
+    assert.match(root.textContent ?? '', /Private site 1/u);
+    assert.match(root.textContent ?? '', /Private source URL/u);
+    assert.match(root.textContent ?? '', /Exact review timing is hidden in Privacy Mode/u);
+    assert.equal(root.querySelectorAll('.image-trail-url-review__record[data-privacy="true"]').length, 3);
   } finally {
     await cleanup(root);
   }
@@ -332,8 +407,44 @@ test('Settings exposes a retry path after a repository load failure', async () =
     await act(async () => retry?.click());
     await flush();
     assert.equal(attempts, 2);
-    assert.equal(root.querySelectorAll('.image-trail-destination-settings__group').length, 5);
+    assert.equal(root.querySelectorAll('.image-trail-destination-settings__group').length, 6);
   } finally {
     await cleanup(root);
   }
 });
+
+function reviewRecords(): readonly UrlReviewStatusRecord[] {
+  return [
+    {
+      schemaVersion: 1,
+      hostname: 'images.example.test',
+      pageUrl: 'https://images.example.test/gallery?private=one',
+      sourceUrl: 'https://images.example.test/broken.jpg',
+      status: 'failed',
+      fieldIds: ['field-secret'],
+      activeFieldId: 'field-secret',
+      reason: 'Image failed: HTTP 404',
+      updatedAt: '2026-07-14T12:30:00.000Z',
+    },
+    {
+      schemaVersion: 1,
+      hostname: 'images.example.test',
+      pageUrl: 'https://images.example.test/gallery?private=two',
+      sourceUrl: 'https://images.example.test/unchanged.jpg',
+      status: 'unchanged',
+      fieldIds: ['field-secret'],
+      activeFieldId: null,
+      updatedAt: '2026-07-14T11:00:00.000Z',
+    },
+    {
+      schemaVersion: 1,
+      hostname: 'alpha.example.test',
+      pageUrl: 'https://alpha.example.test/page',
+      sourceUrl: 'https://alpha.example.test/one.jpg',
+      status: 'passed',
+      fieldIds: [],
+      activeFieldId: null,
+      updatedAt: '2026-07-14T10:00:00.000Z',
+    },
+  ];
+}

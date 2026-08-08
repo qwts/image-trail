@@ -686,18 +686,35 @@
     },
     {
       "id": "url-review-status-import-export",
-      "acceptance": "URL review status import/export",
+      "acceptance": "URL review status import/export and read-only review by site",
       "repoPath": "docs/acceptance-tests/url-review-status-import-export.md",
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-URL-Review-Status-Import-Export",
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/import-export.test.ts", "tests/restore-import-preview.test.ts"]
+          "paths": [
+            "tests/import-export.test.ts",
+            "tests/restore-import-preview.test.ts",
+            "tests/indexeddb-repositories.test.ts",
+            "tests/url-metadata-privacy.test.ts",
+            "tests/dom/extension-destination-surfaces.test.tsx"
+          ],
+          "notes": "Covers all-sites reads under plaintext and encrypted searchable-metadata policy, site/status filtering, exact first/last/elapsed time derivation, read-only Settings rendering, Privacy Mode masking, and the no Queue/Recents/Recall service boundary."
         },
         {
           "type": "playwright-e2e",
-          "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
-          "notes": "Covers passed and failed URL review status records, JSON export/import restore preview, confirm import, and no Recents, pins/bookmarks, Recall, or encrypted-original side effects."
+          "paths": ["tests/e2e/url-editor-parsed-fields.spec.ts", "tests/e2e/extension-destination-pages.spec.ts"],
+          "notes": "Covers passed and failed URL review status records, JSON export/import restore preview, confirm import, the extension-owned Settings review surface with site/status filters, exact time span, Privacy Mode masking, and no Recents, pins/bookmarks, Recall, or encrypted-original side effects."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/stories/extension-destinations.stories.tsx",
+          "notes": "Covers normal filtering and a privacy-masked review-history state without exact site, URL, field, reason, or timestamp text."
+        },
+        {
+          "type": "manual",
+          "reason": "Screen-sharing privacy and readability across real retained review histories need human visual confirmation.",
+          "notes": "Open Settings > URL review history with records from at least two sites and all three statuses. Verify site/status filters, first/last/elapsed context, long URL wrapping, and Reload. Enable Privacy Mode and verify site, source/page URLs, field ids, reasons, and exact times are absent while filter controls and status categories remain usable."
         }
       ]
     },

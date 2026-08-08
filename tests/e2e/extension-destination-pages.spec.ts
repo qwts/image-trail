@@ -20,6 +20,11 @@ test.afterEach(async ({ extensionId, page }) => {
       await chrome.runtime.sendMessage({ type: 'imageTrail.removeBookmarks', version: 1, payload: { ids } });
     }
     await chrome.storage.local.remove('imageTrail.localSettings');
+    await chrome.runtime.sendMessage({
+      type: 'imageTrail.clearUrlReviewStatus',
+      version: 1,
+      payload: { filter: { scope: 'all' } },
+    });
   }, PREFIX);
 });
 
@@ -62,21 +67,38 @@ test('real destination pages share navigation and real durable state', async ({ 
   await expect(page.getByText('Durable record 30')).toHaveCount(0);
   await expect.poll(() => firstDurableLabel(page)).toBe('Durable record 30');
 
+  await seedUrlReviewHistory(page);
+
   await page.getByRole('link', { name: /Settings/u }).click();
   await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
   await expect(page.locator('.image-trail-destination-settings__group > summary')).toHaveText([
     'Display',
     'Privacy',
     'Automation',
+    'URL review history',
     'Utilities',
     'System',
   ]);
+  await page.getByText('URL review history', { exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'URL review site' }).locator('option')).toHaveText([
+    'All sites',
+    'alpha.example.test',
+    'images.example.test',
+  ]);
+  await page.getByRole('combobox', { name: 'URL review site' }).selectOption({ label: 'images.example.test' });
+  await page.getByRole('combobox', { name: 'URL review status' }).selectOption('failed');
+  await expect(page.locator('.image-trail-url-review__record')).toHaveCount(1);
+  await expect(page.getByText('Image failed: HTTP 404')).toBeVisible();
+  await expect(page.getByText('Elapsed span: under 1 minute')).toBeVisible();
   await captureArtifact(page, testInfo, '07-settings');
 
   await page.getByText('Privacy', { exact: true }).click();
   const privacy = page.getByRole('checkbox', { name: 'Privacy mode' });
   await privacy.check();
   await expect.poll(() => savedPrivacyMode(page)).toBe(true);
+  await expect(page.getByText('Private source URL')).toBeVisible();
+  await expect(page.locator('.image-trail-url-review__record')).not.toContainText('images.example.test');
+  await expect(page.locator('.image-trail-url-review__record')).not.toContainText('HTTP 404');
   await page.reload();
   await page.getByText('Privacy', { exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'Privacy mode' })).toBeChecked();
@@ -209,6 +231,38 @@ async function seedRecentOnlyRecord(page: Page): Promise<void> {
       },
     });
   });
+}
+
+async function seedUrlReviewHistory(page: Page): Promise<void> {
+  const responses = await page.evaluate(async () => {
+    const records = [
+      {
+        schemaVersion: 1,
+        hostname: 'images.example.test',
+        pageUrl: 'https://images.example.test/gallery?private=one',
+        sourceUrl: 'https://images.example.test/broken.jpg',
+        status: 'failed',
+        fieldIds: ['path:0:0'],
+        activeFieldId: 'path:0:0',
+        reason: 'Image failed: HTTP 404',
+        updatedAt: '2026-07-14T12:30:00.000Z',
+      },
+      {
+        schemaVersion: 1,
+        hostname: 'alpha.example.test',
+        pageUrl: 'https://alpha.example.test/page',
+        sourceUrl: 'https://alpha.example.test/one.jpg',
+        status: 'passed',
+        fieldIds: [],
+        activeFieldId: null,
+        updatedAt: '2026-07-14T10:00:00.000Z',
+      },
+    ];
+    return Promise.all(
+      records.map((record) => chrome.runtime.sendMessage({ type: 'imageTrail.saveUrlReviewStatus', version: 1, payload: { record } })),
+    );
+  });
+  expect(responses.every((response) => (response as { payload?: { ok?: boolean } })?.payload?.ok === true)).toBe(true);
 }
 
 async function firstDurableLabel(page: Page): Promise<string | undefined> {
