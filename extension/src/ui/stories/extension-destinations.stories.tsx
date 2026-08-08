@@ -102,8 +102,8 @@ export const Settings: Story = {
     const downArrow = canvas.getByRole('combobox', { name: 'Down arrow action' });
     await userEvent.selectOptions(downArrow, 'download');
     await expect(savedDownArrowAction).toHaveBeenCalledWith('download');
-    await userEvent.click(canvas.getByText('URL review history'));
-    await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'URL review status' }), 'failed');
+    await userEvent.click(await canvas.findByText('URL review history'));
+    await userEvent.selectOptions(await canvas.findByRole('combobox', { name: 'URL review status' }), 'failed');
     await expect(canvas.getByText('Review detail hidden')).toBeVisible();
   },
 };
@@ -112,7 +112,7 @@ export const SettingsPrivateReviewHistory: Story = {
   render: () => page('settings', <SettingsDestination services={services({ privacyMode: true })} />),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByText('URL review history'));
+    await userEvent.click(await canvas.findByText('URL review history'));
     await expect(await canvas.findAllByText('Private source URL')).toHaveLength(2);
     await expect(canvas.getByText('Exact review timing is hidden in Privacy Mode.')).toBeVisible();
     await expect(canvasElement.innerHTML).not.toContain('images.example.test');
