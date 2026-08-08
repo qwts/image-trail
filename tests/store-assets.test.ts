@@ -93,12 +93,44 @@ test('Chrome Web Store submission evidence locks the audited release, manifest, 
       'store-assets/releases/v0.26.6/image-trail-small-promo-440x280.png',
     ],
   );
-  for (const asset of evidence.assets) {
-    assert.equal(asset.sourceCommit, evidence.release.commit, `${asset.file} should name its immutable source commit`);
+  const expectedAssets = [
+    {
+      file: 'store-assets/releases/v0.26.6/icon128.png',
+      width: 128,
+      height: 128,
+      sha256: 'b1faf228a9332523b724543677d921dec87fb5303b3b82c3a1d176a65b23009b',
+    },
+    {
+      file: 'store-assets/releases/v0.26.6/image-trail-screenshot-1280x800.png',
+      width: 1280,
+      height: 800,
+      sha256: '859b89a13e9c4371d84ebb4d6301bbef5ae71732c937f90d4b959a1f9a2f6378',
+    },
+    {
+      file: 'store-assets/releases/v0.26.6/image-trail-small-promo-440x280.png',
+      width: 440,
+      height: 280,
+      sha256: '0ce322069e4486b84604f29641954bb85b022f1e44df4c3494eba651225bbac4',
+    },
+  ] as const;
+  for (let index = 0; index < expectedAssets.length; index += 1) {
+    const expected = expectedAssets[index]!;
+    const asset = evidence.assets[index]!;
+    assert.deepEqual(
+      asset,
+      {
+        file: expected.file,
+        sourceCommit: evidence.release.commit,
+        width: expected.width,
+        height: expected.height,
+        sha256: expected.sha256,
+      },
+      `${expected.file} should match the audited record`,
+    );
     const bytes = readFileSync(path.resolve(asset.file));
     assert.deepEqual([...bytes.subarray(0, 8)], pngSignature, `${asset.file} should be a PNG`);
-    assert.equal(bytes.readUInt32BE(16), asset.width, `${asset.file} should match the audited width`);
-    assert.equal(bytes.readUInt32BE(20), asset.height, `${asset.file} should match the audited height`);
-    assert.equal(sha256(asset.file), asset.sha256, `${asset.file} should match the audited SHA-256`);
+    assert.equal(bytes.readUInt32BE(16), expected.width, `${asset.file} should match the audited width`);
+    assert.equal(bytes.readUInt32BE(20), expected.height, `${asset.file} should match the audited height`);
+    assert.equal(sha256(asset.file), expected.sha256, `${asset.file} should match the audited SHA-256`);
   }
 });
