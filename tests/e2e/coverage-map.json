@@ -18,7 +18,7 @@
             "tests/release-artifacts.test.ts",
             "tests/manifest-commands.test.ts"
           ],
-          "notes": "Covers the default-off build define, baseline manifest permission and pairing-import artifact removal, release-audit rejection, exact review and custody counts, durable bookmark selection IDs, stable canonical identity, pairing-key-sealed Move outbox persistence and restart recovery, provider selection and extension-owned pairing import controls, pairing-return status refresh, synchronous provider-specific permission preflight, conflict intent, gated Queue and captured-original entry points, and locked-state privacy."
+          "notes": "Covers the default-off build define, baseline manifest permission and pairing-import artifact removal, release-audit rejection, exact review and custody counts, durable bookmark selection IDs, stable canonical identity, pairing-key-sealed Move outbox persistence and restart recovery, provider selection and extension-owned pairing import controls, pairing-return status refresh, long OAuth channel-loss focus refresh, duplicate interactive-connect suppression, valid saved-credential reuse with expired-credential fallback, scope-denial retry without a reconnect loop, synchronous provider-specific permission preflight, conflict intent, gated Queue and captured-original entry points, and locked-state privacy."
         },
         {
           "type": "storybook",
@@ -33,7 +33,7 @@
         {
           "type": "manual",
           "reason": "Provider credentials and the signed iCloud host remain owner-run closeout evidence in issue #590 before the experimental gate can be removed.",
-          "notes": "Build with IMAGE_TRAIL_ENABLE_INTEROP=1, then open Transfer and Sync from one Queue row, a multi-selection, Gallery, and a captured original. Verify exact counts and recovery copy, keyboard containment, narrow layout, preserved selection and queue order, and no thumbnails, names, counts, or provider details in the locked workspace."
+          "notes": "Build with IMAGE_TRAIL_ENABLE_INTEROP=1, then open Transfer and Sync from one Queue row, a multi-selection, Gallery, and a captured original. Authorize pCloud once, allow the OAuth window to remain open long enough for the original message channel to close, and return focus; verify the connected state refreshes without another OAuth window and repeated Connect clicks never queue windows. Deny or invalidate the app-folder scope and verify an honest provider-unavailable message with Retry check instead of a Reconnect loop. Also verify exact counts and recovery copy, keyboard containment, narrow layout, preserved selection and queue order, and no thumbnails, names, counts, or provider details in the locked workspace."
         }
       ]
     },

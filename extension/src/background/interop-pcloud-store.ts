@@ -31,8 +31,14 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 
 function resultError(result: number): InteropTransportError {
-  if ([1000, 2000, 2003, 2094, 2095, 4000].includes(result))
+  if ([1000, 2000, 2094, 2095, 4000].includes(result))
     return new InteropTransportError('pCloud interoperability authorization expired.', 'auth-expired', false);
+  if (result === 2003)
+    return new InteropTransportError(
+      'pCloud denied interoperability access. Confirm the app-folder scope and pCloud permissions, then retry the check.',
+      'provider-unavailable',
+      true,
+    );
   if (result === 2008) return new InteropTransportError('pCloud interoperability quota is exhausted.', 'quota', false);
   if ([2002, 2005, 2009].includes(result))
     return new InteropTransportError('pCloud interoperability object was not found.', 'not-found', false);
