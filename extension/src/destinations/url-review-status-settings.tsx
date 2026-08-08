@@ -71,12 +71,13 @@ function useReviewHistory(services: DestinationServices) {
 }
 
 function siteOptions(records: readonly UrlReviewStatusRecord[], privacyMode: boolean): readonly SiteOption[] {
-  const hostnames = [...new Set(records.map((record) => record.hostname))].sort((left, right) => left.localeCompare(right));
-  return hostnames.map((hostname) => ({
-    key: `site-${hostname}`,
-    hostname,
-    label: privacyMode ? `Private site ${hostnames.indexOf(hostname) + 1}` : hostname,
-  }));
+  return [...new Set(records.map((record) => record.hostname))]
+    .sort((left, right) => left.localeCompare(right))
+    .map((hostname, index) => ({
+      key: `site-${index + 1}`,
+      hostname,
+      label: privacyMode ? `Private site ${index + 1}` : hostname,
+    }));
 }
 
 function formatTimestamp(timestamp: string): string {
