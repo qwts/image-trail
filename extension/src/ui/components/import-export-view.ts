@@ -1,5 +1,6 @@
 import type { ImportedEncryptedImageFile, ImportRestorePreviewState } from '../../core/types.js';
 import type { BackupReminderSchedule } from '../../core/backup-reminder.js';
+import { backupReminderStatus } from '../../core/backup-reminder.js';
 import { createBackupReminderView } from './backup-reminder-view.js';
 import type { ImportExportAction, UrlReviewStatusClearScope } from './import-export-actions.js';
 import { createActionGroup } from './action-group.js';
@@ -109,6 +110,8 @@ export function createImageTransferView(state: ImportExportViewState, dispatch: 
 }
 
 export function createImportExportView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
+  const reminderDue = state.backupReminder ? backupReminderStatus(state.backupReminder).due : false;
+  if (reminderDue) importExportOpen = true;
   const { section, body } = createCollapsibleImportExportSection(
     'image-trail-panel__import-export',
     'Import / Export',

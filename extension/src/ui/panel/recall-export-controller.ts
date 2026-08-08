@@ -39,18 +39,6 @@ import { PCloudBackupExportCoordinator } from './pcloud-backup-export.js';
 import { finishDirectExport, finishStatusExport, finishTextExport } from './export-completion.js';
 import { SecureSessionUiController } from './secure-session-ui-controller.js';
 
-/**
- * Collaborator that owns the blob-key, pCloud backup, and data/image export flows extracted from
- * ImageTrailPanel (epic #290). The pure builders it calls already live in record-export-helpers.ts,
- * export-download.ts, and panel-services.ts; this controller only orchestrates the stores, the panel
- * state reducer, and the pCloud provider client.
- *
- * Every external interaction routes through the injected {@link RecallExportControllerDeps} callbacks,
- * which the panel wires as lazy arrow closures over `this`. The pCloud client functions are injected
- * (rather than imported directly) so the backup flow is testable with fakes. The sibling
- * RecallRestoreController reaches this controller's `loadAllBookmarksForExport` and
- * `refreshBlobKeyStatus` through its own deps.
- */
 export interface RecallExportControllerDeps {
   getState(): PanelState;
   setState(state: PanelState): void;
@@ -178,7 +166,14 @@ export class RecallExportController {
       ...(this.deps.getState().recall.selectedIds.length > 0 ? this.selectedRecallRecords() : []),
     ];
     const exportsAllBookmarks = selectedBookmarks.length === 0;
-    const bookmarks = exportsAllBookmarks ? await this.loadAllBookmarksForExport() : selectedBookmarks;
+    let bookmarks: readonly ImageDisplayRecord[];
+    try {
+      bookmarks = exportsAllBookmarks ? await this.loadAllBookmarksForExport() : selectedBookmarks;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load bookmarks for export.';
+      finishTextExport(this.deps, undefined, undefined, message, false);
+      return;
+    }
     if (bookmarks.some(isLockedPrivatePin)) {
       finishTextExport(
         this.deps,
@@ -190,8 +185,12 @@ export class RecallExportController {
       return;
     }
     const entries = bookmarks.map(bookmarkRecordToExportEntry);
+    const hasStoredOriginal = bookmarks.some(
+      (record) => record.storedOriginal !== undefined || record.protectedPin?.storedOriginalBlobId !== undefined,
+    );
     const result = plaintext ? exportPlainBookmarks({ entries }) : await exportEncryptedBookmarks({ entries, password });
-    finishStatusExport(this.deps, result, !plaintext && exportsAllBookmarks ? this.deps.backupCompleted : undefined);
+    const shouldComplete = !plaintext && exportsAllBookmarks && !hasStoredOriginal;
+    finishStatusExport(this.deps, result, shouldComplete ? this.deps.backupCompleted : undefined);
   }
 
   async exportUrlReviewStatus(): Promise<void> {
@@ -406,16 +405,25 @@ export class RecallExportController {
   }
 
   async loadAllBookmarksForExport(): Promise<readonly ImageDisplayRecord[]> {
-    const bookmarkStore = this.deps.bookmarkStore();
-    if (!bookmarkStore) return this.deps.getState().bookmarks;
+    const s = this.deps.bookmarkStore();
+    if (!s) return this.deps.getState().bookmarks;
     const all: ImageDisplayRecord[] = [];
-    let offset = 0;
-    const limit = 100;
+    let off = 0,
+      total: number | null = null;
     for (;;) {
-      const page = await bookmarkStore.loadPage({ offset, limit, scope: 'global', currentPageUrl: window.location.href });
-      all.push(...page.items);
-      if (!page.hasOlder) return all;
-      offset = page.offset + page.limit;
+      const p = await s.loadPage({ offset: off, limit: 100, scope: 'global', currentPageUrl: window.location.href });
+      if (total === null) total = p.total;
+      if (p.items.length === 0 && !p.hasOlder && p.total === 0 && (total! > 0 || all.length > 0))
+        throw new Error('Failed to load all bookmarks: paging aborted.');
+      if (!p.hasOlder && p.total !== 0 && all.length + p.items.length !== p.total)
+        throw new Error('Failed to load all bookmarks: incomplete.');
+      all.push(...p.items);
+      if (!p.hasOlder) {
+        if (total !== null && total !== 0 && all.length !== total) throw new Error('Failed to load all bookmarks: count mismatch.');
+        return all;
+      }
+      if (p.items.length === 0 && p.hasOlder) throw new Error('Failed to load all bookmarks: empty page.');
+      off = p.offset + p.limit;
     }
   }
 }

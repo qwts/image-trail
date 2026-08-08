@@ -102,7 +102,8 @@ export class PCloudBackupExportCoordinator {
 
   private async runBackup(password: string, active: ActiveBackup): Promise<void> {
     const bookmarks = await this.deps.loadAllBookmarks();
-    const albums = (await this.deps.albumStore()?.listBackupEntries()) ?? [];
+    const albumStore = this.deps.albumStore();
+    const albums = albumStore ? await albumStore.listBackupEntries() : [];
     this.assertNotCancelled(active);
     if (bookmarks.some(isLockedPrivatePin)) throw new CloudBackupFlowError(PRIVATE_PIN_EXPORT_LOCKED_MESSAGE);
     if (bookmarks.length === 0 && albums.length === 0) {
