@@ -22,7 +22,10 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/extension-smoke.spec.ts", "tests/e2e/interop-ui.spec.ts"],
+          "paths": [
+            "tests/e2e/extension-smoke.spec.ts",
+            "tests/e2e/interop-ui.spec.ts"
+          ],
           "notes": "The packaged baseline exercises gesture-only active-tab injection and core reviewer behavior while proving unfinished Transfer and Sync plus nativeMessaging are absent."
         },
         {
@@ -56,7 +59,11 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/interop-ui.spec.ts", "tests/e2e/gallery-design-system.spec.ts", "tests/e2e/detachable-sections.spec.ts"],
+          "paths": [
+            "tests/e2e/interop-ui.spec.ts",
+            "tests/e2e/gallery-design-system.spec.ts",
+            "tests/e2e/detachable-sections.spec.ts"
+          ],
           "notes": "The default packaged workflow proves nativeMessaging, pairing-import artifacts, Queue and Gallery controls, and the interop runtime registry are absent. The same spec retains an explicit IMAGE_TRAIL_ENABLE_INTEROP=1 path for the experimental Queue workflow and secure extension-page pairing import handoff, while existing workflows guard Gallery and detached-panel behavior."
         },
         {
@@ -177,12 +184,18 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/design-tokens.test.ts", "tests/panel-css.test.ts"],
+          "paths": [
+            "tests/design-tokens.test.ts",
+            "tests/panel-css.test.ts"
+          ],
           "notes": "Covers the canonical token inventory, document and Shadow DOM scopes, direct panel and Gallery imports, removal of Gallery-only aliases and global legacy controls, web-accessible token loading, and preservation of existing panel layout contracts."
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/dom/primitives.test.ts", "tests/primitives-css.test.ts"],
+          "paths": [
+            "tests/dom/primitives.test.ts",
+            "tests/primitives-css.test.ts"
+          ],
           "notes": "Covers typed plain-DOM Button, IconButton, Input, Select, Toggle, Badge, StatusPill, Kbd, Toast, Card, and SectionHeader output; native semantics and callbacks; pressed, waiting, disabled, invalid, semantic, privacy-safe, focus, packaging, and reduced-motion contracts."
         },
         {
@@ -217,7 +230,7 @@
             "tests/dom/primitives.test.ts",
             "tests/primitives-css.test.ts"
           ],
-          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; #755 explicit Hide/Show header controls across Host target, URL editor, Field Editor, Controls, Recents, and Queue; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, Shift-modified Capture/Pin, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
+          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; #755 explicit Hide/Show, Host target detach pinning (#821/#822) header controls across Host target, URL editor, Field Editor, Controls, Recents, and Queue; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, Shift-modified Capture/Pin, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
         },
         {
           "type": "storybook",
@@ -355,7 +368,10 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/recents-queue-recall.spec.ts", "tests/e2e/extension-smoke.spec.ts"],
+          "paths": [
+            "tests/e2e/recents-queue-recall.spec.ts",
+            "tests/e2e/extension-smoke.spec.ts"
+          ],
           "notes": "Covers packaged Queue, Recents, and Recall row selection, preview, paging, capture, durable state, and lifecycle behavior after migration to the shared primitive."
         },
         {
@@ -523,7 +539,11 @@
       "coverage": [
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/keyboard-feedback.spec.ts", "tests/e2e/automation-governance.spec.ts", "tests/e2e/design-baseline.spec.ts"],
+          "paths": [
+            "tests/e2e/keyboard-feedback.spec.ts",
+            "tests/e2e/automation-governance.spec.ts",
+            "tests/e2e/design-baseline.spec.ts"
+          ],
           "notes": "Covers the canonical bare-key table, typing/modifier/native-row exclusions, Trail and Grab routing, capture/pin semantics, 1400ms repeated-key reset, Controls hint reset, privacy-safe feedback, Help/Settings/Escape transitions, Down-arrow assignment and existing download path including imported data images, cross-tab setting reload, source-page reload, extension process restart, duplicate-listener prevention, fixed-viewport capture/Help artifacts, slideshow controls, opposite-direction manual interruption, retry reachability, and request-governor capping."
         },
         {
@@ -640,7 +660,11 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/gallery-search.test.ts", "tests/dom/gallery-view.test.ts", "tests/data-crypto.test.ts"],
+          "paths": [
+            "tests/gallery-search.test.ts",
+            "tests/dom/gallery-view.test.ts",
+            "tests/data-crypto.test.ts"
+          ],
           "notes": "Covers gallery metadata matching, privacy-mode search masking, matched-result queue order, single-pass durable search loading, zero-as-unlimited gallery limit migration, draft search input handling, and the gallery search/page-limit controls."
         },
         {
@@ -717,12 +741,16 @@
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/dom/projection-application-controller.test.ts"],
+          "paths": [
+            "tests/dom/projection-application-controller.test.ts"
+          ],
           "notes": "Covers #429: a successful record preview clears a stale failed draftUrl so the URL editor and parsed fields rebuild from the projected URL."
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/projection-application-controller.test.ts"],
+          "paths": [
+            "tests/projection-application-controller.test.ts"
+          ],
           "notes": "Covers encrypted-original preview hardening: retrieved decrypted data URLs stay out of host-image projection while the selected host image receives only the durable page URL and the panel reports original availability."
         },
         {
@@ -732,7 +760,9 @@
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/dom/projection-application-controller.test.ts"],
+          "paths": [
+            "tests/dom/projection-application-controller.test.ts"
+          ],
           "notes": "Covers #434: plain-URL record previews load through the applySelectedUrl pipeline (record-preview session, projection order, field-state persistence) and reset stale failed/active field markers and the failed draft from the previous URL."
         },
         {
@@ -747,7 +777,10 @@
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/dom/fields-view.test.ts", "tests/projection-application-controller.test.ts"],
+          "paths": [
+            "tests/dom/fields-view.test.ts",
+            "tests/projection-application-controller.test.ts"
+          ],
           "notes": "Covers #450: a load failure always sets failedFieldId (functional re-basing + review record) and records the failure, but the visible feedback is gated by the loadFailureFeedback mode \u2014 the field ring renders only when showFieldFailure is not Mute, and the projection failure branch flashes the status error only in Alert (Display/Mute keep the prior status/message)."
         },
         {
@@ -785,7 +818,10 @@
         {
           "type": "unit-dom",
           "notes": "Covers the Recall drawer's inline width staying clamped inside the viewport's edge padding on a narrow viewport, mirroring the CSS max-width so the Close control can't be pushed off-screen (regression: a stale 240px width floor). Header follow-up to #408: the detach control and Show/Hide hint form fixed right-hand columns (single auto margin; fixed-width hint), and Reset all availability compares resolved image URLs so a restored baseline no longer shows it when nothing changed.",
-          "paths": ["tests/dom/recall-destination-view.test.ts", "tests/parsed-field-reset-baseline.test.ts"]
+          "paths": [
+            "tests/dom/recall-destination-view.test.ts",
+            "tests/parsed-field-reset-baseline.test.ts"
+          ]
         }
       ]
     },
@@ -872,7 +908,10 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/url-editor-parsed-fields.spec.ts", "tests/e2e/extension-destination-pages.spec.ts"],
+          "paths": [
+            "tests/e2e/url-editor-parsed-fields.spec.ts",
+            "tests/e2e/extension-destination-pages.spec.ts"
+          ],
           "notes": "Covers passed and failed URL review status records, JSON export/import restore preview, confirm import, the extension-owned Settings review surface with site/status filters, exact time span, Privacy Mode masking, and no Recents, pins/bookmarks, Recall, or encrypted-original side effects."
         },
         {
@@ -895,7 +934,11 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/invariants.test.ts", "tests/panel-state-queue-recents.test.ts", "tests/dom/recall-restore-controller.test.ts"]
+          "paths": [
+            "tests/invariants.test.ts",
+            "tests/panel-state-queue-recents.test.ts",
+            "tests/dom/recall-restore-controller.test.ts"
+          ]
         },
         {
           "type": "playwright-e2e",
@@ -961,7 +1004,10 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/recents-scope.spec.ts", "tests/e2e/recents-worker-session.spec.ts"],
+          "paths": [
+            "tests/e2e/recents-scope.spec.ts",
+            "tests/e2e/recents-worker-session.spec.ts"
+          ],
           "notes": "Covers packaged-extension switching across two pages on one site and a second site, scoped row counts, labels, focus retention after rerender, a 340px viewport regression pin that keeps the collapse header under 44px with scope context below it, and Recents restoration after the MV3 service worker is terminated and recreated within the same browser session."
         },
         {
@@ -997,7 +1043,10 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/recents-queue-recall.spec.ts", "tests/e2e/bookmark-original-preservation.spec.ts"],
+          "paths": [
+            "tests/e2e/recents-queue-recall.spec.ts",
+            "tests/e2e/bookmark-original-preservation.spec.ts"
+          ],
           "notes": "Covers a captured queue row moving off the visible page into Recall, then reloading the same URL into Recents with the pinned/captured state and durable actions reflected without creating duplicate controls; also verifies re-pinning a captured URL keeps its stored-original indicator."
         }
       ]
@@ -1093,7 +1142,10 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/image-utilities.spec.ts", "tests/e2e/storage-orphan-scan.spec.ts"],
+          "paths": [
+            "tests/e2e/image-utilities.spec.ts",
+            "tests/e2e/storage-orphan-scan.spec.ts"
+          ],
           "notes": "Covers encrypted original setup, capture from a queue row, stored-original indicator, selected-record export preferring stored original bytes when unlocked, and isolated packaged storage-health and cleanup requests that preserve byte/count/deletion behavior while rejecting blob-store getAll and value-cursor reads."
         }
       ]
@@ -1106,7 +1158,10 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/encrypted-blobs.test.ts", "tests/image-request-manager.test.ts"]
+          "paths": [
+            "tests/encrypted-blobs.test.ts",
+            "tests/image-request-manager.test.ts"
+          ]
         },
         {
           "type": "playwright-e2e",
@@ -1123,7 +1178,10 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/data-crypto.test.ts", "tests/indexeddb-protected-pins.test.ts"]
+          "paths": [
+            "tests/data-crypto.test.ts",
+            "tests/indexeddb-protected-pins.test.ts"
+          ]
         },
         {
           "type": "playwright-e2e",
@@ -1176,7 +1234,10 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/secure-session.spec.ts", "tests/e2e/import-export-settings.spec.ts"],
+          "paths": [
+            "tests/e2e/secure-session.spec.ts",
+            "tests/e2e/import-export-settings.spec.ts"
+          ],
           "notes": "Covers one real extension key session across the panel, a detached Recents window, Dashboard, Gallery, and a decrypted preview tab; verifies no protected DOM remains while locked, cold-start Gallery content stays detached, failed unlock cannot flash content, key-import unlock cannot recurse through Recall rendering, cross-context unlock restores every surface, and the injected panel host is never duplicated. The packaged path also clicks the title-bar Lock workspace control after password setup."
         }
       ]
@@ -1292,7 +1353,7 @@
             "tests/dom/extension-destination-surfaces.test.tsx",
             "tests/dom/parsed-field-navigation-controller.test.ts"
           ],
-          "notes": "Includes #631 cache bounds: supported settings are 1–500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Includes #627 decoded-image lifecycle coverage too: rebuild and disabled-preload paths revoke offscreen buffered blobs while transferring the still-selected display blob, final disposal revokes every retained blob, concurrent decodes that complete after disposal are revoked too, and the HTTP anchor remains untouched; DOM-backed image state is covered. Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts. Includes compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
+          "notes": "Includes #631 cache bounds: supported settings are 1\u2013500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Includes #627 decoded-image lifecycle coverage too: rebuild and disabled-preload paths revoke offscreen buffered blobs while transferring the still-selected display blob, final disposal revokes every retained blob, concurrent decodes that complete after disposal are revoked too, and the HTTP anchor remains untouched; DOM-backed image state is covered. Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts. Includes compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
         },
         {
           "type": "storybook",
@@ -1302,16 +1363,20 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/automation-governance.spec.ts",
-          "notes": "Covers #631 in the packaged panel: Cache exposes the 1–500 range and explains the per-page-session memory bound."
+          "notes": "Covers #631 in the packaged panel: Cache exposes the 1\u2013500 range and explains the per-page-session memory bound."
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/dom/parsed-field-navigation-controller.test.ts"],
+          "paths": [
+            "tests/dom/parsed-field-navigation-controller.test.ts"
+          ],
           "notes": "Covers #447: when the navigation drain stops after skipping (no loadable candidate), the transient quiet-skip failed-field marker and stale failed draft are reconciled at the drain's resting point, so the field is not left flagged failed while showing its last-good value and the next press bases from the good URL."
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/buffered-navigation-controller.test.ts"],
+          "paths": [
+            "tests/buffered-navigation-controller.test.ts"
+          ],
           "notes": "Covers #450: the 'Skipped a failed image candidate.' toast is failure feedback, so it fires only in Alert mode; Display/Mute skip past the failed neighbor to the next good candidate silently (the skip is driven by the request-policy cache, not the toast)."
         },
         {
@@ -1375,7 +1440,10 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/image-request-manager.test.ts", "tests/buffered-navigation-controller.test.ts"]
+          "paths": [
+            "tests/image-request-manager.test.ts",
+            "tests/buffered-navigation-controller.test.ts"
+          ]
         },
         {
           "type": "deferred",
@@ -1412,7 +1480,11 @@
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/form-controls.test.ts", "tests/dom/form-controls.test.ts", "tests/dom/panel-render-controller.test.ts"],
+          "paths": [
+            "tests/form-controls.test.ts",
+            "tests/dom/form-controls.test.ts",
+            "tests/dom/panel-render-controller.test.ts"
+          ],
           "notes": "Covers accessible password and file-picker labeling plus native file-chooser focus, selection, cancellation, and render-time focus restoration without moving the Settings scroll position."
         }
       ]
@@ -1461,12 +1533,18 @@
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/dom/history-view.test.ts", "tests/dom/bookmarks-view.test.ts"],
+          "paths": [
+            "tests/dom/history-view.test.ts",
+            "tests/dom/bookmarks-view.test.ts"
+          ],
           "notes": "Covers #430: the Recents and Queue action toolbars render inside their section header rows (heading | wrapping toolbar | pinned detach column) instead of floating rows below the heading."
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/dom/history-view.test.ts", "tests/dom/bookmarks-view.test.ts"],
+          "paths": [
+            "tests/dom/history-view.test.ts",
+            "tests/dom/bookmarks-view.test.ts"
+          ],
           "notes": "Covers #438/#441/#755: explicit Recents/Queue Hide/Show buttons collapse and expand the section body while keeping sort, detach, and bulk actions independently usable; detached windows omit the attached collapse control."
         },
         {
@@ -1476,7 +1554,9 @@
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/dom/detachable-section.test.ts"],
+          "paths": [
+            "tests/dom/detachable-section.test.ts"
+          ],
           "notes": "Covers #443: collapsing a Recents/Queue section parks its list scrollTop in PanelLayoutState (the list leaves the DOM, so the plain scroll snapshot cannot bridge it) and re-expanding restores the offset; an open list still follows its live snapshot across ordinary re-renders rather than a stale parked value."
         },
         {
@@ -1548,7 +1628,9 @@
         },
         {
           "type": "unit-dom",
-          "paths": ["tests/dom/help-view.test.ts"],
+          "paths": [
+            "tests/dom/help-view.test.ts"
+          ],
           "notes": "Covers help/toggle reduction, the shared shortcut registry rendering (labels come from the same source the keyboard router uses), feature-guide completeness for the major panel areas, and the privacy-inert static-copy guarantee (no URL or blob values in Help content)."
         }
       ],
@@ -1601,7 +1683,10 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/recents-scope.spec.ts", "tests/e2e/recents-queue-recall.spec.ts"],
+          "paths": [
+            "tests/e2e/recents-scope.spec.ts",
+            "tests/e2e/recents-queue-recall.spec.ts"
+          ],
           "notes": "In Chromium, verifies Recents sorting sits left of Site scope below the title and Queue ordering is the first control beside Recall and Queue; current-image Pin lives in the primary Shift-modified Capture control, including while Queue is collapsed."
         },
         {
@@ -1628,7 +1713,10 @@
         },
         {
           "type": "playwright-e2e",
-          "paths": ["tests/e2e/page-context.spec.ts", "tests/e2e/target-recovery.spec.ts"],
+          "paths": [
+            "tests/e2e/page-context.spec.ts",
+            "tests/e2e/target-recovery.spec.ts"
+          ],
           "notes": "The packaged extension proves unrelated infinite-feed churn causes no image geometry reads, adding one feed image measures only that image, a delayed image load refreshes live qualification without a DOM replacement, and redraw recovery still preserves projection ownership and host restoration."
         },
         {
@@ -1692,7 +1780,10 @@
         },
         {
           "type": "storybook",
-          "paths": ["extension/src/ui/render.stories.ts", "extension/src/ui/components/recall-destination-view.stories.ts"],
+          "paths": [
+            "extension/src/ui/render.stories.ts",
+            "extension/src/ui/components/recall-destination-view.stories.ts"
+          ],
           "notes": "Covers Dashboard, Gallery, Recall, and Settings destination compositions, active-tile and close chrome assertions, populated/empty/loading/error/selected Recall states, and narrow destination geometry."
         },
         {
@@ -1754,7 +1845,9 @@
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/dom/page-style.test.ts"],
+          "paths": [
+            "tests/dom/page-style.test.ts"
+          ],
           "notes": "Covers neutralizing the selected image's transition while it is darkened so Chrome's standalone image-viewer grey->black background-color transition cannot animate/flash the backdrop (worst in fit/letterboxed mode), and restoring the original transition last on release so it cannot flash on close either. Page/element restore stays verbatim (tests/page-style.test.ts)."
         }
       ]
