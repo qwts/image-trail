@@ -222,6 +222,72 @@ function trapInteropFocus(scrim: HTMLElement, close: () => void): void {
   });
 }
 
+type InteropWorkflowDispatch = (action: InteropRuntimeAction, renderResult?: boolean) => ReturnType<typeof dispatchInteropRuntime>;
+
+function createProviderRecovery(
+  scrim: HTMLElement,
+  dispatch: InteropWorkflowDispatch,
+  render: (state: InteropVisibleWorkflow) => void,
+  selectedProvider: () => InteropProviderId,
+) {
+  let refreshPairingOnFocus = false;
+  let actionPending = false;
+  let replyLost = false;
+  let focusObserved = false;
+  let probeTimer: ReturnType<typeof setTimeout> | undefined;
+  const probe = (attempt = 0): void => {
+    if (!actionPending || !scrim.isConnected) return;
+    void dispatch({ name: 'status' }, false).then((result) => {
+      if (!actionPending || !scrim.isConnected) return;
+      const state = result?.snapshot.provider.state;
+      const transient = result === null || state === 'connecting' || state === 'disconnected';
+      if (transient && attempt < 2) {
+        probeTimer = setTimeout(() => probe(attempt + 1), 100);
+        return;
+      }
+      if (result) render(result.snapshot);
+      actionPending = false;
+      replyLost = false;
+    });
+  };
+  const onFocus = (): void => {
+    if (!scrim.isConnected) return;
+    if (actionPending) {
+      focusObserved = true;
+      if (replyLost) probe();
+      return;
+    }
+    if (!refreshPairingOnFocus) return;
+    refreshPairingOnFocus = false;
+    void dispatch({ name: 'status' });
+  };
+  const connect = (name: 'connect' | 'reconnect'): void => {
+    if (actionPending) return;
+    actionPending = true;
+    replyLost = false;
+    focusObserved = false;
+    void dispatch({ name, provider: selectedProvider() }).then((result) => {
+      if (result !== null) {
+        actionPending = false;
+        return;
+      }
+      replyLost = true;
+      if (focusObserved) probe();
+    });
+  };
+  window.addEventListener('focus', onFocus);
+  return {
+    connect,
+    expectPairingReturn: () => {
+      refreshPairingOnFocus = true;
+    },
+    dispose: () => {
+      window.removeEventListener('focus', onFocus);
+      if (probeTimer) clearTimeout(probeTimer);
+    },
+  };
+}
+
 export function openInteropWorkflow(entry: InteropEntryContext, recordIds: readonly string[], locked = false): void {
   let focused = document.activeElement;
   while (focused instanceof HTMLElement && focused.shadowRoot?.activeElement instanceof HTMLElement) {
@@ -246,6 +312,10 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
   scrim.setAttribute('aria-label', 'Transfer and Sync');
   const context: InteropRuntimeContext = { entry, total: recordIds.length, recordIds, locked };
   let selectedProvider: InteropProviderId = 'pcloud';
+  function render(state: InteropVisibleWorkflow): void {
+    selectedProvider = state.provider.id;
+    scrim.replaceChildren(createInteropWorkflowView(state, handlers));
+  }
   let latestRequest = 0;
   const dispatch = async (action: InteropRuntimeAction, renderResult = true) => {
     const request = ++latestRequest;
@@ -253,55 +323,9 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     if (renderResult && result && request === latestRequest && scrim.isConnected) render(result.snapshot);
     return result;
   };
-  let refreshPairingOnFocus = false;
-  let providerActionPending = false;
-  let providerReplyLost = false;
-  let providerFocusObserved = false;
-  let providerProbeTimer: ReturnType<typeof setTimeout> | undefined;
-  const probeProviderAfterLostReply = (attempt = 0): void => {
-    if (!providerActionPending || !scrim.isConnected) return;
-    void dispatch({ name: 'status' }, false).then((result) => {
-      if (!providerActionPending || !scrim.isConnected) return;
-      const state = result?.snapshot.provider.state;
-      const transient = result === null || state === 'connecting' || state === 'disconnected';
-      if (transient && attempt < 2) {
-        providerProbeTimer = setTimeout(() => probeProviderAfterLostReply(attempt + 1), 100);
-        return;
-      }
-      if (result) render(result.snapshot);
-      providerActionPending = false;
-      providerReplyLost = false;
-    });
-  };
-  const refreshInteractiveStatus = (): void => {
-    if (!scrim.isConnected) return;
-    if (providerActionPending) {
-      providerFocusObserved = true;
-      if (providerReplyLost) probeProviderAfterLostReply();
-      return;
-    }
-    if (!refreshPairingOnFocus) return;
-    refreshPairingOnFocus = false;
-    void dispatch({ name: 'status' });
-  };
-  const connectProvider = (name: 'connect' | 'reconnect'): void => {
-    if (providerActionPending) return;
-    providerActionPending = true;
-    providerReplyLost = false;
-    providerFocusObserved = false;
-    void dispatch({ name, provider: selectedProvider }).then((result) => {
-      if (result !== null) {
-        providerActionPending = false;
-        return;
-      }
-      providerReplyLost = true;
-      if (providerFocusObserved) probeProviderAfterLostReply();
-    });
-  };
-  window.addEventListener('focus', refreshInteractiveStatus);
+  const providerRecovery = createProviderRecovery(scrim, dispatch, render, () => selectedProvider);
   const close = (): void => {
-    window.removeEventListener('focus', refreshInteractiveStatus);
-    if (providerProbeTimer) clearTimeout(providerProbeTimer);
+    providerRecovery.dispose();
     scrim.remove();
     for (const { root, inert, pointerEvents } of panelRoots) {
       root.inert = inert;
@@ -316,23 +340,19 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
       selectedProvider = provider;
       void dispatch({ name: 'select-provider', provider });
     },
-    onConnect: () => connectProvider('connect'),
+    onConnect: () => providerRecovery.connect('connect'),
     onImportPairing: () => {
-      refreshPairingOnFocus = true;
+      providerRecovery.expectPairingReturn();
       void dispatch({ name: 'open-pairing-import' });
     },
     onStart: () => void dispatch({ name: 'start' }),
     onPause: () => void dispatch({ name: 'pause' }),
     onResume: () => void dispatch({ name: 'resume' }),
     onCancel: () => void dispatch({ name: 'cancel' }),
-    onReconnect: () => connectProvider('reconnect'),
+    onReconnect: () => providerRecovery.connect('reconnect'),
     onRetryCheck: () => void dispatch({ name: 'status' }),
     onDisconnect: () => void dispatch({ name: 'disconnect' }),
     onConflict: (interopId, action, applyToAll) => void dispatch({ name: 'resolve-conflict', interopId, action, applyToAll }),
-  };
-  const render = (state: InteropVisibleWorkflow): void => {
-    selectedProvider = state.provider.id;
-    scrim.replaceChildren(createInteropWorkflowView(state, handlers));
   };
   render(blockedInteropWorkflow(entry, recordIds.length, locked));
   scrim.addEventListener('click', (event) => {
