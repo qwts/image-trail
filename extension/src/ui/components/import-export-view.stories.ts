@@ -19,6 +19,13 @@ type Story = StoryObj<typeof meta>;
 
 export const RecordsReady: Story = {};
 
+export const ManualBackupReminderDue: Story = {
+  render: () =>
+    importExportStory({
+      backupReminder: { enabled: true, intervalDays: 30, nextAt: '2000-01-01T00:00:00.000Z' },
+    }),
+};
+
 export const Busy: Story = {
   render: () =>
     importExportStory({

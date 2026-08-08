@@ -55,7 +55,7 @@ import { PanelRenderController } from './panel/panel-render-controller.js';
 import { ParsedFieldStateRecordController } from './panel/parsed-field-state-record-controller.js';
 import { UrlReviewStatusController } from './panel/url-review-status-controller.js';
 import { PanelDataLoadController } from './panel/panel-data-load-controller.js';
-import { PanelSettingsController } from './panel/panel-settings-controller.js';
+import { createBackupReminderBindings, PanelSettingsController } from './panel/panel-settings-controller.js';
 import { RecallDestinationController } from './panel/recall-destination-controller.js';
 import { RecallExportController } from './panel/recall-export-controller.js';
 import { RecallRestoreController } from './panel/recall-restore-controller.js';
@@ -174,7 +174,7 @@ export class ImageTrailPanel {
     render: () => this.render(),
     renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
-    getLocalSettings: () => this.localSettings,
+    ...createBackupReminderBindings(() => [this.panelSettings, this.localSettings]),
     findSelectedImage: (handleId) => this.findSelectedImage(handleId),
     bookmarkStore: () => this.bookmarkStore,
     albumStore: () => this.albumStore,
@@ -552,8 +552,7 @@ export class ImageTrailPanel {
       refreshRecallIfOpen: () => this.recallDestination.refreshRecallIfOpen(),
       clearRecallMessageTimer: () => this.recallDestination.clearRecallMessageTimer(),
       showFeedback: (message, tone) => this.panelRender.showShortcutFeedback(message, tone),
-      getLocalSettings: () => this.localSettings,
-      saveLocalSettings: (settings) => this.panelSettings.saveLocalSettings(settings),
+      ...createBackupReminderBindings(() => [this.panelSettings, this.localSettings]),
       applyBuildInfoOverlayVisibility: (visible) => this.options.applyBuildInfoOverlayVisibility?.(visible),
       updatePageContextOverride: (context) => this.pageContext.setOverride(context),
       pageAdapter: () => this.pageAdapter,

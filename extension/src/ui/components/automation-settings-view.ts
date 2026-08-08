@@ -9,6 +9,12 @@ import {
   URL_REVIEW_STATUS_LIMITS,
 } from '../../core/settings.js';
 import type { PanelAction } from '../../core/types.js';
+import {
+  BACKUP_REMINDER_INTERVAL_OPTIONS,
+  backupReminderStatus,
+  isBackupReminderIntervalDays,
+  type BackupReminderIntervalDays,
+} from '../../core/backup-reminder.js';
 
 export interface RequestThrottleSettingsState {
   readonly minimumIntervalMs: number;
@@ -27,6 +33,52 @@ export interface NeighborPreloadSettingsState {
 export interface UrlReviewStatusSettingsState {
   readonly limit: number;
   readonly clearAfterExport: boolean;
+}
+
+export interface BackupReminderSettingsState {
+  readonly enabled: boolean;
+  readonly intervalDays: BackupReminderIntervalDays;
+  readonly nextAt: string | null;
+}
+
+export function createBackupReminderSettingsView(state: BackupReminderSettingsState, dispatch: (action: PanelAction) => void): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'image-trail-panel__settings-templates';
+  const heading = document.createElement('h4');
+  heading.textContent = 'Local backup reminder';
+  const enabledLabel = document.createElement('label');
+  enabledLabel.className = 'image-trail-panel__settings-checkbox';
+  const enabledInput = document.createElement('input');
+  enabledInput.type = 'checkbox';
+  enabledInput.checked = state.enabled;
+  const enabledText = document.createElement('span');
+  enabledText.textContent = 'Remind me to make manual encrypted backups';
+  enabledLabel.append(enabledInput, enabledText);
+  const cadence = createSelect(
+    BACKUP_REMINDER_INTERVAL_OPTIONS.map((days) => ({ value: String(days), label: `Every ${days} days` })),
+    String(state.intervalDays),
+  );
+  cadence.disabled = !state.enabled;
+  const dispatchCurrent = (): void => {
+    const intervalDays = Number(cadence.value);
+    if (!isBackupReminderIntervalDays(intervalDays)) return;
+    dispatch({ name: 'settings/update-backup-reminder', enabled: enabledInput.checked, intervalDays });
+  };
+  enabledInput.addEventListener('change', () => {
+    cadence.disabled = !enabledInput.checked;
+    dispatchCurrent();
+  });
+  cadence.addEventListener('change', dispatchCurrent);
+  const status = backupReminderStatus(state);
+  const meta = document.createElement('p');
+  meta.className = 'image-trail-panel__settings-empty';
+  meta.textContent = !state.enabled
+    ? 'Off by default. No alarm, notification, provider connection, or upload is scheduled.'
+    : status.due
+      ? 'A manual encrypted backup is due. The reminder appears only inside Image Trail.'
+      : `Next in-app reminder: ${status.nextAt?.slice(0, 10) ?? 'when Image Trail opens'}. Nothing uploads automatically.`;
+  wrapper.append(heading, enabledLabel, createSettingField('Cadence', cadence), meta);
+  return wrapper;
 }
 
 interface NeighborPreloadControls {

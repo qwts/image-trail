@@ -3,6 +3,7 @@ import { expect, fn, userEvent } from 'storybook/test';
 
 import { settingsGroupStory } from '../stories/settings-story-host.js';
 import {
+  createBackupReminderSettingsView,
   createNeighborPreloadSettingsView,
   createRequestThrottleSettingsView,
   createUrlReviewStatusSettingsView,
@@ -16,6 +17,7 @@ const meta = {
       createRequestThrottleSettingsView({ minimumIntervalMs: 0, maxRequests: 3, windowMs: 10_000 }, dispatchSpy),
       createNeighborPreloadSettingsView({ enabled: false, radius: 3, cacheLimit: 24, probeMethod: 'get', feedback: 'mute' }, dispatchSpy),
       createUrlReviewStatusSettingsView({ limit: 5_000, clearAfterExport: false }, dispatchSpy),
+      createBackupReminderSettingsView({ enabled: false, intervalDays: 30, nextAt: null }, dispatchSpy),
     ]),
 } satisfies Meta;
 

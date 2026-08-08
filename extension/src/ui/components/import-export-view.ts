@@ -1,4 +1,7 @@
-import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePreviewState } from '../../core/types.js';
+import type { ImportedEncryptedImageFile, ImportRestorePreviewState } from '../../core/types.js';
+import type { BackupReminderSchedule } from '../../core/backup-reminder.js';
+import { createBackupReminderView } from './backup-reminder-view.js';
+import type { ImportExportAction, UrlReviewStatusClearScope } from './import-export-actions.js';
 import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
 import { createBackupHistory, createCloudBackupMetadata, type CloudBackupHistoryViewRecord } from './cloud-backup-metadata.js';
@@ -6,23 +9,7 @@ import { cloudConnectionLabel, createCloudBackupButton } from './cloud-backup-co
 import { createDirectMediaUrlControl, readMediaFiles } from './media-import-controls.js';
 import { addTrustedClickListener } from './trusted-events.js';
 
-type UrlReviewStatusClearScope = 'hostname' | 'page' | 'source' | 'all';
-
-export type ImportExportAction =
-  | { readonly name: 'selection/select-visible' }
-  | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
-  | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
-  | { readonly name: 'export/url-review-status' }
-  | { readonly name: 'clear/url-review-status'; readonly scope?: UrlReviewStatusClearScope }
-  | { readonly name: 'export/image'; readonly saveAs?: boolean }
-  | { readonly name: 'export/encrypted-image' }
-  | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string; readonly fileName?: string }
-  | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string; readonly fileName?: string }
-  | { readonly name: 'import/url-review-status'; readonly fileContent: string; readonly fileName?: string }
-  | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
-  | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] }
-  | { readonly name: 'import/confirm-restore-preview' }
-  | { readonly name: 'import/cancel-restore-preview' };
+export type { ImportExportAction } from './import-export-actions.js';
 
 type RestorePreviewAction = Extract<
   ImportExportAction,
@@ -92,6 +79,7 @@ export interface ImportExportViewState {
   readonly lastMessage?: string | undefined;
   readonly lastMessageIsError?: boolean | undefined;
   readonly restorePreview?: ImportRestorePreviewState | undefined;
+  readonly backupReminder?: BackupReminderSchedule | undefined;
 }
 
 let imageUtilitiesOpen = false;
@@ -137,6 +125,9 @@ export function createImportExportView(state: ImportExportViewState, dispatch: (
     msg.textContent = state.lastMessage;
     body.append(msg);
   }
+
+  const reminder = createBackupReminderView(state.backupReminder, () => dispatch({ name: 'backup-reminder/snooze' }));
+  if (reminder) body.append(reminder);
 
   const exportGroup = createExportGroup(state, dispatch);
   const importGroup = createImportGroup(state, dispatch);

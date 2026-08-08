@@ -312,6 +312,39 @@
       ]
     },
     {
+      "id": "local-only-backup-reminders",
+      "acceptance": "Opt-in local-only reminders for manual encrypted backups",
+      "repoPath": "docs/acceptance-tests/local-only-backup-reminders.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Local-Only-Backup-Reminders",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/backup-reminder.test.ts",
+            "tests/local-settings-handlers.test.ts",
+            "tests/panel-settings-controller.test.ts",
+            "tests/dom/backup-reminder-view.test.ts",
+            "tests/dom/extension-destination-surfaces.test.tsx",
+            "tests/dom/recall-export-controller.test.ts"
+          ],
+          "notes": "Covers default-off migration, guarded 7/30/90-day scheduling, due-state calculation, extension-local settings, standalone and source-panel controls, snooze, successful encrypted bookmark and verified manual pCloud completion, plaintext/failure exclusions, and copy that promises no alarms, provider connection, or automatic upload."
+        },
+        {
+          "type": "storybook",
+          "paths": [
+            "extension/src/ui/components/automation-settings-view.stories.ts",
+            "extension/src/ui/components/import-export-view.stories.ts"
+          ],
+          "notes": "Covers the default-off reminder settings and the due manual-backup prompt in the production view factories."
+        },
+        {
+          "type": "manual",
+          "reason": "Calendar rollover and the absence of browser/provider side effects need owner observation in a real extension profile.",
+          "notes": "Confirm reminders are off after install, opt into each cadence, move the local next-due value across the current time, and reopen Image Trail. Verify the due prompt appears only in Import / Export; Remind me later reschedules locally; plaintext/history exports do not clear it; successful encrypted bookmark or manually initiated pCloud backups reschedule it; and no browser notification, provider connection, or upload starts without a separate user action."
+        }
+      ]
+    },
+    {
       "id": "design-system-gallery-acceptance",
       "acceptance": "Shared design-system Gallery and final high-fidelity acceptance",
       "repoPath": "docs/acceptance-tests/gallery-design-system.md",

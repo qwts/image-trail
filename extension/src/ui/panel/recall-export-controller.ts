@@ -36,6 +36,7 @@ import {
   selectedRecords,
 } from './record-export-helpers.js';
 import { PCloudBackupExportCoordinator } from './pcloud-backup-export.js';
+import { finishDirectExport, finishStatusExport, finishTextExport } from './export-completion.js';
 import { SecureSessionUiController } from './secure-session-ui-controller.js';
 
 /**
@@ -57,6 +58,7 @@ export interface RecallExportControllerDeps {
   renderPanelAndRefreshRecall(): void;
   loadBookmarkPage(offset: number, options?: { readonly render?: boolean }): Promise<void>;
   getLocalSettings(): PlaintextLocalSettings;
+  backupCompleted?(): void;
   findSelectedImage(handleId: string): HTMLImageElement | null;
   bookmarkStore(): BookmarkStore | null;
   albumStore(): { readonly listBackupEntries: () => Promise<readonly AlbumBackupEntry[]> } | null;
@@ -163,7 +165,7 @@ export class RecallExportController {
     const history = selectedRecords(this.deps.getState().history, this.deps.getState().selectedHistoryIds);
     const entries = history.map(historyRecordToExportEntry);
     const result = plaintext ? exportPlainHistory({ entries }) : await exportEncryptedHistory({ entries, password });
-    this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
+    finishStatusExport(this.deps, result);
   }
 
   async exportBookmarks(password: string, plaintext: boolean): Promise<void> {
@@ -177,7 +179,8 @@ export class RecallExportController {
     ];
     const bookmarks = selectedBookmarks.length > 0 ? selectedBookmarks : await this.loadAllBookmarksForExport();
     if (bookmarks.some(isLockedPrivatePin)) {
-      this.finishExport(
+      finishTextExport(
+        this.deps,
         undefined,
         undefined,
         'Unlock encrypted storage before exporting private pins so the backup includes their metadata and thumbnails.',
@@ -187,7 +190,7 @@ export class RecallExportController {
     }
     const entries = bookmarks.map(bookmarkRecordToExportEntry);
     const result = plaintext ? exportPlainBookmarks({ entries }) : await exportEncryptedBookmarks({ entries, password });
-    this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
+    finishStatusExport(this.deps, result, plaintext ? undefined : this.deps.backupCompleted);
   }
 
   async exportUrlReviewStatus(): Promise<void> {
@@ -198,7 +201,7 @@ export class RecallExportController {
     const records = hostname && urlReviewStatusStore ? await urlReviewStatusStore.list(hostname) : [];
     const result = exportUrlReviewStatusFile({ records });
     if (!result.status.ok || !result.fileContent || !result.fileName) {
-      this.finishExport(result.fileContent, result.fileName, result.status.message, result.status.ok);
+      finishStatusExport(this.deps, result);
       return;
     }
     downloadTextFile(result.fileContent, result.fileName);
@@ -211,24 +214,13 @@ export class RecallExportController {
     this.deps.render();
   }
 
-  private finishExport(fileContent: string | undefined, fileName: string | undefined, message: string, ok: boolean): void {
-    if (!ok || !fileContent || !fileName) {
-      this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/error', message }));
-      this.deps.render();
-      return;
-    }
-    downloadTextFile(fileContent, fileName);
-    this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/complete', message }));
-    this.deps.render();
-  }
-
   async exportBlobKeyBackup(password: string): Promise<void> {
     const captureStore = this.deps.captureStore();
     if (!captureStore || this.deps.getState().importExportBusy) return;
     this.deps.setState(reducePanelAction(this.deps.getState(), { name: 'import-export/start' }));
     this.deps.render();
     const result = await captureStore.exportBlobKeyBackup(password, this.deps.getState().blobKeyReference ?? undefined);
-    this.finishExport(result.ok ? result.fileContent : undefined, result.ok ? result.fileName : undefined, result.message, result.ok);
+    finishDirectExport(this.deps, result);
   }
 
   async importBlobKeyBackup(fileContent: string, password: string): Promise<void> {

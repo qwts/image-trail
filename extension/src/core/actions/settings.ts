@@ -309,6 +309,8 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
     case 'storage/update':
       return { ...state, storageUsage: action.usage, lastUpdatedAt: Date.now() };
     case 'settings/reset-panel-position':
+    case 'settings/update-backup-reminder':
+    case 'backup-reminder/snooze':
     case 'settings/update-workspace-layout-restore':
     case 'settings/reset-workspace-layout':
     case 'neighbor-preload/manual':

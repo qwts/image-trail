@@ -35,6 +35,7 @@ export interface PCloudBackupExportDeps {
   albumStore(): { readonly listBackupEntries: () => Promise<readonly AlbumBackupEntry[]> } | null;
   uploadPCloudBackup: typeof uploadPCloudBackup;
   loadAllBookmarks(): Promise<readonly ImageDisplayRecord[]>;
+  backupCompleted?(): void;
 }
 
 interface ActiveBackup {
@@ -273,6 +274,7 @@ export class PCloudBackupExportCoordinator {
         ),
       }),
     );
+    this.deps.backupCompleted?.();
     this.deps.render();
   }
 

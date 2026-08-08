@@ -1,4 +1,10 @@
 import type { BuildIdentity } from '../core/build-info.js';
+import {
+  BACKUP_REMINDER_INTERVAL_OPTIONS,
+  backupReminderStatus,
+  isBackupReminderIntervalDays,
+  nextBackupReminderAt,
+} from '../core/backup-reminder.js';
 import type { ImageProbeMethod } from '../core/image/request-policy.js';
 import { NEIGHBOR_PRELOAD_CACHE_LIMITS, type LoadFailureFeedback } from '../core/settings.js';
 import type { ObjectFitMode } from '../core/preview-style.js';
@@ -35,8 +41,59 @@ export function AutomationSettingsGroup({ settings, disabled, save }: SettingsGr
         disabled={disabled}
         onChange={(checked) => save({ ...settings, clearUrlReviewStatusAfterExport: checked })}
       />
+      <BackupReminderSettings settings={settings} disabled={disabled} save={save} />
       <KeybindingSettings settings={settings} disabled={disabled} save={save} />
     </SettingsGroup>
+  );
+}
+
+function BackupReminderSettings({ settings, disabled, save }: SettingsGroupProps) {
+  const status = backupReminderStatus({
+    enabled: settings.backupReminderEnabled,
+    intervalDays: settings.backupReminderIntervalDays,
+    nextAt: settings.backupReminderNextAt,
+  });
+  return (
+    <div className="image-trail-destination-settings__subsection">
+      <strong>Local backup reminder</strong>
+      <SettingToggle
+        label="Remind me to make manual encrypted backups"
+        checked={settings.backupReminderEnabled}
+        disabled={disabled}
+        onChange={(enabled) =>
+          save({
+            ...settings,
+            backupReminderEnabled: enabled,
+            backupReminderNextAt: enabled ? nextBackupReminderAt(settings.backupReminderIntervalDays) : null,
+          })
+        }
+      />
+      <SettingField label="Cadence">
+        <select
+          aria-label="Backup reminder cadence"
+          value={settings.backupReminderIntervalDays}
+          disabled={disabled || !settings.backupReminderEnabled}
+          onChange={(event) => {
+            const intervalDays = Number(event.currentTarget.value);
+            if (!isBackupReminderIntervalDays(intervalDays)) return;
+            save({ ...settings, backupReminderIntervalDays: intervalDays, backupReminderNextAt: nextBackupReminderAt(intervalDays) });
+          }}
+        >
+          {BACKUP_REMINDER_INTERVAL_OPTIONS.map((days) => (
+            <option key={days} value={days}>
+              Every {days} days
+            </option>
+          ))}
+        </select>
+      </SettingField>
+      <SettingNote>
+        {!settings.backupReminderEnabled
+          ? 'Off by default. No alarm, notification, provider connection, or upload is scheduled.'
+          : status.due
+            ? 'A manual encrypted backup is due. The reminder appears only inside Image Trail.'
+            : `Next in-app reminder: ${status.nextAt?.slice(0, 10) ?? 'when Image Trail opens'}. Nothing uploads automatically.`}
+      </SettingNote>
+    </div>
   );
 }
 

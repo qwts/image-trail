@@ -103,6 +103,8 @@ function createHarness(): Harness {
     updateDownArrowAction: noop,
     updatePinSaveStoragePreference: noop,
     updateUrlReviewStatusRetention: noopAsync,
+    updateBackupReminder: noop,
+    snoozeBackupReminder: noop,
     updateRequestThrottle: noop,
     updateNeighborPreload: noop,
     preloadMoreNeighbors: noop,
