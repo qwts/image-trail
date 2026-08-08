@@ -19,6 +19,7 @@ import {
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
+import { pinCurrentImage } from './current-image-actions.js';
 
 const encryptedOriginalsPassword = 'correct horse battery staple';
 
@@ -130,7 +131,7 @@ async function deleteAllDurableQueueRows(page: Page): Promise<void> {
 }
 
 async function pinCurrent(page: Page, filename: string): Promise<void> {
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: filename })).toBeVisible();
 }
 
@@ -490,9 +491,9 @@ test('the Recents and Queue sections collapse and expand from their heading togg
   await expect(queueActions.locator(':scope > :first-child')).toHaveAttribute('aria-label', 'Queue order');
   await queueToggle.click({ position: { x: 10, y: 10 } });
   await expect(page.locator('.image-trail-panel__bookmark-status-row')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Pin current' })).toBeVisible();
-  // Toolbar clicks never toggle the collapse: pin while collapsed, then expand and see the row.
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await expect(page.getByRole('button', { name: 'Capture original' })).toBeVisible();
+  // Primary-workflow clicks never toggle Queue collapse: pin with Shift, then expand and see the row.
+  await pinCurrentImage(page);
   await expect(page.getByRole('button', { name: 'Hide Queue' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Show Queue' }).click();
   await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' })).toBeVisible();

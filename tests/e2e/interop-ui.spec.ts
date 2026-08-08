@@ -1,4 +1,5 @@
 import { expect, expectPanelOpen, fixturePaths, openFixturePage, test, togglePanelFromExtensionAction } from './fixtures.js';
+import { pinCurrentImage } from './current-image-actions.js';
 
 const interopEnabled = process.env['IMAGE_TRAIL_ENABLE_INTEROP'] === '1';
 
@@ -24,7 +25,7 @@ test('the baseline package omits native messaging and unfinished Transfer & Sync
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
 
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   const panel = page.getByRole('dialog', { name: 'Image Trail panel' });
   const row = panel.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
   await expect(row).toBeVisible();
@@ -63,7 +64,7 @@ test('an enabled experimental build opens Transfer & Sync without reordering the
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
 
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   const row = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
   await expect(row).toBeVisible();
   const orderBefore = await page

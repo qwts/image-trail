@@ -17,7 +17,7 @@ import { reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
 import type { BuildIdentity } from '../core/build-info.js';
-import { createInitialPanelState, setAutomationState, setTargetState } from '../core/state.js';
+import { createInitialPanelState, setAutomationState, setCapturePinModifier, setTargetState } from '../core/state.js';
 import type {
   BookmarkStore,
   PanelAction,
@@ -449,9 +449,7 @@ export class ImageTrailPanel {
           this.state = setTargetState(this.state, toTargetState(snapshot));
           this.render();
         },
-        restoreFieldState: () => {
-          void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore());
-        },
+        restoreFieldState: () => void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore()),
         captureGrabbedBookmark: (r) => this.capturedOriginals.captureGrabbedBookmark(r, this.state.siteCaptureRules, location.hostname),
       }),
     );
@@ -461,7 +459,11 @@ export class ImageTrailPanel {
     void this.recallExport.refreshBlobKeyStatus();
     void this.recallExport.refreshPCloudProviderStatus();
 
-    this.keyboard = new KeyboardRouter((action) => this.handleShortcutAction(action));
+    this.keyboard = new KeyboardRouter(
+      (action) => this.handleShortcutAction(action),
+      undefined,
+      (active) => this.applyPanelState(setCapturePinModifier(this.state, active), { render: this.state.visible }),
+    );
     this.slideshow = new Slideshow(
       (direction) => this.parsedFieldNavigation.navigateBy(direction, 'slideshow'),
       (phase, count) => {
@@ -623,9 +625,7 @@ export class ImageTrailPanel {
   // Built in a field initializer; safe because every deps member is a lazy closure, so nothing
   // dereferences the constructor-assigned collaborators (keyboard/slideshow/retry) until a handler runs.
   private readonly actionRegistry = buildPanelActionRegistry(this.createActionDeps());
-  private dispatch = (action: PanelAction): void => {
-    dispatchPanelAction(this.actionRegistry, action, this.handleDefaultAction);
-  };
+  private dispatch = (action: PanelAction): void => dispatchPanelAction(this.actionRegistry, action, this.handleDefaultAction);
   handleShortcutAction(action: string): boolean {
     return handlePanelShortcutAction(action, {
       getState: () => this.state,

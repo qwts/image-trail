@@ -316,7 +316,8 @@ test('a detached section window keeps its header-row action toolbar usable (#430
 
   // The window chrome carries the title, but the header row must stay for its actions: the
   // toolbar moved into the section header (#430) and previously vanished with it when detached.
-  await expect(windowEl.getByRole('button', { name: 'Pin current' })).toBeVisible();
+  await expect(windowEl.getByRole('button', { name: 'Pin current' })).toHaveCount(0);
+  await expect(windowEl.getByRole('button', { name: 'Recall' })).toBeVisible();
   await expect(windowEl.getByTitle('Queue scope and maintenance actions.')).toBeVisible();
   await expect(windowEl.locator('.image-trail-panel__section-header--with-actions h3')).toBeHidden();
 

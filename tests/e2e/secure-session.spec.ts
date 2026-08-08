@@ -15,6 +15,7 @@ import {
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
+import { pinCurrentImage } from './current-image-actions.js';
 import { detachHistory } from './workspace-test-helpers.js';
 
 async function stopExtensionWorker(page: Page, worker: Worker): Promise<void> {
@@ -61,7 +62,7 @@ test('one secure lock conceals and restores panel, detached, destination, Galler
     await expect(page.locator('.image-trail-panel__encryption-badge')).toHaveText('Unlocked');
     await closeSettings(page);
 
-    await page.getByRole('button', { name: 'Pin current' }).click();
+    await pinCurrentImage(page);
     const row = page.locator('.image-trail-panel__bookmark-item').first();
     await expect(row).toBeVisible();
     await stopExtensionWorker(page, serviceWorker);

@@ -12,6 +12,7 @@ export interface KeyBinding {
 }
 
 export type KeyActionHandler = (action: string) => boolean;
+export type ShiftModifierHandler = (active: boolean) => void;
 
 export interface KeyCodeShortcut {
   readonly code: string;
@@ -106,11 +107,13 @@ function matchesBinding(event: KeyboardEvent, binding: KeyBinding): boolean {
 
 export class KeyboardRouter {
   private active = false;
+  private shiftModifierActive = false;
   private bindings: KeyBinding[];
 
   constructor(
     private readonly handler: KeyActionHandler,
     bindings?: KeyBinding[],
+    private readonly onShiftModifierChange?: ShiftModifierHandler,
   ) {
     this.bindings = bindings ?? [...DEFAULT_BINDINGS];
   }
@@ -119,12 +122,19 @@ export class KeyboardRouter {
     if (this.active) return;
     this.active = true;
     document.addEventListener('keydown', this.onKeyDown, true);
+    document.addEventListener('keyup', this.onKeyUp, true);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
+    window.addEventListener('blur', this.onWindowBlur);
   }
 
   disable(): void {
     if (!this.active) return;
     this.active = false;
     document.removeEventListener('keydown', this.onKeyDown, true);
+    document.removeEventListener('keyup', this.onKeyUp, true);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    window.removeEventListener('blur', this.onWindowBlur);
+    this.setShiftModifier(false);
   }
 
   updateBindings(bindings: KeyBinding[]): void {
@@ -132,8 +142,9 @@ export class KeyboardRouter {
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
-    if (event.metaKey || event.ctrlKey || event.altKey) return;
     const target = classifyTarget(event);
+    if (target !== 'typing' && target !== 'record-row') this.setShiftModifier(event.shiftKey);
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
 
     for (const binding of this.bindings) {
       if (matchesBinding(event, binding)) {
@@ -146,4 +157,18 @@ export class KeyboardRouter {
       }
     }
   };
+
+  private onKeyUp = (event: KeyboardEvent): void => {
+    if (event.key === 'Shift' || !event.shiftKey) this.setShiftModifier(false);
+  };
+
+  private onWindowBlur = (): void => this.setShiftModifier(false);
+  private onVisibilityChange = (): void => {
+    if (document.visibilityState !== 'visible') this.setShiftModifier(false);
+  };
+  private setShiftModifier(active: boolean): void {
+    if (this.shiftModifierActive === active) return;
+    this.shiftModifierActive = active;
+    this.onShiftModifierChange?.(active);
+  }
 }

@@ -10,6 +10,10 @@ function dispatchKey(target: EventTarget, key: string, options: KeyboardEventIni
   return event;
 }
 
+function dispatchKeyUp(target: EventTarget, key: string, options: KeyboardEventInit = {}): void {
+  target.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true, cancelable: true, ...options }));
+}
+
 test('router handles approved bare keys case-insensitively and leaves modifiers to the browser', () => {
   const actions: string[] = [];
   const router = new KeyboardRouter((action) => {
@@ -52,6 +56,42 @@ test('router preserves typing controls and native record-row behavior', () => {
     input.remove();
     row.remove();
   }
+});
+
+test('Shift modifier state follows page keydown and clears on keyup, blur, and disable without rerouting typing', () => {
+  const changes: boolean[] = [];
+  const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+  const router = new KeyboardRouter(
+    () => false,
+    undefined,
+    (active) => changes.push(active),
+  );
+  const input = document.createElement('input');
+  document.body.append(input);
+  router.enable();
+  try {
+    dispatchKey(input, 'Shift', { shiftKey: true });
+    assert.deepEqual(changes, [], 'typing modifiers remain native');
+    dispatchKey(document, 'Shift', { shiftKey: true });
+    dispatchKey(document, 'Shift', { shiftKey: true });
+    assert.deepEqual(changes, [true], 'repeated keydown does not duplicate state');
+    dispatchKeyUp(document, 'Shift');
+    assert.deepEqual(changes, [true, false]);
+    dispatchKey(document, 'Shift', { shiftKey: true });
+    window.dispatchEvent(new Event('blur'));
+    assert.deepEqual(changes, [true, false, true, false]);
+    dispatchKey(document, 'Shift', { shiftKey: true });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    assert.deepEqual(changes, [true, false, true, false, true, false]);
+    dispatchKey(document, 'Shift', { shiftKey: true });
+  } finally {
+    if (visibilityDescriptor) Object.defineProperty(document, 'visibilityState', visibilityDescriptor);
+    else Reflect.deleteProperty(document, 'visibilityState');
+    router.disable();
+    input.remove();
+  }
+  assert.deepEqual(changes, [true, false, true, false, true, false, true, false]);
 });
 
 test('an unassigned Down action remains native because the handler declines it', () => {

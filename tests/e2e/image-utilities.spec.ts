@@ -24,6 +24,7 @@ import {
   togglePanelFromExtensionAction,
   type ExtensionDownloadRequest,
 } from './fixtures.js';
+import { pinCurrentImage } from './current-image-actions.js';
 
 const primaryImage = '#fixture-primary-image';
 const password = 'correct horse battery staple';
@@ -259,10 +260,10 @@ test('exports selected recents, queue rows, and Recall rows in UI order', async 
   expect(downloads.map((download) => download.filename)).toEqual(['asset-three.svg', 'asset-two.svg', 'asset-one.svg']);
 
   await page.locator('.image-trail-panel__history-item', { hasText: 'asset-three.svg' }).click();
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-three.svg' })).toBeVisible();
   await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetTwo));
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-two.svg' })).toBeVisible();
   await clearSelectedRecentRows(page);
   await openQueueMenu(page);
@@ -295,7 +296,7 @@ test('captures originals, prefers stored bytes for export, and round-trips encry
   await openPanel(page, serviceWorker);
   await setupEncryptedOriginals(page);
 
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   const queueRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
   await expect(queueRow).toBeVisible();
   await queueRow.getByRole('button', { name: 'Capture' }).click();
@@ -363,7 +364,7 @@ test('refuses to store oversized originals and keeps stored-original usage bound
   }
   await setupEncryptedOriginals(page);
 
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   const baselineRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
   await expect(baselineRow).toBeVisible();
   await baselineRow.getByRole('button', { name: 'Capture' }).click();
@@ -395,7 +396,7 @@ test('refuses to store oversized originals and keeps stored-original usage bound
   // there, so the refusal is exercised against a pinned queue record (matching the
   // acceptance flow) and a regression that mutated or dropped the durable row on an
   // oversized capture would be caught.
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   const oversizedRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'generated-oversized.svg' });
   await expect(oversizedRow).toBeVisible();
 

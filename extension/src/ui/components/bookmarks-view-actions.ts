@@ -1,8 +1,6 @@
 import type { QueueDisplayOrder } from '../../core/display-order.js';
 
 export type BookmarkAction =
-  | { readonly name: 'pin/current' }
-  | { readonly name: 'bookmark/current' }
   | { readonly name: 'bookmark/load'; readonly id: string }
   | { readonly name: 'bookmark/remove'; readonly id: string }
   | { readonly name: 'bookmark/clear'; readonly id: string }

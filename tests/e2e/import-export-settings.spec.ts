@@ -20,6 +20,7 @@ import {
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
+import { pinCurrentImage } from './current-image-actions.js';
 
 const primaryImage = '#fixture-primary-image';
 const encryptionPassword = 'correct horse battery staple';
@@ -346,7 +347,7 @@ test('history and bookmark exports restore through preview without durable side 
 
   await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetTwo));
   await expectPanelStatusMessage(page, /Loaded .*asset-two\.svg/u);
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-two.svg' })).toBeVisible();
 
   const historyExport = await exportRecordJson(page, 'Export history');
@@ -378,7 +379,7 @@ test('key backup import fails closed with a wrong password and restores the capt
   await openPanel(page, serviceWorker);
   await setupEncryptedOriginals(page);
   await deleteVisibleQueueRows(page);
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   const queueRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
   await expect(queueRow).toBeVisible();
   await queueRow.getByRole('button', { name: 'Capture' }).click();
@@ -417,7 +418,7 @@ test('settings utilities persist through rerenders and pCloud remains a mocked m
   await openPanel(page, serviceWorker);
   await setupEncryptedOriginals(page);
   await deleteVisibleQueueRows(page);
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' })).toBeVisible();
 
   await closeSettingsGroup(page, 'Encrypted originals');

@@ -14,6 +14,7 @@ import {
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
+import { pinCurrentImage } from './current-image-actions.js';
 
 async function openCleanPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await page.setViewportSize({ width: 1_440, height: 900 });
@@ -69,10 +70,8 @@ async function windowWidth(windowElement: Locator): Promise<number> {
   return Math.round(box!.width);
 }
 
-async function pinCurrent(queueWindow: Locator, expectedRows: number): Promise<void> {
-  const pinButton = queueWindow.getByRole('button', { name: 'Pin current' });
-  await expect(pinButton).toBeEnabled();
-  await pinButton.click();
+async function pinCurrent(page: Page, queueWindow: Locator, expectedRows: number): Promise<void> {
+  await pinCurrentImage(page);
   await expect(queueWindow.locator('.image-trail-panel__bookmark-item')).toHaveCount(expectedRows);
 }
 
@@ -109,7 +108,7 @@ test('detached Recents and Queue auto-grow until resized, then keep their user s
 }) => {
   await openCleanPanel(page, serviceWorker);
   await loadAsset(page, fixtureAssetPaths.assetOne, 'asset-one.svg');
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(1);
 
   await page.getByRole('button', { name: 'Detach Recent history into a floating window (drag to place)' }).click();
@@ -126,7 +125,7 @@ test('detached Recents and Queue auto-grow until resized, then keep their user s
   await loadAsset(page, fixtureAssetPaths.assetTwo, 'asset-two.svg');
   await expect(recents.locator('.image-trail-panel__history-item')).toHaveCount(2);
   await expect.poll(() => windowHeight(recents)).toBeGreaterThan(initialRecentsHeight);
-  await pinCurrent(queue, 2);
+  await pinCurrent(page, queue, 2);
   await expect.poll(() => windowHeight(queue)).toBeGreaterThan(initialQueueHeight);
 
   await recents.getByRole('button', { name: 'Resize Recent history' }).press('Shift+ArrowDown');
@@ -140,7 +139,7 @@ test('detached Recents and Queue auto-grow until resized, then keep their user s
 
   await loadAsset(page, fixtureAssetPaths.assetThree, 'asset-three.svg');
   await expect(recents.locator('.image-trail-panel__history-item')).toHaveCount(3);
-  await pinCurrent(queue, 3);
+  await pinCurrent(page, queue, 3);
   await expect.poll(() => windowHeight(recents)).toBe(userRecentsHeight);
   await expect.poll(() => windowHeight(queue)).toBe(userQueueHeight);
 
