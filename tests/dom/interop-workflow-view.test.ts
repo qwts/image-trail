@@ -185,6 +185,31 @@ test('open workflow makes the panel inert and restores focus when closed', () =>
   panel.remove();
 });
 
+test('open workflow reaches a closed production shadow root through the opener control', () => {
+  const host = document.createElement('div');
+  const shadow = host.attachShadow({ mode: 'closed' });
+  const panel = document.createElement('section');
+  panel.className = 'image-trail-panel-root';
+  const opener = document.createElement('button');
+  panel.append(opener);
+  shadow.append(panel);
+  document.body.append(host);
+  opener.focus();
+
+  openInteropWorkflow('bookmark', ['bookmark-1'], false, opener);
+  assert.equal(document.querySelector('.image-trail-interop-scrim'), null, 'the modal never lands in the host page body');
+  const dialog = shadow.querySelector('[role="dialog"][aria-label="Transfer and Sync"]');
+  assert.ok(dialog instanceof HTMLElement);
+  assert.equal(panel.inert, true);
+  const close = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Close');
+  assert.ok(close instanceof HTMLButtonElement);
+  close.click();
+
+  assert.equal(panel.inert, false);
+  assert.equal(shadow.activeElement, opener);
+  host.remove();
+});
+
 test('open workflow traps keyboard focus inside the active shadow root', () => {
   const host = document.createElement('div');
   const shadow = host.attachShadow({ mode: 'open' });
