@@ -97,7 +97,7 @@ test('Host target uses the shared explicit Hide/Show header control (#755)', asy
   unmountReactSubtree(root);
 });
 
-test('Host target cannot stay collapsed while target selection needs attention', async () => {
+test('Host target can be collapsed even while target selection needs attention', async () => {
   const baseTarget: TargetState = {
     mode: 'auto',
     picking: false,
@@ -125,13 +125,16 @@ test('Host target cannot stay collapsed while target selection needs attention',
     const toggle = root.querySelector<HTMLButtonElement>('.image-trail-ds__section-toggle');
     const card = root.querySelector<HTMLElement>('.image-trail-panel__target-card');
     assert.ok(toggle && card);
+    // Needs-attention forces initial open even when open:false was requested
     assert.equal(toggle.textContent, 'Hide');
     assert.equal(card.hidden, false);
 
     toggle.click();
     await Promise.resolve();
-    assert.equal(card.hidden, false);
-    assert.deepEqual(openChanges, []);
+    // User can now collapse even when selection needs attention
+    assert.equal(toggle.textContent, 'Show');
+    assert.equal(card.hidden, true);
+    assert.deepEqual(openChanges, [false]);
     unmountReactSubtree(root);
   }
 });
