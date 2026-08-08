@@ -4,12 +4,12 @@ import { ExtensionBookmarkStore } from '../content/extension-bookmark-store.js';
 import { ExtensionLocalSettingsStore } from '../content/local-settings-store.js';
 import { RecallStore, type RecallCandidatesResult, type RecallRecordsResult } from '../content/recall-store.js';
 import { sendRuntimeMessage } from '../content/runtime-message.js';
+import { ExtensionUrlReviewStatusStore } from '../content/url-review-status-store.js';
 import type { BuildIdentity } from '../core/build-info.js';
 import { recordHasStoredOriginal } from '../core/display-records.js';
 import type { UrlReviewStatusRecord } from '../core/types.js';
 import type { PlaintextLocalSettings } from '../data/local-settings.js';
 import { LOCAL_SETTINGS_KEY } from '../data/local-settings.js';
-import { IndexedDbUrlReviewStatusStore } from '../data/url-review-status-controller.js';
 
 const DASHBOARD_LIMIT = 200;
 const RECALL_LIMIT = 100;
@@ -45,6 +45,7 @@ export function createDestinationServices(): DestinationServices {
   const bookmarks = new ExtensionBookmarkStore();
   const recall = new RecallStore();
   const settings = new ExtensionLocalSettingsStore();
+  const reviews = new ExtensionUrlReviewStatusStore();
   return {
     async loadDashboard() {
       const page = await bookmarks.loadPage({ offset: 0, limit: DASHBOARD_LIMIT, scope: 'global' });
@@ -65,17 +66,7 @@ export function createDestinationServices(): DestinationServices {
     },
     recall: (ids) => recall.recall(ids),
     loadSettings: () => settings.load(),
-    loadUrlReviewStatus: async () => {
-      const current = await settings.load();
-      const reviews = new IndexedDbUrlReviewStatusStore({
-        getSearchableMetadataPolicy: () => current.searchableMetadataPolicy,
-      });
-      try {
-        return await reviews.listAll();
-      } finally {
-        await reviews.close();
-      }
-    },
+    loadUrlReviewStatus: () => reviews.listAll(),
     saveSettings: (value) => settings.save(value),
     loadBuildIdentity,
     subscribeLibrary: (refresh) => subscribeLibrary(refresh),

@@ -458,6 +458,7 @@ async function handleSaveParsedFieldState(
 async function handleListUrlReviewStatus(
   message: ListUrlReviewStatusMessage,
 ): Promise<import('./messages.js').ListUrlReviewStatusResultMessage['payload']> {
+  if (message.payload.hostname === null) return { ok: true, records: await urlReviewStatusStore.listAll() };
   const hostname = normalizeHostname(message.payload.hostname);
   if (!hostname) return { ok: true, records: [] };
   return { ok: true, records: await urlReviewStatusStore.list(hostname) };

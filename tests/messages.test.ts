@@ -309,6 +309,7 @@ test('creates URL review status messages', () => {
     updatedAt: '2026-06-23T00:00:00.000Z',
   };
   const list = createListUrlReviewStatusMessage('example.test');
+  const listAll = createListUrlReviewStatusMessage(null);
   const listResult = createListUrlReviewStatusResultMessage({ ok: true, records: [record] });
   const save = createSaveUrlReviewStatusMessage(record);
   const saveResult = createSaveUrlReviewStatusResultMessage({ ok: true });
@@ -319,7 +320,9 @@ test('creates URL review status messages', () => {
 
   assert.equal(list.type, MessageType.ListUrlReviewStatus);
   assert.equal(list.payload.hostname, 'example.test');
+  assert.equal(listAll.payload.hostname, null);
   assert.equal(isExtensionRequest(list), true);
+  assert.equal(isExtensionRequest(listAll), true);
   assert.equal(isExtensionResponse(listResult), true);
   assert.equal(isListUrlReviewStatusResultMessage(listResult), true);
   assert.equal(save.type, MessageType.SaveUrlReviewStatus);

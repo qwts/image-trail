@@ -148,13 +148,14 @@ export function UrlReviewStatusSettingsGroup({
 }) {
   const history = useReviewHistory(services);
   const sites = useMemo(() => siteOptions(history.records, privacyMode), [history.records, privacyMode]);
-  const [siteKey, setSiteKey] = useState('all');
+  const [selectedHostname, setSelectedHostname] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusFilter>('all');
-  const selectedSite = sites.find((site) => site.key === siteKey) ?? null;
-  const visible = filterUrlReviewStatus(history.records, selectedSite?.hostname ?? null, status);
+  const selectedSite = sites.find((site) => site.hostname === selectedHostname) ?? null;
+  const siteKey = selectedSite?.key ?? 'all';
+  const visible = filterUrlReviewStatus(history.records, selectedHostname, status);
   useEffect(() => {
-    if (siteKey !== 'all' && !selectedSite) setSiteKey('all');
-  }, [selectedSite, siteKey]);
+    if (selectedHostname !== null && !selectedSite) setSelectedHostname(null);
+  }, [selectedHostname, selectedSite]);
 
   return (
     <SettingsGroup title="URL review history">
@@ -164,7 +165,11 @@ export function UrlReviewStatusSettingsGroup({
       </SettingNote>
       <div className="image-trail-url-review__controls">
         <SettingField label="Site">
-          <select aria-label="URL review site" value={siteKey} onChange={(event) => setSiteKey(event.currentTarget.value)}>
+          <select
+            aria-label="URL review site"
+            value={siteKey}
+            onChange={(event) => setSelectedHostname(sites.find((site) => site.key === event.currentTarget.value)?.hostname ?? null)}
+          >
             <option value="all">All sites</option>
             {sites.map((site) => (
               <option key={site.key} value={site.key}>

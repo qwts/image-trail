@@ -207,6 +207,7 @@ test('Settings renders all groups and persists through the extension-owned servi
 test('Settings reviews URL status by site and status without loading durable or transient libraries', async () => {
   let dashboardLoads = 0;
   let recallLoads = 0;
+  let currentReviews = reviewRecords();
   const root = await mount(
     <SettingsDestination
       services={services({
@@ -218,7 +219,7 @@ test('Settings reviews URL status by site and status without loading durable or 
           recallLoads += 1;
           throw new Error('unexpected Recall read');
         },
-        loadUrlReviewStatus: async () => reviewRecords(),
+        loadUrlReviewStatus: async () => currentReviews,
       })}
     />,
   );
@@ -252,6 +253,26 @@ test('Settings reviews URL status by site and status without loading durable or 
     assert.match(root.textContent ?? '', /https:\/\/images\.example\.test\/broken\.jpg/u);
     assert.match(root.textContent ?? '', /Image failed: HTTP 404/u);
     assert.doesNotMatch(root.textContent ?? '', /alpha\.example\.test\/one/u);
+
+    currentReviews = [
+      {
+        schemaVersion: 1,
+        hostname: 'aardvark.example.test',
+        pageUrl: 'https://aardvark.example.test/page',
+        sourceUrl: 'https://aardvark.example.test/new.jpg',
+        status: 'failed',
+        fieldIds: [],
+        activeFieldId: null,
+        updatedAt: '2026-07-14T13:00:00.000Z',
+      },
+      ...currentReviews,
+    ];
+    const reload = Array.from(root.querySelectorAll('button')).find((button) => button.textContent === 'Reload review history');
+    await act(async () => reload?.click());
+    await flush();
+    assert.equal(root.querySelector<HTMLSelectElement>('[aria-label="URL review site"]')?.value, 'site-3');
+    assert.match(root.textContent ?? '', /https:\/\/images\.example\.test\/broken\.jpg/u);
+    assert.doesNotMatch(root.textContent ?? '', /aardvark\.example\.test\/new/u);
   } finally {
     await cleanup(root);
   }

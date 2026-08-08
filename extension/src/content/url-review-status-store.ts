@@ -17,6 +17,11 @@ export class ExtensionUrlReviewStatusStore implements UrlReviewStatusStore {
     return isListUrlReviewStatusResultMessage(response) && response.payload.ok ? response.payload.records : [];
   }
 
+  async listAll(): Promise<readonly UrlReviewStatusRecord[]> {
+    const response = await sendRuntimeMessage(createListUrlReviewStatusMessage(null));
+    return isListUrlReviewStatusResultMessage(response) && response.payload.ok ? response.payload.records : [];
+  }
+
   async save(record: UrlReviewStatusRecord, options?: { readonly maxRecordsPerHost?: number }): Promise<void> {
     void options;
     const response = await sendRuntimeMessage(createSaveUrlReviewStatusMessage(record));
