@@ -24,10 +24,8 @@ import { addImportedImageToLibrary, type RecordLibraryImportInput } from './impo
 import type { RecordAddOptions, ValidatedRecordUrl } from './record-library-types.js';
 import { renderRecentHistoryAddResult } from './recent-history-add-result.js';
 import { recentHistoryMutationIsCurrent, recentHistoryMutationProjection } from './recent-history-mutation-projection.js';
-
 export type { RecordAddOptions } from './record-library-types.js';
 export type { RecordLibraryImportInput } from './imported-image-library.js';
-
 export interface RecordLibraryControllerDeps {
   getState(): PanelState;
   setState(state: PanelState): void;
@@ -49,12 +47,9 @@ export interface RecordLibraryControllerDeps {
   createThumbnailDataUrlFromDataUrl: typeof createThumbnailDataUrlFromDataUrl;
   fetchThumbnailSource: typeof fetchThumbnailSource;
 }
-
 export class RecordLibraryController {
   private bookmarkMutationQueue: Promise<void> = Promise.resolve();
-
   constructor(private readonly deps: RecordLibraryControllerDeps) {}
-
   async bookmarkCurrentImage(): Promise<boolean> {
     const state = this.deps.getState();
     const url = state.target.selectedUrl;
@@ -67,17 +62,13 @@ export class RecordLibraryController {
       height: image?.naturalHeight || undefined,
     });
   }
-
   enqueueBookmarkMutation(work: () => Promise<void>): void {
     this.bookmarkMutationQueue = this.bookmarkMutationQueue.then(work, work);
     void this.bookmarkMutationQueue;
   }
-
   async bookmarkUrl(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<boolean> {
     const validation = await this.validateRecordUrlForAdd(url, options);
-    if (!validation.ok || !validation.sourceUrl) {
-      return false;
-    }
+    if (!validation.ok || !validation.sourceUrl) return false;
     const sourceUrl = validation.sourceUrl;
     const resolvedThumbnail = await this.resolveRecordThumbnail(sourceUrl, thumbnail, validation, options);
     const draft = createDisplayRecord({
@@ -88,19 +79,29 @@ export class RecordLibraryController {
       height: options.height,
       source: 'bookmark',
     });
+    let bookmark: ImageDisplayRecord = draft;
     const bookmarkStore = this.deps.bookmarkStore();
-    const bookmark = bookmarkStore ? await bookmarkStore.save(draft) : draft;
+    if (bookmarkStore) {
+      const r = bookmarkStore.saveResult
+        ? await bookmarkStore.saveResult(draft)
+        : { ok: true as const, record: await bookmarkStore.save(draft) };
+      if (!r.ok) {
+        this.deps.setState({ ...this.deps.getState(), message: r.message, status: 'error' as const, lastUpdatedAt: Date.now() });
+        this.deps.render();
+        return false;
+      }
+      bookmark = r.record;
+    }
+    options.onBookmarkSaved?.(bookmark);
     this.deps.setState({ ...this.deps.getState(), message: bookmarkSaveMessage(bookmark), lastUpdatedAt: Date.now() });
     await this.deps.loadBookmarkPage(0, { render: false });
     this.deps.renderPanelAndRefreshRecall();
     void this.deps.refreshStorageUsage({ render: true });
     return true;
   }
-
   async addImportedImage(file: RecordLibraryImportInput, captured?: CapturedImportedMedia): Promise<boolean> {
     return addImportedImageToLibrary(this.deps, file, captured);
   }
-
   async addRecentHistory(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<void> {
     if (!this.isProjectionActive(options)) return;
     const validation = await this.validateRecordUrlForAdd(url, options);
@@ -128,7 +129,6 @@ export class RecordLibraryController {
     if (!this.isProjectionActive(options) || !recentHistoryMutationIsCurrent(this.deps.getState(), historyProjection)) return;
     await renderRecentHistoryAddResult(this.deps, addResult);
   }
-
   async pinRecentHistory(id: string): Promise<void> {
     const record = this.deps.getState().history.find((item) => item.id === id);
     if (!record) return;

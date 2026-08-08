@@ -1,5 +1,5 @@
 import { parsePCloudOAuthRedirect } from '../core/cloud/pcloud-provider.js';
-import type { InteropObjectStore } from '../core/interop/transport.js';
+import { InteropTransportError, type InteropObjectStore } from '../core/interop/transport.js';
 import {
   createChromePCloudInteropConnectionStore,
   type PCloudInteropConnectionStore,
@@ -30,6 +30,15 @@ export class PCloudInteropAuth {
 
   async probe(interactive: boolean): Promise<boolean> {
     if (interactive) {
+      const existing = await this.options.store.load();
+      if (existing) {
+        try {
+          await this.provider(existing).quota();
+          return true;
+        } catch (error) {
+          if (!(error instanceof InteropTransportError && error.code === 'auth-expired')) throw error;
+        }
+      }
       await this.connect();
       return true;
     }

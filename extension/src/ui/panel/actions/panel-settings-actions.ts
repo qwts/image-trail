@@ -24,6 +24,9 @@ type DisplaySettingsActionName =
 
 type AutomationSettingsActionName =
   | 'settings/update-url-review-status-retention'
+  | 'settings/update-backup-reminder'
+  | 'backup-reminder/snooze'
+  | 'settings/update-site-capture-rule'
   | 'settings/update-request-throttle'
   | 'settings/update-neighbor-preload'
   | 'settings/update-down-arrow-action'
@@ -183,6 +186,21 @@ function buildAutomationSettingsEntries(deps: PanelActionDeps): ActionEntries<Au
     'settings/update-url-review-status-retention': {
       handle(action) {
         void deps.updateUrlReviewStatusRetention(action.limit, action.clearAfterExport);
+      },
+    },
+    'settings/update-backup-reminder': {
+      handle(action) {
+        deps.updateBackupReminder(action.enabled, action.intervalDays);
+      },
+    },
+    'backup-reminder/snooze': {
+      handle() {
+        deps.snoozeBackupReminder();
+      },
+    },
+    'settings/update-site-capture-rule': {
+      handle(action) {
+        deps.updateSiteCaptureRule(action.hostname, action.behavior);
       },
     },
     'settings/update-request-throttle': {

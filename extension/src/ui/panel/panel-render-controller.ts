@@ -292,7 +292,15 @@ export class PanelRenderController {
   private restoreCaptureHint(): void {
     const hint = this.deps.root()?.querySelector<HTMLElement>('.image-trail-panel__capture-hint');
     if (!hint || hint.dataset['tone'] === undefined) return;
-    hint.replaceChildren(document.createTextNode('Press '), createKbd('C'), document.createTextNode(' to capture the current image.'));
+    hint.replaceChildren(
+      document.createTextNode('Press '),
+      createKbd('C'),
+      document.createTextNode(' to capture; hold '),
+      createKbd('Shift'),
+      document.createTextNode(' on Capture or press '),
+      createKbd('P'),
+      document.createTextNode(' to pin.'),
+    );
     delete hint.dataset['tone'];
   }
 

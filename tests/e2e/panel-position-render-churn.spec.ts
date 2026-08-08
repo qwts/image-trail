@@ -1,6 +1,7 @@
 import type { Page, Worker } from '@playwright/test';
 
 import { expect, fixturePaths, openFixturePage, resetExtensionLibrary, test } from './fixtures.js';
+import { pinCurrentImage } from './current-image-actions.js';
 import { detachHistory, keyboardSnapLeft, openWorkspacePanel, workspaceViewport } from './workspace-test-helpers.js';
 
 interface RenderCounters {
@@ -62,7 +63,7 @@ test('panel drag stays geometry-only and viewport bursts render once at resize e
   await page.setViewportSize(workspaceViewport);
   await openFixturePage(page, fixturePaths.singleImage);
   const panel = await openWorkspacePanel(page, serviceWorker);
-  await panel.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   await expect(panel.locator('.image-trail-panel__bookmark-item')).toHaveCount(1);
   await keyboardSnapLeft(page, await detachHistory(page));
   await panel.getByRole('button', { name: 'Open Recall' }).click();

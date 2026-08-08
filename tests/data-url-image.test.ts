@@ -113,3 +113,46 @@ test('malformed and truncated declared transport streams never produce capture b
   assert.equal(result.reason, 'not-media');
   assert.match(result.message, /truncated|malformed|probe/iu);
 });
+
+test('common video data URLs retain exact bytes and replace declared MIME with signature facts', () => {
+  const fixture = new Uint8Array(readFileSync('tests/e2e/pages/assets/media/common/h264-aac.mp4'));
+  const dataUrl = imageDataUrlFromBytes(fixture, 'video/webm');
+  const parsed = dataUrlToImageBytes(dataUrl, 'camera.webm');
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.equal(parsed.mimeType, 'video/mp4');
+  assert.equal(parsed.byteLength, fixture.byteLength);
+  assert.equal(parsed.fileName, 'camera.mp4');
+  assert.deepEqual([parsed.width, parsed.height], [64, 48]);
+  assert.equal(parsed.mediaInfo?.kind, 'common-media');
+  assert.deepEqual(parsed.mediaInfo?.kind === 'common-media' ? parsed.mediaInfo.streams.map((stream) => stream.codec) : [], [
+    'H.264',
+    'AAC',
+  ]);
+  assert.deepEqual(new Uint8Array(parsed.bytes), fixture);
+
+  const opened = openedImageDataFromPayload(fixture.buffer, {
+    mimeType: 'video/webm',
+    byteLength: fixture.byteLength,
+    sourceUrl: 'image-trail://local-import',
+    capturedAt: '2026-07-29T00:00:00.000Z',
+    fileName: 'camera.webm',
+    mediaInfo: parsed.mediaInfo,
+  });
+  assert.equal(opened.ok, true);
+  if (!opened.ok) return;
+  assert.equal(opened.mimeType, 'video/mp4');
+  assert.equal(opened.fileName, 'camera.mp4');
+  assert.equal(opened.dataUrl, imageDataUrlFromBytes(fixture, 'video/mp4'));
+  assert.equal(opened.mediaInfo?.kind, 'common-media');
+});
+
+test('spoofed and truncated common-media data URLs never enter encrypted custody', () => {
+  for (const fileName of ['spoofed.mp4', 'truncated.mp4']) {
+    const fixture = new Uint8Array(readFileSync(`tests/e2e/pages/assets/media/common/${fileName}`));
+    const result = dataUrlToImageBytes(imageDataUrlFromBytes(fixture, 'video/mp4'), fileName);
+    assert.equal(result.ok, false);
+    if (result.ok) continue;
+    assert.equal(result.reason, 'not-media');
+  }
+});

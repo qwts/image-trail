@@ -2,6 +2,7 @@ import type { PageAdapter, TargetSelectionSnapshot } from '../../content/page-ad
 import type { ProjectionSessionController } from '../../core/projection-session.js';
 import type { RecordLibraryController } from './record-library-controller.js';
 import type { UrlTemplateSettingsController } from './url-template-settings-controller.js';
+import type { ImageDisplayRecord } from '../../core/display-records.js';
 
 export interface PanelSubscriptionDeps {
   readonly pageAdapter: PageAdapter;
@@ -10,6 +11,7 @@ export interface PanelSubscriptionDeps {
   readonly urlTemplateSettings: UrlTemplateSettingsController;
   readonly onTargetSelection: (snapshot: TargetSelectionSnapshot) => void;
   readonly restoreFieldState: () => void;
+  readonly captureGrabbedBookmark: (record: ImageDisplayRecord) => Promise<void>;
 }
 
 export function subscribeToPageAdapter(deps: PanelSubscriptionDeps): ReadonlyArray<() => void> {
@@ -31,8 +33,16 @@ export function subscribeToPageAdapter(deps: PanelSubscriptionDeps): ReadonlyArr
     deps.pageAdapter.subscribeToBookmarkRequests((target) => {
       deps.recordLibrary.enqueueBookmarkMutation(async () => {
         const options = { trustLoadedImage: target.trustedLoadedImage, width: target.width, height: target.height };
-        const bookmarked = await deps.recordLibrary.bookmarkUrl(target.url, target.thumbnail, options);
-        if (bookmarked) await deps.recordLibrary.addRecentHistory(target.url, target.thumbnail, options);
+        const saved: { record?: ImageDisplayRecord } = {};
+        const bookmarked = await deps.recordLibrary.bookmarkUrl(target.url, target.thumbnail, {
+          ...options,
+          onBookmarkSaved: (record) => {
+            saved.record = record;
+          },
+        });
+        if (!bookmarked) return;
+        if (saved.record) await deps.captureGrabbedBookmark(saved.record);
+        await deps.recordLibrary.addRecentHistory(saved.record?.url ?? target.url, target.thumbnail, options);
       });
     }),
     deps.pageAdapter.subscribeToGrabSourcePatternRequests((url) => {

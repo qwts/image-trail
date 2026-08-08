@@ -140,11 +140,11 @@ function GalleryBody({ state, dispatch }: { readonly state: PanelState; readonly
         <button
           type="button"
           disabled={state.bookmarks.length === 0}
-          onClick={() =>
-            openInteropWorkflow(
-              'gallery',
+          onClick={(event) =>
+            openGalleryInteropWorkflow(
               state.bookmarks.map((bookmark) => bookmark.id),
               !state.blobKeyUnlocked && state.blobKeyAvailable,
+              event.currentTarget,
             )
           }
         >
@@ -162,6 +162,10 @@ function GalleryBody({ state, dispatch }: { readonly state: PanelState; readonly
       )}
     </div>
   );
+}
+
+export function openGalleryInteropWorkflow(recordIds: readonly string[], locked: boolean, anchor: Element): void {
+  openInteropWorkflow('gallery', recordIds, locked, anchor);
 }
 
 function restoreDockFocus(event: MouseEvent<HTMLButtonElement>, destination: PanelDestinationId, dispatch: (action: PanelAction) => void) {

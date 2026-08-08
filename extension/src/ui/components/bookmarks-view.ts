@@ -11,7 +11,6 @@ import { createCaptureOriginalButton, createDeleteOriginalButton, createTrustedR
 import { createSectionToggle } from './primitives.js';
 
 export function createBookmarksView(
-  currentUrl: string | null,
   items: readonly ImageDisplayRecord[],
   selectedIds: readonly string[],
   captureInProgress: boolean,
@@ -50,13 +49,6 @@ export function createBookmarksView(
     header.classList.add('image-trail-panel__section-header--collapsible');
   }
   header.append(heading);
-
-  const add = document.createElement('button');
-  add.type = 'button';
-  add.textContent = 'Pin current';
-  add.title = 'Save the current image URL and thumbnail to the durable queue without capturing original bytes.';
-  add.disabled = currentUrl === null;
-  add.addEventListener('click', () => dispatch({ name: 'pin/current' }));
 
   const recallButton = document.createElement('button');
   recallButton.type = 'button';
@@ -177,12 +169,7 @@ export function createBookmarksView(
 
   const sectionActions = document.createElement('div');
   sectionActions.className = 'image-trail-panel__section-actions image-trail-panel__bookmark-actions';
-  sectionActions.append(
-    createQueueSortControl(options.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER, dispatch),
-    add,
-    recallButton,
-    queueMenu,
-  );
+  sectionActions.append(createQueueSortControl(options.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER, dispatch), recallButton, queueMenu);
 
   const pageMeta = document.createElement('p');
   pageMeta.className = 'image-trail-panel__meta';

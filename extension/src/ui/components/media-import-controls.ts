@@ -12,10 +12,10 @@ export function createDirectMediaUrlControl(
   const description = document.createElement('span');
   description.id = 'image-trail-direct-media-url-description';
   description.className = 'image-trail-panel__meta';
-  description.textContent = 'Capture a direct MPEG-TS URL after an intentional host-permission prompt.';
+  description.textContent = 'Capture a direct image or supported video/audio URL after an intentional host-permission prompt.';
   const input = document.createElement('input');
   input.type = 'url';
-  input.placeholder = 'https://media.example/clip.ts';
+  input.placeholder = 'https://media.example/clip.mp4';
   input.disabled = disabled;
   input.setAttribute('aria-labelledby', text.id);
   input.setAttribute('aria-describedby', description.id);
@@ -61,24 +61,45 @@ export function readMediaFiles(input: HTMLInputElement, onRead: (files: readonly
 function importedFileFromReader(file: File, result: string | ArrayBuffer | null): ImportedImageFile | null {
   if (typeof result !== 'string') return null;
   if (result.startsWith('data:image/')) return { name: file.name, dataUrl: result };
-  if (!isTransportStreamFile(file)) return null;
+  const mimeType = mediaMimeTypeForFile(file);
+  if (!mimeType) return null;
   const marker = result.indexOf(';base64,');
-  return marker < 0 ? null : { name: file.name, dataUrl: `data:video/mp2t${result.slice(marker)}` };
+  return marker < 0 ? null : { name: file.name, dataUrl: `data:${mimeType}${result.slice(marker)}` };
 }
 
 function isSupportedMediaFile(file: File): boolean {
-  return file.type.startsWith('image/') || isTransportStreamFile(file);
+  return file.type.startsWith('image/') || mediaMimeTypeForFile(file) !== null;
 }
 
-function isTransportStreamFile(file: File): boolean {
-  return file.type === 'video/mp2t' || /\.(ts|mts|m2ts)$/iu.test(file.name);
+function mediaMimeTypeForFile(file: File): string | null {
+  const normalized = file.type.toLowerCase();
+  if (
+    /^(?:video\/mp2t|video\/mp4|audio\/mp4|video\/quicktime|video\/webm|audio\/webm|video\/x-matroska|audio\/x-matroska|video\/x-msvideo|video\/mpeg|audio\/mpeg)$/u.test(
+      normalized,
+    )
+  ) {
+    return normalized;
+  }
+  const extension = /\.([a-z0-9]{1,10})$/iu.exec(file.name)?.[1]?.toLowerCase();
+  if (extension === 'ts' || extension === 'mts' || extension === 'm2ts') return 'video/mp2t';
+  if (extension === 'mp4' || extension === 'm4v' || extension === 'mpeg4') return 'video/mp4';
+  if (extension === 'm4a') return 'audio/mp4';
+  if (extension === 'mov' || extension === 'qt') return 'video/quicktime';
+  if (extension === 'webm') return 'video/webm';
+  if (extension === 'weba') return 'audio/webm';
+  if (extension === 'mkv') return 'video/x-matroska';
+  if (extension === 'mka') return 'audio/x-matroska';
+  if (extension === 'avi') return 'video/x-msvideo';
+  if (extension === 'mpg' || extension === 'mpeg') return 'video/mpeg';
+  if (extension === 'mp2') return 'audio/mpeg';
+  return null;
 }
 
 function mediaFileNameFromUrl(sourceUrl: string): string {
   try {
     const name = new URL(sourceUrl).pathname.split('/').filter(Boolean).at(-1);
-    return name ? decodeURIComponent(name) : 'media.ts';
+    return name ? decodeURIComponent(name) : 'media.bin';
   } catch {
-    return 'media.ts';
+    return 'media.bin';
   }
 }

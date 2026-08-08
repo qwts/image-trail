@@ -206,8 +206,7 @@ export function reduceQueueRecentsAction(state: PanelState, action: QueueRecents
         message: action.message,
         lastUpdatedAt: Date.now(),
       };
-    case 'pin/current':
-    case 'bookmark/current': {
+    case 'pin/current': {
       if (!state.target.selectedUrl) return state;
       const bookmarks = [
         {

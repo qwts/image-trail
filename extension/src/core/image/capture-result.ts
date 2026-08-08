@@ -97,7 +97,7 @@ export function captureFailureMessage(reason: CaptureFailureReason, origin?: str
     case 'encryption-locked':
       return 'Image capture is locked until encrypted blob storage is unlocked.';
     case 'not-media':
-      return 'The source did not contain supported image or MPEG-TS media.';
+      return 'The source did not contain a supported, signature-validated media container.';
     case 'unknown':
       return 'An unknown error occurred during capture.';
   }

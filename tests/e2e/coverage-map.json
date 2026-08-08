@@ -4,6 +4,35 @@
   "description": "Manual acceptance coverage map for the maintained Playwright E2E gate. Each entry links a canonical acceptance flow to automated coverage, intentional manual coverage, or a deferred issue.",
   "entries": [
     {
+      "id": "chrome-web-store-submission",
+      "acceptance": "Audited Chrome Web Store listing, privacy disclosures, assets, reviewer path, and exact v0.26.6 upload package (issue #502)",
+      "repoPath": "docs/acceptance-tests/chrome-web-store-submission.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Chrome-Web-Store-Submission",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/store-assets.test.ts",
+            "tests/manifest-commands.test.ts",
+            "tests/permissions.test.ts",
+            "tests/release-artifacts.test.ts",
+            "tests/version-policy.test.ts"
+          ],
+          "notes": "Locks the exact published v0.26.6 tag commit, ZIP URL/SHA-256/size, manifest version and permissions, successful CI/version-cut/release runs, public icon/screenshot/promo bytes and dimensions, baseline nativeMessaging removal, required artifact allowlist, release archive root, and least-privilege manifest policy."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": ["tests/e2e/extension-smoke.spec.ts", "tests/e2e/interop-ui.spec.ts"],
+          "notes": "The packaged baseline exercises gesture-only active-tab injection and core reviewer behavior while proving unfinished Transfer and Sync plus nativeMessaging are absent."
+        },
+        {
+          "type": "manual",
+          "reason": "Chrome Web Store account, legal/trader declarations, asset cropping, distribution, dashboard validation, and Submit for review are owner-only external steps.",
+          "notes": "Verify the downloaded image-trail-v0.26.6.zip against SHA-256 8fc3454bd65302933e3f4cb4b82c4bf78ae2f904b93e691ef9ee8fc15fdb388e; confirm manifest 0.26.6 and the six documented permissions with no nativeMessaging; follow the credential-free reviewer path; upload the versioned 128px icon, 1280x800 screenshot, and 440x280 tile; enter the canonical listing/privacy values without broader claims; resolve any dashboard demand for a promotional video before submission; and retain the dashboard summary as owner evidence."
+        }
+      ]
+    },
+    {
       "id": "overlook-transfer-sync-visible-workflow",
       "acceptance": "Baseline Transfer and Sync feature gate plus truthful experimental review, conflict, progress, recovery, and locked states",
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Overlook-Transfer-And-Sync-UI",
@@ -18,7 +47,7 @@
             "tests/release-artifacts.test.ts",
             "tests/manifest-commands.test.ts"
           ],
-          "notes": "Covers the default-off build define, baseline manifest permission and pairing-import artifact removal, release-audit rejection, exact review and custody counts, durable bookmark selection IDs, stable canonical identity, pairing-key-sealed Move outbox persistence and restart recovery, provider selection and extension-owned pairing import controls, pairing-return status refresh, synchronous provider-specific permission preflight, conflict intent, gated Queue and captured-original entry points, and locked-state privacy."
+          "notes": "Covers the default-off build define, baseline manifest permission and pairing-import artifact removal, release-audit rejection, exact review and custody counts, durable bookmark selection IDs, stable canonical identity, pairing-key-sealed Move outbox persistence and restart recovery, provider selection and extension-owned pairing import controls, pairing-return status refresh, long OAuth channel-loss focus refresh, duplicate interactive-connect suppression, valid saved-credential reuse with expired-credential fallback, scope-denial retry without a reconnect loop, synchronous provider-specific permission preflight, conflict intent, gated Queue and captured-original entry points, locked-state privacy, and closed-production-shadow-root modal parenting through the opener control so the workflow never lands unstyled in the host page body."
         },
         {
           "type": "storybook",
@@ -33,7 +62,7 @@
         {
           "type": "manual",
           "reason": "Provider credentials and the signed iCloud host remain owner-run closeout evidence in issue #590 before the experimental gate can be removed.",
-          "notes": "Build with IMAGE_TRAIL_ENABLE_INTEROP=1, then open Transfer and Sync from one Queue row, a multi-selection, Gallery, and a captured original. Verify exact counts and recovery copy, keyboard containment, narrow layout, preserved selection and queue order, and no thumbnails, names, counts, or provider details in the locked workspace."
+          "notes": "Build with IMAGE_TRAIL_ENABLE_INTEROP=1, then open Transfer and Sync from one Queue row, a multi-selection, Gallery, and a captured original. Authorize pCloud once, allow the OAuth window to remain open long enough for the original message channel to close, and return focus; verify the connected state refreshes without another OAuth window and repeated Connect clicks never queue windows. Deny or invalidate the app-folder scope and verify an honest provider-unavailable message with Retry check instead of a Reconnect loop. Also verify exact counts and recovery copy, keyboard containment, narrow layout, preserved selection and queue order, and no thumbnails, names, counts, or provider details in the locked workspace. In a production build with the closed panel Shadow DOM, click Transfer & Sync in the in-page panel and verify the workflow dialog opens inside the panel while document.body gains no image-trail-interop-scrim node."
         }
       ]
     },
@@ -107,6 +136,41 @@
       ]
     },
     {
+      "id": "common-video-audio-original-preservation",
+      "acceptance": "Signature-validated MP4, MOV, WebM, Matroska, AVI, MPEG program, and MP2 encrypted custody, metadata, preview tiers, export, backup, and Photos preservation",
+      "repoPath": "docs/acceptance-tests/common-video-and-audio-media.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Common-Video-And-Audio-Media",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/common-media.test.ts",
+            "tests/data-url-image.test.ts",
+            "tests/fetch-image.test.ts",
+            "tests/imported-media-batch.test.ts",
+            "tests/imported-media-record.test.ts",
+            "tests/full-backup-originals.test.ts",
+            "tests/interop-media.test.ts",
+            "tests/interop-record-export.test.ts",
+            "tests/interop-record-translation.test.ts",
+            "tests/dom/common-media-preview.test.ts",
+            "tests/dom/media-import-controls.test.ts"
+          ],
+          "notes": "Covers bounded ISO-BMFF/QuickTime, EBML, RIFF AVI, MPEG program-stream, and MPEG audio signature parsing; deterministic known hashes; H.264, HEVC Main 10 HDR, ProRes, VP9, MPEG-4 Part 2, MPEG-2 Video, AAC, Opus, PCM, MP3, and MP2 facts; rotation, dimensions, duration, frame rate, VFR, channel, and color metadata; malformed and spoofed rejection; exact encrypted custody; deterministic inactive queue posters; native no-autoplay and preserved-only preview surfaces; backup restoration; and strict Photos metadata without persisted device playability."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/common-video-media.spec.ts",
+          "notes": "Imports checked-in MP4, Matroska, MP2, and WebM through the packaged extension; proves encrypted-original indicators, authenticated type labels, static posters, exact downloaded MP4 bytes and filename, malformed/spoofed atomicity, no autoplay, focusable WebM controls, native playback and first-frame poster capture, plus explicit Matroska and MP2 preserved-only states."
+        },
+        {
+          "type": "manual",
+          "reason": "System-specific H.264, HEVC, ProRes, and Apple-device codec availability plus live Photos transfer remain browser, operating-system, and owner integration checks while Transfer and Sync stays experimental.",
+          "notes": "Load the packaged extension and import representative iPhone H.264/HEVC MOV, ProRes MOV, MP4, WebM, MKV, AVI, MPEG-PS, and MP2 files. Verify no list autoplay, honest per-device preview fallback, rotation and HDR handling, keyboard play pause seek mute and volume, first-frame poster stability, exact original export and encrypted backup restore, bounded malformed/oversized failure, then run experimental Image Trail to Photos to Image Trail transfers and compare SHA-256, filename, MIME, container, streams, dimensions, rotation, duration, and HDR facts."
+        }
+      ]
+    },
+    {
       "id": "design-system-foundation",
       "acceptance": "Shared design-system tokens and core primitive contracts",
       "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
@@ -153,7 +217,7 @@
             "tests/dom/primitives.test.ts",
             "tests/primitives-css.test.ts"
           ],
-          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; #755 explicit Hide/Show header controls across Host target, URL editor, Field Editor, Controls, Recents, and Queue; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, capture, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
+          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; #755 explicit Hide/Show header controls across Host target, URL editor, Field Editor, Controls, Recents, and Queue; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, Shift-modified Capture/Pin, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
         },
         {
           "type": "storybook",
@@ -165,7 +229,7 @@
             "extension/src/ui/components/target-picker-view.stories.ts",
             "extension/src/ui/components/url-editor-view.stories.ts"
           ],
-          "notes": "Covers the 420px attached shell plus minimized, detached, waiting, error, privacy, expanded workflow, Grab Mode, narrow, and reduced-motion presentation states."
+          "notes": "Covers the 420px attached shell plus minimized, detached, waiting, error, privacy, expanded workflow, default Capture and Shift-modified Pin, Grab Mode, narrow, and reduced-motion presentation states."
         },
         {
           "type": "playwright-e2e",
@@ -183,6 +247,44 @@
           "type": "manual",
           "reason": "The handoff calls for visual fidelity over an arbitrary host page and browser-level reduced-motion behavior.",
           "notes": "Load the packaged extension over the single-image fixture at 420px and a narrow viewport. Compare against the handoff panel and capture-flash references; verify hierarchy, density, glows, typography, status/toast motion, header drag, minimize, detach/restore, keyboard focus, privacy masking, and no failed stylesheet requests."
+        }
+      ]
+    },
+    {
+      "id": "shift-modified-capture-and-pin",
+      "acceptance": "One primary current-image control for Capture by default and Pin while Shift is held (issue #756)",
+      "repoPath": "docs/acceptance-tests/shift-capture-to-pin.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Shift-Modified-Capture-And-Pin",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom/keyboard-router.test.ts",
+            "tests/dom/manual-controls-view.test.ts",
+            "tests/dom/bookmarks-view.test.ts",
+            "tests/action-dispatch.test.ts"
+          ],
+          "notes": "Covers editable and record-row exclusions, Shift keyup/blur/visibility/disable cleanup, trusted Capture-to-Pin dispatch, the existing P shortcut route, and removal of the duplicate Queue action."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/manual-controls-view.stories.ts",
+          "notes": "Covers the production primary workflow in both default Capture and transient Shift-modified Pin states."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": [
+            "tests/e2e/bookmark-original-preservation.spec.ts",
+            "tests/e2e/recents-queue-recall.spec.ts",
+            "tests/e2e/detachable-sections.spec.ts",
+            "tests/e2e/keyboard-feedback.spec.ts"
+          ],
+          "notes": "In Chromium, holds Shift on the trusted primary control to pin metadata, verifies capture/original preservation remains separate, exercises Queue and Recall flows, confirms Queue does not duplicate Pin, and checks the discoverable C, Shift, and P hint."
+        },
+        {
+          "type": "manual",
+          "reason": "Browser key state, trusted activation, focus restoration, and host-page editable boundaries require a packaged extension profile.",
+          "notes": "Load the packaged extension with a selected image. Verify Capture is the default primary action; holding Shift over the page or panel changes it to Pin without firing; releasing Shift, blurring the window, hiding the tab, or closing and reopening the panel restores Capture; Shift typed in an input does not change it; clicking transient Pin or pressing P adds metadata to Queue without capturing original bytes or adding a Recent; clicking Capture or pressing C captures explicitly; and Queue has no duplicate current-image Pin action."
         }
       ]
     },
@@ -308,6 +410,73 @@
           "type": "manual",
           "reason": "The handoff specifies dense visual hierarchy and state contrast across browser-controlled form elements and detached extension windows.",
           "notes": "Load the packaged extension at standard and narrow widths; inspect attached and detached Settings plus Help. Verify grouped hierarchy, sticky headings, native input/select/file controls, focus, locked and privacy states, connected/waiting/error statuses, destructive separation, reduced motion, preserved scroll, and no stylesheet request failures."
+        }
+      ]
+    },
+    {
+      "id": "local-only-backup-reminders",
+      "acceptance": "Opt-in local-only reminders for manual encrypted backups",
+      "repoPath": "docs/acceptance-tests/local-only-backup-reminders.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Local-Only-Backup-Reminders",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/backup-reminder.test.ts",
+            "tests/local-settings-handlers.test.ts",
+            "tests/panel-settings-controller.test.ts",
+            "tests/dom/backup-reminder-view.test.ts",
+            "tests/dom/extension-destination-surfaces.test.tsx",
+            "tests/dom/recall-export-controller.test.ts"
+          ],
+          "notes": "Covers default-off migration, guarded 7/30/90-day scheduling, due-state calculation, extension-local settings, standalone and source-panel controls, snooze, successful encrypted bookmark and verified manual pCloud completion, plaintext/failure exclusions, and copy that promises no alarms, provider connection, or automatic upload."
+        },
+        {
+          "type": "storybook",
+          "paths": [
+            "extension/src/ui/components/automation-settings-view.stories.ts",
+            "extension/src/ui/components/import-export-view.stories.ts"
+          ],
+          "notes": "Covers the default-off reminder settings and the due manual-backup prompt in the production view factories."
+        },
+        {
+          "type": "manual",
+          "reason": "Calendar rollover and the absence of browser/provider side effects need owner observation in a real extension profile.",
+          "notes": "Confirm reminders are off after install, opt into each cadence, move the local next-due value across the current time, and reopen Image Trail. Verify the due prompt appears only in Import / Export; Remind me later reschedules locally; plaintext/history exports do not clear it; successful encrypted bookmark or manually initiated pCloud backups reschedule it; and no browser notification, provider connection, or upload starts without a separate user action."
+        }
+      ]
+    },
+    {
+      "id": "per-site-capture-rules",
+      "acceptance": "Conservative exact-host rules for explicit Grab clicks to pin metadata or capture an encrypted original",
+      "repoPath": "docs/acceptance-tests/per-site-capture-rules.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Per-Site-Capture-Rules",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/site-capture-rules.test.ts",
+            "tests/panel-subscriptions.test.ts",
+            "tests/captured-originals-controller.test.ts",
+            "tests/panel-settings-controller.test.ts",
+            "tests/dom/manual-controls-view.test.ts",
+            "tests/dom/extension-destination-surfaces.test.tsx",
+            "tests/dom/settings-view.test.ts"
+          ],
+          "notes": "Covers the metadata-only default, exact normalized host matching without wildcards or parent/subdomain inheritance, bounded migration and reversal, extension-owned persistence, Privacy Mode masking, inspectable Grab copy, durable pin before optional encrypted capture, and transient Recent creation only after that sequence."
+        },
+        {
+          "type": "storybook",
+          "paths": [
+            "extension/src/ui/components/manual-controls-view.stories.ts",
+            "extension/src/ui/stories/extension-destinations.stories.tsx"
+          ],
+          "notes": "Covers the trusted-site Grab presentation and both source-panel and standalone Settings surfaces through production view factories."
+        },
+        {
+          "type": "manual",
+          "reason": "Host-page click trust, browser permission prompts, encrypted-key state, and a real cross-origin image fetch require a packaged extension profile.",
+          "notes": "With a fresh profile, verify Grab pins metadata only. Add an exact-host Capture rule in Settings, confirm the panel explains that Grab will pin and capture, then explicitly click an image in Grab Mode. Verify the durable Queue row exists before capture, the original indicator appears only after encrypted storage succeeds, a locked or denied capture leaves the pin intact with honest retry/error copy, Recents stays session-only, no other visible image is captured, a subdomain does not inherit the rule, Privacy Mode masks saved hostnames, and removing the rule restores metadata-only behavior."
         }
       ]
     },
@@ -686,18 +855,35 @@
     },
     {
       "id": "url-review-status-import-export",
-      "acceptance": "URL review status import/export",
+      "acceptance": "URL review status import/export and read-only review by site",
       "repoPath": "docs/acceptance-tests/url-review-status-import-export.md",
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-URL-Review-Status-Import-Export",
       "coverage": [
         {
           "type": "unit-dom",
-          "paths": ["tests/import-export.test.ts", "tests/restore-import-preview.test.ts"]
+          "paths": [
+            "tests/import-export.test.ts",
+            "tests/restore-import-preview.test.ts",
+            "tests/indexeddb-repositories.test.ts",
+            "tests/url-metadata-privacy.test.ts",
+            "tests/dom/extension-destination-surfaces.test.tsx"
+          ],
+          "notes": "Covers all-sites reads under plaintext and encrypted searchable-metadata policy, site/status filtering, exact first/last/elapsed time derivation, read-only Settings rendering, Privacy Mode masking, and the no Queue/Recents/Recall service boundary."
         },
         {
           "type": "playwright-e2e",
-          "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
-          "notes": "Covers passed and failed URL review status records, JSON export/import restore preview, confirm import, and no Recents, pins/bookmarks, Recall, or encrypted-original side effects."
+          "paths": ["tests/e2e/url-editor-parsed-fields.spec.ts", "tests/e2e/extension-destination-pages.spec.ts"],
+          "notes": "Covers passed and failed URL review status records, JSON export/import restore preview, confirm import, the extension-owned Settings review surface with site/status filters, exact time span, Privacy Mode masking, and no Recents, pins/bookmarks, Recall, or encrypted-original side effects."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/stories/extension-destinations.stories.tsx",
+          "notes": "Covers normal filtering and a privacy-masked review-history state without exact site, URL, field, reason, or timestamp text."
+        },
+        {
+          "type": "manual",
+          "reason": "Screen-sharing privacy and readability across real retained review histories need human visual confirmation.",
+          "notes": "Open Settings > URL review history with records from at least two sites and all three statuses. Verify site/status filters, first/last/elapsed context, long URL wrapping, and Reload. Enable Privacy Mode and verify site, source/page URLs, field ids, reasons, and exact times are absent while filter controls and status categories remain usable."
         }
       ]
     },
@@ -1416,7 +1602,7 @@
         {
           "type": "playwright-e2e",
           "paths": ["tests/e2e/recents-scope.spec.ts", "tests/e2e/recents-queue-recall.spec.ts"],
-          "notes": "In Chromium, verifies Recents sorting sits left of Site scope below the title and Queue ordering is the first control beside Pin current, Recall, and Queue, including while sections are collapsed."
+          "notes": "In Chromium, verifies Recents sorting sits left of Site scope below the title and Queue ordering is the first control beside Recall and Queue; current-image Pin lives in the primary Shift-modified Capture control, including while Queue is collapsed."
         },
         {
           "type": "manual",

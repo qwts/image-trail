@@ -49,16 +49,31 @@ test('primary workflow exposes navigation, capture, slideshow, and Grab Mode wit
   primary.querySelector<HTMLButtonElement>('[aria-label="Grab Mode"]')?.click();
   assert.equal(
     primary.querySelector<HTMLButtonElement>('[aria-label="Capture original"]')?.title,
-    'Capture original (C) — store the full-resolution original bytes as a Bookmark',
+    'Capture original (C) — hold Shift to pin metadata without capturing original bytes',
   );
   assert.match(primary.querySelector<HTMLButtonElement>('[aria-label="Start slideshow"]')?.title ?? '', /step Trail fields/u);
   assert.match(primary.querySelector<HTMLButtonElement>('[aria-label="Grab Mode"]')?.title ?? '', /click host-page images to pin/u);
-  assert.equal(view.querySelector('.image-trail-panel__capture-hint')?.textContent, 'Press C to capture the current image.');
+  assert.equal(
+    view.querySelector('.image-trail-panel__capture-hint')?.textContent,
+    'Press C to capture; hold Shift on Capture or press P to pin.',
+  );
   assert.deepEqual(actions, [
     { name: 'capture/request', url: 'https://images.example.test/photo.jpg', sourceType: 'target' },
     { name: 'slideshow-start' },
     { name: 'grab-mode/start' },
   ]);
+});
+
+test('Shift modifier replaces the primary Capture action with trusted metadata-only Pin', () => {
+  const { view, actions } = createView({ capturePinModifierActive: true });
+  const pin = view.querySelector<HTMLButtonElement>('[aria-label="Pin current"]');
+  assert.ok(pin);
+  assert.equal(pin.textContent, '○ Pin');
+  assert.match(pin.title, /release Shift to restore Capture original/u);
+  pin.click();
+  assert.deepEqual(actions, [], 'synthetic pin clicks are ignored on the privileged primary control');
+  dispatchTrustedClick(pin, { shiftKey: true });
+  assert.deepEqual(actions, [{ name: 'pin/current' }]);
 });
 
 test('Controls uses the shared explicit Hide/Show header control (#755)', () => {
@@ -94,6 +109,26 @@ test('single-image context hides Grab while feed context explains its state', ()
   }).view;
   assert.equal(feed.querySelector('.image-trail-panel__feed-hint')?.textContent, 'Click images in the feed to pin them.');
   assert.equal(feed.querySelector('.image-trail-panel__feed-hint')?.classList.contains('is-active'), true);
+});
+
+test('an exact-site capture rule makes the explicit Grab behavior inspectable', () => {
+  const happyWindow = window as typeof window & { readonly happyDOM: { setURL(url: string): void } };
+  const previousUrl = window.location.href;
+  try {
+    happyWindow.happyDOM.setURL('https://images.example.test/gallery');
+    const initial = createInitialPanelState(0);
+    const view = createView({
+      pageContext: { ...initial.pageContext, detected: 'feed', effective: 'feed', available: ['single', 'feed'], imageCount: 6 },
+      siteCaptureRules: { 'images.example.test': 'capture-original' },
+    }).view;
+    assert.match(view.querySelector<HTMLButtonElement>('[aria-label="Grab Mode"]')?.title ?? '', /pin and capture encrypted originals/u);
+    assert.equal(
+      view.querySelector('.image-trail-panel__feed-hint')?.textContent,
+      'Turn on Grab mode, then click to pin and capture encrypted originals.',
+    );
+  } finally {
+    happyWindow.happyDOM.setURL(previousUrl);
+  }
 });
 
 test('running workflow exposes pause and stop actions while keeping More controls state-owned', () => {

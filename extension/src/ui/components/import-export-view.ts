@@ -1,29 +1,15 @@
-import type { ImportedEncryptedImageFile, ImportedImageFile, ImportRestorePreviewState } from '../../core/types.js';
+import type { ImportedEncryptedImageFile, ImportRestorePreviewState } from '../../core/types.js';
+import type { BackupReminderSchedule } from '../../core/backup-reminder.js';
+import { backupReminderStatus } from '../../core/backup-reminder.js';
+import { createBackupReminderView } from './backup-reminder-view.js';
+import type { ImportExportAction, UrlReviewStatusClearScope } from './import-export-actions.js';
 import { createActionGroup } from './action-group.js';
 import { createFilePickerField, createPasswordField } from './form-controls.js';
 import { createBackupHistory, createCloudBackupMetadata, type CloudBackupHistoryViewRecord } from './cloud-backup-metadata.js';
 import { cloudConnectionLabel, createCloudBackupButton } from './cloud-backup-controls.js';
 import { createDirectMediaUrlControl, readMediaFiles } from './media-import-controls.js';
 import { addTrustedClickListener } from './trusted-events.js';
-
-type UrlReviewStatusClearScope = 'hostname' | 'page' | 'source' | 'all';
-
-export type ImportExportAction =
-  | { readonly name: 'selection/select-visible' }
-  | { readonly name: 'export/history'; readonly password: string; readonly plaintext: boolean }
-  | { readonly name: 'export/bookmarks'; readonly password: string; readonly plaintext: boolean }
-  | { readonly name: 'export/url-review-status' }
-  | { readonly name: 'clear/url-review-status'; readonly scope?: UrlReviewStatusClearScope }
-  | { readonly name: 'export/image'; readonly saveAs?: boolean }
-  | { readonly name: 'export/encrypted-image' }
-  | { readonly name: 'import/history'; readonly fileContent: string; readonly password: string; readonly fileName?: string }
-  | { readonly name: 'import/bookmarks'; readonly fileContent: string; readonly password: string; readonly fileName?: string }
-  | { readonly name: 'import/url-review-status'; readonly fileContent: string; readonly fileName?: string }
-  | { readonly name: 'import/image'; readonly files: readonly ImportedImageFile[] }
-  | { readonly name: 'import/encrypted-image'; readonly files: readonly ImportedEncryptedImageFile[] }
-  | { readonly name: 'import/confirm-restore-preview' }
-  | { readonly name: 'import/cancel-restore-preview' };
-
+export type { ImportExportAction } from './import-export-actions.js';
 type RestorePreviewAction = Extract<
   ImportExportAction,
   { readonly name: 'import/confirm-restore-preview' } | { readonly name: 'import/cancel-restore-preview' }
@@ -92,6 +78,7 @@ export interface ImportExportViewState {
   readonly lastMessage?: string | undefined;
   readonly lastMessageIsError?: boolean | undefined;
   readonly restorePreview?: ImportRestorePreviewState | undefined;
+  readonly backupReminder?: BackupReminderSchedule | undefined;
 }
 
 let imageUtilitiesOpen = false;
@@ -121,6 +108,8 @@ export function createImageTransferView(state: ImportExportViewState, dispatch: 
 }
 
 export function createImportExportView(state: ImportExportViewState, dispatch: (action: ImportExportAction) => void): HTMLElement {
+  const reminderDue = state.backupReminder ? backupReminderStatus(state.backupReminder).due : false;
+  if (reminderDue) importExportOpen = true;
   const { section, body } = createCollapsibleImportExportSection(
     'image-trail-panel__import-export',
     'Import / Export',
@@ -137,6 +126,9 @@ export function createImportExportView(state: ImportExportViewState, dispatch: (
     msg.textContent = state.lastMessage;
     body.append(msg);
   }
+
+  const reminder = createBackupReminderView(state.backupReminder, () => dispatch({ name: 'backup-reminder/snooze' }));
+  if (reminder) body.append(reminder);
 
   const exportGroup = createExportGroup(state, dispatch);
   const importGroup = createImportGroup(state, dispatch);
@@ -487,10 +479,12 @@ function createImageGroup(state: ImportExportViewState, dispatch: (action: Impor
 
   const imageControl = createFilePickerField({
     label: 'Media files',
-    description: 'Choose local images or MPEG-TS files (.ts, .mts, .m2ts). Transport streams are signature-checked and encrypted.',
+    description:
+      'Choose local images or supported video/audio files. Containers are signature-checked before exact original bytes are encrypted.',
     buttonText: 'Choose media',
     noFileText: 'No file selected',
-    accept: 'image/*,video/mp2t,.ts,.mts,.m2ts',
+    accept:
+      'image/*,video/mp2t,video/mp4,audio/mp4,video/quicktime,video/webm,audio/webm,video/x-matroska,audio/x-matroska,video/x-msvideo,video/mpeg,audio/mpeg,.ts,.mts,.m2ts,.mp4,.m4v,.m4a,.mpeg4,.mov,.qt,.webm,.weba,.mkv,.mka,.avi,.mpg,.mpeg,.mp2',
     multiple: true,
     disabled: state.busy,
   });

@@ -13,11 +13,16 @@ import {
   URL_REVIEW_STATUS_LIMITS,
   VISIBLE_BOOKMARK_SOFT_MAX_LIMITS,
 } from '../../core/settings.js';
+import type { BackupReminderIntervalDays } from '../../core/backup-reminder.js';
 import { setTargetState } from '../../core/state.js';
 import type { PanelState } from '../../core/types.js';
 import { collectUrlFields } from '../../core/url/tokenize-fields.js';
 import type { ParsedUrlModel, UrlField } from '../../core/url/types.js';
 import type { NeighborPreloadController } from './neighbor-preload-controller.js';
+import { BackupReminderSettingsController } from './backup-reminder-settings-controller.js';
+import { SiteCaptureRulesSettingsController } from './site-capture-rules-settings-controller.js';
+
+export { createBackupReminderBindings } from './backup-reminder-settings-controller.js';
 import { toTargetState } from './projection-application-controller.js';
 
 export interface PanelSettingsControllerDeps {
@@ -66,7 +71,25 @@ function queueViewSettingsChanged(state: PanelState, settings: PlaintextLocalSet
  * "side effect fires only on an actual change" ordering.
  */
 export class PanelSettingsController {
-  constructor(private readonly deps: PanelSettingsControllerDeps) {}
+  private readonly backupReminder: BackupReminderSettingsController;
+  private readonly siteCaptureRules: SiteCaptureRulesSettingsController;
+
+  constructor(private readonly deps: PanelSettingsControllerDeps) {
+    this.backupReminder = new BackupReminderSettingsController({
+      getState: deps.getState,
+      setState: deps.setState,
+      getLocalSettings: deps.getLocalSettings,
+      saveLocalSettings: (settings) => this.saveLocalSettings(settings),
+      render: deps.render,
+    });
+    this.siteCaptureRules = new SiteCaptureRulesSettingsController({
+      getState: deps.getState,
+      setState: deps.setState,
+      getLocalSettings: deps.getLocalSettings,
+      saveLocalSettings: (settings) => this.saveLocalSettings(settings),
+      render: deps.render,
+    });
+  }
 
   async loadLocalSettings(options: LoadLocalSettingsOptions = {}): Promise<void> {
     const store = this.deps.localSettingsStore();
@@ -95,6 +118,10 @@ export class PanelSettingsController {
       buildInfoOverlayVisible: settings.buildInfoOverlayVisible,
       urlReviewStatusLimit: settings.urlReviewStatusLimit,
       clearUrlReviewStatusAfterExport: settings.clearUrlReviewStatusAfterExport,
+      backupReminderEnabled: settings.backupReminderEnabled,
+      backupReminderIntervalDays: settings.backupReminderIntervalDays,
+      backupReminderNextAt: settings.backupReminderNextAt,
+      siteCaptureRules: settings.siteCaptureRules,
       requestThrottleMs: settings.requestThrottleMs,
       requestThrottleMaxRequests: settings.requestThrottleMaxRequests,
       requestThrottleWindowMs: settings.requestThrottleWindowMs,
@@ -131,6 +158,22 @@ export class PanelSettingsController {
 
   saveLocalSettings(settings: PlaintextLocalSettings): void {
     void this.saveLocalSettingsAsync(settings);
+  }
+
+  updateBackupReminder(enabled: boolean, intervalDays: BackupReminderIntervalDays, now = Date.now()): void {
+    this.backupReminder.update(enabled, intervalDays, now);
+  }
+
+  snoozeBackupReminder(now = Date.now()): void {
+    this.backupReminder.snooze(now);
+  }
+
+  recordManualBackupCompleted(now = Date.now()): void {
+    this.backupReminder.complete(now);
+  }
+
+  updateSiteCaptureRule(hostname: string, behavior: import('../../core/site-capture-rules.js').SiteCaptureBehavior | null): void {
+    this.siteCaptureRules.update(hostname, behavior);
   }
 
   async saveLocalSettingsAsync(settings: PlaintextLocalSettings): Promise<void> {

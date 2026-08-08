@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createInteropRuntimeResultMessage } from '../../extension/src/background/interop-runtime-messages.js';
 import { createInteropWorkflowView, openInteropWorkflow } from '../../extension/src/ui/components/interop-workflow-view.js';
 import { blockedInteropWorkflow } from '../../extension/src/ui/interop/visible-workflow.js';
+import { openGalleryInteropWorkflow } from '../../extension/src/ui/react/destination-surface.js';
 
 test('renders exact review and progress counts without claiming unavailable work completed', () => {
   const view = createInteropWorkflowView(blockedInteropWorkflow('selection', 4), { onClose: () => undefined });
@@ -140,6 +141,27 @@ test('progress phases cannot start again and resumable errors use the resume han
   assert.deepEqual(calls, ['resume']);
 });
 
+test('provider failures retry status without launching reconnect OAuth', () => {
+  const calls: string[] = [];
+  const view = createInteropWorkflowView(
+    {
+      ...blockedInteropWorkflow('settings', 0),
+      error: { code: 'provider-unavailable', message: 'pCloud denied the app-folder scope.', retryable: true },
+    },
+    {
+      onClose: () => undefined,
+      onReconnect: () => calls.push('reconnect'),
+      onRetryCheck: () => calls.push('status'),
+    },
+  );
+  const retry = Array.from(view.querySelectorAll('.image-trail-interop__error button')).find(
+    (control) => control.textContent === 'Retry check',
+  );
+  assert.ok(retry instanceof HTMLButtonElement);
+  retry.click();
+  assert.deepEqual(calls, ['status']);
+});
+
 test('open workflow makes the panel inert and restores focus when closed', () => {
   const panel = document.createElement('section');
   panel.id = 'image-trail-panel-root';
@@ -162,6 +184,53 @@ test('open workflow makes the panel inert and restores focus when closed', () =>
   assert.equal(panel.style.pointerEvents, '');
   assert.equal(document.activeElement, opener);
   panel.remove();
+});
+
+test('open workflow reaches a closed production shadow root through the opener control', () => {
+  const host = document.createElement('div');
+  const shadow = host.attachShadow({ mode: 'closed' });
+  const panel = document.createElement('section');
+  panel.className = 'image-trail-panel-root';
+  const opener = document.createElement('button');
+  panel.append(opener);
+  shadow.append(panel);
+  document.body.append(host);
+  opener.focus();
+
+  openInteropWorkflow('bookmark', ['bookmark-1'], false, opener);
+  assert.equal(document.querySelector('.image-trail-interop-scrim'), null, 'the modal never lands in the host page body');
+  const dialog = shadow.querySelector('[role="dialog"][aria-label="Transfer and Sync"]');
+  assert.ok(dialog instanceof HTMLElement);
+  assert.equal(panel.inert, true);
+  const close = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Close');
+  assert.ok(close instanceof HTMLButtonElement);
+  close.click();
+
+  assert.equal(panel.inert, false);
+  assert.equal(shadow.activeElement, opener);
+  host.remove();
+});
+
+test('Gallery workflow forwards its opener into the closed production shadow root', () => {
+  const host = document.createElement('div');
+  const shadow = host.attachShadow({ mode: 'closed' });
+  const panel = document.createElement('section');
+  panel.className = 'image-trail-panel-root';
+  const opener = document.createElement('button');
+  panel.append(opener);
+  shadow.append(panel);
+  document.body.append(host);
+
+  openGalleryInteropWorkflow(['bookmark-1'], false, opener);
+
+  assert.equal(document.querySelector('.image-trail-interop-scrim'), null);
+  const dialog = shadow.querySelector('[role="dialog"][aria-label="Transfer and Sync"]');
+  assert.ok(dialog instanceof HTMLElement);
+  const close = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Close');
+  assert.ok(close instanceof HTMLButtonElement);
+  close.click();
+  assert.equal(shadow.activeElement, opener);
+  host.remove();
 });
 
 test('open workflow traps keyboard focus inside the active shadow root', () => {
@@ -254,6 +323,71 @@ test('returning from secure pairing import refreshes the open workflow status', 
   window.dispatchEvent(new Event('focus'));
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(statusCalls, 2);
+});
+
+test('returning from a lost OAuth reply refreshes status and suppresses duplicate connect actions', async (t) => {
+  const actions: string[] = [];
+  let statusCalls = 0;
+  let rejectConnect: ((reason: Error) => void) | undefined;
+  Object.defineProperty(globalThis, 'chrome', {
+    configurable: true,
+    value: {
+      runtime: {
+        id: 'test-extension',
+        sendMessage: (message: { payload: { action: { name: string } } }) => {
+          const name = message.payload.action.name;
+          actions.push(name);
+          if (name === 'connect') {
+            return new Promise((_, reject) => {
+              rejectConnect = reject;
+            });
+          }
+          statusCalls += 1;
+          return Promise.resolve(
+            createInteropRuntimeResultMessage({
+              ok: true,
+              snapshot: {
+                ...blockedInteropWorkflow('settings', 0),
+                provider: {
+                  id: 'pcloud',
+                  label: 'pCloud',
+                  state: statusCalls > 2 ? 'connected' : 'disconnected',
+                  detail: statusCalls > 2 ? 'pCloud is connected.' : 'Connect pCloud.',
+                },
+                error: null,
+              },
+            }),
+          );
+        },
+      },
+    },
+  });
+  t.after(() => Reflect.deleteProperty(globalThis, 'chrome'));
+
+  openInteropWorkflow('settings', []);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const dialog = document.querySelector('[role="dialog"][aria-label="Transfer and Sync"]');
+  assert.ok(dialog instanceof HTMLElement);
+  const connect = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Connect provider');
+  assert.ok(connect instanceof HTMLButtonElement);
+  connect.click();
+  connect.click();
+  window.dispatchEvent(new Event('focus'));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(actions, ['status', 'connect']);
+
+  assert.ok(rejectConnect);
+  rejectConnect(
+    new Error(
+      'A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received',
+    ),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  assert.deepEqual(actions, ['status', 'connect', 'status', 'status']);
+  assert.match(dialog.textContent ?? '', /connected/u);
+  Array.from(dialog.querySelectorAll('button'))
+    .find((control) => control.textContent === 'Close')
+    ?.click();
 });
 
 test('open workflow ignores an older status response after a newer operation response', async (t) => {

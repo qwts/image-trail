@@ -9,4 +9,5 @@ export interface RecordAddOptions {
   readonly width?: number | undefined;
   readonly height?: number | undefined;
   readonly projectionId?: string | undefined;
+  readonly onBookmarkSaved?: ((record: import('../../core/display-records.js').ImageDisplayRecord) => void) | undefined;
 }

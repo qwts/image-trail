@@ -19,11 +19,11 @@ import type { LibraryPanelState, LibraryPreferencePanelAction } from './library-
 import type { SessionInactivityTimeoutMinutes } from './secure-session-policy.js';
 import type { SecureSessionPanelAction } from './secure-session-actions.js';
 import type { ParsedFieldResetBaseline, ParsedFieldStateRecord } from './parsed-field-state-types.js';
-
+import type { BackupReminderPanelAction, BackupReminderPanelState } from './backup-reminder.js';
+import type { SiteCaptureRulesPanelAction, SiteCaptureRulesPanelState } from './site-capture-rules.js';
 export type { RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
 export type { BookmarkStore } from './bookmark-store.js';
 export type { ParsedFieldResetBaseline, ParsedFieldStateRecord } from './parsed-field-state-types.js';
-
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
 type CloudBackupControlActionName = 'cloud-backup/disconnect' | 'cloud-backup/cancel';
@@ -39,7 +39,6 @@ export interface TargetState {
   readonly objectFit: ObjectFitMode;
   readonly message: string;
 }
-
 export interface AutomationState {
   readonly slideshowPhase: AutomationPhase;
   readonly slideshowCount: number;
@@ -51,7 +50,6 @@ export interface AutomationState {
   // True while the parsed-field navigation drain is working; the panel's busy signal (#373).
   readonly navigationBusy: boolean;
 }
-
 export type PanelDestinationId = import('./destinations.js').ExtensionDestinationId;
 
 export type {
@@ -94,11 +92,11 @@ export type UrlReviewStatusClearFilter =
 
 export interface UrlReviewStatusStore {
   list(hostname: string): Promise<readonly UrlReviewStatusRecord[]>;
+  listAll(): Promise<readonly UrlReviewStatusRecord[]>;
   save(record: UrlReviewStatusRecord, options?: { readonly maxRecordsPerHost?: number }): Promise<void>;
   importMany(records: readonly UrlReviewStatusRecord[], options?: { readonly maxRecordsPerHost?: number }): Promise<number>;
   clear(filter: UrlReviewStatusClearFilter): Promise<number>;
 }
-
 export interface RecallCandidate extends ImageDisplayRecord {
   readonly envelopeCreatedAt: string;
 }
@@ -116,7 +114,7 @@ export interface RecallState {
   readonly messageIsError?: boolean | undefined;
 }
 
-export interface PanelState extends LibraryPanelState {
+export interface PanelState extends LibraryPanelState, BackupReminderPanelState, SiteCaptureRulesPanelState {
   readonly visible: boolean;
   readonly minimized: boolean;
   readonly status: PanelStatus;
@@ -141,6 +139,7 @@ export interface PanelState extends LibraryPanelState {
   readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly loadFailureFeedback: LoadFailureFeedback;
   readonly downArrowAction: import('./keyboard-shortcuts.js').DownArrowAction;
+  readonly capturePinModifierActive: boolean;
   readonly secondaryControlsOpen: boolean;
   readonly detachedSections: readonly DetachableSectionId[];
   readonly restoreWorkspaceLayoutEnabled: boolean;
@@ -203,7 +202,6 @@ export type PanelActionName =
   | 'history/load'
   | 'history/download'
   | 'history/select'
-  | 'history/update-display-order'
   | 'selection/select-visible'
   | 'history-selection/toggle'
   | 'history-selection/select'
@@ -215,7 +213,6 @@ export type PanelActionName =
   | 'selected-url/apply'
   | 'selected-url/reject-unsupported-input'
   | 'pin/current'
-  | 'bookmark/current'
   | 'bookmark/load'
   | 'bookmark/remove'
   | 'bookmark-selection/toggle'
@@ -223,7 +220,6 @@ export type PanelActionName =
   | 'bookmark-selection/select'
   | 'bookmark-selection/clear'
   | 'bookmarks/page-loaded'
-  | 'bookmarks/update-display-order'
   | 'gallery/open'
   | 'bookmarks/page-front'
   | 'bookmarks/page-back'
@@ -232,14 +228,14 @@ export type PanelActionName =
   | 'bookmarks/refresh-thumbnails'
   | 'settings/toggle'
   | 'help/toggle'
-  | 'settings/update-visible-bookmark-soft-max'
-  | 'settings/update-recent-history-retention'
-  | 'settings/update-recent-sparse-row-display-mode'
+  | LibraryPreferencePanelAction['name']
   | 'settings/update-pin-save-storage-preference'
   | 'settings/update-privacy-mode'
   | 'settings/update-metadata-policy'
   | 'settings/update-build-info-overlay-visibility'
   | 'settings/update-url-review-status-retention'
+  | BackupReminderPanelAction['name']
+  | SiteCaptureRulesPanelAction['name']
   | 'settings/update-request-throttle'
   | 'settings/update-neighbor-preload'
   | 'settings/update-down-arrow-action'
@@ -327,7 +323,6 @@ export type PanelAction =
         | 'history/mark-pinned'
         | 'history/delete-all'
         | 'history/select'
-        | 'history/update-display-order'
         | 'selection/select-visible'
         | 'history-selection/toggle'
         | 'history-selection/select'
@@ -350,15 +345,14 @@ export type PanelAction =
         | 'bookmark-selection/select'
         | 'bookmark-selection/clear'
         | 'bookmarks/page-loaded'
-        | 'bookmarks/update-display-order'
-        | 'settings/update-visible-bookmark-soft-max'
-        | 'settings/update-recent-history-retention'
-        | 'settings/update-recent-sparse-row-display-mode'
+        | LibraryPreferencePanelAction['name']
         | 'settings/update-pin-save-storage-preference'
         | 'settings/update-privacy-mode'
         | 'settings/update-metadata-policy'
         | 'settings/update-build-info-overlay-visibility'
         | 'settings/update-url-review-status-retention'
+        | 'settings/update-backup-reminder'
+        | 'settings/update-site-capture-rule'
         | 'settings/update-request-throttle'
         | 'settings/update-neighbor-preload'
         | 'settings/update-down-arrow-action'
@@ -464,6 +458,8 @@ export type PanelAction =
       readonly limit: number;
       readonly clearAfterExport: boolean;
     }
+  | BackupReminderPanelAction
+  | SiteCaptureRulesPanelAction
   | {
       readonly name: 'settings/update-request-throttle';
       readonly minimumIntervalMs: number;

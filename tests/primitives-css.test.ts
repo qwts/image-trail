@@ -98,7 +98,7 @@ test('panel packaging loads design-system stylesheets after tokens', () => {
   }
   assert.equal(
     designSystemCss,
-    "@import './tokens.css';\n@import './primitives.css';\n@import './feedback-primitives.css';\n@import './shortcut-feedback.css';\n@import './panel-shell.css';\n@import './primary-workflow.css';\n@import './record-row.css';\n@import './fields.css';\n@import './settings-surface.css';\n@import './settings-integrations.css';\n",
+    "@import './tokens.css';\n@import './primitives.css';\n@import './feedback-primitives.css';\n@import './shortcut-feedback.css';\n@import './panel-shell.css';\n@import './primary-workflow.css';\n@import './record-row.css';\n@import './fields.css';\n@import './settings-surface.css';\n@import './settings-integrations.css';\n@import './site-capture-rules.css';\n",
   );
   const resources = manifest.web_accessible_resources.flatMap((entry) => entry.resources);
   assert.ok(resources.includes('src/ui/styles/design-system.css'));
@@ -111,6 +111,7 @@ test('panel packaging loads design-system stylesheets after tokens', () => {
   assert.ok(resources.includes('src/ui/styles/fields.css'));
   assert.ok(resources.includes('src/ui/styles/settings-surface.css'));
   assert.ok(resources.includes('src/ui/styles/settings-integrations.css'));
+  assert.ok(resources.includes('src/ui/styles/site-capture-rules.css'));
   assert.ok(resources.includes('src/ui/styles/panel-entry.css'));
   assert.ok(resources.includes('src/ui/styles/handoff-baseline.css'));
   for (const name of ['foundation', 'sections', 'controls', 'cloud', 'settings', 'records']) {

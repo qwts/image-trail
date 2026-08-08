@@ -24,6 +24,7 @@ import {
   togglePanelFromExtensionAction,
   type ExtensionDownloadRequest,
 } from './fixtures.js';
+import { pinCurrentImage } from './current-image-actions.js';
 
 const primaryImage = '#fixture-primary-image';
 const password = 'correct horse battery staple';
@@ -163,7 +164,25 @@ async function reopenPanel(page: Page, serviceWorker: Worker): Promise<void> {
 async function exportImages(page: Page, serviceWorker: Worker, options: { readonly saveAs?: boolean } = {}): Promise<void> {
   await openImageUtilities(page);
   await clearDownloadRequestLog(serviceWorker);
-  await page.getByRole('button', { name: /Export images/u }).click({ modifiers: options.saveAs ? ['Shift'] : [] });
+  if (options.saveAs) {
+    // Hold Shift via keyboard so the capture Pin modifier re-render settles before the click.
+    // Using click({modifiers:['Shift']}) races against the panel's Shift-triggered
+    // Capture->Pin swap (full panel DOM re-render) causing html intercepts / detach.
+    await page.keyboard.down('Shift');
+    try {
+      // Wait for the Pin mode UI to settle; polling avoids a hard timeout slump.
+      await page.waitForTimeout(150);
+      const exportButton = page.getByRole('button', { name: /Export images/u });
+      await exportButton.waitFor({ state: 'visible', timeout: 5000 });
+      await exportButton.click();
+    } finally {
+      await page.keyboard.up('Shift');
+      // Allow the Pin->Capture swap to settle before asserting status.
+      await page.waitForTimeout(150);
+    }
+  } else {
+    await page.getByRole('button', { name: /Export images/u }).click();
+  }
   await expectPanelStatusMessage(page, /Image export started\.|Started \d+ image downloads\./u);
   await closeSettings(page);
 }
@@ -259,10 +278,10 @@ test('exports selected recents, queue rows, and Recall rows in UI order', async 
   expect(downloads.map((download) => download.filename)).toEqual(['asset-three.svg', 'asset-two.svg', 'asset-one.svg']);
 
   await page.locator('.image-trail-panel__history-item', { hasText: 'asset-three.svg' }).click();
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-three.svg' })).toBeVisible();
   await applyUrlInEditor(page, fixtureUrl(fixtureAssetPaths.assetTwo));
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   await expect(page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-two.svg' })).toBeVisible();
   await clearSelectedRecentRows(page);
   await openQueueMenu(page);
@@ -295,7 +314,7 @@ test('captures originals, prefers stored bytes for export, and round-trips encry
   await openPanel(page, serviceWorker);
   await setupEncryptedOriginals(page);
 
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   const queueRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
   await expect(queueRow).toBeVisible();
   await queueRow.getByRole('button', { name: 'Capture' }).click();
@@ -363,7 +382,7 @@ test('refuses to store oversized originals and keeps stored-original usage bound
   }
   await setupEncryptedOriginals(page);
 
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   const baselineRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
   await expect(baselineRow).toBeVisible();
   await baselineRow.getByRole('button', { name: 'Capture' }).click();
@@ -395,7 +414,7 @@ test('refuses to store oversized originals and keeps stored-original usage bound
   // there, so the refusal is exercised against a pinned queue record (matching the
   // acceptance flow) and a regression that mutated or dropped the durable row on an
   // oversized capture would be caught.
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   const oversizedRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'generated-oversized.svg' });
   await expect(oversizedRow).toBeVisible();
 

@@ -483,7 +483,7 @@ test('UrlReviewStatusRepository saves, lists, and imports URL review state per h
 
   assert.deepEqual(await repository.listByHostname('example.test'), [failed, passed]);
   assert.deepEqual(await repository.listByHostname('other.test'), [otherHost]);
-
+  assert.deepEqual(await repository.listAll(), [otherHost, failed, passed]);
   const stale = { ...failed, status: 'passed' as const, updatedAt: '2026-06-23T00:00:01.000Z' };
   const unchanged = {
     ...failed,

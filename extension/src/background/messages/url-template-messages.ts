@@ -3,7 +3,7 @@ import { MESSAGE_PROTOCOL_VERSION, MessageType } from '../message-protocol.js';
 export interface ListUrlReviewStatusMessage {
   readonly type: typeof MessageType.ListUrlReviewStatus;
   readonly version: typeof MESSAGE_PROTOCOL_VERSION;
-  readonly payload: { readonly hostname: string };
+  readonly payload: { readonly hostname: string | null };
 }
 
 export interface ListUrlReviewStatusResultMessage {
@@ -130,7 +130,7 @@ export interface DeleteGrabSourcePatternResultMessage {
   readonly payload: { readonly ok: boolean };
 }
 
-export function createListUrlReviewStatusMessage(hostname: string): ListUrlReviewStatusMessage {
+export function createListUrlReviewStatusMessage(hostname: string | null): ListUrlReviewStatusMessage {
   return { type: MessageType.ListUrlReviewStatus, version: MESSAGE_PROTOCOL_VERSION, payload: { hostname } };
 }
 

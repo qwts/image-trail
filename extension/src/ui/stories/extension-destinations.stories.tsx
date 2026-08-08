@@ -5,9 +5,10 @@ import type { ReactNode } from 'react';
 import '../../destinations/destination-tokens.css';
 import '../../destinations/destination-page.css';
 import '../../destinations/destination-surfaces.css';
+import '../../destinations/url-review-status-settings.css';
 import { DEFAULT_LOCAL_SETTINGS } from '../../content/panel-services.js';
 import type { RecallRecordsResult } from '../../content/recall-store.js';
-import type { RecallCandidate } from '../../core/types.js';
+import type { RecallCandidate, UrlReviewStatusRecord } from '../../core/types.js';
 import { DashboardDestination } from '../../destinations/dashboard-destination.js';
 import type { DashboardSnapshot, DestinationServices, RecallWindow } from '../../destinations/destination-services.js';
 import { RecallDestination } from '../../destinations/recall-destination.js';
@@ -101,6 +102,21 @@ export const Settings: Story = {
     const downArrow = canvas.getByRole('combobox', { name: 'Down arrow action' });
     await userEvent.selectOptions(downArrow, 'download');
     await expect(savedDownArrowAction).toHaveBeenCalledWith('download');
+    await userEvent.click(await canvas.findByText('URL review history'));
+    await userEvent.selectOptions(await canvas.findByRole('combobox', { name: 'URL review status' }), 'failed');
+    await expect(canvas.getByText('Review detail hidden')).toBeVisible();
+  },
+};
+
+export const SettingsPrivateReviewHistory: Story = {
+  render: () => page('settings', <SettingsDestination services={services({ privacyMode: true })} />),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByText('URL review history'));
+    await expect(await canvas.findAllByText('Private source URL')).toHaveLength(2);
+    await expect(canvas.getByText('Exact review timing is hidden in Privacy Mode.')).toBeVisible();
+    await expect(canvasElement.innerHTML).not.toContain('images.example.test');
+    await expect(canvasElement.innerHTML).not.toContain('field-secret');
   },
 };
 
@@ -170,6 +186,30 @@ interface ServiceOptions {
   readonly settingsFailure?: boolean;
 }
 
+const reviewHistory: readonly UrlReviewStatusRecord[] = [
+  {
+    schemaVersion: 1,
+    hostname: 'images.example.test',
+    pageUrl: 'https://images.example.test/gallery?secret=one',
+    sourceUrl: 'https://images.example.test/broken.jpg',
+    status: 'failed',
+    fieldIds: ['field-secret'],
+    activeFieldId: 'field-secret',
+    reason: 'Image failed: HTTP 404',
+    updatedAt: '2026-07-14T12:30:00.000Z',
+  },
+  {
+    schemaVersion: 1,
+    hostname: 'alpha.example.test',
+    pageUrl: 'https://alpha.example.test/page',
+    sourceUrl: 'https://alpha.example.test/one.jpg',
+    status: 'passed',
+    fieldIds: [],
+    activeFieldId: null,
+    updatedAt: '2026-07-14T10:00:00.000Z',
+  },
+];
+
 function services(options: ServiceOptions = {}): DestinationServices {
   const items = options.records ?? records;
   const dashboard: DashboardSnapshot = {
@@ -203,7 +243,10 @@ function services(options: ServiceOptions = {}): DestinationServices {
       recalled(ids);
       return { ok: true, records: [], failedCount: 0, message: 'Selected records moved to the front.' };
     },
-    loadSettings: options.settingsFailure ? fail : async () => DEFAULT_LOCAL_SETTINGS,
+    loadSettings: options.settingsFailure
+      ? fail
+      : async () => ({ ...DEFAULT_LOCAL_SETTINGS, privacyModeEnabled: options.privacyMode ?? false }),
+    loadUrlReviewStatus: async () => reviewHistory,
     saveSettings: async (settings) => {
       saved(settings.privacyModeEnabled);
       savedDownArrowAction(settings.downArrowAction);

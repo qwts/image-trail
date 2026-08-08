@@ -30,6 +30,7 @@ function bookmark(overrides: Partial<ImageDisplayRecord> = {}): ImageDisplayReco
 
 interface ExportHarnessConfig {
   readonly bookmarks?: readonly ImageDisplayRecord[];
+  readonly selectedBookmarkIds?: readonly string[];
   readonly albums?: readonly AlbumBackupEntry[];
   readonly captureStore?: Partial<Record<keyof CaptureStore, unknown>>;
   readonly failUploadAttempt?: number;
@@ -41,13 +42,19 @@ interface ExportHarness {
   readonly requestedOriginalBlobIds: string[][];
   readonly uploads: { readonly fileId: number; readonly fileName: string; readonly fileContent: string; readonly recordHistory: boolean }[];
   readonly cleanups: readonly number[][];
+  readonly backupCompletions: number;
 }
 
 function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
-  let state = createInitialPanelState(0);
+  let state: PanelState = {
+    ...createInitialPanelState(0),
+    bookmarks: config.bookmarks ?? [],
+    selectedBookmarkIds: config.selectedBookmarkIds ?? [],
+  };
   const requestedOriginalBlobIds: string[][] = [];
   const uploads: { fileId: number; fileName: string; fileContent: string; recordHistory: boolean }[] = [];
   const cleanups: number[][] = [];
+  let backupCompletions = 0;
 
   const bookmarkStore = {
     loadPage: async () => ({
@@ -80,6 +87,9 @@ function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
     renderPanelAndRefreshRecall: () => {},
     loadBookmarkPage: async () => {},
     getLocalSettings: () => DEFAULT_LOCAL_SETTINGS,
+    backupCompleted: () => {
+      backupCompletions += 1;
+    },
     findSelectedImage: () => null,
     bookmarkStore: () => bookmarkStore,
     albumStore: () => ({ listBackupEntries: async () => config.albums ?? [] }),
@@ -147,7 +157,16 @@ function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
     }) as RecallExportControllerDeps['uploadPCloudBackup'],
   };
 
-  return { controller: new RecallExportController(deps), getState: () => state, requestedOriginalBlobIds, uploads, cleanups };
+  return {
+    controller: new RecallExportController(deps),
+    getState: () => state,
+    requestedOriginalBlobIds,
+    uploads,
+    cleanups,
+    get backupCompletions() {
+      return backupCompletions;
+    },
+  };
 }
 
 async function decryptedParts(harness: ExportHarness, password: string) {
@@ -179,6 +198,7 @@ test('backupPCloudNow rejects an empty backup set', async () => {
 
   assert.match(harness.getState().pcloudBackup.message ?? '', /No durable pins, bookmarks, or albums to back up\./u);
   assert.equal(harness.uploads.length, 0);
+  assert.equal(harness.backupCompletions, 0);
 });
 
 test('backupPCloudNow collects full-backup original blob ids from stored originals', async () => {
@@ -228,6 +248,24 @@ test('backupPCloudNow uploads an encrypted backup and reports success', async ()
   assert.equal(backup.payloads.filter((payload) => payload.kind === 'records').length, 1);
   assert.equal(harness.getState().pcloudBackup.lastBackupMissingOriginalCount, 0);
   assert.equal(harness.getState().pcloudBackup.messageIsError, false);
+  assert.equal(harness.backupCompletions, 1);
+});
+
+test('only encrypted bookmark export completion counts as a manual backup', async () => {
+  const encrypted = createExportHarness({ bookmarks: [bookmark({ id: 'bookmark-1' })] });
+  await encrypted.controller.exportBookmarks('backup-password', false);
+  assert.equal(encrypted.backupCompletions, 1);
+
+  const plaintext = createExportHarness({ bookmarks: [bookmark({ id: 'bookmark-1' })] });
+  await plaintext.controller.exportBookmarks('', true);
+  assert.equal(plaintext.backupCompletions, 0);
+
+  const selected = createExportHarness({
+    bookmarks: [bookmark({ id: 'bookmark-1' }), bookmark({ id: 'bookmark-2' })],
+    selectedBookmarkIds: ['bookmark-1'],
+  });
+  await selected.controller.exportBookmarks('backup-password', false);
+  assert.equal(selected.backupCompletions, 0, 'a selected-only export leaves other durable records unprotected');
 });
 
 test('backupPCloudNow uploads album-only backups', async () => {
@@ -268,6 +306,7 @@ test('backupPCloudNow surfaces the missing-original count in the completion stat
   assert.deepEqual(harness.requestedOriginalBlobIds, [['blob-1']]);
   assert.equal(harness.uploads.length, 3);
   assert.equal(harness.getState().pcloudBackup.lastBackupMissingOriginalCount, 1);
+  assert.equal(harness.backupCompletions, 0, 'an incomplete original set must not postpone the next backup reminder');
 });
 
 test('backupPCloudNow requests and uploads encrypted originals one at a time', async () => {
@@ -323,4 +362,5 @@ test('backupPCloudNow cleans verified parts when a later part upload fails', asy
   assert.deepEqual(harness.cleanups, [[harness.uploads[0]!.fileId, 99]]);
   assert.match(harness.getState().pcloudBackup.message ?? '', /Injected part upload failure/u);
   assert.match(harness.getState().pcloudBackup.message ?? '', /Cleaned up 2 partial backup part/u);
+  assert.equal(harness.backupCompletions, 0);
 });

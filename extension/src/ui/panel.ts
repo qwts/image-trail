@@ -17,7 +17,7 @@ import { reducePanelAction } from '../core/actions.js';
 import { Retry404 } from '../core/automation/retry-404.js';
 import { Slideshow } from '../core/automation/slideshow.js';
 import type { BuildIdentity } from '../core/build-info.js';
-import { createInitialPanelState, setAutomationState, setTargetState } from '../core/state.js';
+import { createInitialPanelState, setAutomationState, setCapturePinModifier, setTargetState } from '../core/state.js';
 import type {
   BookmarkStore,
   PanelAction,
@@ -55,7 +55,7 @@ import { PanelRenderController } from './panel/panel-render-controller.js';
 import { ParsedFieldStateRecordController } from './panel/parsed-field-state-record-controller.js';
 import { UrlReviewStatusController } from './panel/url-review-status-controller.js';
 import { PanelDataLoadController } from './panel/panel-data-load-controller.js';
-import { PanelSettingsController } from './panel/panel-settings-controller.js';
+import { createBackupReminderBindings, PanelSettingsController } from './panel/panel-settings-controller.js';
 import { RecallDestinationController } from './panel/recall-destination-controller.js';
 import { RecallExportController } from './panel/recall-export-controller.js';
 import { RecallRestoreController } from './panel/recall-restore-controller.js';
@@ -72,7 +72,6 @@ import { hostnameFromLocation } from './panel-position.js';
 import { destinationOpenErrorState, openDestinationErrorMessage } from './panel/gallery-action.js';
 import { fieldLoadResultState } from './panel/field-load-result-state.js';
 import { CurrentImageDownloadController } from './panel/current-image-download-controller.js';
-
 export { nextParsedFieldStatePageKey, shouldRestoreParsedFieldState } from './panel/parsed-field-state-sync.js';
 export { projectionSessionOwnsSelectedTarget, urlReviewStatusForLoadResult } from './panel/projection-application-controller.js';
 
@@ -174,7 +173,7 @@ export class ImageTrailPanel {
     render: () => this.render(),
     renderPanelAndRefreshRecall: () => this.panelRender.renderPanelAndRefreshRecall(),
     loadBookmarkPage: (offset, options) => this.panelDataLoad.loadBookmarkPage(offset, options),
-    getLocalSettings: () => this.localSettings,
+    ...createBackupReminderBindings(() => [this.panelSettings, this.localSettings]),
     findSelectedImage: (handleId) => this.findSelectedImage(handleId),
     bookmarkStore: () => this.bookmarkStore,
     albumStore: () => this.albumStore,
@@ -450,9 +449,8 @@ export class ImageTrailPanel {
           this.state = setTargetState(this.state, toTargetState(snapshot));
           this.render();
         },
-        restoreFieldState: () => {
-          void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore());
-        },
+        restoreFieldState: () => void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore()),
+        captureGrabbedBookmark: (r) => this.capturedOriginals.captureGrabbedBookmark(r, this.state.siteCaptureRules, location.hostname),
       }),
     );
     void this.panelDataLoad.loadSettingsBookmarksAndRecents();
@@ -461,7 +459,11 @@ export class ImageTrailPanel {
     void this.recallExport.refreshBlobKeyStatus();
     void this.recallExport.refreshPCloudProviderStatus();
 
-    this.keyboard = new KeyboardRouter((action) => this.handleShortcutAction(action));
+    this.keyboard = new KeyboardRouter(
+      (action) => this.handleShortcutAction(action),
+      undefined,
+      (active) => this.applyPanelState(setCapturePinModifier(this.state, active), { render: this.state.visible }),
+    );
     this.slideshow = new Slideshow(
       (direction) => this.parsedFieldNavigation.navigateBy(direction, 'slideshow'),
       (phase, count) => {
@@ -552,8 +554,7 @@ export class ImageTrailPanel {
       refreshRecallIfOpen: () => this.recallDestination.refreshRecallIfOpen(),
       clearRecallMessageTimer: () => this.recallDestination.clearRecallMessageTimer(),
       showFeedback: (message, tone) => this.panelRender.showShortcutFeedback(message, tone),
-      getLocalSettings: () => this.localSettings,
-      saveLocalSettings: (settings) => this.panelSettings.saveLocalSettings(settings),
+      ...createBackupReminderBindings(() => [this.panelSettings, this.localSettings]),
       applyBuildInfoOverlayVisibility: (visible) => this.options.applyBuildInfoOverlayVisibility?.(visible),
       updatePageContextOverride: (context) => this.pageContext.setOverride(context),
       pageAdapter: () => this.pageAdapter,
@@ -624,9 +625,7 @@ export class ImageTrailPanel {
   // Built in a field initializer; safe because every deps member is a lazy closure, so nothing
   // dereferences the constructor-assigned collaborators (keyboard/slideshow/retry) until a handler runs.
   private readonly actionRegistry = buildPanelActionRegistry(this.createActionDeps());
-  private dispatch = (action: PanelAction): void => {
-    dispatchPanelAction(this.actionRegistry, action, this.handleDefaultAction);
-  };
+  private dispatch = (action: PanelAction): void => dispatchPanelAction(this.actionRegistry, action, this.handleDefaultAction);
   handleShortcutAction(action: string): boolean {
     return handlePanelShortcutAction(action, {
       getState: () => this.state,

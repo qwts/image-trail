@@ -1,0 +1,102 @@
+.image-trail-url-review__controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: var(--it-space-6);
+}
+
+.image-trail-url-review__controls button {
+  min-height: 32px;
+}
+
+.image-trail-url-review__span {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--it-space-4);
+  padding: var(--it-space-8);
+  border: 1px solid var(--it-border-row);
+  border-radius: var(--it-radius-row);
+  background: var(--it-fill-3);
+  color: var(--it-text-dim);
+  font: var(--it-type-meta);
+}
+
+.image-trail-url-review__span strong {
+  color: var(--it-text-3);
+}
+
+.image-trail-url-review__records {
+  display: grid;
+  gap: var(--it-space-6);
+  max-height: min(52vh, 520px);
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.image-trail-url-review__record {
+  min-width: 0;
+  padding: var(--it-space-8);
+  border: 1px solid var(--it-border-row);
+  border-radius: var(--it-radius-row);
+  border-left-width: 3px;
+  background: var(--it-fill-3);
+}
+
+.image-trail-url-review__record[data-status='passed'] {
+  border-left-color: var(--it-ok-strong);
+}
+
+.image-trail-url-review__record[data-status='failed'] {
+  border-left-color: var(--it-danger-border);
+}
+
+.image-trail-url-review__record[data-status='unchanged'] {
+  border-left-color: var(--it-warn-strong);
+}
+
+.image-trail-url-review__record[data-privacy='true'] {
+  background: var(--it-surface-locked);
+}
+
+.image-trail-url-review__record header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--it-space-8);
+  margin-bottom: var(--it-space-6);
+  color: var(--it-text-dim);
+  font: var(--it-type-meta);
+}
+
+.image-trail-url-review__record header strong {
+  color: var(--it-text-3);
+  text-transform: capitalize;
+}
+
+.image-trail-url-review__record dl {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: var(--it-space-2) var(--it-space-8);
+  margin: 0;
+}
+
+.image-trail-url-review__record dt {
+  color: var(--it-text-muted);
+  font: var(--it-type-label);
+}
+
+.image-trail-url-review__record dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--it-text-dim);
+  font: var(--it-type-mono-sm);
+}
+
+@media (max-width: 560px) {
+  .image-trail-url-review__controls,
+  .image-trail-url-review__span {
+    grid-template-columns: 1fr;
+  }
+}

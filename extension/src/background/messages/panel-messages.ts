@@ -81,7 +81,11 @@ type BackwardCompatibleLocalSettingsKey =
   | 'queueDisplayOrder'
   | 'downArrowAction'
   | 'pageContextOverrides'
-  | 'blobKeyInactivityTimeoutMinutes';
+  | 'blobKeyInactivityTimeoutMinutes'
+  | 'backupReminderEnabled'
+  | 'backupReminderIntervalDays'
+  | 'backupReminderNextAt'
+  | 'siteCaptureRules';
 
 type BackwardCompatibleLocalSettings = {
   readonly [Key in BackwardCompatibleLocalSettingsKey]?: SaveLocalSettingsInput[Key] | undefined;

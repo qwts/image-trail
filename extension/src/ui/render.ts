@@ -276,7 +276,6 @@ function createHistorySection(target: PanelRenderTarget, state: PanelState): HTM
 
 function createBookmarksSection(target: PanelRenderTarget, state: PanelState): HTMLElement {
   const section = createBookmarksView(
-    state.target.selectedUrl,
     state.bookmarks,
     state.selectedBookmarkIds,
     state.captureInProgress,

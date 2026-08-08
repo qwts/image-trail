@@ -18,6 +18,7 @@ import {
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
+import { pinCurrentImage } from './current-image-actions.js';
 
 const expectedHashes = new Map([
   ['animated.gif', 'e91380db853442ee77466f0f4a4b85f86c07b1607597efce84f1985ed38267f0'],
@@ -48,7 +49,7 @@ test('GIF/WebP capture keeps exact originals, static posters, safe failures, and
       await applyUrlInEditor(page, capture.url);
       await expectPanelStatusMessage(page, new RegExp(`Loaded .*${capture.fileName.replace('.', '\\.')}`, 'u'));
     }
-    await page.getByRole('button', { name: 'Pin current' }).click();
+    await pinCurrentImage(page);
     const row = page.locator('.image-trail-panel__bookmark-item', { hasText: capture.fileName });
     await expect(row).toBeVisible();
     await row.getByRole('button', { name: 'Capture' }).click();

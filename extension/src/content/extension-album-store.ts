@@ -24,7 +24,10 @@ export class ExtensionAlbumStore {
     if (isLoadAlbumsResultMessage(response) && response.payload.ok) {
       return { albums: response.payload.albums, memberships: response.payload.memberships };
     }
-    return { albums: [], memberships: [] };
+    if (isLoadAlbumsResultMessage(response) && !response.payload.ok) {
+      throw new Error(response.payload.message || 'Albums could not be loaded.');
+    }
+    throw new Error('Albums could not be loaded: invalid response.');
   }
 
   async listBackupEntries(): Promise<readonly AlbumBackupEntry[]> {

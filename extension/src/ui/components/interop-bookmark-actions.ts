@@ -24,6 +24,7 @@ export function createInteropQueueButton(
       entry,
       records.map((record) => record.id),
       locked,
+      control,
     );
   });
   return control;
@@ -35,7 +36,7 @@ export function createInteropRecordButton(item: ImageDisplayRecord, locked: bool
   control.textContent = 'Move / Sync';
   control.title = 'Review this record for Move to Overlook or Sync with Overlook.';
   control.addEventListener('click', () => {
-    openInteropWorkflow(hasStoredOriginal(item) ? 'captured-original' : 'bookmark', [item.id], locked);
+    openInteropWorkflow(hasStoredOriginal(item) ? 'captured-original' : 'bookmark', [item.id], locked, control);
   });
   return control;
 }

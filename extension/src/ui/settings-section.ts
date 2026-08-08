@@ -61,6 +61,16 @@ export function createSettingsSection(
     { identity: state.buildIdentity, overlayVisible: state.buildInfoOverlayVisible },
     { limit: state.urlReviewStatusLimit, clearAfterExport: state.clearUrlReviewStatusAfterExport },
     {
+      enabled: state.backupReminderEnabled,
+      intervalDays: state.backupReminderIntervalDays,
+      nextAt: state.backupReminderNextAt,
+    },
+    {
+      rules: state.siteCaptureRules,
+      currentHostname: window.location.hostname || null,
+      privacyModeEnabled: state.privacyModeEnabled,
+    },
+    {
       minimumIntervalMs: state.requestThrottleMs,
       maxRequests: state.requestThrottleMaxRequests,
       windowMs: state.requestThrottleWindowMs,
@@ -119,6 +129,11 @@ function importExportViewState(state: PanelState): ImportExportViewState {
     lastMessage: state.importExportMessage,
     lastMessageIsError: state.importExportMessageIsError,
     restorePreview: state.importRestorePreview,
+    backupReminder: {
+      enabled: state.backupReminderEnabled,
+      intervalDays: state.backupReminderIntervalDays,
+      nextAt: state.backupReminderNextAt,
+    },
   };
 }
 

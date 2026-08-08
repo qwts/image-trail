@@ -81,13 +81,22 @@ test('legacy plaintext thumbnail policy passes save validation input and persist
   assert.equal((harness.read() as typeof DEFAULT_LOCAL_SETTINGS).searchableMetadataPolicy.thumbnail, 'encrypted');
 });
 
-test('legacy settings without an inactivity timeout persist the migrated default', async () => {
+test('legacy settings persist default inactivity and local backup reminder policies', async () => {
   const harness = storageHarness(null);
   const tabs: SettingsTabMessenger = { query: async () => [], sendMessage: async () => undefined };
-  const { blobKeyInactivityTimeoutMinutes: _omitted, ...legacySettings } = DEFAULT_LOCAL_SETTINGS;
+  const {
+    blobKeyInactivityTimeoutMinutes: _timeout,
+    backupReminderEnabled: _reminderEnabled,
+    backupReminderIntervalDays: _reminderInterval,
+    backupReminderNextAt: _reminderNext,
+    ...legacySettings
+  } = DEFAULT_LOCAL_SETTINGS;
 
   const result = await handleSaveLocalSettings(createSaveLocalSettingsMessage(legacySettings), harness.storage, tabs);
 
   assert.deepEqual(result, { ok: true });
   assert.equal((harness.read() as typeof DEFAULT_LOCAL_SETTINGS).blobKeyInactivityTimeoutMinutes, 10);
+  assert.equal((harness.read() as typeof DEFAULT_LOCAL_SETTINGS).backupReminderEnabled, false);
+  assert.equal((harness.read() as typeof DEFAULT_LOCAL_SETTINGS).backupReminderIntervalDays, 30);
+  assert.equal((harness.read() as typeof DEFAULT_LOCAL_SETTINGS).backupReminderNextAt, null);
 });

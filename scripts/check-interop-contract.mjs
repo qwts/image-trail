@@ -6,8 +6,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-const EXPECTED_SOURCE_COMMIT = '760e23ba1abeaf15bf6d56e029ebdd47d521a7e7';
-const EXPECTED_MANIFEST_SHA256 = '16a7a610104d9c62c44a952aa682e56932740b6a65c633afe5ea19a0f752f657';
+const EXPECTED_SOURCE_COMMIT = '723729d50d63af085502e68cc1377c54a85f1595';
+const EXPECTED_MANIFEST_SHA256 = 'e46c3322833398da6827d76b158e57fed62b244f1be79de8b48ea262caf5dd93';
 const contractRoot = path.resolve('contracts/interop/v1');
 const sourcePath = path.resolve('contracts/interop/source.json');
 
@@ -26,7 +26,7 @@ async function contractFiles() {
 async function verifySource() {
   const source = JSON.parse(await readFile(sourcePath, 'utf8'));
   const expected = {
-    canonicalRepository: 'qwts/photos',
+    canonicalRepository: 'qwts/overlook',
     canonicalCommit: EXPECTED_SOURCE_COMMIT,
     contractVersion: 1,
     manifestSha256: EXPECTED_MANIFEST_SHA256,

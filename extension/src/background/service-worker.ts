@@ -16,17 +16,15 @@ import { BlobsRepository } from '../data/repositories/blobs-repository.js';
 import { EncryptedPinsRepository } from '../data/repositories/encrypted-pins-repository.js';
 import { EncryptedPinThumbnailsRepository } from '../data/repositories/encrypted-pin-thumbnails-repository.js';
 import type { StoredBlobRecord } from '../data/types.js';
-import type { UrlReviewStatusClearFilter } from '../core/types.js';
 import { BROWSER_COMMAND_SHORTCUTS } from '../core/keyboard-shortcuts.js';
 import { fetchImageBytes, preferredCaptureFileName } from './fetch-image.js';
-import { dataUrlToImageBytes, imageDataUrlFromBytes, openedImageDataFromPayload } from './data-url-image.js';
+import { dataUrlToImageBytes, imageDataUrlFromBytes, isSupportedMediaDataUrl, openedImageDataFromPayload } from './data-url-image.js';
 import { openPreviewPayload, takePreviewPayload } from './preview-payload-store.js';
 import { fetchLinkedPage } from './fetch-linked-page.js';
 import {
   MessageType,
   createCaptureImageMessage,
   createCaptureResultMessage,
-  createClearUrlReviewStatusResultMessage,
   createCheckImageRequestPolicyResultMessage,
   createCleanupOrphanedBlobsResultMessage,
   createCreateBlobPreviewResultMessage,
@@ -37,12 +35,9 @@ import {
   createFetchThumbnailSourceResultMessage,
   createLoadParsedFieldStateBySourceResultMessage,
   createImportEncryptedImageResultMessage,
-  createImportUrlReviewStatusResultMessage,
   createLoadBuildIdentityResultMessage,
   createLoadParsedFieldStateResultMessage,
-  createListUrlReviewStatusResultMessage,
   createSaveParsedFieldStateResultMessage,
-  createSaveUrlReviewStatusResultMessage,
   createFetchBufferedImageSourceResultMessage,
   createPingMessage,
   createProbeImageSourceResultMessage,
@@ -62,12 +57,6 @@ import type {
   GrantPermissionAndCaptureMessage,
 } from './messages.js';
 import type { LoadParsedFieldStateMessage, SaveParsedFieldStateMessage } from './messages.js';
-import type {
-  ClearUrlReviewStatusMessage,
-  ImportUrlReviewStatusMessage,
-  ListUrlReviewStatusMessage,
-  SaveUrlReviewStatusMessage,
-} from './messages.js';
 import type {
   FetchBufferedImageSourceMessage,
   CheckImageRequestPolicyMessage,
@@ -100,6 +89,7 @@ import { createOriginalBlobMessageRegistry } from './handlers/original-blob-hand
 import { createDestinationMessageRegistry } from './handlers/destination-page-handler.js';
 import { createCloudMessageRegistry, createInteropSourceFinalizer } from './handlers/pcloud-handlers.js';
 import { createUrlTemplateMessageRegistry } from './handlers/url-template-handlers.js';
+import { createUrlReviewStatusMessageRegistry } from './handlers/url-review-status-handlers.js';
 import { createLocalSettingsMessageRegistry, loadLocalSettings } from './handlers/local-settings-handlers.js';
 import { normalizeHostname } from './handlers/hostname.js';
 import { createChangeNotifiers } from './change-notifiers.js';
@@ -220,16 +210,15 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
       message: 'Encrypted blob storage must be unlocked before original media capture.',
     };
   }
-  const bytesResult =
-    url.startsWith('data:image/') || url.startsWith('data:video/mp2t')
-      ? dataUrlToImageBytes(url, message.payload.fileName)
-      : await (async () => {
-          const origin = extractOrigin(url);
-          if (origin && !(await hasOriginPermission(origin))) {
-            return { ok: false as const, reason: 'permission-needed' as const, message: `Permission needed for ${origin}.`, origin };
-          }
-          return fetchImageBytes(url);
-        })();
+  const bytesResult = isSupportedMediaDataUrl(url)
+    ? dataUrlToImageBytes(url, message.payload.fileName)
+    : await (async () => {
+        const origin = extractOrigin(url);
+        if (origin && !(await hasOriginPermission(origin))) {
+          return { ok: false as const, reason: 'permission-needed' as const, message: `Permission needed for ${origin}.`, origin };
+        }
+        return fetchImageBytes(url);
+      })();
   if (!bytesResult.ok) {
     return 'reason' in bytesResult &&
       bytesResult.reason === 'permission-needed' &&
@@ -455,54 +444,6 @@ async function handleSaveParsedFieldState(
   return { ok: true };
 }
 
-async function handleListUrlReviewStatus(
-  message: ListUrlReviewStatusMessage,
-): Promise<import('./messages.js').ListUrlReviewStatusResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.hostname);
-  if (!hostname) return { ok: true, records: [] };
-  return { ok: true, records: await urlReviewStatusStore.list(hostname) };
-}
-
-async function handleSaveUrlReviewStatus(
-  message: SaveUrlReviewStatusMessage,
-): Promise<import('./messages.js').SaveUrlReviewStatusResultMessage['payload']> {
-  const hostname = normalizeHostname(message.payload.record.hostname);
-  if (!hostname) return { ok: false };
-  const settings = await loadLocalSettings();
-  await urlReviewStatusStore.save({ ...message.payload.record, hostname }, { maxRecordsPerHost: settings.urlReviewStatusLimit });
-  return { ok: true };
-}
-
-async function handleImportUrlReviewStatus(
-  message: ImportUrlReviewStatusMessage,
-): Promise<import('./messages.js').ImportUrlReviewStatusResultMessage['payload']> {
-  const records = message.payload.records
-    .map((record) => {
-      const hostname = normalizeHostname(record.hostname);
-      return hostname ? { ...record, hostname } : null;
-    })
-    .filter((record): record is NonNullable<typeof record> => record !== null);
-  const settings = await loadLocalSettings();
-  return { ok: true, importedCount: await urlReviewStatusStore.importMany(records, { maxRecordsPerHost: settings.urlReviewStatusLimit }) };
-}
-
-async function handleClearUrlReviewStatus(
-  message: ClearUrlReviewStatusMessage,
-): Promise<import('./messages.js').ClearUrlReviewStatusResultMessage['payload']> {
-  const filter = normalizeUrlReviewStatusClearFilter(message.payload.filter);
-  if (!filter) return { ok: false, message: 'URL review status clear scope is invalid.' };
-  return { ok: true, deletedCount: await urlReviewStatusStore.clear(filter) };
-}
-
-function normalizeUrlReviewStatusClearFilter(filter: UrlReviewStatusClearFilter): UrlReviewStatusClearFilter | null {
-  if (filter.scope === 'all') return filter;
-  const hostname = normalizeHostname(filter.hostname);
-  if (!hostname) return null;
-  if (filter.scope === 'hostname') return { scope: 'hostname', hostname };
-  if (filter.scope === 'page') return typeof filter.pageUrl === 'string' ? { scope: 'page', hostname, pageUrl: filter.pageUrl } : null;
-  return typeof filter.sourceUrl === 'string' ? { scope: 'source', hostname, sourceUrl: filter.sourceUrl } : null;
-}
-
 async function handleGrantPermissionAndCapture(
   message: GrantPermissionAndCaptureMessage,
 ): Promise<import('../core/image/capture-result.js').CaptureResult> {
@@ -724,30 +665,7 @@ const messageRegistry = {
     respond: (result) => createSaveParsedFieldStateResultMessage(result),
     fallback: () => createSaveParsedFieldStateResultMessage({ ok: false }),
   }),
-  [MessageType.ListUrlReviewStatus]: defineMessage({
-    requestSchema: requestSchemas.listUrlReviewStatusRequestSchema,
-    handle: (message: ListUrlReviewStatusMessage) => handleListUrlReviewStatus(message),
-    respond: (result) => createListUrlReviewStatusResultMessage(result),
-    fallback: () => createListUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be loaded.' }),
-  }),
-  [MessageType.SaveUrlReviewStatus]: defineMessage({
-    requestSchema: requestSchemas.saveUrlReviewStatusRequestSchema,
-    handle: (message: SaveUrlReviewStatusMessage) => handleSaveUrlReviewStatus(message),
-    respond: (result) => createSaveUrlReviewStatusResultMessage(result),
-    fallback: () => createSaveUrlReviewStatusResultMessage({ ok: false }),
-  }),
-  [MessageType.ImportUrlReviewStatus]: defineMessage({
-    requestSchema: requestSchemas.importUrlReviewStatusRequestSchema,
-    handle: (message: ImportUrlReviewStatusMessage) => handleImportUrlReviewStatus(message),
-    respond: (result) => createImportUrlReviewStatusResultMessage(result),
-    fallback: () => createImportUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be imported.' }),
-  }),
-  [MessageType.ClearUrlReviewStatus]: defineMessage({
-    requestSchema: requestSchemas.clearUrlReviewStatusRequestSchema,
-    handle: (message: ClearUrlReviewStatusMessage) => handleClearUrlReviewStatus(message),
-    respond: (result) => createClearUrlReviewStatusResultMessage(result),
-    fallback: () => createClearUrlReviewStatusResultMessage({ ok: false, message: 'URL review status could not be cleared.' }),
-  }),
+  ...createUrlReviewStatusMessageRegistry(context),
   ...createUrlTemplateMessageRegistry(context),
   ...createLocalSettingsMessageRegistry({ recentHistoryCache, reconcileSearchableMetadataPolicy }),
   ...createCloudMessageRegistry(getDb, createInteropSourceFinalizer(getDb, notifyLibraryChange)),

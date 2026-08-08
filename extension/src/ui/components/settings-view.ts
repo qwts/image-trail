@@ -6,9 +6,11 @@ import type { GrabSourcePattern, UrlTemplateRecord } from '../../core/url/templa
 import type { UrlField } from '../../core/url/types.js';
 import {
   createNeighborPreloadSettingsView,
+  createBackupReminderSettingsView,
   createRequestThrottleSettingsView,
   createUrlReviewStatusSettingsView,
   type NeighborPreloadSettingsState,
+  type BackupReminderSettingsState,
   type RequestThrottleSettingsState,
   type UrlReviewStatusSettingsState,
 } from './automation-settings-view.js';
@@ -33,6 +35,7 @@ import { createGrabSourcePatternSettingsView, createTemplateSettingsView } from 
 import { createUrlSteppingPresetView } from './url-stepping-preset-view.js';
 import { applySettingsPrimitiveContracts } from './settings-primitive-contracts.js';
 import { createSettingsDisclosure } from './settings-disclosure.js';
+import { createSiteCaptureRulesSettingsView, type SiteCaptureRulesSettingsState } from './site-capture-rules-settings-view.js';
 
 export { formatStorageHealthBytes, storageHealthRows } from './maintenance-settings-view.js';
 
@@ -55,6 +58,8 @@ export function createSettingsView(
   storageUsage: StorageUsageSummary | null,
   buildIdentityState: BuildIdentitySettingsState,
   urlReviewStatusState: UrlReviewStatusSettingsState,
+  backupReminderState: BackupReminderSettingsState,
+  siteCaptureRulesState: SiteCaptureRulesSettingsState,
   requestThrottleState: RequestThrottleSettingsState,
   neighborPreloadState: NeighborPreloadSettingsState,
   downArrowAction: DownArrowAction,
@@ -90,6 +95,8 @@ export function createSettingsView(
       createRequestThrottleSettingsView(requestThrottleState, dispatch),
       createNeighborPreloadSettingsView(neighborPreloadState, dispatch),
       createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),
+      createBackupReminderSettingsView(backupReminderState, dispatch),
+      createSiteCaptureRulesSettingsView(siteCaptureRulesState, dispatch),
       createUrlSteppingPresetView(currentFields, dispatch),
       createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
       createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),

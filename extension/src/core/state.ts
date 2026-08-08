@@ -78,6 +78,10 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     buildInfoOverlayVisible: true,
     urlReviewStatusLimit: DEFAULT_URL_REVIEW_STATUS_LIMIT,
     clearUrlReviewStatusAfterExport: false,
+    backupReminderEnabled: false,
+    backupReminderIntervalDays: 30,
+    backupReminderNextAt: null,
+    siteCaptureRules: {},
     requestThrottleMs: DEFAULT_GOVERNOR_CONFIG.minimumIntervalMs,
     requestThrottleMaxRequests: DEFAULT_GOVERNOR_CONFIG.maxRequests,
     requestThrottleWindowMs: DEFAULT_GOVERNOR_CONFIG.windowMs,
@@ -87,6 +91,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     neighborPreloadProbeMethod: 'get',
     loadFailureFeedback: DEFAULT_LOAD_FAILURE_FEEDBACK,
     downArrowAction: 'capture',
+    capturePinModifierActive: false,
     secondaryControlsOpen: false,
     historySectionOpen: true,
     bookmarksSectionOpen: true,
@@ -176,4 +181,8 @@ export function setAutomationState(state: PanelState, automation: Partial<Automa
     automation: { ...state.automation, ...automation },
     lastUpdatedAt: now,
   };
+}
+
+export function setCapturePinModifier(state: PanelState, active: boolean): PanelState {
+  return state.capturePinModifierActive === active ? state : { ...state, capturePinModifierActive: active };
 }

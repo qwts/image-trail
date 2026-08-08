@@ -34,10 +34,27 @@ export const Running: Story = {
   },
 };
 
+export const PinModifier: Story = {
+  render: () => controlsStory({ capturePinModifierActive: true }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('button', { name: 'Pin current' })).toHaveAttribute('title', expect.stringContaining('release Shift'));
+    await expect(canvas.queryByRole('button', { name: 'Capture original' })).not.toBeInTheDocument();
+  },
+};
+
 export const GrabMode: Story = {
   render: () => {
     const initial = createInitialPanelState(0);
     return controlsStory({ target: { ...initial.target, selectedUrl: 'https://images.example.test/photo.jpg', grabModeActive: true } });
+  },
+};
+
+export const GrabModeCapturesForSite: Story = {
+  render: () => controlsStory({ siteCaptureRules: { [window.location.hostname]: 'capture-original' } }),
+  play: async ({ canvasElement }) => {
+    const grab = within(canvasElement).getByRole('button', { name: 'Grab Mode' });
+    await expect(grab).toHaveAttribute('title', expect.stringContaining('pin and capture encrypted originals'));
   },
 };
 
