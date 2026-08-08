@@ -103,7 +103,7 @@ export const Settings: Story = {
     await userEvent.selectOptions(downArrow, 'download');
     await expect(savedDownArrowAction).toHaveBeenCalledWith('download');
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'URL review status' }), 'failed');
-    await expect(canvas.getByText('Image failed: HTTP 404')).toBeVisible();
+    await expect(canvas.getByText('Review detail hidden')).toBeVisible();
   },
 };
 
@@ -111,7 +111,7 @@ export const SettingsPrivateReviewHistory: Story = {
   render: () => page('settings', <SettingsDestination services={services({ privacyMode: true })} />),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByText('Private source URL')).toBeVisible();
+    await expect(await canvas.findAllByText('Private source URL')).toHaveLength(2);
     await expect(canvas.getByText('Exact review timing is hidden in Privacy Mode.')).toBeVisible();
     await expect(canvasElement.innerHTML).not.toContain('images.example.test');
     await expect(canvasElement.innerHTML).not.toContain('field-secret');
