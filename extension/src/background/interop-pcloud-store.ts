@@ -5,8 +5,10 @@ import {
   type InteropObjectPage,
   type InteropObjectStore,
 } from '../core/interop/transport.js';
+import { PCloudApiError, PCloudHttpTransport, pCloudDownloadUrl } from './pcloud-http-transport.js';
 
 const ROOT = '/Image Trail Interop/v1';
+const PCLOUD_REFERRER = 'https://my.pcloud.com/';
 
 export interface InteropPCloudCredential {
   readonly accessToken: string;
@@ -38,11 +40,14 @@ function resultError(result: number): InteropTransportError {
 
 export class PCloudInteropObjectStore implements InteropObjectStore {
   readonly provider = 'pcloud' as const;
-  private readonly fetchImpl: typeof fetch;
+  private readonly http: PCloudHttpTransport;
   private readonly folders = new Set<string>();
 
   constructor(private readonly options: PCloudInteropStoreOptions) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.http = new PCloudHttpTransport({
+      referrer: PCLOUD_REFERRER,
+      ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+    });
   }
 
   authState(): Promise<'connected' | 'not-connected'> {
@@ -70,20 +75,17 @@ export class PCloudInteropObjectStore implements InteropObjectStore {
   async get(pathInput: string): Promise<Uint8Array> {
     const data = await this.api('getfilelink', { path: this.remote(pathInput), forcedownload: '1' });
     const hosts = Array.isArray(data['hosts']) ? data['hosts'] : [];
-    const host = typeof hosts[0] === 'string' ? hosts[0].toLowerCase() : '';
+    const host = typeof hosts[0] === 'string' ? hosts[0] : '';
     const path = typeof data['path'] === 'string' ? data['path'] : '';
-    const origin = `https://${host}`;
     let downloadUrl: URL;
     try {
-      downloadUrl = new URL(path, origin);
+      downloadUrl = pCloudDownloadUrl(host, path);
     } catch {
       throw new InteropTransportError('pCloud returned an unsafe download location.', 'corrupt', false);
     }
-    if ((host !== 'pcloud.com' && !host.endsWith('.pcloud.com')) || !path.startsWith('/') || downloadUrl.origin !== origin)
-      throw new InteropTransportError('pCloud returned an unsafe download location.', 'corrupt', false);
     let response: Response;
     try {
-      response = await this.fetchImpl(downloadUrl);
+      response = await this.http.download(downloadUrl);
     } catch {
       throw new InteropTransportError('pCloud interoperability download is offline.', 'offline', true);
     }
@@ -175,17 +177,13 @@ export class PCloudInteropObjectStore implements InteropObjectStore {
 
   private async request(method: string, body: FormData | URLSearchParams): Promise<Record<string, unknown>> {
     const credential = this.credential();
-    body.set('access_token', credential.accessToken);
-    let response: Response;
     try {
-      response = await this.fetchImpl(`https://${credential.apiHost}/${method}`, { method: 'POST', body });
-    } catch {
+      return body instanceof FormData
+        ? await this.http.requestForm(credential, method, body)
+        : await this.http.request(credential, method, Object.fromEntries(body));
+    } catch (error) {
+      if (error instanceof PCloudApiError) throw resultError(error.resultCode ?? -1);
       throw new InteropTransportError('pCloud interoperability is offline.', 'offline', true);
     }
-    if (!response.ok) throw new InteropTransportError('pCloud interoperability provider is unavailable.', 'provider-unavailable', true);
-    const data = (await response.json()) as Record<string, unknown>;
-    const result = numberValue(data['result']);
-    if (result === null || result !== 0) throw resultError(result ?? -1);
-    return data;
   }
 }
