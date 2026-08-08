@@ -87,6 +87,7 @@
         "src/ui/styles/record-row.css",
         "src/ui/styles/settings-surface.css",
         "src/ui/styles/settings-integrations.css",
+        "src/ui/styles/site-capture-rules.css",
         "src/ui/styles/backup-history.css",
         "src/ui/styles/tokens.css"
       ],

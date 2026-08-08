@@ -415,6 +415,23 @@ test('captureImage bookmark flow re-saves the updated bookmark and re-pages the 
   assert.equal(harness.log.at(-1), 'renderPanelAndRefreshRecall');
 });
 
+test('captureGrabbedBookmark captures only when the exact site rule opts in', async () => {
+  const record = createDisplayRecord({ id: 'bookmark-1', url: 'https://images.example.test/pic.jpg', source: 'bookmark' });
+  const conservative = createHarness();
+  await conservative.controller.captureGrabbedBookmark(record, {}, 'images.example.test');
+  assert.deepEqual(conservative.log, []);
+
+  const parentOnly = createHarness();
+  await parentOnly.controller.captureGrabbedBookmark(record, { 'example.test': 'capture-original' }, 'images.example.test');
+  assert.deepEqual(parentOnly.log, []);
+
+  const optedIn = createHarness();
+  optedIn.patchState({ bookmarks: [record] });
+  await optedIn.controller.captureGrabbedBookmark(record, { 'images.example.test': 'capture-original' }, 'images.example.test');
+  assert.ok(optedIn.log.includes('requestCapture:https://images.example.test/pic.jpg:bookmark'));
+  assert.ok(optedIn.log.includes('bookmarkSave:bookmark-1'));
+});
+
 test('deleteCapturedBlob updates a linked saved row even when it is not visible', async () => {
   const storedOriginal = {
     blobId: 'blob-1',

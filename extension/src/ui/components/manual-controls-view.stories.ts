@@ -41,6 +41,14 @@ export const GrabMode: Story = {
   },
 };
 
+export const GrabModeCapturesForSite: Story = {
+  render: () => controlsStory({ siteCaptureRules: { [window.location.hostname]: 'capture-original' } }),
+  play: async ({ canvasElement }) => {
+    const grab = within(canvasElement).getByRole('button', { name: 'Grab Mode' });
+    await expect(grab).toHaveAttribute('title', expect.stringContaining('pin and capture encrypted originals'));
+  },
+};
+
 export const MoreControls: Story = {
   render: () => controlsStory({ secondaryControlsOpen: true }),
 };

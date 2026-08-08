@@ -1,0 +1,20 @@
+.image-trail-panel-root .image-trail-destination-settings__rule-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.image-trail-panel-root .image-trail-destination-settings__rule-list li {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(190px, 1.4fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .image-trail-panel-root .image-trail-destination-settings__rule-list li {
+    grid-template-columns: 1fr;
+  }
+}

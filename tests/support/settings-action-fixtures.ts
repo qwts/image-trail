@@ -27,6 +27,11 @@ export const settingsActionFixtures = {
   },
   'settings/update-backup-reminder': { name: 'settings/update-backup-reminder', enabled: true, intervalDays: 30 },
   'backup-reminder/snooze': { name: 'backup-reminder/snooze' },
+  'settings/update-site-capture-rule': {
+    name: 'settings/update-site-capture-rule',
+    hostname: 'images.example.test',
+    behavior: 'capture-original',
+  },
   'settings/update-request-throttle': {
     name: 'settings/update-request-throttle',
     minimumIntervalMs: 100,
@@ -57,6 +62,7 @@ export function settingsActionDeps(record: (name: string) => void, recordAsync: 
     updateUrlReviewStatusRetention: () => recordAsync('updateUrlReviewStatusRetention'),
     updateBackupReminder: () => record('updateBackupReminder'),
     snoozeBackupReminder: () => record('snoozeBackupReminder'),
+    updateSiteCaptureRule: () => record('updateSiteCaptureRule'),
     updateRequestThrottle: () => record('updateRequestThrottle'),
     updateNeighborPreload: () => record('updateNeighborPreload'),
     preloadMoreNeighbors: () => record('preloadMoreNeighbors'),

@@ -309,6 +309,42 @@ test('Settings opts into a local-only backup reminder without invoking library o
   }
 });
 
+test('Settings adds exact-host Grab rules and masks saved hostnames in Privacy Mode', async () => {
+  const saved: PlaintextLocalSettings[] = [];
+  const root = await mount(
+    <SettingsDestination
+      services={services({
+        loadSettings: async () => ({
+          ...DEFAULT_LOCAL_SETTINGS,
+          privacyModeEnabled: true,
+          siteCaptureRules: { 'private.example.test': 'capture-original' },
+        }),
+        saveSettings: async (settings) => {
+          saved.push(settings);
+        },
+      })}
+    />,
+  );
+  try {
+    await flush();
+    assert.doesNotMatch(root.innerHTML, /private\.example\.test/u);
+    assert.match(root.textContent ?? '', /Saved site 1/u);
+    const hostname = root.querySelector<HTMLInputElement>('input[name="siteCaptureHostname"]');
+    const behavior = root.querySelector<HTMLSelectElement>('select[name="siteCaptureBehavior"]');
+    const form = hostname?.closest('form');
+    await act(async () => {
+      if (hostname) hostname.value = 'images.example.test';
+      if (behavior) behavior.value = 'capture-original';
+      form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    await flush();
+    assert.equal(saved.at(-1)?.siteCaptureRules['private.example.test'], 'capture-original');
+    assert.equal(saved.at(-1)?.siteCaptureRules['images.example.test'], 'capture-original');
+  } finally {
+    await cleanup(root);
+  }
+});
+
 test('Settings URL review history masks site, URL, field, reason, and exact time metadata in Privacy Mode', async () => {
   const root = await mount(
     <SettingsDestination

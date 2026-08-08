@@ -81,6 +81,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     backupReminderEnabled: false,
     backupReminderIntervalDays: 30,
     backupReminderNextAt: null,
+    siteCaptureRules: {},
     requestThrottleMs: DEFAULT_GOVERNOR_CONFIG.minimumIntervalMs,
     requestThrottleMaxRequests: DEFAULT_GOVERNOR_CONFIG.maxRequests,
     requestThrottleWindowMs: DEFAULT_GOVERNOR_CONFIG.windowMs,

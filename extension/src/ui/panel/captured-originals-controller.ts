@@ -9,6 +9,7 @@ import { bookmarkSaveMessage, recordHasBlobId } from './record-export-helpers.js
 import { MissingOriginalRepairController } from './missing-original-repair-controller.js';
 import { recentHistoryAfterMutation, recentHistoryMutationProjection } from './recent-history-mutation-projection.js';
 import { createTargetCaptureRecord } from './target-capture-record.js';
+import { siteCaptureBehaviorForHostname, type SiteCaptureRules } from '../../core/site-capture-rules.js';
 
 function captureRetryMatches(left: CaptureRetryRequest | null, right: CaptureRetryRequest): boolean {
   return left?.url === right.url && left.sourceType === right.sourceType && left.sourceRecordId === right.sourceRecordId;
@@ -53,6 +54,11 @@ export class CapturedOriginalsController {
       ...deps,
       captureBookmark: (record) => this.repairBookmarkOriginal(record),
     });
+  }
+
+  async captureGrabbedBookmark(record: ImageDisplayRecord, rules: SiteCaptureRules, pageHostname: string): Promise<void> {
+    if (siteCaptureBehaviorForHostname(rules, pageHostname) !== 'capture-original') return;
+    await this.captureImage(record.url, 'bookmark', record.id);
   }
 
   repairSelectedOriginals(ids: readonly string[]): Promise<void> {

@@ -453,6 +453,7 @@ export class ImageTrailPanel {
         restoreFieldState: () => {
           void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore());
         },
+        captureGrabbedBookmark: (r) => this.capturedOriginals.captureGrabbedBookmark(r, this.state.siteCaptureRules, location.hostname),
       }),
     );
     void this.panelDataLoad.loadSettingsBookmarksAndRecents();

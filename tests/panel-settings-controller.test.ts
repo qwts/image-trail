@@ -334,6 +334,21 @@ test('updateDownArrowAction persists and renders only on a change', () => {
   assert.equal(changed.saved.length, 1);
 });
 
+test('updateSiteCaptureRule persists an exact-host reversible rule without changing unrelated settings', () => {
+  const harness = createHarness();
+  harness.controller.updateSiteCaptureRule(' IMAGES.Example.Test. ', 'capture-original');
+  assert.deepEqual(harness.getState().siteCaptureRules, { 'images.example.test': 'capture-original' });
+  assert.deepEqual(harness.getLocalSettings().siteCaptureRules, { 'images.example.test': 'capture-original' });
+  assert.equal(harness.getLocalSettings().privacyModeEnabled, DEFAULT_LOCAL_SETTINGS.privacyModeEnabled);
+  assert.deepEqual(harness.log, ['render']);
+  assert.equal(harness.saved.length, 1);
+
+  harness.controller.updateSiteCaptureRule('images.example.test', null);
+  assert.deepEqual(harness.getState().siteCaptureRules, {});
+  assert.deepEqual(harness.getLocalSettings().siteCaptureRules, {});
+  assert.equal(harness.saved.length, 2);
+});
+
 test('updatePinSaveStoragePreference persists and renders only on a change', () => {
   const unchanged = createHarness();
   unchanged.controller.updatePinSaveStoragePreference('encrypted');

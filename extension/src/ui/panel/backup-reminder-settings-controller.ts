@@ -1,6 +1,7 @@
 import { isBackupReminderIntervalDays, nextBackupReminderAt, type BackupReminderIntervalDays } from '../../core/backup-reminder.js';
 import type { PanelState } from '../../core/types.js';
 import type { PlaintextLocalSettings } from '../../content/panel-services.js';
+import type { SiteCaptureBehavior } from '../../core/site-capture-rules.js';
 
 interface BackupReminderSettingsDeps {
   getState(): PanelState;
@@ -54,6 +55,7 @@ interface BackupReminderBindingTarget {
   updateBackupReminder(enabled: boolean, intervalDays: BackupReminderIntervalDays): void;
   snoozeBackupReminder(): void;
   recordManualBackupCompleted(): void;
+  updateSiteCaptureRule(hostname: string, behavior: SiteCaptureBehavior | null): void;
 }
 
 export function createBackupReminderBindings(source: () => readonly [BackupReminderBindingTarget, PlaintextLocalSettings]) {
@@ -64,5 +66,7 @@ export function createBackupReminderBindings(source: () => readonly [BackupRemin
       source()[0].updateBackupReminder(enabled, intervalDays),
     snoozeBackupReminder: () => source()[0].snoozeBackupReminder(),
     backupCompleted: () => source()[0].recordManualBackupCompleted(),
+    updateSiteCaptureRule: (hostname: string, behavior: SiteCaptureBehavior | null) =>
+      source()[0].updateSiteCaptureRule(hostname, behavior),
   };
 }

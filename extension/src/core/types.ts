@@ -20,6 +20,7 @@ import type { SessionInactivityTimeoutMinutes } from './secure-session-policy.js
 import type { SecureSessionPanelAction } from './secure-session-actions.js';
 import type { ParsedFieldResetBaseline, ParsedFieldStateRecord } from './parsed-field-state-types.js';
 import type { BackupReminderPanelAction, BackupReminderPanelState } from './backup-reminder.js';
+import type { SiteCaptureRulesPanelAction, SiteCaptureRulesPanelState } from './site-capture-rules.js';
 
 export type { RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
 export type { BookmarkStore } from './bookmark-store.js';
@@ -117,7 +118,7 @@ export interface RecallState {
   readonly messageIsError?: boolean | undefined;
 }
 
-export interface PanelState extends LibraryPanelState, BackupReminderPanelState {
+export interface PanelState extends LibraryPanelState, BackupReminderPanelState, SiteCaptureRulesPanelState {
   readonly visible: boolean;
   readonly minimized: boolean;
   readonly status: PanelStatus;
@@ -238,6 +239,7 @@ export type PanelActionName =
   | 'settings/update-build-info-overlay-visibility'
   | 'settings/update-url-review-status-retention'
   | BackupReminderPanelAction['name']
+  | SiteCaptureRulesPanelAction['name']
   | 'settings/update-request-throttle'
   | 'settings/update-neighbor-preload'
   | 'settings/update-down-arrow-action'
@@ -354,6 +356,7 @@ export type PanelAction =
         | 'settings/update-build-info-overlay-visibility'
         | 'settings/update-url-review-status-retention'
         | 'settings/update-backup-reminder'
+        | 'settings/update-site-capture-rule'
         | 'settings/update-request-throttle'
         | 'settings/update-neighbor-preload'
         | 'settings/update-down-arrow-action'
@@ -460,6 +463,7 @@ export type PanelAction =
       readonly clearAfterExport: boolean;
     }
   | BackupReminderPanelAction
+  | SiteCaptureRulesPanelAction
   | {
       readonly name: 'settings/update-request-throttle';
       readonly minimumIntervalMs: number;

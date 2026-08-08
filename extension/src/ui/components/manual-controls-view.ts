@@ -1,9 +1,13 @@
 import type { PanelAction, PanelState } from '../../core/types.js';
+import { siteCaptureBehaviorForHostname } from '../../core/site-capture-rules.js';
 import { bindTrustedClick } from '../trusted-activation.js';
 import { createButton, createKbd, createSectionHeader } from './primitives.js';
 
 export interface ManualControlsViewOptions {
-  readonly state: Pick<PanelState, 'automation' | 'captureInProgress' | 'pageContext' | 'secondaryControlsOpen' | 'target'>;
+  readonly state: Pick<
+    PanelState,
+    'automation' | 'captureInProgress' | 'pageContext' | 'secondaryControlsOpen' | 'siteCaptureRules' | 'target'
+  >;
   readonly previousFieldId: string | null;
   readonly nextFieldId: string | null;
   readonly dispatch: (action: PanelAction) => void;
@@ -47,6 +51,7 @@ function slideshowPresentation(phase: ManualControlsViewOptions['state']['automa
 function createPrimaryWorkflow(state: ManualControlsViewOptions['state'], dispatch: ManualControlsViewOptions['dispatch']): HTMLElement {
   const noTarget = state.target.selectedUrl === null;
   const primary = document.createElement('div');
+  const grabCapturesOriginal = siteCaptureBehaviorForHostname(state.siteCaptureRules, window.location.hostname) === 'capture-original';
   primary.className = 'image-trail-panel__primary-workflow';
   primary.append(
     actionButton('◀ Prev', { name: 'navigate-previous' }, dispatch, { title: 'Previous image', disabled: noTarget }),
@@ -86,8 +91,12 @@ function createPrimaryWorkflow(state: ManualControlsViewOptions['state'], dispat
       actionButton('⌖ Grab', { name: state.target.grabModeActive ? 'grab-mode/stop' : 'grab-mode/start' }, dispatch, {
         ariaLabel: state.target.grabModeActive ? 'Stop Grab Mode' : 'Grab Mode',
         title: state.target.grabModeActive
-          ? 'Grab mode: ON — click host-page images to pin them'
-          : 'Grab mode — click host-page images to pin them',
+          ? grabCapturesOriginal
+            ? 'Grab mode: ON — explicit clicks pin and capture encrypted originals for this site'
+            : 'Grab mode: ON — click host-page images to pin them'
+          : grabCapturesOriginal
+            ? 'Grab mode — explicit clicks pin and capture encrypted originals for this site'
+            : 'Grab mode — click host-page images to pin them',
         active: state.target.grabModeActive,
         pressed: state.target.grabModeActive,
       }),
@@ -102,12 +111,17 @@ function appendContextHints(section: HTMLElement, state: ManualControlsViewOptio
   captureHint.append(document.createTextNode('Press '), createKbd('C'), document.createTextNode(' to capture the current image.'));
   section.append(captureHint);
   if (state.pageContext.effective !== 'feed') return;
+  const grabCapturesOriginal = siteCaptureBehaviorForHostname(state.siteCaptureRules, window.location.hostname) === 'capture-original';
   const feedHint = document.createElement('p');
   feedHint.className = 'image-trail-panel__workflow-meta image-trail-panel__feed-hint';
   feedHint.classList.toggle('is-active', state.target.grabModeActive);
   feedHint.textContent = state.target.grabModeActive
-    ? 'Click images in the feed to pin them.'
-    : 'Turn on Grab mode, then click feed images to pin.';
+    ? grabCapturesOriginal
+      ? 'Explicit clicks pin and capture encrypted originals for this site.'
+      : 'Click images in the feed to pin them.'
+    : grabCapturesOriginal
+      ? 'Turn on Grab mode, then click to pin and capture encrypted originals.'
+      : 'Turn on Grab mode, then click feed images to pin.';
   section.append(feedHint);
 }
 

@@ -75,9 +75,7 @@ export class RecordLibraryController {
 
   async bookmarkUrl(url: string, thumbnail?: string, options: RecordAddOptions = {}): Promise<boolean> {
     const validation = await this.validateRecordUrlForAdd(url, options);
-    if (!validation.ok || !validation.sourceUrl) {
-      return false;
-    }
+    if (!validation.ok || !validation.sourceUrl) return false;
     const sourceUrl = validation.sourceUrl;
     const resolvedThumbnail = await this.resolveRecordThumbnail(sourceUrl, thumbnail, validation, options);
     const draft = createDisplayRecord({
@@ -90,6 +88,7 @@ export class RecordLibraryController {
     });
     const bookmarkStore = this.deps.bookmarkStore();
     const bookmark = bookmarkStore ? await bookmarkStore.save(draft) : draft;
+    options.onBookmarkSaved?.(bookmark);
     this.deps.setState({ ...this.deps.getState(), message: bookmarkSaveMessage(bookmark), lastUpdatedAt: Date.now() });
     await this.deps.loadBookmarkPage(0, { render: false });
     this.deps.renderPanelAndRefreshRecall();

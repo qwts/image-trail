@@ -84,7 +84,8 @@ type BackwardCompatibleLocalSettingsKey =
   | 'blobKeyInactivityTimeoutMinutes'
   | 'backupReminderEnabled'
   | 'backupReminderIntervalDays'
-  | 'backupReminderNextAt';
+  | 'backupReminderNextAt'
+  | 'siteCaptureRules';
 
 type BackwardCompatibleLocalSettings = {
   readonly [Key in BackwardCompatibleLocalSettingsKey]?: SaveLocalSettingsInput[Key] | undefined;

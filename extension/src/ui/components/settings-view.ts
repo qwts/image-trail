@@ -35,6 +35,7 @@ import { createGrabSourcePatternSettingsView, createTemplateSettingsView } from 
 import { createUrlSteppingPresetView } from './url-stepping-preset-view.js';
 import { applySettingsPrimitiveContracts } from './settings-primitive-contracts.js';
 import { createSettingsDisclosure } from './settings-disclosure.js';
+import { createSiteCaptureRulesSettingsView, type SiteCaptureRulesSettingsState } from './site-capture-rules-settings-view.js';
 
 export { formatStorageHealthBytes, storageHealthRows } from './maintenance-settings-view.js';
 
@@ -58,6 +59,7 @@ export function createSettingsView(
   buildIdentityState: BuildIdentitySettingsState,
   urlReviewStatusState: UrlReviewStatusSettingsState,
   backupReminderState: BackupReminderSettingsState,
+  siteCaptureRulesState: SiteCaptureRulesSettingsState,
   requestThrottleState: RequestThrottleSettingsState,
   neighborPreloadState: NeighborPreloadSettingsState,
   downArrowAction: DownArrowAction,
@@ -94,6 +96,7 @@ export function createSettingsView(
       createNeighborPreloadSettingsView(neighborPreloadState, dispatch),
       createUrlReviewStatusSettingsView(urlReviewStatusState, dispatch),
       createBackupReminderSettingsView(backupReminderState, dispatch),
+      createSiteCaptureRulesSettingsView(siteCaptureRulesState, dispatch),
       createUrlSteppingPresetView(currentFields, dispatch),
       createTemplateSettingsView(templates, activeTemplateId, currentFields, dispatch),
       createGrabSourcePatternSettingsView(grabSourcePatterns, dispatch),
