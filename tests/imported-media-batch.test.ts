@@ -62,18 +62,26 @@ function createHarness(
   };
 }
 
-test('image imports bypass original recapture while local MPEG-TS imports capture exact bytes first', async () => {
+test('image imports bypass original recapture while local video/audio imports capture exact bytes first', async () => {
   const harness = createHarness();
   const image = { name: 'photo.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' };
   const media = { name: 'camera.ts', dataUrl: 'data:video/mp2t;base64,R0RBVEE=' };
-  assert.deepEqual(await importMediaFiles([image, media], harness.deps), {
-    imported: 2,
+  const common = { name: 'clip.mp4', dataUrl: 'data:video/mp4;base64,AAAA' };
+  const audio = { name: 'sound.mp2', dataUrl: 'data:audio/mpeg;base64,AAAA' };
+  assert.deepEqual(await importMediaFiles([image, media, common, audio], harness.deps), {
+    imported: 4,
     failed: 0,
     firstFailureMessage: null,
   });
-  assert.deepEqual(harness.log, [`capture:${media.dataUrl}:bookmark:undefined:camera.ts`]);
+  assert.deepEqual(harness.log, [
+    `capture:${media.dataUrl}:bookmark:undefined:camera.ts`,
+    `capture:${common.dataUrl}:bookmark:undefined:clip.mp4`,
+    `capture:${audio.dataUrl}:bookmark:undefined:sound.mp2`,
+  ]);
   assert.equal(harness.added[0]?.captured, undefined);
   assert.equal(harness.added[1]?.captured?.blobId, 'blob-ts');
+  assert.equal(harness.added[2]?.captured?.blobId, 'blob-ts');
+  assert.equal(harness.added[3]?.captured?.blobId, 'blob-ts');
 });
 
 test('remote MPEG-TS uses the intentional permission request and preserves its filename', async () => {

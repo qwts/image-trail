@@ -161,3 +161,45 @@ test('fetchImageBytes rejects truncated MPEG-TS before custody begins', async ()
     globalThis.fetch = originalFetch;
   }
 });
+
+test('fetchImageBytes recognizes signature-authenticated common video and preserves exact bytes', async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = readFileSync('tests/e2e/pages/assets/media/common/iphone-rotated.mov');
+  globalThis.fetch = async () =>
+    new Response(bytes, {
+      status: 200,
+      headers: {
+        'content-type': 'application/octet-stream',
+        'content-disposition': 'attachment; filename="iphone-rotated.mp4"',
+      },
+    });
+
+  try {
+    const result = await fetchImageBytes('https://cdn.example.test/iphone-rotated.mp4');
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.mimeType, 'video/quicktime');
+    assert.equal(result.fileName, 'iphone-rotated.mov');
+    assert.deepEqual([result.width, result.height], [48, 64]);
+    assert.equal(result.mediaInfo?.kind, 'common-media');
+    assert.equal(result.mediaInfo?.kind === 'common-media' ? result.mediaInfo.rotationDegrees : null, 90);
+    assert.deepEqual(new Uint8Array(result.bytes), new Uint8Array(bytes));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('fetchImageBytes rejects a declared MP4 whose bytes do not validate as common media', async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = readFileSync('tests/e2e/pages/assets/media/common/spoofed.mp4');
+  globalThis.fetch = async () => new Response(bytes, { status: 200, headers: { 'content-type': 'video/mp4' } });
+
+  try {
+    const result = await fetchImageBytes('https://cdn.example.test/spoofed.mp4');
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.reason, 'not-media');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

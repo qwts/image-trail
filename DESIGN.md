@@ -37,6 +37,9 @@ capabilities or change persistence/encryption semantics.
 - Bookmarks are pins with associated captured original bytes.
 - Captured original bytes live separately in the encrypted blob/original store and
   are linked from durable pin/bookmark records.
+- Signature-validated video and audio originals follow the same encrypted custody
+  boundary. Deterministic posters and bounded metadata are derivatives, never a
+  replacement for or copy of the original bytes.
 - Recall pages durable pins/bookmarks from the queue producer after the visible
   queue window. Recall is not a browser over encrypted blobs and must not add
   records to Recents.
@@ -61,6 +64,9 @@ capabilities or change persistence/encryption semantics.
   delete actions.
 - Capture originals explicitly from the primary control or C shortcut, show
   capture status, and keep stored-original state distinct from selection.
+- Import supported common video and audio explicitly, preserve exact encrypted
+  originals, never autoplay list surfaces, and distinguish native playback from
+  honest preserved-only fallback without persisting device playability as fact.
 - Keep Grab metadata-only by default. An inspectable exact-host rule may make an
   explicit Grab click pin first and then capture the encrypted original; it must
   not auto-capture visible images or change the Shift-modified Capture control.
@@ -96,6 +102,7 @@ Design review should start from Storybook and the canonical acceptance pages:
 - [Panel Layout Stability](https://github.com/qwts/image-trail/wiki/Acceptance-Test-Panel-Layout-Stability)
 - [Queue And Recall Clear/Delete Semantics](https://github.com/qwts/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics)
 - [pCloud Provider Boundary](https://github.com/qwts/image-trail/wiki/Acceptance-Test-pCloud-Provider-Boundary)
+- [Common Video And Audio Media](https://github.com/qwts/image-trail/wiki/Acceptance-Test-Common-Video-And-Audio-Media)
 
 ## Stable Visual Primitives
 

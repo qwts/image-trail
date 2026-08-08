@@ -1,6 +1,7 @@
 import { inspectGifWebpMedia } from '../image/gif-webp-media.js';
+import { inspectCommonMedia, isNativePlaybackCandidate } from './common-media.js';
 import type { StoredMediaInfo } from './media-info.js';
-import { detectTsLayout, inspectMpegTsMedia, type MpegTsInspection } from './mpeg-ts.js';
+import { detectTsLayout, inspectMpegTsMedia } from './mpeg-ts.js';
 
 export interface SpecializedMediaInspection {
   readonly status: 'supported';
@@ -8,8 +9,8 @@ export interface SpecializedMediaInspection {
   readonly width?: number | undefined;
   readonly height?: number | undefined;
   readonly mediaInfo: StoredMediaInfo;
-  readonly playbackTier?: MpegTsInspection['status'] | undefined;
-  readonly extension?: MpegTsInspection['extension'] | undefined;
+  readonly playbackTier?: 'playable' | 'preserved-only' | undefined;
+  readonly extension?: string | undefined;
 }
 
 export type SpecializedMediaInspectionResult =
@@ -42,6 +43,21 @@ export function inspectSpecializedMedia(
         extension: transportStream.extension,
       };
     }
+  }
+
+  const common = inspectCommonMedia(bytes, declaredMimeType, fileNameOrUrl);
+  if (common.status === 'invalid') return common;
+  if (common.status === 'supported') {
+    const { probe } = common;
+    return {
+      status: 'supported',
+      mimeType: probe.mimeType,
+      width: probe.mediaInfo.displayWidth ?? probe.mediaInfo.codedWidth ?? undefined,
+      height: probe.mediaInfo.displayHeight ?? probe.mediaInfo.codedHeight ?? undefined,
+      mediaInfo: probe.mediaInfo,
+      playbackTier: isNativePlaybackCandidate(probe.mediaInfo) ? 'playable' : 'preserved-only',
+      extension: probe.extension,
+    };
   }
 
   const gifWebp = inspectGifWebpMedia(bytes);

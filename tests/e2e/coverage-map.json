@@ -107,6 +107,41 @@
       ]
     },
     {
+      "id": "common-video-audio-original-preservation",
+      "acceptance": "Signature-validated MP4, MOV, WebM, Matroska, AVI, MPEG program, and MP2 encrypted custody, metadata, preview tiers, export, backup, and Photos preservation",
+      "repoPath": "docs/acceptance-tests/common-video-and-audio-media.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Common-Video-And-Audio-Media",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/common-media.test.ts",
+            "tests/data-url-image.test.ts",
+            "tests/fetch-image.test.ts",
+            "tests/imported-media-batch.test.ts",
+            "tests/imported-media-record.test.ts",
+            "tests/full-backup-originals.test.ts",
+            "tests/interop-media.test.ts",
+            "tests/interop-record-export.test.ts",
+            "tests/interop-record-translation.test.ts",
+            "tests/dom/common-media-preview.test.ts",
+            "tests/dom/media-import-controls.test.ts"
+          ],
+          "notes": "Covers bounded ISO-BMFF/QuickTime, EBML, RIFF AVI, MPEG program-stream, and MPEG audio signature parsing; deterministic known hashes; H.264, HEVC Main 10 HDR, ProRes, VP9, MPEG-4 Part 2, MPEG-2 Video, AAC, Opus, PCM, MP3, and MP2 facts; rotation, dimensions, duration, frame rate, VFR, channel, and color metadata; malformed and spoofed rejection; exact encrypted custody; deterministic inactive queue posters; native no-autoplay and preserved-only preview surfaces; backup restoration; and strict Photos metadata without persisted device playability."
+        },
+        {
+          "type": "playwright-e2e",
+          "path": "tests/e2e/common-video-media.spec.ts",
+          "notes": "Imports checked-in MP4, Matroska, MP2, and WebM through the packaged extension; proves encrypted-original indicators, authenticated type labels, static posters, exact downloaded MP4 bytes and filename, malformed/spoofed atomicity, no autoplay, focusable WebM controls, native playback and first-frame poster capture, plus explicit Matroska and MP2 preserved-only states."
+        },
+        {
+          "type": "manual",
+          "reason": "System-specific H.264, HEVC, ProRes, and Apple-device codec availability plus live Photos transfer remain browser, operating-system, and owner integration checks while Transfer and Sync stays experimental.",
+          "notes": "Load the packaged extension and import representative iPhone H.264/HEVC MOV, ProRes MOV, MP4, WebM, MKV, AVI, MPEG-PS, and MP2 files. Verify no list autoplay, honest per-device preview fallback, rotation and HDR handling, keyboard play pause seek mute and volume, first-frame poster stability, exact original export and encrypted backup restore, bounded malformed/oversized failure, then run experimental Image Trail to Photos to Image Trail transfers and compare SHA-256, filename, MIME, container, streams, dimensions, rotation, duration, and HDR facts."
+        }
+      ]
+    },
+    {
       "id": "design-system-foundation",
       "acceptance": "Shared design-system tokens and core primitive contracts",
       "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",

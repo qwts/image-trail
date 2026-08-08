@@ -1,5 +1,6 @@
 import type { StoredMediaInfo } from '../core/media/media-info.js';
 import { createPreviewMediaSurface } from './animated-preview.js';
+import { createCommonMediaPreviewSurface } from './common-media-preview.js';
 import { createMpegTsPreviewSurface } from './mpeg-ts-preview.js';
 
 export interface MediaPreviewPayload {
@@ -14,6 +15,9 @@ export async function createMediaPreviewSurface(
 ): Promise<HTMLElement> {
   if (payload.mediaInfo?.kind === 'mpeg-ts') {
     return createMpegTsPreviewSurface(document, { dataUrl: payload.dataUrl, mediaInfo: payload.mediaInfo });
+  }
+  if (payload.mediaInfo?.kind === 'common-media') {
+    return createCommonMediaPreviewSurface(document, { dataUrl: payload.dataUrl, mediaInfo: payload.mediaInfo });
   }
   return createPreviewMediaSurface(document, { dataUrl: payload.dataUrl, mediaInfo: payload.mediaInfo }, options);
 }

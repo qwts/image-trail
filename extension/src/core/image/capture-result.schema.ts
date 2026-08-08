@@ -9,6 +9,13 @@ import type {
   StoredOriginalReference,
 } from './capture-result.js';
 import { MAX_GIF_WEBP_FRAMES, MAX_GIF_WEBP_LOOP_COUNT, type GifWebpMediaInfo } from './gif-webp-media.js';
+import {
+  MAX_COMMON_MEDIA_DIMENSION,
+  MAX_COMMON_MEDIA_DURATION_SECONDS,
+  MAX_COMMON_MEDIA_STREAMS,
+  type CommonMediaInfo,
+  type CommonMediaStreamInfo,
+} from '../media/common-media-types.js';
 import type { StoredMediaInfo } from '../media/media-info.js';
 import { MAX_MPEG_TS_DURATION_SECONDS, MAX_MPEG_TS_STREAMS, type MpegTsMediaInfo, type MpegTsStreamInfo } from '../media/mpeg-ts.js';
 
@@ -46,7 +53,40 @@ export const mpegTsMediaInfoSchema = v.strictObject({
   probeIncomplete: v.boolean(),
 });
 
-export const storedMediaInfoSchema = v.variant('kind', [gifWebpMediaInfoSchema, mpegTsMediaInfoSchema]);
+export const commonMediaStreamInfoSchema = v.strictObject({
+  type: v.picklist(['video', 'audio', 'text', 'unknown']),
+  codec: v.nullable(v.pipe(v.string(), v.minLength(1), v.maxLength(80))),
+  profile: v.nullable(v.pipe(v.string(), v.minLength(1), v.maxLength(80))),
+  level: v.nullable(v.pipe(v.string(), v.minLength(1), v.maxLength(40))),
+  bitDepth: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(64))),
+  channels: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(64))),
+  sampleRate: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(768_000))),
+  language: v.nullable(v.pipe(v.string(), v.minLength(2), v.maxLength(40))),
+});
+
+export const commonMediaInfoSchema = v.strictObject({
+  kind: v.literal('common-media'),
+  mediaKind: v.picklist(['video', 'audio']),
+  animated: v.literal(false),
+  frameCount: v.null(),
+  loopCount: v.null(),
+  container: v.picklist(['ISO-BMFF', 'QuickTime', 'WebM', 'Matroska', 'AVI', 'MPEG-PS', 'MPEG-Audio']),
+  streams: v.pipe(v.array(commonMediaStreamInfoSchema), v.minLength(1), v.maxLength(MAX_COMMON_MEDIA_STREAMS), v.readonly()),
+  durationSeconds: v.nullable(v.pipe(v.number(), v.minValue(0), v.maxValue(MAX_COMMON_MEDIA_DURATION_SECONDS))),
+  codedWidth: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_COMMON_MEDIA_DIMENSION))),
+  codedHeight: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_COMMON_MEDIA_DIMENSION))),
+  displayWidth: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_COMMON_MEDIA_DIMENSION))),
+  displayHeight: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_COMMON_MEDIA_DIMENSION))),
+  rotationDegrees: v.nullable(v.picklist([0, 90, 180, 270] as const)),
+  frameRate: v.nullable(v.pipe(v.number(), v.minValue(0), v.maxValue(1_000))),
+  variableFrameRate: v.nullable(v.boolean()),
+  audioPresent: v.boolean(),
+  hdr: v.nullable(v.boolean()),
+  colorTransfer: v.nullable(v.pipe(v.string(), v.minLength(1), v.maxLength(80))),
+  probeIncomplete: v.boolean(),
+});
+
+export const storedMediaInfoSchema = v.variant('kind', [gifWebpMediaInfoSchema, mpegTsMediaInfoSchema, commonMediaInfoSchema]);
 
 export const captureFailureReasonSchema = v.picklist([
   'permission-needed',
@@ -113,7 +153,17 @@ export const storedOriginalReferenceSchema = v.pipe(
 function mediaInfoMatchesMimeType(mimeType: string, mediaInfo: StoredMediaInfo | undefined): boolean {
   if (!mediaInfo) return true;
   if (mediaInfo.kind === 'mpeg-ts') return mimeType === 'video/mp2t';
+  if (mediaInfo.kind === 'common-media') return commonMediaMimeMatches(mimeType, mediaInfo);
   return mimeType === (mediaInfo.kind === 'gif' ? 'image/gif' : 'image/webp');
+}
+
+function commonMediaMimeMatches(mimeType: string, mediaInfo: CommonMediaInfo): boolean {
+  if (mediaInfo.container === 'ISO-BMFF') return mimeType === (mediaInfo.mediaKind === 'audio' ? 'audio/mp4' : 'video/mp4');
+  if (mediaInfo.container === 'QuickTime') return mimeType === 'video/quicktime';
+  if (mediaInfo.container === 'WebM') return mimeType === (mediaInfo.mediaKind === 'audio' ? 'audio/webm' : 'video/webm');
+  if (mediaInfo.container === 'Matroska') return mimeType === (mediaInfo.mediaKind === 'audio' ? 'audio/x-matroska' : 'video/x-matroska');
+  if (mediaInfo.container === 'AVI') return mimeType === (mediaInfo.mediaKind === 'audio' ? 'audio/x-msvideo' : 'video/x-msvideo');
+  return mimeType === (mediaInfo.mediaKind === 'audio' ? 'audio/mpeg' : 'video/mpeg');
 }
 
 export const storageUsageBucketSummarySchema = v.object({
@@ -134,6 +184,8 @@ type _AssertCaptureFailureReason = Assert<MutuallyAssignable<v.InferOutput<typeo
 type _AssertGifWebpMediaInfo = Assert<MutuallyAssignable<v.InferOutput<typeof gifWebpMediaInfoSchema>, GifWebpMediaInfo>>;
 type _AssertMpegTsStreamInfo = Assert<MutuallyAssignable<v.InferOutput<typeof mpegTsStreamInfoSchema>, MpegTsStreamInfo>>;
 type _AssertMpegTsMediaInfo = Assert<MutuallyAssignable<v.InferOutput<typeof mpegTsMediaInfoSchema>, MpegTsMediaInfo>>;
+type _AssertCommonMediaStreamInfo = Assert<MutuallyAssignable<v.InferOutput<typeof commonMediaStreamInfoSchema>, CommonMediaStreamInfo>>;
+type _AssertCommonMediaInfo = Assert<MutuallyAssignable<v.InferOutput<typeof commonMediaInfoSchema>, CommonMediaInfo>>;
 type _AssertStoredMediaInfo = Assert<MutuallyAssignable<v.InferOutput<typeof storedMediaInfoSchema>, StoredMediaInfo>>;
 type _AssertCaptureStatus = Assert<MutuallyAssignable<v.InferOutput<typeof captureStatusSchema>, CaptureStatus>>;
 type _AssertCaptureResult = Assert<MutuallyAssignable<v.InferOutput<typeof captureResultSchema>, CaptureResult>>;

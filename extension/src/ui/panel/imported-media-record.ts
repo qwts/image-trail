@@ -1,6 +1,7 @@
 import { createDisplayRecord, type ImageDisplayRecord } from '../../core/display-records.js';
 import type { CaptureResult, StoredOriginalReference } from '../../core/image/capture-result.js';
 import { isRemuxableMpegTsInfo } from '../../core/media/mpeg-ts-playback-tier.js';
+import { commonMediaLabel, isNativePlaybackCandidate } from '../../core/media/common-media.js';
 import type { ImportedImageFile } from '../../core/types.js';
 
 export type CapturedImportedMedia = Extract<CaptureResult, { readonly status: 'captured' }>;
@@ -52,6 +53,12 @@ function importedMediaPresentation(
       thumbnail: transportStreamPosterDataUrl(captured.mediaInfo),
     };
   }
+  if (captured?.mediaInfo?.kind === 'common-media') {
+    return {
+      url: file.dataUrl.startsWith('data:') ? localMediaUrl(file.name, captured) : file.dataUrl,
+      thumbnail: commonMediaPosterDataUrl(captured.mediaInfo),
+    };
+  }
   return file.dataUrl.startsWith('data:image/') || /^https?:\/\//iu.test(file.dataUrl)
     ? { url: file.dataUrl, thumbnail: file.dataUrl }
     : null;
@@ -61,14 +68,27 @@ export function transportStreamPosterDataUrl(mediaInfo: Extract<CapturedImported
   const codecs = mediaInfo.streams.map((stream) => stream.codec ?? 'Unknown').join(' + ') || 'Unknown codecs';
   const duration = formatDuration(mediaInfo.durationSeconds);
   const tier = isRemuxableMpegTsInfo(mediaInfo) ? 'Ready to preview' : 'Preserved only';
+  return mediaPosterDataUrl('MPEG-TS', codecs, `${duration} · ${tier}`);
+}
+
+export function commonMediaPosterDataUrl(
+  mediaInfo: Extract<CapturedImportedMedia['mediaInfo'], { readonly kind: 'common-media' }>,
+): string {
+  const codecs = mediaInfo.streams.map((stream) => stream.codec ?? 'Unknown').join(' + ') || 'Unknown codecs';
+  const duration = formatDuration(mediaInfo.durationSeconds);
+  const tier = isNativePlaybackCandidate(mediaInfo) ? 'Preview where supported' : 'Preserved only';
+  return mediaPosterDataUrl(commonMediaLabel(mediaInfo), codecs, `${duration} · ${tier}`);
+}
+
+function mediaPosterDataUrl(label: string, codecs: string, details: string): string {
   const svg = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">',
     '<rect width="640" height="360" fill="#07110f"/>',
     '<rect x="24" y="24" width="592" height="312" rx="16" fill="#0f201b" stroke="#7cffa8" stroke-opacity=".45"/>',
     '<path d="M274 126v108l102-54z" fill="#7cffa8"/>',
-    `<text x="48" y="72" fill="#daffe9" font-family="system-ui,sans-serif" font-size="24" font-weight="700">MPEG-TS</text>`,
+    `<text x="48" y="72" fill="#daffe9" font-family="system-ui,sans-serif" font-size="24" font-weight="700">${escapeXml(label)}</text>`,
     `<text x="48" y="286" fill="#cbd5d1" font-family="system-ui,sans-serif" font-size="18">${escapeXml(codecs)}</text>`,
-    `<text x="48" y="316" fill="#91a8a0" font-family="system-ui,sans-serif" font-size="16">${escapeXml(`${duration} · ${tier}`)}</text>`,
+    `<text x="48" y="316" fill="#91a8a0" font-family="system-ui,sans-serif" font-size="16">${escapeXml(details)}</text>`,
     '</svg>',
   ].join('');
   return `data:image/svg+xml;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(svg)))}`;

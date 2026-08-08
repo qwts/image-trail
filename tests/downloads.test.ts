@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  alignFilenameWithVerifiedExtension,
   ensureFilenameExtension,
   extensionFromUrl,
   filenameFromImageRecord,
@@ -29,6 +30,15 @@ test('download filename helpers keep or infer safe image extensions', () => {
   assert.equal(extensionFromUrl('data:image/jpeg;base64,abc'), 'jpg');
   assert.equal(ensureFilenameExtension('custom name', 'https://example.test/source.webp'), 'custom name.webp');
   assert.equal(filenameFromUrl('https://example.test/images/cat%20photo.jpeg?x=1'), 'cat photo.jpeg');
+});
+
+test('download filename helpers preserve supported media extensions and align names with verified bytes', () => {
+  assert.equal(extensionFromUrl('data:video/mp4;base64,abc'), 'mp4');
+  assert.equal(extensionFromUrl('data:audio/mp4;base64,abc'), 'm4a');
+  assert.equal(extensionFromUrl('https://example.test/path/clip.MOV?download=1'), 'mov');
+  assert.equal(alignFilenameWithVerifiedExtension('camera.WEBM', 'webm', 'media'), 'camera.WEBM');
+  assert.equal(alignFilenameWithVerifiedExtension('spoofed.mp4', 'webm', 'media'), 'spoofed.webm');
+  assert.equal(alignFilenameWithVerifiedExtension('unsafe\u202efile.exe', 'mp4', 'media'), 'unsafe_file.mp4');
 });
 
 test('download filenames use image names instead of proxy URL fragments', () => {

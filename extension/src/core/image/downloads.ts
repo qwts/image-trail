@@ -1,6 +1,43 @@
 import { normalizeDisplayLabel, sourceImageUrlFrom } from '../display-records.js';
 
-const SAFE_MEDIA_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'ts', 'mts', 'm2ts']);
+const SAFE_MEDIA_EXTENSIONS = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'ts',
+  'mts',
+  'm2ts',
+  'mp4',
+  'm4v',
+  'm4a',
+  'mpeg4',
+  'mov',
+  'qt',
+  'webm',
+  'weba',
+  'mkv',
+  'mka',
+  'avi',
+  'mpg',
+  'mpeg',
+  'mp2',
+]);
+const DATA_MEDIA_EXTENSION_BY_MIME: Readonly<Record<string, string>> = {
+  'video/mp2t': 'ts',
+  'video/mp4': 'mp4',
+  'audio/mp4': 'm4a',
+  'video/quicktime': 'mov',
+  'video/webm': 'webm',
+  'audio/webm': 'weba',
+  'video/x-matroska': 'mkv',
+  'audio/x-matroska': 'mka',
+  'video/x-msvideo': 'avi',
+  'audio/x-msvideo': 'avi',
+  'video/mpeg': 'mpg',
+  'audio/mpeg': 'mp2',
+};
 const UNSAFE_FILENAME_FORMAT_CHARACTER = /\p{Cf}/u;
 
 export interface DownloadDuplicateCandidate {
@@ -59,8 +96,9 @@ function isUnsafeFilenameCharacter(character: string): boolean {
 }
 
 export function extensionFromUrl(url: string): string {
-  const dataTransportStream = /^data:video\/mp2t[;,]/iu.test(url);
-  if (dataTransportStream) return 'ts';
+  const dataMediaType = /^data:((?:video|audio)\/[a-z0-9.+-]+)[;,]/iu.exec(url)?.[1]?.toLowerCase();
+  const dataMediaExtension = dataMediaType ? DATA_MEDIA_EXTENSION_BY_MIME[dataMediaType] : undefined;
+  if (dataMediaExtension) return dataMediaExtension;
   const dataImageType = /^data:image\/([a-z0-9.+-]+)[;,]/iu.exec(url)?.[1]?.toLowerCase();
   if (dataImageType) {
     const normalized = dataImageType === 'jpeg' ? 'jpg' : dataImageType;
@@ -79,6 +117,16 @@ export function extensionFromUrl(url: string): string {
 export function ensureFilenameExtension(baseName: string, sourceUrl: string): string {
   const clean = sanitizeFilename(baseName);
   return /\.[a-z0-9]{2,5}$/iu.test(clean) ? clean : `${clean}.${extensionFromUrl(sourceUrl)}`;
+}
+
+export function alignFilenameWithVerifiedExtension(candidate: string, verifiedExtension: string, fallbackBase: 'image' | 'media'): string {
+  const extension = verifiedExtension.toLowerCase();
+  const safeExtension = SAFE_MEDIA_EXTENSIONS.has(extension) ? extension : 'bin';
+  const sanitized = sanitizeFilename(candidate, fallbackBase, 240);
+  const currentExtension = /\.([a-z0-9]{1,10})$/iu.exec(sanitized);
+  if (currentExtension?.[1]?.toLowerCase() === safeExtension) return sanitized;
+  const stem = currentExtension ? sanitized.slice(0, -currentExtension[0].length) : sanitized;
+  return `${sanitizeFilename(stem, fallbackBase, 240 - safeExtension.length - 1)}.${safeExtension}`;
 }
 
 export function filenameFromUrl(url: string): string {

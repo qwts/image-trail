@@ -18,7 +18,7 @@ import { EncryptedPinThumbnailsRepository } from '../data/repositories/encrypted
 import type { StoredBlobRecord } from '../data/types.js';
 import { BROWSER_COMMAND_SHORTCUTS } from '../core/keyboard-shortcuts.js';
 import { fetchImageBytes, preferredCaptureFileName } from './fetch-image.js';
-import { dataUrlToImageBytes, imageDataUrlFromBytes, openedImageDataFromPayload } from './data-url-image.js';
+import { dataUrlToImageBytes, imageDataUrlFromBytes, isSupportedMediaDataUrl, openedImageDataFromPayload } from './data-url-image.js';
 import { openPreviewPayload, takePreviewPayload } from './preview-payload-store.js';
 import { fetchLinkedPage } from './fetch-linked-page.js';
 import {
@@ -210,16 +210,15 @@ async function handleCaptureImage(message: CaptureImageMessage): Promise<import(
       message: 'Encrypted blob storage must be unlocked before original media capture.',
     };
   }
-  const bytesResult =
-    url.startsWith('data:image/') || url.startsWith('data:video/mp2t')
-      ? dataUrlToImageBytes(url, message.payload.fileName)
-      : await (async () => {
-          const origin = extractOrigin(url);
-          if (origin && !(await hasOriginPermission(origin))) {
-            return { ok: false as const, reason: 'permission-needed' as const, message: `Permission needed for ${origin}.`, origin };
-          }
-          return fetchImageBytes(url);
-        })();
+  const bytesResult = isSupportedMediaDataUrl(url)
+    ? dataUrlToImageBytes(url, message.payload.fileName)
+    : await (async () => {
+        const origin = extractOrigin(url);
+        if (origin && !(await hasOriginPermission(origin))) {
+          return { ok: false as const, reason: 'permission-needed' as const, message: `Permission needed for ${origin}.`, origin };
+        }
+        return fetchImageBytes(url);
+      })();
   if (!bytesResult.ok) {
     return 'reason' in bytesResult &&
       bytesResult.reason === 'permission-needed' &&

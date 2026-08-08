@@ -1,4 +1,5 @@
 import type { GifWebpMediaInfo } from '../image/gif-webp-media.js';
+import type { CommonMediaInfo } from './common-media.js';
 import type { MpegTsMediaInfo } from './mpeg-ts.js';
 
-export type StoredMediaInfo = GifWebpMediaInfo | MpegTsMediaInfo;
+export type StoredMediaInfo = GifWebpMediaInfo | MpegTsMediaInfo | CommonMediaInfo;

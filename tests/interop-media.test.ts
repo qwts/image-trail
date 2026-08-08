@@ -7,14 +7,17 @@ import {
   interopGifWebpMediaBlockForOriginal,
   interopGifWebpMediaBlockFrom,
   interopGifWebpMediaBlockSchema,
-  interopMediaFileName,
+  interopCommonMediaBlockSchema,
   interopMediaBlockForOriginal,
   interopMediaBlockFrom,
+  interopMediaFileName,
   interopMpegTsMediaBlockSchema,
   withInteropMediaBlock,
   withInteropGifWebpMediaBlock,
 } from '../extension/src/core/interop/media.js';
+import { inspectSpecializedMedia } from '../extension/src/core/media/inspect-media.js';
 import { probeTransportStream } from '../extension/src/core/media/mpeg-ts.js';
+import type { InteropJsonObject } from '../extension/src/core/interop/json.js';
 import { interopRecordSchema } from '../extension/src/core/interop/records.js';
 
 const block = {
@@ -136,3 +139,38 @@ test('MPEG-TS media facts use the Photos-compatible video block without persisti
   assert.equal(overlook['retained'], true);
   assert.deepEqual(v.parse(interopMpegTsMediaBlockSchema, block), block);
 });
+
+test('common video media round-trips bounded custody facts without persisting device playability', () => {
+  const bytes = new Uint8Array(readFileSync('tests/e2e/pages/assets/media/common/iphone-hevc-main10-hdr.mov'));
+  const inspected = inspectSpecializedMedia(bytes, 'video/quicktime', 'iphone-hevc-main10-hdr.mov');
+  assert.equal(inspected.status, 'supported');
+  if (inspected.status !== 'supported' || inspected.mediaInfo.kind !== 'common-media') return;
+  const block = interopMediaBlockForOriginal({
+    blobId: 'blob-common',
+    mimeType: inspected.mimeType,
+    byteLength: bytes.byteLength,
+    capturedAt: '2026-07-29T00:00:00.000Z',
+    fileName: 'iphone-hevc-main10-hdr.mov',
+    mediaInfo: inspected.mediaInfo,
+  });
+  assert.ok(block);
+  assert.equal(block?.kind, 'video');
+  if (!block || block.kind !== 'video' || block.mediaInfo?.container === 'MPEG-TS') return;
+  assert.equal(block.mimeType, 'video/quicktime');
+  assert.equal(block.extension, 'mov');
+  assert.equal(block.mediaInfo?.container, 'QuickTime');
+  assert.equal(block.mediaInfo?.hdr, true);
+  assert.equal(block.mediaInfo?.colorTransfer, 'PQ (ST 2084)');
+  assert.equal('playable' in block, false);
+  assert.equal('playbackTier' in block, false);
+  assert.deepEqual(v.parse(interopCommonMediaBlockSchema, block), block);
+  const overlook = withInteropMediaBlock({ retained: true }, block);
+  assert.deepEqual(interopMediaBlockFrom(overlook), block);
+  assert.equal(overlook['retained'], true);
+  assert.equal(interopMediaBlockFrom(jsonObject({ media: { ...block, playable: true } })), null);
+  assert.equal(interopMediaBlockFrom(jsonObject({ media: { ...block, mimeType: 'video/webm' } })), null);
+});
+
+function jsonObject(value: unknown): InteropJsonObject {
+  return JSON.parse(JSON.stringify(value)) as InteropJsonObject;
+}
