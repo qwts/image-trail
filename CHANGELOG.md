@@ -1,5 +1,12 @@
 # image-trail
 
+## 0.27.1
+
+### Patch Changes
+
+- 3e6ffbf: fix(ui): pin Host target, URL editor, Controls and Field Editor detach controls and remove redundant Queue Recall button
+- 3e6ffbf: fix(ui): Host target visible and collapsible — scope collapsed opacity to details and allow gallery collapse
+
 ## 0.27.0
 
 ### Minor Changes
