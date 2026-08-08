@@ -33,11 +33,15 @@ const STATUS_OPTIONS: readonly { readonly value: StatusFilter; readonly label: s
 ];
 
 export function urlReviewTimeSpan(records: readonly UrlReviewStatusRecord[]): UrlReviewTimeSpan | null {
-  const timestamps = records.map((record) => record.updatedAt).sort((left, right) => left.localeCompare(right));
-  const first = timestamps[0];
-  const last = timestamps.at(-1);
+  const parsed = records
+    .map((record) => ({ raw: record.updatedAt, ms: Date.parse(record.updatedAt) }))
+    .filter((entry) => Number.isFinite(entry.ms))
+    .sort((a, b) => a.ms - b.ms);
+  const first = parsed[0]?.raw;
+  const last = parsed.at(-1)?.raw;
   if (!first || !last) return null;
-  return { first, last, elapsedMs: Math.max(0, Date.parse(last) - Date.parse(first)) };
+  const elapsedMs = Math.max(0, parsed.at(-1)!.ms - parsed[0]!.ms);
+  return { first, last, elapsedMs };
 }
 
 export function filterUrlReviewStatus(
@@ -67,13 +71,12 @@ function useReviewHistory(services: DestinationServices) {
 }
 
 function siteOptions(records: readonly UrlReviewStatusRecord[], privacyMode: boolean): readonly SiteOption[] {
-  return [...new Set(records.map((record) => record.hostname))]
-    .sort((left, right) => left.localeCompare(right))
-    .map((hostname, index) => ({
-      key: `site-${index + 1}`,
-      hostname,
-      label: privacyMode ? `Private site ${index + 1}` : hostname,
-    }));
+  const hostnames = [...new Set(records.map((record) => record.hostname))].sort((left, right) => left.localeCompare(right));
+  return hostnames.map((hostname) => ({
+    key: `site-${hostname}`,
+    hostname,
+    label: privacyMode ? `Private site ${hostnames.indexOf(hostname) + 1}` : hostname,
+  }));
 }
 
 function formatTimestamp(timestamp: string): string {
@@ -89,7 +92,11 @@ export function formatReviewElapsed(elapsedMs: number): string {
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'}${remainingMinutes ? ` ${remainingMinutes} min` : ''}`;
   const days = Math.floor(hours / 24);
   const remainingHours = hours % 24;
-  return `${days} day${days === 1 ? '' : 's'}${remainingHours ? ` ${remainingHours} hr` : ''}`;
+  const remainingAfterDaysMinutes = minutes - days * 24 * 60 - remainingHours * 60;
+  if (remainingHours) {
+    return `${days} day${days === 1 ? '' : 's'}${remainingHours ? ` ${remainingHours} hr` : ''}${remainingAfterDaysMinutes ? ` ${remainingAfterDaysMinutes} min` : ''}`;
+  }
+  return `${days} day${days === 1 ? '' : 's'}${remainingAfterDaysMinutes ? ` ${remainingAfterDaysMinutes} min` : ''}`;
 }
 
 function ReviewSpan({ records, privacyMode }: { readonly records: readonly UrlReviewStatusRecord[]; readonly privacyMode: boolean }) {
@@ -153,6 +160,12 @@ export function UrlReviewStatusSettingsGroup({
   const selectedSite = sites.find((site) => site.hostname === selectedHostname) ?? null;
   const siteKey = selectedSite?.key ?? 'all';
   const visible = filterUrlReviewStatus(history.records, selectedHostname, status);
+  const PAGE_SIZE = 100;
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  useEffect(() => {
+    setPageSize(PAGE_SIZE);
+  }, [selectedHostname, status, history.records.length]);
+  const paged = visible.slice(0, pageSize);
   useEffect(() => {
     if (selectedHostname !== null && !selectedSite) setSelectedHostname(null);
   }, [selectedHostname, selectedSite]);
@@ -199,10 +212,15 @@ export function UrlReviewStatusSettingsGroup({
         <>
           <ReviewSpan records={visible} privacyMode={privacyMode} />
           <ol className="image-trail-url-review__records">
-            {visible.map((record) => (
+            {paged.map((record) => (
               <ReviewRecord key={`${record.hostname}:${record.sourceUrl}`} record={record} privacyMode={privacyMode} />
             ))}
           </ol>
+          {visible.length > paged.length ? (
+            <button type="button" onClick={() => setPageSize((n) => n + PAGE_SIZE)}>
+              Load more ({visible.length - paged.length} remaining)
+            </button>
+          ) : null}
         </>
       )}
     </SettingsGroup>

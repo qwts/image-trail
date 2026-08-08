@@ -103,7 +103,7 @@ export const Settings: Story = {
     await userEvent.selectOptions(downArrow, 'download');
     await expect(savedDownArrowAction).toHaveBeenCalledWith('download');
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'URL review status' }), 'failed');
-    await expect(canvas.getByText('Review detail hidden')).toBeVisible();
+    await expect(canvas.getByText('Image failed: HTTP 404')).toBeVisible();
   },
 };
 

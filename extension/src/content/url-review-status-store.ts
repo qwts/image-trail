@@ -14,12 +14,16 @@ import { sendRuntimeMessage } from './runtime-message.js';
 export class ExtensionUrlReviewStatusStore implements UrlReviewStatusStore {
   async list(hostname: string): Promise<readonly UrlReviewStatusRecord[]> {
     const response = await sendRuntimeMessage(createListUrlReviewStatusMessage(hostname));
-    return isListUrlReviewStatusResultMessage(response) && response.payload.ok ? response.payload.records : [];
+    if (isListUrlReviewStatusResultMessage(response) && response.payload.ok) return response.payload.records;
+    if (isListUrlReviewStatusResultMessage(response) && !response.payload.ok) throw new Error('URL review status list failed.');
+    return [];
   }
 
   async listAll(): Promise<readonly UrlReviewStatusRecord[]> {
     const response = await sendRuntimeMessage(createListUrlReviewStatusMessage(null));
-    return isListUrlReviewStatusResultMessage(response) && response.payload.ok ? response.payload.records : [];
+    if (isListUrlReviewStatusResultMessage(response) && response.payload.ok) return response.payload.records;
+    if (isListUrlReviewStatusResultMessage(response) && !response.payload.ok) throw new Error('URL review status list failed.');
+    return [];
   }
 
   async save(record: UrlReviewStatusRecord, options?: { readonly maxRecordsPerHost?: number }): Promise<void> {
