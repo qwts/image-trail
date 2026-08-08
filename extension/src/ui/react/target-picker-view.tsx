@@ -157,9 +157,8 @@ function reapplyFitSelectFocusAfterNativeChange(root: Node, ownerDocument: Docum
 }
 
 function TargetPickerContent({ target, pageContext, dispatch, privacyMode, open, collapsible, onOpenChange }: TargetPickerProps) {
-  const [requestedOpen, setRequestedOpen] = useState(open);
-  const forceOpen = targetNeedsAttention(target);
-  const sectionOpen = forceOpen || requestedOpen;
+  const [requestedOpen, setRequestedOpen] = useState(open || targetNeedsAttention(target));
+  const sectionOpen = requestedOpen;
   return (
     <>
       <div className="image-trail-panel__target-summary image-trail-panel__section-header image-trail-ds__section-header">
@@ -172,7 +171,6 @@ function TargetPickerContent({ target, pageContext, dispatch, privacyMode, open,
             aria-expanded={sectionOpen}
             aria-label={`${sectionOpen ? 'Hide' : 'Show'} Host target`}
             onClick={() => {
-              if (forceOpen) return;
               const nextOpen = !sectionOpen;
               setRequestedOpen(nextOpen);
               onOpenChange?.(nextOpen);
