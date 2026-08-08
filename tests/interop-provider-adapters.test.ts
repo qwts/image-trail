@@ -10,6 +10,7 @@ import { PCloudInteropAuth } from '../extension/src/background/interop-pcloud-au
 import {
   PCLOUD_INTEROP_CONNECTION_KEY,
   PCloudInteropConnectionStore,
+  type PCloudInteropConnectionRecord,
 } from '../extension/src/background/interop-pcloud-connection-store.js';
 import { PCloudInteropObjectStore } from '../extension/src/background/interop-pcloud-store.js';
 import { INTEROP_PROVIDER_LOGICAL_ROOT } from '../extension/src/core/interop/provider-root.js';
@@ -19,6 +20,7 @@ describe('pCloud interoperability namespace (#588)', () => {
   test('authorizes and stores only a dedicated interop credential', async () => {
     const values = new Map<string, unknown>();
     const restricted: string[] = [];
+    let authFlows = 0;
     const store = new PCloudInteropConnectionStore(
       {
         get: async (key) => ({ [key]: values.get(key) }),
@@ -39,6 +41,7 @@ describe('pCloud interoperability namespace (#588)', () => {
       createState: () => 'interop-state',
       now: () => '2026-07-17T12:00:00.000Z',
       launchAuthFlow: async (input) => {
+        authFlows += 1;
         const url = new URL(input);
         assert.equal(url.searchParams.get('redirect_uri'), 'https://extension.test/pcloud-interop');
         assert.equal(url.searchParams.get('state'), 'interop-state');
@@ -53,6 +56,8 @@ describe('pCloud interoperability namespace (#588)', () => {
 
     assert.equal(await auth.probe(false), false);
     assert.equal(await auth.probe(true), true);
+    assert.equal(await auth.probe(true), true);
+    assert.equal(authFlows, 1);
     assert.deepEqual(values.get(PCLOUD_INTEROP_CONNECTION_KEY), {
       schemaVersion: 1,
       provider: 'pcloud-interop',
@@ -65,6 +70,62 @@ describe('pCloud interoperability namespace (#588)', () => {
     await auth.disconnect();
     assert.equal(values.has(PCLOUD_INTEROP_CONNECTION_KEY), false);
     assert.ok(restricted.length >= 4);
+  });
+
+  test('treats pCloud access denied as a scope failure instead of expired authorization', async () => {
+    const store = new PCloudInteropObjectStore({
+      credential: () => ({ accessToken: 'interop-only-token', apiHost: 'api.pcloud.com' }),
+      fetchImpl: async () => Response.json({ result: 2003, error: 'Access denied.' }),
+    });
+
+    await assert.rejects(
+      store.quota(),
+      (error: unknown) =>
+        error instanceof InteropTransportError &&
+        error.code === 'provider-unavailable' &&
+        error.retryable &&
+        /app-folder scope/u.test(error.message),
+    );
+  });
+
+  test('interactive probe falls back to OAuth only when the saved interop credential expired', async () => {
+    let stored: PCloudInteropConnectionRecord = {
+      schemaVersion: 1 as const,
+      provider: 'pcloud-interop' as const,
+      accessToken: 'expired-token',
+      apiHost: 'api.pcloud.com' as const,
+      connectedAt: '2026-07-17T12:00:00.000Z',
+    };
+    const store = new PCloudInteropConnectionStore(
+      {
+        get: async (key) => ({ [key]: stored }),
+        set: async (items) => {
+          stored = items[PCLOUD_INTEROP_CONNECTION_KEY] as PCloudInteropConnectionRecord;
+        },
+        remove: async () => undefined,
+      },
+      async () => undefined,
+    );
+    let authFlows = 0;
+    const auth = new PCloudInteropAuth({
+      store,
+      redirectUrl: 'https://extension.test/pcloud-interop',
+      createState: () => 'fresh-state',
+      launchAuthFlow: () => {
+        authFlows += 1;
+        return Promise.resolve('https://extension.test/pcloud-interop#access_token=fresh-token&hostname=api.pcloud.com&state=fresh-state');
+      },
+      fetchImpl: async (_input, init) =>
+        Response.json(
+          (init?.body as URLSearchParams).get('access_token') === 'expired-token'
+            ? { result: 1000, error: 'Log in required.' }
+            : { result: 0, usedquota: 12, quota: 100 },
+        ),
+    });
+
+    assert.equal(await auth.probe(true), true);
+    assert.equal(authFlows, 1);
+    assert.equal(stored.accessToken, 'fresh-token');
   });
 
   test('writes and verifies only below the interop root with separate custody', async () => {

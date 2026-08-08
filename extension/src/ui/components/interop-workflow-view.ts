@@ -21,6 +21,7 @@ export interface InteropWorkflowHandlers {
   readonly onResume?: () => void;
   readonly onCancel?: () => void;
   readonly onReconnect?: () => void;
+  readonly onRetryCheck?: () => void;
   readonly onDisconnect?: () => void;
   readonly onConflict?: (interopId: string, action: InteropConflictAction, applyToAll: boolean) => void;
 }
@@ -165,8 +166,10 @@ function createErrorAndControls(state: InteropVisibleWorkflow, handlers: Interop
   if (state.error) {
     error.setAttribute('role', 'alert');
     error.textContent = `${state.error.code.replaceAll('-', ' ')} · ${state.error.message}`;
-    const recoveryHandler = interopRecoveryLabel(state.error.code) === 'Resume' ? handlers.onResume : handlers.onReconnect;
-    error.append(button(interopRecoveryLabel(state.error.code), recoveryHandler, !state.error.retryable));
+    const recoveryLabel = interopRecoveryLabel(state.error.code);
+    const recoveryHandler =
+      recoveryLabel === 'Resume' ? handlers.onResume : recoveryLabel === 'Reconnect' ? handlers.onReconnect : handlers.onRetryCheck;
+    error.append(button(recoveryLabel, recoveryHandler, !state.error.retryable));
   }
   const controls = document.createElement('footer');
   controls.append(
@@ -244,20 +247,34 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
   const context: InteropRuntimeContext = { entry, total: recordIds.length, recordIds, locked };
   let selectedProvider: InteropProviderId = 'pcloud';
   let latestRequest = 0;
-  const dispatch = async (action: InteropRuntimeAction): Promise<void> => {
+  const dispatch = async (action: InteropRuntimeAction) => {
     const request = ++latestRequest;
     const result = await dispatchInteropRuntime(context, action);
     if (result && request === latestRequest && scrim.isConnected) render(result.snapshot);
+    return result;
   };
-  let refreshPairingOnFocus = false;
-  const refreshPairingStatus = (): void => {
-    if (!refreshPairingOnFocus || !scrim.isConnected) return;
-    refreshPairingOnFocus = false;
-    void dispatch({ name: 'status' });
+  let refreshStatusOnFocus = false;
+  let providerActionPending = false;
+  const refreshInteractiveStatus = (): void => {
+    if (!refreshStatusOnFocus || !scrim.isConnected) return;
+    refreshStatusOnFocus = false;
+    void dispatch({ name: 'status' }).finally(() => {
+      providerActionPending = false;
+    });
   };
-  window.addEventListener('focus', refreshPairingStatus);
+  const connectProvider = (name: 'connect' | 'reconnect'): void => {
+    if (providerActionPending) return;
+    providerActionPending = true;
+    refreshStatusOnFocus = true;
+    void dispatch({ name, provider: selectedProvider }).then((result) => {
+      if (result === null) return;
+      refreshStatusOnFocus = false;
+      providerActionPending = false;
+    });
+  };
+  window.addEventListener('focus', refreshInteractiveStatus);
   const close = (): void => {
-    window.removeEventListener('focus', refreshPairingStatus);
+    window.removeEventListener('focus', refreshInteractiveStatus);
     scrim.remove();
     for (const { root, inert, pointerEvents } of panelRoots) {
       root.inert = inert;
@@ -272,16 +289,17 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
       selectedProvider = provider;
       void dispatch({ name: 'select-provider', provider });
     },
-    onConnect: () => void dispatch({ name: 'connect', provider: selectedProvider }),
+    onConnect: () => connectProvider('connect'),
     onImportPairing: () => {
-      refreshPairingOnFocus = true;
+      refreshStatusOnFocus = true;
       void dispatch({ name: 'open-pairing-import' });
     },
     onStart: () => void dispatch({ name: 'start' }),
     onPause: () => void dispatch({ name: 'pause' }),
     onResume: () => void dispatch({ name: 'resume' }),
     onCancel: () => void dispatch({ name: 'cancel' }),
-    onReconnect: () => void dispatch({ name: 'reconnect', provider: selectedProvider }),
+    onReconnect: () => connectProvider('reconnect'),
+    onRetryCheck: () => void dispatch({ name: 'status' }),
     onDisconnect: () => void dispatch({ name: 'disconnect' }),
     onConflict: (interopId, action, applyToAll) => void dispatch({ name: 'resolve-conflict', interopId, action, applyToAll }),
   };
