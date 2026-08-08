@@ -26,6 +26,19 @@ test('direct media URL control validates the scheme and derives a decoded filena
       dataUrl: 'https://media.example/archive/camera%2001.m2ts?download=1',
     },
   ]);
+
+  input.value = 'https://media.example/';
+  control.button.click();
+  assert.deepEqual(imports, [
+    {
+      name: 'camera 01.m2ts',
+      dataUrl: 'https://media.example/archive/camera%2001.m2ts?download=1',
+    },
+    {
+      name: 'media.bin',
+      dataUrl: 'https://media.example/',
+    },
+  ]);
 });
 
 test('direct media URL control disables both input and action while locked', () => {

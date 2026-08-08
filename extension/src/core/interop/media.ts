@@ -256,7 +256,7 @@ function originalMediaExtension(fileName: string | undefined): string | null {
 
 function commonInteropMimeMatches(kind: 'video' | 'audio', mimeType: string, container: CommonMediaInfo['container']): boolean {
   if (container === 'ISO-BMFF') return mimeType === (kind === 'audio' ? 'audio/mp4' : 'video/mp4');
-  if (container === 'QuickTime') return kind === 'video' && mimeType === 'video/quicktime';
+  if (container === 'QuickTime') return mimeType === 'video/quicktime';
   if (container === 'WebM') return mimeType === (kind === 'audio' ? 'audio/webm' : 'video/webm');
   if (container === 'Matroska') return mimeType === (kind === 'audio' ? 'audio/x-matroska' : 'video/x-matroska');
   if (container === 'AVI') return mimeType === (kind === 'audio' ? 'audio/x-msvideo' : 'video/x-msvideo');

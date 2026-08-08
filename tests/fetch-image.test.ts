@@ -170,12 +170,12 @@ test('fetchImageBytes recognizes signature-authenticated common video and preser
       status: 200,
       headers: {
         'content-type': 'application/octet-stream',
-        'content-disposition': 'attachment; filename="iphone-rotated.mov"',
+        'content-disposition': 'attachment; filename="iphone-rotated.mp4"',
       },
     });
 
   try {
-    const result = await fetchImageBytes('https://cdn.example.test/iphone-rotated.mov');
+    const result = await fetchImageBytes('https://cdn.example.test/iphone-rotated.mp4');
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(result.mimeType, 'video/quicktime');

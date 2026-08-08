@@ -1,6 +1,6 @@
 import type { CaptureFailureReason } from '../core/image/capture-result.js';
 import { DEFAULT_MAX_ORIGINAL_BYTES } from '../core/image/capture-result.js';
-import { sanitizeFilename } from '../core/image/downloads.js';
+import { alignFilenameWithVerifiedExtension, sanitizeFilename } from '../core/image/downloads.js';
 import { commonMediaHint } from '../core/media/common-media.js';
 import { inspectSpecializedMedia } from '../core/media/inspect-media.js';
 import { hasMpegTsHint } from '../core/media/mpeg-ts-hints.js';
@@ -183,15 +183,16 @@ export function credentialsForImageRequest(url: string, referrer: string | undef
   }
 }
 
-function originalMediaFileName(contentDisposition: string | null, url: string, fallbackExtension: string, fallbackBase: string): string {
+function originalMediaFileName(
+  contentDisposition: string | null,
+  url: string,
+  fallbackExtension: string,
+  fallbackBase: 'image' | 'media',
+): string {
   const dispositionName = fileNameFromContentDisposition(contentDisposition);
   const urlName = fileNameFromUrlPath(url);
   const sanitized = sanitizeOriginalFileName(dispositionName ?? urlName ?? fallbackBase, fallbackBase);
-  const extension = /\.([a-z0-9]{1,10})$/iu.exec(sanitized);
-  const normalizedExtension = fallbackExtension.toLowerCase();
-  if (extension?.[1]?.toLowerCase() === normalizedExtension) return sanitized;
-  const stem = extension ? sanitized.slice(0, -extension[0].length) : sanitized;
-  return `${sanitizeFilename(stem, fallbackBase, 240 - normalizedExtension.length - 1)}.${normalizedExtension}`;
+  return alignFilenameWithVerifiedExtension(sanitized, fallbackExtension, fallbackBase);
 }
 
 function fileNameFromContentDisposition(value: string | null): string | null {

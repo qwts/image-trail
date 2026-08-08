@@ -98,7 +98,7 @@ function mediaMimeTypeForFile(file: File): string | null {
 function mediaFileNameFromUrl(sourceUrl: string): string {
   try {
     const name = new URL(sourceUrl).pathname.split('/').filter(Boolean).at(-1);
-    return name ? decodeURIComponent(name) : 'media.ts';
+    return name ? decodeURIComponent(name) : 'media.bin';
   } catch {
     return 'media.bin';
   }

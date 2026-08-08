@@ -62,8 +62,9 @@ export function inspectIsoBmffMedia(bytes: Uint8Array, _declaredMimeType = '', f
     return invalid('ISO BMFF movie metadata is missing or outside the bounded container structure.');
   }
   const movieChildren = childBoxes(reader, moov);
-  const tracks = movieChildren
-    .filter((box) => box.type === 'trak')
+  const trackBoxes = movieChildren.filter((box) => box.type === 'trak');
+  const trackLimitExceeded = trackBoxes.length > MAX_COMMON_MEDIA_STREAMS;
+  const tracks = trackBoxes
     .slice(0, MAX_COMMON_MEDIA_STREAMS)
     .map((track) => parseTrack(reader, track))
     .filter((track): track is IsoTrack => track !== null);
@@ -97,7 +98,7 @@ export function inspectIsoBmffMedia(bytes: Uint8Array, _declaredMimeType = '', f
     audioPresent: tracks.some((track) => track.stream.type === 'audio'),
     hdr: video?.hdr ?? null,
     colorTransfer: video?.colorTransfer ?? null,
-    probeIncomplete: tracks.some((track) => !track.complete),
+    probeIncomplete: trackLimitExceeded || tracks.some((track) => !track.complete),
   };
   return {
     status: 'supported',

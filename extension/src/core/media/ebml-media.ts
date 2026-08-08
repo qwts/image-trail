@@ -52,8 +52,9 @@ export function inspectEbmlMedia(bytes: Uint8Array, _declaredMimeType = '', file
   const tracksElement = segmentChildren.find((element) => element.id === TRACKS_ID);
   if (!tracksElement) return invalid('EBML media does not contain a bounded track table.');
   const trackElements = childElements(reader, tracksElement);
-  const tracks = trackElements
-    .filter((element) => element.id === TRACK_ENTRY_ID)
+  const trackEntries = trackElements.filter((element) => element.id === TRACK_ENTRY_ID);
+  const trackLimitExceeded = trackEntries.length > MAX_COMMON_MEDIA_STREAMS;
+  const tracks = trackEntries
     .slice(0, MAX_COMMON_MEDIA_STREAMS)
     .map((entry) => parseTrack(reader, entry))
     .filter((track): track is EbmlTrack => track !== null);
@@ -91,7 +92,7 @@ export function inspectEbmlMedia(bytes: Uint8Array, _declaredMimeType = '', file
     audioPresent: tracks.some((track) => track.stream.type === 'audio'),
     hdr: video?.hdr ?? null,
     colorTransfer: video?.colorTransfer ?? null,
-    probeIncomplete: !info || tracks.some((track) => !track.complete),
+    probeIncomplete: !info || trackLimitExceeded || tracks.some((track) => !track.complete),
   };
   return {
     status: 'supported',

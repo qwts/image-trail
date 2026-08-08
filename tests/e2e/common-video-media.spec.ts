@@ -16,12 +16,19 @@ import {
   openFixturePage,
   openSettingsGroup,
   readDownloadRequestLog,
+  resetExtensionLibrary,
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
 
 const commonFixtureUrl = new URL('./pages/assets/media/common/', import.meta.url);
 const mp4Hash = '255d0bf97174c3be46680efa94e9fc5a0fc22509c94cf7e92e805bd013eca020';
+const importedFileNames: readonly string[] = ['mislabeled.webm', 'h264-aac.mkv', 'audio-only.mp2', 'vp9-opus.webm'];
+const fixturePageUrl = fixtureUrl(fixturePaths.singleImage);
+
+test.afterEach(async ({ extensionId, page }) => {
+  await resetExtensionLibrary(page, extensionId, { recentPageUrl: fixturePageUrl, recordLabels: importedFileNames });
+});
 
 test('common video/audio import keeps exact custody, safe preview tiers, and atomic failures', async ({
   extensionId,
@@ -45,7 +52,7 @@ test('common video/audio import keeps exact custody, safe preview tiers, and ato
   await openSettingsGroup(page, 'Image utilities');
 
   await page.getByLabel('Media files').setInputFiles([
-    { name: 'h264-aac.mp4', mimeType: 'video/mp4', buffer: mp4 },
+    { name: 'mislabeled.webm', mimeType: 'video/webm', buffer: mp4 },
     { name: 'h264-aac.mkv', mimeType: 'video/x-matroska', buffer: matroska },
     { name: 'audio-only.mp2', mimeType: 'audio/mpeg', buffer: mp2 },
   ]);
@@ -57,7 +64,7 @@ test('common video/audio import keeps exact custody, safe preview tiers, and ato
   await expectPanelStatusMessage(page, 'Imported 1 media item into bookmarks and recent history.');
 
   for (const [name, extension] of [
-    ['h264-aac.mp4', 'MP4'],
+    ['mislabeled.webm', 'MP4'],
     ['h264-aac.mkv', 'MKV'],
     ['audio-only.mp2', 'MP2'],
     ['vp9-opus.webm', 'WEBM'],
@@ -81,14 +88,14 @@ test('common video/audio import keeps exact custody, safe preview tiers, and ato
   }
   await validationPage.close();
 
-  const mp4Row = page.locator('.image-trail-panel__bookmark-item', { hasText: 'h264-aac.mp4' });
+  const mp4Row = page.locator('.image-trail-panel__bookmark-item', { hasText: 'mislabeled.webm' });
   await mp4Row.click();
   await expect(mp4Row).toHaveAttribute('aria-selected', 'true');
   await clearDownloadRequestLog(serviceWorker);
   await page.getByRole('button', { name: /Export (?:images|media) \(1\)/u }).click();
   await expectPanelStatusMessage(page, /(?:Image|Media) export started\./u);
   const [download] = await waitForDownloadRequests(serviceWorker, 1);
-  expect(download?.filename).toBe('h264-aac.mp4');
+  expect(download?.filename).toBe('mislabeled.mp4');
   expect(hashMediaDataUrl(download?.url ?? '')).toBe(mp4Hash);
 
   await closeSettings(page);

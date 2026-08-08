@@ -1,5 +1,5 @@
 import { DEFAULT_MAX_ORIGINAL_BYTES } from '../core/image/capture-result.js';
-import { sanitizeFilename } from '../core/image/downloads.js';
+import { alignFilenameWithVerifiedExtension, sanitizeFilename } from '../core/image/downloads.js';
 import { inspectSpecializedMedia } from '../core/media/inspect-media.js';
 import type { StoredMediaInfo } from '../core/media/media-info.js';
 import type { BlobPayloadMetadata } from '../data/crypto/binary-envelope.js';
@@ -62,20 +62,18 @@ export function dataUrlToImageBytes(dataUrl: string, fileName = ''): FetchImageR
           width: media.width,
           height: media.height,
           mediaInfo: media.mediaInfo,
-          ...(fileName
-            ? {
-                fileName: sanitizeFilename(
-                  fileName,
-                  media.mediaInfo.kind === 'gif' || media.mediaInfo.kind === 'webp' ? 'image' : `media.${media.extension ?? 'bin'}`,
-                  240,
-                ),
-              }
-            : {}),
+          ...(fileName ? { fileName: verifiedMediaFileName(fileName, media.mediaInfo.kind, media.extension) } : {}),
         }
       : { ok: true, bytes: bytes.buffer, mimeType, byteLength: bytes.byteLength };
   } catch {
     return invalidDataUrl();
   }
+}
+
+function verifiedMediaFileName(fileName: string, kind: StoredMediaInfo['kind'], extension: string | undefined): string {
+  const fallbackBase = kind === 'gif' || kind === 'webp' ? 'image' : 'media';
+  const verifiedExtension = extension ?? (kind === 'mpeg-ts' ? 'ts' : kind);
+  return alignFilenameWithVerifiedExtension(fileName, verifiedExtension, fallbackBase);
 }
 
 export function openedImageDataFromPayload(bytes: ArrayBuffer, metadata: BlobPayloadMetadata): OpenedImageDataResult {
@@ -91,18 +89,26 @@ export function openedImageDataFromPayload(bytes: ArrayBuffer, metadata: BlobPay
   const mimeType = media.status === 'supported' ? media.mimeType : metadata.mimeType;
   const width = media.status === 'supported' ? media.width : positiveInteger(metadata.width);
   const height = media.status === 'supported' ? media.height : positiveInteger(metadata.height);
+  const fileName = openedMediaFileName(metadata.fileName, media);
   return {
     ok: true,
     dataUrl: imageDataUrlFromBytes(bytes, mimeType),
     mimeType,
     byteLength: bytes.byteLength,
     capturedAt: metadata.capturedAt,
-    ...(metadata.fileName ? { fileName: sanitizeFilename(metadata.fileName, 'media', 240) } : {}),
+    ...(fileName ? { fileName } : {}),
     ...(metadata.sha256 ? { sha256: metadata.sha256 } : {}),
     ...(width ? { width } : {}),
     ...(height ? { height } : {}),
     ...(media.status === 'supported' ? { mediaInfo: media.mediaInfo } : {}),
   };
+}
+
+function openedMediaFileName(fileName: string | undefined, media: ReturnType<typeof inspectSpecializedMedia>): string | undefined {
+  if (!fileName) return undefined;
+  return media.status === 'supported'
+    ? verifiedMediaFileName(fileName, media.mediaInfo.kind, media.extension)
+    : sanitizeFilename(fileName, 'media', 240);
 }
 
 export function imageDataUrlFromBytes(bytes: ArrayBuffer | Uint8Array, mimeType: string): string {

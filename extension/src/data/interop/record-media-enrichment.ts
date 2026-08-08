@@ -1,6 +1,7 @@
 import {
   interopMediaBlockFrom,
   interopMediaFileName,
+  type InteropCommonMediaBlock,
   type InteropGifWebpMediaBlock,
   type InteropMediaBlock,
 } from '../../core/interop/media.js';
@@ -66,11 +67,18 @@ function interopOriginalFileName(record: InteropRecord, media: InteropMediaBlock
   const candidates = [record.label, record.title, sourceFileName(record.sourceUrl)].filter(
     (value): value is string => typeof value === 'string' && value.trim() !== '',
   );
-  const expectedExtension = media.extension ?? (media.kind === 'video' ? 'mp4' : media.kind === 'audio' ? 'mp2' : media.kind);
+  const expectedExtension =
+    media.extension ?? (isCommonMediaBlock(media) ? (media.kind === 'audio' ? 'mp2' : 'mp4') : media.kind === 'video' ? 'ts' : media.kind);
+  const fallbackBase = media.kind === 'gif' || media.kind === 'webp' ? 'image' : 'media';
   return interopMediaFileName(
-    candidates.find((candidate) => candidate.toLowerCase().endsWith(`.${expectedExtension.toLowerCase()}`)) ?? `image.${expectedExtension}`,
+    candidates.find((candidate) => candidate.toLowerCase().endsWith(`.${expectedExtension.toLowerCase()}`)) ??
+      `${fallbackBase}.${expectedExtension}`,
     expectedExtension,
   );
+}
+
+function isCommonMediaBlock(media: InteropMediaBlock): media is InteropCommonMediaBlock {
+  return (media.kind === 'video' || media.kind === 'audio') && media.mediaInfo !== null && media.mediaInfo.container !== 'MPEG-TS';
 }
 
 function sourceFileName(sourceUrl: string | null): string | null {

@@ -117,7 +117,7 @@ test('malformed and truncated declared transport streams never produce capture b
 test('common video data URLs retain exact bytes and replace declared MIME with signature facts', () => {
   const fixture = new Uint8Array(readFileSync('tests/e2e/pages/assets/media/common/h264-aac.mp4'));
   const dataUrl = imageDataUrlFromBytes(fixture, 'video/webm');
-  const parsed = dataUrlToImageBytes(dataUrl, 'camera.mp4');
+  const parsed = dataUrlToImageBytes(dataUrl, 'camera.webm');
   assert.equal(parsed.ok, true);
   if (!parsed.ok) return;
   assert.equal(parsed.mimeType, 'video/mp4');
@@ -136,12 +136,13 @@ test('common video data URLs retain exact bytes and replace declared MIME with s
     byteLength: fixture.byteLength,
     sourceUrl: 'image-trail://local-import',
     capturedAt: '2026-07-29T00:00:00.000Z',
-    fileName: 'camera.mp4',
+    fileName: 'camera.webm',
     mediaInfo: parsed.mediaInfo,
   });
   assert.equal(opened.ok, true);
   if (!opened.ok) return;
   assert.equal(opened.mimeType, 'video/mp4');
+  assert.equal(opened.fileName, 'camera.mp4');
   assert.equal(opened.dataUrl, imageDataUrlFromBytes(fixture, 'video/mp4'));
   assert.equal(opened.mediaInfo?.kind, 'common-media');
 });

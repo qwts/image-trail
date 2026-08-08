@@ -41,7 +41,9 @@ export function inspectAviMedia(bytes: Uint8Array, _declaredMimeType = '', fileN
   if (!headerList) return invalid('AVI header list is missing.');
   const headerChunks = readChunks(reader, { start: headerList.dataStart + 4, end: headerList.end });
   const mainHeader = headerChunks.find((chunk) => chunk.id === 'avih');
-  const streamLists = headerChunks.filter((chunk) => chunk.id === 'LIST' && chunk.listType === 'strl').slice(0, MAX_COMMON_MEDIA_STREAMS);
+  const allStreamLists = headerChunks.filter((chunk) => chunk.id === 'LIST' && chunk.listType === 'strl');
+  const streamLimitExceeded = allStreamLists.length > MAX_COMMON_MEDIA_STREAMS;
+  const streamLists = allStreamLists.slice(0, MAX_COMMON_MEDIA_STREAMS);
   const streams = streamLists.map((chunk) => parseStream(reader, chunk)).filter((stream): stream is AviStream => stream !== null);
   if (reader.probeLimitExceeded) return invalid('AVI metadata exceeds the bounded element limit.', true);
   if (streams.length === 0) return invalid('AVI does not contain a valid audio or video stream header.');
@@ -67,7 +69,7 @@ export function inspectAviMedia(bytes: Uint8Array, _declaredMimeType = '', fileN
     audioPresent: streams.some((stream) => stream.stream.type === 'audio'),
     hdr: null,
     colorTransfer: null,
-    probeIncomplete: streams.some((stream) => !stream.complete),
+    probeIncomplete: streamLimitExceeded || streams.some((stream) => !stream.complete),
   };
   const extension = normalizedFileExtension(fileNameOrUrl);
   return {
