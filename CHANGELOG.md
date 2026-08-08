@@ -1,5 +1,30 @@
 # image-trail
 
+## 0.27.0
+
+### Minor Changes
+
+- 89d8ab0: Add an opt-in Auto-pin overflow policy that promotes older Recents through the normal durable pin path while retaining failed promotions in session state.
+- aa8787a: Add opt-in, local-only reminders for manual encrypted backup workflows.
+- 4b9f4a9: Add conservative, exact-host rules for explicit Grab clicks to capture encrypted originals after pinning.
+- 99e28b2: Add an explicit session-only review mode for retained Recents without changing retention settings or creating durable pins.
+- dafae3f: Add a privacy-safe, read-only URL review history in Settings with site and status filters plus first, last, and elapsed review timing.
+- a57c4dd: Unify Capture and Pin in one primary control that switches to Pin while Shift is held.
+- 0ae2264: Add bounded MP4, MOV, WebM, Matroska, AVI, MPEG program-stream, and MP2 capture with exact encrypted custody, portable media facts, honest native or preserved-only previews, and deterministic acceptance fixtures.
+
+### Patch Changes
+
+- 3c59964: Enable Apply to Host when the edited image URL differs from the URL currently projected into the selected host image.
+- d7748db: Keep provider action pending through transient recovery probes and preserve request ordering so duplicate OAuth windows cannot open and stale status does not overwrite newer selection.
+- d5f3319: Keep the Host target action and image-fit flyout at a usable viewport-bounded width instead of collapsing it to the trigger width.
+- 41dc79c: Hide the page-context override switcher in production builds behind an explicit build-time feature flag while keeping automatic context detection active.
+- 9017e91: Open the Transfer & Sync workflow inside the production panel's closed Shadow DOM instead of appending an invisible unstyled modal to the host page body.
+- e971c28: Carry overflowing split-field edits across the fixed-width source number and preserve the split when resetting parsed values.
+- e430c98: Keep encrypted image imports inside protected background storage and confirm their durable queue record before reporting success.
+- 4397c23: Record the published Chrome Web Store beta extension identity and require it for the signed Overlook iCloud interoperability host instead of trusting whatever identity the running build reports.
+- c97db4c: Move Recents and Queue sort controls out of title bars and into their related context and action rows.
+- f80d1c3: Give every dashboard section the same explicit Hide/Show header control while preserving independent header actions and expanded detached windows.
+
 ## 0.26.6
 
 ### Patch Changes
