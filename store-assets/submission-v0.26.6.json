@@ -24,19 +24,22 @@
   },
   "assets": [
     {
-      "file": "extension/icons/icon128.png",
+      "file": "store-assets/releases/v0.26.6/icon128.png",
+      "sourceCommit": "6fbd99522e1e9541620780df9cbeadde06db3a47",
       "width": 128,
       "height": 128,
       "sha256": "b1faf228a9332523b724543677d921dec87fb5303b3b82c3a1d176a65b23009b"
     },
     {
-      "file": "store-assets/image-trail-screenshot-1280x800.png",
+      "file": "store-assets/releases/v0.26.6/image-trail-screenshot-1280x800.png",
+      "sourceCommit": "6fbd99522e1e9541620780df9cbeadde06db3a47",
       "width": 1280,
       "height": 800,
       "sha256": "859b89a13e9c4371d84ebb4d6301bbef5ae71732c937f90d4b959a1f9a2f6378"
     },
     {
-      "file": "store-assets/image-trail-small-promo-440x280.png",
+      "file": "store-assets/releases/v0.26.6/image-trail-small-promo-440x280.png",
+      "sourceCommit": "6fbd99522e1e9541620780df9cbeadde06db3a47",
       "width": 440,
       "height": 280,
       "sha256": "0ce322069e4486b84604f29641954bb85b022f1e44df4c3494eba651225bbac4"

@@ -25,7 +25,13 @@ type SubmissionEvidence = {
     };
     readonly workflowEvidence: Record<string, string>;
   };
-  readonly assets: readonly { readonly file: string; readonly width: number; readonly height: number; readonly sha256: string }[];
+  readonly assets: readonly {
+    readonly file: string;
+    readonly sourceCommit: string;
+    readonly width: number;
+    readonly height: number;
+    readonly sha256: string;
+  }[];
 };
 
 function readJson<T>(file: string): T {
@@ -72,12 +78,23 @@ test('Chrome Web Store submission evidence locks the audited release, manifest, 
     'declarativeNetRequestWithHostAccess',
   ]);
   assert.deepEqual(evidence.release.manifest.optionalHostPermissions, ['http://*/*', 'https://*/*']);
-  assert.deepEqual(Object.keys(evidence.release.workflowEvidence).sort(), ['ci', 'release', 'versionCut']);
-  for (const url of Object.values(evidence.release.workflowEvidence))
-    assert.match(url, /^https:\/\/github\.com\/qwts\/image-trail\/actions\/runs\/\d+$/u);
+  assert.deepEqual(evidence.release.workflowEvidence, {
+    ci: 'https://github.com/qwts/image-trail/actions/runs/31051521404',
+    versionCut: 'https://github.com/qwts/image-trail/actions/runs/31051521263',
+    release: 'https://github.com/qwts/image-trail/actions/runs/31051828001',
+  });
 
   assert.equal(evidence.assets.length, 3);
+  assert.deepEqual(
+    evidence.assets.map((asset) => asset.file),
+    [
+      'store-assets/releases/v0.26.6/icon128.png',
+      'store-assets/releases/v0.26.6/image-trail-screenshot-1280x800.png',
+      'store-assets/releases/v0.26.6/image-trail-small-promo-440x280.png',
+    ],
+  );
   for (const asset of evidence.assets) {
+    assert.equal(asset.sourceCommit, evidence.release.commit, `${asset.file} should name its immutable source commit`);
     const bytes = readFileSync(path.resolve(asset.file));
     assert.deepEqual([...bytes.subarray(0, 8)], pngSignature, `${asset.file} should be a PNG`);
     assert.equal(bytes.readUInt32BE(16), asset.width, `${asset.file} should match the audited width`);
