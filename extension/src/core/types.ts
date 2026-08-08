@@ -21,11 +21,9 @@ import type { SecureSessionPanelAction } from './secure-session-actions.js';
 import type { ParsedFieldResetBaseline, ParsedFieldStateRecord } from './parsed-field-state-types.js';
 import type { BackupReminderPanelAction, BackupReminderPanelState } from './backup-reminder.js';
 import type { SiteCaptureRulesPanelAction, SiteCaptureRulesPanelState } from './site-capture-rules.js';
-
 export type { RecentHistoryOverflowBehavior, RecentSparseRowDisplayMode } from './library-panel-state.js';
 export type { BookmarkStore } from './bookmark-store.js';
 export type { ParsedFieldResetBaseline, ParsedFieldStateRecord } from './parsed-field-state-types.js';
-
 export type PanelStatus = 'idle' | 'ready' | 'closed' | 'unsupported' | 'error' | 'picking';
 export type PinSaveStoragePreference = 'encrypted' | 'plaintext';
 type CloudBackupControlActionName = 'cloud-backup/disconnect' | 'cloud-backup/cancel';
@@ -41,7 +39,6 @@ export interface TargetState {
   readonly objectFit: ObjectFitMode;
   readonly message: string;
 }
-
 export interface AutomationState {
   readonly slideshowPhase: AutomationPhase;
   readonly slideshowCount: number;
@@ -53,7 +50,6 @@ export interface AutomationState {
   // True while the parsed-field navigation drain is working; the panel's busy signal (#373).
   readonly navigationBusy: boolean;
 }
-
 export type PanelDestinationId = import('./destinations.js').ExtensionDestinationId;
 
 export type {
