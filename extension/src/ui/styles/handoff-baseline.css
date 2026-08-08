@@ -96,11 +96,9 @@
   min-block-size: var(--it-icon-btn);
 }
 
-.image-trail-panel-root .image-trail-ds__target > .image-trail-panel__target-summary.image-trail-ds__section-header {
-  display: grid;
+.image-trail-panel-root .image-trail-panel__target-summary.image-trail-ds__section-header {
   grid-template-columns: minmax(0, 1fr) max-content max-content;
   gap: 8px;
-  align-items: center;
 }
 
 .image-trail-panel-root .image-trail-panel__secondary-controls-summary::after {

@@ -24,17 +24,6 @@
   list-style: none;
 }
 
-.image-trail-panel-root .image-trail-panel__fields-summary.image-trail-ds__section-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
-  gap: var(--it-space-4) var(--it-space-6);
-  align-items: center;
-}
-
-.image-trail-panel-root .image-trail-panel__fields-summary.image-trail-ds__section-header:has(.image-trail-panel__fields-reset-controls) {
-  grid-template-columns: minmax(0, 1fr) max-content max-content max-content max-content;
-}
-
 .image-trail-panel-root .image-trail-ds__field-summary {
   min-width: 0;
   overflow: hidden;

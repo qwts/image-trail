@@ -334,7 +334,7 @@
 }
 
 .image-trail-panel-root .image-trail-panel__section-header.image-trail-ds__section-header {
-  grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
+  grid-template-columns: minmax(0, 1fr) minmax(0, max-content) max-content;
   gap: var(--it-space-4) var(--it-space-6);
 }
 

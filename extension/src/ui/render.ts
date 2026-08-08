@@ -289,6 +289,7 @@ function createBookmarksSection(target: PanelRenderTarget, state: PanelState): H
       hasOlder: state.hasOlderBookmarks,
       hasNewer: state.hasNewerBookmarks,
     },
+    { recallOpen: state.activeDestination === 'recall' },
     {
       privacyMode: state.privacyModeEnabled,
       displayOrder: state.queueDisplayOrder,
