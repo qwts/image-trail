@@ -1,6 +1,7 @@
 import type { CaptureStore } from '../../content/capture-controller.js';
 import type { RecentHistoryStore } from '../../content/recent-history-store.js';
 import { reducePanelAction } from '../../core/actions.js';
+import { updateRecordCapture } from '../../core/actions/queue-record-transitions.js';
 import { isDurableImageSourceUrl, recordHasStoredOriginal, withoutStoredOriginal } from '../../core/display-records.js';
 import type { ImageDisplayRecord } from '../../core/display-records.js';
 import { isCapturedResult, type CaptureResult, type CaptureRetryRequest, type CaptureSourceType } from '../../core/image/capture-result.js';
@@ -244,7 +245,7 @@ export class CapturedOriginalsController {
     }
     const bookmarkStoreForSource = this.deps.bookmarkStore();
     if (isCapturedResult(result) && sourceType === 'bookmark' && sourceRecordId && bookmarkStoreForSource) {
-      const updatedBookmark = this.deps.getState().bookmarks.find((b) => b.id === sourceRecordId);
+      const updatedBookmark = await this.updatedCapturedBookmark(bookmarkStoreForSource, sourceRecordId, result);
       if (updatedBookmark) {
         await bookmarkStoreForSource.save(updatedBookmark);
         await this.deps.loadBookmarkPage(this.deps.getState().bookmarkOffset, { render: false });
@@ -258,6 +259,18 @@ export class CapturedOriginalsController {
     } else {
       this.deps.render();
     }
+  }
+
+  private async updatedCapturedBookmark(
+    store: BookmarkStore,
+    recordId: string,
+    result: CaptureResult & { readonly status: 'captured' },
+  ): Promise<ImageDisplayRecord | undefined> {
+    const visible = this.deps.getState().bookmarks.find((bookmark) => bookmark.id === recordId);
+    const saved = visible ?? (await store.loadByIds([recordId]))[0];
+    return saved
+      ? updateRecordCapture([saved], recordId, result, new Date(this.deps.getState().lastUpdatedAt).toISOString())[0]
+      : undefined;
   }
 
   private async discardDetachedCapture(

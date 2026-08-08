@@ -425,11 +425,20 @@ test('captureGrabbedBookmark captures only when the exact site rule opts in', as
   await parentOnly.controller.captureGrabbedBookmark(record, { 'example.test': 'capture-original' }, 'images.example.test');
   assert.deepEqual(parentOnly.log, []);
 
-  const optedIn = createHarness();
-  optedIn.patchState({ bookmarks: [record] });
+  const savedDrafts: ImageDisplayRecord[] = [];
+  const optedIn = createHarness({
+    bookmarkStore: {
+      loadByIds: async (ids) => (ids.includes(record.id) ? [record] : []),
+      save: async (draft) => {
+        savedDrafts.push(draft);
+        return draft;
+      },
+    },
+  });
   await optedIn.controller.captureGrabbedBookmark(record, { 'images.example.test': 'capture-original' }, 'images.example.test');
   assert.ok(optedIn.log.includes('requestCapture:https://images.example.test/pic.jpg:bookmark'));
-  assert.ok(optedIn.log.includes('bookmarkSave:bookmark-1'));
+  assert.equal(savedDrafts[0]?.id, record.id);
+  assert.equal(savedDrafts[0]?.storedOriginal?.blobId, 'blob-1', 'capture persists even when the saved pin is off the visible queue page');
 });
 
 test('deleteCapturedBlob updates a linked saved row even when it is not visible', async () => {
