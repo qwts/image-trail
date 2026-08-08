@@ -164,7 +164,25 @@ async function reopenPanel(page: Page, serviceWorker: Worker): Promise<void> {
 async function exportImages(page: Page, serviceWorker: Worker, options: { readonly saveAs?: boolean } = {}): Promise<void> {
   await openImageUtilities(page);
   await clearDownloadRequestLog(serviceWorker);
-  await page.getByRole('button', { name: /Export images/u }).click({ modifiers: options.saveAs ? ['Shift'] : [] });
+  if (options.saveAs) {
+    // Hold Shift via keyboard so the capture Pin modifier re-render settles before the click.
+    // Using click({modifiers:['Shift']}) races against the panel's Shift-triggered
+    // Capture->Pin swap (full panel DOM re-render) causing html intercepts / detach.
+    await page.keyboard.down('Shift');
+    try {
+      // Wait for the Pin mode UI to settle; polling avoids a hard timeout slump.
+      await page.waitForTimeout(150);
+      const exportButton = page.getByRole('button', { name: /Export images/u });
+      await exportButton.waitFor({ state: 'visible', timeout: 5000 });
+      await exportButton.click();
+    } finally {
+      await page.keyboard.up('Shift');
+      // Allow the Pin->Capture swap to settle before asserting status.
+      await page.waitForTimeout(150);
+    }
+  } else {
+    await page.getByRole('button', { name: /Export images/u }).click();
+  }
   await expectPanelStatusMessage(page, /Image export started\.|Started \d+ image downloads\./u);
   await closeSettings(page);
 }
