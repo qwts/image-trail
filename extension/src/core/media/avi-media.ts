@@ -47,6 +47,8 @@ export function inspectAviMedia(bytes: Uint8Array, _declaredMimeType = '', fileN
   const streams = streamLists.map((chunk) => parseStream(reader, chunk)).filter((stream): stream is AviStream => stream !== null);
   if (reader.probeLimitExceeded) return invalid('AVI metadata exceeds the bounded element limit.', true);
   if (streams.length === 0) return invalid('AVI does not contain a valid audio or video stream header.');
+  const movi = rootChunks.find((chunk) => chunk.id === 'LIST' && chunk.listType === 'movi');
+  if (!movi) return invalid('AVI media data is missing.');
   const video = streams.find((stream) => stream.stream.type === 'video') ?? null;
   const main = parseMainHeader(reader, mainHeader);
   const durationSeconds = boundedDuration(

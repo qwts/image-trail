@@ -40,6 +40,10 @@ export function probeMpegAudio(bytes: Uint8Array, requireLayerTwo = false): Mpeg
       frame = parseFrame(reader, offset);
     }
     if (frameCount < 2) continue;
+    if (offset < bytes.byteLength) {
+      const nextHeader = reader.uint32(offset);
+      if (nextHeader !== null && nextHeader >>> 21 === 0x7ff) continue;
+    }
     return {
       stream: {
         type: 'audio',

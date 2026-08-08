@@ -73,6 +73,8 @@ export function inspectIsoBmffMedia(bytes: Uint8Array, _declaredMimeType = '', f
     .filter((track): track is IsoTrack => track !== null);
   if (reader.probeLimitExceeded) return invalid('ISO BMFF metadata exceeds the bounded element limit.', true);
   if (tracks.length === 0) return invalid('ISO BMFF metadata does not contain a valid audio or video track.');
+  const mdat = topLevel.find((box) => box.type === 'mdat');
+  if (!mdat) return invalid('ISO BMFF media data is missing.');
 
   const video = tracks.find((track) => track.stream.type === 'video') ?? null;
   const mediaKind = video ? 'video' : 'audio';

@@ -35,6 +35,14 @@ export function inspectMpegProgramMedia(bytes: Uint8Array, _declaredMimeType = '
   const video = sequenceOffset < 0 ? null : videoFacts(reader, sequenceOffset, scanEnd);
   const audio = probeMpegAudio(bytes.subarray(packOffset, scanEnd));
   if (!video && !audio) return invalid('MPEG program stream does not contain a bounded audio or video sequence.');
+  for (let offset = packOffset; offset + 6 <= scanEnd; offset += 1) {
+    if (reader.bytes[offset] !== 0 || reader.bytes[offset + 1] !== 0 || reader.bytes[offset + 2] !== 1) continue;
+    const streamId = reader.bytes[offset + 3] ?? 0;
+    if (!((streamId >= 0xc0 && streamId <= 0xef) || streamId === 0xbd)) continue;
+    const pesLength = ((reader.bytes[offset + 4] ?? 0) << 8) | (reader.bytes[offset + 5] ?? 0);
+    if (pesLength === 0) continue;
+    if (offset + 6 + pesLength > bytes.byteLength) return invalid('MPEG program stream is truncated.');
+  }
   const pts = collectPts(reader, packOffset, scanEnd);
   const durationSeconds = boundedDuration(
     pts.maximum !== null && pts.minimum !== null ? (pts.maximum - pts.minimum) / 90_000 : (audio?.durationSeconds ?? null),

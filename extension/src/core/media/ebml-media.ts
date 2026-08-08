@@ -48,6 +48,10 @@ export function inspectEbmlMedia(bytes: Uint8Array, _declaredMimeType = '', file
   const docType = elementString(reader, headerChildren.find((element) => element.id === 0x4282) ?? null)?.toLowerCase();
   if (docType !== 'webm' && docType !== 'matroska') return invalid('EBML DocType is not WebM or Matroska media.');
   const segmentChildren = readElements(reader, segment.dataStart, segment.end);
+  if (segmentChildren.length > 0 && segmentChildren.at(-1)!.end !== segment.end) {
+    const next = readElements(reader, segmentChildren.at(-1)!.end, segment.end);
+    if (next.length === 0) return invalid('EBML media data is truncated.');
+  }
   const info = segmentChildren.find((element) => element.id === INFO_ID);
   const tracksElement = segmentChildren.find((element) => element.id === TRACKS_ID);
   if (!tracksElement) return invalid('EBML media does not contain a bounded track table.');
