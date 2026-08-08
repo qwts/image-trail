@@ -247,34 +247,61 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
   const context: InteropRuntimeContext = { entry, total: recordIds.length, recordIds, locked };
   let selectedProvider: InteropProviderId = 'pcloud';
   let latestRequest = 0;
-  const dispatch = async (action: InteropRuntimeAction) => {
+  const dispatch = async (action: InteropRuntimeAction, renderResult = true) => {
     const request = ++latestRequest;
     const result = await dispatchInteropRuntime(context, action);
-    if (result && request === latestRequest && scrim.isConnected) render(result.snapshot);
+    if (renderResult && result && request === latestRequest && scrim.isConnected) render(result.snapshot);
     return result;
   };
-  let refreshStatusOnFocus = false;
+  let refreshPairingOnFocus = false;
   let providerActionPending = false;
-  const refreshInteractiveStatus = (): void => {
-    if (!refreshStatusOnFocus || !scrim.isConnected) return;
-    refreshStatusOnFocus = false;
-    void dispatch({ name: 'status' }).finally(() => {
+  let providerReplyLost = false;
+  let providerFocusObserved = false;
+  let providerProbeTimer: ReturnType<typeof setTimeout> | undefined;
+  const probeProviderAfterLostReply = (attempt = 0): void => {
+    if (!providerActionPending || !scrim.isConnected) return;
+    void dispatch({ name: 'status' }, false).then((result) => {
+      if (!providerActionPending || !scrim.isConnected) return;
+      const state = result?.snapshot.provider.state;
+      const transient = result === null || state === 'connecting' || state === 'disconnected';
+      if (transient && attempt < 2) {
+        providerProbeTimer = setTimeout(() => probeProviderAfterLostReply(attempt + 1), 100);
+        return;
+      }
+      if (result) render(result.snapshot);
       providerActionPending = false;
+      providerReplyLost = false;
     });
+  };
+  const refreshInteractiveStatus = (): void => {
+    if (!scrim.isConnected) return;
+    if (providerActionPending) {
+      providerFocusObserved = true;
+      if (providerReplyLost) probeProviderAfterLostReply();
+      return;
+    }
+    if (!refreshPairingOnFocus) return;
+    refreshPairingOnFocus = false;
+    void dispatch({ name: 'status' });
   };
   const connectProvider = (name: 'connect' | 'reconnect'): void => {
     if (providerActionPending) return;
     providerActionPending = true;
-    refreshStatusOnFocus = true;
+    providerReplyLost = false;
+    providerFocusObserved = false;
     void dispatch({ name, provider: selectedProvider }).then((result) => {
-      if (result === null) return;
-      refreshStatusOnFocus = false;
-      providerActionPending = false;
+      if (result !== null) {
+        providerActionPending = false;
+        return;
+      }
+      providerReplyLost = true;
+      if (providerFocusObserved) probeProviderAfterLostReply();
     });
   };
   window.addEventListener('focus', refreshInteractiveStatus);
   const close = (): void => {
     window.removeEventListener('focus', refreshInteractiveStatus);
+    if (providerProbeTimer) clearTimeout(providerProbeTimer);
     scrim.remove();
     for (const { root, inert, pointerEvents } of panelRoots) {
       root.inert = inert;
@@ -291,7 +318,7 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     },
     onConnect: () => connectProvider('connect'),
     onImportPairing: () => {
-      refreshStatusOnFocus = true;
+      refreshPairingOnFocus = true;
       void dispatch({ name: 'open-pairing-import' });
     },
     onStart: () => void dispatch({ name: 'start' }),

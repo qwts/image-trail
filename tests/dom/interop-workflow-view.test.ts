@@ -280,6 +280,7 @@ test('returning from secure pairing import refreshes the open workflow status', 
 test('returning from a lost OAuth reply refreshes status and suppresses duplicate connect actions', async (t) => {
   const actions: string[] = [];
   let statusCalls = 0;
+  let rejectConnect: ((reason: Error) => void) | undefined;
   Object.defineProperty(globalThis, 'chrome', {
     configurable: true,
     value: {
@@ -289,11 +290,9 @@ test('returning from a lost OAuth reply refreshes status and suppresses duplicat
           const name = message.payload.action.name;
           actions.push(name);
           if (name === 'connect') {
-            return Promise.reject(
-              new Error(
-                'A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received',
-              ),
-            );
+            return new Promise((_, reject) => {
+              rejectConnect = reject;
+            });
           }
           statusCalls += 1;
           return Promise.resolve(
@@ -304,8 +303,8 @@ test('returning from a lost OAuth reply refreshes status and suppresses duplicat
                 provider: {
                   id: 'pcloud',
                   label: 'pCloud',
-                  state: statusCalls > 1 ? 'connected' : 'disconnected',
-                  detail: statusCalls > 1 ? 'pCloud is connected.' : 'Connect pCloud.',
+                  state: statusCalls > 2 ? 'connected' : 'disconnected',
+                  detail: statusCalls > 2 ? 'pCloud is connected.' : 'Connect pCloud.',
                 },
                 error: null,
               },
@@ -325,12 +324,18 @@ test('returning from a lost OAuth reply refreshes status and suppresses duplicat
   assert.ok(connect instanceof HTMLButtonElement);
   connect.click();
   connect.click();
+  window.dispatchEvent(new Event('focus'));
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(actions, ['status', 'connect']);
 
-  window.dispatchEvent(new Event('focus'));
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.deepEqual(actions, ['status', 'connect', 'status']);
+  assert.ok(rejectConnect);
+  rejectConnect(
+    new Error(
+      'A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received',
+    ),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  assert.deepEqual(actions, ['status', 'connect', 'status', 'status']);
   assert.match(dialog.textContent ?? '', /connected/u);
   Array.from(dialog.querySelectorAll('button'))
     .find((control) => control.textContent === 'Close')
