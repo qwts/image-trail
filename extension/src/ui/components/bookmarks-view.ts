@@ -24,7 +24,6 @@ export function createBookmarksView(
     readonly hasOlder: boolean;
     readonly hasNewer: boolean;
   },
-  recall: { readonly recallOpen: boolean },
   options: {
     readonly privacyMode?: boolean;
     readonly sectionOpen?: boolean;
@@ -49,14 +48,6 @@ export function createBookmarksView(
     header.classList.add('image-trail-panel__section-header--collapsible');
   }
   header.append(heading);
-
-  const recallButton = document.createElement('button');
-  recallButton.type = 'button';
-  recallButton.textContent = recall.recallOpen ? 'Close Recall' : 'Recall';
-  recallButton.className = 'image-trail-panel__primary-action';
-  recallButton.disabled = page.total === 0;
-  recallButton.title = 'Browse offloaded queue records and recall selected rows into the visible queue.';
-  recallButton.addEventListener('click', () => dispatch({ name: 'recall/open', side: 'right' }));
 
   const queueMenu = document.createElement('details');
   queueMenu.className = 'image-trail-panel__queue-menu';
@@ -169,7 +160,7 @@ export function createBookmarksView(
 
   const sectionActions = document.createElement('div');
   sectionActions.className = 'image-trail-panel__section-actions image-trail-panel__bookmark-actions';
-  sectionActions.append(createQueueSortControl(options.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER, dispatch), recallButton, queueMenu);
+  sectionActions.append(createQueueSortControl(options.displayOrder ?? DEFAULT_QUEUE_DISPLAY_ORDER, dispatch), queueMenu);
 
   const pageMeta = document.createElement('p');
   pageMeta.className = 'image-trail-panel__meta';

@@ -45,7 +45,6 @@ function buildBookmarksView(
     true,
     'global',
     { offset: 0, limit: Math.max(items.length, 1), total: overrides.total ?? items.length, hasOlder: false, hasNewer: false },
-    { recallOpen: false },
     { sectionOpen: overrides.sectionOpen ?? true, collapsible: overrides.collapsible ?? true, displayOrder: overrides.displayOrder },
     (action) => actions.push(action),
   );
@@ -319,7 +318,6 @@ test('Queue pager maps front/back availability to back-first display order', () 
     true,
     'global',
     { offset: 0, limit: 1, total: 2, hasOlder: true, hasNewer: false },
-    { recallOpen: false },
     { displayOrder: 'back-first' },
     (action) => actions.push(action),
   );
@@ -354,14 +352,7 @@ test('Queue order control stays static when privacy mode masks a locked private 
   assert.ok(!select.outerHTML.includes('image-trail-private:private-row'));
 });
 
-test('Recall is disabled when the queue is empty', () => {
-  const actions: unknown[] = [];
-  const view = buildBookmarksView(actions, { items: [], total: 0 });
-
-  assert.equal(buttonByText(view, 'Recall').disabled, true);
-});
-
-test('the Queue sort control sits with Recall and Queue actions (#448/#754/#756)', () => {
+test('the Queue sort control sits with Queue actions (#448/#754/#756)', () => {
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions);
   const header = view.querySelector('.image-trail-panel__section-header--with-actions');
@@ -387,8 +378,11 @@ test('a collapsed queue section keeps its actions but hides the rows (#438)', ()
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions, { sectionOpen: false });
   assert.equal(view.querySelector('.image-trail-panel__record-list'), null, 'the list is hidden while collapsed');
-  buttonByText(view, 'Recall').click();
-  assert.deepEqual(actions, [{ name: 'recall/open', side: 'right' }], 'toolbar clicks never toggle the collapse');
+  const select = view.querySelector('select[aria-label="Queue order"]');
+  assert.ok(select, 'queue sort control remains while collapsed');
+  const queueMenu = view.querySelector('.image-trail-panel__queue-menu');
+  assert.ok(queueMenu, 'queue menu remains while collapsed');
+  assert.deepEqual(actions, [], 'toolbar in collapsed state does not toggle collapse');
 });
 
 test('a non-collapsible render (detached window) has no toggle affordance (#441)', () => {
