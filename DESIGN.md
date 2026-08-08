@@ -55,13 +55,15 @@ capabilities or change persistence/encryption semantics.
 - Edit URL fields, preview changes, and use previous/next navigation over
   included fields.
 - Review Recents for active-session image activity.
-- Pin durable records into the visible queue and use queue actions without
-  confusing clear/presentation actions with destructive delete actions.
-- Capture originals explicitly, show capture status, and keep stored-original
-  state distinct from selection.
+- Pin durable records into the visible queue from the primary Capture control by
+  holding Shift, or with the P shortcut. Queue actions must not duplicate that
+  current-image action or confuse clear/presentation actions with destructive
+  delete actions.
+- Capture originals explicitly from the primary control or C shortcut, show
+  capture status, and keep stored-original state distinct from selection.
 - Keep Grab metadata-only by default. An inspectable exact-host rule may make an
   explicit Grab click pin first and then capture the encrypted original; it must
-  not auto-capture visible images or change the separate Pin and Capture controls.
+  not auto-capture visible images or change the Shift-modified Capture control.
 - Open Recall to page durable offscreen queue records back into the current
   workflow.
 - Unlock, import, export, back up, and restore encrypted local data through

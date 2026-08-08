@@ -49,16 +49,31 @@ test('primary workflow exposes navigation, capture, slideshow, and Grab Mode wit
   primary.querySelector<HTMLButtonElement>('[aria-label="Grab Mode"]')?.click();
   assert.equal(
     primary.querySelector<HTMLButtonElement>('[aria-label="Capture original"]')?.title,
-    'Capture original (C) — store the full-resolution original bytes as a Bookmark',
+    'Capture original (C) — hold Shift to pin metadata without capturing original bytes',
   );
   assert.match(primary.querySelector<HTMLButtonElement>('[aria-label="Start slideshow"]')?.title ?? '', /step Trail fields/u);
   assert.match(primary.querySelector<HTMLButtonElement>('[aria-label="Grab Mode"]')?.title ?? '', /click host-page images to pin/u);
-  assert.equal(view.querySelector('.image-trail-panel__capture-hint')?.textContent, 'Press C to capture the current image.');
+  assert.equal(
+    view.querySelector('.image-trail-panel__capture-hint')?.textContent,
+    'Press C to capture; hold Shift on Capture or press P to pin.',
+  );
   assert.deepEqual(actions, [
     { name: 'capture/request', url: 'https://images.example.test/photo.jpg', sourceType: 'target' },
     { name: 'slideshow-start' },
     { name: 'grab-mode/start' },
   ]);
+});
+
+test('Shift modifier replaces the primary Capture action with trusted metadata-only Pin', () => {
+  const { view, actions } = createView({ capturePinModifierActive: true });
+  const pin = view.querySelector<HTMLButtonElement>('[aria-label="Pin current"]');
+  assert.ok(pin);
+  assert.equal(pin.textContent, '○ Pin');
+  assert.match(pin.title, /release Shift to restore Capture original/u);
+  pin.click();
+  assert.deepEqual(actions, [], 'synthetic pin clicks are ignored on the privileged primary control');
+  dispatchTrustedClick(pin, { shiftKey: true });
+  assert.deepEqual(actions, [{ name: 'pin/current' }]);
 });
 
 test('Controls uses the shared explicit Hide/Show header control (#755)', () => {

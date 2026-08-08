@@ -91,6 +91,7 @@ export function createInitialPanelState(now = Date.now()): PanelState {
     neighborPreloadProbeMethod: 'get',
     loadFailureFeedback: DEFAULT_LOAD_FAILURE_FEEDBACK,
     downArrowAction: 'capture',
+    capturePinModifierActive: false,
     secondaryControlsOpen: false,
     historySectionOpen: true,
     bookmarksSectionOpen: true,
@@ -180,4 +181,8 @@ export function setAutomationState(state: PanelState, automation: Partial<Automa
     automation: { ...state.automation, ...automation },
     lastUpdatedAt: now,
   };
+}
+
+export function setCapturePinModifier(state: PanelState, active: boolean): PanelState {
+  return state.capturePinModifierActive === active ? state : { ...state, capturePinModifierActive: active };
 }

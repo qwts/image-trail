@@ -99,7 +99,7 @@ test('canonical bare keys route surfaces and reset privacy-safe capture feedback
   await page.waitForTimeout(900);
   await expect(page.locator(feedbackSelector)).toBeVisible();
   await expect(page.locator(feedbackSelector)).toHaveCount(0, { timeout: 900 });
-  await expect(page.locator('.image-trail-panel__capture-hint')).toHaveText('Press C to capture the current image.');
+  await expect(page.locator('.image-trail-panel__capture-hint')).toHaveText('Press C to capture; hold Shift on Capture or press P to pin.');
 
   await page.keyboard.press('p');
   await expectFeedback(page, 'Pinned current image ✓');

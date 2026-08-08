@@ -139,6 +139,7 @@ export interface PanelState extends LibraryPanelState, BackupReminderPanelState,
   readonly neighborPreloadProbeMethod: ImageProbeMethod;
   readonly loadFailureFeedback: LoadFailureFeedback;
   readonly downArrowAction: import('./keyboard-shortcuts.js').DownArrowAction;
+  readonly capturePinModifierActive: boolean;
   readonly secondaryControlsOpen: boolean;
   readonly detachedSections: readonly DetachableSectionId[];
   readonly restoreWorkspaceLayoutEnabled: boolean;
@@ -212,7 +213,6 @@ export type PanelActionName =
   | 'selected-url/apply'
   | 'selected-url/reject-unsupported-input'
   | 'pin/current'
-  | 'bookmark/current'
   | 'bookmark/load'
   | 'bookmark/remove'
   | 'bookmark-selection/toggle'

@@ -3,7 +3,6 @@ import type { PanelActionDeps } from './deps.js';
 
 export type LibraryActionName =
   | 'pin/current'
-  | 'bookmark/current'
   | 'history/remove'
   | 'history/delete-all'
   | 'history/pin'
@@ -61,9 +60,9 @@ function actionDef(handle: AnyActionDef['handle']): AnyActionDef {
   return { handle };
 }
 
-function primaryLibraryActions(deps: PanelActionDeps): Pick<ActionEntries<LibraryActionName>, 'pin/current' | 'bookmark/current'> {
+function primaryLibraryActions(deps: PanelActionDeps): Pick<ActionEntries<LibraryActionName>, 'pin/current'> {
   const bookmarkCurrent = actionDef(() => void deps.bookmarkCurrentImage());
-  return { 'pin/current': bookmarkCurrent, 'bookmark/current': bookmarkCurrent };
+  return { 'pin/current': bookmarkCurrent };
 }
 
 /** Recent history, bookmarks, and row selection. Bodies moved verbatim from the panel dispatch chain. */

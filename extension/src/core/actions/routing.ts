@@ -54,7 +54,6 @@ export const PANEL_ACTION_DOMAINS = {
   'selected-url/apply': 'parsed-fields',
   'selected-url/reject-unsupported-input': 'parsed-fields',
   'pin/current': 'queue-recents',
-  'bookmark/current': 'queue-recents',
   'bookmark/load': 'queue-recents',
   'bookmark/remove': 'queue-recents',
   'bookmark/clear': 'queue-recents',

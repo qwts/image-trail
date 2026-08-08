@@ -38,7 +38,6 @@ function buildBookmarksView(
 ): HTMLElement {
   const items = overrides.items ?? [record];
   return createBookmarksView(
-    'https://images.example.test/current.jpg',
     items,
     overrides.selectedIds ?? [],
     false,
@@ -218,13 +217,12 @@ test('stored queue rows label the captured source MIME before the navigation suf
   assert.equal(view.querySelector('.image-trail-panel__bookmark-source')?.textContent, 'WEBP');
 });
 
-test('Pin current dispatches pin/current', () => {
-  const actions: unknown[] = [];
-  const view = buildBookmarksView(actions);
-
-  buttonByText(view, 'Pin current').click();
-
-  assert.deepEqual(actions, [{ name: 'pin/current' }]);
+test('Queue omits the duplicate current-image Pin action', () => {
+  const view = buildBookmarksView([]);
+  assert.equal(
+    Array.from(view.querySelectorAll('button')).some((button) => button.textContent === 'Pin current'),
+    false,
+  );
 });
 
 test('Open gallery dispatches gallery/open from the Queue menu', () => {
@@ -314,7 +312,6 @@ test('Queue order control dispatches a static back-first display setting', () =>
 test('Queue pager maps front/back availability to back-first display order', () => {
   const actions: unknown[] = [];
   const view = createBookmarksView(
-    'https://images.example.test/current.jpg',
     [record],
     [],
     false,
@@ -364,7 +361,7 @@ test('Recall is disabled when the queue is empty', () => {
   assert.equal(buttonByText(view, 'Recall').disabled, true);
 });
 
-test('the Queue sort control sits with Pin current, Recall, and Queue actions (#448/#754)', () => {
+test('the Queue sort control sits with Recall and Queue actions (#448/#754/#756)', () => {
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions);
   const header = view.querySelector('.image-trail-panel__section-header--with-actions');
@@ -390,11 +387,8 @@ test('a collapsed queue section keeps its actions but hides the rows (#438)', ()
   const actions: unknown[] = [];
   const view = buildBookmarksView(actions, { sectionOpen: false });
   assert.equal(view.querySelector('.image-trail-panel__record-list'), null, 'the list is hidden while collapsed');
-  const pinCurrent = [...view.querySelectorAll('button')].find((button) => button.textContent === 'Pin current');
-  assert.ok(pinCurrent, 'the action row stays usable while collapsed');
-
-  pinCurrent.click();
-  assert.deepEqual(actions, [{ name: 'pin/current' }], 'toolbar clicks never toggle the collapse');
+  buttonByText(view, 'Recall').click();
+  assert.deepEqual(actions, [{ name: 'recall/open', side: 'right' }], 'toolbar clicks never toggle the collapse');
 });
 
 test('a non-collapsible render (detached window) has no toggle affordance (#441)', () => {

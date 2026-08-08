@@ -232,7 +232,6 @@ const fixtures: { readonly [N in RegisteredPanelActionName]: PanelActionFor<N> }
   'settings/update-workspace-layout-restore': { name: 'settings/update-workspace-layout-restore', enabled: true },
   'settings/reset-workspace-layout': { name: 'settings/reset-workspace-layout' },
   'pin/current': { name: 'pin/current' },
-  'bookmark/current': { name: 'bookmark/current' },
   'history/remove': { name: 'history/remove', id: 'history-1' },
   'history/delete-all': { name: 'history/delete-all' },
   'history/pin': { name: 'history/pin', id: 'history-1' },

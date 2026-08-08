@@ -6,7 +6,13 @@ import { createButton, createKbd, createSectionHeader } from './primitives.js';
 export interface ManualControlsViewOptions {
   readonly state: Pick<
     PanelState,
-    'automation' | 'captureInProgress' | 'pageContext' | 'secondaryControlsOpen' | 'siteCaptureRules' | 'target'
+    | 'automation'
+    | 'captureInProgress'
+    | 'capturePinModifierActive'
+    | 'pageContext'
+    | 'secondaryControlsOpen'
+    | 'siteCaptureRules'
+    | 'target'
   >;
   readonly previousFieldId: string | null;
   readonly nextFieldId: string | null;
@@ -50,27 +56,37 @@ function slideshowPresentation(phase: ManualControlsViewOptions['state']['automa
 
 function createPrimaryWorkflow(state: ManualControlsViewOptions['state'], dispatch: ManualControlsViewOptions['dispatch']): HTMLElement {
   const noTarget = state.target.selectedUrl === null;
+  const pinMode = state.capturePinModifierActive;
   const primary = document.createElement('div');
   const grabCapturesOriginal = siteCaptureBehaviorForHostname(state.siteCaptureRules, window.location.hostname) === 'capture-original';
   primary.className = 'image-trail-panel__primary-workflow';
   primary.append(
     actionButton('◀ Prev', { name: 'navigate-previous' }, dispatch, { title: 'Previous image', disabled: noTarget }),
     actionButton('Next ▶', { name: 'navigate-next' }, dispatch, { title: 'Next image', disabled: noTarget }),
-    actionButton(
-      '◉ Capture',
-      state.target.selectedUrl ? { name: 'capture/request', url: state.target.selectedUrl, sourceType: 'target' } : null,
-      dispatch,
-      {
-        ariaLabel: 'Capture original',
-        title: 'Capture original (C) — store the full-resolution original bytes as a Bookmark',
-        variant: 'primary',
-        waiting: state.captureInProgress,
-        disabled: noTarget || state.captureInProgress,
-        className: 'image-trail-panel__capture-btn',
-        trustedOnly: true,
-      },
-    ),
   );
+  {
+    const label = pinMode ? '○ Pin' : '◉ Capture';
+    const ariaLabel = pinMode ? 'Pin current' : 'Capture original';
+    const title = pinMode
+      ? 'Pin current (P) — release Shift to restore Capture original'
+      : 'Capture original (C) — hold Shift to pin metadata without capturing original bytes';
+    const button = createButton({
+      label,
+      ariaLabel,
+      title,
+      variant: 'primary',
+      waiting: state.captureInProgress,
+      disabled: noTarget || state.captureInProgress,
+      className: 'image-trail-panel__capture-btn',
+    });
+    if (state.target.selectedUrl) {
+      bindTrustedClick(button, (event) => {
+        if (event.shiftKey) dispatch({ name: 'pin/current' });
+        else dispatch({ name: 'capture/request', url: state.target.selectedUrl!, sourceType: 'target' });
+      });
+    }
+    primary.append(button);
+  }
 
   const phase = state.automation.slideshowPhase;
   const slideshowAction: PanelAction =
@@ -108,7 +124,15 @@ function createPrimaryWorkflow(state: ManualControlsViewOptions['state'], dispat
 function appendContextHints(section: HTMLElement, state: ManualControlsViewOptions['state']): void {
   const captureHint = document.createElement('p');
   captureHint.className = 'image-trail-panel__workflow-meta image-trail-panel__capture-hint';
-  captureHint.append(document.createTextNode('Press '), createKbd('C'), document.createTextNode(' to capture the current image.'));
+  captureHint.append(
+    document.createTextNode('Press '),
+    createKbd('C'),
+    document.createTextNode(' to capture; hold '),
+    createKbd('Shift'),
+    document.createTextNode(' on Capture or press '),
+    createKbd('P'),
+    document.createTextNode(' to pin.'),
+  );
   section.append(captureHint);
   if (state.pageContext.effective !== 'feed') return;
   const grabCapturesOriginal = siteCaptureBehaviorForHostname(state.siteCaptureRules, window.location.hostname) === 'capture-original';

@@ -77,14 +77,13 @@ export const PreviewsSelectedRow: Story = {
 };
 
 function bookmarksStory(
-  items: Parameters<typeof createBookmarksView>[1],
+  items: Parameters<typeof createBookmarksView>[0],
   selectedIds: readonly string[],
   options: { readonly width?: number } = {},
-  dispatch: Parameters<typeof createBookmarksView>[10] = mockDispatch(),
+  dispatch: Parameters<typeof createBookmarksView>[9] = mockDispatch(),
 ) {
   return panelStory(
     createBookmarksView(
-      'https://images.example.test/gallery/current.jpg',
       items,
       selectedIds,
       false,

@@ -34,6 +34,15 @@ export const Running: Story = {
   },
 };
 
+export const PinModifier: Story = {
+  render: () => controlsStory({ capturePinModifierActive: true }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('button', { name: 'Pin current' })).toHaveAttribute('title', expect.stringContaining('release Shift'));
+    await expect(canvas.queryByRole('button', { name: 'Capture original' })).not.toBeInTheDocument();
+  },
+};
+
 export const GrabMode: Story = {
   render: () => {
     const initial = createInitialPanelState(0);

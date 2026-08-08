@@ -15,6 +15,7 @@ import {
   test,
   togglePanelFromExtensionAction,
 } from './fixtures.js';
+import { pinCurrentImage } from './current-image-actions.js';
 
 async function openPanel(page: Page, serviceWorker: Worker): Promise<void> {
   await page.setViewportSize({ width: 924, height: 540 });
@@ -27,7 +28,7 @@ async function pinUrl(page: Page, url: string, expectedVisibleCount: number): Pr
   await applyUrlInEditor(page, url);
   const escaped = url.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
   await expectPanelStatusMessage(page, new RegExp(`(Loaded|Applied|Image loaded but did not change).*${escaped}`, 'u'));
-  await page.getByRole('button', { name: 'Pin current' }).click();
+  await pinCurrentImage(page);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(expectedVisibleCount);
 }
 

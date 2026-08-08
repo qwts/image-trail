@@ -153,7 +153,7 @@
             "tests/dom/primitives.test.ts",
             "tests/primitives-css.test.ts"
           ],
-          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; #755 explicit Hide/Show header controls across Host target, URL editor, Field Editor, Controls, Recents, and Queue; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, capture, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
+          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; #755 explicit Hide/Show header controls across Host target, URL editor, Field Editor, Controls, Recents, and Queue; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, Shift-modified Capture/Pin, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
         },
         {
           "type": "storybook",
@@ -165,7 +165,7 @@
             "extension/src/ui/components/target-picker-view.stories.ts",
             "extension/src/ui/components/url-editor-view.stories.ts"
           ],
-          "notes": "Covers the 420px attached shell plus minimized, detached, waiting, error, privacy, expanded workflow, Grab Mode, narrow, and reduced-motion presentation states."
+          "notes": "Covers the 420px attached shell plus minimized, detached, waiting, error, privacy, expanded workflow, default Capture and Shift-modified Pin, Grab Mode, narrow, and reduced-motion presentation states."
         },
         {
           "type": "playwright-e2e",
@@ -183,6 +183,44 @@
           "type": "manual",
           "reason": "The handoff calls for visual fidelity over an arbitrary host page and browser-level reduced-motion behavior.",
           "notes": "Load the packaged extension over the single-image fixture at 420px and a narrow viewport. Compare against the handoff panel and capture-flash references; verify hierarchy, density, glows, typography, status/toast motion, header drag, minimize, detach/restore, keyboard focus, privacy masking, and no failed stylesheet requests."
+        }
+      ]
+    },
+    {
+      "id": "shift-modified-capture-and-pin",
+      "acceptance": "One primary current-image control for Capture by default and Pin while Shift is held (issue #756)",
+      "repoPath": "docs/acceptance-tests/shift-capture-to-pin.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Shift-Modified-Capture-And-Pin",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/dom/keyboard-router.test.ts",
+            "tests/dom/manual-controls-view.test.ts",
+            "tests/dom/bookmarks-view.test.ts",
+            "tests/action-dispatch.test.ts"
+          ],
+          "notes": "Covers editable and record-row exclusions, Shift keyup/blur/visibility/disable cleanup, trusted Capture-to-Pin dispatch, the existing P shortcut route, and removal of the duplicate Queue action."
+        },
+        {
+          "type": "storybook",
+          "path": "extension/src/ui/components/manual-controls-view.stories.ts",
+          "notes": "Covers the production primary workflow in both default Capture and transient Shift-modified Pin states."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": [
+            "tests/e2e/bookmark-original-preservation.spec.ts",
+            "tests/e2e/recents-queue-recall.spec.ts",
+            "tests/e2e/detachable-sections.spec.ts",
+            "tests/e2e/keyboard-feedback.spec.ts"
+          ],
+          "notes": "In Chromium, holds Shift on the trusted primary control to pin metadata, verifies capture/original preservation remains separate, exercises Queue and Recall flows, confirms Queue does not duplicate Pin, and checks the discoverable C, Shift, and P hint."
+        },
+        {
+          "type": "manual",
+          "reason": "Browser key state, trusted activation, focus restoration, and host-page editable boundaries require a packaged extension profile.",
+          "notes": "Load the packaged extension with a selected image. Verify Capture is the default primary action; holding Shift over the page or panel changes it to Pin without firing; releasing Shift, blurring the window, hiding the tab, or closing and reopening the panel restores Capture; Shift typed in an input does not change it; clicking transient Pin or pressing P adds metadata to Queue without capturing original bytes or adding a Recent; clicking Capture or pressing C captures explicitly; and Queue has no duplicate current-image Pin action."
         }
       ]
     },
@@ -1500,7 +1538,7 @@
         {
           "type": "playwright-e2e",
           "paths": ["tests/e2e/recents-scope.spec.ts", "tests/e2e/recents-queue-recall.spec.ts"],
-          "notes": "In Chromium, verifies Recents sorting sits left of Site scope below the title and Queue ordering is the first control beside Pin current, Recall, and Queue, including while sections are collapsed."
+          "notes": "In Chromium, verifies Recents sorting sits left of Site scope below the title and Queue ordering is the first control beside Recall and Queue; current-image Pin lives in the primary Shift-modified Capture control, including while Queue is collapsed."
         },
         {
           "type": "manual",
