@@ -94,11 +94,11 @@ export type UrlReviewStatusClearFilter =
 
 export interface UrlReviewStatusStore {
   list(hostname: string): Promise<readonly UrlReviewStatusRecord[]>;
+  listAll(): Promise<readonly UrlReviewStatusRecord[]>;
   save(record: UrlReviewStatusRecord, options?: { readonly maxRecordsPerHost?: number }): Promise<void>;
   importMany(records: readonly UrlReviewStatusRecord[], options?: { readonly maxRecordsPerHost?: number }): Promise<number>;
   clear(filter: UrlReviewStatusClearFilter): Promise<number>;
 }
-
 export interface RecallCandidate extends ImageDisplayRecord {
   readonly envelopeCreatedAt: string;
 }

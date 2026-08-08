@@ -179,7 +179,7 @@ export const loadParsedFieldStateBySourceRequestSchema = v.object({ hostname: v.
 
 export const saveParsedFieldStateRequestSchema = v.object({ record: parsedFieldStateRecordSchema });
 
-export const listUrlReviewStatusRequestSchema = v.object({ hostname: v.string() });
+export const listUrlReviewStatusRequestSchema = v.object({ hostname: v.nullable(v.string()) });
 
 export const saveUrlReviewStatusRequestSchema = v.object({ record: urlReviewStatusRecordSchema });
 

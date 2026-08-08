@@ -62,6 +62,22 @@ export class UrlReviewStatusRepository {
     );
   }
 
+  async listAll(): Promise<readonly UrlReviewStatusRecord[]> {
+    return this.withPolicy(async (mode) => {
+      if (mode === 'plaintext') {
+        const stored = await storedRecordsForPrefix(this.db, 'plaintext', URL_REVIEW_STATUS_KEY_PREFIX);
+        return stored.map(stripMetadataKey).sort(compareNewestFirst);
+      }
+      const stored = await storedRecordsForPrefix(this.db, 'encrypted', URL_REVIEW_STATUS_KEY_PREFIX);
+      const records: UrlReviewStatusRecord[] = [];
+      for (const record of stored) {
+        const opened = await this.openEncrypted(record);
+        if (opened) records.push(opened);
+      }
+      return records.sort(compareNewestFirst);
+    });
+  }
+
   async put(record: UrlReviewStatusRecord, options: { readonly maxRecordsPerHost?: number } = {}): Promise<void> {
     await this.withPolicy(async (mode) => {
       const stored = await this.storedRecord(mode, record);
@@ -235,6 +251,10 @@ export class UrlReviewStatusRepository {
 function stripMetadataKey(record: UrlReviewStatusMetadataRecord): UrlReviewStatusRecord {
   const { key: _key, kind: _kind, ...status } = record;
   return status;
+}
+
+function compareNewestFirst(left: UrlReviewStatusRecord, right: UrlReviewStatusRecord): number {
+  return right.updatedAt.localeCompare(left.updatedAt);
 }
 
 function urlReviewStatusKey(mode: SearchableMetadataMode, hostname: string, sourceUrl: string): Promise<string> | string {

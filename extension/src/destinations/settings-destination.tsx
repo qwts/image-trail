@@ -6,6 +6,7 @@ import type { DestinationServices } from './destination-services.js';
 import { useRequestGeneration } from './request-generation.js';
 import { AutomationSettingsGroup, SystemSettingsGroup, UtilitySettingsGroup } from './settings-automation-system.js';
 import { DisplaySettingsGroup, PrivacySettingsGroup } from './settings-display-privacy.js';
+import { UrlReviewStatusSettingsGroup } from './url-review-status-settings.js';
 
 interface SettingsState {
   readonly settings: PlaintextLocalSettings | null;
@@ -37,7 +38,11 @@ function useSettings(services: DestinationServices) {
   const save = useCallback(
     async (settings: PlaintextLocalSettings) => {
       const request = requests.begin();
-      setState((current) => ({ ...current, settings, busy: true, message: null, error: null }));
+      let previous: PlaintextLocalSettings | null = null;
+      setState((current) => {
+        previous = current.settings;
+        return { ...current, settings, busy: true, message: null, error: null };
+      });
       try {
         await services.saveSettings(settings);
         if (requests.isCurrent(request)) {
@@ -45,7 +50,12 @@ function useSettings(services: DestinationServices) {
         }
       } catch {
         if (requests.isCurrent(request)) {
-          setState((current) => ({ ...current, busy: false, error: 'Settings could not be saved.' }));
+          setState((current) => ({
+            ...current,
+            settings: previous ?? current.settings,
+            busy: false,
+            error: 'Settings could not be saved.',
+          }));
         }
       }
     },
@@ -81,6 +91,7 @@ export function SettingsDestination({ services }: { readonly services: Destinati
       <DisplaySettingsGroup {...props} />
       <PrivacySettingsGroup {...props} />
       <AutomationSettingsGroup {...props} />
+      <UrlReviewStatusSettingsGroup services={services} privacyMode={page.settings.privacyModeEnabled} />
       <UtilitySettingsGroup {...props} />
       <SystemSettingsGroup {...props} identity={page.identity} />
     </div>

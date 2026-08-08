@@ -19,6 +19,11 @@ export class IndexedDbUrlReviewStatusStore implements UrlReviewStatusStore {
     return context ? context.repository.listByHostname(hostname) : [];
   }
 
+  async listAll(): Promise<readonly UrlReviewStatusRecord[]> {
+    const context = await this.openContext();
+    return context ? context.repository.listAll() : [];
+  }
+
   async save(record: UrlReviewStatusRecord, options: { readonly maxRecordsPerHost?: number } = {}): Promise<void> {
     const context = await this.openContext();
     await context?.repository.put(record, options);
