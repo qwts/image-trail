@@ -107,10 +107,11 @@
 
 .image-trail-panel-root .image-trail-ds__target > .image-trail-ds__section-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, max-content) max-content 30px;
-  gap: var(--it-space-6);
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  gap: var(--it-space-4) var(--it-space-6);
   min-width: 0;
   list-style: none;
+  align-items: center;
 }
 
 .image-trail-panel-root .image-trail-ds__target .image-trail-panel__target-body {
