@@ -84,6 +84,12 @@ test('Shift modifier state follows trusted page keys, ignores synthetic keys, an
     assert.deepEqual(changes, [true, false]);
     dispatchTrustedKeydown(document, 'Shift', { shiftKey: true });
     window.dispatchEvent(new Event('blur'));
+    assert.deepEqual(changes, [true, false, true], 'synthetic blur must not clear trusted modifier');
+    {
+      const event = new FocusEvent('blur');
+      Object.defineProperty(event, 'isTrusted', { value: true });
+      window.dispatchEvent(event);
+    }
     assert.deepEqual(changes, [true, false, true, false]);
     dispatchTrustedKeydown(document, 'Shift', { shiftKey: true });
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });

@@ -63,27 +63,30 @@ function createPrimaryWorkflow(state: ManualControlsViewOptions['state'], dispat
   primary.append(
     actionButton('◀ Prev', { name: 'navigate-previous' }, dispatch, { title: 'Previous image', disabled: noTarget }),
     actionButton('Next ▶', { name: 'navigate-next' }, dispatch, { title: 'Next image', disabled: noTarget }),
-    actionButton(
-      pinMode ? '○ Pin' : '◉ Capture',
-      state.target.selectedUrl
-        ? pinMode
-          ? { name: 'pin/current' }
-          : { name: 'capture/request', url: state.target.selectedUrl, sourceType: 'target' }
-        : null,
-      dispatch,
-      {
-        ariaLabel: pinMode ? 'Pin current' : 'Capture original',
-        title: pinMode
-          ? 'Pin current (P) — release Shift to restore Capture original'
-          : 'Capture original (C) — hold Shift to pin metadata without capturing original bytes',
-        variant: 'primary',
-        waiting: state.captureInProgress,
-        disabled: noTarget || state.captureInProgress,
-        className: 'image-trail-panel__capture-btn',
-        trustedOnly: true,
-      },
-    ),
   );
+  {
+    const label = pinMode ? '○ Pin' : '◉ Capture';
+    const ariaLabel = pinMode ? 'Pin current' : 'Capture original';
+    const title = pinMode
+      ? 'Pin current (P) — release Shift to restore Capture original'
+      : 'Capture original (C) — hold Shift to pin metadata without capturing original bytes';
+    const button = createButton({
+      label,
+      ariaLabel,
+      title,
+      variant: 'primary',
+      waiting: state.captureInProgress,
+      disabled: noTarget || state.captureInProgress,
+      className: 'image-trail-panel__capture-btn',
+    });
+    if (state.target.selectedUrl) {
+      bindTrustedClick(button, (event) => {
+        if (event.shiftKey) dispatch({ name: 'pin/current' });
+        else dispatch({ name: 'capture/request', url: state.target.selectedUrl!, sourceType: 'target' });
+      });
+    }
+    primary.append(button);
+  }
 
   const phase = state.automation.slideshowPhase;
   const slideshowAction: PanelAction =

@@ -163,7 +163,10 @@ export class KeyboardRouter {
     if (event.key === 'Shift' || !event.shiftKey) this.setShiftModifier(false);
   };
 
-  private onWindowBlur = (): void => this.setShiftModifier(false);
+  private onWindowBlur = (event: Event): void => {
+    if (!isTrustedActivation(event)) return;
+    this.setShiftModifier(false);
+  };
   private onVisibilityChange = (): void => {
     if (document.visibilityState !== 'visible') this.setShiftModifier(false);
   };
