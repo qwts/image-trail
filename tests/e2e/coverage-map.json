@@ -4,6 +4,35 @@
   "description": "Manual acceptance coverage map for the maintained Playwright E2E gate. Each entry links a canonical acceptance flow to automated coverage, intentional manual coverage, or a deferred issue.",
   "entries": [
     {
+      "id": "chrome-web-store-submission",
+      "acceptance": "Audited Chrome Web Store listing, privacy disclosures, assets, reviewer path, and exact v0.26.6 upload package (issue #502)",
+      "repoPath": "docs/acceptance-tests/chrome-web-store-submission.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Chrome-Web-Store-Submission",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/store-assets.test.ts",
+            "tests/manifest-commands.test.ts",
+            "tests/permissions.test.ts",
+            "tests/release-artifacts.test.ts",
+            "tests/version-policy.test.ts"
+          ],
+          "notes": "Locks the exact published v0.26.6 tag commit, ZIP URL/SHA-256/size, manifest version and permissions, successful CI/version-cut/release runs, public icon/screenshot/promo bytes and dimensions, baseline nativeMessaging removal, required artifact allowlist, release archive root, and least-privilege manifest policy."
+        },
+        {
+          "type": "playwright-e2e",
+          "paths": ["tests/e2e/extension-smoke.spec.ts", "tests/e2e/interop-ui.spec.ts"],
+          "notes": "The packaged baseline exercises gesture-only active-tab injection and core reviewer behavior while proving unfinished Transfer and Sync plus nativeMessaging are absent."
+        },
+        {
+          "type": "manual",
+          "reason": "Chrome Web Store account, legal/trader declarations, asset cropping, distribution, dashboard validation, and Submit for review are owner-only external steps.",
+          "notes": "Verify the downloaded image-trail-v0.26.6.zip against SHA-256 8fc3454bd65302933e3f4cb4b82c4bf78ae2f904b93e691ef9ee8fc15fdb388e; confirm manifest 0.26.6 and the six documented permissions with no nativeMessaging; follow the credential-free reviewer path; upload the versioned 128px icon, 1280x800 screenshot, and 440x280 tile; enter the canonical listing/privacy values without broader claims; resolve any dashboard demand for a promotional video before submission; and retain the dashboard summary as owner evidence."
+        }
+      ]
+    },
+    {
       "id": "overlook-transfer-sync-visible-workflow",
       "acceptance": "Baseline Transfer and Sync feature gate plus truthful experimental review, conflict, progress, recovery, and locked states",
       "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Overlook-Transfer-And-Sync-UI",
