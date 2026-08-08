@@ -229,6 +229,7 @@ function createProviderRecovery(
   dispatch: InteropWorkflowDispatch,
   render: (state: InteropVisibleWorkflow) => void,
   selectedProvider: () => InteropProviderId,
+  getLatestRequest: () => number,
 ) {
   let refreshPairingOnFocus = false;
   let actionPending = false;
@@ -237,12 +238,17 @@ function createProviderRecovery(
   let probeTimer: ReturnType<typeof setTimeout> | undefined;
   const probe = (attempt = 0): void => {
     if (!actionPending || !scrim.isConnected) return;
+    const probeRequest = getLatestRequest() + 1;
     void dispatch({ name: 'status' }, false).then((result) => {
       if (!actionPending || !scrim.isConnected) return;
+      if (probeRequest !== getLatestRequest()) return;
       const state = result?.snapshot.provider.state;
       const transient = result === null || state === 'connecting' || state === 'disconnected';
-      if (transient && attempt < 2) {
-        probeTimer = setTimeout(() => probe(attempt + 1), 100);
+      if (transient) {
+        if (attempt < 2) {
+          probeTimer = setTimeout(() => probe(attempt + 1), 100);
+          return;
+        }
         return;
       }
       if (result) render(result.snapshot);
@@ -323,7 +329,13 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     if (renderResult && result && request === latestRequest && scrim.isConnected) render(result.snapshot);
     return result;
   };
-  const providerRecovery = createProviderRecovery(scrim, dispatch, render, () => selectedProvider);
+  const providerRecovery = createProviderRecovery(
+    scrim,
+    dispatch,
+    render,
+    () => selectedProvider,
+    () => latestRequest,
+  );
   const close = (): void => {
     providerRecovery.dispose();
     scrim.remove();
