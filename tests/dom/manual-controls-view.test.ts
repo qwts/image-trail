@@ -96,6 +96,26 @@ test('single-image context hides Grab while feed context explains its state', ()
   assert.equal(feed.querySelector('.image-trail-panel__feed-hint')?.classList.contains('is-active'), true);
 });
 
+test('an exact-site capture rule makes the explicit Grab behavior inspectable', () => {
+  const happyWindow = window as typeof window & { readonly happyDOM: { setURL(url: string): void } };
+  const previousUrl = window.location.href;
+  try {
+    happyWindow.happyDOM.setURL('https://images.example.test/gallery');
+    const initial = createInitialPanelState(0);
+    const view = createView({
+      pageContext: { ...initial.pageContext, detected: 'feed', effective: 'feed', available: ['single', 'feed'], imageCount: 6 },
+      siteCaptureRules: { 'images.example.test': 'capture-original' },
+    }).view;
+    assert.match(view.querySelector<HTMLButtonElement>('[aria-label="Grab Mode"]')?.title ?? '', /pin and capture encrypted originals/u);
+    assert.equal(
+      view.querySelector('.image-trail-panel__feed-hint')?.textContent,
+      'Turn on Grab mode, then click to pin and capture encrypted originals.',
+    );
+  } finally {
+    happyWindow.happyDOM.setURL(previousUrl);
+  }
+});
+
 test('running workflow exposes pause and stop actions while keeping More controls state-owned', () => {
   const initial = createInitialPanelState(0);
   const { view, actions } = createView({

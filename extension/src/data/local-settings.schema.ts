@@ -12,6 +12,7 @@ const pageContextOverridesSchema = v.record(
   v.string(),
   v.object({ context: v.picklist(['single', 'gallery', 'feed']), updatedAt: v.number() }),
 );
+const siteCaptureRulesSchema = v.record(v.string(), v.picklist(['pin-only', 'capture-original']));
 const searchableMetadataPolicyEntries = {
   urlDerived: v.picklist(['plaintext', 'encrypted']),
   albumName: v.picklist(['plaintext', 'encrypted']),
@@ -43,6 +44,7 @@ const plaintextLocalSettingsEntries = {
   backupReminderEnabled: v.boolean(),
   backupReminderIntervalDays: v.picklist([7, 30, 90]),
   backupReminderNextAt: v.nullable(v.string()),
+  siteCaptureRules: siteCaptureRulesSchema,
   neighborPreloadEnabled: v.boolean(),
   neighborPreloadRadius: v.number(),
   neighborPreloadCacheLimit: v.number(),
@@ -66,6 +68,7 @@ export const saveLocalSettingsPayloadSchema = v.object({
   backupReminderEnabled: v.optional(v.boolean()),
   backupReminderIntervalDays: v.optional(v.picklist([7, 30, 90])),
   backupReminderNextAt: v.optional(v.nullable(v.string())),
+  siteCaptureRules: v.optional(siteCaptureRulesSchema),
   pageContextOverrides: v.optional(pageContextOverridesSchema),
   searchableMetadataPolicy: v.object({
     ...searchableMetadataPolicyEntries,

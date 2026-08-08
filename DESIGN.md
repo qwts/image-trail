@@ -59,6 +59,9 @@ capabilities or change persistence/encryption semantics.
   confusing clear/presentation actions with destructive delete actions.
 - Capture originals explicitly, show capture status, and keep stored-original
   state distinct from selection.
+- Keep Grab metadata-only by default. An inspectable exact-host rule may make an
+  explicit Grab click pin first and then capture the encrypted original; it must
+  not auto-capture visible images or change the separate Pin and Capture controls.
 - Open Recall to page durable offscreen queue records back into the current
   workflow.
 - Unlock, import, export, back up, and restore encrypted local data through

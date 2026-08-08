@@ -85,6 +85,7 @@ export const PANEL_ACTION_DOMAINS = {
   'settings/update-url-review-status-retention': 'settings',
   'settings/update-backup-reminder': 'settings',
   'backup-reminder/snooze': 'settings',
+  'settings/update-site-capture-rule': 'settings',
   'settings/update-request-throttle': 'settings',
   'settings/update-neighbor-preload': 'settings',
   'settings/update-down-arrow-action': 'settings',

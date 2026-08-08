@@ -1,4 +1,5 @@
 import type { BuildIdentity } from '../core/build-info.js';
+import { SiteCaptureRulesSettings } from './settings-site-capture-rules.js';
 import {
   BACKUP_REMINDER_INTERVAL_OPTIONS,
   backupReminderStatus,
@@ -42,6 +43,7 @@ export function AutomationSettingsGroup({ settings, disabled, save }: SettingsGr
         onChange={(checked) => save({ ...settings, clearUrlReviewStatusAfterExport: checked })}
       />
       <BackupReminderSettings settings={settings} disabled={disabled} save={save} />
+      <SiteCaptureRulesSettings settings={settings} disabled={disabled} save={save} />
       <KeybindingSettings settings={settings} disabled={disabled} save={save} />
     </SettingsGroup>
   );

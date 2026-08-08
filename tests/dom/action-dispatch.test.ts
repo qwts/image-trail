@@ -104,6 +104,7 @@ function createHarness(): Harness {
     updatePinSaveStoragePreference: noop,
     updateUrlReviewStatusRetention: noopAsync,
     updateBackupReminder: noop,
+    updateSiteCaptureRule: noop,
     snoozeBackupReminder: noop,
     updateRequestThrottle: noop,
     updateNeighborPreload: noop,

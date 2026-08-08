@@ -2,6 +2,7 @@ import type { PanelState } from '../types.js';
 import { BACKUP_HISTORY_LIMIT } from '../cloud/pcloud-provider.js';
 import { assertNeverAction } from './routing.js';
 import type { PanelActionForDomain } from './routing.js';
+import { updateSiteCaptureRule } from '../site-capture-rules.js';
 
 type SettingsAction = PanelActionForDomain<'settings'>;
 
@@ -84,6 +85,12 @@ export function reduceSettingsAction(state: PanelState, action: SettingsAction):
         ...state,
         urlReviewStatusLimit: action.limit,
         clearUrlReviewStatusAfterExport: action.clearAfterExport,
+        lastUpdatedAt: Date.now(),
+      };
+    case 'settings/update-site-capture-rule':
+      return {
+        ...state,
+        siteCaptureRules: updateSiteCaptureRule(state.siteCaptureRules, action.hostname, action.behavior),
         lastUpdatedAt: Date.now(),
       };
     case 'settings/update-request-throttle':

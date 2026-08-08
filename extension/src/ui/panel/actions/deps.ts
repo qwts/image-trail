@@ -87,6 +87,7 @@ export interface PanelActionDeps {
   updateUrlReviewStatusRetention(limit: number, clearAfterExport: boolean): Promise<void>;
   updateBackupReminder(enabled: boolean, intervalDays: PlaintextLocalSettings['backupReminderIntervalDays']): void;
   snoozeBackupReminder(): void;
+  updateSiteCaptureRule(hostname: string, behavior: PlaintextLocalSettings['siteCaptureRules'][string] | null): void;
   updateRequestThrottle(minimumIntervalMs: number, maxRequests: number, windowMs: number): void;
   updateNeighborPreload(
     enabled: boolean,

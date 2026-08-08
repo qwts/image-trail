@@ -66,6 +66,11 @@ export function createSettingsSection(
       nextAt: state.backupReminderNextAt,
     },
     {
+      rules: state.siteCaptureRules,
+      currentHostname: window.location.hostname || null,
+      privacyModeEnabled: state.privacyModeEnabled,
+    },
+    {
       minimumIntervalMs: state.requestThrottleMs,
       maxRequests: state.requestThrottleMaxRequests,
       windowMs: state.requestThrottleWindowMs,

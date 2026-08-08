@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { DEFAULT_LOCAL_SETTINGS, type PlaintextLocalSettings } from '../extension/src/content/panel-services.js';
 import { createInitialPanelState } from '../extension/src/core/state.js';
+import { SITE_CAPTURE_RULE_LIMIT } from '../extension/src/core/site-capture-rules.js';
 import type { PanelState } from '../extension/src/core/types.js';
 import { parseUrl } from '../extension/src/core/url/parse-url.js';
 import type { ParsedUrlModel, UrlField } from '../extension/src/core/url/types.js';
@@ -332,6 +333,37 @@ test('updateDownArrowAction persists and renders only on a change', () => {
   assert.equal(changed.getLocalSettings().downArrowAction, 'download');
   assert.deepEqual(changed.log, ['render']);
   assert.equal(changed.saved.length, 1);
+});
+
+test('updateSiteCaptureRule persists an exact-host reversible rule without changing unrelated settings', () => {
+  const harness = createHarness();
+  harness.controller.updateSiteCaptureRule(' IMAGES.Example.Test. ', 'capture-original');
+  assert.deepEqual(harness.getState().siteCaptureRules, { 'images.example.test': 'capture-original' });
+  assert.deepEqual(harness.getLocalSettings().siteCaptureRules, { 'images.example.test': 'capture-original' });
+  assert.equal(harness.getLocalSettings().privacyModeEnabled, DEFAULT_LOCAL_SETTINGS.privacyModeEnabled);
+  assert.deepEqual(harness.log, ['render']);
+  assert.equal(harness.saved.length, 1);
+
+  harness.controller.updateSiteCaptureRule('images.example.test', null);
+  assert.deepEqual(harness.getState().siteCaptureRules, {});
+  assert.deepEqual(harness.getLocalSettings().siteCaptureRules, {});
+  assert.equal(harness.saved.length, 2);
+});
+
+test('updateSiteCaptureRule rejects a new site visibly when the bounded rule set is full', () => {
+  const harness = createHarness();
+  const siteCaptureRules = Object.fromEntries(
+    Array.from({ length: SITE_CAPTURE_RULE_LIMIT }, (_, index) => [`site-${index}.example.test`, 'pin-only' as const]),
+  );
+  harness.setState({ ...harness.getState(), siteCaptureRules });
+
+  harness.controller.updateSiteCaptureRule('overflow.example.test', 'capture-original');
+
+  assert.deepEqual(harness.getState().siteCaptureRules, siteCaptureRules);
+  assert.equal(harness.getState().status, 'error');
+  assert.match(harness.getState().message, /supports up to 100 saved sites/u);
+  assert.deepEqual(harness.log, ['render'], 'rerender restores the controlled selection after the rejected change');
+  assert.equal(harness.saved.length, 0);
 });
 
 test('updatePinSaveStoragePreference persists and renders only on a change', () => {

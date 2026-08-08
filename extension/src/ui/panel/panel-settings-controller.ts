@@ -20,6 +20,7 @@ import { collectUrlFields } from '../../core/url/tokenize-fields.js';
 import type { ParsedUrlModel, UrlField } from '../../core/url/types.js';
 import type { NeighborPreloadController } from './neighbor-preload-controller.js';
 import { BackupReminderSettingsController } from './backup-reminder-settings-controller.js';
+import { SiteCaptureRulesSettingsController } from './site-capture-rules-settings-controller.js';
 
 export { createBackupReminderBindings } from './backup-reminder-settings-controller.js';
 import { toTargetState } from './projection-application-controller.js';
@@ -71,9 +72,17 @@ function queueViewSettingsChanged(state: PanelState, settings: PlaintextLocalSet
  */
 export class PanelSettingsController {
   private readonly backupReminder: BackupReminderSettingsController;
+  private readonly siteCaptureRules: SiteCaptureRulesSettingsController;
 
   constructor(private readonly deps: PanelSettingsControllerDeps) {
     this.backupReminder = new BackupReminderSettingsController({
+      getState: deps.getState,
+      setState: deps.setState,
+      getLocalSettings: deps.getLocalSettings,
+      saveLocalSettings: (settings) => this.saveLocalSettings(settings),
+      render: deps.render,
+    });
+    this.siteCaptureRules = new SiteCaptureRulesSettingsController({
       getState: deps.getState,
       setState: deps.setState,
       getLocalSettings: deps.getLocalSettings,
@@ -112,6 +121,7 @@ export class PanelSettingsController {
       backupReminderEnabled: settings.backupReminderEnabled,
       backupReminderIntervalDays: settings.backupReminderIntervalDays,
       backupReminderNextAt: settings.backupReminderNextAt,
+      siteCaptureRules: settings.siteCaptureRules,
       requestThrottleMs: settings.requestThrottleMs,
       requestThrottleMaxRequests: settings.requestThrottleMaxRequests,
       requestThrottleWindowMs: settings.requestThrottleWindowMs,
@@ -160,6 +170,10 @@ export class PanelSettingsController {
 
   recordManualBackupCompleted(now = Date.now()): void {
     this.backupReminder.complete(now);
+  }
+
+  updateSiteCaptureRule(hostname: string, behavior: import('../../core/site-capture-rules.js').SiteCaptureBehavior | null): void {
+    this.siteCaptureRules.update(hostname, behavior);
   }
 
   async saveLocalSettingsAsync(settings: PlaintextLocalSettings): Promise<void> {

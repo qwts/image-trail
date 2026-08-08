@@ -39,6 +39,7 @@ import {
 } from '../core/display-order.js';
 import type { SessionInactivityTimeoutMinutes } from '../core/secure-session-policy.js';
 import { isBackupReminderIntervalDays, sanitizeBackupReminderTimestamp, type BackupReminderIntervalDays } from '../core/backup-reminder.js';
+import { sanitizeSiteCaptureRules, type SiteCaptureRules } from '../core/site-capture-rules.js';
 
 export interface PlaintextLocalSettings {
   readonly schemaVersion: 1;
@@ -66,6 +67,7 @@ export interface PlaintextLocalSettings {
   readonly backupReminderEnabled: boolean;
   readonly backupReminderIntervalDays: BackupReminderIntervalDays;
   readonly backupReminderNextAt: string | null;
+  readonly siteCaptureRules: SiteCaptureRules;
   readonly neighborPreloadEnabled: boolean;
   readonly neighborPreloadRadius: number;
   readonly neighborPreloadCacheLimit: number;
@@ -103,6 +105,7 @@ export const DEFAULT_LOCAL_SETTINGS: PlaintextLocalSettings = {
   backupReminderEnabled: false,
   backupReminderIntervalDays: 30,
   backupReminderNextAt: null,
+  siteCaptureRules: {},
   neighborPreloadEnabled: false,
   neighborPreloadRadius: DEFAULT_NEIGHBOR_PRELOAD_RADIUS,
   neighborPreloadCacheLimit: DEFAULT_NEIGHBOR_PRELOAD_CACHE_LIMIT,
@@ -210,6 +213,7 @@ export function migrateLocalSettings(input: LocalSettingsMigrationInput): Plaint
       ? input.backupReminderIntervalDays
       : DEFAULT_LOCAL_SETTINGS.backupReminderIntervalDays,
     backupReminderNextAt: sanitizeBackupReminderTimestamp(input.backupReminderNextAt),
+    siteCaptureRules: sanitizeSiteCaptureRules(input.siteCaptureRules),
     neighborPreloadEnabled: input.neighborPreloadEnabled === true,
     neighborPreloadRadius: isSafeNeighborPreloadRadius(input.neighborPreloadRadius)
       ? input.neighborPreloadRadius

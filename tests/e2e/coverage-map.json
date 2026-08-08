@@ -345,6 +345,40 @@
       ]
     },
     {
+      "id": "per-site-capture-rules",
+      "acceptance": "Conservative exact-host rules for explicit Grab clicks to pin metadata or capture an encrypted original",
+      "repoPath": "docs/acceptance-tests/per-site-capture-rules.md",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Per-Site-Capture-Rules",
+      "coverage": [
+        {
+          "type": "unit-dom",
+          "paths": [
+            "tests/site-capture-rules.test.ts",
+            "tests/panel-subscriptions.test.ts",
+            "tests/captured-originals-controller.test.ts",
+            "tests/panel-settings-controller.test.ts",
+            "tests/dom/manual-controls-view.test.ts",
+            "tests/dom/extension-destination-surfaces.test.tsx",
+            "tests/dom/settings-view.test.ts"
+          ],
+          "notes": "Covers the metadata-only default, exact normalized host matching without wildcards or parent/subdomain inheritance, bounded migration and reversal, extension-owned persistence, Privacy Mode masking, inspectable Grab copy, durable pin before optional encrypted capture, and transient Recent creation only after that sequence."
+        },
+        {
+          "type": "storybook",
+          "paths": [
+            "extension/src/ui/components/manual-controls-view.stories.ts",
+            "extension/src/ui/stories/extension-destinations.stories.tsx"
+          ],
+          "notes": "Covers the trusted-site Grab presentation and both source-panel and standalone Settings surfaces through production view factories."
+        },
+        {
+          "type": "manual",
+          "reason": "Host-page click trust, browser permission prompts, encrypted-key state, and a real cross-origin image fetch require a packaged extension profile.",
+          "notes": "With a fresh profile, verify Grab pins metadata only. Add an exact-host Capture rule in Settings, confirm the panel explains that Grab will pin and capture, then explicitly click an image in Grab Mode. Verify the durable Queue row exists before capture, the original indicator appears only after encrypted storage succeeds, a locked or denied capture leaves the pin intact with honest retry/error copy, Recents stays session-only, no other visible image is captured, a subdomain does not inherit the rule, Privacy Mode masks saved hostnames, and removing the rule restores metadata-only behavior."
+        }
+      ]
+    },
+    {
       "id": "design-system-gallery-acceptance",
       "acceptance": "Shared design-system Gallery and final high-fidelity acceptance",
       "repoPath": "docs/acceptance-tests/gallery-design-system.md",

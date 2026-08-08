@@ -72,7 +72,6 @@ import { hostnameFromLocation } from './panel-position.js';
 import { destinationOpenErrorState, openDestinationErrorMessage } from './panel/gallery-action.js';
 import { fieldLoadResultState } from './panel/field-load-result-state.js';
 import { CurrentImageDownloadController } from './panel/current-image-download-controller.js';
-
 export { nextParsedFieldStatePageKey, shouldRestoreParsedFieldState } from './panel/parsed-field-state-sync.js';
 export { projectionSessionOwnsSelectedTarget, urlReviewStatusForLoadResult } from './panel/projection-application-controller.js';
 
@@ -453,6 +452,7 @@ export class ImageTrailPanel {
         restoreFieldState: () => {
           void this.panelDataLoad.loadGrabSettings().then(() => this.fieldStateSync.restore());
         },
+        captureGrabbedBookmark: (r) => this.capturedOriginals.captureGrabbedBookmark(r, this.state.siteCaptureRules, location.hostname),
       }),
     );
     void this.panelDataLoad.loadSettingsBookmarksAndRecents();
