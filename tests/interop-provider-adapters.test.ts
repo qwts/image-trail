@@ -12,6 +12,7 @@ import {
   PCloudInteropConnectionStore,
 } from '../extension/src/background/interop-pcloud-connection-store.js';
 import { PCloudInteropObjectStore } from '../extension/src/background/interop-pcloud-store.js';
+import { INTEROP_PROVIDER_LOGICAL_ROOT } from '../extension/src/core/interop/provider-root.js';
 import { InteropTransportError } from '../extension/src/core/interop/transport.js';
 
 describe('pCloud interoperability namespace (#588)', () => {
@@ -98,7 +99,7 @@ describe('pCloud interoperability namespace (#588)', () => {
     const bytes = new Uint8Array([1, 2, 3]);
     assert.deepEqual(await store.put('pairings/a/object.bin', bytes), { bytes: 3 });
     assert.equal((await store.verify('pairings/a/object.bin')).sha256, createHash('sha256').update(bytes).digest('hex'));
-    assert.ok(paths.every((path) => path.startsWith('/Image Trail Interop/v1/')));
+    assert.ok(paths.every((path) => path.startsWith(`/${INTEROP_PROVIDER_LOGICAL_ROOT}/`)));
     assert.ok(paths.every((path) => !path.includes('/Applications/Playbook-Eng-Trail-Overlook-1/backups')));
 
     const disconnected = new PCloudInteropObjectStore({ credential: () => null, fetchImpl });
@@ -106,6 +107,55 @@ describe('pCloud interoperability namespace (#588)', () => {
       disconnected.put('pairings/a/object.bin', bytes),
       (error: unknown) => error instanceof InteropTransportError && error.code === 'auth-expired',
     );
+  });
+
+  test('shapes getfilelink and download requests with exact-lifetime DNR rules', async () => {
+    const originalChrome = globalThis.chrome;
+    const dnrCalls: Array<{
+      readonly addRules?: readonly { readonly id: number; readonly condition: { readonly regexFilter?: string } }[];
+      readonly removeRuleIds?: readonly number[];
+    }> = [];
+    globalThis.chrome = {
+      declarativeNetRequest: {
+        RuleActionType: { MODIFY_HEADERS: 'modifyHeaders' },
+        HeaderOperation: { SET: 'set' },
+        ResourceType: { XMLHTTPREQUEST: 'xmlhttprequest' },
+        updateSessionRules: async (input: (typeof dnrCalls)[number]) => {
+          dnrCalls.push(input);
+        },
+      },
+    } as unknown as typeof chrome;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      assert.equal(init?.referrer, 'https://my.pcloud.com/');
+      if (url === 'https://api.pcloud.com/getfilelink') {
+        assert.equal((init?.body as URLSearchParams).get('path'), `/${INTEROP_PROVIDER_LOGICAL_ROOT}/pairings/a/object.bin`);
+        return Response.json({ result: 0, hosts: ['c123.pcloud.com'], path: '/download/object.bin' });
+      }
+      assert.equal(url, 'https://c123.pcloud.com/download/object.bin');
+      return new Response(new Uint8Array([4, 5, 6]));
+    };
+
+    try {
+      const store = new PCloudInteropObjectStore({
+        credential: () => ({ accessToken: 'interop-only-token', apiHost: 'api.pcloud.com' }),
+        fetchImpl,
+      });
+      assert.deepEqual(await store.get('pairings/a/object.bin'), new Uint8Array([4, 5, 6]));
+      const added = dnrCalls.flatMap((call) => call.addRules ?? []);
+      const removed = dnrCalls.flatMap((call) => call.removeRuleIds ?? []);
+      assert.equal(added.length, 2);
+      assert.deepEqual(
+        added.map((rule) => rule.condition.regexFilter),
+        ['^https://api\\.pcloud\\.com/getfilelink$', '^https://c123\\.pcloud\\.com/download/object\\.bin$'],
+      );
+      assert.deepEqual(
+        removed,
+        added.map((rule) => rule.id),
+      );
+    } finally {
+      globalThis.chrome = originalChrome;
+    }
   });
 
   test('rejects a provider-controlled download path that changes the vetted host', async () => {
