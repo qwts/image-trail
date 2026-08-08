@@ -274,7 +274,7 @@ export class PCloudBackupExportCoordinator {
         ),
       }),
     );
-    this.deps.backupCompleted?.();
+    if (originals.missingOriginalBlobIds.length === 0) this.deps.backupCompleted?.();
     this.deps.render();
   }
 

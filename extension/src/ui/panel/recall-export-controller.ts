@@ -177,7 +177,8 @@ export class RecallExportController {
         : []),
       ...(this.deps.getState().recall.selectedIds.length > 0 ? this.selectedRecallRecords() : []),
     ];
-    const bookmarks = selectedBookmarks.length > 0 ? selectedBookmarks : await this.loadAllBookmarksForExport();
+    const exportsAllBookmarks = selectedBookmarks.length === 0;
+    const bookmarks = exportsAllBookmarks ? await this.loadAllBookmarksForExport() : selectedBookmarks;
     if (bookmarks.some(isLockedPrivatePin)) {
       finishTextExport(
         this.deps,
@@ -190,7 +191,7 @@ export class RecallExportController {
     }
     const entries = bookmarks.map(bookmarkRecordToExportEntry);
     const result = plaintext ? exportPlainBookmarks({ entries }) : await exportEncryptedBookmarks({ entries, password });
-    finishStatusExport(this.deps, result, plaintext ? undefined : this.deps.backupCompleted);
+    finishStatusExport(this.deps, result, !plaintext && exportsAllBookmarks ? this.deps.backupCompleted : undefined);
   }
 
   async exportUrlReviewStatus(): Promise<void> {

@@ -30,6 +30,7 @@ function bookmark(overrides: Partial<ImageDisplayRecord> = {}): ImageDisplayReco
 
 interface ExportHarnessConfig {
   readonly bookmarks?: readonly ImageDisplayRecord[];
+  readonly selectedBookmarkIds?: readonly string[];
   readonly albums?: readonly AlbumBackupEntry[];
   readonly captureStore?: Partial<Record<keyof CaptureStore, unknown>>;
   readonly failUploadAttempt?: number;
@@ -45,7 +46,11 @@ interface ExportHarness {
 }
 
 function createExportHarness(config: ExportHarnessConfig = {}): ExportHarness {
-  let state = createInitialPanelState(0);
+  let state: PanelState = {
+    ...createInitialPanelState(0),
+    bookmarks: config.bookmarks ?? [],
+    selectedBookmarkIds: config.selectedBookmarkIds ?? [],
+  };
   const requestedOriginalBlobIds: string[][] = [];
   const uploads: { fileId: number; fileName: string; fileContent: string; recordHistory: boolean }[] = [];
   const cleanups: number[][] = [];
@@ -254,6 +259,13 @@ test('only encrypted bookmark export completion counts as a manual backup', asyn
   const plaintext = createExportHarness({ bookmarks: [bookmark({ id: 'bookmark-1' })] });
   await plaintext.controller.exportBookmarks('', true);
   assert.equal(plaintext.backupCompletions, 0);
+
+  const selected = createExportHarness({
+    bookmarks: [bookmark({ id: 'bookmark-1' }), bookmark({ id: 'bookmark-2' })],
+    selectedBookmarkIds: ['bookmark-1'],
+  });
+  await selected.controller.exportBookmarks('backup-password', false);
+  assert.equal(selected.backupCompletions, 0, 'a selected-only export leaves other durable records unprotected');
 });
 
 test('backupPCloudNow uploads album-only backups', async () => {
@@ -294,6 +306,7 @@ test('backupPCloudNow surfaces the missing-original count in the completion stat
   assert.deepEqual(harness.requestedOriginalBlobIds, [['blob-1']]);
   assert.equal(harness.uploads.length, 3);
   assert.equal(harness.getState().pcloudBackup.lastBackupMissingOriginalCount, 1);
+  assert.equal(harness.backupCompletions, 0, 'an incomplete original set must not postpone the next backup reminder');
 });
 
 test('backupPCloudNow requests and uploads encrypted originals one at a time', async () => {
