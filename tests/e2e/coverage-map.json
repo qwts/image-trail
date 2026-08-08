@@ -47,7 +47,7 @@
             "tests/release-artifacts.test.ts",
             "tests/manifest-commands.test.ts"
           ],
-          "notes": "Covers the default-off build define, baseline manifest permission and pairing-import artifact removal, release-audit rejection, exact review and custody counts, durable bookmark selection IDs, stable canonical identity, pairing-key-sealed Move outbox persistence and restart recovery, provider selection and extension-owned pairing import controls, pairing-return status refresh, long OAuth channel-loss focus refresh, duplicate interactive-connect suppression, valid saved-credential reuse with expired-credential fallback, scope-denial retry without a reconnect loop, synchronous provider-specific permission preflight, conflict intent, gated Queue and captured-original entry points, locked-state privacy, and closed-production-shadow-root modal parenting through the opener control so the workflow never lands unstyled in the host page body."
+          "notes": "Covers the default-off build define, baseline manifest permission and pairing-import artifact removal, release-audit rejection, exact review and custody counts, durable bookmark selection IDs, Queue without duplicate Recall, stable canonical identity, pairing-key-sealed Move outbox persistence and restart recovery, provider selection and extension-owned pairing import controls, pairing-return status refresh, long OAuth channel-loss focus refresh, duplicate interactive-connect suppression, valid saved-credential reuse with expired-credential fallback, scope-denial retry without a reconnect loop, synchronous provider-specific permission preflight, conflict intent, gated Queue and captured-original entry points, locked-state privacy, and closed-production-shadow-root modal parenting through the opener control so the workflow never lands unstyled in the host page body."
         },
         {
           "type": "storybook",
@@ -217,7 +217,7 @@
             "tests/dom/primitives.test.ts",
             "tests/primitives-css.test.ts"
           ],
-          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; #755 explicit Hide/Show header controls across Host target, URL editor, Field Editor, Controls, Recents, and Queue; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, Shift-modified Capture/Pin, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; narrow layouts; reduced motion; and stylesheet packaging."
+          "notes": "Covers shared header, status pill, toast, minimized and detached chrome; #755 explicit Hide/Show, Host target detach pinning (#821/#822) header controls across Host target, URL editor, Field Editor, Controls, Recents, and Queue; the unlocked secure-session title-bar lock control as a single padlock glyph beside Help; production-closed panel Shadow DOM with an audited disposable E2E build seam; always-visible navigation, Shift-modified Capture/Pin, slideshow, and Grab Mode controls; state-owned More controls; typed URL editor Apply action; Host target primitives; focus-safe native controls; privacy-safe status text and titles; section detach placement; Queue sort+menu without duplicate Recall (dock is single source); narrow layouts; reduced motion; and stylesheet packaging."
         },
         {
           "type": "storybook",
@@ -1292,7 +1292,7 @@
             "tests/dom/extension-destination-surfaces.test.tsx",
             "tests/dom/parsed-field-navigation-controller.test.ts"
           ],
-          "notes": "Includes #631 cache bounds: supported settings are 1–500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Includes #627 decoded-image lifecycle coverage too: rebuild and disabled-preload paths revoke offscreen buffered blobs while transferring the still-selected display blob, final disposal revokes every retained blob, concurrent decodes that complete after disposal are revoked too, and the HTTP anchor remains untouched; DOM-backed image state is covered. Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts. Includes compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
+          "notes": "Includes #631 cache bounds: supported settings are 1\u2013500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Includes #627 decoded-image lifecycle coverage too: rebuild and disabled-preload paths revoke offscreen buffered blobs while transferring the still-selected display blob, final disposal revokes every retained blob, concurrent decodes that complete after disposal are revoked too, and the HTTP anchor remains untouched; DOM-backed image state is covered. Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts. Includes compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
         },
         {
           "type": "storybook",
@@ -1302,7 +1302,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/automation-governance.spec.ts",
-          "notes": "Covers #631 in the packaged panel: Cache exposes the 1–500 range and explains the per-page-session memory bound."
+          "notes": "Covers #631 in the packaged panel: Cache exposes the 1\u2013500 range and explains the per-page-session memory bound."
         },
         {
           "type": "unit-dom",
