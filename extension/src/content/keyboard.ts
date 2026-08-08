@@ -143,7 +143,7 @@ export class KeyboardRouter {
 
   private onKeyDown = (event: KeyboardEvent): void => {
     const target = classifyTarget(event);
-    if (target !== 'typing' && target !== 'record-row') this.setShiftModifier(event.shiftKey);
+    if (isTrustedActivation(event) && target !== 'typing' && target !== 'record-row') this.setShiftModifier(event.shiftKey);
     if (event.metaKey || event.ctrlKey || event.altKey) return;
 
     for (const binding of this.bindings) {
@@ -159,6 +159,7 @@ export class KeyboardRouter {
   };
 
   private onKeyUp = (event: KeyboardEvent): void => {
+    if (!isTrustedActivation(event)) return;
     if (event.key === 'Shift' || !event.shiftKey) this.setShiftModifier(false);
   };
 

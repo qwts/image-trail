@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { KeyboardRouter } from '../../extension/src/content/keyboard.js';
-import { dispatchTrustedKeydown } from './trusted-events.js';
+import { dispatchTrustedKeydown, dispatchTrustedKeyup } from './trusted-events.js';
 
 function dispatchKey(target: EventTarget, key: string, options: KeyboardEventInit = {}): KeyboardEvent {
   const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options });
@@ -58,7 +58,7 @@ test('router preserves typing controls and native record-row behavior', () => {
   }
 });
 
-test('Shift modifier state follows page keydown and clears on keyup, blur, and disable without rerouting typing', () => {
+test('Shift modifier state follows trusted page keys, ignores synthetic keys, and clears on blur and disable', () => {
   const changes: boolean[] = [];
   const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
   const router = new KeyboardRouter(
@@ -73,18 +73,23 @@ test('Shift modifier state follows page keydown and clears on keyup, blur, and d
     dispatchKey(input, 'Shift', { shiftKey: true });
     assert.deepEqual(changes, [], 'typing modifiers remain native');
     dispatchKey(document, 'Shift', { shiftKey: true });
-    dispatchKey(document, 'Shift', { shiftKey: true });
+    dispatchKeyUp(document, 'Shift');
+    assert.deepEqual(changes, [], 'host-page synthetic key transitions cannot select the Pin modifier');
+    dispatchTrustedKeydown(document, 'Shift', { shiftKey: true });
+    dispatchTrustedKeydown(document, 'Shift', { shiftKey: true });
     assert.deepEqual(changes, [true], 'repeated keydown does not duplicate state');
     dispatchKeyUp(document, 'Shift');
+    assert.deepEqual(changes, [true], 'a synthetic keyup cannot mutate a trusted active modifier');
+    dispatchTrustedKeyup(document, 'Shift');
     assert.deepEqual(changes, [true, false]);
-    dispatchKey(document, 'Shift', { shiftKey: true });
+    dispatchTrustedKeydown(document, 'Shift', { shiftKey: true });
     window.dispatchEvent(new Event('blur'));
     assert.deepEqual(changes, [true, false, true, false]);
-    dispatchKey(document, 'Shift', { shiftKey: true });
+    dispatchTrustedKeydown(document, 'Shift', { shiftKey: true });
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
     document.dispatchEvent(new Event('visibilitychange'));
     assert.deepEqual(changes, [true, false, true, false, true, false]);
-    dispatchKey(document, 'Shift', { shiftKey: true });
+    dispatchTrustedKeydown(document, 'Shift', { shiftKey: true });
   } finally {
     if (visibilityDescriptor) Object.defineProperty(document, 'visibilityState', visibilityDescriptor);
     else Reflect.deleteProperty(document, 'visibilityState');

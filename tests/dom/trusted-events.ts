@@ -12,6 +12,13 @@ export function dispatchTrustedKeydown(target: EventTarget, key: string, options
   return event;
 }
 
+export function dispatchTrustedKeyup(target: EventTarget, key: string, options: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent('keyup', { key, bubbles: true, cancelable: true, ...options });
+  markTrusted(event);
+  target.dispatchEvent(event);
+  return event;
+}
+
 function markTrusted(event: Event): void {
   Object.defineProperty(event, 'isTrusted', { value: true });
 }
