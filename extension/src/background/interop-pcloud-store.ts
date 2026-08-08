@@ -5,9 +5,10 @@ import {
   type InteropObjectPage,
   type InteropObjectStore,
 } from '../core/interop/transport.js';
+import { INTEROP_PROVIDER_LOGICAL_ROOT } from '../core/interop/provider-root.js';
 import { PCloudApiError, PCloudHttpTransport, pCloudDownloadUrl } from './pcloud-http-transport.js';
 
-const ROOT = '/Image Trail Interop/v1';
+const ROOT = `/${INTEROP_PROVIDER_LOGICAL_ROOT}`;
 const PCLOUD_REFERRER = 'https://my.pcloud.com/';
 
 export interface InteropPCloudCredential {
@@ -73,7 +74,7 @@ export class PCloudInteropObjectStore implements InteropObjectStore {
   }
 
   async get(pathInput: string): Promise<Uint8Array> {
-    const data = await this.api('getfilelink', { path: this.remote(pathInput), forcedownload: '1' });
+    const data = await this.api('getfilelink', { path: this.remote(pathInput), forcedownload: '1' }, true);
     const hosts = Array.isArray(data['hosts']) ? data['hosts'] : [];
     const host = typeof hosts[0] === 'string' ? hosts[0] : '';
     const path = typeof data['path'] === 'string' ? data['path'] : '';
@@ -171,16 +172,16 @@ export class PCloudInteropObjectStore implements InteropObjectStore {
     }
   }
 
-  private api(method: string, params: Record<string, string> = {}): Promise<Record<string, unknown>> {
-    return this.request(method, new URLSearchParams(params));
+  private api(method: string, params: Record<string, string> = {}, withRequestHeaders = false): Promise<Record<string, unknown>> {
+    return this.request(method, new URLSearchParams(params), withRequestHeaders);
   }
 
-  private async request(method: string, body: FormData | URLSearchParams): Promise<Record<string, unknown>> {
+  private async request(method: string, body: FormData | URLSearchParams, withRequestHeaders = false): Promise<Record<string, unknown>> {
     const credential = this.credential();
     try {
       return body instanceof FormData
         ? await this.http.requestForm(credential, method, body)
-        : await this.http.request(credential, method, Object.fromEntries(body));
+        : await this.http.request(credential, method, Object.fromEntries(body), withRequestHeaders);
     } catch (error) {
       if (error instanceof PCloudApiError) throw resultError(error.resultCode ?? -1);
       throw new InteropTransportError('pCloud interoperability is offline.', 'offline', true);
