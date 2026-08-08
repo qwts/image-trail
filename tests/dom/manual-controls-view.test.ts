@@ -72,7 +72,7 @@ test('Shift modifier replaces the primary Capture action with trusted metadata-o
   assert.match(pin.title, /release Shift to restore Capture original/u);
   pin.click();
   assert.deepEqual(actions, [], 'synthetic pin clicks are ignored on the privileged primary control');
-  dispatchTrustedClick(pin);
+  dispatchTrustedClick(pin, { shiftKey: true });
   assert.deepEqual(actions, [{ name: 'pin/current' }]);
 });
 
