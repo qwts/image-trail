@@ -11,9 +11,11 @@ rules:
         # build; the repository secret keeps it out of source control.
         - PCLOUD_CLIENT_ID
         # Consumed only by the advisory aca judge (contents: read, pull_request
-        # from same-repo branches; fork PRs receive no secrets). Budget-capped
-        # key; absence degrades to a one-line notice, never a failure.
-        - ANTHROPIC_API_KEY
+        # from same-repo branches; fork PRs receive no secrets). Prepaid Qwen
+        # token-plan key — spend is capped by the plan, service pauses at
+        # quota; absence degrades to a one-line notice, never a failure.
+        # (ANTHROPIC_API_KEY removed 2026-08-18: CI never bills Anthropic.)
+        - QWEN_API_KEY
   unpinned-uses:
     config:
       policies:
