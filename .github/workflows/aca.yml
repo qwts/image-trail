@@ -80,9 +80,13 @@ jobs:
           run_check() {
             check="$1"
             model="$2"
+            # `|| rc=$?` keeps the loop alive under the runner's inherited
+            # errexit (`bash -e {0}`): a failing check must not stop the
+            # checks after it, or a PR gets one finding per push instead of
+            # its whole advisory picture.
+            rc=0
             echo "::group::${check} (qwen/${model})"
-            ACA_MODEL="$model" node .aca/src/cli.ts "$check" --base origin/main
-            rc=$?
+            ACA_MODEL="$model" node .aca/src/cli.ts "$check" --base origin/main || rc=$?
             echo "::endgroup::"
             if [ "$rc" -ne 0 ] && [ "$rc" -ne 78 ]; then
               echo "${check}: exit ${rc}"
