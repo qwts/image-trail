@@ -3,10 +3,12 @@
 # promotion to --enforce is a separate owner decision. The size ratchet is
 # untouched; the contract is conjunctive (ratchet AND semantic check).
 #
-# Judge routing policy (owner, 2026-08-18): CI screening spends the Hugging
-# Face router (Qwen), never the Anthropic key. Anthropic is reserved for
-# qualification/adjudication via agentic-code-analysis's dispatch-only
-# calibrate workflow. An absent HF_TOKEN skips screening rather than failing.
+# Judge routing policy (owner, 2026-08-18): CI screening spends the Qwen
+# token plan (prepaid credits, service pauses at quota — never surprise
+# billing). Anthropic is reserved for qualification/adjudication via
+# agentic-code-analysis's dispatch-only calibrate workflow; the HF router
+# stays the experimentation lane. A depleted plan surfaces as
+# judge-unavailable, never as findings.
 name: aca
 on:
   pull_request:
@@ -18,10 +20,41 @@ concurrency:
   cancel-in-progress: true
 jobs:
   context-footprint:
+    name: context-footprint
     # Repo policy: draft PRs start no Actions jobs (same guard as ci.yml).
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    uses: qwts/playbook-engineering/.github/workflows/semantic-ratchet.yml@68b920af61725d3107e9a7d4c151f7c06616bda4 # main 2026-08-18; bump deliberately
-    with:
-      model: Qwen/Qwen3-235B-A22B-Instruct-2507
-    secrets:
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # merge-base with origin/main needs history
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: qwts/agentic-code-analysis
+          ref: 60be121a7b27c94c56f85ac61c20ea61ab1d5d0f # main 2026-08-18 (first pin with the qwen adapter); bump deliberately
+          path: .aca
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - run: npm --prefix .aca clean-install
+      # A pull request can commit a file under .cache/aca whose name matches a
+      # real content-addressed verdict. Remove caller-controlled entries before
+      # restoring the trusted Actions cache so they cannot suppress a judge
+      # call (same guard as playbook-engineering's semantic-ratchet).
+      - name: Discard checked-out semantic verdicts
+        run: rm -rf -- .cache/aca
+      - name: Restore semantic verdicts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/aca
+          key: aca-context-footprint-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            aca-context-footprint-${{ runner.os }}-
+      - run: node .aca/src/cli.ts context-footprint --base origin/main
+        env:
+          ACA_PROVIDER: qwen
+          ACA_MODEL: qwen3.8-max
+          QWEN_BASE_URL: https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+          QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
