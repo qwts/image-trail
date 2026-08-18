@@ -1,8 +1,12 @@
-# Advisory semantic check (agentic-code-analysis, issue qwts/agentic-code-analysis#6).
-# Advisory only: this job always exits 0 — findings are informational.
-# Promotion to --enforce is a separate owner decision on advisory evidence.
-# The size ratchet is untouched; the contract is conjunctive (ratchet AND
-# semantic check).
+# Advisory semantic check (agentic-code-analysis, issue qwts/agentic-code-analysis#6;
+# routed per qwts/image-trail#838). Advisory only — findings are informational;
+# promotion to --enforce is a separate owner decision. The size ratchet is
+# untouched; the contract is conjunctive (ratchet AND semantic check).
+#
+# Judge routing policy (owner, 2026-08-18): CI screening spends the Hugging
+# Face router (Qwen), never the Anthropic key. Anthropic is reserved for
+# qualification/adjudication via agentic-code-analysis's dispatch-only
+# calibrate workflow. An absent HF_TOKEN skips screening rather than failing.
 name: aca
 on:
   pull_request:
@@ -14,25 +18,10 @@ concurrency:
   cancel-in-progress: true
 jobs:
   context-footprint:
-    name: context-footprint
     # Repo policy: draft PRs start no Actions jobs (same guard as ci.yml).
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0 # merge-base with origin/main needs history
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: qwts/agentic-code-analysis
-          ref: 6d4f69f30ca487a6af522f5aa73ca4068a0c4877 # pinned; bump deliberately
-          path: .aca
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-      - run: npm --prefix .aca clean-install
-      - run: node .aca/src/cli.ts context-footprint --base origin/main
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    uses: qwts/playbook-engineering/.github/workflows/semantic-ratchet.yml@68b920af61725d3107e9a7d4c151f7c06616bda4 # main 2026-08-18; bump deliberately
+    with:
+      model: Qwen/Qwen3-235B-A22B-Instruct-2507
+    secrets:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
