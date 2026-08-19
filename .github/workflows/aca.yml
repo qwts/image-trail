@@ -26,11 +26,14 @@ on:
     # Deliberately NO `synchronize` (overlook lesson, qwts/overlook#1037): a
     # full-suite judgment on a real PR costs millions of reasoning tokens,
     # and judging every push multiplies that by push count. A PR is judged
-    # once when it becomes reviewable — opened non-draft, reopened, or
-    # flipped ready — and on demand via the Actions re-run button after
-    # meaningful revisions. `ready_for_review` is listed explicitly because
-    # the defaults omit it.
-    types: [opened, reopened, ready_for_review]
+    # when it becomes reviewable — opened non-draft, reopened, or flipped
+    # ready — and again on demand by applying the `aca` label (remove and
+    # re-apply to repeat). The label, not the re-run button, is the
+    # fresh-head path: a re-run replays the workflow at the run's original
+    # head sha, so a revised PR would never get its new delta judged that
+    # way. `ready_for_review` is listed explicitly because the defaults
+    # omit it.
+    types: [opened, reopened, ready_for_review, labeled]
 permissions:
   contents: read
 # One advisory run per PR; a newer trigger obsoletes the in-flight judgment.
@@ -38,10 +41,40 @@ concurrency:
   group: aca-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
+  # A PR past 25 changed files is not judged at all: per-file reasoning
+  # across ten checks on a sweeping refactor is the multi-million-token burn
+  # measured on overlook (2026-08-19), and "too large to judge economically"
+  # is itself the first review finding. The skip is loud, never a silent
+  # partial — judging a truncated subset would present a partial verdict as
+  # a whole one. `changed_files` comes free with the event.
+  over-budget:
+    name: aca skipped — diff exceeds judgment budget
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+      && (github.event.action != 'labeled' || github.event.label.name == 'aca')
+      && github.event.pull_request.changed_files > 25
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          CHANGED: ${{ github.event.pull_request.changed_files }}
+        run: |
+          {
+            echo "## aca: not judged"
+            echo ""
+            echo "This PR changes ${CHANGED} files — past the 25-file judgment budget."
+            echo "Per-file reasoning across ten checks on a diff this size costs a"
+            echo "meaningful fraction of the weekly judge quota, and the size itself"
+            echo "is the first review finding. Split the PR, or accept that this"
+            echo "change ships without semantic advisory coverage."
+          } >> "$GITHUB_STEP_SUMMARY"
   check:
     name: aca ${{ matrix.check }}
-    # Repo policy: draft PRs start no Actions jobs (same guard as ci.yml).
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # Draft guard (ci.yml's); `labeled` judges only when the label is `aca`;
+    # and the 25-file diff budget above.
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+      && (github.event.action != 'labeled' || github.event.label.name == 'aca')
+      && github.event.pull_request.changed_files <= 25
     runs-on: ubuntu-latest
     strategy:
       # Advisory: every check reports; one check's findings must not silence
