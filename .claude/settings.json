@@ -121,15 +121,6 @@
             "timeout": 60
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/scripts/guard-session-context.mjs",
-            "timeout": 10
-          }
-        ]
       }
     ],
     "WorktreeCreate": [
