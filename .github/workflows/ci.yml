@@ -41,6 +41,7 @@ jobs:
     name: Action Policy
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       mode: ${{ steps.policy.outputs.mode }}
       run_full: ${{ steps.policy.outputs.run_full }}
@@ -48,13 +49,14 @@ jobs:
     steps:
       - id: policy
         # ENG-0004 requires this reviewed immutable commit even though it has no release tag.
-        uses: qwts/playbook-engineering/.github/actions/ci-policy@dd4bf511ac8305c412a0c3e23a702b3f55795967 # zizmor: ignore[stale-action-refs]
+        uses: qwts/playbook-engineering/.github/actions/ci-policy@5455a3f5939369ea843b1bbb4d2573739f4381a6
 
   merge-evidence:
     name: Verify merged commit evidence
     needs: policy
     if: needs.policy.outputs.run_post_merge == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       validated: ${{ steps.evidence.outputs.validated }}
     steps:
@@ -77,6 +79,7 @@ jobs:
     needs: policy
     if: github.event_name == 'pull_request' && needs.policy.outputs.run_full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       validated: ${{ steps.evidence.outputs.validated }}
     steps:
@@ -122,7 +125,14 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6
+        with:
+          task: Install locked dependencies
+          executable: npm
+          arguments-json: '["ci"]'
+          timeout-seconds: '900'
+          attempts: '2'
+          retry-delay-seconds: '5'
 
       # Keep the companion checkout under the ignored dependency tree so repo
       # lint/format tooling sees only Image Trail while the acceptance gate can
@@ -167,7 +177,14 @@ jobs:
           path: coverage/lcov.info
 
       - name: Install Playwright browser for Storybook
-        run: npx playwright install --with-deps chromium
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6
+        with:
+          task: Install Playwright Chromium and system dependencies
+          executable: npx
+          arguments-json: '["playwright","install","--with-deps","chromium"]'
+          timeout-seconds: '600'
+          attempts: '2'
+          retry-delay-seconds: '5'
 
       - name: Storybook interaction tests
         run: npm run test:stories:ci
@@ -196,10 +213,24 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6
+        with:
+          task: Install locked dependencies for E2E
+          executable: npm
+          arguments-json: '["ci"]'
+          timeout-seconds: '900'
+          attempts: '2'
+          retry-delay-seconds: '5'
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6
+        with:
+          task: Install Playwright Chromium for E2E
+          executable: npx
+          arguments-json: '["playwright","install","--with-deps","chromium"]'
+          timeout-seconds: '600'
+          attempts: '2'
+          retry-delay-seconds: '5'
 
       - name: Playwright E2E tests
         run: npm run test:e2e
@@ -235,6 +266,31 @@ jobs:
       (needs.policy.outputs.mode == 'post-merge' && needs.merge-evidence.outputs.validated != 'true'))
     uses: ./.github/workflows/zizmor.yml
 
+  workflow-runtime:
+    name: Workflow runtime policy
+    needs: policy
+    if: needs.policy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact validation commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Checkout pinned runtime checker
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: qwts/playbook-engineering
+          ref: 5455a3f5939369ea843b1bbb4d2573739f4381a6
+          path: .ci-runtime-policy
+          sparse-checkout: tools/ci-runtime
+          persist-credentials: false
+
+      - name: Enforce bounded workflow runtime
+        run: node .ci-runtime-policy/tools/ci-runtime/runtime-policy.mjs --root "$GITHUB_WORKSPACE"
+
   post-merge:
     name: Post-merge smoke
     needs: [policy, merge-evidence]
@@ -254,10 +310,24 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6
+        with:
+          task: Install locked dependencies for post-merge smoke
+          executable: npm
+          arguments-json: '["ci"]'
+          timeout-seconds: '900'
+          attempts: '2'
+          retry-delay-seconds: '5'
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6
+        with:
+          task: Install Playwright Chromium for post-merge smoke
+          executable: npx
+          arguments-json: '["playwright","install","--with-deps","chromium"]'
+          timeout-seconds: '600'
+          attempts: '2'
+          retry-delay-seconds: '5'
 
       - name: Extension smoke
         run: npm run test:e2e -- tests/e2e/extension-smoke.spec.ts
@@ -300,7 +370,7 @@ jobs:
 
   gate:
     name: CI
-    needs: [policy, merge-evidence, preflight-evidence, complete, e2e-gate, codeql, zizmor, post-merge]
+    needs: [policy, merge-evidence, preflight-evidence, complete, e2e-gate, codeql, zizmor, workflow-runtime, post-merge]
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -313,12 +383,14 @@ jobs:
           E2E_GATE: ${{ needs.e2e-gate.result }}
           CODEQL: ${{ needs.codeql.result }}
           ZIZMOR: ${{ needs.zizmor.result }}
+          WORKFLOW_RUNTIME: ${{ needs.workflow-runtime.result }}
           PREFLIGHT: ${{ needs.preflight-evidence.result }}
           PREFLIGHT_VALIDATED: ${{ needs.preflight-evidence.outputs.validated }}
           MERGE_VALIDATED: ${{ needs.merge-evidence.outputs.validated }}
           POST_MERGE: ${{ needs.post-merge.result }}
         run: |
           test "$POLICY" = success
+          test "$WORKFLOW_RUNTIME" = success
           case "$MODE" in
             full)
               if [ "$PREFLIGHT_VALIDATED" = true ]; then

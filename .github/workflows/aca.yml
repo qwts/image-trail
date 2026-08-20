@@ -41,6 +41,15 @@ concurrency:
   group: aca-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
+  policy:
+    name: Action Policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: qwts/playbook-engineering/.github/actions/ci-policy@5455a3f5939369ea843b1bbb4d2573739f4381a6
+        with:
+          authorization-only: 'true'
+
   # A PR past 25 changed files is not judged at all: per-file reasoning
   # across ten checks on a sweeping refactor is the multi-million-token burn
   # measured on overlook (2026-08-19), and "too large to judge economically"
@@ -50,10 +59,13 @@ jobs:
   over-budget:
     name: aca skipped — diff exceeds judgment budget
     if: >-
-      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+      needs.policy.result == 'success'
+      && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
       && (github.event.action != 'labeled' || github.event.label.name == 'aca')
       && github.event.pull_request.changed_files > 25
+    needs: policy
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - env:
           CHANGED: ${{ github.event.pull_request.changed_files }}
@@ -72,10 +84,13 @@ jobs:
     # Draft guard (ci.yml's); `labeled` judges only when the label is `aca`;
     # and the 25-file diff budget above.
     if: >-
-      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+      needs.policy.result == 'success'
+      && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
       && (github.event.action != 'labeled' || github.event.label.name == 'aca')
       && github.event.pull_request.changed_files <= 25
+    needs: policy
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       # Advisory: every check reports; one check's findings must not silence
       # another's runner. One runner per check keeps wall-clock at the
@@ -108,7 +123,16 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      - run: npm --prefix .aca clean-install
+      - name: Install advisory checker dependencies
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6
+        with:
+          task: Install advisory checker dependencies
+          executable: npm
+          arguments-json: '["clean-install"]'
+          working-directory: .aca
+          timeout-seconds: '600'
+          attempts: '2'
+          retry-delay-seconds: '5'
       # A pull request can commit a file under .cache/aca whose name matches a
       # real content-addressed verdict. Remove caller-controlled entries before
       # restoring the trusted Actions cache so they cannot suppress a judge
