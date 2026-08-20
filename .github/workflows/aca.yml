@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: qwts/playbook-engineering/.github/actions/ci-policy@5455a3f5939369ea843b1bbb4d2573739f4381a6
+      - uses: qwts/playbook-engineering/.github/actions/ci-policy@5455a3f5939369ea843b1bbb4d2573739f4381a6 # zizmor: ignore[stale-action-refs]
         with:
           authorization-only: 'true'
 
@@ -124,7 +124,7 @@ jobs:
         with:
           node-version: 24
       - name: Install advisory checker dependencies
-        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6 # zizmor: ignore[stale-action-refs]
         with:
           task: Install advisory checker dependencies
           executable: npm
