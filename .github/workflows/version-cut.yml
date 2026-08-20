@@ -46,9 +46,21 @@ permissions:
   contents: read
 
 jobs:
+  policy:
+    name: Action Policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: qwts/playbook-engineering/.github/actions/ci-policy@5455a3f5939369ea843b1bbb4d2573739f4381a6 # zizmor: ignore[stale-action-refs]
+        with:
+          authorization-only: 'true'
+
   prepare-version-pr:
     name: Prepare version packages PR
+    needs: policy
+    if: needs.policy.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       ready: ${{ steps.version.outputs.ready }}
     steps:
@@ -64,7 +76,14 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6 # zizmor: ignore[stale-action-refs]
+        with:
+          task: Install locked version tooling
+          executable: npm
+          arguments-json: '["ci"]'
+          timeout-seconds: '900'
+          attempts: '2'
+          retry-delay-seconds: '5'
 
       # Dependency code runs only in this read-only job. The next job starts on
       # a clean runner and accepts only the narrow version patch validated here.
@@ -101,6 +120,7 @@ jobs:
     needs: prepare-version-pr
     if: needs.prepare-version-pr.outputs.ready == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read # Required only by checkout; writes use the App token.
     steps:
@@ -227,7 +247,10 @@ jobs:
 
   tag:
     name: Tag version merges
+    needs: policy
+    if: needs.policy.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read # Required only by checkout; writes use the App token.
     steps:

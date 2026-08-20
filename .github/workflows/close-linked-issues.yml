@@ -14,13 +14,27 @@ concurrency:
 permissions: {}
 
 jobs:
+  policy:
+    name: Action Policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: qwts/playbook-engineering/.github/actions/ci-policy@5455a3f5939369ea843b1bbb4d2573739f4381a6 # zizmor: ignore[stale-action-refs]
+        with:
+          authorization-only: 'true'
+
   close-linked-issues:
     name: Close linked issues
     # Keep in sync with TARGET_BASE_REFS in scripts/close-linked-issues.mjs.
     if: |
+      needs.policy.result == 'success' &&
       github.event.pull_request.merged == true &&
       github.event.pull_request.base.ref == 'main'
+    needs: policy
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read # Required by checkout.
       issues: write # Required to close issues referenced by the merged PR.
