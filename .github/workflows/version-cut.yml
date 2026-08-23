@@ -316,7 +316,7 @@ jobs:
           attempt=1
           while [ "$attempt" -le 60 ]; do
             run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?event=push&head_sha=$GITHUB_SHA&per_page=100" \
-              --jq 'first(.workflow_runs[] | select(.name == "CI" and .path == ".github/workflows/ci.yml") | .id) // empty')
+              --jq 'first(.workflow_runs[] | select(.path == ".github/workflows/ci.yml") | .id) // empty')
             if [ -n "$run_id" ]; then break; fi
             sleep 5
             attempt=$((attempt + 1))
