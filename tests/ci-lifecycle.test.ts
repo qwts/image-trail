@@ -42,6 +42,8 @@ test('ready PR and main evidence are exact-SHA and require the stable CI gate', 
   );
   assert.match(ci, /\.event == "merge_group" or \.event == "push"/u);
   assert.equal(ci.match(/\.name == "CI" and \.conclusion == "success"/gu)?.length, 2);
+  assert.match(ci, /\.path == "\.github\/workflows\/ci\.yml"/u);
+  assert.doesNotMatch(ci, /select\(\.name == "CI"/u);
   assert.doesNotMatch(ci, /git (?:patch-id|merge-tree)|tree equivalence/iu);
 });
 
