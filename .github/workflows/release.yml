@@ -27,9 +27,23 @@ concurrency:
 permissions: {}
 
 jobs:
+  policy:
+    name: Action Policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: qwts/playbook-engineering/.github/actions/ci-policy@5455a3f5939369ea843b1bbb4d2573739f4381a6 # zizmor: ignore[stale-action-refs]
+        with:
+          authorization-only: 'true'
+
   release:
     name: Validate and cut release
+    needs: policy
+    if: needs.policy.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       actions: read # Required to prove exact-commit complete-suite evidence.
       contents: read # Required only by checkout; writes use the App token.
@@ -77,7 +91,7 @@ jobs:
           set -euo pipefail
           source_sha=$(git rev-list -n 1 "$TAG_NAME")
           run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$source_sha&per_page=100" \
-            --jq 'first(.workflow_runs[] | select(.name == "CI" and .path == ".github/workflows/ci.yml" and (.event == "merge_group" or .event == "push") and .conclusion == "success") | .id) // empty')
+            --jq 'first(.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and (.event == "merge_group" or .event == "push") and .conclusion == "success") | .id) // empty')
           if [ -z "$run_id" ]; then
             echo "No successful complete-suite evidence exists for release commit $source_sha." >&2
             exit 1
@@ -94,7 +108,7 @@ jobs:
           fi
           pr_head=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq '.head.sha')
           ready_run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?event=pull_request&head_sha=$pr_head&per_page=100" \
-            --jq 'first(.workflow_runs[] | select(.name == "CI" and .path == ".github/workflows/ci.yml" and .conclusion == "success") | .id) // empty')
+            --jq 'first(.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and .conclusion == "success") | .id) // empty')
           if [ -z "$ready_run" ]; then
             echo "PR #$pr_number head $pr_head has no successful ready-PR CI evidence." >&2
             exit 1
@@ -111,7 +125,14 @@ jobs:
           package-manager-cache: false
 
       - name: Install dependencies
-        run: npm ci
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6 # zizmor: ignore[stale-action-refs]
+        with:
+          task: Install locked release dependencies
+          executable: npm
+          arguments-json: '["ci"]'
+          timeout-seconds: '900'
+          attempts: '2'
+          retry-delay-seconds: '5'
 
       # npm ci replaces node_modules, so the pinned evidence checkout must follow it.
       - name: Checkout pinned Overlook acceptance evidence
@@ -123,7 +144,14 @@ jobs:
           persist-credentials: false
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        uses: qwts/playbook-engineering/.github/actions/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6 # zizmor: ignore[stale-action-refs]
+        with:
+          task: Install Playwright Chromium for release validation
+          executable: npx
+          arguments-json: '["playwright","install","--with-deps","chromium"]'
+          timeout-seconds: '600'
+          attempts: '2'
+          retry-delay-seconds: '5'
 
       - name: Smoke-test hardened release build
         env:

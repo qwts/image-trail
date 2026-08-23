@@ -22,11 +22,8 @@ test('CI exposes only the governed lifecycle triggers and skips every draft job'
 test('CI loads immutable actor policy and scopes obsolete-run cancellation to PR or queue identity', () => {
   const ci = workflow('ci.yml');
 
-  assert.match(
-    ci,
-    /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@dd4bf511ac8305c412a0c3e23a702b3f55795967 # zizmor: ignore\[stale-action-refs\]/u,
-  );
-  assert.equal(ci.match(/zizmor: ignore\[stale-action-refs\]/gu)?.length, 1);
+  assert.match(ci, /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@5455a3f5939369ea843b1bbb4d2573739f4381a6/u);
+  assert.equal(ci.match(/qwts\/playbook-engineering\/\.github\/actions\/ci-policy@5455a3f5939369ea843b1bbb4d2573739f4381a6/gu)?.length, 1);
   assert.match(ci, /format\('pr-\{0\}', github\.event\.pull_request\.number\)/u);
   assert.match(ci, /format\('merge-group-\{0\}', github\.event\.merge_group\.head_ref\)/u);
   assert.match(ci, /cancel-in-progress: \$\{\{ github\.event_name != 'push' \}\}/u);
@@ -41,10 +38,12 @@ test('ready PR and main evidence are exact-SHA and require the stable CI gate', 
     `${ci}\n${workflow('codeql.yml')}\n${workflow('zizmor.yml')}`.match(
       /ref: \$\{\{ github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/gu,
     )?.length,
-    4,
+    5,
   );
   assert.match(ci, /\.event == "merge_group" or \.event == "push"/u);
   assert.equal(ci.match(/\.name == "CI" and \.conclusion == "success"/gu)?.length, 2);
+  assert.match(ci, /\.path == "\.github\/workflows\/ci\.yml"/u);
+  assert.doesNotMatch(ci, /select\(\.name == "CI"/u);
   assert.doesNotMatch(ci, /git (?:patch-id|merge-tree)|tree equivalence/iu);
 });
 
@@ -74,6 +73,38 @@ test('complete suite retains repository, Storybook, E2E, workflow-security, and 
   assert.equal(codeql.match(/github\/codeql-action\/(?:init|analyze)@[0-9a-f]{40}/gu)?.length, 2);
   assert.match(zizmor, /workflow_call:/u);
   assert.doesNotMatch(zizmor, /pull_request:|workflow_dispatch:|push:/u);
+});
+
+test('every direct workflow entry point authorizes the actor before repository work', () => {
+  for (const file of ['aca.yml', 'close-linked-issues.yml', 'release.yml', 'version-cut.yml']) {
+    const source = workflow(file);
+    assert.match(source, /name: Action Policy/u, `${file} must define an actor-policy job`);
+    assert.match(
+      source,
+      /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@5455a3f5939369ea843b1bbb4d2573739f4381a6/u,
+      `${file} must use the reviewed immutable policy`,
+    );
+    assert.match(source, /authorization-only: 'true'/u, `${file} must select authorization-only mode`);
+  }
+});
+
+test('workflow installers and runner jobs are bounded by the governed runtime contract', () => {
+  const sources = ['aca.yml', 'ci.yml', 'close-linked-issues.yml', 'codeql.yml', 'release.yml', 'version-cut.yml', 'zizmor.yml']
+    .map((file) => workflow(file))
+    .join('\n');
+
+  assert.doesNotMatch(sources, /^\s*run: (?:npm (?:ci|clean-install)|npm --prefix .* clean-install|npx playwright install)/gmu);
+  assert.match(sources, /uses: qwts\/playbook-engineering\/\.github\/actions\/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6/u);
+  assert.match(sources, /arguments-json: '\["ci"\]'/u);
+  assert.match(sources, /arguments-json: '\["playwright","install","--with-deps","chromium"\]'/u);
+  assert.match(sources, /timeout-minutes:/u);
+
+  const ci = workflow('ci.yml');
+  assert.match(ci, /name: Workflow runtime policy/u);
+  assert.match(ci, /ref: 5455a3f5939369ea843b1bbb4d2573739f4381a6/u);
+  assert.match(ci, /runtime-policy\.mjs --root "\$GITHUB_WORKSPACE"/u);
+  assert.match(ci, /WORKFLOW_RUNTIME: \$\{\{ needs\.workflow-runtime\.result \}\}/u);
+  assert.match(ci, /test "\$WORKFLOW_RUNTIME" = success/u);
 });
 
 test('validated main runs a focused smoke while missing evidence falls back to every complete lane', () => {
