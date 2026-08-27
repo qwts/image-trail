@@ -82,7 +82,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ==============================================================================
-mpegts.js@1.8.1 — Apache-2.0
+mpegts.js@1.8.2 — Apache-2.0
 ==============================================================================
 
 
