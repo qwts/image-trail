@@ -252,7 +252,7 @@ test('version-cut keeps dependency code off the clean token-bearing runner', () 
 
   assert.match(
     prepareJob,
-    /uses: qwts\/playbook-engineering\/\.github\/actions\/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6/u,
+    /uses: qwts\/playbook-engineering\/\.github\/actions\/bounded-command@40d1c46756ba70ef40d1b56915d1cdd45b8efa85/u,
   );
   assert.match(prepareJob, /arguments-json: '\["ci"\]'/u);
   assert.match(prepareJob, /npm run changeset:version/u);
@@ -486,7 +486,7 @@ test('release workflow checks out a supplied tag and publishes assets without st
   assert.match(workflow, /head_sha=\$source_sha/u);
   assert.match(workflow, /event=pull_request&head_sha=\$pr_head/u);
   assert.match(workflow, /\.name == "CI" and \.conclusion == "success"/u);
-  assert.match(workflow, /uses: qwts\/playbook-engineering\/\.github\/actions\/bounded-command@5455a3f5939369ea843b1bbb4d2573739f4381a6/u);
+  assert.match(workflow, /uses: qwts\/playbook-engineering\/\.github\/actions\/bounded-command@40d1c46756ba70ef40d1b56915d1cdd45b8efa85/u);
   assert.match(workflow, /arguments-json: '\["playwright","install","--with-deps","chromium"\]'/u);
   assert.match(workflow, /run: npm run test:e2e:release/u);
   assert.match(workflow, /npm run package:release -- --tag/u);
