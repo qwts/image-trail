@@ -9,6 +9,7 @@ import {
 } from '../extension/src/background/interop-icloud-client.js';
 import {
   EncryptedInteropTransport,
+  INTEROP_CONTROL_FRAME_BYTES,
   InteropTransportError,
   sha256,
   type InteropObjectPage,
@@ -136,5 +137,52 @@ describe('signed iCloud native client (#588)', () => {
   test('records the published Chrome Web Store beta identity for the Overlook host allowlist', () => {
     assert.equal(RELEASED_IMAGE_TRAIL_EXTENSION_ID, 'kopcjofaojfpgdoianeddagpenhijphi');
     assert.match(RELEASED_IMAGE_TRAIL_EXTENSION_ID, /^[a-p]{32}$/u);
+  });
+
+  test('fails closed when the signed host is missing or returns a malformed response', async () => {
+    const runtime = {
+      id: RELEASED_IMAGE_TRAIL_EXTENSION_ID,
+      getPlatformInfo: () => Promise.resolve({ os: 'mac' as const, arch: 'arm64' as const, nacl_arch: 'arm' as const }),
+      sendNativeMessage: () => Promise.reject(new Error('native host missing')),
+    };
+    const client = new OverlookICloudNativeClient(RELEASED_IMAGE_TRAIL_EXTENSION_ID, runtime);
+    await assert.rejects(
+      client.request({ operation: 'status' }),
+      (error: unknown) => error instanceof InteropTransportError && error.code === 'provider-unavailable' && !error.retryable,
+    );
+
+    await assert.rejects(
+      new OverlookICloudNativeClient(RELEASED_IMAGE_TRAIL_EXTENSION_ID, {
+        ...runtime,
+        sendNativeMessage: () => Promise.resolve({ schemaVersion: 1 }),
+      }).request({ operation: 'status' }),
+      (error: unknown) => error instanceof InteropTransportError && error.code === 'corrupt' && !error.retryable,
+    );
+  });
+
+  test('rejects byte-bearing and oversized native control responses', async () => {
+    const runtime = {
+      id: RELEASED_IMAGE_TRAIL_EXTENSION_ID,
+      getPlatformInfo: () => Promise.resolve({ os: 'mac' as const, arch: 'arm64' as const, nacl_arch: 'arm' as const }),
+      sendNativeMessage: (_host: string, message: object) => Promise.resolve(message),
+    };
+
+    for (const response of [{ bytes: [1, 2, 3] }, { ciphertext: 'not-a-control-frame' }]) {
+      await assert.rejects(
+        new OverlookICloudNativeClient(RELEASED_IMAGE_TRAIL_EXTENSION_ID, {
+          ...runtime,
+          sendNativeMessage: () => Promise.resolve(response),
+        }).request({ operation: 'status' }),
+        (error: unknown) => error instanceof InteropTransportError && error.code === 'corrupt' && !error.retryable,
+      );
+    }
+
+    await assert.rejects(
+      new OverlookICloudNativeClient(RELEASED_IMAGE_TRAIL_EXTENSION_ID, {
+        ...runtime,
+        sendNativeMessage: () => Promise.resolve({ schemaVersion: 1, ok: true, result: 'x'.repeat(INTEROP_CONTROL_FRAME_BYTES) }),
+      }).request({ operation: 'status' }),
+      (error: unknown) => error instanceof InteropTransportError && error.code === 'corrupt' && !error.retryable,
+    );
   });
 });
