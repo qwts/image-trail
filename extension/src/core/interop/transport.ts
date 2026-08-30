@@ -19,7 +19,7 @@ const safePathSchema = v.pipe(
   ),
 );
 
-export type InteropTransportProvider = 'pcloud' | 'google-drive' | 'icloud';
+export type InteropTransportProvider = 'pcloud' | 'google-drive' | 'icloud' | 'local-overlook';
 export type InteropTransportFailure =
   'offline' | 'auth-expired' | 'quota' | 'provider-unavailable' | 'partial-failure' | 'not-found' | 'corrupt' | 'unsupported';
 

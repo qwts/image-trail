@@ -3,10 +3,22 @@ import { restoreActiveBlobKey } from '../data/crypto/blob-keyring.js';
 import { DRIVE_FILE_SCOPE } from './interop-chrome-identity.js';
 import { createChromeIdentityInteropDriveStore } from './interop-google-drive-store.js';
 import { OverlookICloudNativeClient, RELEASED_IMAGE_TRAIL_EXTENSION_ID } from './interop-icloud-client.js';
+import { installLiveLocalE2EProbe } from './interop-live-local-e2e-probe.js';
 import { createChromePCloudInteropAuth } from './interop-pcloud-auth.js';
 import { InteropRuntime } from './interop-runtime.js';
 import { PCLOUD_HOST_PERMISSION, requestHostPermission } from './permissions.js';
 import type { InteropRuntimeAction } from '../core/interop/runtime-state.js';
+
+declare const __IMAGE_TRAIL_INTEROP_ENABLED__: boolean | undefined;
+declare const __IMAGE_TRAIL_E2E_TEST_BUILD__: boolean | undefined;
+if (
+  typeof __IMAGE_TRAIL_INTEROP_ENABLED__ === 'boolean' &&
+  __IMAGE_TRAIL_INTEROP_ENABLED__ &&
+  typeof __IMAGE_TRAIL_E2E_TEST_BUILD__ === 'boolean' &&
+  __IMAGE_TRAIL_E2E_TEST_BUILD__
+) {
+  installLiveLocalE2EProbe();
+}
 
 export async function ensurePCloudInteropHostPermission(
   interactive: boolean,

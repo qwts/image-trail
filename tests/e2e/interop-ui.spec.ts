@@ -12,6 +12,10 @@ test('the baseline package omits native messaging and unfinished Transfer & Sync
 
   const manifest = await serviceWorker.evaluate(() => chrome.runtime.getManifest());
   expect(manifest.permissions ?? []).not.toContain('nativeMessaging');
+  const liveLocalProbe = await serviceWorker.evaluate(() => {
+    return '__imageTrailRunLiveLocalE2EProbe' in globalThis;
+  });
+  expect(liveLocalProbe).toBe(false);
   const pairingImportShipped = await serviceWorker.evaluate(async () => {
     try {
       return (await fetch(chrome.runtime.getURL('src/interop-pairing/import.html'))).ok;
@@ -59,6 +63,27 @@ test('an enabled experimental build opens Transfer & Sync without reordering the
 
   const manifest = await serviceWorker.evaluate(() => chrome.runtime.getManifest());
   expect(manifest.permissions ?? []).toContain('nativeMessaging');
+  const liveLocalProbe = await serviceWorker.evaluate(async () => {
+    const scope = globalThis as typeof globalThis & {
+      __imageTrailRunLiveLocalE2EProbe?: () => Promise<{
+        readonly connected: boolean;
+        readonly bootstrapCalls: number;
+        readonly socketProtocol: string;
+        readonly controlTypes: readonly string[];
+        readonly acknowledgedBytes: number;
+      }>;
+    };
+    return scope.__imageTrailRunLiveLocalE2EProbe?.();
+  });
+  expect(liveLocalProbe).toEqual({
+    connected: true,
+    bootstrapCalls: 1,
+    socketProtocol: 'overlook.interop.v1',
+    controlTypes: ['redeem', 'open', 'heartbeat'],
+    acknowledgedBytes: 4,
+  });
+  expect(JSON.stringify(liveLocalProbe)).not.toContain('A'.repeat(43));
+  expect(JSON.stringify(liveLocalProbe)).not.toMatch(/secret|endpoint|sessionId/u);
 
   await openFixturePage(page, fixturePaths.singleImage);
   await togglePanelFromExtensionAction(page, serviceWorker);
