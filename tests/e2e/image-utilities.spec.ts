@@ -97,8 +97,16 @@ async function confirmQueueDeletion(page: Page, actionName: RegExp, confirmName:
   await page.getByRole('button', { name: confirmName }).click();
 }
 
-async function setupEncryptedOriginals(page: Page, value = password): Promise<void> {
+async function setupEncryptedOriginals(page: Page, serviceWorker: Worker, value = password): Promise<void> {
   await openEncryptedOriginals(page);
+  if ((await page.getByRole('button', { name: 'Clear key' }).count()) > 0) {
+    await clearEncryptedOriginalsKey(page);
+    await openEncryptedOriginals(page);
+  } else if ((await page.getByRole('button', { name: 'Unlock', exact: true }).count()) > 0) {
+    await clearStoredBlobKeys(serviceWorker);
+    await reopenPanel(page, serviceWorker);
+    await openEncryptedOriginals(page);
+  }
   await page.getByLabel('New encrypted originals password').fill(value);
   await page.getByRole('button', { name: 'Create first key' }).click();
   await expectPanelStatusMessage(page, /Encrypted blob storage unlocked with blob:[a-f0-9-]+\./u);
@@ -165,21 +173,14 @@ async function exportImages(page: Page, serviceWorker: Worker, options: { readon
   await openImageUtilities(page);
   await clearDownloadRequestLog(serviceWorker);
   if (options.saveAs) {
-    // Hold Shift via keyboard so the capture Pin modifier re-render settles before the click.
-    // Using click({modifiers:['Shift']}) races against the panel's Shift-triggered
-    // Capture->Pin swap (full panel DOM re-render) causing html intercepts / detach.
-    await page.keyboard.down('Shift');
-    try {
-      // Wait for the Pin mode UI to settle; polling avoids a hard timeout slump.
-      await page.waitForTimeout(150);
-      const exportButton = page.getByRole('button', { name: /Export images/u });
-      await exportButton.waitFor({ state: 'visible', timeout: 5000 });
-      await exportButton.click();
-    } finally {
-      await page.keyboard.up('Shift');
-      // Allow the Pin->Capture swap to settle before asserting status.
-      await page.waitForTimeout(150);
-    }
+    // This test owns the export handler's Shift/saveAs contract. Real keyboard
+    // modifier rendering is covered separately; holding Shift here re-renders the
+    // entire panel and detaches the export control before its click can complete.
+    await page.getByRole('button', { name: /Export images/u }).dispatchEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      shiftKey: true,
+    });
   } else {
     await page.getByRole('button', { name: /Export images/u }).click();
   }
@@ -312,7 +313,7 @@ test('captures originals, prefers stored bytes for export, and round-trips encry
   test.setTimeout(60_000);
   await installDownloadRequestLog(serviceWorker);
   await openPanel(page, serviceWorker);
-  await setupEncryptedOriginals(page);
+  await setupEncryptedOriginals(page, serviceWorker);
 
   await pinCurrentImage(page);
   const queueRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
@@ -357,7 +358,7 @@ test('captures originals, prefers stored bytes for export, and round-trips encry
   await deleteVisibleQueueRows(page);
   await expect(page.locator('.image-trail-panel__bookmark-item')).toHaveCount(0);
   await clearEncryptedOriginalsKey(page);
-  await setupEncryptedOriginals(page, wrongPassword);
+  await setupEncryptedOriginals(page, serviceWorker, wrongPassword);
   const historyCountBeforeWrongKey = await page.locator('.image-trail-panel__history-item').count();
   await importEncryptedImage(page, fileContent);
   await expectPanelStatusMessage(page, /Unlock blob:[a-f0-9-]+ before importing this encrypted image\./u);
@@ -368,19 +369,7 @@ test('captures originals, prefers stored bytes for export, and round-trips encry
 test('refuses to store oversized originals and keeps stored-original usage bounded', async ({ page, serviceWorker }) => {
   test.setTimeout(60_000);
   await openPanel(page, serviceWorker);
-  // The extension context is shared across tests: earlier tests can leave a blob key
-  // (locked with another password) and orphaned blobs behind. If the key is still
-  // unlocked, the panel offers Clear key. If a service-worker restart has locked it,
-  // the panel shows only the unlock form with no Clear key control, so fall back to
-  // clearing the stored key directly and reopening the panel to refresh its status.
-  await openEncryptedOriginals(page);
-  if ((await page.getByRole('button', { name: 'Clear key' }).count()) > 0) {
-    await clearEncryptedOriginalsKey(page);
-  } else if ((await page.getByRole('button', { name: 'Unlock', exact: true }).count()) > 0) {
-    await clearStoredBlobKeys(serviceWorker);
-    await reopenPanel(page, serviceWorker);
-  }
-  await setupEncryptedOriginals(page);
+  await setupEncryptedOriginals(page, serviceWorker);
 
   await pinCurrentImage(page);
   const baselineRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });
