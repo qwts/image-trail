@@ -4,10 +4,12 @@ import process from 'node:process';
 import { auditExtensionArtifacts } from './extension-artifact-policy.mjs';
 
 const requireRelease = process.argv.slice(2).includes('--require-release');
+const requireExperimental = process.argv.slice(2).includes('--require-experimental');
 const result = await auditExtensionArtifacts({
   directory: 'extension/dist',
   rootDirectory: process.cwd(),
   requireRelease,
+  requireExperimental,
   allowE2ETestBuild: process.env.IMAGE_TRAIL_E2E_TEST_BUILD === '1',
 });
 

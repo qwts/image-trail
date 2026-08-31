@@ -9,7 +9,10 @@ const execFileAsync = promisify(execFile);
 
 const rootDirectory = process.cwd();
 const manifest = JSON.parse(await readFile('extension/manifest.json', 'utf8'));
-const mode = process.env.IMAGE_TRAIL_RELEASE_BUILD === '1' ? 'release' : 'local';
+const releaseBuild = process.env.IMAGE_TRAIL_RELEASE_BUILD === '1';
+const experimentalBuild = process.env.IMAGE_TRAIL_EXPERIMENTAL_BUILD === '1';
+if (releaseBuild && experimentalBuild) throw new Error('A build cannot be both release and experimental.');
+const mode = releaseBuild ? 'release' : experimentalBuild ? 'experimental' : 'local';
 
 const buildInfo = {
   schemaVersion: 1,
@@ -17,7 +20,7 @@ const buildInfo = {
   builtAt: new Date().toISOString(),
   commit: await gitValue(['rev-parse', '--short=12', 'HEAD']),
   branch: await gitValue(['branch', '--show-current']),
-  worktree: mode === 'release' ? null : localWorktreeLabel(rootDirectory),
+  worktree: mode === 'local' ? localWorktreeLabel(rootDirectory) : null,
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
   mode,
 };

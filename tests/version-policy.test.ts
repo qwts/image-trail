@@ -35,6 +35,7 @@ type ReleasePackageModule = {
   validateReleaseTag(tag: string, version: string): string[];
   validateArchiveEntries(entries: string[]): string[];
   releaseArtifactNames(version: string): { archive: string; checksum: string };
+  experimentalArtifactNames(version: string): { archive: string; checksum: string };
 };
 
 type VersionCutModule = {
@@ -85,12 +86,20 @@ test('requires both package-lock version fields to match package.json', () => {
   assert.match(policy.evaluateVersionArtifacts({ ...versionArtifacts(), lockRootVersion: '0.0.9' }).join(' '), /root package \(0\.0\.9\)/u);
 });
 
-test('validates local and release build identity policy', () => {
+test('validates local, release, and experimental build identity policy', () => {
   assert.deepEqual(
     policy.evaluateVersionArtifacts({
       ...versionArtifacts(),
       buildInfo: { version: '0.1.0', mode: 'local', worktree: 'image-trail' },
       requiredBuildMode: 'local',
+    }),
+    [],
+  );
+  assert.deepEqual(
+    policy.evaluateVersionArtifacts({
+      ...versionArtifacts(),
+      buildInfo: { version: '0.1.0', mode: 'experimental', worktree: null },
+      requiredBuildMode: 'experimental',
     }),
     [],
   );
@@ -466,6 +475,10 @@ test('release packaging requires an exact version tag and stable artifact names'
   assert.deepEqual(releasePackage.releaseArtifactNames('1.2.3'), {
     archive: 'image-trail-v1.2.3.zip',
     checksum: 'image-trail-v1.2.3.zip.sha256',
+  });
+  assert.deepEqual(releasePackage.experimentalArtifactNames('1.2.3'), {
+    archive: 'image-trail-v1.2.3-experimental.zip',
+    checksum: 'image-trail-v1.2.3-experimental.zip.sha256',
   });
 });
 

@@ -2,15 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, win32 } from 'node:path';
+import { dirname, join, win32 } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 type ArtifactPolicyModule = {
+  auditExtensionArtifacts(options: {
+    directory: string;
+    rootDirectory: string;
+    requireExperimental?: boolean;
+    requireRelease?: boolean;
+  }): Promise<{ errors: string[] }>;
   expectedExtensionArtifacts(manifest: Record<string, unknown>): string[];
   validateArtifactPaths(files: string[], manifest: Record<string, unknown>): string[];
   validateReleaseArtifactText(file: string, content: string, rootDirectory: string, options?: { allowE2ETestBuild?: boolean }): string[];
   validateReleaseBuildInfo(buildInfo: Record<string, unknown>): string[];
   validateReleaseManifest(manifest: Record<string, unknown>): string[];
+  validateExperimentalBuildInfo(buildInfo: Record<string, unknown>): string[];
+  validateExperimentalManifest(manifest: Record<string, unknown>): string[];
 };
 
 type BuildPolicyModule = {
@@ -29,6 +37,7 @@ type BuildPolicyModule = {
     pcloudClientId?: string | null;
   }): Record<string, unknown>;
   isInteropFeatureEnabled(environment?: Record<string, string | undefined>): boolean;
+  isExperimentalBuild(environment?: Record<string, string | undefined>): boolean;
   isReleaseBuild(environment?: Record<string, string | undefined>): boolean;
   isE2ETestBuild(environment?: Record<string, string | undefined>): boolean;
   isPageContextSwitcherFeatureEnabled(environment?: Record<string, string | undefined>, e2eTestBuild?: boolean): boolean;
@@ -38,10 +47,13 @@ type BuildPolicyModule = {
 };
 
 type ManifestPolicyModule = {
+  RELEASED_IMAGE_TRAIL_EXTENSION_ID: string;
+  RELEASED_IMAGE_TRAIL_PUBLIC_KEY: string;
+  chromeExtensionIdFromPublicKey(publicKey: string): string;
   extensionManifestForBuild(
     manifest: Record<string, unknown>,
-    options?: { interopEnabled?: boolean },
-  ): Record<string, unknown> & { permissions: string[] };
+    options?: { interopEnabled?: boolean; experimentalBuild?: boolean },
+  ): Record<string, unknown> & { key?: string; permissions: string[] };
 };
 
 const artifacts = (await import(pathToFileURL(join(process.cwd(), 'scripts/extension-artifact-policy.mjs')).href)) as ArtifactPolicyModule;
@@ -69,6 +81,15 @@ function releaseBuildInfo(overrides: Record<string, unknown> = {}) {
     mode: 'release',
     ...overrides,
   };
+}
+
+function writeArtifactFixture(directory: string, manifest: Record<string, unknown>, buildInfo: Record<string, unknown>) {
+  for (const file of artifacts.expectedExtensionArtifacts(manifest)) {
+    const target = join(directory, file);
+    mkdirSync(dirname(target), { recursive: true });
+    const content = file === 'manifest.json' ? manifest : file === 'build-info.json' ? buildInfo : '';
+    writeFileSync(target, typeof content === 'string' ? content : `${JSON.stringify(content)}\n`);
+  }
 }
 
 test('central release build policy minifies and removes development-only debugging', () => {
@@ -152,6 +173,8 @@ test('central release build policy minifies and removes development-only debuggi
 test('release-mode detection and minification regression threshold are explicit', () => {
   assert.equal(builds.isReleaseBuild({ IMAGE_TRAIL_RELEASE_BUILD: '1' }), true);
   assert.equal(builds.isReleaseBuild({ IMAGE_TRAIL_RELEASE_BUILD: '0' }), false);
+  assert.equal(builds.isExperimentalBuild({ IMAGE_TRAIL_EXPERIMENTAL_BUILD: '1' }), true);
+  assert.equal(builds.isExperimentalBuild({ IMAGE_TRAIL_EXPERIMENTAL_BUILD: '0' }), false);
   assert.equal(builds.isInteropFeatureEnabled({ IMAGE_TRAIL_ENABLE_INTEROP: '1' }), true);
   assert.equal(builds.isInteropFeatureEnabled({ IMAGE_TRAIL_ENABLE_INTEROP: '0' }), false);
   assert.equal(builds.isE2ETestBuild({ IMAGE_TRAIL_E2E_TEST_BUILD: '1' }), true);
@@ -181,6 +204,14 @@ test('baseline manifests omit native messaging and experimental interop builds o
     'storage',
     'nativeMessaging',
   ]);
+  const experimental = manifests.extensionManifestForBuild(source, { experimentalBuild: true, interopEnabled: true });
+  assert.equal(experimental.key, manifests.RELEASED_IMAGE_TRAIL_PUBLIC_KEY);
+  assert.equal(manifests.chromeExtensionIdFromPublicKey(experimental.key ?? ''), manifests.RELEASED_IMAGE_TRAIL_EXTENSION_ID);
+  assert.equal(manifests.RELEASED_IMAGE_TRAIL_EXTENSION_ID, 'kopcjofaojfpgdoianeddagpenhijphi');
+  assert.throws(
+    () => manifests.extensionManifestForBuild(source, { experimentalBuild: true, interopEnabled: false }),
+    /Experimental builds require interoperability/u,
+  );
   assert.deepEqual(source.permissions, ['activeTab', 'nativeMessaging', 'storage']);
 });
 
@@ -296,9 +327,40 @@ test('release build identity rejects extra metadata and local build markers', ()
   );
 });
 
+test('experimental build identity is hardened and distinct from release', () => {
+  const experimental = releaseBuildInfo({ mode: 'experimental' });
+  assert.deepEqual(artifacts.validateExperimentalBuildInfo(experimental), []);
+  assert.match(artifacts.validateExperimentalBuildInfo(releaseBuildInfo()).join(' '), /experimental mode/u);
+  assert.match(artifacts.validateExperimentalBuildInfo({ ...experimental, worktree: 'image-trail' }).join(' '), /worktree/u);
+});
+
+test('an explicit experimental audit rejects a release-mode artifact', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'image-trail-experimental-audit-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const manifest = {
+    ...manifestFixture(),
+    web_accessible_resources: [{ resources: ['src/ui/styles/panel.css'], matches: ['https://*/*'], use_dynamic_url: true }],
+  };
+  writeArtifactFixture(directory, manifest, releaseBuildInfo());
+
+  const result = await artifacts.auditExtensionArtifacts({
+    directory,
+    rootDirectory: directory,
+    requireExperimental: true,
+  });
+  assert.match(result.errors.join(' '), /experimental mode/u);
+});
+
 test('release manifests reject the feature-gated native messaging permission', () => {
   assert.deepEqual(artifacts.validateReleaseManifest({ permissions: ['activeTab', 'storage'] }), []);
   assert.match(artifacts.validateReleaseManifest({ permissions: ['nativeMessaging'] }).join(' '), /must not request nativeMessaging/u);
+});
+
+test('experimental manifests require native messaging and the released extension identity', () => {
+  const manifest = manifests.extensionManifestForBuild({ permissions: ['activeTab'] }, { experimentalBuild: true, interopEnabled: true });
+  assert.deepEqual(artifacts.validateExperimentalManifest(manifest), []);
+  assert.match(artifacts.validateExperimentalManifest({ permissions: [] }).join(' '), /requires nativeMessaging/u);
+  assert.match(artifacts.validateExperimentalManifest({ ...manifest, key: undefined }).join(' '), /released extension public key/u);
 });
 
 test('release manifests require dynamic URLs for every web-accessible-resource group', () => {
@@ -322,9 +384,18 @@ test('build pipeline typechecks without emitting source-shaped modules and audit
   assert.match(packageJson.scripts['build'] ?? '', /npm run check:artifacts/u);
   assert.match(packageJson.scripts['build:release'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=0/u);
   assert.match(packageJson.scripts['build:release'] ?? '', /IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER=0/u);
+  assert.match(packageJson.scripts['build:release'] ?? '', /IMAGE_TRAIL_EXPERIMENTAL_BUILD=0/u);
   assert.match(packageJson.scripts['build:release'] ?? '', /IMAGE_TRAIL_E2E_TEST_BUILD=0/u);
   assert.match(packageJson.scripts['build:release'] ?? '', /audit-extension-artifacts\.mjs --require-release/u);
+  assert.match(packageJson.scripts['build:experimental'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=1/u);
+  assert.match(packageJson.scripts['build:experimental'] ?? '', /IMAGE_TRAIL_EXPERIMENTAL_BUILD=1/u);
+  assert.match(packageJson.scripts['build:experimental'] ?? '', /IMAGE_TRAIL_RELEASE_BUILD=0/u);
+  assert.match(packageJson.scripts['build:experimental'] ?? '', /audit-extension-artifacts\.mjs --require-experimental/u);
+  assert.match(packageJson.scripts['package:experimental'] ?? '', /package-extension-release\.mjs --experimental/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=0/u);
+  assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_EXPERIMENTAL_BUILD=0/u);
+  assert.match(packageJson.scripts['test:e2e:experimental'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=1/u);
+  assert.match(packageJson.scripts['test:e2e:experimental'] ?? '', /IMAGE_TRAIL_EXPERIMENTAL_BUILD=1/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER=0/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_RELEASE_BUILD=1 npm run test:e2e/u);
   assert.match(readFileSync('tests/e2e/global-setup.ts', 'utf8'), /IMAGE_TRAIL_E2E_TEST_BUILD: '1'/u);

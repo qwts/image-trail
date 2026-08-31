@@ -86,6 +86,14 @@ export function isReleaseBuild(environment = process.env) {
   return environment.IMAGE_TRAIL_RELEASE_BUILD === '1';
 }
 
+export function isExperimentalBuild(environment = process.env) {
+  return environment.IMAGE_TRAIL_EXPERIMENTAL_BUILD === '1';
+}
+
+export function isHardenedBuild(environment = process.env) {
+  return isReleaseBuild(environment) || isExperimentalBuild(environment);
+}
+
 export function isInteropFeatureEnabled(environment = process.env) {
   return environment.IMAGE_TRAIL_ENABLE_INTEROP === '1';
 }
@@ -130,7 +138,7 @@ export function extensionBuildOptions({
   outfile,
   format,
   jsx = null,
-  release = isReleaseBuild(),
+  release = isHardenedBuild(),
   interopEnabled = isInteropFeatureEnabled(),
   e2eTestBuild = isE2ETestBuild(),
   pageContextSwitcherEnabled = isPageContextSwitcherFeatureEnabled(process.env, e2eTestBuild),
@@ -169,7 +177,7 @@ export function extensionBuildOptions({
 }
 
 export async function buildExtensionEntry(configuration) {
-  const release = configuration.release ?? isReleaseBuild();
+  const release = configuration.release ?? isHardenedBuild();
   const options = extensionBuildOptions({ ...configuration, release });
   let unminifiedBytes = null;
 
@@ -200,7 +208,7 @@ export async function bundledPackageDirectories(entryPoints = Object.values(EXTE
   return [...directories].sort();
 }
 
-export async function writeStylesheet(sourcePath, outputPath, { release = isReleaseBuild() } = {}) {
+export async function writeStylesheet(sourcePath, outputPath, { release = isHardenedBuild() } = {}) {
   const source = await readFile(sourcePath, 'utf8');
   const output = release
     ? (
@@ -218,7 +226,7 @@ export async function writeStylesheet(sourcePath, outputPath, { release = isRele
   if (release) reportMinification(outputPath, Buffer.byteLength(source), Buffer.byteLength(output));
 }
 
-export async function bundleStylesheet(sourcePath, outputPath, { release = isReleaseBuild() } = {}) {
+export async function bundleStylesheet(sourcePath, outputPath, { release = isHardenedBuild() } = {}) {
   await mkdir(path.dirname(outputPath), { recursive: true });
   const options = {
     entryPoints: [sourcePath],

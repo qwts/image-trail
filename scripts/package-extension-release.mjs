@@ -46,6 +46,11 @@ export function releaseArtifactNames(version) {
   return { archive, checksum: `${archive}.sha256` };
 }
 
+export function experimentalArtifactNames(version) {
+  const archive = `image-trail-${expectedReleaseTag(version)}-experimental.zip`;
+  return { archive, checksum: `${archive}.sha256` };
+}
+
 function requestedTag(args) {
   const index = args.indexOf('--tag');
   if (index === -1) return null;
@@ -55,6 +60,7 @@ function requestedTag(args) {
 }
 
 async function main() {
+  const experimental = process.argv.slice(2).includes('--experimental');
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
   const manifest = JSON.parse(await readFile(`${DIST_DIRECTORY}/manifest.json`, 'utf8'));
   const packageLock = JSON.parse(await readFile('package-lock.json', 'utf8'));
@@ -66,7 +72,7 @@ async function main() {
     lockVersion: packageLock.version,
     lockRootVersion: packageLock.packages?.['']?.version,
     buildInfo,
-    requiredBuildMode: 'release',
+    requiredBuildMode: experimental ? 'experimental' : 'release',
   });
   const tag = requestedTag(process.argv.slice(2));
   if (tag) errors.push(...validateReleaseTag(tag, version));
@@ -74,18 +80,21 @@ async function main() {
   const artifactAudit = await auditExtensionArtifacts({
     directory: DIST_DIRECTORY,
     rootDirectory: process.cwd(),
-    requireRelease: true,
+    requireRelease: !experimental,
+    requireExperimental: experimental,
   });
   const files = artifactAudit.files;
   errors.push(...artifactAudit.errors);
   errors.push(...validateArchiveEntries(files));
   if (errors.length > 0) {
-    throw new Error(`Release package validation failed:\n${errors.map((error) => `  - ${error}`).join('\n')}`);
+    throw new Error(
+      `${experimental ? 'Experimental' : 'Release'} package validation failed:\n${errors.map((error) => `  - ${error}`).join('\n')}`,
+    );
   }
 
   await rm(RELEASE_DIRECTORY, { recursive: true, force: true });
   await mkdir(RELEASE_DIRECTORY, { recursive: true });
-  const names = releaseArtifactNames(version);
+  const names = experimental ? experimentalArtifactNames(version) : releaseArtifactNames(version);
   const archivePath = path.resolve(RELEASE_DIRECTORY, names.archive);
   await execFileAsync('zip', ['-X', '-q', archivePath, ...files], { cwd: DIST_DIRECTORY });
 
@@ -102,7 +111,7 @@ async function main() {
     .update(await readFile(archivePath))
     .digest('hex');
   await writeFile(path.join(RELEASE_DIRECTORY, names.checksum), `${digest}  ${names.archive}\n`);
-  console.log(`Release package: ${path.relative(process.cwd(), archivePath)}`);
+  console.log(`${experimental ? 'Experimental' : 'Release'} package: ${path.relative(process.cwd(), archivePath)}`);
   console.log(`SHA-256: ${digest}`);
 }
 
