@@ -3,15 +3,6 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "^Bash$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/scripts/guard-agent-command.mjs\" --protocol=codex"
-          }
-        ]
-      },
-      {
         "hooks": [
           {
             "type": "command",
