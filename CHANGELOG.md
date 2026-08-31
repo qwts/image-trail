@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.27.3
+
+### Patch Changes
+
+- c47108c: Wire encrypted Move and Sync journals into resumable live local Overlook sessions.
+
 ## 0.27.2
 
 ### Patch Changes
