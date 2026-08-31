@@ -167,13 +167,20 @@ describe('signed iCloud native client (#588)', () => {
       sendNativeMessage: (_host: string, message: object) => Promise.resolve(message),
     };
 
-    for (const response of [{ bytes: [1, 2, 3] }, { ciphertext: 'not-a-control-frame' }]) {
+    for (const response of [
+      { schemaVersion: 1, ok: true, bytes: [1, 2, 3] },
+      { schemaVersion: 1, ok: true, ciphertext: 'not-a-control-frame' },
+    ]) {
       await assert.rejects(
         new OverlookICloudNativeClient(RELEASED_IMAGE_TRAIL_EXTENSION_ID, {
           ...runtime,
           sendNativeMessage: () => Promise.resolve(response),
         }).request({ operation: 'status' }),
-        (error: unknown) => error instanceof InteropTransportError && error.code === 'corrupt' && !error.retryable,
+        (error: unknown) =>
+          error instanceof InteropTransportError &&
+          error.code === 'corrupt' &&
+          !error.retryable &&
+          /contains payload bytes/u.test(error.message),
       );
     }
 
