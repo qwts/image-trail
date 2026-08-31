@@ -47,3 +47,13 @@ test('Help content is static and privacy-inert — no URLs or record values can 
   assert.ok(!/https?:\/\//u.test(text), 'no URL values appear in Help copy');
   assert.ok(!text.includes('blob:'), 'no blob references appear in Help copy');
 });
+
+test('Help distinguishes local Overlook from explicit cloud routes without exposing authority', () => {
+  const text = createHelpView().textContent ?? '';
+  assert.match(text, /compatible signed Overlook app on this computer/u);
+  assert.match(text, /Native Messaging only requests short-lived loopback authority/u);
+  assert.match(text, /Cloud providers are explicit cross-machine routes/u);
+  assert.match(text, /never silently moves between local and cloud/u);
+  assert.match(text, /release builds.+omit Native Messaging/u);
+  assert.doesNotMatch(text, /sessionId|endpoint|A{43}/u);
+});

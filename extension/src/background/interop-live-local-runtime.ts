@@ -6,6 +6,7 @@ import type { InteropProviderOpenContext, InteropRuntimeProviderStore } from './
 
 interface ActiveLiveLocalRuntime {
   readonly key: string;
+  readonly operationId: string;
   readonly session: LiveLocalRuntimeSession;
   readonly store: InteropRuntimeProviderStore;
 }
@@ -14,6 +15,7 @@ export interface LiveLocalRuntimeSession {
   readonly phase: string;
   readonly store: InteropObjectStore;
   commit(): Promise<void>;
+  cancel(): void;
   close(): void;
 }
 
@@ -131,8 +133,19 @@ export class LiveLocalInteropRuntime {
       );
     }
     const store = new LiveLocalRuntimeStore(result.session, repository);
-    this.#active = { key, session: result.session, store };
+    this.#active = { key, operationId: context.operationId, session: result.session, store };
     return store;
+  }
+
+  async cancel(operationId: string): Promise<void> {
+    const db = await this.getDb();
+    if (!db) throw new InteropTransportError('Live local cancellation storage is unavailable.', 'provider-unavailable', true);
+    const active = this.#active;
+    if (active?.operationId === operationId) {
+      active.session.cancel();
+      this.#active = null;
+    }
+    await new IndexedDbLiveLocalObjectRepository(db, operationId).clear();
   }
 
   disconnect(): Promise<void> {

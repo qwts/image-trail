@@ -231,10 +231,10 @@ export class LiveLocalOverlookSession implements LiveLocalObjectChannel {
   cancel(): void {
     if (this.#phase === 'closed' || this.#phase === 'closing') return;
     const wasConnected = this.#phase === 'connected';
+    if (wasConnected) this.sendControl({ schemaVersion: 1, type: 'cancel' });
     const error = new InteropTransportError('Live local operation was cancelled.', 'offline', true);
     this.rejectPending(error);
     this.#phase = 'closing';
-    if (wasConnected) this.sendControl({ schemaVersion: 1, type: 'cancel' });
     this.#store.close(error);
     this.#socket.close(1000, 'cancelled');
     this.#stateChanged({ state: 'paused', operationId: this.#open.operationId, retryable: true });

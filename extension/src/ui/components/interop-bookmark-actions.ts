@@ -51,7 +51,10 @@ export function addInteropBookmarkActions(
   for (const row of section.querySelectorAll<HTMLElement>('[data-image-trail-row-id]')) {
     const item = items.find((candidate) => candidate.id === row.dataset['imageTrailRowId']);
     const actions = row.querySelector('.image-trail-panel__item-actions');
-    if (item && actions) actions.prepend(createInteropRecordButton(item, locked));
+    if (item && actions) {
+      actions.classList.add('image-trail-interop__record-actions');
+      actions.prepend(createInteropRecordButton(item, locked));
+    }
   }
   return section;
 }

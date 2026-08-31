@@ -3,7 +3,11 @@ import { createHash } from 'node:crypto';
 import { describe, test } from 'node:test';
 
 import { RELEASED_IMAGE_TRAIL_EXTENSION_ID, type NativeRuntime } from '../extension/src/background/interop-icloud-client.js';
-import { OverlookLiveLocalNativeClient, probeLiveLocalNativeSupport } from '../extension/src/background/interop-live-local-native.js';
+import {
+  OverlookLiveLocalNativeClient,
+  probeLiveLocalNativeAvailability,
+  probeLiveLocalNativeSupport,
+} from '../extension/src/background/interop-live-local-native.js';
 import { LiveLocalOverlookClient, type LiveLocalNativeBootstrapClient } from '../extension/src/background/interop-live-local-client.js';
 import {
   LiveLocalOverlookObjectStore,
@@ -110,6 +114,23 @@ class MemoryRepository implements LiveLocalIncomingObjectRepository {
 }
 
 describe('live local native bootstrap (#675)', () => {
+  test('reports pairing-scoped availability without exposing the one-use capability', async () => {
+    const calls: unknown[] = [];
+    const running = {
+      bootstrap: (pairingId: string, operation: 'move' | 'sync') => {
+        calls.push({ pairingId, operation });
+        return Promise.resolve({ schemaVersion: 1 as const, state: 'running' as const, capability: capability() });
+      },
+    };
+    assert.equal(await probeLiveLocalNativeAvailability(PAIRING_ID, 'move', running), 'connected');
+    assert.deepEqual(calls, [{ pairingId: PAIRING_ID, operation: 'move' }]);
+
+    const closed = {
+      bootstrap: () => Promise.resolve({ schemaVersion: 1 as const, state: 'not-running' as const }),
+    };
+    assert.equal(await probeLiveLocalNativeAvailability(PAIRING_ID, 'sync', closed), 'not-running');
+  });
+
   test('sends the exact schema-v2 request and accepts only a matching bounded capability', async () => {
     const messages: object[] = [];
     const client = new OverlookLiveLocalNativeClient(
@@ -379,6 +400,7 @@ class FakeSocket implements LiveLocalWebSocketLike {
   readyState = 0;
   bufferedAmount = 0;
   binaryType: 'arraybuffer' | 'blob' = 'blob';
+  failNextSend = false;
   readonly sent: unknown[] = [];
   readonly #listeners = new Map<string, Set<(event: Event) => void>>();
   readonly #objects = new Map<string, number>();
@@ -395,6 +417,10 @@ class FakeSocket implements LiveLocalWebSocketLike {
   }
 
   send(data: string | ArrayBuffer | ArrayBufferView | Blob): void {
+    if (this.failNextSend) {
+      this.failNextSend = false;
+      throw new Error('socket send failed');
+    }
     this.sent.push(data);
     if (typeof data === 'string') {
       const value = JSON.parse(data) as { readonly type?: string; readonly operationId?: string };
@@ -500,6 +526,24 @@ describe('authenticated live local WebSocket session (#675)', () => {
     await result.session.heartbeat();
     result.session.cancel();
     await result.session.waitForClose();
+  });
+
+  test('keeps a connected session retryable when sending the cancel frame fails', async () => {
+    const { client, sockets } = harness();
+    const result = await client.connect(input());
+    assert.equal(result.state, 'connected');
+    if (result.state !== 'connected') return;
+    const socket = sockets[0];
+    assert.ok(socket);
+    socket.failNextSend = true;
+
+    assert.throws(() => result.session.cancel(), /socket send failed/u);
+    assert.equal(result.session.phase, 'connected');
+
+    result.session.cancel();
+    await result.session.waitForClose();
+    const controls = socket.sent.filter((value): value is string => typeof value === 'string').map((value) => JSON.parse(value));
+    assert.equal(controls.filter((value) => value.type === 'cancel').length, 1);
   });
 
   test('fresh reconnect reboots authority instead of persisting or replaying a capability', async () => {

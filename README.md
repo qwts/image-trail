@@ -36,8 +36,23 @@ Recall, encrypted backups, pCloud integration, and import/export workflows.
 - Use Recall to page durable pins/bookmarks back into the visible queue.
 - Import, export, back up, and restore local Image Trail data, including
   encrypted backup files and pCloud-backed restore workflows.
+- In explicit experimental builds, move or sync reviewed records through a
+  same-computer Overlook connection or an explicitly chosen cloud provider.
 - Govern automation with bounded request, retry, slideshow, shortcut, and
   neighbor-preload controls.
+
+## Experimental Transfer & Sync
+
+Baseline and release builds keep Transfer & Sync disabled and omit the
+`nativeMessaging` permission. An explicit experimental build can connect to a
+compatible signed Overlook app on the same computer after its matching pairing
+is imported. Native Messaging is used only to obtain short-lived loopback
+authority; visited pages do not receive pairing material or connection details.
+
+Cloud providers are separate, explicit cross-machine routes. Image Trail does
+not automatically fall back from local Overlook to a cloud provider, and an
+active reviewed Move or Sync journal remains bound to its selected route until
+it completes or is cancelled.
 
 ## Local Development
 

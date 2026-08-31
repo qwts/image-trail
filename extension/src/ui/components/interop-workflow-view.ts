@@ -9,6 +9,8 @@ import {
   type InteropEntryContext,
   type InteropVisibleWorkflow,
 } from '../interop/visible-workflow.js';
+import { createInteropProviderRecovery } from './interop-provider-recovery.js';
+import { createInteropProviderSetup } from './interop-provider-setup.js';
 
 export interface InteropWorkflowHandlers {
   readonly onClose: () => void;
@@ -83,36 +85,6 @@ function createSummary(state: InteropVisibleWorkflow, handlers: InteropWorkflowH
   return [header, operation, provider];
 }
 
-function createProviderSetup(state: InteropVisibleWorkflow, handlers: InteropWorkflowHandlers): HTMLElement {
-  const setup = document.createElement('fieldset');
-  setup.className = 'image-trail-interop__setup';
-  const legend = document.createElement('legend');
-  legend.textContent = 'Provider and pairing';
-  const provider = document.createElement('select');
-  provider.setAttribute('aria-label', 'Transfer provider');
-  for (const [value, label] of [
-    ['pcloud', 'pCloud'],
-    ['google-drive', 'Google Drive'],
-    ['icloud-drive', 'iCloud Drive'],
-  ] as const) {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    option.selected = state.provider.id === value;
-    provider.append(option);
-  }
-  provider.disabled = handlers.onProviderChange === undefined;
-  provider.addEventListener('change', () => handlers.onProviderChange?.(provider.value as InteropProviderId));
-  const connectLabel = state.provider.state === 'reconnect-required' ? 'Reconnect provider' : 'Connect provider';
-  const connect = button(connectLabel, handlers.onConnect, ['connected', 'unavailable'].includes(state.provider.state));
-  const importHelp = document.createElement('p');
-  importHelp.className = 'image-trail-interop__pairing-help';
-  importHelp.textContent = 'Import pairing keys in an extension-owned page so the visited site cannot inspect the file or password.';
-  const importButton = button('Open secure pairing import', handlers.onImportPairing);
-  setup.append(legend, provider, connect, importHelp, importButton);
-  return setup;
-}
-
 function createReviewAndProgress(state: InteropVisibleWorkflow): readonly HTMLElement[] {
   const review = document.createElement('dl');
   review.className = 'image-trail-interop__review';
@@ -175,7 +147,7 @@ function createErrorAndControls(state: InteropVisibleWorkflow, handlers: Interop
   controls.append(
     button('Close', handlers.onClose),
     button('Disconnect', handlers.onDisconnect, state.provider.state !== 'connected'),
-    button('Cancel', handlers.onCancel, !['transferring', 'paused', 'awaiting-acknowledgement'].includes(state.phase)),
+    button('Cancel', handlers.onCancel, !state.active && !['transferring', 'paused', 'awaiting-acknowledgement'].includes(state.phase)),
     button('Pause', handlers.onPause, state.phase !== 'transferring'),
     button('Resume', handlers.onResume, state.phase !== 'paused'),
     button(
@@ -196,7 +168,7 @@ export function createInteropWorkflowView(state: InteropVisibleWorkflow, handler
 
   root.append(
     ...createSummary(state, handlers),
-    createProviderSetup(state, handlers),
+    createInteropProviderSetup(state, handlers),
     ...createReviewAndProgress(state),
     createConflicts(state, handlers),
     ...createErrorAndControls(state, handlers),
@@ -220,78 +192,6 @@ function trapInteropFocus(scrim: HTMLElement, close: () => void): void {
       first.focus();
     }
   });
-}
-
-type InteropWorkflowDispatch = (action: InteropRuntimeAction, renderResult?: boolean) => ReturnType<typeof dispatchInteropRuntime>;
-
-function createProviderRecovery(
-  scrim: HTMLElement,
-  dispatch: InteropWorkflowDispatch,
-  render: (state: InteropVisibleWorkflow) => void,
-  selectedProvider: () => InteropProviderId,
-  getLatestRequest: () => number,
-) {
-  let refreshPairingOnFocus = false;
-  let actionPending = false;
-  let replyLost = false;
-  let focusObserved = false;
-  let probeTimer: ReturnType<typeof setTimeout> | undefined;
-  const probe = (attempt = 0): void => {
-    if (!actionPending || !scrim.isConnected) return;
-    const probeRequest = getLatestRequest() + 1;
-    void dispatch({ name: 'status' }, false).then((result) => {
-      if (!actionPending || !scrim.isConnected) return;
-      if (probeRequest !== getLatestRequest()) return;
-      const state = result?.snapshot.provider.state;
-      const transient = result === null || state === 'connecting' || state === 'disconnected';
-      if (transient) {
-        if (attempt < 2) {
-          probeTimer = setTimeout(() => probe(attempt + 1), 100);
-          return;
-        }
-        return;
-      }
-      if (result) render(result.snapshot);
-      actionPending = false;
-      replyLost = false;
-    });
-  };
-  const onFocus = (): void => {
-    if (!scrim.isConnected) return;
-    if (actionPending) {
-      focusObserved = true;
-      if (replyLost) probe();
-      return;
-    }
-    if (!refreshPairingOnFocus) return;
-    refreshPairingOnFocus = false;
-    void dispatch({ name: 'status' });
-  };
-  const connect = (name: 'connect' | 'reconnect'): void => {
-    if (actionPending) return;
-    actionPending = true;
-    replyLost = false;
-    focusObserved = false;
-    void dispatch({ name, provider: selectedProvider() }).then((result) => {
-      if (result !== null) {
-        actionPending = false;
-        return;
-      }
-      replyLost = true;
-      if (focusObserved) probe();
-    });
-  };
-  window.addEventListener('focus', onFocus);
-  return {
-    connect,
-    expectPairingReturn: () => {
-      refreshPairingOnFocus = true;
-    },
-    dispose: () => {
-      window.removeEventListener('focus', onFocus);
-      if (probeTimer) clearTimeout(probeTimer);
-    },
-  };
 }
 
 export function openInteropWorkflow(entry: InteropEntryContext, recordIds: readonly string[], locked = false, anchor?: Element): void {
@@ -320,8 +220,11 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
   scrim.setAttribute('aria-modal', 'true');
   scrim.setAttribute('aria-label', 'Transfer and Sync');
   const context: InteropRuntimeContext = { entry, total: recordIds.length, recordIds, locked };
-  let selectedProvider: InteropProviderId = 'pcloud';
+  let selectedProvider: InteropProviderId = 'icloud-drive';
+  let providerSelection: Promise<boolean> | undefined;
+  let visibleState = blockedInteropWorkflow(entry, recordIds.length, locked);
   function render(state: InteropVisibleWorkflow): void {
+    visibleState = state;
     selectedProvider = state.provider.id;
     scrim.replaceChildren(createInteropWorkflowView(state, handlers));
   }
@@ -332,13 +235,16 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     if (renderResult && result && request === latestRequest && scrim.isConnected) render(result.snapshot);
     return result;
   };
-  const providerRecovery = createProviderRecovery(
+  const providerRecovery = createInteropProviderRecovery({
     scrim,
     dispatch,
     render,
-    () => selectedProvider,
-    () => latestRequest,
-  );
+    visibleState: () => visibleState,
+    selectedProvider: () => selectedProvider,
+    waitForProviderSelection: (provider) =>
+      providerSelection ? providerSelection.then((persisted) => persisted && selectedProvider === provider) : selectedProvider === provider,
+    latestRequest: () => latestRequest,
+  });
   const close = (): void => {
     providerRecovery.dispose();
     scrim.remove();
@@ -353,7 +259,12 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     onOperationChange: (operation) => void dispatch({ name: 'set-operation', operation }),
     onProviderChange: (provider) => {
       selectedProvider = provider;
-      void dispatch({ name: 'select-provider', provider });
+      const pending = dispatch({ name: 'select-provider', provider }).then((result) => result?.snapshot.provider.id === provider);
+      providerSelection = pending;
+      const clearPending = (): void => {
+        if (providerSelection === pending) providerSelection = undefined;
+      };
+      void pending.then(clearPending, clearPending);
     },
     onConnect: () => providerRecovery.connect('connect'),
     onImportPairing: () => {

@@ -4,12 +4,9 @@ import test from 'node:test';
 import { IDBFactory } from 'fake-indexeddb';
 import * as v from 'valibot';
 
-import {
-  ensurePCloudInteropHostPermission,
-  hasConfiguredDriveOAuth,
-  preflightChromeInteropAction,
-} from '../extension/src/background/interop-runtime-chrome.js';
+import { ensurePCloudInteropHostPermission, preflightChromeInteropAction } from '../extension/src/background/interop-runtime-chrome.js';
 import { InteropRuntime, type InteropRuntimeDependencies } from '../extension/src/background/interop-runtime.js';
+import type { InteropLocalAvailability } from '../extension/src/background/interop-runtime-dependencies.js';
 import {
   EncryptedInteropTransport,
   InteropTransportError,
@@ -97,6 +94,7 @@ async function harness(overrides: Partial<InteropRuntimeDependencies> = {}) {
   assert.ok(opened.db);
   let value: unknown;
   const probes: boolean[] = [];
+  const localProbes: { readonly pairingId: string; readonly operation: 'move' | 'sync' }[] = [];
   const dependencies: InteropRuntimeDependencies = {
     storage: {
       get: async () => ({ interopRuntimePreferences: value }),
@@ -112,15 +110,17 @@ async function harness(overrides: Partial<InteropRuntimeDependencies> = {}) {
       probes.push(interactive);
     },
     disconnectGoogleDrive: async () => undefined,
-    probeICloud: async () => {
-      throw new Error('Signed Overlook iCloud host is missing.');
+    probeICloud: async (pairingId, operation) => {
+      localProbes.push({ pairingId, operation });
+      return 'missing-host';
     },
     disconnectICloud: async () => undefined,
+    cancelICloudOperation: async () => undefined,
     openProvider: async () => null,
     finalizeSourceRecord: async () => undefined,
     ...overrides,
   };
-  return { runtime: new InteropRuntime(dependencies), db: opened.db, probes, getStored: () => value };
+  return { runtime: new InteropRuntime(dependencies), db: opened.db, probes, localProbes, getStored: () => value };
 }
 
 test('runtime messages and request schema accept the typed provider boundary', () => {
@@ -158,6 +158,7 @@ test('runtime messages and request schema accept the typed provider boundary', (
       processed: 0,
       conflicts: [],
       error: null,
+      active: false,
       locked: false,
     },
   });
@@ -218,18 +219,6 @@ test('the baseline cloud registry fails interop closed without initializing a pr
   });
 });
 
-test('Google Drive is enabled only for a non-empty drive.file OAuth manifest', () => {
-  assert.equal(hasConfiguredDriveOAuth({}), false);
-  assert.equal(hasConfiguredDriveOAuth({ oauth2: { client_id: '', scopes: ['https://www.googleapis.com/auth/drive.file'] } }), false);
-  assert.equal(hasConfiguredDriveOAuth({ oauth2: { client_id: 'client-id', scopes: ['openid'] } }), false);
-  assert.equal(
-    hasConfiguredDriveOAuth({
-      oauth2: { client_id: 'client-id', scopes: ['https://www.googleapis.com/auth/drive.file'] },
-    }),
-    true,
-  );
-});
-
 test('pCloud requests its optional host permission only for an interactive connection', async () => {
   const requested: string[] = [];
   const request = async (pattern: string): Promise<boolean> => {
@@ -250,13 +239,15 @@ test('pCloud requests its optional host permission only for an interactive conne
   assert.deepEqual(requested, ['https://*.pcloud.com/*']);
 });
 
-test('provider choice is durable and connection probes never reuse backup custody', async (t) => {
-  const { runtime, db, probes } = await harness();
+test('local Overlook is the fresh default and cloud provider choice remains durable', async (t) => {
+  const { runtime, db, probes, localProbes } = await harness();
   t.after(() => db.close());
   const initial = await runtime.dispatch(context, { name: 'status' });
-  assert.equal(initial.snapshot.provider.id, 'pcloud');
+  assert.equal(initial.snapshot.provider.id, 'icloud-drive');
   assert.equal(initial.snapshot.provider.state, 'disconnected');
-  assert.match(initial.snapshot.provider.detail, /Separate pCloud interoperability access/u);
+  assert.match(initial.snapshot.provider.label, /Local — Overlook on this computer/u);
+  assert.match(initial.snapshot.provider.detail, /matching Overlook pairing/u);
+  assert.deepEqual(localProbes, [], 'presence is not probed before pairing establishes authorization');
   const selected = await runtime.dispatch(context, { name: 'select-provider', provider: 'google-drive' });
   assert.equal(selected.snapshot.provider.state, 'connected');
   assert.deepEqual(probes, [false]);
@@ -282,7 +273,7 @@ test('pCloud connect and disconnect use isolated interop custody', async (t) => 
     },
   });
   t.after(() => db.close());
-  const initial = await runtime.dispatch(context, { name: 'status' });
+  const initial = await runtime.dispatch(context, { name: 'select-provider', provider: 'pcloud' });
   assert.equal(initial.snapshot.provider.state, 'disconnected');
   const connectedResult = await runtime.dispatch(context, { name: 'connect', provider: 'pcloud' });
   assert.equal(connectedResult.snapshot.provider.state, 'connected');
@@ -290,6 +281,40 @@ test('pCloud connect and disconnect use isolated interop custody', async (t) => 
   const disconnected = await runtime.dispatch(context, { name: 'disconnect' });
   assert.equal(disconnected.snapshot.provider.state, 'disconnected');
   assert.equal(disconnects, 1);
+});
+
+test('paired local availability uses the exact pairing and distinguishes actionable Overlook states', async (t) => {
+  let availability: InteropLocalAvailability = 'connected';
+  const probes: { readonly pairingId: string; readonly operation: 'move' | 'sync' }[] = [];
+  const { runtime, db } = await harness({
+    probeICloud: async (pairingId, operation) => {
+      probes.push({ pairingId, operation });
+      return availability;
+    },
+  });
+  t.after(() => db.close());
+  const bundle = readFileSync('contracts/interop/v1/fixtures/valid-pairing-bundle.json', 'utf8');
+  const paired = await runtime.dispatch(context, { name: 'import-pairing', fileContent: bundle, password: 'fixture-password' });
+  assert.equal(paired.snapshot.provider.state, 'connected');
+  assert.equal(probes.length, 1);
+  assert.equal(probes[0]?.operation, 'move');
+  assert.equal(probes[0]?.pairingId, (await new InteropKeysRepository(db).list())[0]?.pairingId);
+
+  const expected = [
+    ['missing-host', 'not installed', false],
+    ['not-running', 'Open Overlook', true],
+    ['locked', 'Unlock Overlook', true],
+    ['incompatible', 'incompatible', false],
+    ['unavailable', 'temporarily unavailable', true],
+    ['unsupported', 'unsupported', false],
+  ] as const;
+  for (const [state, message, retryable] of expected) {
+    availability = state;
+    const result = await runtime.dispatch(context, { name: 'status' });
+    assert.equal(result.snapshot.provider.state, 'unavailable');
+    assert.match(result.snapshot.provider.detail, new RegExp(message, 'u'));
+    assert.equal(result.snapshot.error?.retryable, retryable);
+  }
 });
 
 test('an unconfigured Google OAuth client keeps Drive unavailable without claiming connection', async (t) => {
@@ -373,6 +398,7 @@ test('runtime start publishes the exact reviewed selection and reloads durable M
   await runtime.dispatch(selectedContext, { name: 'import-pairing', fileContent: bundle, password: 'fixture-password' });
   const started = await runtime.dispatch(selectedContext, { name: 'start' });
   assert.equal(started.ok, true);
+  assert.equal(started.snapshot.active, true);
   assert.equal(started.snapshot.phase, 'awaiting-acknowledgement');
   assert.equal(started.snapshot.counts.eligible, 1);
   assert.equal(started.snapshot.processed, 1);
@@ -381,6 +407,11 @@ test('runtime start publishes the exact reviewed selection and reloads durable M
   assert.equal(opens[0]?.operation, 'move');
   assert.deepEqual(opens[0]?.recordIds, ['bookmark-1']);
   assert.notEqual(opens[0]?.operationId, opens[0]?.remoteSessionId);
+  const rejectedRouteChange = await runtime.dispatch(selectedContext, { name: 'select-provider', provider: 'pcloud' });
+  assert.equal(rejectedRouteChange.ok, false);
+  assert.equal(rejectedRouteChange.snapshot.active, true);
+  assert.equal(rejectedRouteChange.snapshot.provider.id, 'google-drive');
+  assert.match(rejectedRouteChange.snapshot.error?.message ?? '', /Cancel the active journal/u);
   const restored = await runtime.dispatch(selectedContext, { name: 'status' });
   assert.equal(restored.snapshot.phase, 'awaiting-acknowledgement');
   assert.equal(restored.snapshot.processed, 1);
@@ -428,6 +459,8 @@ test('runtime start publishes the exact reviewed selection and reloads durable M
   assert.equal(completed.snapshot.phase, 'completed');
   assert.equal(completed.snapshot.counts.acknowledged, 1);
   assert.equal(completed.snapshot.counts.finalized, 1);
+  assert.equal(completed.snapshot.active, false);
+  assert.equal((getStored() as { activeTransferId?: string }).activeTransferId, undefined);
   assert.deepEqual(finalized, ['bookmark-1']);
 });
 
@@ -540,11 +573,17 @@ test('runtime Sync publishes a pairing-key-sealed selected snapshot without plai
   assert.equal(resumed.snapshot.processed, 1);
   const cancelled = await runtime.dispatch(selected, { name: 'cancel' });
   assert.equal(cancelled.snapshot.phase, 'cancelled');
+  assert.equal(cancelled.snapshot.active, false);
   const afterCancel = getStored() as { activeTransferId?: string; activeSyncSessionId?: string };
   assert.equal(afterCancel.activeTransferId, moveTransferId);
   assert.equal(afterCancel.activeSyncSessionId, undefined);
   const statusAfterCancel = await runtime.dispatch(selected, { name: 'status' });
   assert.equal(statusAfterCancel.snapshot.phase, 'queued');
+  await runtime.dispatch(selected, { name: 'select-provider', provider: 'pcloud' });
+  const restoredMove = await runtime.dispatch(selected, { name: 'set-operation', operation: 'move' });
+  assert.equal(restoredMove.snapshot.provider.id, 'google-drive', 'the still-active Move journal restores its reviewed route');
+  await runtime.dispatch(selected, { name: 'set-operation', operation: 'sync' });
+  await runtime.dispatch(selected, { name: 'select-provider', provider: 'google-drive' });
   const restarted = await runtime.dispatch(selected, { name: 'start' });
   assert.equal(restarted.snapshot.phase, 'reviewing');
 });

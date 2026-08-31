@@ -16,21 +16,25 @@ import type { SecureSyncProgress } from '../data/interop/secure-sync-outbox-repo
 import { InteropMoveRuntime, InteropMoveSetupError } from './interop-move-runtime.js';
 import { InteropSyncRuntime, InteropSyncSetupError } from './interop-sync-runtime.js';
 import { activeInteropProgress } from './interop-runtime-active.js';
+import { fallbackInteropRuntime } from './interop-runtime-fallback.js';
 import { INTEROP_PROVIDERS, interopPairingState, interopProviderStatus } from './interop-runtime-provider.js';
 import * as progressViews from './interop-runtime-progress.js';
+import { activeInteropRuntimePairingId, recoverInteropRuntimePreferences } from './interop-runtime-recovery.js';
 import type { InteropRuntimeDependencies } from './interop-runtime-dependencies.js';
 export type { InteropRuntimeDependencies } from './interop-runtime-dependencies.js';
 import {
   activeInteropRuntimeSelection,
-  clearActiveSyncRuntimeSelection,
+  clearActiveInteropRuntimeSelection,
   createActiveInteropRuntimePreferences,
   ensureInteropRuntimeRemoteSessionIds,
   parseInteropRuntimePreferences,
   sameInteropRecordIds,
+  selectInteropRuntimeOperation,
   type InteropRuntimePreferences as RuntimePreferences,
 } from './interop-runtime-preferences.js';
 
 const STORAGE_KEY = 'interopRuntimePreferences';
+const UNKNOWN_ROUTE_ERROR = 'The active journal transport cannot be recovered. Cancel it before continuing.';
 
 export class InteropRuntime {
   constructor(private readonly dependencies: InteropRuntimeDependencies) {}
@@ -38,41 +42,55 @@ export class InteropRuntime {
   async dispatch(context: InteropRuntimeContext, action: InteropRuntimeAction): Promise<InteropRuntimeResult> {
     const stored = parseInteropRuntimePreferences((await this.dependencies.storage.get(STORAGE_KEY))[STORAGE_KEY]);
     let selected = await ensureInteropRuntimeRemoteSessionIds(stored, (value) => this.save(value));
+    selected = await recoverInteropRuntimePreferences(selected, this.syncRuntime(), (value) => this.save(value));
+    const activeRoute = activeInteropRuntimeSelection(selected);
+    if (activeRoute.id && !activeRoute.provider && action.name !== 'cancel' && action.name !== 'set-operation')
+      return this.unsupportedAction(context, selected, 'failed', UNKNOWN_ROUTE_ERROR);
     if (action.name === 'select-provider') {
+      const active = activeInteropRuntimeSelection(selected);
+      if (active.id && active.provider && active.provider !== action.provider)
+        return this.unsupportedAction(context, selected, 'failed', 'Cancel the active journal before reviewing a different transport.');
       selected = { ...selected, provider: action.provider };
       await this.save(selected);
     } else if (action.name === 'set-operation') {
-      selected = { ...selected, operation: action.operation };
+      selected = selectInteropRuntimeOperation(selected, action.operation);
       await this.save(selected);
     }
-
     if ((action.name === 'connect' || action.name === 'reconnect') && action.provider !== selected.provider)
       return this.unsupportedAction(context, selected, 'failed', 'The selected provider changed before connection started.');
-
-    if (action.name === 'import-pairing') return this.importPairing(context, selected, action.fileContent, action.password);
+    const activePairingId = await activeInteropRuntimePairingId(selected, context.total, this.moveRuntime(), this.syncRuntime());
+    if (action.name === 'import-pairing')
+      return this.importPairing(context, selected, action.fileContent, action.password, activePairingId);
     if (action.name === 'disconnect') return this.disconnect(context, selected);
     if (action.name === 'cancel' || action.name === 'pause') {
       const active = activeInteropRuntimeSelection(selected);
+      if (active.id && !sameInteropRecordIds(active.recordIds, context.recordIds))
+        return this.unsupportedAction(context, selected, 'failed', 'This selection does not own the active journal.');
       if (selected.operation === 'sync' && active.id) {
         try {
           const progress = await this.syncRuntime().control(active.id, action.name);
-          const provider = await interopProviderStatus(this.dependencies, selected.provider, false);
-          const resultPreferences = action.name === 'cancel' ? clearActiveSyncRuntimeSelection(selected) : selected;
+          if (action.name === 'cancel' && (!active.provider || active.provider === 'icloud-drive'))
+            await this.dependencies.cancelICloudOperation(active.id);
+          const provider = await interopProviderStatus(this.dependencies, selected.provider, false, selected.operation, activePairingId);
+          const resultPreferences = action.name === 'cancel' ? clearActiveInteropRuntimeSelection(selected) : selected;
           if (action.name === 'cancel') await this.save(resultPreferences);
           return this.progressResult(context, resultPreferences, provider, progress);
         } catch (error) {
           return this.unsupportedAction(context, selected, 'failed', error instanceof Error ? error.message : 'Sync control failed.');
         }
       }
-      return action.name === 'cancel'
-        ? this.result(context, selected, 'cancelled', 'disconnected')
-        : this.unsupportedAction(context, selected, 'paused', 'Transfer is not currently running.');
+      if (action.name === 'cancel') {
+        if (active.id && (!active.provider || active.provider === 'icloud-drive')) await this.dependencies.cancelICloudOperation(active.id);
+        const cleared = clearActiveInteropRuntimeSelection(selected);
+        if (active.id) await this.save(cleared);
+        return this.result(context, cleared, 'cancelled', 'disconnected');
+      }
+      return this.unsupportedAction(context, selected, 'paused', 'Transfer is not currently running.');
     }
     if (action.name === 'resolve-conflict')
       return this.unsupportedAction(context, selected, 'failed', 'The selected conflict is no longer available.');
-
     const interactive = action.name === 'connect' || action.name === 'reconnect';
-    const provider = await interopProviderStatus(this.dependencies, selected.provider, interactive);
+    const provider = await interopProviderStatus(this.dependencies, selected.provider, interactive, selected.operation, activePairingId);
     if (action.name === 'start') return this.start(context, selected, provider);
     if (action.name === 'resume') return this.resume(context, selected, provider);
     if (action.name === 'status') {
@@ -97,28 +115,7 @@ export class InteropRuntime {
   }
 
   fallback(context: InteropRuntimeContext): InteropRuntimeResult {
-    const selected: RuntimePreferences = { provider: 'pcloud', operation: 'move' };
-    return {
-      ok: false,
-      snapshot: {
-        entry: context.entry,
-        operation: selected.operation,
-        target: 'overlook',
-        provider: {
-          id: selected.provider,
-          label: INTEROP_PROVIDERS[selected.provider].label,
-          state: 'unavailable',
-          detail: 'Interoperability status could not be loaded.',
-        },
-        pairing: 'invalid',
-        phase: 'failed',
-        counts: progressViews.emptyInteropCounts(context.total),
-        processed: 0,
-        conflicts: [],
-        error: { code: 'provider-unavailable', message: 'Interoperability status could not be loaded.', retryable: true },
-        locked: context.locked,
-      },
-    };
+    return fallbackInteropRuntime(context);
   }
 
   private async importPairing(
@@ -126,13 +123,14 @@ export class InteropRuntime {
     selected: RuntimePreferences,
     fileContent: string,
     password: string,
+    activePairingId?: string | null,
   ): Promise<InteropRuntimeResult> {
     try {
       const db = await this.dependencies.getDb();
       if (!db) throw new Error('Interop key storage is unavailable.');
       const bundle: unknown = JSON.parse(fileContent);
       await importInteropPairingBundle({ db, bundle, password });
-      const provider = await interopProviderStatus(this.dependencies, selected.provider, false);
+      const provider = await interopProviderStatus(this.dependencies, selected.provider, false, selected.operation, activePairingId);
       return this.result(context, selected, 'queued', provider.state, provider.detail, provider.error, 'paired');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Overlook pairing key could not be imported.';
@@ -300,7 +298,7 @@ export class InteropRuntime {
     return new InteropSyncRuntime(this.dependencies.getDb, this.dependencies.openProvider, this.dependencies.getActiveBlobKey);
   }
 
-  private progressResult(
+  private async progressResult(
     context: InteropRuntimeContext,
     selected: RuntimePreferences,
     provider: { readonly state: InteropProviderState; readonly detail: string; readonly error: InteropRuntimeError | null },
@@ -309,9 +307,11 @@ export class InteropRuntime {
     phase?: InteropRuntimeSnapshot['phase'],
   ): Promise<InteropRuntimeResult> {
     const view = 'session' in progress ? progressViews.syncProgressView(progress, error) : progressViews.moveProgressView(progress, error);
+    const preferences = view.phase === 'completed' ? clearActiveInteropRuntimeSelection(selected) : selected;
+    if (preferences !== selected) await this.save(preferences);
     return this.result(
       context,
-      selected,
+      preferences,
       phase ?? view.phase,
       provider.state,
       provider.detail,
@@ -376,6 +376,7 @@ export class InteropRuntime {
     processed = 0,
     conflicts: InteropRuntimeSnapshot['conflicts'] = [],
   ): Promise<InteropRuntimeResult> {
+    const active = activeInteropRuntimeSelection(selected);
     const snapshot: InteropRuntimeSnapshot = {
       entry: context.entry,
       operation: selected.operation,
@@ -387,6 +388,7 @@ export class InteropRuntime {
       processed,
       conflicts,
       error,
+      active: active.id !== undefined && sameInteropRecordIds(active.recordIds, context.recordIds),
       locked: context.locked,
     };
     return { ok: error === null, snapshot };
