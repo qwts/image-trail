@@ -76,6 +76,7 @@ class FakeSession implements LiveLocalRuntimeSession {
   readonly store = new MemoryStore();
   commits = 0;
   cancels = 0;
+  cancelFailures = 0;
   closes = 0;
 
   commit(): Promise<void> {
@@ -84,6 +85,10 @@ class FakeSession implements LiveLocalRuntimeSession {
   }
   cancel(): void {
     this.cancels += 1;
+    if (this.cancelFailures > 0) {
+      this.cancelFailures -= 1;
+      throw new InteropTransportError('cancel frame failed', 'offline', true);
+    }
     this.phase = 'closed';
   }
   close(): void {
@@ -125,6 +130,35 @@ test('live local runtime cancels the matching session and clears operation-scope
 
   assert.equal(client.sessions[0]?.cancels, 1);
   await assert.rejects(staged.get('pairings/a/objects/cancelled.bin'), /unavailable/u);
+});
+
+test('live local runtime retains the session and staged ciphertext until cancellation succeeds', async (t) => {
+  const opened = await openImageTrailDb(new IDBFactory());
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+  const client = new FakeClient();
+  const runtime = new LiveLocalInteropRuntime(() => Promise.resolve(opened.db), client);
+  await runtime.open({
+    operation: 'sync',
+    operationId,
+    remoteSessionId: otherOperationId,
+    pairingId: '33333333-3333-4333-8333-333333333333',
+    recordIds: ['bookmark-1'],
+  });
+  const session = client.sessions[0];
+  assert.ok(session);
+  session.cancelFailures = 1;
+  const staged = new IndexedDbLiveLocalObjectRepository(opened.db, operationId);
+  const bytes = new TextEncoder().encode('retry-cancelled-ciphertext');
+  await staged.put('pairings/a/objects/retry.bin', bytes, await sha256(bytes));
+
+  await assert.rejects(runtime.cancel(operationId), /cancel frame failed/u);
+  assert.equal(session.cancels, 1);
+  assert.deepEqual(await staged.get('pairings/a/objects/retry.bin'), bytes);
+
+  await runtime.cancel(operationId);
+  assert.equal(session.cancels, 2);
+  await assert.rejects(staged.get('pairings/a/objects/retry.bin'), /unavailable/u);
 });
 
 test('live local runtime binds exact reviewed identities, reuses only that session, and commits explicitly', async (t) => {

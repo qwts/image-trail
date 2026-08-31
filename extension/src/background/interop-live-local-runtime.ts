@@ -142,8 +142,8 @@ export class LiveLocalInteropRuntime {
     if (!db) throw new InteropTransportError('Live local cancellation storage is unavailable.', 'provider-unavailable', true);
     const active = this.#active;
     if (active?.operationId === operationId) {
-      this.#active = null;
       active.session.cancel();
+      this.#active = null;
     }
     await new IndexedDbLiveLocalObjectRepository(db, operationId).clear();
   }

@@ -400,6 +400,7 @@ class FakeSocket implements LiveLocalWebSocketLike {
   readyState = 0;
   bufferedAmount = 0;
   binaryType: 'arraybuffer' | 'blob' = 'blob';
+  failNextSend = false;
   readonly sent: unknown[] = [];
   readonly #listeners = new Map<string, Set<(event: Event) => void>>();
   readonly #objects = new Map<string, number>();
@@ -416,6 +417,10 @@ class FakeSocket implements LiveLocalWebSocketLike {
   }
 
   send(data: string | ArrayBuffer | ArrayBufferView | Blob): void {
+    if (this.failNextSend) {
+      this.failNextSend = false;
+      throw new Error('socket send failed');
+    }
     this.sent.push(data);
     if (typeof data === 'string') {
       const value = JSON.parse(data) as { readonly type?: string; readonly operationId?: string };
@@ -521,6 +526,24 @@ describe('authenticated live local WebSocket session (#675)', () => {
     await result.session.heartbeat();
     result.session.cancel();
     await result.session.waitForClose();
+  });
+
+  test('keeps a connected session retryable when sending the cancel frame fails', async () => {
+    const { client, sockets } = harness();
+    const result = await client.connect(input());
+    assert.equal(result.state, 'connected');
+    if (result.state !== 'connected') return;
+    const socket = sockets[0];
+    assert.ok(socket);
+    socket.failNextSend = true;
+
+    assert.throws(() => result.session.cancel(), /socket send failed/u);
+    assert.equal(result.session.phase, 'connected');
+
+    result.session.cancel();
+    await result.session.waitForClose();
+    const controls = socket.sent.filter((value): value is string => typeof value === 'string').map((value) => JSON.parse(value));
+    assert.equal(controls.filter((value) => value.type === 'cancel').length, 1);
   });
 
   test('fresh reconnect reboots authority instead of persisting or replaying a capability', async () => {
