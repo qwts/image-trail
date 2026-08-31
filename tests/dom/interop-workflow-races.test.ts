@@ -62,26 +62,25 @@ test('an immediate provider change and Connect dispatches and renders the newly 
   assert.ok(connect instanceof HTMLButtonElement);
   connect.click();
 
-  assert.match(dialog.textContent ?? '', /Checking Overlook on this computer/u);
   assert.equal(dialog.querySelector<HTMLSelectElement>('[aria-label="Transfer provider"]')?.value, 'icloud-drive');
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.deepEqual(actions, [
-    { name: 'status' },
-    { name: 'select-provider', provider: 'icloud-drive' },
-    { name: 'connect', provider: 'icloud-drive' },
-  ]);
-  assert.match(dialog.textContent ?? '', /connected/u);
+  assert.deepEqual(actions, [{ name: 'status' }, { name: 'select-provider', provider: 'icloud-drive' }]);
 
   resolveSelection?.(
     createInteropRuntimeResultMessage({
       ok: true,
       snapshot: {
         ...blockedInteropWorkflow('settings', 0),
-        provider: { id: 'icloud-drive', label: 'Local — Overlook on this computer', state: 'disconnected', detail: 'Stale.' },
+        provider: { id: 'icloud-drive', label: 'Local — Overlook on this computer', state: 'disconnected', detail: 'Ready.' },
       },
     }),
   );
   await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(actions, [
+    { name: 'status' },
+    { name: 'select-provider', provider: 'icloud-drive' },
+    { name: 'connect', provider: 'icloud-drive' },
+  ]);
   assert.match(dialog.textContent ?? '', /connected/u);
   Array.from(dialog.querySelectorAll('button'))
     .find((control) => control.textContent === 'Close')

@@ -34,6 +34,7 @@ import {
 } from './interop-runtime-preferences.js';
 
 const STORAGE_KEY = 'interopRuntimePreferences';
+const UNKNOWN_ROUTE_ERROR = 'The active journal transport cannot be recovered. Cancel it before continuing.';
 
 export class InteropRuntime {
   constructor(private readonly dependencies: InteropRuntimeDependencies) {}
@@ -42,6 +43,9 @@ export class InteropRuntime {
     const stored = parseInteropRuntimePreferences((await this.dependencies.storage.get(STORAGE_KEY))[STORAGE_KEY]);
     let selected = await ensureInteropRuntimeRemoteSessionIds(stored, (value) => this.save(value));
     selected = await recoverInteropRuntimePreferences(selected, this.syncRuntime(), (value) => this.save(value));
+    const activeRoute = activeInteropRuntimeSelection(selected);
+    if (activeRoute.id && !activeRoute.provider && action.name !== 'cancel' && action.name !== 'set-operation')
+      return this.unsupportedAction(context, selected, 'failed', UNKNOWN_ROUTE_ERROR);
     if (action.name === 'select-provider') {
       const active = activeInteropRuntimeSelection(selected);
       if (active.id && active.provider && active.provider !== action.provider)
@@ -52,10 +56,8 @@ export class InteropRuntime {
       selected = selectInteropRuntimeOperation(selected, action.operation);
       await this.save(selected);
     }
-
     if ((action.name === 'connect' || action.name === 'reconnect') && action.provider !== selected.provider)
       return this.unsupportedAction(context, selected, 'failed', 'The selected provider changed before connection started.');
-
     const activePairingId = await activeInteropRuntimePairingId(selected, context.total, this.moveRuntime(), this.syncRuntime());
     if (action.name === 'import-pairing')
       return this.importPairing(context, selected, action.fileContent, action.password, activePairingId);
@@ -67,6 +69,8 @@ export class InteropRuntime {
       if (selected.operation === 'sync' && active.id) {
         try {
           const progress = await this.syncRuntime().control(active.id, action.name);
+          if (action.name === 'cancel' && (!active.provider || active.provider === 'icloud-drive'))
+            await this.dependencies.cancelICloudOperation(active.id);
           const provider = await interopProviderStatus(this.dependencies, selected.provider, false, selected.operation, activePairingId);
           const resultPreferences = action.name === 'cancel' ? clearActiveInteropRuntimeSelection(selected) : selected;
           if (action.name === 'cancel') await this.save(resultPreferences);
@@ -76,8 +80,7 @@ export class InteropRuntime {
         }
       }
       if (action.name === 'cancel') {
-        if (active.id && (active.provider ?? selected.provider) === 'icloud-drive')
-          await this.dependencies.cancelICloudOperation(active.id);
+        if (active.id && (!active.provider || active.provider === 'icloud-drive')) await this.dependencies.cancelICloudOperation(active.id);
         const cleared = clearActiveInteropRuntimeSelection(selected);
         if (active.id) await this.save(cleared);
         return this.result(context, cleared, 'cancelled', 'disconnected');
@@ -86,7 +89,6 @@ export class InteropRuntime {
     }
     if (action.name === 'resolve-conflict')
       return this.unsupportedAction(context, selected, 'failed', 'The selected conflict is no longer available.');
-
     const interactive = action.name === 'connect' || action.name === 'reconnect';
     const provider = await interopProviderStatus(this.dependencies, selected.provider, interactive, selected.operation, activePairingId);
     if (action.name === 'start') return this.start(context, selected, provider);

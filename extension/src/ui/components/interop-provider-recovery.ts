@@ -10,6 +10,7 @@ interface ProviderRecoveryOptions {
   readonly render: (state: InteropVisibleWorkflow) => void;
   readonly visibleState: () => InteropVisibleWorkflow;
   readonly selectedProvider: () => InteropProviderId;
+  readonly waitForProviderSelection: (provider: InteropProviderId) => boolean | Promise<boolean>;
   readonly latestRequest: () => number;
 }
 
@@ -86,15 +87,24 @@ export function createInteropProviderRecovery(options: ProviderRecoveryOptions) 
     actionPending = true;
     replyLost = false;
     focusObserved = false;
-    renderConnecting(options, provider);
-    void options.dispatch({ name, provider }).then((result) => {
-      if (result !== null) {
+    const start = (persisted: boolean): void => {
+      if (!persisted || !options.scrim.isConnected) {
         actionPending = false;
         return;
       }
-      replyLost = true;
-      if (provider === 'icloud-drive' || focusObserved) probe();
-    });
+      renderConnecting(options, provider);
+      void options.dispatch({ name, provider }).then((result) => {
+        if (result !== null) {
+          actionPending = false;
+          return;
+        }
+        replyLost = true;
+        if (provider === 'icloud-drive' || focusObserved) probe();
+      });
+    };
+    const selection = options.waitForProviderSelection(provider);
+    if (typeof selection === 'boolean') start(selection);
+    else void selection.then(start, () => start(false));
   };
   window.addEventListener('focus', onFocus);
   return {

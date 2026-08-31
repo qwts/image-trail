@@ -221,6 +221,7 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
   scrim.setAttribute('aria-label', 'Transfer and Sync');
   const context: InteropRuntimeContext = { entry, total: recordIds.length, recordIds, locked };
   let selectedProvider: InteropProviderId = 'icloud-drive';
+  let providerSelection: Promise<boolean> | undefined;
   let visibleState = blockedInteropWorkflow(entry, recordIds.length, locked);
   function render(state: InteropVisibleWorkflow): void {
     visibleState = state;
@@ -240,6 +241,8 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     render,
     visibleState: () => visibleState,
     selectedProvider: () => selectedProvider,
+    waitForProviderSelection: (provider) =>
+      providerSelection ? providerSelection.then((persisted) => persisted && selectedProvider === provider) : selectedProvider === provider,
     latestRequest: () => latestRequest,
   });
   const close = (): void => {
@@ -256,7 +259,12 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     onOperationChange: (operation) => void dispatch({ name: 'set-operation', operation }),
     onProviderChange: (provider) => {
       selectedProvider = provider;
-      void dispatch({ name: 'select-provider', provider });
+      const pending = dispatch({ name: 'select-provider', provider }).then((result) => result?.snapshot.provider.id === provider);
+      providerSelection = pending;
+      const clearPending = (): void => {
+        if (providerSelection === pending) providerSelection = undefined;
+      };
+      void pending.then(clearPending, clearPending);
     },
     onConnect: () => providerRecovery.connect('connect'),
     onImportPairing: () => {

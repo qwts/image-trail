@@ -26,7 +26,7 @@ async function putPairing(db: IDBDatabase, pairingId: string, updatedAt: string)
   });
 }
 
-test('local probes use the newest pairing for new work and recover the journal pairing and provider for legacy Sync', async (t) => {
+test('local probes recover Sync routes while unknown legacy Move routes fail closed with safe cancellation', async (t) => {
   const opened = await openImageTrailDb(new IDBFactory());
   assert.ok(opened.db);
   const db = opened.db;
@@ -38,6 +38,7 @@ test('local probes use the newest pairing for new work and recover the journal p
 
   let stored: unknown;
   const probes: string[] = [];
+  const cancellations: string[] = [];
   const dependencies: InteropRuntimeDependencies = {
     storage: {
       get: async () => ({ interopRuntimePreferences: stored }),
@@ -56,7 +57,9 @@ test('local probes use the newest pairing for new work and recover the journal p
       return 'connected';
     },
     disconnectICloud: async () => undefined,
-    cancelICloudOperation: async () => undefined,
+    cancelICloudOperation: async (operationId) => {
+      cancellations.push(operationId);
+    },
     openProvider: async () => null,
     finalizeSourceRecord: async () => undefined,
   };
@@ -100,4 +103,26 @@ test('local probes use the newest pairing for new work and recover the journal p
   assert.equal(routeChange.ok, false);
   assert.equal(routeChange.snapshot.provider.id, 'icloud-drive');
   assert.match(routeChange.snapshot.error?.message ?? '', /Cancel the active journal/u);
+
+  const cancelledSync = await runtime.dispatch(context, { name: 'cancel' });
+  assert.equal(cancelledSync.snapshot.phase, 'cancelled');
+  assert.deepEqual(cancellations, [sessionId]);
+  assert.equal((stored as { activeSyncSessionId?: string }).activeSyncSessionId, undefined);
+
+  const transferId = crypto.randomUUID();
+  stored = {
+    provider: 'pcloud',
+    operation: 'move',
+    activeTransferId: transferId,
+    activeTransferRemoteSessionId: crypto.randomUUID(),
+    activeRecordIds: ['bookmark-1'],
+  };
+  const legacyMove = await runtime.dispatch(context, { name: 'status' });
+  assert.equal(legacyMove.ok, false);
+  assert.match(legacyMove.snapshot.error?.message ?? '', /transport cannot be recovered/u);
+  assert.deepEqual(probes, [newestPairingId, journalPairingId, journalPairingId]);
+  const cancelledMove = await runtime.dispatch(context, { name: 'cancel' });
+  assert.equal(cancelledMove.snapshot.phase, 'cancelled');
+  assert.deepEqual(cancellations, [sessionId, transferId]);
+  assert.equal((stored as { activeTransferId?: string }).activeTransferId, undefined);
 });
