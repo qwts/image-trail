@@ -200,6 +200,11 @@ export function migrateImageTrailDb(db: IDBDatabase, oldVersion: number, transac
     }
   }
 
+  if (oldVersion < 15) {
+    const liveLocalObjects = db.createObjectStore(DataStore.LiveLocalObjects, { keyPath: 'id' });
+    liveLocalObjects.createIndex(SchemaIndex.LiveLocalObjectsByOperationId, 'operationId', { unique: false });
+  }
+
   const metadata = transaction?.objectStore(DataStore.Metadata);
   metadata?.put({
     key: 'schema',

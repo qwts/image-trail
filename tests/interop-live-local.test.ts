@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { describe, test } from 'node:test';
 
 import { RELEASED_IMAGE_TRAIL_EXTENSION_ID, type NativeRuntime } from '../extension/src/background/interop-icloud-client.js';
-import { OverlookLiveLocalNativeClient } from '../extension/src/background/interop-live-local-native.js';
+import { OverlookLiveLocalNativeClient, probeLiveLocalNativeSupport } from '../extension/src/background/interop-live-local-native.js';
 import { LiveLocalOverlookClient, type LiveLocalNativeBootstrapClient } from '../extension/src/background/interop-live-local-client.js';
 import {
   LiveLocalOverlookObjectStore,
@@ -166,6 +166,21 @@ describe('live local native bootstrap (#675)', () => {
       state: 'unavailable',
       retryable: false,
     });
+  });
+
+  test('allows the live-local authority probe on Windows without invoking the legacy macOS client', async () => {
+    const runtime = {
+      ...nativeRuntime({ schemaVersion: 1, ok: true }),
+      getPlatformInfo: () => Promise.resolve({ os: 'win' as const, arch: 'x86-64' as const, nacl_arch: 'x86-64' as const }),
+    };
+    await probeLiveLocalNativeSupport(RELEASED_IMAGE_TRAIL_EXTENSION_ID, runtime);
+    await assert.rejects(
+      probeLiveLocalNativeSupport(RELEASED_IMAGE_TRAIL_EXTENSION_ID, {
+        ...runtime,
+        getPlatformInfo: () => Promise.resolve({ os: 'linux' as const, arch: 'x86-64' as const, nacl_arch: 'x86-64' as const }),
+      }),
+      (error: unknown) => error instanceof InteropTransportError && error.code === 'unsupported' && !error.retryable,
+    );
   });
 
   test('fails closed on malformed, non-loopback, downgraded, or cross-pairing capability data', async () => {
@@ -367,6 +382,7 @@ class FakeSocket implements LiveLocalWebSocketLike {
   readonly sent: unknown[] = [];
   readonly #listeners = new Map<string, Set<(event: Event) => void>>();
   readonly #objects = new Map<string, number>();
+  #operationId: string | undefined;
 
   constructor(private readonly mode: SocketMode) {
     queueMicrotask(() => {
@@ -386,9 +402,14 @@ class FakeSocket implements LiveLocalWebSocketLike {
         if (this.mode === 'reject-capability') queueMicrotask(() => this.emit('close', { code: 1008 }));
         else queueMicrotask(() => this.message({ schemaVersion: 1, ok: true }));
       } else if (value.type === 'open') {
+        this.#operationId = value.operationId;
         queueMicrotask(() => this.message({ schemaVersion: 1, type: 'state', status: 'connected', operationId: value.operationId }));
       } else if (value.type === 'heartbeat') queueMicrotask(() => this.message({ schemaVersion: 1, type: 'heartbeat-ack' }));
-      else if (value.type === 'cancel') queueMicrotask(() => this.close(1000));
+      else if (value.type === 'commit') {
+        queueMicrotask(() =>
+          this.message({ schemaVersion: 1, type: 'operation-result', operationId: this.#operationId, status: 'reviewing' }),
+        );
+      } else if (value.type === 'cancel') queueMicrotask(() => this.close(1000));
       return;
     }
     const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : ArrayBuffer.isView(data) ? new Uint8Array(data.buffer) : null;
@@ -475,6 +496,7 @@ describe('authenticated live local WebSocket session (#675)', () => {
     assert.equal(controls?.[0]?.secret, 'A'.repeat(43));
     assert.equal(controls?.[1]?.type, 'open');
     await result.store.put('outbound/object.bin', new Uint8Array([9, 8, 7]));
+    await result.session.commit();
     await result.session.heartbeat();
     result.session.cancel();
     await result.session.waitForClose();

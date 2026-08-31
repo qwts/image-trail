@@ -22,6 +22,23 @@ export type LiveLocalNativeBootstrapResult =
       readonly retryable?: boolean;
     };
 
+/** Checks only the authority and platform gates that are safe before a reviewed
+ * pairing/operation context exists. Host availability is established by the
+ * pairing-scoped bootstrap so Windows never falls through the legacy macOS-only
+ * iCloud control client. */
+export async function probeLiveLocalNativeSupport(
+  releasedExtensionId = RELEASED_IMAGE_TRAIL_EXTENSION_ID,
+  runtime: NativeRuntime = chrome.runtime,
+): Promise<void> {
+  if (runtime.id !== releasedExtensionId) {
+    throw new InteropTransportError('Live local host rejected the extension identity.', 'unsupported', false);
+  }
+  const platform = await runtime.getPlatformInfo();
+  if (platform.os !== 'mac' && platform.os !== 'win') {
+    throw new InteropTransportError('Live local Overlook transfer is unsupported on this platform.', 'unsupported', false);
+  }
+}
+
 function nativeHostMissing(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /(?:specified\s+)?native(?:\s+messaging)?\s+host.*(?:missing|not\s+found)|native host missing/iu.test(message);

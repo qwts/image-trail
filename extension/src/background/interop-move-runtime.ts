@@ -1,9 +1,9 @@
 import type { InteropProviderId } from '../core/interop/runtime-state.js';
-import type { InteropObjectStore } from '../core/interop/transport.js';
 import { MoveOutboxPublisher, readMoveOutboxProgress, type MoveOutboxProgress } from '../data/interop/move-outbox-publisher.js';
 import { MoveAcknowledgementReconciler, type MoveSourceRecordFinalizer } from '../data/interop/move-acknowledgement-reconciler.js';
 import { InteropKeysRepository, type StoredInteropKeyRecord } from '../data/repositories/interop-keys-repository.js';
 import type { ActiveBlobKey } from '../data/crypto/blob-keyring.js';
+import type { InteropProviderOpenContext, InteropRuntimeProviderStore } from './interop-runtime-dependencies.js';
 
 export class InteropMoveSetupError extends Error {
   override readonly name = 'InteropMoveSetupError';
@@ -20,7 +20,10 @@ export class InteropMoveSetupError extends Error {
 export class InteropMoveRuntime {
   constructor(
     private readonly getDb: () => Promise<IDBDatabase | null>,
-    private readonly openProvider: (provider: InteropProviderId) => Promise<InteropObjectStore | null>,
+    private readonly openProvider: (
+      provider: InteropProviderId,
+      context: InteropProviderOpenContext,
+    ) => Promise<InteropRuntimeProviderStore | null>,
     private readonly getActiveBlobKey: () => Promise<ActiveBlobKey | null>,
     private readonly finalizer: MoveSourceRecordFinalizer,
   ) {}
@@ -28,23 +31,34 @@ export class InteropMoveRuntime {
   async start(input: {
     readonly provider: InteropProviderId;
     readonly transferId: string;
+    readonly remoteSessionId: string;
     readonly recordIds: readonly string[];
   }): Promise<MoveOutboxProgress> {
     const db = await this.requireDb();
     const pairing = await this.pairing(db);
     if (!pairing) throw new InteropMoveSetupError('Import the Overlook pairing key before starting interoperability.', 'wrong-key', false);
-    const store = await this.requireProvider(input.provider);
-    return new MoveOutboxPublisher(db, store).start({
+    const store = await this.requireProvider(input.provider, {
+      operation: 'move',
+      operationId: input.transferId,
+      remoteSessionId: input.remoteSessionId,
+      pairingId: pairing.pairingId,
+      recordIds: input.recordIds,
+    });
+    const progress = await new MoveOutboxPublisher(db, store).start({
       transferId: input.transferId,
       recordIds: input.recordIds,
       pairing,
       activeBlobKey: await this.getActiveBlobKey(),
     });
+    await store.commit?.();
+    return progress;
   }
 
   async resume(input: {
     readonly provider: InteropProviderId;
     readonly transferId: string;
+    readonly remoteSessionId: string;
+    readonly recordIds: readonly string[];
     readonly total: number;
     readonly allowFinalization: boolean;
   }): Promise<MoveOutboxProgress> {
@@ -53,35 +67,55 @@ export class InteropMoveRuntime {
     if (!progress) throw new InteropMoveSetupError('The interrupted Move journal is unavailable.', 'interrupted', false);
     const pairing = await this.pairing(db, progress.journal.pairingId);
     if (!pairing) throw new InteropMoveSetupError('The Move journal pairing key is unavailable.', 'wrong-key', false);
-    const store = await this.requireProvider(input.provider);
+    const store = await this.requireProvider(input.provider, {
+      operation: 'move',
+      operationId: input.transferId,
+      remoteSessionId: input.remoteSessionId,
+      pairingId: pairing.pairingId,
+      recordIds: input.recordIds,
+    });
     await new MoveOutboxPublisher(db, store).resume(input.transferId, pairing, input.total);
-    return new MoveAcknowledgementReconciler(db, store, this.finalizer).reconcile({
+    await store.commit?.();
+    const reconciled = await new MoveAcknowledgementReconciler(db, store, this.finalizer).reconcile({
       transferId: input.transferId,
       total: input.total,
       pairing,
       allowFinalization: input.allowFinalization,
     });
+    await store.clearStaged?.();
+    return reconciled;
   }
 
   async status(input: {
     readonly transferId: string;
     readonly total: number;
     readonly provider?: InteropProviderId | undefined;
+    readonly remoteSessionId?: string | undefined;
+    readonly recordIds?: readonly string[] | undefined;
     readonly allowFinalization?: boolean | undefined;
   }): Promise<MoveOutboxProgress | null> {
     const db = await this.getDb();
     if (!db) return null;
     const progress = await readMoveOutboxProgress(db, input.transferId, input.total);
-    if (!progress || !input.provider) return progress;
+    if (!progress || !input.provider || !input.remoteSessionId || !input.recordIds) return progress;
     const pairing = await this.pairing(db, progress.journal.pairingId);
     if (!pairing) throw new InteropMoveSetupError('The Move journal pairing key is unavailable.', 'wrong-key', false);
-    const store = await this.requireProvider(input.provider);
-    return new MoveAcknowledgementReconciler(db, store, this.finalizer).reconcile({
+    const store = await this.requireProvider(input.provider, {
+      operation: 'move',
+      operationId: input.transferId,
+      remoteSessionId: input.remoteSessionId,
+      pairingId: pairing.pairingId,
+      recordIds: input.recordIds,
+    });
+    await store.commit?.();
+    const reconciled = await new MoveAcknowledgementReconciler(db, store, this.finalizer).reconcile({
       transferId: input.transferId,
       total: input.total,
       pairing,
       allowFinalization: input.allowFinalization ?? false,
     });
+    await store.clearStaged?.();
+    return reconciled;
   }
 
   private async requireDb(): Promise<IDBDatabase> {
@@ -90,8 +124,8 @@ export class InteropMoveRuntime {
     return db;
   }
 
-  private async requireProvider(provider: InteropProviderId): Promise<InteropObjectStore> {
-    const store = await this.openProvider(provider);
+  private async requireProvider(provider: InteropProviderId, context: InteropProviderOpenContext): Promise<InteropRuntimeProviderStore> {
+    const store = await this.openProvider(provider, context);
     if (!store) {
       throw new InteropMoveSetupError('The selected provider cannot publish encrypted Move objects yet.', 'provider-unavailable', false);
     }

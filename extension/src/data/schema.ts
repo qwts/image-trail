@@ -1,7 +1,7 @@
 import type { DataStoreName } from './types.js';
 
 export const IMAGE_TRAIL_DB_NAME = 'image-trail';
-export const IMAGE_TRAIL_DB_VERSION = 14;
+export const IMAGE_TRAIL_DB_VERSION = 15;
 
 export const DataStore = {
   Metadata: 'metadata',
@@ -28,6 +28,7 @@ export const DataStore = {
   SecureSyncItems: 'secureSyncItems',
   SecureSyncOutbox: 'secureSyncOutbox',
   SecureSyncInbox: 'secureSyncInbox',
+  LiveLocalObjects: 'liveLocalObjects',
 } as const satisfies Record<string, DataStoreName>;
 
 export const DATA_STORE_NAMES = Object.values(DataStore);
@@ -69,4 +70,5 @@ export const SchemaIndex = {
   SecureSyncItemsBySessionId: 'secureSyncItems.bySessionId',
   SecureSyncOutboxBySessionId: 'secureSyncOutbox.bySessionId',
   SecureSyncInboxBySessionId: 'secureSyncInbox.bySessionId',
+  LiveLocalObjectsByOperationId: 'liveLocalObjects.byOperationId',
 } as const;

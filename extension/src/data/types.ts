@@ -27,7 +27,8 @@ export type DataStoreName =
   | 'secureSyncSessions'
   | 'secureSyncItems'
   | 'secureSyncOutbox'
-  | 'secureSyncInbox';
+  | 'secureSyncInbox'
+  | 'liveLocalObjects';
 export type DataStatusCode =
   'ok' | 'db-open-failed' | 'migration-failed' | 'encryption-failed' | 'decryption-failed' | 'not-found' | 'locked';
 
