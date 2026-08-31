@@ -56,6 +56,7 @@ test('local probes use the newest pairing for new work and recover the journal p
       return 'connected';
     },
     disconnectICloud: async () => undefined,
+    cancelICloudOperation: async () => undefined,
     openProvider: async () => null,
     finalizeSourceRecord: async () => undefined,
   };

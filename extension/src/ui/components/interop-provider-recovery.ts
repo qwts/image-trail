@@ -13,17 +13,21 @@ interface ProviderRecoveryOptions {
   readonly latestRequest: () => number;
 }
 
-function renderConnecting(options: ProviderRecoveryOptions): void {
+function providerLabel(provider: InteropProviderId): string {
+  if (provider === 'icloud-drive') return 'Local — Overlook on this computer';
+  return provider === 'pcloud' ? 'pCloud' : 'Google Drive';
+}
+
+function renderConnecting(options: ProviderRecoveryOptions, provider: InteropProviderId): void {
   const state = options.visibleState();
   options.render({
     ...state,
     provider: {
       ...state.provider,
+      id: provider,
+      label: providerLabel(provider),
       state: 'connecting',
-      detail:
-        options.selectedProvider() === 'icloud-drive'
-          ? 'Checking Overlook on this computer…'
-          : 'Connecting to the selected cloud provider…',
+      detail: provider === 'icloud-drive' ? 'Checking Overlook on this computer…' : 'Connecting to the selected cloud provider…',
     },
     error: null,
   });
@@ -78,17 +82,18 @@ export function createInteropProviderRecovery(options: ProviderRecoveryOptions) 
   };
   const connect = (name: 'connect' | 'reconnect'): void => {
     if (actionPending) return;
+    const provider = options.selectedProvider();
     actionPending = true;
     replyLost = false;
     focusObserved = false;
-    renderConnecting(options);
-    void options.dispatch({ name, provider: options.selectedProvider() }).then((result) => {
+    renderConnecting(options, provider);
+    void options.dispatch({ name, provider }).then((result) => {
       if (result !== null) {
         actionPending = false;
         return;
       }
       replyLost = true;
-      if (options.selectedProvider() === 'icloud-drive' || focusObserved) probe();
+      if (provider === 'icloud-drive' || focusObserved) probe();
     });
   };
   window.addEventListener('focus', onFocus);

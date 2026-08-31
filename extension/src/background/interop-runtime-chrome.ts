@@ -82,6 +82,7 @@ export function createChromeInteropRuntime(
     disconnectGoogleDrive: () => chrome.identity.clearAllCachedAuthTokens(),
     probeICloud: (pairingId, operation) => probeLiveLocalNativeAvailability(pairingId, operation),
     disconnectICloud: () => liveLocal.disconnect(),
+    cancelICloudOperation: (operationId) => liveLocal.cancel(operationId),
     openProvider: async (provider, context) => {
       if (provider === 'pcloud') return pcloud.openProvider();
       if (provider === 'google-drive' && hasConfiguredDriveOAuth(chrome.runtime.getManifest()))

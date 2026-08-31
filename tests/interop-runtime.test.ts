@@ -115,6 +115,7 @@ async function harness(overrides: Partial<InteropRuntimeDependencies> = {}) {
       return 'missing-host';
     },
     disconnectICloud: async () => undefined,
+    cancelICloudOperation: async () => undefined,
     openProvider: async () => null,
     finalizeSourceRecord: async () => undefined,
     ...overrides,

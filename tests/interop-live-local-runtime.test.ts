@@ -75,11 +75,16 @@ class FakeSession implements LiveLocalRuntimeSession {
   phase = 'connected';
   readonly store = new MemoryStore();
   commits = 0;
+  cancels = 0;
   closes = 0;
 
   commit(): Promise<void> {
     this.commits += 1;
     return Promise.resolve();
+  }
+  cancel(): void {
+    this.cancels += 1;
+    this.phase = 'closed';
   }
   close(): void {
     this.closes += 1;
@@ -98,6 +103,29 @@ class FakeClient implements LiveLocalRuntimeClient {
     return Promise.resolve({ state: 'connected', session });
   }
 }
+
+test('live local runtime cancels the matching session and clears operation-scoped staged ciphertext', async (t) => {
+  const opened = await openImageTrailDb(new IDBFactory());
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+  const client = new FakeClient();
+  const runtime = new LiveLocalInteropRuntime(() => Promise.resolve(opened.db), client);
+  await runtime.open({
+    operation: 'move',
+    operationId,
+    remoteSessionId: otherOperationId,
+    pairingId: '33333333-3333-4333-8333-333333333333',
+    recordIds: ['bookmark-1'],
+  });
+  const staged = new IndexedDbLiveLocalObjectRepository(opened.db, operationId);
+  const bytes = new TextEncoder().encode('cancelled-ciphertext');
+  await staged.put('pairings/a/objects/cancelled.bin', bytes, await sha256(bytes));
+
+  await runtime.cancel(operationId);
+
+  assert.equal(client.sessions[0]?.cancels, 1);
+  await assert.rejects(staged.get('pairings/a/objects/cancelled.bin'), /unavailable/u);
+});
 
 test('live local runtime binds exact reviewed identities, reuses only that session, and commits explicitly', async (t) => {
   const opened = await openImageTrailDb(new IDBFactory());

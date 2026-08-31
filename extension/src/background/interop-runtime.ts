@@ -62,6 +62,8 @@ export class InteropRuntime {
     if (action.name === 'disconnect') return this.disconnect(context, selected);
     if (action.name === 'cancel' || action.name === 'pause') {
       const active = activeInteropRuntimeSelection(selected);
+      if (active.id && !sameInteropRecordIds(active.recordIds, context.recordIds))
+        return this.unsupportedAction(context, selected, 'failed', 'This selection does not own the active journal.');
       if (selected.operation === 'sync' && active.id) {
         try {
           const progress = await this.syncRuntime().control(active.id, action.name);
@@ -74,6 +76,8 @@ export class InteropRuntime {
         }
       }
       if (action.name === 'cancel') {
+        if (active.id && (active.provider ?? selected.provider) === 'icloud-drive')
+          await this.dependencies.cancelICloudOperation(active.id);
         const cleared = clearActiveInteropRuntimeSelection(selected);
         if (active.id) await this.save(cleared);
         return this.result(context, cleared, 'cancelled', 'disconnected');
@@ -370,6 +374,7 @@ export class InteropRuntime {
     processed = 0,
     conflicts: InteropRuntimeSnapshot['conflicts'] = [],
   ): Promise<InteropRuntimeResult> {
+    const active = activeInteropRuntimeSelection(selected);
     const snapshot: InteropRuntimeSnapshot = {
       entry: context.entry,
       operation: selected.operation,
@@ -381,7 +386,7 @@ export class InteropRuntime {
       processed,
       conflicts,
       error,
-      active: activeInteropRuntimeSelection(selected).id !== undefined,
+      active: active.id !== undefined && sameInteropRecordIds(active.recordIds, context.recordIds),
       locked: context.locked,
     };
     return { ok: error === null, snapshot };
