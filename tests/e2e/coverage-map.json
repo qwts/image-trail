@@ -35,6 +35,7 @@
     {
       "id": "overlook-transfer-sync-visible-workflow",
       "acceptance": "Baseline Transfer and Sync feature gate plus local-first same-computer presence, explicit cloud routing, active-route locking, and truthful experimental review, conflict, progress, recovery, and locked states",
+      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Overlook-Transfer-And-Sync-UI",
       "coverage": [
         {
           "type": "unit-dom",
