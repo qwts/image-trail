@@ -9,6 +9,7 @@ import {
   type InteropEntryContext,
   type InteropVisibleWorkflow,
 } from '../interop/visible-workflow.js';
+import { createInteropProviderSetup } from './interop-provider-setup.js';
 
 export interface InteropWorkflowHandlers {
   readonly onClose: () => void;
@@ -83,36 +84,6 @@ function createSummary(state: InteropVisibleWorkflow, handlers: InteropWorkflowH
   return [header, operation, provider];
 }
 
-function createProviderSetup(state: InteropVisibleWorkflow, handlers: InteropWorkflowHandlers): HTMLElement {
-  const setup = document.createElement('fieldset');
-  setup.className = 'image-trail-interop__setup';
-  const legend = document.createElement('legend');
-  legend.textContent = 'Provider and pairing';
-  const provider = document.createElement('select');
-  provider.setAttribute('aria-label', 'Transfer provider');
-  for (const [value, label] of [
-    ['pcloud', 'pCloud'],
-    ['google-drive', 'Google Drive'],
-    ['icloud-drive', 'iCloud Drive'],
-  ] as const) {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    option.selected = state.provider.id === value;
-    provider.append(option);
-  }
-  provider.disabled = handlers.onProviderChange === undefined;
-  provider.addEventListener('change', () => handlers.onProviderChange?.(provider.value as InteropProviderId));
-  const connectLabel = state.provider.state === 'reconnect-required' ? 'Reconnect provider' : 'Connect provider';
-  const connect = button(connectLabel, handlers.onConnect, ['connected', 'unavailable'].includes(state.provider.state));
-  const importHelp = document.createElement('p');
-  importHelp.className = 'image-trail-interop__pairing-help';
-  importHelp.textContent = 'Import pairing keys in an extension-owned page so the visited site cannot inspect the file or password.';
-  const importButton = button('Open secure pairing import', handlers.onImportPairing);
-  setup.append(legend, provider, connect, importHelp, importButton);
-  return setup;
-}
-
 function createReviewAndProgress(state: InteropVisibleWorkflow): readonly HTMLElement[] {
   const review = document.createElement('dl');
   review.className = 'image-trail-interop__review';
@@ -175,7 +146,7 @@ function createErrorAndControls(state: InteropVisibleWorkflow, handlers: Interop
   controls.append(
     button('Close', handlers.onClose),
     button('Disconnect', handlers.onDisconnect, state.provider.state !== 'connected'),
-    button('Cancel', handlers.onCancel, !['transferring', 'paused', 'awaiting-acknowledgement'].includes(state.phase)),
+    button('Cancel', handlers.onCancel, !state.active && !['transferring', 'paused', 'awaiting-acknowledgement'].includes(state.phase)),
     button('Pause', handlers.onPause, state.phase !== 'transferring'),
     button('Resume', handlers.onResume, state.phase !== 'paused'),
     button(
@@ -196,7 +167,7 @@ export function createInteropWorkflowView(state: InteropVisibleWorkflow, handler
 
   root.append(
     ...createSummary(state, handlers),
-    createProviderSetup(state, handlers),
+    createInteropProviderSetup(state, handlers),
     ...createReviewAndProgress(state),
     createConflicts(state, handlers),
     ...createErrorAndControls(state, handlers),
@@ -228,6 +199,7 @@ function createProviderRecovery(
   scrim: HTMLElement,
   dispatch: InteropWorkflowDispatch,
   render: (state: InteropVisibleWorkflow) => void,
+  renderConnecting: () => void,
   selectedProvider: () => InteropProviderId,
   getLatestRequest: () => number,
 ) {
@@ -272,6 +244,7 @@ function createProviderRecovery(
     actionPending = true;
     replyLost = false;
     focusObserved = false;
+    renderConnecting();
     void dispatch({ name, provider: selectedProvider() }).then((result) => {
       if (result !== null) {
         actionPending = false;
@@ -320,8 +293,10 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
   scrim.setAttribute('aria-modal', 'true');
   scrim.setAttribute('aria-label', 'Transfer and Sync');
   const context: InteropRuntimeContext = { entry, total: recordIds.length, recordIds, locked };
-  let selectedProvider: InteropProviderId = 'pcloud';
+  let selectedProvider: InteropProviderId = 'icloud-drive';
+  let visibleState = blockedInteropWorkflow(entry, recordIds.length, locked);
   function render(state: InteropVisibleWorkflow): void {
+    visibleState = state;
     selectedProvider = state.provider.id;
     scrim.replaceChildren(createInteropWorkflowView(state, handlers));
   }
@@ -336,6 +311,17 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     scrim,
     dispatch,
     render,
+    () =>
+      render({
+        ...visibleState,
+        provider: {
+          ...visibleState.provider,
+          state: 'connecting',
+          detail:
+            selectedProvider === 'icloud-drive' ? 'Checking Overlook on this computer…' : 'Connecting to the selected cloud provider…',
+        },
+        error: null,
+      }),
     () => selectedProvider,
     () => latestRequest,
   );

@@ -9,7 +9,7 @@ import { openGalleryInteropWorkflow } from '../../extension/src/ui/react/destina
 test('renders exact review and progress counts without claiming unavailable work completed', () => {
   const view = createInteropWorkflowView(blockedInteropWorkflow('selection', 4), { onClose: () => undefined });
   assert.match(view.textContent ?? '', /0 \/ 4 processed · 0 acknowledged · 0 finalized/);
-  assert.match(view.textContent ?? '', /Eligibility has not been checked/);
+  assert.match(view.textContent ?? '', /eligibility have not been checked/iu);
   const start = Array.from(view.querySelectorAll('button')).find((control) => control.textContent === 'Start move');
   assert.ok(start instanceof HTMLButtonElement);
   assert.equal(start.disabled, true);
@@ -44,7 +44,7 @@ test('provider setup dispatches the selected isolated provider and connect actio
   assert.ok(provider instanceof HTMLSelectElement);
   provider.value = 'icloud-drive';
   provider.dispatchEvent(new Event('change'));
-  const connect = Array.from(view.querySelectorAll('button')).find((control) => control.textContent === 'Connect provider');
+  const connect = Array.from(view.querySelectorAll('button')).find((control) => control.textContent === 'Connect cloud provider');
   assert.ok(connect instanceof HTMLButtonElement);
   connect.click();
   assert.deepEqual(calls, ['provider:icloud-drive', 'connect']);
@@ -67,7 +67,7 @@ test('disconnected pCloud exposes the separate interoperability authorization ac
       connects += 1;
     },
   });
-  const connect = Array.from(view.querySelectorAll('button')).find((control) => control.textContent === 'Connect provider');
+  const connect = Array.from(view.querySelectorAll('button')).find((control) => control.textContent === 'Connect cloud provider');
   assert.ok(connect instanceof HTMLButtonElement);
   assert.equal(connect.disabled, false);
   connect.click();
@@ -89,6 +89,62 @@ test('provider setup keeps pairing secrets out of the page-mounted workflow', ()
   assert.ok(importButton instanceof HTMLButtonElement);
   importButton.click();
   assert.equal(imports, 1);
+});
+
+test('local Overlook is visibly preferred while cloud remains an explicit route', () => {
+  const view = createInteropWorkflowView(blockedInteropWorkflow('settings', 0), {
+    onClose: () => undefined,
+    onProviderChange: () => undefined,
+    onConnect: () => undefined,
+  });
+  const provider = view.querySelector('[aria-label="Transfer provider"]');
+  assert.ok(provider instanceof HTMLSelectElement);
+  assert.equal(provider.value, 'icloud-drive');
+  assert.deepEqual(
+    [...provider.querySelectorAll('optgroup')].map((group) => group.label),
+    ['Same computer', 'Cloud — cross-machine'],
+  );
+  assert.equal(provider.options[0]?.textContent, 'Local — Overlook on this computer');
+  assert.match(view.textContent ?? '', /short-lived same-machine connection/u);
+  assert.match(view.textContent ?? '', /never falls back automatically/u);
+  assert.ok(Array.from(view.querySelectorAll('button')).some((control) => control.textContent === 'Check local connection'));
+});
+
+test('an active journal locks its reviewed route and leaves cancellation available', () => {
+  let changes = 0;
+  let cancels = 0;
+  const state = {
+    ...blockedInteropWorkflow('selection', 3),
+    active: true,
+    pairing: 'paired' as const,
+    phase: 'failed' as const,
+    provider: {
+      id: 'icloud-drive' as const,
+      label: 'Local — Overlook on this computer',
+      state: 'unavailable' as const,
+      detail: 'The local connection was interrupted.',
+    },
+    error: { code: 'interrupted' as const, message: 'The local connection was interrupted.', retryable: true },
+  };
+  const view = createInteropWorkflowView(state, {
+    onClose: () => undefined,
+    onProviderChange: () => {
+      changes += 1;
+    },
+    onCancel: () => {
+      cancels += 1;
+    },
+  });
+  const provider = view.querySelector('[aria-label="Transfer provider"]');
+  assert.ok(provider instanceof HTMLSelectElement);
+  assert.equal(provider.disabled, true);
+  assert.equal(changes, 0);
+  assert.match(view.textContent ?? '', /active move keeps Local — Overlook on this computer for its 3-record reviewed scope/u);
+  const cancel = Array.from(view.querySelectorAll('button')).find((control) => control.textContent === 'Cancel');
+  assert.ok(cancel instanceof HTMLButtonElement);
+  assert.equal(cancel.disabled, false);
+  cancel.click();
+  assert.equal(cancels, 1);
 });
 
 test('conflict choice carries explicit apply-to-all intent', () => {
@@ -368,10 +424,12 @@ test('returning from a lost OAuth reply refreshes status and suppresses duplicat
   await new Promise((resolve) => setTimeout(resolve, 0));
   const dialog = document.querySelector('[role="dialog"][aria-label="Transfer and Sync"]');
   assert.ok(dialog instanceof HTMLElement);
-  const connect = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Connect provider');
+  const connect = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Connect cloud provider');
   assert.ok(connect instanceof HTMLButtonElement);
   connect.click();
   connect.click();
+  assert.match(dialog.textContent ?? '', /connecting · pairing/u);
+  assert.match(dialog.textContent ?? '', /Connecting to the selected cloud provider/u);
   window.dispatchEvent(new Event('focus'));
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(actions, ['status', 'connect']);

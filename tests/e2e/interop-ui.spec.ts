@@ -96,11 +96,15 @@ test('an enabled experimental build opens Transfer & Sync without reordering the
     .locator('.image-trail-panel__bookmark-item')
     .evaluateAll((rows) => rows.map((candidate) => candidate.getAttribute('data-image-trail-row-id')));
 
+  await row.click();
+  await expect(row).toHaveAttribute('aria-selected', 'true');
   await row.getByRole('button', { name: 'Move / Sync' }).click();
   const dialog = page.getByRole('dialog', { name: 'Transfer and Sync' });
   await expect(dialog).toContainText('bookmark · Queued');
-  await expect(dialog).toContainText('pCloud');
-  await expect(dialog.getByLabel('Transfer provider')).toHaveValue('pcloud');
+  await expect(dialog).toContainText('Local — Overlook on this computer');
+  await expect(dialog.getByLabel('Transfer provider')).toHaveValue('icloud-drive');
+  await expect(dialog).toContainText('Cloud is an explicit cross-machine route');
+  await expect(dialog).toContainText('never falls back automatically');
   await expect(dialog.getByText('extension-owned page')).toBeVisible();
   await expect(dialog.getByLabel('Overlook pairing key')).toHaveCount(0);
   await expect(dialog.getByLabel('Pairing key password')).toHaveCount(0);

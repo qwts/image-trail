@@ -3,6 +3,9 @@ import type { InteropProviderId } from '../core/interop/runtime-state.js';
 import type { InteropObjectStore } from '../core/interop/transport.js';
 import type { ActiveBlobKey } from '../data/crypto/blob-keyring.js';
 
+export type InteropLocalAvailability =
+  'connected' | 'missing-host' | 'not-running' | 'locked' | 'incompatible' | 'unavailable' | 'unsupported';
+
 export interface InteropProviderOpenContext {
   readonly operation: InteropOperation;
   readonly operationId: string;
@@ -27,7 +30,7 @@ export interface InteropRuntimeDependencies {
   readonly disconnectPCloud: () => Promise<void>;
   readonly probeGoogleDrive: (interactive: boolean) => Promise<void>;
   readonly disconnectGoogleDrive: () => Promise<void>;
-  readonly probeICloud: () => Promise<void>;
+  readonly probeICloud: (pairingId: string, operation: InteropOperation) => Promise<InteropLocalAvailability | void>;
   readonly disconnectICloud: () => Promise<void>;
   readonly openProvider: (provider: InteropProviderId, context: InteropProviderOpenContext) => Promise<InteropRuntimeProviderStore | null>;
   readonly finalizeSourceRecord: (sourceLocalId: string, sourceUpdatedAt: string) => Promise<void>;

@@ -42,15 +42,29 @@
   max-width: 100%;
 }
 
+/* Keep the experimental action column outside the row's established selection target. */
+.image-trail-panel-root .image-trail-panel__item-actions.image-trail-interop__record-actions {
+  display: grid;
+  grid-template-columns: minmax(88px, max-content);
+}
+
 .image-trail-interop h3,
 .image-trail-interop p {
   margin: 0;
 }
 
 .image-trail-interop__context,
-.image-trail-interop__provider p {
+.image-trail-interop__provider p,
+.image-trail-interop__transport-help,
+.image-trail-interop__route-lock,
+.image-trail-interop__pairing-help {
   width: 100%;
   color: var(--image-trail-muted, #aaa);
+}
+
+.image-trail-interop__route-lock {
+  padding-inline-start: 8px;
+  border-inline-start: 3px solid #ffd18a;
 }
 
 .image-trail-interop__review {

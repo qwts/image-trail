@@ -3,7 +3,11 @@ import { createHash } from 'node:crypto';
 import { describe, test } from 'node:test';
 
 import { RELEASED_IMAGE_TRAIL_EXTENSION_ID, type NativeRuntime } from '../extension/src/background/interop-icloud-client.js';
-import { OverlookLiveLocalNativeClient, probeLiveLocalNativeSupport } from '../extension/src/background/interop-live-local-native.js';
+import {
+  OverlookLiveLocalNativeClient,
+  probeLiveLocalNativeAvailability,
+  probeLiveLocalNativeSupport,
+} from '../extension/src/background/interop-live-local-native.js';
 import { LiveLocalOverlookClient, type LiveLocalNativeBootstrapClient } from '../extension/src/background/interop-live-local-client.js';
 import {
   LiveLocalOverlookObjectStore,
@@ -110,6 +114,23 @@ class MemoryRepository implements LiveLocalIncomingObjectRepository {
 }
 
 describe('live local native bootstrap (#675)', () => {
+  test('reports pairing-scoped availability without exposing the one-use capability', async () => {
+    const calls: unknown[] = [];
+    const running = {
+      bootstrap: (pairingId: string, operation: 'move' | 'sync') => {
+        calls.push({ pairingId, operation });
+        return Promise.resolve({ schemaVersion: 1 as const, state: 'running' as const, capability: capability() });
+      },
+    };
+    assert.equal(await probeLiveLocalNativeAvailability(PAIRING_ID, 'move', running), 'connected');
+    assert.deepEqual(calls, [{ pairingId: PAIRING_ID, operation: 'move' }]);
+
+    const closed = {
+      bootstrap: () => Promise.resolve({ schemaVersion: 1 as const, state: 'not-running' as const }),
+    };
+    assert.equal(await probeLiveLocalNativeAvailability(PAIRING_ID, 'sync', closed), 'not-running');
+  });
+
   test('sends the exact schema-v2 request and accepts only a matching bounded capability', async () => {
     const messages: object[] = [];
     const client = new OverlookLiveLocalNativeClient(

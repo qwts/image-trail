@@ -56,6 +56,45 @@ export const Completed: Story = { render: () => createInteropWorkflowView(progre
 export const ProviderDisconnected: Story = {
   render: () => createInteropWorkflowView(blockedInteropWorkflow('settings', 12), handlers()),
 };
+export const LocalConnected: Story = {
+  render: () => createInteropWorkflowView(localState('connected', 'Local Overlook is connected.'), handlers()),
+};
+export const LocalHostMissing: Story = {
+  render: () =>
+    createInteropWorkflowView(localState('unavailable', 'The signed Overlook local connection host is not installed.'), handlers()),
+};
+export const OverlookClosed: Story = {
+  render: () => createInteropWorkflowView(localState('unavailable', 'Open Overlook on this computer, then retry.', true), handlers()),
+};
+export const OverlookLocked: Story = {
+  render: () => createInteropWorkflowView(localState('unavailable', 'Unlock Overlook on this computer, then retry.', true), handlers()),
+};
+export const LocalIncompatible: Story = {
+  render: () =>
+    createInteropWorkflowView(
+      localState('unavailable', 'The installed Overlook version is incompatible with this local protocol.'),
+      handlers(),
+    ),
+};
+export const LocalConnecting: Story = {
+  render: () => createInteropWorkflowView(localState('connecting', 'Checking Overlook on this computer…'), handlers()),
+};
+export const LocalInterrupted: Story = {
+  render: () =>
+    createInteropWorkflowView(
+      {
+        ...localState('unavailable', 'The local connection was interrupted.', true),
+        active: true,
+        phase: 'failed',
+        error: { code: 'interrupted', message: 'The local connection was interrupted.', retryable: true },
+      },
+      handlers(),
+    ),
+};
+export const LocalResumable: Story = {
+  render: () =>
+    createInteropWorkflowView({ ...localState('connected', 'Local Overlook is connected.'), active: true, phase: 'paused' }, handlers()),
+};
 export const Locked: Story = {
   render: () => createInteropWorkflowView(blockedInteropWorkflow('captured-original', 1, true), handlers()),
 };
@@ -69,7 +108,27 @@ export const Narrow: Story = {
 };
 
 function handlers() {
-  return { onClose, onPause, onResume: fn(), onCancel: fn(), onStart: fn(), onReconnect: fn(), onConflict };
+  return {
+    onClose,
+    onPause,
+    onResume: fn(),
+    onCancel: fn(),
+    onStart: fn(),
+    onReconnect: fn(),
+    onConflict,
+    onProviderChange: fn(),
+    onConnect: fn(),
+  };
+}
+
+function localState(state: InteropVisibleWorkflow['provider']['state'], detail: string, retryable = false): InteropVisibleWorkflow {
+  return {
+    ...blockedInteropWorkflow('settings', 12),
+    provider: { id: 'icloud-drive', label: 'Local — Overlook on this computer', state, detail },
+    pairing: 'paired',
+    error:
+      state === 'unavailable' ? { code: retryable ? 'provider-unavailable' : 'unsupported-version', message: detail, retryable } : null,
+  };
 }
 
 function reviewState(): InteropVisibleWorkflow {

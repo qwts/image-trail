@@ -10,6 +10,7 @@ import {
   type LiveLocalBootstrapResult,
 } from './interop-live-local-protocol.js';
 import { OVERLOOK_ICLOUD_NATIVE_HOST, RELEASED_IMAGE_TRAIL_EXTENSION_ID, type NativeRuntime } from './interop-icloud-client.js';
+import type { InteropLocalAvailability } from './interop-runtime-dependencies.js';
 
 type LiveLocalRunningBootstrapResult = Extract<LiveLocalBootstrapResult, { readonly state: 'running' }>;
 type LiveLocalUnavailableBootstrapState = Exclude<LiveLocalBootstrapResult['state'], 'running'> | 'missing-host' | 'unsupported';
@@ -107,4 +108,15 @@ export class OverlookLiveLocalNativeClient {
     }
     return result;
   }
+}
+
+/** Reads pairing-scoped presence without retaining the one-use capability.
+ * Starting or resuming an operation always bootstraps again for fresh authority. */
+export async function probeLiveLocalNativeAvailability(
+  pairingId: string,
+  operation: InteropOperation,
+  client: Pick<OverlookLiveLocalNativeClient, 'bootstrap'> = new OverlookLiveLocalNativeClient(),
+): Promise<InteropLocalAvailability> {
+  const result = await client.bootstrap(pairingId, operation);
+  return result.state === 'running' ? 'connected' : result.state;
 }

@@ -24,10 +24,10 @@ export function blockedInteropWorkflow(entry: InteropEntryContext, total: number
     operation: 'move',
     target: 'overlook',
     provider: {
-      id: 'pcloud',
-      label: 'pCloud',
-      state: 'unavailable',
-      detail: 'Separate pCloud interoperability access is not configured.',
+      id: 'icloud-drive',
+      label: 'Local — Overlook on this computer',
+      state: 'disconnected',
+      detail: 'Import the matching Overlook pairing before checking the local connection.',
     },
     pairing: 'unpaired',
     phase: 'queued',
@@ -36,9 +36,10 @@ export function blockedInteropWorkflow(entry: InteropEntryContext, total: number
     conflicts: [],
     error: {
       code: 'provider-unavailable',
-      message: 'Eligibility has not been checked. No records or originals have been transferred.',
+      message: 'Local availability and eligibility have not been checked. No records or originals have been transferred.',
       retryable: true,
     },
+    active: false,
     locked,
   };
 }

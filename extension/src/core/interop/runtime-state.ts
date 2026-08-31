@@ -61,6 +61,7 @@ export interface InteropRuntimeSnapshot {
   readonly processed: number;
   readonly conflicts: readonly InteropRuntimeConflict[];
   readonly error: InteropRuntimeError | null;
+  readonly active: boolean;
   readonly locked: boolean;
 }
 
