@@ -37,10 +37,13 @@ const LOCAL_UNAVAILABLE: Record<
   },
 };
 
-async function interopPairingId(getDb: () => Promise<IDBDatabase | null>): Promise<string | undefined> {
+async function interopPairingId(getDb: () => Promise<IDBDatabase | null>, requiredPairingId?: string): Promise<string | undefined> {
   try {
     const db = await getDb();
-    return db ? (await new InteropKeysRepository(db).list()).at(0)?.pairingId : undefined;
+    if (!db) return undefined;
+    const records = await new InteropKeysRepository(db).list();
+    if (requiredPairingId) return records.find((record) => record.pairingId === requiredPairingId)?.pairingId;
+    return [...records].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]?.pairingId;
   } catch {
     return undefined;
   }
@@ -66,6 +69,7 @@ export async function interopProviderStatus(
   provider: InteropProviderId,
   interactive: boolean,
   operation: InteropOperation,
+  activePairingId?: string | null,
 ): Promise<{ readonly state: InteropProviderState; readonly detail: string; readonly error: InteropRuntimeError | null }> {
   try {
     if (provider === 'pcloud') {
@@ -74,7 +78,11 @@ export async function interopProviderStatus(
       }
     } else if (provider === 'google-drive') await dependencies.probeGoogleDrive(interactive);
     else {
-      const pairingId = await interopPairingId(dependencies.getDb);
+      if (activePairingId === null) {
+        const detail = 'The active journal pairing is unavailable.';
+        return { state: 'unavailable', detail, error: { code: 'wrong-key', message: detail, retryable: false } };
+      }
+      const pairingId = await interopPairingId(dependencies.getDb, activePairingId);
       if (!pairingId) return { state: 'disconnected', detail: INTEROP_PROVIDERS[provider].disconnected, error: null };
       const availability = await dependencies.probeICloud(pairingId, operation);
       if (availability && availability !== 'connected') {

@@ -448,6 +448,72 @@ test('returning from a lost OAuth reply refreshes status and suppresses duplicat
     ?.click();
 });
 
+test('a lost local check reply probes immediately and restores a retryable control without a focus event', async (t) => {
+  const actions: string[] = [];
+  let statusCalls = 0;
+  let connectCalls = 0;
+  const localSnapshot = (connected: boolean) => ({
+    ...blockedInteropWorkflow('settings', 0),
+    provider: {
+      id: 'icloud-drive' as const,
+      label: 'Local — Overlook on this computer',
+      state: connected ? ('connected' as const) : ('disconnected' as const),
+      detail: connected ? 'Local — Overlook on this computer is connected.' : 'Check the local connection.',
+    },
+    pairing: 'paired' as const,
+    error: null,
+  });
+  Object.defineProperty(globalThis, 'chrome', {
+    configurable: true,
+    value: {
+      runtime: {
+        id: 'test-extension',
+        sendMessage: (message: { payload: { action: { name: string } } }) => {
+          const name = message.payload.action.name;
+          actions.push(name);
+          if (name === 'status') {
+            statusCalls += 1;
+            return Promise.resolve(
+              statusCalls === 1 ? createInteropRuntimeResultMessage({ ok: true, snapshot: localSnapshot(false) }) : undefined,
+            );
+          }
+          connectCalls += 1;
+          if (connectCalls === 1) {
+            return Promise.reject(
+              new Error(
+                'A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received',
+              ),
+            );
+          }
+          return Promise.resolve(createInteropRuntimeResultMessage({ ok: true, snapshot: localSnapshot(true) }));
+        },
+      },
+    },
+  });
+  t.after(() => Reflect.deleteProperty(globalThis, 'chrome'));
+
+  openInteropWorkflow('settings', []);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const dialog = document.querySelector('[role="dialog"][aria-label="Transfer and Sync"]');
+  assert.ok(dialog instanceof HTMLElement);
+  const localCheck = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Check local connection');
+  assert.ok(localCheck instanceof HTMLButtonElement);
+  localCheck.click();
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  assert.deepEqual(actions, ['status', 'connect', 'status', 'status', 'status']);
+  assert.match(dialog.textContent ?? '', /local connection check was interrupted/u);
+
+  const retry = Array.from(dialog.querySelectorAll('button')).find((control) => control.textContent === 'Check local connection');
+  assert.ok(retry instanceof HTMLButtonElement);
+  retry.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(connectCalls, 2);
+  assert.match(dialog.textContent ?? '', /connected/u);
+  Array.from(dialog.querySelectorAll('button'))
+    .find((control) => control.textContent === 'Close')
+    ?.click();
+});
+
 test('open workflow ignores an older status response after a newer operation response', async (t) => {
   let resolveStatus: ((value: unknown) => void) | undefined;
   let resolveOperation: ((value: unknown) => void) | undefined;

@@ -9,6 +9,7 @@ import {
   type InteropEntryContext,
   type InteropVisibleWorkflow,
 } from '../interop/visible-workflow.js';
+import { createInteropProviderRecovery } from './interop-provider-recovery.js';
 import { createInteropProviderSetup } from './interop-provider-setup.js';
 
 export interface InteropWorkflowHandlers {
@@ -193,80 +194,6 @@ function trapInteropFocus(scrim: HTMLElement, close: () => void): void {
   });
 }
 
-type InteropWorkflowDispatch = (action: InteropRuntimeAction, renderResult?: boolean) => ReturnType<typeof dispatchInteropRuntime>;
-
-function createProviderRecovery(
-  scrim: HTMLElement,
-  dispatch: InteropWorkflowDispatch,
-  render: (state: InteropVisibleWorkflow) => void,
-  renderConnecting: () => void,
-  selectedProvider: () => InteropProviderId,
-  getLatestRequest: () => number,
-) {
-  let refreshPairingOnFocus = false;
-  let actionPending = false;
-  let replyLost = false;
-  let focusObserved = false;
-  let probeTimer: ReturnType<typeof setTimeout> | undefined;
-  const probe = (attempt = 0): void => {
-    if (!actionPending || !scrim.isConnected) return;
-    const probeRequest = getLatestRequest() + 1;
-    void dispatch({ name: 'status' }, false).then((result) => {
-      if (!actionPending || !scrim.isConnected) return;
-      if (probeRequest !== getLatestRequest()) return;
-      const state = result?.snapshot.provider.state;
-      const transient = result === null || state === 'connecting' || state === 'disconnected';
-      if (transient) {
-        if (attempt < 2) {
-          probeTimer = setTimeout(() => probe(attempt + 1), 100);
-          return;
-        }
-        return;
-      }
-      if (result) render(result.snapshot);
-      actionPending = false;
-      replyLost = false;
-    });
-  };
-  const onFocus = (): void => {
-    if (!scrim.isConnected) return;
-    if (actionPending) {
-      focusObserved = true;
-      if (replyLost) probe();
-      return;
-    }
-    if (!refreshPairingOnFocus) return;
-    refreshPairingOnFocus = false;
-    void dispatch({ name: 'status' });
-  };
-  const connect = (name: 'connect' | 'reconnect'): void => {
-    if (actionPending) return;
-    actionPending = true;
-    replyLost = false;
-    focusObserved = false;
-    renderConnecting();
-    void dispatch({ name, provider: selectedProvider() }).then((result) => {
-      if (result !== null) {
-        actionPending = false;
-        return;
-      }
-      replyLost = true;
-      if (focusObserved) probe();
-    });
-  };
-  window.addEventListener('focus', onFocus);
-  return {
-    connect,
-    expectPairingReturn: () => {
-      refreshPairingOnFocus = true;
-    },
-    dispose: () => {
-      window.removeEventListener('focus', onFocus);
-      if (probeTimer) clearTimeout(probeTimer);
-    },
-  };
-}
-
 export function openInteropWorkflow(entry: InteropEntryContext, recordIds: readonly string[], locked = false, anchor?: Element): void {
   let focused = document.activeElement;
   while (focused instanceof HTMLElement && focused.shadowRoot?.activeElement instanceof HTMLElement) {
@@ -307,24 +234,14 @@ export function openInteropWorkflow(entry: InteropEntryContext, recordIds: reado
     if (renderResult && result && request === latestRequest && scrim.isConnected) render(result.snapshot);
     return result;
   };
-  const providerRecovery = createProviderRecovery(
+  const providerRecovery = createInteropProviderRecovery({
     scrim,
     dispatch,
     render,
-    () =>
-      render({
-        ...visibleState,
-        provider: {
-          ...visibleState.provider,
-          state: 'connecting',
-          detail:
-            selectedProvider === 'icloud-drive' ? 'Checking Overlook on this computer…' : 'Connecting to the selected cloud provider…',
-        },
-        error: null,
-      }),
-    () => selectedProvider,
-    () => latestRequest,
-  );
+    visibleState: () => visibleState,
+    selectedProvider: () => selectedProvider,
+    latestRequest: () => latestRequest,
+  });
   const close = (): void => {
     providerRecovery.dispose();
     scrim.remove();

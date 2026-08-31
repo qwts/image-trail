@@ -19,14 +19,14 @@ export function parseInteropRuntimePreferences(value: unknown): InteropRuntimePr
   const record = value as Record<string, unknown>;
   const provider = providerValue(record['provider']) ?? 'icloud-drive';
   const activeTransferId = typeof record['activeTransferId'] === 'string' ? record['activeTransferId'] : undefined;
-  const activeTransferProvider = providerValue(record['activeTransferProvider']) ?? provider;
+  const activeTransferProvider = providerValue(record['activeTransferProvider']);
   const activeTransferRemoteSessionId =
     typeof record['activeTransferRemoteSessionId'] === 'string' ? record['activeTransferRemoteSessionId'] : undefined;
   const activeRecordIds = Array.isArray(record['activeRecordIds'])
     ? record['activeRecordIds'].filter((id): id is string => typeof id === 'string' && id !== '')
     : undefined;
   const activeSyncSessionId = typeof record['activeSyncSessionId'] === 'string' ? record['activeSyncSessionId'] : undefined;
-  const activeSyncProvider = providerValue(record['activeSyncProvider']) ?? provider;
+  const activeSyncProvider = providerValue(record['activeSyncProvider']);
   const activeSyncRemoteSessionId =
     typeof record['activeSyncRemoteSessionId'] === 'string' ? record['activeSyncRemoteSessionId'] : undefined;
   const activeSyncRecordIds = Array.isArray(record['activeSyncRecordIds'])
@@ -38,16 +38,16 @@ export function parseInteropRuntimePreferences(value: unknown): InteropRuntimePr
     ...(activeTransferId && activeRecordIds
       ? {
           activeTransferId,
-          activeTransferProvider,
           activeRecordIds,
+          ...(activeTransferProvider ? { activeTransferProvider } : {}),
           ...(activeTransferRemoteSessionId ? { activeTransferRemoteSessionId } : {}),
         }
       : {}),
     ...(activeSyncSessionId && activeSyncRecordIds
       ? {
           activeSyncSessionId,
-          activeSyncProvider,
           activeSyncRecordIds,
+          ...(activeSyncProvider ? { activeSyncProvider } : {}),
           ...(activeSyncRemoteSessionId ? { activeSyncRemoteSessionId } : {}),
         }
       : {}),
@@ -92,8 +92,8 @@ export function clearActiveInteropRuntimeSelection(value: InteropRuntimePreferen
     ...(value.activeSyncSessionId && value.activeSyncRecordIds
       ? {
           activeSyncSessionId: value.activeSyncSessionId,
-          activeSyncProvider: value.activeSyncProvider ?? value.provider,
           activeSyncRecordIds: value.activeSyncRecordIds,
+          ...(value.activeSyncProvider ? { activeSyncProvider: value.activeSyncProvider } : {}),
           ...(value.activeSyncRemoteSessionId ? { activeSyncRemoteSessionId: value.activeSyncRemoteSessionId } : {}),
         }
       : {}),
@@ -107,8 +107,8 @@ export function clearActiveSyncRuntimeSelection(value: InteropRuntimePreferences
     ...(value.activeTransferId && value.activeRecordIds
       ? {
           activeTransferId: value.activeTransferId,
-          activeTransferProvider: value.activeTransferProvider ?? value.provider,
           activeRecordIds: value.activeRecordIds,
+          ...(value.activeTransferProvider ? { activeTransferProvider: value.activeTransferProvider } : {}),
           ...(value.activeTransferRemoteSessionId ? { activeTransferRemoteSessionId: value.activeTransferRemoteSessionId } : {}),
         }
       : {}),
