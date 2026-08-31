@@ -1,5 +1,11 @@
 # image-trail
 
+## 0.27.2
+
+### Patch Changes
+
+- 14ef4f2: Add the authenticated experimental live local transport seam for Overlook.
+
 ## 0.27.1
 
 ### Patch Changes
