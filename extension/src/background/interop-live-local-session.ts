@@ -276,7 +276,7 @@ export class LiveLocalOverlookSession implements LiveLocalObjectChannel {
 
   private readonly onClose = (event: Event): void => {
     const close = event as CloseEvent;
-    const expected = this.#phase === 'closing' || (this.#phase === 'connected' && close.code === 1000);
+    const expected = this.#phase === 'closing';
     const error = expected ? null : closeError(close.code, this.#phase);
     this.#phase = 'closed';
     if (error !== null) this.fail(error);

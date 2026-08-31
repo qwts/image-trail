@@ -22,6 +22,7 @@ import {
 } from '../extension/src/background/interop-live-local-protocol.js';
 import {
   LiveLocalSessionError,
+  type LiveLocalSessionState,
   type LiveLocalWebSocketFactory,
   type LiveLocalWebSocketLike,
 } from '../extension/src/background/interop-live-local-session.js';
@@ -155,6 +156,18 @@ describe('live local native bootstrap (#675)', () => {
     assert.deepEqual(messages, []);
   });
 
+  test('preserves native bootstrap retryability classifications', async () => {
+    const native = new OverlookLiveLocalNativeClient(
+      RELEASED_IMAGE_TRAIL_EXTENSION_ID,
+      nativeRuntime({ schemaVersion: 1, ok: false, code: 'unavailable', retryable: false }),
+    );
+    assert.deepEqual(await native.bootstrap(PAIRING_ID, 'move'), {
+      schemaVersion: 1,
+      state: 'unavailable',
+      retryable: false,
+    });
+  });
+
   test('fails closed on malformed, non-loopback, downgraded, or cross-pairing capability data', async () => {
     const issuedAtMs = Date.now();
     const candidates = [
@@ -264,6 +277,11 @@ describe('live local encrypted object frames (#675)', () => {
     );
     store.acknowledge('one.bin', sent[0]?.sha256 ?? '');
     await first;
+    assert.deepEqual(await store.get('one.bin'), new Uint8Array([1, 2, 3, 4]));
+    assert.deepEqual(await store.list('one', null), {
+      entries: [{ path: 'one.bin', bytes: 4 }],
+      nextCursor: null,
+    });
     await waitFor(() => sent.length === 2);
     assert.deepEqual(
       sent.map(({ path }) => path),
@@ -278,6 +296,44 @@ describe('live local encrypted object frames (#675)', () => {
       { path: 'two.bin', sentBytes: 4, acknowledgedBytes: 4, totalBytes: 4 },
     ]);
     assert.equal(LIVE_LOCAL_OBJECT_CHUNK_BYTES < 4 * 1024 * 1024, true);
+  });
+
+  test('uses and enforces the negotiated ciphertext frame limit', async () => {
+    const sent: Uint8Array[] = [];
+    const maxCiphertextFrameBytes = 2_600;
+    const store = new LiveLocalOverlookObjectStore(
+      { maxCiphertextFrameBytes, maxInFlightBytes: 8_000 },
+      {
+        sendBinary: (frame) => {
+          sent.push(frame.slice());
+          return Promise.resolve();
+        },
+        sendControl: () => undefined,
+      },
+      new MemoryRepository(),
+    );
+    const pending = store.put('chunked.bin', new Uint8Array(1_500));
+    await waitFor(() => sent.length > 1);
+    assert.equal(
+      sent.every((frame) => frame.byteLength <= maxCiphertextFrameBytes),
+      true,
+    );
+    const decoded = await decodeLiveLocalObjectChunk(sent[0] as Uint8Array);
+    store.acknowledge('chunked.bin', decoded.header.objectSha256);
+    await pending;
+
+    const oversizedPayload = new Uint8Array(2_500);
+    const oversizedFrame = await encodeLiveLocalObjectChunk(
+      {
+        path: 'incoming/oversized.bin',
+        objectBytes: oversizedPayload.byteLength,
+        objectSha256: await sha256(oversizedPayload),
+        chunkIndex: 0,
+        chunkCount: 1,
+      },
+      oversizedPayload,
+    );
+    await assert.rejects(store.receive(oversizedFrame), /negotiated bound/u);
   });
 
   test('cancels an object waiting for durable acknowledgement without closing the session', async () => {
@@ -448,5 +504,21 @@ describe('authenticated live local WebSocket session (#675)', () => {
         return error instanceof LiveLocalSessionError && error.state === state && !error.retryable;
       });
     }
+  });
+
+  test('preserves explicit native unavailability and treats a peer close as retryable', async () => {
+    const unavailable = new LiveLocalOverlookClient({
+      bootstrap: () => Promise.resolve({ schemaVersion: 1, state: 'unavailable', retryable: false }),
+    });
+    assert.deepEqual(await unavailable.connect(input()), { state: 'unavailable', retryable: false });
+
+    const states: LiveLocalSessionState[] = [];
+    const { client, sockets } = harness();
+    const result = await client.connect({ ...input(), stateChanged: (state) => states.push(state) });
+    assert.equal(result.state, 'connected');
+    if (result.state !== 'connected') return;
+    sockets[0]?.close(1000);
+    await result.session.waitForClose();
+    assert.deepEqual(states.at(-1), { state: 'closed', operationId: OPERATION_ID, retryable: true });
   });
 });

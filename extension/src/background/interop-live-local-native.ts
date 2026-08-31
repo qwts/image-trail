@@ -11,8 +11,16 @@ import {
 } from './interop-live-local-protocol.js';
 import { OVERLOOK_ICLOUD_NATIVE_HOST, RELEASED_IMAGE_TRAIL_EXTENSION_ID, type NativeRuntime } from './interop-icloud-client.js';
 
+type LiveLocalRunningBootstrapResult = Extract<LiveLocalBootstrapResult, { readonly state: 'running' }>;
+type LiveLocalUnavailableBootstrapState = Exclude<LiveLocalBootstrapResult['state'], 'running'> | 'missing-host' | 'unsupported';
+
 export type LiveLocalNativeBootstrapResult =
-  LiveLocalBootstrapResult | { readonly schemaVersion: 1; readonly state: 'missing-host' | 'unsupported' };
+  | LiveLocalRunningBootstrapResult
+  | {
+      readonly schemaVersion: 1;
+      readonly state: LiveLocalUnavailableBootstrapState;
+      readonly retryable?: boolean;
+    };
 
 function nativeHostMissing(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -60,6 +68,7 @@ export class OverlookLiveLocalNativeClient {
       return {
         schemaVersion: 1,
         state: response.code === 'unsupported' ? 'unsupported' : 'unavailable',
+        retryable: response.retryable,
       };
     }
 

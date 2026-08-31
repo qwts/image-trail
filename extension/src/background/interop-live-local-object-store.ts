@@ -9,6 +9,7 @@ import {
 import {
   LIVE_LOCAL_MAX_OBJECT_BYTES,
   LIVE_LOCAL_OBJECT_CHUNK_BYTES,
+  LIVE_LOCAL_OBJECT_HEADER_BYTES,
   decodeLiveLocalObjectChunk,
   encodeLiveLocalObjectChunk,
   type LiveLocalCapability,
@@ -118,7 +119,7 @@ export class LiveLocalOverlookObjectStore implements InteropObjectStore {
   readonly #window: AcknowledgementWindow;
   readonly #pending = new Map<string, PendingAcknowledgement>();
   readonly #incoming = new Map<string, IncomingObject>();
-  readonly #remote = new Map<string, { readonly sha256: string; readonly bytes: number }>();
+  readonly #remote = new Map<string, { readonly sha256: string; readonly bytes: Uint8Array }>();
   #incomingBytes = 0;
   #closed = false;
 
@@ -168,13 +169,20 @@ export class LiveLocalOverlookObjectStore implements InteropObjectStore {
       if (signal?.aborted === true) abortAcknowledgement();
       pending = true;
       let sentBytes = 0;
-      const chunkCount = Math.max(1, Math.ceil(bytes.byteLength / LIVE_LOCAL_OBJECT_CHUNK_BYTES));
+      const negotiatedChunkBytes = Math.min(
+        LIVE_LOCAL_OBJECT_CHUNK_BYTES,
+        this.capability.maxCiphertextFrameBytes - LIVE_LOCAL_OBJECT_HEADER_BYTES - 4,
+      );
+      if (negotiatedChunkBytes < 1) {
+        throw new InteropTransportError('Live local ciphertext frame cannot contain an object payload.', 'partial-failure', false);
+      }
+      const chunkCount = Math.max(1, Math.ceil(bytes.byteLength / negotiatedChunkBytes));
       for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
         this.assertOpen();
         if (signal?.aborted === true) throw interrupted('Live local transfer was cancelled.');
         const payload = bytes.subarray(
-          chunkIndex * LIVE_LOCAL_OBJECT_CHUNK_BYTES,
-          Math.min(bytes.byteLength, (chunkIndex + 1) * LIVE_LOCAL_OBJECT_CHUNK_BYTES),
+          chunkIndex * negotiatedChunkBytes,
+          Math.min(bytes.byteLength, (chunkIndex + 1) * negotiatedChunkBytes),
         );
         const frame = await encodeLiveLocalObjectChunk(
           { path, objectBytes: bytes.byteLength, objectSha256, chunkIndex, chunkCount },
@@ -190,7 +198,8 @@ export class LiveLocalOverlookObjectStore implements InteropObjectStore {
         this.progress({ path, sentBytes, acknowledgedBytes: 0, totalBytes: bytes.byteLength });
       }
       await acknowledgement;
-      this.#remote.set(path, { sha256: objectSha256, bytes: bytes.byteLength });
+      this.#remote.get(path)?.bytes.fill(0);
+      this.#remote.set(path, { sha256: objectSha256, bytes: bytes.slice() });
       this.progress({ path, sentBytes, acknowledgedBytes: bytes.byteLength, totalBytes: bytes.byteLength });
       return { bytes: bytes.byteLength };
     } catch (error) {
@@ -204,7 +213,9 @@ export class LiveLocalOverlookObjectStore implements InteropObjectStore {
   }
 
   get(pathInput: string): Promise<Uint8Array> {
-    return this.repository.get(assertSafeInteropPath(pathInput));
+    const path = assertSafeInteropPath(pathInput);
+    const remote = this.#remote.get(path);
+    return remote === undefined ? this.repository.get(path) : Promise.resolve(remote.bytes.slice());
   }
 
   async list(prefixInput: string, cursor: string | null): Promise<InteropObjectPage> {
@@ -213,26 +224,28 @@ export class LiveLocalOverlookObjectStore implements InteropObjectStore {
     if (cursor !== null) return page;
     const entries = new Map<string, InteropObjectEntry>(page.entries.map((entry) => [entry.path, entry]));
     for (const [path, metadata] of this.#remote) {
-      if (path.startsWith(prefix)) entries.set(path, { path, bytes: metadata.bytes });
+      if (path.startsWith(prefix)) entries.set(path, { path, bytes: metadata.bytes.byteLength });
     }
     return { entries: [...entries.values()].sort((left, right) => left.path.localeCompare(right.path)), nextCursor: page.nextCursor };
   }
 
   async delete(pathInput: string): Promise<void> {
     const path = assertSafeInteropPath(pathInput);
+    this.#remote.get(path)?.bytes.fill(0);
     this.#remote.delete(path);
     await this.repository.delete(path);
   }
 
   async quota(): Promise<{ readonly usedBytes: number; readonly totalBytes: number | null }> {
     const local = await this.repository.quota();
-    const remoteBytes = [...this.#remote.values()].reduce((total, entry) => total + entry.bytes, 0);
+    const remoteBytes = [...this.#remote.values()].reduce((total, entry) => total + entry.bytes.byteLength, 0);
     return { usedBytes: local.usedBytes + remoteBytes, totalBytes: null };
   }
 
   async verify(pathInput: string): Promise<{ readonly sha256: string; readonly bytes: number }> {
     const path = assertSafeInteropPath(pathInput);
-    return this.#remote.get(path) ?? this.repository.verify(path);
+    const remote = this.#remote.get(path);
+    return remote === undefined ? this.repository.verify(path) : { sha256: remote.sha256, bytes: remote.bytes.byteLength };
   }
 
   acknowledge(pathInput: string, digest: string): void {
@@ -247,6 +260,9 @@ export class LiveLocalOverlookObjectStore implements InteropObjectStore {
 
   async receive(frame: Uint8Array): Promise<void> {
     this.assertOpen();
+    if (frame.byteLength > this.capability.maxCiphertextFrameBytes) {
+      throw new InteropTransportError('Live local incoming frame exceeds its negotiated bound.', 'partial-failure', false);
+    }
     const { header, payload } = await decodeLiveLocalObjectChunk(frame);
     try {
       if (header.objectBytes > this.capability.maxInFlightBytes) {
@@ -284,6 +300,9 @@ export class LiveLocalOverlookObjectStore implements InteropObjectStore {
       this.#incoming.set(header.path, incoming);
       if (incoming.chunks.size !== header.chunkCount) return;
       const chunks = [...incoming.chunks.entries()].sort(([left], [right]) => left - right).map(([, chunk]) => chunk);
+      if (chunks.reduce((total, chunk) => total + chunk.byteLength, 0) !== header.objectBytes) {
+        throw new InteropTransportError('Live local encrypted object chunks do not match its declared size.', 'corrupt', false);
+      }
       const object = new Uint8Array(header.objectBytes);
       let offset = 0;
       for (const chunk of chunks) {
@@ -313,6 +332,8 @@ export class LiveLocalOverlookObjectStore implements InteropObjectStore {
     this.#pending.clear();
     this.#window.close(error);
     for (const [path, incoming] of this.#incoming) this.releaseIncoming(path, [...incoming.chunks.values()]);
+    for (const remote of this.#remote.values()) remote.bytes.fill(0);
+    this.#remote.clear();
   }
 
   private releaseIncoming(path: string, chunks: readonly Uint8Array[]): void {

@@ -72,6 +72,7 @@ export const liveLocalCapabilitySchema = v.pipe(
   ),
   v.check(
     (capability) =>
+      capability.maxCiphertextFrameBytes > LIVE_LOCAL_OBJECT_HEADER_BYTES + 4 &&
       capability.maxCiphertextFrameBytes <= INTEROP_CHUNK_BYTES &&
       capability.maxInFlightBytes >= capability.maxCiphertextFrameBytes &&
       capability.maxInFlightBytes <= LIVE_LOCAL_MAX_IN_FLIGHT_BYTES,
@@ -186,16 +187,12 @@ export const liveLocalObjectHeaderSchema = v.pipe(
   }),
   v.check((header) => header.chunkIndex < header.chunkCount, 'Live local chunk index is outside its object.'),
   v.check(
-    (header) => header.chunkCount === Math.max(1, Math.ceil(header.objectBytes / LIVE_LOCAL_OBJECT_CHUNK_BYTES)),
-    'Live local chunk count does not match the bounded object size.',
+    (header) =>
+      header.objectBytes === 0
+        ? header.chunkCount === 1 && header.chunkBytes === 0
+        : header.chunkCount <= header.objectBytes && header.chunkBytes > 0 && header.chunkBytes <= header.objectBytes,
+    'Live local chunk shape does not match its bounded object.',
   ),
-  v.check((header) => {
-    const expected =
-      header.chunkIndex + 1 === header.chunkCount
-        ? header.objectBytes - header.chunkIndex * LIVE_LOCAL_OBJECT_CHUNK_BYTES
-        : LIVE_LOCAL_OBJECT_CHUNK_BYTES;
-    return header.chunkBytes === expected;
-  }, 'Live local chunk length does not match its bounded position.'),
 );
 
 export type LiveLocalBootstrapRequest = v.InferOutput<typeof liveLocalBootstrapRequestSchema>;

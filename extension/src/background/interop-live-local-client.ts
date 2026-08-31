@@ -31,7 +31,9 @@ export class LiveLocalOverlookClient {
 
   async connect(input: LiveLocalConnectInput): Promise<LiveLocalConnectResult> {
     const bootstrap = await this.native.bootstrap(input.pairingId, input.operation);
-    if (bootstrap.state !== 'running') return { state: bootstrap.state, retryable: availabilityRetryable(bootstrap.state) };
+    if (bootstrap.state !== 'running') {
+      return { state: bootstrap.state, retryable: bootstrap.retryable ?? availabilityRetryable(bootstrap.state) };
+    }
     if (input.review.operation !== input.operation) {
       throw new LiveLocalSessionError('Live local review does not match the requested operation.', 'protocol-error', 'corrupt', false);
     }
