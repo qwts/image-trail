@@ -244,7 +244,13 @@ export class SecureSyncOutboxRepository {
     const store = transaction.objectStore(DataStore.SecureSyncSessions);
     const session = hydrateRecord(DataStore.SecureSyncSessions, sessionSchema, await requestToPromise<unknown>(store.get(sessionId)));
     if (!session) throw new Error('Secure Sync session is unavailable.');
-    if (session.phase === 'cancelled') throw new Error('Cancelled Sync sessions cannot resume.');
+    if (session.phase === 'cancelled') {
+      if (action === 'cancel') {
+        await transactionDone(transaction);
+        return session;
+      }
+      throw new Error('Cancelled Sync sessions cannot resume.');
+    }
     const rows =
       action === 'resume'
         ? await requestToPromise<unknown[]>(

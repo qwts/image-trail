@@ -126,3 +126,75 @@ test('local probes recover Sync routes while unknown legacy Move routes fail clo
   assert.deepEqual(cancellations, [sessionId, transferId]);
   assert.equal((stored as { activeTransferId?: string }).activeTransferId, undefined);
 });
+
+test('retries live local Sync cleanup after durable cancellation has already completed', async (t) => {
+  const opened = await openImageTrailDb(new IDBFactory());
+  assert.ok(opened.db);
+  const db = opened.db;
+  t.after(() => db.close());
+  const pairingId = crypto.randomUUID();
+  await putPairing(db, pairingId, '2026-08-30T12:00:00.000Z');
+  const sessionId = crypto.randomUUID();
+  await new SecureSyncOutboxRepository(db).queueBatch({
+    sessionId,
+    pairingId,
+    provider: 'icloud-drive',
+    requested: 1,
+    unsupported: 0,
+    items: [
+      {
+        interopId: crypto.randomUUID(),
+        sourceLocalId: 'bookmark-1',
+        messageId: crypto.randomUUID(),
+        sequence: 1,
+        path: 'messages/outbox/retry-sync.json.aesgcm',
+        reviewCategory: 'eligible',
+        ciphertext: new Uint8Array([1, 2, 3]),
+      },
+    ],
+    at: '2026-08-30T13:00:00.000Z',
+  });
+
+  let stored: unknown = {
+    provider: 'icloud-drive',
+    operation: 'sync',
+    activeSyncSessionId: sessionId,
+    activeSyncRemoteSessionId: crypto.randomUUID(),
+    activeSyncRecordIds: ['bookmark-1'],
+    activeSyncProvider: 'icloud-drive',
+  };
+  let cleanupAttempts = 0;
+  const runtime = new InteropRuntime({
+    storage: {
+      get: async () => ({ interopRuntimePreferences: stored }),
+      set: async (items) => {
+        stored = items['interopRuntimePreferences'];
+      },
+    },
+    getDb: async () => db,
+    getActiveBlobKey: async () => null,
+    probePCloud: async () => false,
+    disconnectPCloud: async () => undefined,
+    probeGoogleDrive: async () => undefined,
+    disconnectGoogleDrive: async () => undefined,
+    probeICloud: async () => 'connected',
+    disconnectICloud: async () => undefined,
+    cancelICloudOperation: async () => {
+      cleanupAttempts += 1;
+      if (cleanupAttempts === 1) throw new Error('cleanup interrupted');
+    },
+    openProvider: async () => null,
+    finalizeSourceRecord: async () => undefined,
+  });
+
+  const first = await runtime.dispatch(context, { name: 'cancel' });
+  assert.equal(first.snapshot.phase, 'failed');
+  assert.match(first.snapshot.error?.message ?? '', /cleanup interrupted/u);
+  assert.equal((stored as { activeSyncSessionId?: string }).activeSyncSessionId, sessionId);
+  assert.equal((await new SecureSyncOutboxRepository(db).progress(sessionId))?.session.phase, 'cancelled');
+
+  const retried = await runtime.dispatch(context, { name: 'cancel' });
+  assert.equal(retried.snapshot.phase, 'cancelled');
+  assert.equal(cleanupAttempts, 2);
+  assert.equal((stored as { activeSyncSessionId?: string }).activeSyncSessionId, undefined);
+});
