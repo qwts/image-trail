@@ -395,6 +395,7 @@ test('build pipeline typechecks without emitting source-shaped modules and audit
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=0/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_EXPERIMENTAL_BUILD=0/u);
   assert.match(packageJson.scripts['test:e2e:experimental'] ?? '', /IMAGE_TRAIL_ENABLE_INTEROP=1/u);
+  assert.match(packageJson.scripts['test:e2e:experimental'] ?? '', /IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER=0/u);
   assert.match(packageJson.scripts['test:e2e:experimental'] ?? '', /IMAGE_TRAIL_EXPERIMENTAL_BUILD=1/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER=0/u);
   assert.match(packageJson.scripts['test:e2e:release'] ?? '', /IMAGE_TRAIL_RELEASE_BUILD=1 npm run test:e2e/u);

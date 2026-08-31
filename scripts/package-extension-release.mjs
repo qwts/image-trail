@@ -51,6 +51,11 @@ export function experimentalArtifactNames(version) {
   return { archive, checksum: `${archive}.sha256` };
 }
 
+export async function prepareArtifactOutput(directory, names) {
+  await mkdir(directory, { recursive: true });
+  await Promise.all([rm(path.join(directory, names.archive), { force: true }), rm(path.join(directory, names.checksum), { force: true })]);
+}
+
 function requestedTag(args) {
   const index = args.indexOf('--tag');
   if (index === -1) return null;
@@ -92,9 +97,8 @@ async function main() {
     );
   }
 
-  await rm(RELEASE_DIRECTORY, { recursive: true, force: true });
-  await mkdir(RELEASE_DIRECTORY, { recursive: true });
   const names = experimental ? experimentalArtifactNames(version) : releaseArtifactNames(version);
+  await prepareArtifactOutput(RELEASE_DIRECTORY, names);
   const archivePath = path.resolve(RELEASE_DIRECTORY, names.archive);
   await execFileAsync('zip', ['-X', '-q', archivePath, ...files], { cwd: DIST_DIRECTORY });
 
