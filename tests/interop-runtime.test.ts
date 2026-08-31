@@ -51,6 +51,7 @@ class MemoryStore implements InteropObjectStore {
   readonly provider = 'google-drive' as const;
   readonly objects = new Map<string, Uint8Array>();
   failPuts = 0;
+  commits = 0;
 
   authState(): Promise<'connected'> {
     return Promise.resolve('connected');
@@ -86,6 +87,9 @@ class MemoryStore implements InteropObjectStore {
     const bytes = await this.get(path);
     return { sha256: await sha256(bytes), bytes: bytes.byteLength };
   }
+  commit(): void {
+    this.commits += 1;
+  }
 }
 
 async function harness(overrides: Partial<InteropRuntimeDependencies> = {}) {
@@ -111,6 +115,7 @@ async function harness(overrides: Partial<InteropRuntimeDependencies> = {}) {
     probeICloud: async () => {
       throw new Error('Signed Overlook iCloud host is missing.');
     },
+    disconnectICloud: async () => undefined,
     openProvider: async () => null,
     finalizeSourceRecord: async () => undefined,
     ...overrides,
@@ -321,9 +326,13 @@ test('pairing import stores non-extractable custody while unavailable publicatio
 
 test('runtime start publishes the exact reviewed selection and reloads durable Move progress', async (t) => {
   const store = new MemoryStore();
+  const opens: Parameters<InteropRuntimeDependencies['openProvider']>[1][] = [];
   const finalized: string[] = [];
   const { runtime, db, getStored } = await harness({
-    openProvider: async () => store,
+    openProvider: async (_provider, context) => {
+      opens.push(context);
+      return store;
+    },
     finalizeSourceRecord: async (sourceLocalId) => {
       finalized.push(sourceLocalId);
     },
@@ -347,9 +356,16 @@ test('runtime start publishes the exact reviewed selection and reloads durable M
   assert.equal(started.snapshot.counts.eligible, 1);
   assert.equal(started.snapshot.processed, 1);
   assert.ok(store.objects.size > 0);
+  assert.equal(store.commits, 1);
+  assert.equal(opens[0]?.operation, 'move');
+  assert.deepEqual(opens[0]?.recordIds, ['bookmark-1']);
+  assert.notEqual(opens[0]?.operationId, opens[0]?.remoteSessionId);
   const restored = await runtime.dispatch(selectedContext, { name: 'status' });
   assert.equal(restored.snapshot.phase, 'awaiting-acknowledgement');
   assert.equal(restored.snapshot.processed, 1);
+  assert.equal(store.commits, 2);
+  assert.equal(opens[1]?.operationId, opens[0]?.operationId);
+  assert.equal(opens[1]?.remoteSessionId, opens[0]?.remoteSessionId);
   const pairing = (await new InteropKeysRepository(db).list())[0];
   assert.ok(pairing);
   const transferId = (getStored() as { activeTransferId?: string }).activeTransferId;

@@ -22,6 +22,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
       DataStore.AlbumMemberships,
       DataStore.History,
       DataStore.Keys,
+      DataStore.LiveLocalObjects,
       DataStore.Metadata,
       DataStore.MoveAudit,
       DataStore.MoveItems,
@@ -43,6 +44,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
     [
       DataStore.Metadata,
       DataStore.Keys,
+      DataStore.LiveLocalObjects,
       DataStore.History,
       DataStore.Bookmarks,
       DataStore.Blobs,
@@ -86,6 +88,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   const secureSyncItems = transaction.objectStore(DataStore.SecureSyncItems);
   const secureSyncInbox = transaction.objectStore(DataStore.SecureSyncInbox);
   const secureSyncOutbox = transaction.objectStore(DataStore.SecureSyncOutbox);
+  const liveLocalObjects = transaction.objectStore(DataStore.LiveLocalObjects);
 
   assert.deepEqual(asArray(keys.indexNames), [SchemaIndex.KeysByKind, SchemaIndex.KeysByReference, SchemaIndex.KeysByUuid].sort());
   assert.deepEqual(asArray(history.indexNames), [SchemaIndex.HistoryByKeyReference, SchemaIndex.HistoryByUpdatedAt].sort());
@@ -140,6 +143,7 @@ test('IndexedDB migrations create data stores, indexes, and schema metadata', as
   assert.deepEqual(asArray(secureSyncItems.indexNames), [SchemaIndex.SecureSyncItemsBySessionId]);
   assert.deepEqual(asArray(secureSyncInbox.indexNames), [SchemaIndex.SecureSyncInboxBySessionId]);
   assert.deepEqual(asArray(secureSyncOutbox.indexNames), [SchemaIndex.SecureSyncOutboxBySessionId]);
+  assert.deepEqual(asArray(liveLocalObjects.indexNames), [SchemaIndex.LiveLocalObjectsByOperationId]);
 
   const metadata = await new Promise((resolve, reject) => {
     const request = transaction.objectStore(DataStore.Metadata).get('schema');
@@ -303,6 +307,25 @@ test('IndexedDB v14 migration adds the key-only blob byte-length index to existi
   });
   await transactionDone(transaction);
   assert.deepEqual(byteLengths, [300, 500]);
+});
+
+test('IndexedDB v15 migration adds operation-scoped live local ciphertext staging', async (t) => {
+  await deleteImageTrailDb();
+  const legacyDb = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(IMAGE_TRAIL_DB_NAME, 14);
+    request.onupgradeneeded = () => request.result.createObjectStore(DataStore.Metadata, { keyPath: 'key' });
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  legacyDb.close();
+
+  const opened = await openImageTrailDb();
+  assert.equal(opened.status.ok, true, opened.status.message);
+  assert.ok(opened.db);
+  t.after(() => opened.db?.close());
+  const transaction = opened.db.transaction(DataStore.LiveLocalObjects, 'readonly');
+  assert.deepEqual(asArray(transaction.objectStore(DataStore.LiveLocalObjects).indexNames), [SchemaIndex.LiveLocalObjectsByOperationId]);
+  await transactionDone(transaction);
 });
 
 test('IndexedDB v4 migration preserves existing blob records', async (t) => {

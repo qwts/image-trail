@@ -4,6 +4,7 @@ import { DRIVE_FILE_SCOPE } from './interop-chrome-identity.js';
 import { createChromeIdentityInteropDriveStore } from './interop-google-drive-store.js';
 import { OverlookICloudNativeClient, RELEASED_IMAGE_TRAIL_EXTENSION_ID } from './interop-icloud-client.js';
 import { installLiveLocalE2EProbe } from './interop-live-local-e2e-probe.js';
+import { LiveLocalInteropRuntime } from './interop-live-local-runtime.js';
 import { createChromePCloudInteropAuth } from './interop-pcloud-auth.js';
 import { InteropRuntime } from './interop-runtime.js';
 import { PCLOUD_HOST_PERMISSION, requestHostPermission } from './permissions.js';
@@ -61,6 +62,7 @@ export function createChromeInteropRuntime(
     Promise.reject(new Error('Move source finalization is not composed.')),
 ): InteropRuntime {
   const pcloud = createChromePCloudInteropAuth();
+  const liveLocal = new LiveLocalInteropRuntime(getDb);
   return new InteropRuntime({
     storage: chrome.storage.local,
     getDb,
@@ -81,10 +83,12 @@ export function createChromeInteropRuntime(
     probeICloud: async () => {
       await new OverlookICloudNativeClient(RELEASED_IMAGE_TRAIL_EXTENSION_ID).request({ operation: 'status' });
     },
-    openProvider: async (provider) => {
+    disconnectICloud: () => liveLocal.disconnect(),
+    openProvider: async (provider, context) => {
       if (provider === 'pcloud') return pcloud.openProvider();
       if (provider === 'google-drive' && hasConfiguredDriveOAuth(chrome.runtime.getManifest()))
         return createChromeIdentityInteropDriveStore(false);
+      if (provider === 'icloud-drive') return liveLocal.open(context);
       return null;
     },
     finalizeSourceRecord,

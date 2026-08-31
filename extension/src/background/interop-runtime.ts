@@ -1,7 +1,6 @@
 import type { InteropErrorCode } from '../core/interop/contract.js';
 import type { InteropCounts } from '../core/interop/messages.js';
 import type {
-  InteropProviderId,
   InteropProviderState,
   InteropRuntimeAction,
   InteropRuntimeContext,
@@ -15,6 +14,7 @@ import { SyncOutboxPublishError } from '../data/interop/sync-outbox-publisher.js
 import type { SecureSyncProgress } from '../data/interop/secure-sync-outbox-repository.js';
 import { InteropMoveRuntime, InteropMoveSetupError } from './interop-move-runtime.js';
 import { InteropSyncRuntime, InteropSyncSetupError } from './interop-sync-runtime.js';
+import { activeInteropProgress } from './interop-runtime-active.js';
 import { INTEROP_PROVIDERS, interopPairingState, interopProviderStatus } from './interop-runtime-provider.js';
 import * as progressViews from './interop-runtime-progress.js';
 import type { InteropRuntimeDependencies } from './interop-runtime-dependencies.js';
@@ -22,6 +22,8 @@ export type { InteropRuntimeDependencies } from './interop-runtime-dependencies.
 import {
   activeInteropRuntimeSelection,
   clearActiveSyncRuntimeSelection,
+  createActiveInteropRuntimePreferences,
+  ensureInteropRuntimeRemoteSessionIds,
   parseInteropRuntimePreferences,
   sameInteropRecordIds,
   type InteropRuntimePreferences as RuntimePreferences,
@@ -34,12 +36,12 @@ export class InteropRuntime {
 
   async dispatch(context: InteropRuntimeContext, action: InteropRuntimeAction): Promise<InteropRuntimeResult> {
     const stored = parseInteropRuntimePreferences((await this.dependencies.storage.get(STORAGE_KEY))[STORAGE_KEY]);
-    let selected = stored;
+    let selected = await ensureInteropRuntimeRemoteSessionIds(stored, (value) => this.save(value));
     if (action.name === 'select-provider') {
-      selected = { ...stored, provider: action.provider };
+      selected = { ...selected, provider: action.provider };
       await this.save(selected);
     } else if (action.name === 'set-operation') {
-      selected = { ...stored, operation: action.operation };
+      selected = { ...selected, operation: action.operation };
       await this.save(selected);
     }
 
@@ -74,11 +76,17 @@ export class InteropRuntime {
     if (action.name === 'resume') return this.resume(context, selected, provider);
     if (action.name === 'status') {
       try {
-        const active = await this.activeProgress(context, selected, provider.state === 'connected' ? selected.provider : undefined);
+        const active = await activeInteropProgress(
+          context,
+          selected,
+          provider.state === 'connected' ? selected.provider : undefined,
+          this.moveRuntime(),
+          this.syncRuntime(),
+        );
         if (active) return this.progressResult(context, selected, provider, active);
       } catch (error) {
         const normalized = progressViews.interopRuntimeError(error);
-        const local = await this.activeProgress(context, selected);
+        const local = await activeInteropProgress(context, selected, undefined, this.moveRuntime(), this.syncRuntime());
         return local
           ? this.progressResult(context, selected, provider, local, normalized, 'failed')
           : this.result(context, selected, 'failed', provider.state, provider.detail, normalized);
@@ -142,6 +150,7 @@ export class InteropRuntime {
   private async disconnect(context: InteropRuntimeContext, selected: RuntimePreferences): Promise<InteropRuntimeResult> {
     if (selected.provider === 'pcloud') await this.dependencies.disconnectPCloud();
     else if (selected.provider === 'google-drive') await this.dependencies.disconnectGoogleDrive();
+    else await this.dependencies.disconnectICloud();
     return this.result(context, selected, 'queued', 'disconnected', INTEROP_PROVIDERS[selected.provider].disconnected);
   }
 
@@ -184,16 +193,15 @@ export class InteropRuntime {
         'unsupported-record',
       );
     const id = crypto.randomUUID();
-    const active: RuntimePreferences =
-      selected.operation === 'sync'
-        ? { ...selected, activeSyncSessionId: id, activeSyncRecordIds: [...context.recordIds] }
-        : { ...selected, activeTransferId: id, activeRecordIds: [...context.recordIds] };
+    const remoteSessionId = crypto.randomUUID();
+    const active = createActiveInteropRuntimePreferences(selected, id, remoteSessionId, context.recordIds);
     await this.save(active);
     try {
       if (selected.operation === 'sync') {
         const progress = await this.syncRuntime().start({
           provider: selected.provider,
           sessionId: id,
+          remoteSessionId,
           recordIds: context.recordIds,
         });
         return this.progressResult(context, active, provider, progress);
@@ -201,6 +209,7 @@ export class InteropRuntime {
       const progress = await this.moveRuntime().start({
         provider: selected.provider,
         transferId: id,
+        remoteSessionId,
         recordIds: context.recordIds,
       });
       return this.progressResult(context, active, provider, progress);
@@ -225,7 +234,7 @@ export class InteropRuntime {
     provider: { readonly state: InteropProviderState; readonly detail: string; readonly error: InteropRuntimeError | null },
   ): Promise<InteropRuntimeResult> {
     const active = activeInteropRuntimeSelection(selected);
-    if (!active.id || !sameInteropRecordIds(active.recordIds, context.recordIds)) {
+    if (!active.id || !active.remoteSessionId || !sameInteropRecordIds(active.recordIds, context.recordIds)) {
       return this.unsupportedAction(context, selected, 'failed', 'There is no interrupted transfer for this selection to resume.');
     }
     if (provider.state !== 'connected') {
@@ -251,12 +260,14 @@ export class InteropRuntime {
     }
     try {
       if (selected.operation === 'sync') {
-        const progress = await this.syncRuntime().resume(selected.provider, active.id);
+        const progress = await this.syncRuntime().resume(selected.provider, active.id, active.remoteSessionId, context.recordIds);
         return this.progressResult(context, selected, provider, progress);
       }
       const progress = await this.moveRuntime().resume({
         provider: selected.provider,
         transferId: active.id,
+        remoteSessionId: active.remoteSessionId,
+        recordIds: context.recordIds,
         total: context.total,
         allowFinalization: true,
       });
@@ -271,22 +282,6 @@ export class InteropRuntime {
       const normalized = progressViews.interopRuntimeError(error);
       return this.result(context, selected, 'failed', provider.state, provider.detail, normalized);
     }
-  }
-
-  private async activeProgress(
-    context: InteropRuntimeContext,
-    selected: RuntimePreferences,
-    provider?: InteropProviderId,
-  ): Promise<MoveOutboxProgress | SecureSyncProgress | null> {
-    const active = activeInteropRuntimeSelection(selected);
-    if (!active.id || !sameInteropRecordIds(active.recordIds, context.recordIds)) return null;
-    if (selected.operation === 'sync') return this.syncRuntime().status(active.id, context.locked ? undefined : provider);
-    return this.moveRuntime().status({
-      transferId: active.id,
-      total: context.total,
-      provider,
-      allowFinalization: !!provider && !context.locked,
-    });
   }
 
   private moveRuntime(): InteropMoveRuntime {
