@@ -50,7 +50,7 @@ export class InteropSyncRuntime {
       pairing,
       activeBlobKey,
     });
-    store.commit?.();
+    await store.commit?.();
     return progress;
   }
 
@@ -76,7 +76,7 @@ export class InteropSyncRuntime {
       recordIds,
     });
     await new SyncOutboxPublisher(db, store).resume(sessionId, pairing);
-    store.commit?.();
+    await store.commit?.();
     const refreshed = await new SyncInboxScanner(db, store).refresh(sessionId, pairing, await this.getActiveBlobKey());
     await store.clearStaged?.();
     return refreshed;
@@ -104,7 +104,7 @@ export class InteropSyncRuntime {
       pairingId: pairing.pairingId,
       recordIds,
     });
-    store.commit?.();
+    await store.commit?.();
     const refreshed = await new SyncInboxScanner(db, store).refresh(sessionId, pairing, await this.getActiveBlobKey());
     await store.clearStaged?.();
     return refreshed;

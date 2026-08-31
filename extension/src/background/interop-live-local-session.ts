@@ -14,6 +14,7 @@ import {
   type LiveLocalObjectChannel,
   type LiveLocalObjectProgress,
 } from './interop-live-local-object-store.js';
+import { LiveLocalResultBarrier } from './interop-live-local-result-barrier.js';
 
 const SOCKET_CONNECT_TIMEOUT_MS = 5_000;
 const HEARTBEAT_TIMEOUT_MS = 5_000;
@@ -118,6 +119,7 @@ export class LiveLocalOverlookSession implements LiveLocalObjectChannel {
   readonly #connected = deferred<void>();
   readonly #closed = deferred<void>();
   readonly #heartbeats: Deferred<void>[] = [];
+  readonly #operationResults = new LiveLocalResultBarrier();
   readonly #socket: LiveLocalWebSocketLike;
   readonly #store: LiveLocalOverlookObjectStore;
   readonly #open: LiveLocalOpen;
@@ -216,9 +218,14 @@ export class LiveLocalOverlookSession implements LiveLocalObjectChannel {
     }
   }
 
-  commit(): void {
+  async commit(): Promise<void> {
     this.assertConnected();
-    this.sendControl({ schemaVersion: 1, type: 'commit' });
+    try {
+      await this.#operationResults.wait(() => this.sendControl({ schemaVersion: 1, type: 'commit' }));
+    } catch (error) {
+      this.fail(error);
+      throw error;
+    }
   }
 
   cancel(): void {
@@ -324,7 +331,13 @@ export class LiveLocalOverlookSession implements LiveLocalObjectChannel {
       if (this.#phase !== 'connected') throw protocolError('Overlook sent live local control data before the session opened.');
       if (control.type === 'heartbeat-ack') this.#heartbeats.shift()?.resolve();
       else if (control.type === 'object-ack') this.#store.acknowledge(control.path, control.sha256);
-      else if (control.type === 'operation-result') this.#resultChanged(control);
+      else if (control.type === 'operation-result') {
+        if (control.operationId !== this.#open.operationId) {
+          throw protocolError('Overlook returned a result for a different live local operation.');
+        }
+        this.#operationResults.resolve(control.status);
+        this.#resultChanged(control);
+      }
       return;
     }
     const bytes = await messageBytes(data);
@@ -349,6 +362,7 @@ export class LiveLocalOverlookSession implements LiveLocalObjectChannel {
     this.#redeemed.reject(error);
     this.#connected.reject(error);
     for (const heartbeat of this.#heartbeats.splice(0)) heartbeat.reject(error);
+    this.#operationResults.close(error);
   }
 
   private async withDeadline<T>(operation: Promise<T>, timeoutMs: number, timeoutError: () => never): Promise<T> {

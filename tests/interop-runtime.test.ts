@@ -324,6 +324,27 @@ test('pairing import stores non-extractable custody while unavailable publicatio
   assert.equal(started.snapshot.counts.finalized, 0);
 });
 
+test('a retryable live-local bootstrap failure remains recoverable after the status probe succeeds', async (t) => {
+  const { runtime, db } = await harness({
+    openProvider: async () => {
+      throw new InteropTransportError('Open or unlock Overlook and retry.', 'provider-unavailable', true);
+    },
+  });
+  t.after(() => db.close());
+  await runtime.dispatch(context, { name: 'select-provider', provider: 'google-drive' });
+  await runtime.dispatch(context, {
+    name: 'import-pairing',
+    fileContent: readFileSync('contracts/interop/v1/fixtures/valid-pairing-bundle.json', 'utf8'),
+    password: 'fixture-password',
+  });
+  const result = await runtime.dispatch(context, { name: 'start' });
+  assert.equal(result.ok, false);
+  assert.equal(result.snapshot.provider.state, 'unavailable');
+  assert.equal(result.snapshot.error?.code, 'provider-unavailable');
+  assert.equal(result.snapshot.error?.retryable, true);
+  assert.match(result.snapshot.error?.message ?? '', /unlock Overlook/u);
+});
+
 test('runtime start publishes the exact reviewed selection and reloads durable Move progress', async (t) => {
   const store = new MemoryStore();
   const opens: Parameters<InteropRuntimeDependencies['openProvider']>[1][] = [];

@@ -1,5 +1,6 @@
 import type { InteropErrorCode } from '../core/interop/contract.js';
 import type { InteropCounts } from '../core/interop/messages.js';
+import { InteropTransportError } from '../core/interop/transport.js';
 import type {
   InteropProviderState,
   InteropRuntimeAction,
@@ -219,6 +220,11 @@ export class InteropRuntime {
       if (error instanceof InteropMoveSetupError || error instanceof InteropSyncSetupError) {
         const failure = progressViews.moveSetupFailureView(error, provider.state);
         return this.result(context, active, 'failed', failure.providerState, provider.detail, failure.error);
+      }
+      if (error instanceof InteropTransportError) {
+        const normalized = progressViews.interopRuntimeError(error);
+        const state = progressViews.interopProviderFailureState(normalized);
+        return this.result(context, active, 'failed', state, normalized.message, normalized);
       }
       return this.result(context, active, 'failed', provider.state, provider.detail, {
         code: 'unsupported-record',

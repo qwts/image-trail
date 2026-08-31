@@ -77,8 +77,9 @@ class FakeSession implements LiveLocalRuntimeSession {
   commits = 0;
   closes = 0;
 
-  commit(): void {
+  commit(): Promise<void> {
     this.commits += 1;
+    return Promise.resolve();
   }
   close(): void {
     this.closes += 1;

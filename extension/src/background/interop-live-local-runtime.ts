@@ -13,7 +13,7 @@ interface ActiveLiveLocalRuntime {
 export interface LiveLocalRuntimeSession {
   readonly phase: string;
   readonly store: InteropObjectStore;
-  commit(): void;
+  commit(): Promise<void>;
   close(): void;
 }
 
@@ -75,8 +75,8 @@ class LiveLocalRuntimeStore implements InteropRuntimeProviderStore {
     return this.session.store.verify(path);
   }
 
-  commit(): void {
-    this.session.commit();
+  commit(): Promise<void> {
+    return this.session.commit();
   }
 
   clearStaged(): Promise<void> {

@@ -12,7 +12,7 @@ export interface InteropProviderOpenContext {
 }
 
 export interface InteropRuntimeProviderStore extends InteropObjectStore {
-  commit?(): void;
+  commit?(): Promise<void> | void;
   clearStaged?(): Promise<void>;
 }
 

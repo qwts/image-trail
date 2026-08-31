@@ -50,7 +50,7 @@ export class InteropMoveRuntime {
       pairing,
       activeBlobKey: await this.getActiveBlobKey(),
     });
-    store.commit?.();
+    await store.commit?.();
     return progress;
   }
 
@@ -75,7 +75,7 @@ export class InteropMoveRuntime {
       recordIds: input.recordIds,
     });
     await new MoveOutboxPublisher(db, store).resume(input.transferId, pairing, input.total);
-    store.commit?.();
+    await store.commit?.();
     const reconciled = await new MoveAcknowledgementReconciler(db, store, this.finalizer).reconcile({
       transferId: input.transferId,
       total: input.total,
@@ -107,7 +107,7 @@ export class InteropMoveRuntime {
       pairingId: pairing.pairingId,
       recordIds: input.recordIds,
     });
-    store.commit?.();
+    await store.commit?.();
     const reconciled = await new MoveAcknowledgementReconciler(db, store, this.finalizer).reconcile({
       transferId: input.transferId,
       total: input.total,
