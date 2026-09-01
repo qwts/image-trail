@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -35,6 +35,8 @@ type ReleasePackageModule = {
   validateReleaseTag(tag: string, version: string): string[];
   validateArchiveEntries(entries: string[]): string[];
   releaseArtifactNames(version: string): { archive: string; checksum: string };
+  experimentalArtifactNames(version: string): { archive: string; checksum: string };
+  prepareArtifactOutput(directory: string, names: { archive: string; checksum: string }): Promise<void>;
 };
 
 type VersionCutModule = {
@@ -85,12 +87,20 @@ test('requires both package-lock version fields to match package.json', () => {
   assert.match(policy.evaluateVersionArtifacts({ ...versionArtifacts(), lockRootVersion: '0.0.9' }).join(' '), /root package \(0\.0\.9\)/u);
 });
 
-test('validates local and release build identity policy', () => {
+test('validates local, release, and experimental build identity policy', () => {
   assert.deepEqual(
     policy.evaluateVersionArtifacts({
       ...versionArtifacts(),
       buildInfo: { version: '0.1.0', mode: 'local', worktree: 'image-trail' },
       requiredBuildMode: 'local',
+    }),
+    [],
+  );
+  assert.deepEqual(
+    policy.evaluateVersionArtifacts({
+      ...versionArtifacts(),
+      buildInfo: { version: '0.1.0', mode: 'experimental', worktree: null },
+      requiredBuildMode: 'experimental',
     }),
     [],
   );
@@ -467,6 +477,27 @@ test('release packaging requires an exact version tag and stable artifact names'
     archive: 'image-trail-v1.2.3.zip',
     checksum: 'image-trail-v1.2.3.zip.sha256',
   });
+  assert.deepEqual(releasePackage.experimentalArtifactNames('1.2.3'), {
+    archive: 'image-trail-v1.2.3-experimental.zip',
+    checksum: 'image-trail-v1.2.3-experimental.zip.sha256',
+  });
+});
+
+test('packaging one variant preserves the other variant', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'image-trail-package-variants-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const releaseNames = releasePackage.releaseArtifactNames('1.2.3');
+  const experimentalNames = releasePackage.experimentalArtifactNames('1.2.3');
+  for (const name of [...Object.values(releaseNames), ...Object.values(experimentalNames)]) {
+    writeFileSync(join(directory, name), name);
+  }
+
+  await releasePackage.prepareArtifactOutput(directory, releaseNames);
+
+  assert.equal(existsSync(join(directory, releaseNames.archive)), false);
+  assert.equal(existsSync(join(directory, releaseNames.checksum)), false);
+  assert.equal(existsSync(join(directory, experimentalNames.archive)), true);
+  assert.equal(existsSync(join(directory, experimentalNames.checksum)), true);
 });
 
 test('release packaging enforces a Chrome Web Store-compatible archive root', () => {

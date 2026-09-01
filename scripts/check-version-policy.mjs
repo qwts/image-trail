@@ -69,14 +69,14 @@ export function evaluateVersionArtifacts({
     if (buildInfo.version !== manifestVersion) {
       errors.push(`extension/dist/build-info.json (${String(buildInfo.version)}) does not match ${manifestVersion}`);
     }
-    if (buildInfo.mode !== 'local' && buildInfo.mode !== 'release') {
-      errors.push(`extension/dist/build-info.json mode must be "local" or "release", got ${String(buildInfo.mode)}`);
+    if (buildInfo.mode !== 'local' && buildInfo.mode !== 'release' && buildInfo.mode !== 'experimental') {
+      errors.push(`extension/dist/build-info.json mode must be "local", "release", or "experimental", got ${String(buildInfo.mode)}`);
     }
     if (buildInfo.mode === 'local' && (typeof buildInfo.worktree !== 'string' || buildInfo.worktree.length === 0)) {
       errors.push('local build identity must include a worktree label');
     }
-    if (buildInfo.mode === 'release' && buildInfo.worktree !== null) {
-      errors.push('release build identity must set worktree to null');
+    if ((buildInfo.mode === 'release' || buildInfo.mode === 'experimental') && buildInfo.worktree !== null) {
+      errors.push(`${buildInfo.mode} build identity must set worktree to null`);
     }
     if (requiredBuildMode && buildInfo.mode !== requiredBuildMode) {
       errors.push(`build mode must be "${requiredBuildMode}", got ${String(buildInfo.mode)}`);

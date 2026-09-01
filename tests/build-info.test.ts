@@ -36,6 +36,18 @@ test('validates extension build identity payloads', () => {
     }),
     true,
   );
+  assert.equal(
+    isBuildIdentity({
+      schemaVersion: 1,
+      version: '0.1.0',
+      builtAt: '2026-06-28T03:30:00.000Z',
+      commit: 'abc123def456',
+      branch: 'codex/experimental',
+      worktree: null,
+      mode: 'experimental',
+    }),
+    true,
+  );
 });
 
 test('build identity rows include local build identity fields', () => {

@@ -1,5 +1,10 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import {
+  chromeExtensionIdFromPublicKey,
+  RELEASED_IMAGE_TRAIL_EXTENSION_ID,
+  RELEASED_IMAGE_TRAIL_PUBLIC_KEY,
+} from './extension-manifest-policy.mjs';
 
 const STATIC_APPLICATION_ARTIFACTS = [
   'build-info.json',
@@ -84,14 +89,32 @@ export function validateReleaseArtifactText(file, content, rootDirectory, { allo
   return errors;
 }
 
-export function validateReleaseBuildInfo(buildInfo) {
+function validateHardenedBuildInfo(buildInfo, mode) {
   const errors = [];
   const keys = Object.keys(buildInfo).sort();
   if (keys.join('\n') !== RELEASE_BUILD_INFO_KEYS.join('\n')) {
-    errors.push(`release build identity keys must be exactly: ${RELEASE_BUILD_INFO_KEYS.join(', ')}`);
+    errors.push(`${mode} build identity keys must be exactly: ${RELEASE_BUILD_INFO_KEYS.join(', ')}`);
   }
-  if (buildInfo.mode !== 'release') errors.push(`release artifact audit requires release mode, got "${String(buildInfo.mode)}"`);
-  if (buildInfo.worktree !== null) errors.push('release build identity must not include a worktree');
+  if (buildInfo.mode !== mode) errors.push(`${mode} artifact audit requires ${mode} mode, got "${String(buildInfo.mode)}"`);
+  if (buildInfo.worktree !== null) errors.push(`${mode} build identity must not include a worktree`);
+  return errors;
+}
+
+export function validateReleaseBuildInfo(buildInfo) {
+  return validateHardenedBuildInfo(buildInfo, 'release');
+}
+
+export function validateExperimentalBuildInfo(buildInfo) {
+  return validateHardenedBuildInfo(buildInfo, 'experimental');
+}
+
+function validateDynamicWebAccessibleResources(manifest) {
+  const errors = [];
+  for (const [index, resourceGroup] of (manifest.web_accessible_resources ?? []).entries()) {
+    if (resourceGroup.use_dynamic_url !== true) {
+      errors.push(`manifest web-accessible-resource group ${index} must use a dynamic URL`);
+    }
+  }
   return errors;
 }
 
@@ -101,11 +124,20 @@ export function validateReleaseManifest(manifest) {
   if (permissions.includes('nativeMessaging')) {
     errors.push('release manifest must not request nativeMessaging while Transfer & Sync is feature-gated');
   }
-  for (const [index, resourceGroup] of (manifest.web_accessible_resources ?? []).entries()) {
-    if (resourceGroup.use_dynamic_url !== true) {
-      errors.push(`release manifest web-accessible-resource group ${index} must use a dynamic URL`);
-    }
+  errors.push(...validateDynamicWebAccessibleResources(manifest));
+  return errors;
+}
+
+export function validateExperimentalManifest(manifest) {
+  const permissions = Array.isArray(manifest.permissions) ? manifest.permissions : [];
+  const errors = [];
+  if (!permissions.includes('nativeMessaging')) errors.push('experimental manifest requires nativeMessaging');
+  if (manifest.key !== RELEASED_IMAGE_TRAIL_PUBLIC_KEY) {
+    errors.push('experimental manifest requires the released extension public key');
+  } else if (chromeExtensionIdFromPublicKey(manifest.key) !== RELEASED_IMAGE_TRAIL_EXTENSION_ID) {
+    errors.push(`experimental manifest public key must derive ${RELEASED_IMAGE_TRAIL_EXTENSION_ID}`);
   }
+  errors.push(...validateDynamicWebAccessibleResources(manifest));
   return errors;
 }
 
@@ -121,22 +153,42 @@ export async function collectArtifactFiles(directory, relativeDirectory = '') {
   return files.sort();
 }
 
-export async function auditExtensionArtifacts({ directory, rootDirectory, requireRelease = false, allowE2ETestBuild = false }) {
+export async function auditExtensionArtifacts({
+  directory,
+  rootDirectory,
+  requireRelease = false,
+  requireExperimental = false,
+  allowE2ETestBuild = false,
+}) {
   const files = await collectArtifactFiles(directory);
   const manifest = JSON.parse(await readFile(path.join(directory, 'manifest.json'), 'utf8'));
   const buildInfo = JSON.parse(await readFile(path.join(directory, 'build-info.json'), 'utf8'));
   const release = buildInfo.mode === 'release';
+  const experimental = buildInfo.mode === 'experimental';
   const errors = validateArtifactPaths(files, manifest);
 
-  if (requireRelease || release) {
+  if (requireRelease && requireExperimental) errors.push('artifact audit cannot require both release and experimental modes');
+
+  if (requireRelease) {
     errors.push(...validateReleaseBuildInfo(buildInfo));
     errors.push(...validateReleaseManifest(manifest));
+  } else if (requireExperimental) {
+    errors.push(...validateExperimentalBuildInfo(buildInfo));
+    errors.push(...validateExperimentalManifest(manifest));
+  } else if (release) {
+    errors.push(...validateReleaseBuildInfo(buildInfo));
+    errors.push(...validateReleaseManifest(manifest));
+  } else if (experimental) {
+    errors.push(...validateExperimentalBuildInfo(buildInfo));
+    errors.push(...validateExperimentalManifest(manifest));
+  }
+  if (requireRelease || requireExperimental || release || experimental) {
     for (const file of files) {
       if (!TEXT_ARTIFACT.test(file)) continue;
       const content = await readFile(path.join(directory, file), 'utf8');
       errors.push(
         ...validateReleaseArtifactText(file, content, rootDirectory, {
-          allowE2ETestBuild: allowE2ETestBuild && !requireRelease,
+          allowE2ETestBuild: allowE2ETestBuild && !requireRelease && !requireExperimental,
         }),
       );
     }
