@@ -3,15 +3,6 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "^Bash$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/scripts/guard-agent-command.mjs\" --protocol=codex"
-          }
-        ]
-      },
-      {
         "hooks": [
           {
             "type": "command",
@@ -37,6 +28,15 @@
             "type": "command",
             "command": "export AGENT_BOT_UNMANAGED_AUTHORS=\"${AGENT_BOT_UNMANAGED_AUTHORS-ai9d}\"; H=\"${AGENT_BOT_HOOK_BIN:-$HOME/.local/share/agent-bot/agent-hook}\"; [ -x \"$H\" ] && exec \"$H\" --dialect codex --event pre-file-write; exit 0 # agent-bot agent-hook",
             "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/scripts/guard-agent-command.mjs\" --protocol=codex"
           }
         ]
       }
