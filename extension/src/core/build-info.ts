@@ -1,4 +1,4 @@
-export type BuildIdentityMode = 'local' | 'release' | 'unknown';
+export type BuildIdentityMode = 'experimental' | 'local' | 'release' | 'unknown';
 
 export interface BuildIdentity {
   readonly schemaVersion: 1;
@@ -22,7 +22,7 @@ export function isBuildIdentity(value: unknown): value is BuildIdentity {
     (typeof candidate.branch === 'string' || candidate.branch === null) &&
     (typeof candidate.worktree === 'string' || candidate.worktree === null) &&
     (typeof candidate.timezone === 'string' || candidate.timezone === null || candidate.timezone === undefined) &&
-    (candidate.mode === 'local' || candidate.mode === 'release' || candidate.mode === 'unknown')
+    (candidate.mode === 'experimental' || candidate.mode === 'local' || candidate.mode === 'release' || candidate.mode === 'unknown')
   );
 }
 
