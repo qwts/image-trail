@@ -1,5 +1,12 @@
 # image-trail
 
+## 0.27.4
+
+### Patch Changes
+
+- f8246e9: Prefer a pairing-scoped local Overlook connection while keeping cloud fallback explicit and active transfer routes stable.
+- bafd9dd: Add a hardened, fixed-ID experimental package for released-product interoperability acceptance while keeping baseline releases unchanged.
+
 ## 0.27.3
 
 ### Patch Changes
