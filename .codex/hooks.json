@@ -30,6 +30,15 @@
             "timeout": 60
           }
         ]
+      },
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/scripts/guard-agent-command.mjs\" --protocol=codex"
+          }
+        ]
       }
     ],
     "SessionStart": [

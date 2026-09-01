@@ -101,6 +101,15 @@
             "timeout": 60
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/scripts/guard-agent-command.mjs --protocol=claude"
+          }
+        ]
       }
     ],
     "SessionStart": [
