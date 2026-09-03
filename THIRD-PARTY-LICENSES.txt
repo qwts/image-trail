@@ -5,7 +5,7 @@ packages listed below. Each is distributed under its own license, and the
 full text of each package's license/copyright notice follows its entry.
 
 ==============================================================================
-@noble/hashes@2.3.0 — MIT
+@noble/hashes@2.4.0 — MIT
 ==============================================================================
 
 The MIT License (MIT)
