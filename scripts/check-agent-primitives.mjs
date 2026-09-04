@@ -251,7 +251,7 @@ export function validateAgentPrimitives(root = process.cwd()) {
 
   const releaseCommand = readFileSync(path.join(root, '.claude/commands/release.md'), 'utf8');
   scannedFiles.add('.claude/commands/release.md');
-  add('release command delegates to the canonical release runbook', releaseCommand.includes('wiki/Versioning-and-Releases'));
+  add('release command delegates to the canonical release runbook', releaseCommand.includes('docs/versioning-and-releases.md') && !releaseCommand.includes('wiki/Versioning-and-Releases'));
 
   const settings = readJson(root, '.claude/settings.json');
   validatePermissions(settings, add);
