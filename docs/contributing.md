@@ -219,8 +219,8 @@ human contributors, plus these extra rules:
   coverage lives in `docs/acceptance-tests/`; decisions live in `docs/adr/`;
   versioning and release guidance in `docs/versioning-and-releases.md`; the
   contributor guide in this file.
-- Do not add new `https://github.com/qwts/image-trail/wiki` references; the wiki
-  is retired. Keep guidance versioned with the code in `docs/`.
+- Do not add new links to the retired GitHub wiki; the wiki is retired.
+  Keep guidance versioned with the code in `docs/`.
 
 ## Local environment notes
 

@@ -11,7 +11,9 @@ const pattern = 'github.com/qwts/image-trail/wiki';
 
 let files;
 try {
-  const output = execFileSync('git', ['grep', '-l', '-I', pattern, '--', ':!package-lock.json'], {
+  // The guard itself and the one-shot migration tool name the retired URL as
+  // the thing they forbid/rewrite, so they are excluded from their own scan.
+  const output = execFileSync('git', ['grep', '-l', '-I', pattern, '--', ':!package-lock.json', ':!scripts/check-wiki-retired.mjs', ':!scripts/wiki-migrate-856.mjs'], {
     encoding: 'utf8',
   });
   files = output.split('\n').filter(Boolean);
