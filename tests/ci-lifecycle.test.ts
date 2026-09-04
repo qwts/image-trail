@@ -22,8 +22,8 @@ test('CI exposes only the governed lifecycle triggers and skips every draft job'
 test('CI loads immutable actor policy and scopes obsolete-run cancellation to PR or queue identity', () => {
   const ci = workflow('ci.yml');
 
-  assert.match(ci, /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@40d1c46756ba70ef40d1b56915d1cdd45b8efa85/u);
-  assert.equal(ci.match(/qwts\/playbook-engineering\/\.github\/actions\/ci-policy@40d1c46756ba70ef40d1b56915d1cdd45b8efa85/gu)?.length, 1);
+  assert.match(ci, /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@f9250d2c515d7b8b86834d0b7d2feef90ae3eed1/u);
+  assert.equal(ci.match(/qwts\/playbook-engineering\/\.github\/actions\/ci-policy@f9250d2c515d7b8b86834d0b7d2feef90ae3eed1/gu)?.length, 1);
   assert.match(ci, /format\('pr-\{0\}', github\.event\.pull_request\.number\)/u);
   assert.match(ci, /format\('merge-group-\{0\}', github\.event\.merge_group\.head_ref\)/u);
   assert.match(ci, /cancel-in-progress: \$\{\{ github\.event_name != 'push' \}\}/u);
@@ -81,7 +81,7 @@ test('every direct workflow entry point authorizes the actor before repository w
     assert.match(source, /name: Action Policy/u, `${file} must define an actor-policy job`);
     assert.match(
       source,
-      /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@40d1c46756ba70ef40d1b56915d1cdd45b8efa85/u,
+      /uses: qwts\/playbook-engineering\/\.github\/actions\/ci-policy@f9250d2c515d7b8b86834d0b7d2feef90ae3eed1/u,
       `${file} must use the reviewed immutable policy`,
     );
     assert.match(source, /authorization-only: 'true'/u, `${file} must select authorization-only mode`);

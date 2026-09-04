@@ -1,7 +1,19 @@
 # Target Picker Captures Only The Selected Image
 
-This documentation now lives in the GitHub wiki:
+Purpose: verify that manual target selection does not persist unrelated page images.
 
-- [Target Picker Captures Only The Selected Image](https://github.com/qwts/image-trail/wiki/Acceptance-Test-Target-Picker-Captures-Only-The-Selected-Image)
+## Steps
 
-This repository file is kept only as a pointer for existing links. Update the wiki page, not this stub.
+1. Open a fixture page with many qualifying images.
+2. Click the extension action.
+3. Use the target picker.
+4. Select one page image.
+5. Click `Capture`.
+6. Verify only the selected image receives a durable metadata/blob record.
+7. Verify other page images are not stored as originals.
+
+## Expected Result
+
+- Exactly one selected image is captured.
+- Non-selected page images are not silently persisted.
+- If runtime discovery lists other images, those records remain session-only unless a future feature intentionally stores them.

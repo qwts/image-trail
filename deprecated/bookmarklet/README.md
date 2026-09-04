@@ -1,7 +1,11 @@
 # Deprecated Bookmarklet
 
-This documentation now lives in the GitHub wiki:
+Canonical archive for the deprecated bookmarklet and its historical notes,
+versioned with the code.
 
-- [Deprecated Bookmarklet](https://github.com/qwts/image-trail/wiki/Deprecated-Bookmarklet)
+## Documents
 
-This repository file is kept only as a pointer for existing links. Update the wiki page, not this stub.
+- [Architecture Notes](docs/architecture-notes.md)
+- [Bugs & Fixes](docs/bugs-and-fixes.md)
+- [Add Target Picker + Single Image Auto-Detect](docs/target_picker_and_single-image_autodetect_962f4f39.plan.md)
+- [Deprecated Bookmarklet Plan](plan.md)

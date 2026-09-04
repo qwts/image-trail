@@ -1,7 +1,59 @@
 # Acceptance Tests
 
-This documentation now lives in the GitHub wiki:
+Canonical manual acceptance scenarios for Image Trail, versioned with the code.
 
-- [Acceptance Tests](https://github.com/qwts/image-trail/wiki/Acceptance-Tests)
+Product capability matrices:
 
-This repository file is kept only as a pointer for existing links. Update the wiki page, not this stub.
+- [Page Context Capability Matrix](../page-context-capability-matrix.md)
+
+## Scenarios
+
+- [Acknowledged Move Journals](acknowledged-move-journals.md)
+- [Bounded Neighbor Preloading](bounded-neighbor-preloading.md)
+- [Chrome Web Store Submission](chrome-web-store-submission.md)
+- [Common Video And Audio Media](common-video-and-audio-media.md)
+- [Dedicated Durable Gallery Tab](dedicated-durable-gallery-tab.md)
+- [Detachable Sections](detachable-sections.md)
+- [Deterministic Reviewed Sync](deterministic-reviewed-sync.md)
+- [Encrypted Image Downloads](encrypted-image-downloads.md)
+- [Encrypted Session Inactivity](encrypted-session-inactivity.md)
+- [Form Control Consistency](form-control-consistency.md)
+- [Gallery Albums](gallery-albums.md)
+- [Gallery Design System](gallery-design-system.md)
+- [Gallery Search](gallery-search.md)
+- [GIF And WebP Media](gif-and-webp-media.md)
+- [Grab Mode Strategies](grab-mode-strategies.md)
+- [Host Image Projection Ownership](host-image-projection-ownership.md)
+- [In-Panel Help](in-panel-help.md)
+- [Image Preview Backdrop No-Flash](image-preview-backdrop-no-flash.md)
+- [Interop Contract And Pairing](interop-contract-and-pairing.md)
+- [Isolated Encrypted Interop Transports](isolated-encrypted-interop-transports.md)
+- [Key Backup Restore](key-backup-restore.md)
+- [Local Only Backup Reminders](local-only-backup-reminders.md)
+- [Local Original Capture Survives Remote Loss](local-original-capture-survives-remote-loss.md)
+- [M00 Planning Baseline Review](m00-planning-baseline-review.md)
+- [MPEG-TS Media](mpeg-ts-media.md)
+- [Multi-Select Image Download](multi-select-image-download.md)
+- [Overlook Record Translation](overlook-record-translation.md)
+- [Overlook Transfer And Sync UI](overlook-transfer-and-sync-ui.md)
+- [Oversized Original Is Bounded](oversized-original-is-bounded.md)
+- [Panel Layout Stability](panel-layout-stability.md)
+- [pCloud API Spike](pcloud-api-spike.md)
+- [pCloud Provider Boundary](pcloud-provider-boundary.md)
+- [Per-Site Capture Rules](per-site-capture-rules.md)
+- [Queue And Recall Clear/Delete Semantics](queue-recall-clear-delete.md)
+- [Recents Retention Settings](recents-retention-settings.md)
+- [Recents Scope Selector](recents-scope-selector.md)
+- [Row And List Visual System](row-list-visual-system.md)
+- [Searchable Metadata Privacy Policy](searchable-metadata-privacy-policy.md)
+- [Secure Workspace Lock](secure-workspace-lock.md)
+- [Settings Action Hierarchy](settings-action-hierarchy.md)
+- [Settings Utility Layout](settings-utility-layout.md)
+- [Shift Modified Capture And Pin](shift-capture-to-pin.md)
+- [Storybook UI Review](storybook-ui-review.md)
+- [Target Picker Captures Only The Selected Image](target-picker-captures-only-selected-image.md)
+- [Third-Party CDN Permission Flow](third-party-cdn-permission-flow.md)
+- [Trusted Privileged Activation](trusted-privileged-activation.md)
+- [URL Review Status Import/Export](url-review-status-import-export.md)
+- [URL Template Learning](url-template-learning.md)
+- [Workspace Rails Cross-Site Safety](workspace-rails-cross-site-safety.md)

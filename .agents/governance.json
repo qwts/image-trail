@@ -31,7 +31,7 @@
     {
       "name": "release",
       "path": ".claude/commands/release.md",
-      "canonicalProcedure": "https://github.com/qwts/image-trail/wiki/Versioning-and-Releases"
+      "canonicalProcedure": "docs/versioning-and-releases.md"
     }
   ],
   "supplyChain": {

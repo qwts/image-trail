@@ -3,7 +3,7 @@
 Canonical agent context for Image Trail; vendor files are thin adapters.
 
 Start with [CONTRIBUTING.md](CONTRIBUTING.md) and its
-[wiki guide](https://github.com/qwts/image-trail/wiki/Contributing).
+[contributor guide](docs/contributing.md).
 
 ## Product boundaries
 
@@ -31,10 +31,10 @@ and `eslint.config.js` enforce the highest-risk boundaries.
 
 | Work                                                 | Read first                                                                                                                |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Issue claims, branches, PRs, review threads, cleanup | [Contributing](https://github.com/qwts/image-trail/wiki/Contributing)                                                     |
+| Issue claims, branches, PRs, review threads, cleanup | [docs/contributing.md](docs/contributing.md)                                                                              |
 | Product model, UI, privacy, accessibility            | [DESIGN.md](DESIGN.md)                                                                                                    |
-| Tests, coverage, acceptance ledger                   | [Testing Strategy](https://github.com/qwts/image-trail/wiki/Testing-Strategy)                                             |
-| Versioning, changesets, release packaging            | [Versioning and Releases](https://github.com/qwts/image-trail/wiki/Versioning-and-Releases)                               |
+| Tests, coverage, acceptance ledger                   | [docs/testing-strategy.md](docs/testing-strategy.md)                                                                      |
+| Versioning, changesets, release packaging            | [docs/versioning-and-releases.md](docs/versioning-and-releases.md)                                                        |
 | Data, IndexedDB, crypto, queue ordering              | [data context](extension/src/data/AGENTS.md)                                                                              |
 | UI rendering and interaction traps                   | [UI context](extension/src/ui/AGENTS.md)                                                                                  |
 | Guarded local processes and isolation                | [docs/agent-process-guard.md](docs/agent-process-guard.md)                                                                |
@@ -50,13 +50,14 @@ Layer direction is enforced by ESLint:
 
 - Keep chat brief. During issue work, put scope, progress, validation, and
   review handoff on the issue.
-- A request to implement an issue authorizes the stated scope. Follow the wiki
-  claim/branch-link flow, then post the confirmed problem or scope and plan.
+- A request to implement an issue authorizes the stated scope. Follow the
+  claim/branch-link flow in [docs/contributing.md](docs/contributing.md), then
+  post the confirmed problem or scope and plan.
 - Before editing, state the likely fix, why it may fail, confidence, and possible
   regressions in one short line each.
 - Preserve unrelated work. Keep one behavioral objective per PR and carry every
   actionable review thread through visible reply, fix or rationale, then resolve.
-- User-visible or workflow changes need the corresponding wiki/acceptance update
+- User-visible or workflow changes need the corresponding acceptance-doc update
   and an honest manual test script before final review.
 
 ## Validation and process safety
