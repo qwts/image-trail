@@ -634,7 +634,7 @@
           "notes": "Load the built extension, open the Queue menu, choose Open gallery, verify a dedicated extension tab lists only durable pins/bookmarks, URL-only rows open their saved URL, unlocked captured originals use encrypted preview, locked originals stay disabled, and Queue/Recents/Recall/pCloud/import-export state does not change while browsing."
         }
       ],
-      "documentation": "tests/dom/gallery-view.test.ts"
+      "documentation": "docs/acceptance-tests/dedicated-durable-gallery-tab.md"
     },
     {
       "id": "gallery-search",
@@ -657,7 +657,7 @@
           "notes": "Load the built extension, open the gallery, save a finite gallery page limit and then 0, type host/filename/label/extension queries, verify search waits for a typing pause, results stay in queue order, no-match and cleared states are explicit, privacy mode hides URL/label matches, thumbnails crop from the top, and queue/Recents/Recall/pCloud/import-export state does not change."
         }
       ],
-      "documentation": "tests/gallery-search.test.ts"
+      "documentation": "docs/acceptance-tests/gallery-search.md"
     },
     {
       "id": "gallery-albums",
@@ -1761,7 +1761,7 @@
           "notes": "Covers neutralizing the selected image's transition while it is darkened so Chrome's standalone image-viewer grey->black background-color transition cannot animate/flash the backdrop (worst in fit/letterboxed mode), and restoring the original transition last on release so it cannot flash on close either. Page/element restore stays verbatim (tests/page-style.test.ts)."
         }
       ],
-      "documentation": "tests/dom/page-style.test.ts"
+      "documentation": "docs/acceptance-tests/image-preview-backdrop-no-flash.md"
     },
     {
       "id": "indexeddb-open-recovery",
