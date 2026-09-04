@@ -63,8 +63,10 @@ for (const [entryIndex, entry] of coverageEntries.entries()) {
   if (typeof entry?.id !== 'string' || entry.id.length === 0) {
     failures.push(`${entryLabel}: id is required.`);
   }
-  if (typeof entry?.wiki !== 'string' || entry.wiki.length === 0) {
-    failures.push(`${entryLabel}: wiki is required.`);
+  if (typeof entry?.documentation !== 'string' || entry.documentation.length === 0) {
+    failures.push(`${entryLabel}: documentation is required (a source-controlled doc path naming the canonical flow).`);
+  } else if (typeof entry?.documentation === 'string' && !(await pathExists(entry.documentation))) {
+    failures.push(`${entryLabel}: documentation path does not exist: ${entry.documentation}`);
   }
   if (!Array.isArray(entry?.coverage) || entry.coverage.length === 0) {
     failures.push(`${entryLabel}: coverage must list at least one coverage source.`);

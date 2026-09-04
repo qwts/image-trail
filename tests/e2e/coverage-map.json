@@ -7,7 +7,6 @@
       "id": "chrome-web-store-submission",
       "acceptance": "Audited Chrome Web Store listing, privacy disclosures, assets, reviewer path, and exact v0.26.6 upload package (issue #502)",
       "repoPath": "docs/acceptance-tests/chrome-web-store-submission.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Chrome-Web-Store-Submission",
       "coverage": [
         {
           "type": "unit-dom",
@@ -30,12 +29,12 @@
           "reason": "Chrome Web Store account, legal/trader declarations, asset cropping, distribution, dashboard validation, and Submit for review are owner-only external steps.",
           "notes": "Verify the downloaded image-trail-v0.26.6.zip against SHA-256 8fc3454bd65302933e3f4cb4b82c4bf78ae2f904b93e691ef9ee8fc15fdb388e; confirm manifest 0.26.6 and the six documented permissions with no nativeMessaging; follow the credential-free reviewer path; upload the versioned 128px icon, 1280x800 screenshot, and 440x280 tile; enter the canonical listing/privacy values without broader claims; resolve any dashboard demand for a promotional video before submission; and retain the dashboard summary as owner evidence."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/chrome-web-store-submission.md"
     },
     {
       "id": "overlook-transfer-sync-visible-workflow",
       "acceptance": "Baseline Transfer and Sync feature gate plus local-first same-computer presence, explicit cloud routing, active-route locking, and truthful experimental review, conflict, progress, recovery, and locked states",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Overlook-Transfer-And-Sync-UI",
       "coverage": [
         {
           "type": "unit-dom",
@@ -68,13 +67,13 @@
           "reason": "Provider credentials and the signed iCloud host remain owner-run closeout evidence in issue #590 before the experimental gate can be removed.",
           "notes": "Build with IMAGE_TRAIL_ENABLE_INTEROP=1, then open Transfer and Sync from one Queue row, a multi-selection, Gallery, and a captured original. Verify Local is selected first; pairing remains separate from presence; missing host, closed app, locked app, incompatible app, connecting, connected, interrupted, and resumable states are exact; cloud is chosen only explicitly; and an active journal cannot change routes until completion or cancellation. With signed Overlook running and paired, verify the released Image Trail identity alone can obtain a one-use capability, the connection uses only the exact 127.0.0.1 session endpoint, sleep or worker restart pauses safely and requires fresh bootstrap, cancellation remains retryable, and no token, plaintext, filename, or ciphertext appears in host-page DOM, content messages, logs, or durable extension storage. Authorize pCloud once, allow the OAuth window to remain open long enough for the original message channel to close, and return focus; verify the connected state refreshes without another OAuth window and repeated Connect clicks never queue windows. Deny or invalidate the app-folder scope and verify an honest provider-unavailable message with Retry check instead of a Reconnect loop. Also verify exact counts and recovery copy, keyboard containment, narrow layout, preserved selection and queue order, and no thumbnails, names, counts, or provider details in the locked workspace. In a production build with the closed panel Shadow DOM, click Transfer & Sync in the in-page panel and verify the workflow dialog opens inside the panel while document.body gains no image-trail-interop-scrim node."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/overlook-transfer-and-sync-ui.md"
     },
     {
       "id": "gif-webp-original-preservation",
       "acceptance": "Static and animated GIF/WebP capture, poster, preview, export, backup, and Photos metadata preservation",
       "repoPath": "tests/e2e/gif-webp-media.spec.ts",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-GIF-And-WebP-Media",
       "coverage": [
         {
           "type": "unit-dom",
@@ -102,13 +101,13 @@
           "reason": "Real operating-system reduced-motion startup, source timing perception, and live Photos transfer remain human/browser integration checks while Transfer and Sync stays experimental.",
           "notes": "Start Chrome with reduced motion already enabled, open each captured original from Gallery, verify no animated frame appears before Play, compare visible frame timing and loop behavior to the source, then run an experimental Image Trail to Photos to Image Trail transfer and compare filename, MIME, dimensions, animation facts, and SHA-256."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/gif-and-webp-media.md"
     },
     {
       "id": "mpeg-ts-original-preservation",
       "acceptance": "MPEG-TS signature validation, encrypted custody, playable and preserved-only tiers, preview, export, backup, and Photos metadata preservation",
       "repoPath": "tests/e2e/mpeg-ts-media.spec.ts",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-MPEG-TS-Media",
       "coverage": [
         {
           "type": "unit-dom",
@@ -137,13 +136,13 @@
           "reason": "System codec availability and live Photos transfer remain browser and owner integration checks while Transfer and Sync stays experimental.",
           "notes": "Load the packaged extension, import representative .ts, .mts, and .m2ts files, and verify no list autoplay, first-frame poster stability, keyboard play pause seek mute and volume, duration and error copy, exact original download, encrypted backup restore, bounded failure for malformed and oversized files, and an experimental Image Trail to Photos to Image Trail transfer with identical SHA-256, MIME, extension, and stream facts."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/mpeg-ts-media.md"
     },
     {
       "id": "common-video-audio-original-preservation",
       "acceptance": "Signature-validated MP4, MOV, WebM, Matroska, AVI, MPEG program, and MP2 encrypted custody, metadata, preview tiers, export, backup, and Photos preservation",
       "repoPath": "docs/acceptance-tests/common-video-and-audio-media.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Common-Video-And-Audio-Media",
       "coverage": [
         {
           "type": "unit-dom",
@@ -172,12 +171,12 @@
           "reason": "System-specific H.264, HEVC, ProRes, and Apple-device codec availability plus live Photos transfer remain browser, operating-system, and owner integration checks while Transfer and Sync stays experimental.",
           "notes": "Load the packaged extension and import representative iPhone H.264/HEVC MOV, ProRes MOV, MP4, WebM, MKV, AVI, MPEG-PS, and MP2 files. Verify no list autoplay, honest per-device preview fallback, rotation and HDR handling, keyboard play pause seek mute and volume, first-frame poster stability, exact original export and encrypted backup restore, bounded malformed/oversized failure, then run experimental Image Trail to Photos to Image Trail transfers and compare SHA-256, filename, MIME, container, streams, dimensions, rotation, duration, and HDR facts."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/common-video-and-audio-media.md"
     },
     {
       "id": "design-system-foundation",
       "acceptance": "Shared design-system tokens and core primitive contracts",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
       "coverage": [
         {
           "type": "unit-dom",
@@ -199,12 +198,12 @@
           "reason": "Token and primitive styling requires a packaged-extension visual and keyboard smoke check across the injected Shadow DOM.",
           "notes": "Load the built extension, open the panel over the single-image fixture, and inspect the core-primitives Storybook stories. Verify the panel and Gallery retain their prior rendering, every primitive matches the canonical hierarchy, keyboard focus is visible, disabled and waiting states remain distinct, narrow content wraps without overflow, reduced motion removes animation without hiding state, and no stylesheet request fails."
         }
-      ]
+      ],
+      "documentation": "docs/design-system.md"
     },
     {
       "id": "design-system-panel-shell-primary-workflow",
       "acceptance": "Shared design-system panel shell and primary workflow",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
       "coverage": [
         {
           "type": "unit-dom",
@@ -252,13 +251,13 @@
           "reason": "The handoff calls for visual fidelity over an arbitrary host page and browser-level reduced-motion behavior.",
           "notes": "Load the packaged extension over the single-image fixture at 420px and a narrow viewport. Compare against the handoff panel and capture-flash references; verify hierarchy, density, glows, typography, status/toast motion, header drag, minimize, detach/restore, keyboard focus, privacy masking, and no failed stylesheet requests."
         }
-      ]
+      ],
+      "documentation": "docs/design-system.md"
     },
     {
       "id": "shift-modified-capture-and-pin",
       "acceptance": "One primary current-image control for Capture by default and Pin while Shift is held (issue #756)",
       "repoPath": "docs/acceptance-tests/shift-capture-to-pin.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Shift-Modified-Capture-And-Pin",
       "coverage": [
         {
           "type": "unit-dom",
@@ -290,12 +289,12 @@
           "reason": "Browser key state, trusted activation, focus restoration, and host-page editable boundaries require a packaged extension profile.",
           "notes": "Load the packaged extension with a selected image. Verify Capture is the default primary action; holding Shift over the page or panel changes it to Pin without firing; releasing Shift, blurring the window, hiding the tab, or closing and reopening the panel restores Capture; Shift typed in an input does not change it; clicking transient Pin or pressing P adds metadata to Queue without capturing original bytes or adding a Recent; clicking Capture or pressing C captures explicitly; and Queue has no duplicate current-image Pin action."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/shift-capture-to-pin.md"
     },
     {
       "id": "workspace-rails-layout-v2",
       "acceptance": "React workspace shade, floating windows, four edge rails, and private versioned restoration",
-      "wiki": "https://github.com/qwts/image-trail/wiki/ADR-0003-Workspace-Rails-And-Host-Reflow-Boundary",
       "coverage": [
         {
           "type": "unit-dom",
@@ -333,12 +332,12 @@
           "reason": "The arbitrary-host overlay, browser zoom clamp, and final handoff visual fidelity need packaged-extension inspection.",
           "notes": "Follow the canonical Workspace Rails Cross-Site Safety wiki script at 1440x900 and 200% zoom. Confirm rail width 344px, top and bottom height 240px, supported overlay and fallback behavior, exact host cleanup, keyboard and pointer escape paths, private persistence/reset, Recall remaining panel-relative without flicker while dragging, smooth live viewport resize with one final reflow, and chrome matching handoff screenshot 11."
         }
-      ]
+      ],
+      "documentation": "docs/adr/0003-workspace-rails-and-host-reflow-boundary.md"
     },
     {
       "id": "design-system-record-row",
       "acceptance": "Shared RecordRow across Queue, Recents, Recall, and Gallery",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
       "coverage": [
         {
           "type": "unit-dom",
@@ -367,12 +366,12 @@
           "reason": "The handoff defines a signature thumbnail bleed, fade, glow, and state hierarchy that requires visual comparison in the injected panel and extension Gallery.",
           "notes": "Load the packaged extension and compare Queue, Recents, Recall, and Gallery against the handoff. Verify full-height faded thumbnails, source/name/meta hierarchy, selected dominance over the stored-original dot, locked and key-unavailable dimming, privacy masking, missing thumbnails, keyboard focus, narrow widths, and no layout flicker."
         }
-      ]
+      ],
+      "documentation": "docs/design-system.md"
     },
     {
       "id": "design-system-settings-help",
       "acceptance": "Shared design-system Settings, integrations, shortcuts, and Help surfaces",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
       "coverage": [
         {
           "type": "unit-dom",
@@ -415,13 +414,13 @@
           "reason": "The handoff specifies dense visual hierarchy and state contrast across browser-controlled form elements and detached extension windows.",
           "notes": "Load the packaged extension at standard and narrow widths; inspect attached and detached Settings plus Help. Verify grouped hierarchy, sticky headings, native input/select/file controls, focus, locked and privacy states, connected/waiting/error statuses, destructive separation, reduced motion, preserved scroll, and no stylesheet request failures."
         }
-      ]
+      ],
+      "documentation": "docs/design-system.md"
     },
     {
       "id": "local-only-backup-reminders",
       "acceptance": "Opt-in local-only reminders for manual encrypted backups",
       "repoPath": "docs/acceptance-tests/local-only-backup-reminders.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Local-Only-Backup-Reminders",
       "coverage": [
         {
           "type": "unit-dom",
@@ -448,13 +447,13 @@
           "reason": "Calendar rollover and the absence of browser/provider side effects need owner observation in a real extension profile.",
           "notes": "Confirm reminders are off after install, opt into each cadence, move the local next-due value across the current time, and reopen Image Trail. Verify the due prompt appears only in Import / Export; Remind me later reschedules locally; plaintext/history exports do not clear it; successful encrypted bookmark or manually initiated pCloud backups reschedule it; and no browser notification, provider connection, or upload starts without a separate user action."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/local-only-backup-reminders.md"
     },
     {
       "id": "per-site-capture-rules",
       "acceptance": "Conservative exact-host rules for explicit Grab clicks to pin metadata or capture an encrypted original",
       "repoPath": "docs/acceptance-tests/per-site-capture-rules.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Per-Site-Capture-Rules",
       "coverage": [
         {
           "type": "unit-dom",
@@ -482,13 +481,13 @@
           "reason": "Host-page click trust, browser permission prompts, encrypted-key state, and a real cross-origin image fetch require a packaged extension profile.",
           "notes": "With a fresh profile, verify Grab pins metadata only. Add an exact-host Capture rule in Settings, confirm the panel explains that Grab will pin and capture, then explicitly click an image in Grab Mode. Verify the durable Queue row exists before capture, the original indicator appears only after encrypted storage succeeds, a locked or denied capture leaves the pin intact with honest retry/error copy, Recents stays session-only, no other visible image is captured, a subdomain does not inherit the rule, Privacy Mode masks saved hostnames, and removing the rule restores metadata-only behavior."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/per-site-capture-rules.md"
     },
     {
       "id": "design-system-gallery-acceptance",
       "acceptance": "Shared design-system Gallery and final high-fidelity acceptance",
       "repoPath": "docs/acceptance-tests/gallery-design-system.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Gallery-Design-System",
       "coverage": [
         {
           "type": "unit-dom",
@@ -518,12 +517,12 @@
           "reason": "Browser zoom, drag-and-drop affordances, and final visual comparison against the supplied mocked-tab reference require a packaged-extension inspection.",
           "notes": "Open Gallery from the packaged panel and compare its dark extension-page shell, hierarchy, density, type, borders, glows, status, cards, and controls with the mocked-tab handoff. Exercise search plus source/kind/type filters, filter clearing, privacy mode, 200% zoom, keyboard-only navigation, album drag/drop, locked/private records, captured-original indicators, empty/no-match and load-error states, reduced motion, and confirm no context rail, destination navigation, Recents, or failed stylesheet requests appear."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/gallery-design-system.md"
     },
     {
       "id": "automation-keybindings-and-request-governance",
       "acceptance": "M08 automation, keybindings, and request governance",
-      "wiki": "https://github.com/qwts/image-trail/wiki/User-Story-M08-Automation-Keybindings-And-Request-Governance",
       "coverage": [
         {
           "type": "playwright-e2e",
@@ -584,12 +583,12 @@
           ],
           "notes": "Covers #373 bounded manual navigation (latest wins): a rapid press burst coalesces into one net jump, cancelQueuedManualNavigation drops queued presses on Escape/Stop, a long governor wait abandons manual-only intent with a visible message, parsed-field +/- bursts fold into one net transform (a +/- pair loads nothing, interleaved interactions preserve order), the navigationBusy waiting state toggles around the drain, and an unchanged status toast is not rebuilt across renders so stale messages cannot replay their enter animation. Buffered prewarming responsiveness: a blocked seek probes the skip-budget frontier concurrently and lands past a failed run in one step, and the GET the user is blocked on bypasses the prefetch concurrency cap."
         }
-      ]
+      ],
+      "documentation": "docs/user-stories/m08-automation-keybindings-and-request-governance.md"
     },
     {
       "id": "extension-smoke",
       "acceptance": "Extension port acceptance baseline",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Extension-Port-Acceptance-Baseline",
       "coverage": [
         {
           "type": "playwright-e2e",
@@ -606,13 +605,13 @@
           ],
           "notes": "Covers removal of static all-sites injection and required host access, retention of activeTab plus scripting, optional http/https declarations, session-scoped web-accessible resources, exact per-origin permission requests, linked-page permission preflight, and same-origin-only credential inclusion across the validated runtime-message boundary."
         }
-      ]
+      ],
+      "documentation": "docs/extension-port-acceptance-baseline.md"
     },
     {
       "id": "durable-gallery-tab",
       "acceptance": "Dedicated durable gallery tab",
       "repoPath": "tests/dom/gallery-view.test.ts",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Dedicated-Durable-Gallery-Tab",
       "coverage": [
         {
           "type": "unit-dom",
@@ -634,13 +633,13 @@
           "reason": "The production toolbar gesture, cross-extension-tab focus, encrypted-original preview tab, and final visual comparison remain browser-level checks.",
           "notes": "Load the built extension, open the Queue menu, choose Open gallery, verify a dedicated extension tab lists only durable pins/bookmarks, URL-only rows open their saved URL, unlocked captured originals use encrypted preview, locked originals stay disabled, and Queue/Recents/Recall/pCloud/import-export state does not change while browsing."
         }
-      ]
+      ],
+      "documentation": "tests/dom/gallery-view.test.ts"
     },
     {
       "id": "gallery-search",
       "acceptance": "Gallery search",
       "repoPath": "tests/gallery-search.test.ts",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Gallery-Search",
       "coverage": [
         {
           "type": "unit-dom",
@@ -657,13 +656,13 @@
           "reason": "The complete metadata matrix, privacy-mode term masking, and unlimited-result visual review remain manual browser checks.",
           "notes": "Load the built extension, open the gallery, save a finite gallery page limit and then 0, type host/filename/label/extension queries, verify search waits for a typing pause, results stay in queue order, no-match and cleared states are explicit, privacy mode hides URL/label matches, thumbnails crop from the top, and queue/Recents/Recall/pCloud/import-export state does not change."
         }
-      ]
+      ],
+      "documentation": "tests/gallery-search.test.ts"
     },
     {
       "id": "gallery-albums",
       "acceptance": "Gallery albums",
       "repoPath": "docs/acceptance-tests/gallery-albums.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Gallery-Albums",
       "coverage": [
         {
           "type": "unit-dom",
@@ -690,13 +689,13 @@
           "reason": "Rename/delete, drag-and-drop, concurrent external refresh, missing-membership recovery, and full-backup restore remain manual browser checks.",
           "notes": "Load the built extension, create captured and uncaptured durable records, open Gallery, pin/capture from another tab and verify the Gallery updates without browser refresh, create/rename/delete an album, add/remove records through the card popover, choose albums for several cards and apply one to verify other pending choices remain, drag a card onto an album chip, search from the header inside the selected album, verify missing/deleted referenced records are omitted with status text, confirm the gallery uses the dark panel palette and privacy mode still masks URL-derived record metadata, verify queue/Recall/Recents order is unchanged, then run pCloud/full-backup restore and verify albums restore without duplicating encrypted originals."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/gallery-albums.md"
     },
     {
       "id": "host-image-projection-ownership",
       "acceptance": "Host image projection ownership",
       "repoPath": "docs/acceptance-tests/host-image-projection-ownership.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Host-Image-Projection-Ownership",
       "coverage": [
         {
           "type": "unit-dom",
@@ -732,7 +731,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/extension-smoke.spec.ts",
-          "notes": "Covers #429 end to end: ok load, 404 load (draft parks on the dead URL), double-click a recent \u2014 the projection lands and the URL editor shows the projected record's URL, not the failed draft."
+          "notes": "Covers #429 end to end: ok load, 404 load (draft parks on the dead URL), double-click a recent — the projection lands and the URL editor shows the projected record's URL, not the failed draft."
         },
         {
           "type": "unit-dom",
@@ -742,7 +741,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
-          "notes": "Covers #434 end to end: step a field into a mocked 404 (field row shows the failed marker), double-click an earlier recent \u2014 the projection lands, the URL editor follows the record, and no field renders the failed marker."
+          "notes": "Covers #434 end to end: step a field into a mocked 404 (field row shows the failed marker), double-click an earlier recent — the projection lands, the URL editor follows the record, and no field renders the failed marker."
         },
         {
           "type": "playwright-e2e",
@@ -752,20 +751,20 @@
         {
           "type": "unit-dom",
           "paths": ["tests/dom/fields-view.test.ts", "tests/projection-application-controller.test.ts"],
-          "notes": "Covers #450: a load failure always sets failedFieldId (functional re-basing + review record) and records the failure, but the visible feedback is gated by the loadFailureFeedback mode \u2014 the field ring renders only when showFieldFailure is not Mute, and the projection failure branch flashes the status error only in Alert (Display/Mute keep the prior status/message)."
+          "notes": "Covers #450: a load failure always sets failedFieldId (functional re-basing + review record) and records the failure, but the visible feedback is gated by the loadFailureFeedback mode — the field ring renders only when showFieldFailure is not Mute, and the projection failure branch flashes the status error only in Alert (Display/Mute keep the prior status/message)."
         },
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
-          "notes": "Covers #450 end to end: in Mute (default) a failed apply surfaces no red field ring and no error status, while the same failure in Alert flashes the red status + HTTP error \u2014 proving Mute suppresses real feedback rather than being a no-op."
+          "notes": "Covers #450 end to end: in Mute (default) a failed apply surfaces no red field ring and no error status, while the same failure in Alert flashes the red status + HTTP error — proving Mute suppresses real feedback rather than being a no-op."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/host-image-projection-ownership.md"
     },
     {
       "id": "panel-layout-stability",
       "acceptance": "Panel layout stability",
       "repoPath": "docs/acceptance-tests/panel-layout-stability.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Panel-Layout-Stability",
       "coverage": [
         {
           "type": "playwright-e2e",
@@ -791,13 +790,13 @@
           "notes": "Covers the Recall drawer's inline width staying clamped inside the viewport's edge padding on a narrow viewport, mirroring the CSS max-width so the Close control can't be pushed off-screen (regression: a stale 240px width floor). Header follow-up to #408: the detach control and Show/Hide hint form fixed right-hand columns (single auto margin; fixed-width hint), and Reset all availability compares resolved image URLs so a restored baseline no longer shows it when nothing changed.",
           "paths": ["tests/dom/recall-destination-view.test.ts", "tests/parsed-field-reset-baseline.test.ts"]
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/panel-layout-stability.md"
     },
     {
       "id": "target-picker-captures-only-selected-image",
       "acceptance": "Target picker captures only the selected image",
       "repoPath": "docs/acceptance-tests/target-picker-captures-only-selected-image.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Target-Picker-Captures-Only-The-Selected-Image",
       "coverage": [
         {
           "type": "playwright-e2e",
@@ -809,13 +808,13 @@
           "path": "tests/target-image.test.ts",
           "notes": "Covers target URL precedence and link-source trust boundaries: only the real trusted search-page origin can unwrap a trusted search link, page-authored base URLs cannot spoof that origin, and wrapper parameters plus direct linked-image URLs reject file:, javascript:, and data: schemes."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/target-picker-captures-only-selected-image.md"
     },
     {
       "id": "url-template-learning",
       "acceptance": "URL template learning",
       "repoPath": "docs/acceptance-tests/url-template-learning.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-URL-Template-Learning",
       "coverage": [
         {
           "type": "unit-dom",
@@ -855,13 +854,13 @@
           "path": "tests/e2e/url-editor-parsed-fields.spec.ts",
           "notes": "Covers URL editor Apply to Host button enablement, click application, and post-apply disablement (#752); parsed numeric field increment/decrement; #757 split-child overflow carry plus Reset all preserving the split; failed parsed-field loads without Recent rows; included-field Previous/Next navigation (including stepping ALL included fields together into one combined URL, #263); #758 learned-template visibility under the redacted path display contract; and close/reopen parsed-field restore for the same selected image context."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/url-template-learning.md"
     },
     {
       "id": "url-review-status-import-export",
       "acceptance": "URL review status import/export and read-only review by site",
       "repoPath": "docs/acceptance-tests/url-review-status-import-export.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-URL-Review-Status-Import-Export",
       "coverage": [
         {
           "type": "unit-dom",
@@ -889,13 +888,13 @@
           "reason": "Screen-sharing privacy and readability across real retained review histories need human visual confirmation.",
           "notes": "Open Settings > URL review history with records from at least two sites and all three statuses. Verify site/status filters, first/last/elapsed context, long URL wrapping, and Reload. Enable Privacy Mode and verify site, source/page URLs, field ids, reasons, and exact times are absent while filter controls and status categories remain usable."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/url-review-status-import-export.md"
     },
     {
       "id": "queue-recall-clear-delete",
       "acceptance": "Queue and Recall clear/delete semantics",
       "repoPath": "docs/acceptance-tests/queue-recall-clear-delete.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics",
       "coverage": [
         {
           "type": "unit-dom",
@@ -906,13 +905,13 @@
           "path": "tests/e2e/recents-queue-recall.spec.ts",
           "notes": "Covers successful image loads adding Recents, failed loads not adding Recents, durable pins persisting across panel close/reopen, Recall loading offscreen queue rows, recalled rows moving to the capped visible queue, Select all scoped to visible Recents/queue/Recall rows, and Clear results hiding Recall rows without deleting durable queue records."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/queue-recall-clear-delete.md"
     },
     {
       "id": "recents-retention-settings",
       "acceptance": "Recents retention, explicit recent-session review, and opt-in auto-pin overflow (issues #209 and #148)",
       "repoPath": "docs/acceptance-tests/recents-retention-settings.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Recents-Retention-Settings",
       "coverage": [
         {
           "type": "unit-dom",
@@ -935,13 +934,13 @@
           "path": "tests/e2e/recents-queue-recall.spec.ts",
           "notes": "Covers visible Recents being populated only by successful image loads, failed loads being excluded from the transient recent list, Visible recents limiting, Max kept recents bounding hidden session retention, Keep hidden this session retention, #209 explicitly reviewing then finishing retained session overflow without changing retention settings or creating durable queue rows, and #148 promoting overflow into a durable plaintext pin without capturing original bytes."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/recents-retention-settings.md"
     },
     {
       "id": "recents-scope-selector",
       "issue": 69,
       "acceptance": "Transient Recents page, site, and all-sites scopes",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Recents-Scope-Selector",
       "coverage": [
         {
           "type": "unit-dom",
@@ -973,13 +972,13 @@
           "reason": "Service-worker lifecycle and privacy presentation require a packaged-extension smoke check.",
           "notes": "Load images on two paths and two hostnames, verify Page/Site/All sites contents and private labels, then restart the extension service worker and verify Recents remain available while durable pins remain unchanged. Close the browser session and verify Recents clear while durable pins remain."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/recents-scope-selector.md"
     },
     {
       "id": "recents-to-queue-state-unification",
       "issue": 155,
       "acceptance": "Unified Recents-to-Queue saved state",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Queue-And-Recall-Clear-Delete-Semantics",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1004,13 +1003,13 @@
           "paths": ["tests/e2e/recents-queue-recall.spec.ts", "tests/e2e/bookmark-original-preservation.spec.ts"],
           "notes": "Covers a captured queue row moving off the visible page into Recall, then reloading the same URL into Recents with the pinned/captured state and durable actions reflected without creating duplicate controls; also verifies re-pinning a captured URL keeps its stored-original indicator."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/queue-recall-clear-delete.md"
     },
     {
       "id": "trusted-privileged-activation",
       "issue": 760,
       "acceptance": "Privileged capture and destructive UI actions require trusted user activation",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Trusted-Privileged-Activation",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1023,13 +1022,13 @@
           ],
           "notes": "Covers synthetic and trusted activation for primary, Queue, and Recent original capture; Queue repair; original deletion confirmation; Queue and Recent record deletion; destructive Backspace; bulk deletion; and C, B, and capture-configurable ArrowDown shortcuts while retaining synthetic non-destructive navigation and panel shortcuts."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/trusted-privileged-activation.md"
     },
     {
       "id": "multi-select-image-download",
       "acceptance": "Multi-select image download",
       "repoPath": "docs/acceptance-tests/multi-select-image-download.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Multi-Select-Image-Download",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1046,13 +1045,13 @@
           "path": "tests/e2e/image-utilities.spec.ts",
           "notes": "Covers current selected host-image export fallback, shifted Save As metadata, and selected Recents, visible queue, and Recall image export order."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/multi-select-image-download.md"
     },
     {
       "id": "encrypted-image-downloads",
       "acceptance": "Encrypted image downloads",
       "repoPath": "docs/acceptance-tests/encrypted-image-downloads.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Encrypted-Image-Downloads",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1073,13 +1072,13 @@
           "path": "tests/e2e/image-utilities.spec.ts",
           "notes": "Covers encrypted image JSON export, clean imported-image restore after unlock, and wrong-key or wrong-import-type failures without adding plaintext rows."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/encrypted-image-downloads.md"
     },
     {
       "id": "local-original-capture-survives-remote-loss",
       "acceptance": "Local original capture survives remote loss",
       "repoPath": "docs/acceptance-tests/local-original-capture-survives-remote-loss.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Local-Original-Capture-Survives-Remote-Loss",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1100,13 +1099,13 @@
           "paths": ["tests/e2e/image-utilities.spec.ts", "tests/e2e/storage-orphan-scan.spec.ts"],
           "notes": "Covers encrypted original setup, capture from a queue row, stored-original indicator, selected-record export preferring stored original bytes when unlocked, and isolated packaged storage-health and cleanup requests that preserve byte/count/deletion behavior while rejecting blob-store getAll and value-cursor reads."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/local-original-capture-survives-remote-loss.md"
     },
     {
       "id": "oversized-original-is-bounded",
       "acceptance": "Oversized original is bounded",
       "repoPath": "docs/acceptance-tests/oversized-original-is-bounded.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Oversized-Original-Is-Bounded",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1117,13 +1116,13 @@
           "path": "tests/e2e/image-utilities.spec.ts",
           "notes": "Covers oversized capture refusal from a pinned queue row against a generated >25 MB fixture: the failure status names the size limit, no stored-original indicator appears, the pinned record stays listed, and the Storage health originals row keeps its pre-attempt count and byte total."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/oversized-original-is-bounded.md"
     },
     {
       "id": "key-backup-restore",
       "acceptance": "Key backup restore",
       "repoPath": "docs/acceptance-tests/key-backup-restore.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Key-Backup-Restore",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1134,12 +1133,12 @@
           "path": "tests/e2e/import-export-settings.spec.ts",
           "notes": "Covers key backup export, wrong-password fail-closed import, key backup restore, and unlocking captured originals after key restore without exposing the encryption password or raw CryptoKey material in the backup JSON."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/key-backup-restore.md"
     },
     {
       "id": "encrypted-session-inactivity",
       "acceptance": "Encrypted-session inactivity and MV3 worker recovery",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Encrypted-Session-Inactivity",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1156,12 +1155,12 @@
           "path": "tests/e2e/secure-session.spec.ts",
           "notes": "Stops the real extension service worker through CDP without a keepalive, then verifies that capture restores the memory-only session key and that manual lock clears the unlocked state."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/encrypted-session-inactivity.md"
     },
     {
       "id": "secure-workspace-lock",
       "acceptance": "One opaque secure-session lock for every Image Trail workspace and record surface",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Secure-Workspace-Lock",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1183,13 +1182,13 @@
           "paths": ["tests/e2e/secure-session.spec.ts", "tests/e2e/import-export-settings.spec.ts"],
           "notes": "Covers one real extension key session across the panel, a detached Recents window, Dashboard, Gallery, and a decrypted preview tab; verifies no protected DOM remains while locked, cold-start Gallery content stays detached, failed unlock cannot flash content, key-import unlock cannot recurse through Recall rendering, cross-context unlock restores every surface, and the injected panel host is never duplicated. The packaged path also clicks the title-bar Lock workspace control after password setup."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/secure-workspace-lock.md"
     },
     {
       "id": "settings-utility-layout",
       "acceptance": "Settings utility layout",
       "repoPath": "docs/acceptance-tests/settings-utility-layout.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Settings-Utility-Layout",
       "coverage": [
         {
           "type": "storybook",
@@ -1218,13 +1217,13 @@
           ],
           "notes": "Covers #470 group ordering/open-state orchestration plus focused Display, Privacy, Automation, Utilities, and System DOM/event contracts, including bounded single dispatch, metadata preservation, preload command ordering, storage rendering, and confirmed deletion."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/settings-utility-layout.md"
     },
     {
       "id": "pcloud-provider-boundary",
       "acceptance": "pCloud provider boundary",
       "repoPath": "docs/acceptance-tests/pcloud-provider-boundary.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-pCloud-Provider-Boundary",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1256,13 +1255,13 @@
           "path": "tests/e2e/import-export-settings.spec.ts",
           "notes": "Covers the injected non-secret pCloud OAuth client id, exact application-root folder creation, mocked connect, token-hiding UI boundary, sequential encrypted part uploads with a manifest published last, persistent manifest-only backup history across disconnect and Settings rerender, restore candidate listing, and bounded restore preview without real pCloud credentials."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/pcloud-provider-boundary.md"
     },
     {
       "id": "pcloud-api-spike",
       "acceptance": "pCloud API spike",
       "repoPath": "docs/acceptance-tests/pcloud-api-spike.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-pCloud-API-Spike",
       "coverage": [
         {
           "type": "manual",
@@ -1273,13 +1272,13 @@
           "path": "tests/e2e/import-export-settings.spec.ts",
           "notes": "Covers product UI boundary behavior with mocked pCloud provider responses while live provider proof remains intentionally manual."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/pcloud-api-spike.md"
     },
     {
       "id": "bounded-neighbor-preloading",
       "acceptance": "Bounded neighbor preloading",
       "repoPath": "docs/acceptance-tests/bounded-neighbor-preloading.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Bounded-Neighbor-Preloading",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1296,7 +1295,7 @@
             "tests/dom/extension-destination-surfaces.test.tsx",
             "tests/dom/parsed-field-navigation-controller.test.ts"
           ],
-          "notes": "Includes #631 cache bounds: supported settings are 1\u2013500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Includes #627 decoded-image lifecycle coverage too: rebuild and disabled-preload paths revoke offscreen buffered blobs while transferring the still-selected display blob, final disposal revokes every retained blob, concurrent decodes that complete after disposal are revoked too, and the HTTP anchor remains untouched; DOM-backed image state is covered. Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts. Includes compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
+          "notes": "Includes #631 cache bounds: supported settings are 1–500, stored legacy 0 migrates to the safe default, and an unexpected runtime 0 evicts page-session data URLs while retaining at most 50 lightweight failure sentinels so a dead neighbor is not immediately retried. Includes #627 decoded-image lifecycle coverage too: rebuild and disabled-preload paths revoke offscreen buffered blobs while transferring the still-selected display blob, final disposal revokes every retained blob, concurrent decodes that complete after disposal are revoked too, and the HTTP anchor remains untouched; DOM-backed image state is covered. Includes the parsed-field navigation consecutive-miss short-circuit (#287): a dead run stops after max(3, neighborPreloadRadius) probes, successes reset the consecutive budget, and a 50-skip-per-drain outer net bounds queued bursts. Includes compact neighbor outcome status (#208): transient reducer history distinguishes actually traversed skips from warmed, warming, failed, and unknown live-window candidates; URL-free targeted DOM refreshes retain their section node; Mute suppresses failed/skipped counts."
         },
         {
           "type": "storybook",
@@ -1306,7 +1305,7 @@
         {
           "type": "playwright-e2e",
           "path": "tests/e2e/automation-governance.spec.ts",
-          "notes": "Covers #631 in the packaged panel: Cache exposes the 1\u2013500 range and explains the per-page-session memory bound."
+          "notes": "Covers #631 in the packaged panel: Cache exposes the 1–500 range and explains the per-page-session memory bound."
         },
         {
           "type": "unit-dom",
@@ -1333,13 +1332,13 @@
           "issue": 310,
           "notes": "Browser-level automation and request-governance coverage."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/bounded-neighbor-preloading.md"
     },
     {
       "id": "third-party-cdn-permission-flow",
       "acceptance": "Third-party CDN permission flow",
       "repoPath": "docs/acceptance-tests/third-party-cdn-permission-flow.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Third-Party-CDN-Permission-Flow",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1369,13 +1368,13 @@
           "issue": 310,
           "notes": "Request-governance E2E coverage."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/third-party-cdn-permission-flow.md"
     },
     {
       "id": "grab-mode-strategies",
       "acceptance": "Grab mode strategies",
       "repoPath": "docs/acceptance-tests/grab-mode-strategies.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Grab-Mode-Strategies",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1386,13 +1385,13 @@
           "issue": 310,
           "notes": "Browser-level retry and request-governance flows."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/grab-mode-strategies.md"
     },
     {
       "id": "storybook-ui-review",
       "acceptance": "Storybook UI review",
       "repoPath": "docs/acceptance-tests/storybook-ui-review.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Storybook-UI-Review",
       "coverage": [
         {
           "type": "storybook",
@@ -1402,13 +1401,13 @@
           "type": "manual",
           "reason": "Critique coverage still requires human review of visual hierarchy, accessibility cues, and interaction feedback."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/storybook-ui-review.md"
     },
     {
       "id": "form-control-consistency",
       "acceptance": "Form control consistency",
       "repoPath": "docs/acceptance-tests/form-control-consistency.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Form-Control-Consistency",
       "coverage": [
         {
           "type": "storybook",
@@ -1419,13 +1418,13 @@
           "paths": ["tests/form-controls.test.ts", "tests/dom/form-controls.test.ts", "tests/dom/panel-render-controller.test.ts"],
           "notes": "Covers accessible password and file-picker labeling plus native file-chooser focus, selection, cancellation, and render-time focus restoration without moving the Settings scroll position."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/form-control-consistency.md"
     },
     {
       "id": "settings-action-hierarchy",
       "acceptance": "Settings action hierarchy",
       "repoPath": "docs/acceptance-tests/settings-action-hierarchy.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Settings-Action-Hierarchy",
       "coverage": [
         {
           "type": "storybook",
@@ -1435,13 +1434,13 @@
           "type": "unit-dom",
           "path": "tests/settings-view.test.ts"
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/settings-action-hierarchy.md"
     },
     {
       "id": "row-list-visual-system",
       "acceptance": "Row and list visual system",
       "repoPath": "docs/acceptance-tests/row-list-visual-system.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Row-And-List-Visual-System",
       "coverage": [
         {
           "type": "storybook",
@@ -1461,7 +1460,7 @@
             "tests/dom/bookmarks-view.test.ts",
             "tests/dom/recall-destination-view.test.ts"
           ],
-          "notes": "Covers #426: previewing/projecting a Recents, queue, or Recall row requires a real double-click \u2014 a second click within the 500ms window on the same row previews, while a stale later click re-selects; window semantics unit-tested in the shared registerPreviewRowClick helper. Covers #446 Recents sparse-row sizing by locking the attached list to stable 120px auto rows, start-aligned grid tracks, a one-to-three-row viewport cap, viewport-only user resize, and panel scroll anchoring when sparse Recents grow above visible Queue rows."
+          "notes": "Covers #426: previewing/projecting a Recents, queue, or Recall row requires a real double-click — a second click within the 500ms window on the same row previews, while a stale later click re-selects; window semantics unit-tested in the shared registerPreviewRowClick helper. Covers #446 Recents sparse-row sizing by locking the attached list to stable 120px auto rows, start-aligned grid tracks, a one-to-three-row viewport cap, viewport-only user resize, and panel scroll anchoring when sparse Recents grow above visible Queue rows."
         },
         {
           "type": "unit-dom",
@@ -1488,25 +1487,25 @@
           "path": "tests/e2e/recents-queue-recall.spec.ts",
           "notes": "Covers #443 end to end with real layout: scroll an overflowing Recents list, Hide then Show, and assert the rebuilt list reopens at the pre-collapse scrollTop instead of jumping to the top."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/row-list-visual-system.md"
     },
     {
       "id": "m00-planning-baseline-review",
       "acceptance": "M00 planning baseline review",
       "repoPath": "docs/acceptance-tests/m00-planning-baseline-review.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-M00-Planning-Baseline-Review",
       "coverage": [
         {
           "type": "manual",
           "reason": "Planning baseline review is documentation and behavior-map inspection, not executable product behavior."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/m00-planning-baseline-review.md"
     },
     {
       "id": "detachable-sections",
       "acceptance": "Detachable sections",
       "repoPath": "docs/acceptance-tests/detachable-sections.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Detachable-Sections",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1539,7 +1538,8 @@
           ],
           "notes": "Browser-level detach/restore: floating dialog + placeholder, minimize/expand, close-to-restore with focus hand-off, drag-out placement at the drop point, Escape restore, and detached Settings following the gear toggle without duplication; #408 adds heading-surface drag-out placement and Escape mid-drag cancel. #398 adds the reload round-trip: opt in, detach + drag + minimize, reload restores the arrangement at the saved position, and Reset workspace layout reattaches everything. #520 uses disposable host fixtures to prove overlay cleanup and expose root-inset responsive/fixed failures, wrapper direct-child breakage, transform/layout divergence, and overlay fallback across responsive, fixed/sticky, feed, nested-scroll, iframe, transformed-root, fullscreen, RTL, SPA, and Shadow DOM layouts. #572 verifies that detached Recents and Queue grow for new rows until manually resized, retain that user size as rows continue, remain resizable, and reset to automatic sizing after reattachment."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/detachable-sections.md"
     },
     {
       "id": "in-panel-help-surface",
@@ -1556,13 +1556,12 @@
           "notes": "Covers help/toggle reduction, the shared shortcut registry rendering (labels come from the same source the keyboard router uses), feature-guide completeness for the major panel areas, and the privacy-inert static-copy guarantee (no URL or blob values in Help content)."
         }
       ],
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-In-Panel-Help"
+      "documentation": "docs/acceptance-tests/in-panel-help.md"
     },
     {
       "id": "searchable-metadata-privacy-policy",
-      "acceptance": "User-controlled searchable metadata privacy policy (issues #451 and #641) \u2014 policy framework, settings surface, bookmark URL indexes, and encrypted URL-derived workflow metadata",
+      "acceptance": "User-controlled searchable metadata privacy policy (issues #451 and #641) — policy framework, settings surface, bookmark URL indexes, and encrypted URL-derived workflow metadata",
       "repoPath": "docs/acceptance-tests/searchable-metadata-privacy-policy.md",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Searchable-Metadata-Privacy-Policy",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1585,7 +1584,8 @@
           "issue": 451,
           "notes": "Album-name encryption (Slice 2) remains follow-up scope. Thumbnail bytes are confirmed encrypted at rest in both durable storage paths by #573."
         }
-      ]
+      ],
+      "documentation": "docs/acceptance-tests/searchable-metadata-privacy-policy.md"
     },
     {
       "id": "display-only-recents-and-queue-ordering",
@@ -1613,12 +1613,11 @@
           "reason": "With mixed Queue rows, switch Front first and Back first, page through both directions, open Recall, and confirm Recall remains front-first while neither mode exposes private row metadata."
         }
       ],
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Tests"
+      "documentation": "docs/acceptance-tests/README.md"
     },
     {
       "id": "content-script-layout-hot-paths",
       "acceptance": "Bounded host-page layout work for context detection, target recovery, and Grab preview (issue #633)",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Testing-Strategy",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1640,12 +1639,12 @@
           "reason": "Browser performance tooling is required to inspect layout events and long tasks on real redraw-heavy and infinite-feed hosts.",
           "notes": "Profile the packaged extension on an infinite feed while appending unrelated nodes, moving across repeated Grab targets, and repeatedly redrawing a selected target. Verify context counts update for new images, pointer affordances track target changes, recovery stops after sustained unmatched churn, no continuous image-layout scan appears, and release restores host-owned state."
         }
-      ]
+      ],
+      "documentation": "docs/testing-strategy.md"
     },
     {
       "id": "page-context-detection-and-override",
       "acceptance": "Automatic Single image, Gallery page, and Feed detection with capability-aware per-host override (issue #517)",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Page-Context-Capability-Matrix",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1673,7 +1672,8 @@
           "reason": "Detection quality must be checked in a release build, while the feature-gated switcher needs a separate explicit flagged-build review against representative real-world markup.",
           "notes": "Release build: open one standalone image, one multi-image gallery, and one infinite feed; verify the switcher is absent, saved legacy overrides are ignored, and automatic labels, target badges, Grab availability/hints, and SPA transitions remain correct. Flagged build (`IMAGE_TRAIL_ENABLE_PAGE_CONTEXT_SWITCHER=1`): verify enabled overrides, reset-to-automatic behavior, reload persistence, keyboard focus, and pixel fidelity against handoff screenshots 08 and 09 without exposing URL evidence."
         }
-      ]
+      ],
+      "documentation": "docs/page-context-capability-matrix.md"
     },
     {
       "id": "context-destination-dock-and-routing",
@@ -1716,12 +1716,11 @@
           "notes": "At 924x540 and 360x740, compare all four populated routes against screenshots 04 through 07. Verify the active indicator, header and close chrome, 420px overlay geometry, primary workflow behind the surface, selected/stored-original hierarchy, generic privacy copy, visible keyboard focus, scroll restoration, reduced motion, and no full-panel flicker during Recall refresh."
         }
       ],
-      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System"
+      "documentation": "docs/design-system.md"
     },
     {
       "id": "context-extension-page-destinations",
       "acceptance": "Self-contained Dashboard, Gallery, Recall, and Settings extension-page destinations (issue #518)",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Design-System",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1749,24 +1748,24 @@
           "reason": "Browser chrome and final visual fidelity against the supplied real-tab references require a packaged-extension inspection.",
           "notes": "Open each destination from the panel at 924x540 and 360x740. Compare the real browser tab against handoff screenshots 02 and 04 through 07; verify no faux browser chrome, source return and source-closed states, keyboard focus, privacy masking, reload and duplicate-tab behavior, reduced motion, no horizontal overflow, and no failed stylesheet requests."
         }
-      ]
+      ],
+      "documentation": "docs/design-system.md"
     },
     {
       "id": "image-preview-backdrop-no-flash",
       "acceptance": "Image preview backdrop applies instantly without a transition flash (issue #456)",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Acceptance-Test-Image-Preview-Backdrop-No-Flash",
       "coverage": [
         {
           "type": "unit-dom",
           "paths": ["tests/dom/page-style.test.ts"],
           "notes": "Covers neutralizing the selected image's transition while it is darkened so Chrome's standalone image-viewer grey->black background-color transition cannot animate/flash the backdrop (worst in fit/letterboxed mode), and restoring the original transition last on release so it cannot flash on close either. Page/element restore stays verbatim (tests/page-style.test.ts)."
         }
-      ]
+      ],
+      "documentation": "tests/dom/page-style.test.ts"
     },
     {
       "id": "indexeddb-open-recovery",
       "acceptance": "Blocked or failed IndexedDB opens recover on a later request without restarting the extension worker (issue #637)",
-      "wiki": "https://github.com/qwts/image-trail/wiki/Testing-Strategy",
       "coverage": [
         {
           "type": "unit-dom",
@@ -1783,7 +1782,8 @@
           "reason": "Chrome owns the real unpacked-extension update and long-lived page lifecycle.",
           "notes": "Keep an older Gallery or preview page open across a database-version update, trigger a storage-backed action and confirm its bounded unavailable state, close the old page, then retry the action without reloading or terminating the service worker. Verify the existing durable key and queue remain intact and no repeated Database unavailable state persists."
         }
-      ]
+      ],
+      "documentation": "docs/testing-strategy.md"
     }
   ]
 }

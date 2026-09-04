@@ -1,8 +1,6 @@
 # Contributing to Image Trail
 
-The canonical contributor and agent workflow guide lives in the GitHub wiki:
-
-- [Contributing](https://github.com/qwts/image-trail/wiki/Contributing)
-
-This repository file is retained as a pointer for GitHub and existing links.
-Update the wiki page, not this stub.
+The canonical contributor and agent workflow guide lives at
+[`docs/contributing.md`](docs/contributing.md). Read it before starting tracked
+work. For the fastest onboarding reference, [`AGENTS.md`](AGENTS.md) summarizes
+the repo-specific working agreement and validation flow.

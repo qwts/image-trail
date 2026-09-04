@@ -1,7 +1,57 @@
 # Local Original Capture Survives Remote Loss
 
-This documentation now lives in the GitHub wiki:
+Purpose: verify that an explicitly captured original image is stored locally in extension-owned durable storage and remains displayable without the remote source.
 
-- [Local Original Capture Survives Remote Loss](https://github.com/qwts/image-trail/wiki/Acceptance-Test-Local-Original-Capture-Survives-Remote-Loss)
+## Steps
 
-This repository file is kept only as a pointer for existing links. Update the wiki page, not this stub.
+1. Open a fixture page with exactly one qualifying image.
+2. Click the extension action.
+3. Verify the panel injects and auto-selects the image.
+4. Click `Capture`.
+5. Verify the extension stores a durable metadata/history record.
+6. Verify the extension stores the original image bytes in IndexedDB, with byte-size metadata available for storage usage reporting.
+7. Close and reopen the browser, or otherwise restart the extension context.
+8. Open the extension panel.
+9. Verify the captured image appears from local durable storage.
+10. Disable network access or remove the remote image from the fixture server.
+11. Verify the captured image still displays locally.
+12. Delete the captured image.
+13. Verify the storage record, local blob, thumbnail if present, and related key references are removed or marked according to the final deletion policy.
+
+## Recent Pin/Capture Coverage
+
+1. Load an image so it appears in Recent history.
+2. Use `Pin` on the recent row.
+3. Verify the row is added to the bookmark queue as a durable pin.
+4. Verify the recent row remains transient but shows it is pinned to the queue.
+5. Verify the recent row no longer offers the duplicate `Pin` action.
+6. Load another image into Recent history, unlock encrypted storage, then use `Capture` on the recent row.
+7. Verify capture also adds the row to the bookmark queue with the captured-original link intact.
+8. Verify the recent row remains transient but shows both pinned/bookmarked and captured-original state.
+9. Verify the captured row no longer offers duplicate `Pin` or `Capture` actions.
+10. Reload the panel during the same extension session.
+11. Verify the captured bookmark remains in the queue and can preview/download from the stored original when unlocked.
+
+## Missing-Original Repair Coverage
+
+1. Create three durable queue pins: one with a present encrypted original, one with stored-original metadata whose encrypted blob has been removed, and one without stored-original metadata.
+2. Record each pin's queue order and `queueUpdatedAt`.
+3. Unlock encrypted storage, select all three rows, and choose `Repair selected originals`.
+4. Verify the present original is not re-captured.
+5. Verify the metadata-only and missing-blob originals are captured and linked to their existing durable pins.
+6. Verify queue order and every `queueUpdatedAt` remain unchanged.
+7. Repeat with a cross-origin missing original that needs optional permission.
+8. Verify repair pauses at the permission boundary, names the required origin, and retains the normal grant-and-retry action.
+9. Grant permission and retry, then verify the selected pin receives the captured original without moving in the queue.
+10. Replace a referenced original row with a thumbnail row using the same blob ID, then repeat repair.
+11. Verify the row is treated as missing and re-captured instead of being reported as already present.
+12. Repeat with a malformed blob row that fails stored-original schema validation and verify the same missing/repair behavior.
+
+## Expected Result
+
+- The image is not dependent on the original remote URL after capture.
+- The UI does not report success until durable metadata and local bytes are both written.
+- Storage usage counts and byte totals reflect the capture and deletion.
+- Pinning a recent persists only the chosen row, while capturing a recent persists both the durable pin/bookmark metadata and the linked original bytes.
+- Successful Pin and Capture actions keep visible recent rows honest by showing durable pin/capture state and removing duplicate primary actions without making Recents durable memory.
+- Repair checks only selected durable pins through the schema-valid original-presence index, never loads or serializes ciphertext during verification, treats thumbnail and malformed rows as missing, does not duplicate present originals, and preserves queue order while restoring missing originals through the normal permission-aware capture path.

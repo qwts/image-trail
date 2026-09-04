@@ -1,7 +1,88 @@
 # ADR-0001: Automation Check Governance
 
-This documentation now lives in the GitHub wiki:
+## Status
 
-- [ADR-0001: Automation Check Governance](https://github.com/qwts/image-trail/wiki/ADR-0001-Automation-Check-Governance)
+Accepted
 
-This repository file is kept only as a pointer for existing links. Update the wiki page, not this stub.
+## Context
+
+Image Trail relies on automation checks to catch regressions before merge:
+formatting, linting, unit tests, builds, CodeQL, and future targeted quality gates.
+As PRs and review cleanup grow, the project needs one repo-versioned place to track
+why each automation check exists, which use cases it protects, and when PR authors
+must update documentation before merging.
+
+This ADR applies to repository automation and review gates. Product automation
+features such as slideshow, retry, preload, and request throttling are covered by
+the M08 user story and implementation docs.
+
+## Decision
+
+Automation check decisions must be tracked in ADRs when they affect merge
+requirements, CI behavior, security review, repository ownership, or the expected
+local verification flow.
+
+Every PR author must complete a documentation review before merge:
+
+- If the PR changes behavior, architecture, storage, security boundaries, or CI
+  expectations, update the relevant repo doc, user story, acceptance test, or ADR.
+- If no documentation update is needed, state that in the PR description with a
+  short reason.
+- If a reviewer identifies a missing document update, resolve it before merge or
+  defer it to a linked issue with rationale.
+
+The PR template must keep documentation review visible beside testing so it is not
+treated as optional cleanup after approval.
+
+## Automation Check Use Cases
+
+| Check                  | Protected use case                                                                                      | Documentation update trigger                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `npm run format:check` | Prevent formatting-only churn and unreviewable diffs.                                                   | Formatter rules or generated-file expectations change.                            |
+| `npm run lint`         | Catch unsafe TypeScript, unused code, and policy drift before review.                                   | Lint rules, allowed exceptions, or module-boundary conventions change.            |
+| `npm test`             | Protect parser, crypto, storage, UI state, request governance, and import/export behavior.              | Test coverage expectations or regression fixtures change.                         |
+| `npm run build`        | Verify the extension can compile and package source assets.                                             | Build pipeline, module format, manifest handling, or asset-copy behavior changes. |
+| `npm run test:e2e`     | Protect the browser-extension smoke harness and keep manual acceptance coverage mapped to owned checks. | Playwright specs, E2E fixtures, CI browser setup, or coverage-map entries change. |
+| CodeQL                 | Catch security and dependency-analysis findings before merge.                                           | Security posture, ignored findings, or required query coverage changes.           |
+| CODEOWNERS review      | Keep governance files and broad repo changes under owner review.                                        | Ownership rules, protected branches, or required reviewer policy changes.         |
+
+## Playwright E2E Gate
+
+Playwright E2E is a maintained merge gate for the extension harness. CI installs the Chromium browser
+only for the post-build browser-test phase, then runs `npm run test:e2e` before Storybook interaction
+tests. The default `npm test` command remains unit/DOM focused and must not absorb Playwright unless a
+future issue explicitly changes the local default.
+
+The E2E gate includes `tests/e2e/coverage-map.json`, validated by
+`scripts/check-e2e-coverage-map.mjs`. The map links canonical manual acceptance flows to one or more
+owned coverage sources: Playwright E2E, Storybook, unit/DOM tests, intentional manual coverage, or a
+deferred linked issue. Deleting a Playwright spec or referencing a missing repo path must fail
+`npm run test:e2e` until the map is updated.
+
+## Issue Close-Out Automation
+
+Development is trunk-based on `main`, which is also the repository default
+branch. GitHub auto-closes issues from standard closing keywords when a PR
+merges into `main`.
+
+The `Close linked issues` workflow still runs on merged PRs into `main` as
+explicit close-out automation. It parses the merged PR body for standard
+closing keywords, closes same-repo referenced issues, comments with the merged
+PR number and target branch, and removes stale leading `[WIP]` issue-title
+markers. PR authors must keep explicit closing keywords in PR bodies because
+the workflow uses them as the source of truth.
+
+## Consequences
+
+- PRs should be blocked from merge when docs are stale for the behavior being
+  reviewed.
+- Small PRs remain small by documenting follow-up decisions in linked issues or
+  ADR updates instead of expanding unrelated implementation scope.
+- Review comments that are intentionally ignored or deferred must leave an audit
+  trail in the PR, linked issue, or ADR.
+
+## Follow-Up Decisions To Track
+
+- Whether to add a single `npm run ci` command that mirrors GitHub Actions.
+- Whether branch protection should require CODEOWNERS review on `main`.
+- Whether future automation checks need their own ADRs or can extend this record.

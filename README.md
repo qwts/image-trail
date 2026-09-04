@@ -77,22 +77,17 @@ ships the built MV3 service worker/content-script bundle from `extension/dist/`.
 
 ## Documentation
 
-Canonical long-lived documentation lives in the GitHub wiki, with root
-`DESIGN.md` as the design-editor exception:
+Canonical documentation lives in source-controlled markdown under `docs/`:
 
-- [Image Trail Wiki](https://github.com/qwts/image-trail/wiki)
-- [Contributing](https://github.com/qwts/image-trail/wiki/Contributing)
-- [Testing Strategy](https://github.com/qwts/image-trail/wiki/Testing-Strategy)
-- [Acceptance Tests](https://github.com/qwts/image-trail/wiki/Acceptance-Tests)
-- [User Stories](https://github.com/qwts/image-trail/wiki/User-Stories)
-- [Repo Documentation Pointer Map](https://github.com/qwts/image-trail/wiki/Repo-Documentation-Pointer-Map)
+- [Contributing](docs/contributing.md)
+- [Testing Strategy](docs/testing-strategy.md)
+- [Versioning and Releases](docs/versioning-and-releases.md)
+- [Privacy and Permissions Review](docs/privacy-and-permissions-review.md)
 - [Design brief](DESIGN.md)
+- [Acceptance Tests](docs/acceptance-tests/README.md)
+- [User Stories](docs/user-stories/README.md)
+- [Architecture Decision Records](docs/adr/README.md)
 - [Versioning automation planning](https://github.com/qwts/image-trail/issues/387)
-
-Repository markdown files are pointer stubs unless they are agent instruction
-files, `README.md`, `CONTRIBUTING.md`, root `DESIGN.md`, or GitHub issue and
-pull request templates. Update the wiki page linked from a stub, not the stub
-itself.
 
 ## Validation
 
@@ -138,6 +133,6 @@ when product-facing capabilities, install/build instructions, validation
 commands, or release/versioning expectations change.
 
 Detailed SOPs, ADRs, acceptance criteria, test strategy, implementation notes,
-and fast-moving planning details belong in the wiki. If a PR changes behavior
-that affects this README but intentionally does not update it, the PR should
-state why.
+and planning details are versioned with the code under `docs/`. If a PR changes
+behavior that affects this README but intentionally does not update it, the PR
+should state why.
