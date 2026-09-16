@@ -260,10 +260,7 @@ test('version-cut keeps dependency code off the clean token-bearing runner', () 
   );
   const refreshStep = publishJob.slice(publishJob.indexOf('- name: Create or refresh the ready version PR'));
 
-  assert.match(
-    prepareJob,
-    /uses: qwts\/qwts-agent-ci\/\.github\/actions\/bounded-command@3a5617b287d922e37f262210a1d8750d8217b56d/u,
-  );
+  assert.match(prepareJob, /uses: qwts\/qwts-agent-ci\/\.github\/actions\/bounded-command@3a5617b287d922e37f262210a1d8750d8217b56d/u);
   assert.match(prepareJob, /arguments-json: '\["ci"\]'/u);
   assert.match(prepareJob, /npm run changeset:version/u);
   assert.match(prepareJob, /actions\/upload-artifact@[0-9a-f]{40} # v7\.0\.1/u);
