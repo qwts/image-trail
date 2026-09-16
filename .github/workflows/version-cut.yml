@@ -60,7 +60,7 @@ jobs:
     needs: policy
     if: needs.policy.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 32
     outputs:
       ready: ${{ steps.version.outputs.ready }}
     steps:
