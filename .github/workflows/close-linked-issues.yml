@@ -21,7 +21,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: qwts/playbook-engineering/.github/actions/ci-policy@f9250d2c515d7b8b86834d0b7d2feef90ae3eed1 # zizmor: ignore[stale-action-refs]
+      - uses: qwts/qwts-agent-ci/.github/actions/ci-policy@3a5617b287d922e37f262210a1d8750d8217b56d # zizmor: ignore[stale-action-refs]
         with:
           authorization-only: 'true'
 
