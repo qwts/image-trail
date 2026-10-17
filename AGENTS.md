@@ -38,7 +38,6 @@ and `eslint.config.js` enforce the highest-risk boundaries.
 | Data, IndexedDB, crypto, queue ordering              | [data context](extension/src/data/AGENTS.md)                                                                              |
 | UI rendering and interaction traps                   | [UI context](extension/src/ui/AGENTS.md)                                                                                  |
 | Guarded local processes and isolation                | [docs/agent-process-guard.md](docs/agent-process-guard.md)                                                                |
-| Claude-specific enforcement                          | [docs/claude-code-environment.md](docs/claude-code-environment.md)                                                        |
 | Full validation and invariant report                 | [.agents/skills/source-command-check/SKILL.md](.agents/skills/source-command-check/SKILL.md)                              |
 | Agent primitive inventory and eval cases             | [.agents/governance.json](.agents/governance.json) and [.agents/evals/golden-tasks.json](.agents/evals/golden-tasks.json) |
 
