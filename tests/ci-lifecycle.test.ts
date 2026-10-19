@@ -22,8 +22,8 @@ test('CI exposes only the governed lifecycle triggers and skips every draft job'
 test('CI loads immutable actor policy and scopes obsolete-run cancellation to PR or queue identity', () => {
   const ci = workflow('ci.yml');
 
-  assert.match(ci, /uses: qwts\/qwts-agent-ci\/\.github\/actions\/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a/u);
-  assert.equal(ci.match(/qwts\/qwts-agent-ci\/\.github\/actions\/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a/gu)?.length, 1);
+  assert.match(ci, /uses: true-line\?/trueline-agent-ci\/\.github\/actions\/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a/u);
+  assert.equal(ci.match(/true-line\?/trueline-agent-ci\/\.github\/actions\/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a/gu)?.length, 1);
   assert.match(ci, /format\('pr-\{0\}', github\.event\.pull_request\.number\)/u);
   assert.match(ci, /format\('merge-group-\{0\}', github\.event\.merge_group\.head_ref\)/u);
   assert.match(ci, /cancel-in-progress: \$\{\{ github\.event_name != 'push' \}\}/u);
@@ -81,7 +81,7 @@ test('every direct workflow entry point authorizes the actor before repository w
     assert.match(source, /name: Action Policy/u, `${file} must define an actor-policy job`);
     assert.match(
       source,
-      /uses: qwts\/qwts-agent-ci\/\.github\/actions\/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a/u,
+      /uses: true-line\?/trueline-agent-ci\/\.github\/actions\/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a/u,
       `${file} must use the reviewed immutable policy`,
     );
     assert.match(source, /authorization-only: 'true'/u, `${file} must select authorization-only mode`);
@@ -94,7 +94,7 @@ test('workflow installers and runner jobs are bounded by the governed runtime co
     .join('\n');
 
   assert.doesNotMatch(sources, /^\s*run: (?:npm (?:ci|clean-install)|npm --prefix .* clean-install|npx playwright install)/gmu);
-  assert.match(sources, /uses: qwts\/qwts-agent-ci\/\.github\/actions\/bounded-command@87c6b301057992f79a723f63c64624bf40c9d06a/u);
+  assert.match(sources, /uses: true-line\?/trueline-agent-ci\/\.github\/actions\/bounded-command@87c6b301057992f79a723f63c64624bf40c9d06a/u);
   assert.match(sources, /arguments-json: '\["ci"\]'/u);
   assert.match(sources, /arguments-json: '\["playwright","install","--with-deps","chromium"\]'/u);
   assert.match(sources, /timeout-minutes:/u);
