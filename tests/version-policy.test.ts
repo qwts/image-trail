@@ -390,7 +390,7 @@ test('no workflow that carries repository automation credentials can reach a thi
     if (!workflow.includes('CHORES_DUMB_PRIVATE_KEY')) continue;
     const foreign = [...workflow.matchAll(/^\s*uses: (?<action>[^@\s]+)/gmu)]
       .map((match) => match.groups?.['action'] ?? '')
-      .filter((action) => !action.startsWith('actions/') && action !== 'qwts/qwts-agent-ci/.github/actions/bounded-command');
+      .filter((action) => !action.startsWith('actions/') && action !== 'true-line/trueline-agent-ci/.github/actions/bounded-command');
     assert.deepEqual(foreign, [], `${file} passes a third-party action into a credential-bearing workflow`);
   }
 });
