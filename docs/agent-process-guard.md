@@ -57,13 +57,18 @@ details — never call them directly.
 
 ## Enforcement by environment
 
+> Harness configuration was removed from this repository
+> (qwts/qwts-agent-sop#89): hooks, rules, and settings now live in each
+> harness's user directory (`~/.<harness>`), installed by the agent identity
+> runtime. The per-environment sections below record the hook design that
+> user-directory configuration implements; the repository-side enforcement
+> that remains in every environment is the guarded npm entrypoints
+> (`scripts/run-guarded.mjs`). Verify with `npm run check:agent-env`, which
+> now asserts the harness paths stay absent from the repo.
+
 ### Claude Code (#671)
 
-Full environment record: `docs/claude-code-environment.md` (settings
-architecture, permissions posture, hook lifecycle decisions, sandbox
-evaluation, isolation surfaces, and the reproducible bootstrap).
-
-`.claude/settings.json` registers a `PreToolUse` hook on `Bash`
+The `PreToolUse` hook on `Bash`
 (`scripts/guard-agent-command.mjs --protocol=claude`) that denies direct
 `node --test`, `.test-dist` execution, `playwright test`, `test-storybook`, `vitest`,
 `c8`, `:run`/`:inner` scripts, and agent use of `IMAGE_TRAIL_GUARD_DISABLE`,
@@ -78,22 +83,21 @@ terminal, IDE integration, and headless runs alike because project settings
 are checked in. Background-shell etiquette (poll or terminate a live command
 before starting another) is enforced mechanically by the worktree lock: a
 second guarded run refuses to start while one is active.
-`npm run check:agent-env` (in `npm run ci`) fails the build if any of this
-wiring drifts.
+`npm run check:agent-env` (in `npm run ci`) fails the build if harness
+configuration returns to the repository.
 
 ### Cursor (#673)
 
-`.cursor/hooks.json` (`beforeShellExecution`, same script with
-`--protocol=cursor`) blocks agent-issued unguarded commands;
-`.cursor/rules/process-guard.mdc` (`alwaysApply`) carries the written rule.
-Cursor inherits the VS Code task definitions below, and the worktree lock
+The user-directory Cursor hook (`beforeShellExecution`, same script with
+`--protocol=cursor`) blocks agent-issued unguarded commands; the written rule
+lives with that user-directory configuration. The worktree lock
 prevents overlapping agent retries. Hooks are a recent Cursor feature — if a
 Cursor version does not honor them, the npm scripts themselves are still
 guarded; only the direct-binary bypass reopens.
 
 ### VS Code (#672)
 
-`.vscode/tasks.json` defines the test tasks on top of the guarded npm scripts,
+Editor task definitions, where a harness provides them, define test tasks on top of the guarded npm scripts,
 so the task runner, npm-scripts explorer, and anything else that shells out to
 `npm run …` is guarded with no extra configuration. Stopping a task sends the
 usual signals, which the guard forwards to the whole group. A raw integrated
@@ -104,14 +108,13 @@ bypass, mitigated by the scripts being guard-by-default.
 
 An earlier revision of this section claimed Codex had no project-scoped
 command hook. That is out of date: current Codex (Desktop 0.145.x /
-CLI 0.144.x, July 2026) loads a repo-side `.codex/` policy layer for trusted
-projects, and the incident forensics (`~/.codex/process_manager/
+CLI 0.144.x, July 2026) loads a user-directory policy layer, and the incident forensics (`~/.codex/process_manager/
 chat_processes.json`) show the incident session composed **raw
 `node --import … --test` commands**, bypassing the npm scripts entirely — so
 guarded scripts alone were never sufficient for Codex. Enforcement is now
 three mechanical layers plus the written rules:
 
-1. **execpolicy rules** — `.codex/rules/process-guard.rules` hard-forbids the
+1. **execpolicy rules** — the user-directory Codex rules hard-forbid the
    clean argv prefixes (`node --test`, `npx playwright test`, `c8`,
    `test-storybook`, `vitest`, every `:run`/`:inner` script, headed e2e) with
    `decision = "forbidden"`; the most restrictive decision wins, so a
@@ -120,7 +123,7 @@ three mechanical layers plus the written rules:
    raw-runner workaround. Prefix matching cannot see argument-order variants
    (`node --import … --test`) or unsplittable `bash -lc` wrappers — layer 2
    covers those. Validate with
-   `codex execpolicy check --rules .codex/rules/process-guard.rules -- <cmd…>`.
+   `codex execpolicy check --rules <user-directory rules> -- <cmd…>`.
 2. **PreToolUse hook** — `.codex/hooks.json` runs
    `scripts/guard-agent-command.mjs --protocol=codex` (same regexes as the
    Claude/Cursor protocols; Codex argv arrays are joined before matching) and
