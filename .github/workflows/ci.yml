@@ -144,7 +144,7 @@ jobs:
           # The default GITHUB_TOKEN is scoped to this repository, so a
           # checkout of a sibling private repository 404s. An empty secret
           # falls back to github.token, so this stays backwards compatible.
-          token: ${{ secrets.CROSS_REPO_TOKEN }}
+          token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
           ref: 723729d50d63af085502e68cc1377c54a85f1595
           path: node_modules/.interop-photos
           persist-credentials: false
