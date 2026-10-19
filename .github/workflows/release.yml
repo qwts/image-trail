@@ -34,7 +34,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: qwts/qwts-agent-ci/.github/actions/ci-policy@3a5617b287d922e37f262210a1d8750d8217b56d # zizmor: ignore[stale-action-refs]
+      - uses: qwts/qwts-agent-ci/.github/actions/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a # zizmor: ignore[stale-action-refs]
         with:
           authorization-only: 'true'
 
@@ -125,7 +125,7 @@ jobs:
           package-manager-cache: false
 
       - name: Install dependencies
-        uses: qwts/qwts-agent-ci/.github/actions/bounded-command@3a5617b287d922e37f262210a1d8750d8217b56d # zizmor: ignore[stale-action-refs]
+        uses: qwts/qwts-agent-ci/.github/actions/bounded-command@87c6b301057992f79a723f63c64624bf40c9d06a # zizmor: ignore[stale-action-refs]
         with:
           task: Install locked release dependencies
           executable: npm
@@ -138,13 +138,17 @@ jobs:
       - name: Checkout pinned Overlook acceptance evidence
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: qwts/overlook
+          repository: true-line/overlook
+          # The default GITHUB_TOKEN is scoped to this repository, so a
+          # checkout of a sibling private repository 404s. An empty secret
+          # falls back to github.token, so this stays backwards compatible.
+          token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
           ref: 723729d50d63af085502e68cc1377c54a85f1595
           path: node_modules/.interop-photos
           persist-credentials: false
 
       - name: Install Playwright browser
-        uses: qwts/qwts-agent-ci/.github/actions/bounded-command@3a5617b287d922e37f262210a1d8750d8217b56d # zizmor: ignore[stale-action-refs]
+        uses: qwts/qwts-agent-ci/.github/actions/bounded-command@87c6b301057992f79a723f63c64624bf40c9d06a # zizmor: ignore[stale-action-refs]
         with:
           task: Install Playwright Chromium for release validation
           executable: npx

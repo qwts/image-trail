@@ -6,10 +6,15 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 const ROOT_INSTRUCTION_MAX_LINES = 100;
-const ADAPTERS = [
-  { path: 'CLAUDE.md', maxLines: 20 },
-  { path: '.github/copilot-instructions.md', maxLines: 40 },
-  { path: '.cursor/rules/process-guard.mdc', maxLines: 20 },
+// Harness adapters/settings were removed (qwts/qwts-agent-sop#89): these
+// paths must not exist in the repository.
+const FORBIDDEN_HARNESS_PATHS = [
+  'CLAUDE.md',
+  '.github/copilot-instructions.md',
+  '.cursor/rules/process-guard.mdc',
+  '.claude/settings.json',
+  '.claude/commands/check.md',
+  '.claude/commands/release.md',
 ];
 const DIRECTORY_INSTRUCTIONS = ['extension/src/data/AGENTS.md', 'extension/src/ui/AGENTS.md'];
 const BROAD_ALLOW_PATTERNS = [
@@ -28,16 +33,6 @@ const OUTWARD_ALLOW_PATTERNS = [
   /^Bash\(gh issue (?:comment|create|develop|edit)/u,
   /^Bash\(gh pr (?:comment|create|merge|ready|review)/u,
   /^Bash\(gh (?:release|workflow run|run rerun)/u,
-];
-const REQUIRED_ASK_PREFIXES = [
-  'Bash(npm publish',
-  'Bash(npm run package:release',
-  'Bash(git push',
-  'Bash(gh issue comment',
-  'Bash(gh pr create',
-  'Bash(gh pr merge',
-  'Bash(gh release ',
-  'Bash(gh workflow run',
 ];
 const REQUIRED_SOURCE_CHECK_GATES = [
   'npm run lint',
@@ -144,8 +139,7 @@ function validateInventory(root, governance, add) {
   add('AGENTS.md is the canonical instruction file', governance.canonicalInstructions === 'AGENTS.md');
 
   const declaredAdapters = (governance.vendorAdapters ?? []).map((entry) => entry.path).sort();
-  const expectedAdapters = ADAPTERS.map((entry) => entry.path).sort();
-  add('vendor adapter inventory matches the repository', JSON.stringify(declaredAdapters) === JSON.stringify(expectedAdapters));
+  add('vendor adapter inventory is empty (harness adapters removed)', JSON.stringify(declaredAdapters) === JSON.stringify([]));
 
   const declaredDirectories = [...(governance.directoryInstructions ?? [])].sort();
   add(
@@ -171,34 +165,9 @@ function validateInventory(root, governance, add) {
   add('golden-task evaluation path is declared', governance.evaluationSet === '.agents/evals/golden-tasks.json');
 }
 
-function validatePermissions(settings, add) {
-  const broad = findBroadAllows(settings);
-  add('Claude allows contain no command-family wildcards', broad.length === 0, broad.join(', '));
-
-  const outward = findOutwardAllows(settings);
-  add('outward and history-changing commands are not pre-approved', outward.length === 0, outward.join(', '));
-
-  const ask = Array.isArray(settings?.permissions?.ask) ? settings.permissions.ask : [];
-  const missingAsk = REQUIRED_ASK_PREFIXES.filter((prefix) => !ask.some((rule) => rule.startsWith(prefix)));
-  add('outward operations retain ask checkpoints', missingAsk.length === 0, missingAsk.join(', '));
-
-  const deny = Array.isArray(settings?.permissions?.deny) ? settings.permissions.deny : [];
-  const headedDenied = ['test:e2e:ui', 'test:e2e:headed'].every((name) => deny.some((rule) => rule.includes(name)));
-  add('focus-stealing browser modes remain denied', headedDenied);
-}
-
-function validateAdapters(root, add, scannedFiles) {
-  const duplicateHeadings = /## (?:Product Model|Storage Rules|Branch And GitHub Hygiene|Documentation And Validation)/u;
-  for (const adapter of ADAPTERS) {
-    const absolutePath = path.join(root, adapter.path);
-    const exists = existsSync(absolutePath);
-    add(`${adapter.path} exists`, exists);
-    if (!exists) continue;
-    const text = readFileSync(absolutePath, 'utf8');
-    scannedFiles.add(adapter.path);
-    add(`${adapter.path} points to AGENTS.md`, /AGENTS\.md/u.test(text));
-    add(`${adapter.path} stays within ${adapter.maxLines} lines`, countLines(text) <= adapter.maxLines);
-    add(`${adapter.path} does not duplicate shared instruction sections`, !duplicateHeadings.test(text));
+function validateAdapters(root, add, _scannedFiles) {
+  for (const file of FORBIDDEN_HARNESS_PATHS) {
+    add(`${file} absent (harness configuration lives in the user directory)`, !existsSync(path.join(root, file)));
   }
 }
 
@@ -212,7 +181,7 @@ function validateSecrets(root, scannedFiles, add) {
 export function validateAgentPrimitives(root = process.cwd()) {
   const checks = [];
   const add = (label, ok, detail = '') => checks.push({ label, ok, detail });
-  const scannedFiles = new Set(['AGENTS.md', '.claude/settings.json']);
+  const scannedFiles = new Set(['AGENTS.md']);
 
   const rootInstructions = readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
   add(`AGENTS.md stays within ${ROOT_INSTRUCTION_MAX_LINES} lines`, countLines(rootInstructions) <= ROOT_INSTRUCTION_MAX_LINES);
@@ -232,13 +201,6 @@ export function validateAgentPrimitives(root = process.cwd()) {
   const deepClaudeFiles = listFiles(root, 'extension/src').filter((file) => file.endsWith('/CLAUDE.md'));
   add('directory guidance is vendor-neutral', deepClaudeFiles.length === 0, deepClaudeFiles.join(', '));
 
-  const checkCommand = readFileSync(path.join(root, '.claude/commands/check.md'), 'utf8');
-  scannedFiles.add('.claude/commands/check.md');
-  add(
-    'check command delegates to the canonical source-command skill',
-    checkCommand.includes('.agents/skills/source-command-check/SKILL.md'),
-  );
-
   const sourceCheckSkillPath = '.agents/skills/source-command-check/SKILL.md';
   const sourceCheckSkill = readFileSync(path.join(root, sourceCheckSkillPath), 'utf8');
   scannedFiles.add(sourceCheckSkillPath);
@@ -248,13 +210,6 @@ export function validateAgentPrimitives(root = process.cwd()) {
     missingSourceCheckGates.length === 0,
     missingSourceCheckGates.join(', '),
   );
-
-  const releaseCommand = readFileSync(path.join(root, '.claude/commands/release.md'), 'utf8');
-  scannedFiles.add('.claude/commands/release.md');
-  add('release command delegates to the canonical release runbook', releaseCommand.includes('docs/versioning-and-releases.md') && !releaseCommand.includes('wiki/Versioning-and-Releases'));
-
-  const settings = readJson(root, '.claude/settings.json');
-  validatePermissions(settings, add);
 
   const governance = readJson(root, '.agents/governance.json');
   scannedFiles.add('.agents/governance.json');
