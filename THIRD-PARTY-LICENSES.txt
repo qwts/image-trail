@@ -289,7 +289,7 @@ mpegts.js@1.8.2 — Apache-2.0
    limitations under the License.
 
 ==============================================================================
-react@19.2.8 — MIT
+react@19.3.0 — MIT
 ==============================================================================
 
 MIT License
@@ -315,7 +315,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ==============================================================================
-react-dom@19.2.8 — MIT
+react-dom@19.3.0 — MIT
 ==============================================================================
 
 MIT License
@@ -341,7 +341,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ==============================================================================
-scheduler@0.27.0 — MIT
+scheduler@0.28.0 — MIT
 ==============================================================================
 
 MIT License
@@ -367,7 +367,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ==============================================================================
-valibot@1.4.2 — MIT
+valibot@1.5.0 — MIT
 ==============================================================================
 
 MIT License
