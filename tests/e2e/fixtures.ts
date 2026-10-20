@@ -8,6 +8,7 @@ interface ExtensionFixtures {
   extensionId: string;
   serviceWorker: Worker;
   page: Page;
+  extensionContext: BrowserContext;
 }
 
 export interface ExtensionDownloadRequest {
@@ -15,10 +16,6 @@ export interface ExtensionDownloadRequest {
   readonly filename?: string;
   readonly saveAs?: boolean;
   readonly conflictAction?: string;
-}
-
-interface ExtensionWorkerFixtures {
-  extensionContext: BrowserContext;
 }
 
 export interface PersistentExtensionSession {
@@ -80,10 +77,17 @@ function extensionIdFromWorker(worker: Worker): string {
   return extensionId;
 }
 
-export const test = base.extend<ExtensionFixtures, ExtensionWorkerFixtures>({
+// The extension profile is opened per test rather than per worker. A worker-scoped profile is
+// shared by every test Playwright happens to co-locate in that worker, so the state one spec file
+// leaves behind — the encrypted-originals key, the Recents and Queue rows, the remembered window
+// size and layout — is still there for the next one, and a spec that expects a fresh profile
+// fails on state it never created. Playwright assigns files to workers by size, so editing any
+// spec file moves the failures to a different spec; a profile per test makes the lane independent
+// of that assignment.
+export const test = base.extend<ExtensionFixtures>({
   extensionContext: [
     async ({ headless }, use) => {
-      // The extension is built once in global-setup.ts; each worker only loads it.
+      // The extension is built once in global-setup.ts; each test only loads it.
       const userDataDir = await mkdtemp(path.join(tmpdir(), 'image-trail-e2e-'));
       const context = await chromium.launchPersistentContext(userDataDir, {
         channel: 'chromium',
@@ -98,7 +102,7 @@ export const test = base.extend<ExtensionFixtures, ExtensionWorkerFixtures>({
         await rm(userDataDir, { recursive: true, force: true });
       }
     },
-    { scope: 'worker' },
+    { scope: 'test' },
   ],
 
   serviceWorker: async ({ extensionContext }, use) => {
@@ -353,6 +357,45 @@ export async function openSettingsGroup(page: Page, name: string): Promise<void>
 export async function closeSettings(page: Page): Promise<void> {
   const hideSettings = page.getByRole('button', { name: 'Hide settings' });
   if ((await hideSettings.count()) > 0) await hideSettings.click();
+}
+
+// Clears the encrypted-originals key the profile already holds, if it holds one. The "Clear key"
+// button is only there while a key exists and the workspace is unlocked, so this is a no-op on a
+// profile that has no key. Settings stays open afterwards.
+async function clearBlobKeyIfPresent(page: Page): Promise<void> {
+  const clear = page.getByRole('button', { name: 'Clear key' });
+  if ((await clear.count()) === 0) return;
+  await clear.click();
+  await page.getByRole('button', { name: 'Confirm clear key' }).click();
+  await expectPanelStatusMessage(page, /Encrypted blob key cleared/u);
+}
+
+// Puts the workspace back in the state a fresh profile has: no encrypted-originals key, so the
+// blob key is unavailable and the panel is locked. The extension profile is worker-scoped, so
+// every spec file that runs in the same worker shares it and a spec that set a key up leaves it
+// behind. A test that asserts the locked behaviour has to say so itself, instead of depending on
+// which spec ran before it. Self-contained: opens Settings, clears the key if there is one, then
+// closes Settings again.
+export async function ensureBlobKeyUnavailable(page: Page): Promise<void> {
+  await openSettingsGroup(page, 'Encrypted originals');
+  await clearBlobKeyIfPresent(page);
+  await closeSettings(page);
+}
+
+// Creates the encrypted-originals key from `password`, replacing any key the profile already
+// holds. The extension profile is worker-scoped, so a spec that set a key up leaves it behind and
+// the panel then offers to unlock or clear that key instead of asking for a new one — the "New
+// encrypted originals password" field is gone, and a spec that fills it waits for a field that
+// never arrives. A spec that needs the key therefore says so itself: it clears what the profile
+// holds first, so the key it creates is the one it encrypts with. Self-contained: opens Settings,
+// clears the key if there is one, creates the key, then closes Settings again.
+export async function ensureBlobKeyCreated(page: Page, password: string): Promise<void> {
+  await openSettingsGroup(page, 'Encrypted originals');
+  await clearBlobKeyIfPresent(page);
+  await page.getByLabel('New encrypted originals password').fill(password);
+  await page.getByRole('button', { name: 'Create first key' }).click();
+  await expect(page.locator('.image-trail-panel__encryption-badge')).toHaveText('Unlocked');
+  await closeSettings(page);
 }
 
 // Sets the parsed-field load-failure feedback mode (#450). The control lives in Settings → Automation

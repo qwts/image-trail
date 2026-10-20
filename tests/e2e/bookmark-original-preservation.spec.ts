@@ -1,4 +1,5 @@
 import {
+  ensureBlobKeyCreated,
   expect,
   expectPanelOpen,
   expectPanelStatusMessage,
@@ -15,11 +16,7 @@ test('re-pinning a captured bookmark preserves its stored original', async ({ pa
   await togglePanelFromExtensionAction(page, serviceWorker);
   await expectPanelOpen(page);
 
-  await openSettingsGroup(page, 'Encrypted originals');
-  await page.getByLabel('New encrypted originals password').fill('bookmark-original-preservation-password');
-  await page.getByRole('button', { name: 'Create first key' }).click();
-  await expect(page.locator('.image-trail-panel__encryption-badge')).toHaveText('Unlocked');
-  await page.getByRole('button', { name: 'Close settings' }).click();
+  await ensureBlobKeyCreated(page, 'bookmark-original-preservation-password');
 
   await pinCurrentImage(page);
   const queueRow = page.locator('.image-trail-panel__bookmark-item', { hasText: 'asset-one.svg' });

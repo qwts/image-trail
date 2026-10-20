@@ -23,7 +23,10 @@ test('CI loads immutable actor policy and scopes obsolete-run cancellation to PR
   const ci = workflow('ci.yml');
 
   assert.match(ci, /uses: true-line\/trueline-agent-ci\/\.github\/actions\/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a/u);
-  assert.equal(ci.match(/true-line\/trueline-agent-ci\/\.github\/actions\/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a/gu)?.length, 1);
+  assert.equal(
+    ci.match(/true-line\/trueline-agent-ci\/\.github\/actions\/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a/gu)?.length,
+    1,
+  );
   assert.match(ci, /format\('pr-\{0\}', github\.event\.pull_request\.number\)/u);
   assert.match(ci, /format\('merge-group-\{0\}', github\.event\.merge_group\.head_ref\)/u);
   assert.match(ci, /cancel-in-progress: \$\{\{ github\.event_name != 'push' \}\}/u);
