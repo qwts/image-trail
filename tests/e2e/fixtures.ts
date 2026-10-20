@@ -355,6 +355,23 @@ export async function closeSettings(page: Page): Promise<void> {
   if ((await hideSettings.count()) > 0) await hideSettings.click();
 }
 
+// Puts the workspace back in the state a fresh profile has: no encrypted-originals key, so the
+// blob key is unavailable and the panel is locked. The extension profile is worker-scoped, so
+// every spec file that runs in the same worker shares it and a spec that set a key up leaves it
+// behind. A test that asserts the locked behaviour has to say so itself, instead of depending on
+// which spec ran before it. Self-contained: opens Settings, clears the key if there is one, then
+// closes Settings again.
+export async function ensureBlobKeyUnavailable(page: Page): Promise<void> {
+  await openSettingsGroup(page, 'Encrypted originals');
+  const clear = page.getByRole('button', { name: 'Clear key' });
+  if ((await clear.count()) > 0) {
+    await clear.click();
+    await page.getByRole('button', { name: 'Confirm clear key' }).click();
+    await expectPanelStatusMessage(page, /Encrypted blob key cleared/u);
+  }
+  await closeSettings(page);
+}
+
 // Sets the parsed-field load-failure feedback mode (#450). The control lives in Settings → Automation
 // → Preload; the default is Mute, so tests that assert a red field ring or an HTTP-error status must
 // opt into Display/Alert. Self-contained: opens Settings, selects the mode, then closes Settings so
