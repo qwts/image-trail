@@ -36,17 +36,29 @@ concurrency:
   group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'merge_group' && format('merge-group-{0}', github.event.merge_group.head_ref) || github.event_name == 'workflow_dispatch' && format('manual-{0}', github.sha) || github.sha }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
+# Jobs run on the organisation's own runners: the Linux runner group holds one
+# x86-64 runner, the MacOS group one arm64 runner. A fork's pull request and a
+# merge-queue run keep a hosted runner, because a pull request controls the
+# workflow file it runs and would otherwise execute its own code on the
+# organisation's hardware.
 jobs:
   policy:
     name: Action Policy
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON((github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork) && '["ubuntu-latest"]' || '["self-hosted", "Linux", "X64"]') }}
     timeout-minutes: 10
     outputs:
       mode: ${{ steps.policy.outputs.mode }}
       run_full: ${{ steps.policy.outputs.run_full }}
       run_post_merge: ${{ steps.policy.outputs.run_post_merge }}
     steps:
+      # The organisation's Linux runner does not carry Node on its default PATH.
+      # This step reaches for `node`, or runs an action that does, so the
+      # runtime is installed first, with the same pinned action the rest of
+      # the workflow already uses.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
       - id: policy
         # ENG-0004 requires this reviewed immutable commit even though it has no release tag.
         uses: true-line/trueline-agent-ci/.github/actions/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a # zizmor: ignore[stale-action-refs]
@@ -55,7 +67,7 @@ jobs:
     name: Verify merged commit evidence
     needs: policy
     if: needs.policy.outputs.run_post_merge == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON((github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork) && '["ubuntu-latest"]' || '["self-hosted", "Linux", "X64"]') }}
     timeout-minutes: 10
     outputs:
       validated: ${{ steps.evidence.outputs.validated }}
@@ -78,7 +90,7 @@ jobs:
     name: Verify preflight evidence
     needs: policy
     if: github.event_name == 'pull_request' && needs.policy.outputs.run_full == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON((github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork) && '["ubuntu-latest"]' || '["self-hosted", "Linux", "X64"]') }}
     timeout-minutes: 10
     outputs:
       validated: ${{ steps.evidence.outputs.validated }}
@@ -106,7 +118,7 @@ jobs:
       ((needs.policy.outputs.mode == 'full' && needs.preflight-evidence.outputs.validated != 'true') ||
       needs.policy.outputs.mode == 'queue' || needs.policy.outputs.mode == 'manual' ||
       (needs.policy.outputs.mode == 'post-merge' && needs.merge-evidence.outputs.validated != 'true'))
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON((github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork) && '["ubuntu-latest"]' || '["self-hosted", "Linux", "X64"]') }}
     timeout-minutes: 60
     env:
       INTEROP_PHOTOS_ROOT: ${{ github.workspace }}/node_modules/.interop-photos
@@ -201,7 +213,13 @@ jobs:
       ((needs.policy.outputs.mode == 'full' && needs.preflight-evidence.outputs.validated != 'true') ||
       needs.policy.outputs.mode == 'queue' || needs.policy.outputs.mode == 'manual' ||
       (needs.policy.outputs.mode == 'post-merge' && needs.merge-evidence.outputs.validated != 'true'))
-    runs-on: ubuntu-latest
+    # The E2E lane runs on the organisation's macOS runner rather than its
+    # Linux one. Installing the Playwright browser needs the system libraries
+    # that `playwright install --with-deps` installs with root, and the Linux
+    # runner has no passwordless sudo; the macOS runner needs neither, because
+    # Playwright has no system dependencies to install there. The E2E suite
+    # holds no platform-specific assertions, so the lane proves the same thing.
+    runs-on: ${{ fromJSON((github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork) && '["macos-latest"]' || '["self-hosted", "macOS", "ARM64"]') }}
     timeout-minutes: 52
     steps:
       - name: Checkout
@@ -274,7 +292,7 @@ jobs:
     name: Workflow runtime policy
     needs: policy
     if: needs.policy.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON((github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork) && '["ubuntu-latest"]' || '["self-hosted", "Linux", "X64"]') }}
     timeout-minutes: 10
     steps:
       - name: Checkout exact validation commit
@@ -292,6 +310,13 @@ jobs:
           sparse-checkout: tools/ci-runtime
           persist-credentials: false
 
+      # The organisation's Linux runner does not carry Node on its default PATH.
+      # This step reaches for `node`, or runs an action that does, so the
+      # runtime is installed first, with the same pinned action the rest of
+      # the workflow already uses.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
       - name: Enforce bounded workflow runtime
         run: node .ci-runtime-policy/tools/ci-runtime/runtime-policy.mjs --root "$GITHUB_WORKSPACE"
 
@@ -299,7 +324,7 @@ jobs:
     name: Post-merge smoke
     needs: [policy, merge-evidence]
     if: needs.policy.outputs.run_post_merge == 'true' && needs.merge-evidence.outputs.validated == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON((github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork) && '["ubuntu-latest"]' || '["self-hosted", "Linux", "X64"]') }}
     timeout-minutes: 52
     steps:
       - name: Checkout
@@ -340,7 +365,7 @@ jobs:
     name: E2E gate
     needs: [policy, merge-evidence, preflight-evidence, e2e]
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON((github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork) && '["ubuntu-latest"]' || '["self-hosted", "Linux", "X64"]') }}
     timeout-minutes: 5
     steps:
       - name: Enforce E2E evidence for the selected lane
@@ -376,7 +401,7 @@ jobs:
     name: CI
     needs: [policy, merge-evidence, preflight-evidence, complete, e2e-gate, codeql, zizmor, workflow-runtime, post-merge]
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON((github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork) && '["ubuntu-latest"]' || '["self-hosted", "Linux", "X64"]') }}
     timeout-minutes: 5
     steps:
       - name: Enforce the selected lifecycle lane
