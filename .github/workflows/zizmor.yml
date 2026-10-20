@@ -5,10 +5,15 @@ on:
 
 permissions: {}
 
+# Jobs run on the organisation's own runners: the Linux runner group holds one
+# x86-64 runner, the MacOS group one arm64 runner. A fork's pull request and a
+# merge-queue run keep a hosted runner, because a pull request controls the
+# workflow file it runs and would otherwise execute its own code on the
+# organisation's hardware.
 jobs:
   zizmor:
     name: zizmor
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON((github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork) && '["ubuntu-latest"]' || '["self-hosted", "Linux", "X64"]') }}
     timeout-minutes: 10
     permissions:
       contents: read
