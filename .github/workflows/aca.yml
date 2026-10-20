@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: qwts/qwts-agent-ci/.github/actions/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a # zizmor: ignore[stale-action-refs]
+      - uses: true-line/trueline-agent-ci/.github/actions/ci-policy@87c6b301057992f79a723f63c64624bf40c9d06a # zizmor: ignore[stale-action-refs]
         with:
           authorization-only: 'true'
 
@@ -128,7 +128,7 @@ jobs:
         with:
           node-version: 24
       - name: Install advisory checker dependencies
-        uses: qwts/qwts-agent-ci/.github/actions/bounded-command@87c6b301057992f79a723f63c64624bf40c9d06a # zizmor: ignore[stale-action-refs]
+        uses: true-line/trueline-agent-ci/.github/actions/bounded-command@87c6b301057992f79a723f63c64624bf40c9d06a # zizmor: ignore[stale-action-refs]
         with:
           task: Install advisory checker dependencies
           executable: npm
